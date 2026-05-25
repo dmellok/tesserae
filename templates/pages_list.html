@@ -6,7 +6,7 @@
   <h1><i class="ph ph-squares-four"></i> Dashboards
     <form method="post" action="{{ url_for('pages.create') }}" class="inline">
       <button type="submit" class="header-action">
-        <i class="ph ph-plus"></i><span>New dashboard</span>
+        <i class="ph-bold ph-bold-plus" aria-hidden="true"></i><span>New dashboard</span>
       </button>
     </form>
   </h1>
@@ -33,7 +33,10 @@
   {% for page in pages %}
   <li class="page-row">
     <a class="page-card-link" href="{{ url_for('pages.edit', page_id=page.id) }}">
-      <div class="page-name">{{ page.name }}</div>
+      <div class="page-name">
+        {% if page.icon %}<span class="page-icon"><i class="ph ph-{{ page.icon }}" aria-hidden="true"></i></span>{% endif %}
+        <span>{{ page.name }}</span>
+      </div>
       <div class="page-meta">
         <code>{{ page.id }}</code>
         <span class="muted">·</span>

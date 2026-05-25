@@ -4,6 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Tesserae{% endblock %}</title>
+  <script>
+    // Apply the saved theme before paint to avoid a light-mode flash.
+    (function () {
+      try {
+        var t = localStorage.getItem('tesserae-theme');
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) { /* localStorage unavailable */ }
+    })();
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
@@ -62,6 +71,10 @@
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
     </nav>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark mode">
+      <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
+      <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
+    </button>
     {% if session.authed %}
     <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">
       <button type="submit" class="ghost">Sign out</button>
@@ -100,6 +113,19 @@
         scrim.hidden = !open;
       }
       btn.addEventListener('click', () => setOpen(!document.body.classList.contains('nav-open')));
+    })();
+    (function () {
+      const btn = document.querySelector('[data-theme-toggle]');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        if (next === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+        }
+        try { localStorage.setItem('tesserae-theme', next); } catch (e) { /* ignore */ }
+      });
       scrim.addEventListener('click', () => setOpen(false));
       nav.addEventListener('click', (e) => {
         // Close after navigating, but keep dropdown summaries interactive.

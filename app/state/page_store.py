@@ -77,6 +77,7 @@ class Page(BaseModel):
     gap: int = 0
     corner_radius: int = 0
     bleed_color: str = "#ffffff"
+    icon: str | None = None
 
 
 class PageStore:

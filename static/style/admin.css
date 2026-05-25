@@ -88,6 +88,39 @@
 
   --t-trans:      150ms cubic-bezier(0.16, 1, 0.3, 1);
   --t-trans-fast: 80ms ease;
+  color-scheme: light;
+}
+
+/* Dark theme — toggled via <html data-theme="dark">. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --t-bg:            #0f1115;
+  --t-surface:       #181b21;
+  --t-surface-soft:  #1f232b;
+  --t-surface-sunk:  #14171c;
+  --t-fg:            #e7e9ee;
+  --t-fg-soft:       #b6bcc7;
+  --t-muted:         #8b93a1;
+  --t-border:        #2a2f38;
+  --t-border-strong: #3a4150;
+
+  --t-accent:        #2dd4bf;
+  --t-accent-hover:  #14b8a6;
+  --t-accent-soft:   color-mix(in oklab, #2dd4bf 18%, #181b21);
+  --t-accent-fg:     #04241f;
+
+  --t-danger:    #f87171;
+  --t-danger-bg: color-mix(in oklab, #f87171 18%, #181b21);
+  --t-warn:      #fbbf24;
+  --t-warn-bg:   color-mix(in oklab, #fbbf24 18%, #181b21);
+  --t-ok:        #4ade80;
+  --t-ok-bg:     color-mix(in oklab, #4ade80 18%, #181b21);
+
+  --t-shadow-sm: 0 1px 2px rgba(0,0,0,.30);
+  --t-shadow:    0 1px 2px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.35);
+  --t-shadow-md: 0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.45);
+  --t-shadow-lg: 0 12px 28px rgba(0,0,0,.55);
 }
 
 * { box-sizing: border-box; }
@@ -285,6 +318,29 @@ a:hover { color: var(--t-accent-hover); }
   font-size: 12px;
   color: var(--t-muted);
 }
+
+/* Theme toggle — sits between the nav and the sign-out button. */
+.theme-toggle {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  color: var(--t-fg-soft);
+  padding: 0;
+}
+.theme-toggle:hover { color: var(--t-accent); background: var(--t-surface-sunk); }
+.theme-toggle .ph { font-size: 18px; }
+.theme-toggle + .topbar-logout { margin-left: 8px; }
+
+/* Show/hide based on the current theme. Dark icon is visible only when
+   data-theme=dark, light icon is visible only when it's absent. */
+:root[data-theme="dark"] .is-light-only { display: none; }
+:root:not([data-theme="dark"]) .is-dark-only { display: none; }
 
 .topbar-logout { margin-left: auto; }
 .topbar-logout button {
@@ -999,6 +1055,57 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   border-radius: var(--t-radius-md);
   background: var(--t-surface-soft);
   margin-top: var(--t-space-3);
+}
+
+.page-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 16px;
+}
+
+/* ----- Dashboard icon picker --------------------------------------- */
+
+.icon-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--t-surface-soft);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+}
+.icon-pick {
+  display: inline-grid;
+  place-items: center;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--t-radius-sm);
+  background: transparent;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.icon-pick .ph { font-size: 18px; }
+.icon-pick:hover {
+  background: var(--t-surface);
+  color: var(--t-accent);
+}
+.icon-pick.is-active {
+  background: var(--t-accent-soft);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
+  color: var(--t-accent);
 }
 
 /* ----- Send tabs: paired options + preview cards -------------------- */
@@ -1765,9 +1872,12 @@ button[disabled] {
     box-shadow var(--t-trans-fast),
     transform var(--t-trans-fast);
 }
-.header-action .ph {
-  font-size: 15px;
-  color: #fff;
+/* Match the regular and bold weights — earlier markup used `.ph`,
+   current markup uses `.ph-bold` for crisper visibility. */
+.header-action .ph,
+.header-action [class*="ph-"] {
+  font-size: 16px;
+  color: #fff !important;
 }
 .header-action:hover {
   background: var(--t-accent-hover);
@@ -1819,6 +1929,19 @@ button[disabled] {
   color: var(--t-fg-soft);
 }
 .editor-header .header-back:hover { background: var(--t-surface-soft); color: var(--t-accent); }
+
+.editor-name-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.editor-name-icon:empty { display: none; }
 
 .inline-name-form { flex: 1; max-width: 480px; }
 .inline-name-input {

@@ -177,11 +177,42 @@
     });
   }
 
+  // Icon picker — grid of buttons. Click sets the hidden `icon` input
+  // and marks the form dirty so the user has to Save explicitly.
+  function watchIconPicker() {
+    const picker = document.querySelector(".icon-picker");
+    if (!picker) return;
+    const input = picker.parentElement.querySelector("[data-icon-value]");
+    const form = picker.closest("form[data-editor-form]");
+    picker.querySelectorAll(".icon-pick").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        picker.querySelectorAll(".icon-pick").forEach((b) => b.classList.remove("is-active"));
+        btn.classList.add("is-active");
+        if (input) {
+          input.value = btn.dataset.icon || "";
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        // Mirror the choice in the editor header.
+        const headerIcon = document.querySelector("[data-editor-name-icon]");
+        if (headerIcon) {
+          headerIcon.innerHTML = btn.dataset.icon
+            ? '<i class="ph ph-' + btn.dataset.icon + '" aria-hidden="true"></i>'
+            : "";
+        }
+        if (form) {
+          setDirty(true);
+          schedulePreview();
+        }
+      });
+    });
+  }
+
   if (saveBtn) {
     saveBtn.addEventListener("click", saveAll);
     saveBtn.disabled = true;
   }
   watchForms();
   watchLayoutForms();
+  watchIconPicker();
   setStatus("saved");
 })();

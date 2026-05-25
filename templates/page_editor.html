@@ -93,6 +93,9 @@
   <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to dashboards">
     <i class="ph ph-arrow-left" aria-hidden="true"></i>
   </a>
+  <span class="editor-name-icon" data-editor-name-icon>
+    {% if page.icon %}<i class="ph ph-{{ page.icon }}" aria-hidden="true"></i>{% endif %}
+  </span>
   <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="inline-name-form" data-editor-form>
     <input type="text" name="name" value="{{ page.name }}" class="inline-name-input" aria-label="Dashboard name">
   </form>
@@ -146,8 +149,30 @@
       {{ card_head('Dashboard', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-editor-form>
         <input type="hidden" name="name" value="{{ page.name }}">
+        <input type="hidden" name="icon" value="{{ page.icon or '' }}" data-icon-value>
         {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
         {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
+
+        <div class="field">
+          <label>Icon</label>
+          <div class="icon-picker">
+            <button type="button" class="icon-pick {% if not page.icon %}is-active{% endif %}"
+                    data-icon=""
+                    aria-label="No icon"
+                    title="No icon">
+              <i class="ph ph-prohibit" aria-hidden="true"></i>
+            </button>
+            {% for ic in dashboard_icons %}
+            <button type="button" class="icon-pick {% if page.icon == ic %}is-active{% endif %}"
+                    data-icon="{{ ic }}"
+                    aria-label="{{ ic }}"
+                    title="{{ ic }}">
+              <i class="ph ph-{{ ic }}" aria-hidden="true"></i>
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
         <div class="field-grid">
           {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or '', options=theme_options, blank_label='(default)') }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
