@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/plugin.schema.json",
+  "title": "Tesserae plugin manifest",
+  "description": "Shape of plugin.json. See docs/contracts/plugins.md for the prose contract.",
+  "type": "object",
+  "required": ["tesserae_compat", "name", "version", "kind", "supports"],
+  "properties": {
+    "tesserae_compat": {
+      "type": "string",
+      "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$",
+      "description": "Major version range this plugin works against (e.g. '1.x'). The loader rejects mismatches."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
+    },
+    "kind": {
+      "enum": ["widget", "theme", "font", "admin"]
+    },
+    "description": {
+      "type": "string"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Phosphor icon class (e.g. 'ph-list-checks').",
+      "pattern": "^ph-[a-z0-9-]+$"
+    },
+    "supports": {
+      "type": "object",
+      "required": ["sizes"],
+      "properties": {
+        "sizes": {
+          "type": "array",
+          "items": { "enum": ["xs", "sm", "md", "lg"] },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "panels": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "cell_options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "label"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "enum": ["string", "textarea", "number", "select", "boolean", "color"] },
+          "label": { "type": "string" },
+          "default": {},
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["value", "label"],
+              "properties": {
+                "value": {},
+                "label": { "type": "string" }
+              }
+            }
+          },
+          "choices_from": { "type": "string" }
+        }
+      }
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "label"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "label": { "type": "string" },
+          "secret": {
+            "type": "boolean",
+            "description": "When true, this field is saved to settings.json as '<name>_secret' so disk-grepping reveals which values are sensitive."
+          },
+          "default": {}
+        }
+      }
+    },
+    "render": {
+      "type": "object",
+      "properties": {
+        "dither": { "enum": ["none", "floyd-steinberg", "ordered"] },
+        "full_bleed": { "type": "boolean" },
+        "needs_network": { "type": "boolean" }
+      }
+    },
+    "themes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "palette"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "mode": { "enum": ["light", "dark"] },
+          "palette": {
+            "type": "object",
+            "required": [
+              "bg", "surface", "surface2",
+              "fg", "fgSoft", "muted",
+              "accent", "accentSoft",
+              "divider", "danger", "warn", "ok"
+            ],
+            "additionalProperties": false,
+            "patternProperties": {
+              "^(bg|surface|surface2|fg|fgSoft|muted|accent|accentSoft|divider|danger|warn|ok)$": {
+                "type": "string",
+                "pattern": "^#[0-9a-fA-F]{6}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "fonts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "weights", "files"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+          "name": { "type": "string", "minLength": 1 },
+          "category": { "enum": ["sans", "serif", "mono", "display", "handwriting"] },
+          "weights": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 100, "maximum": 900 },
+            "minItems": 1
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

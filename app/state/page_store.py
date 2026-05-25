@@ -1,0 +1,115 @@
+"""File-backed store for saved dashboards.
+
+A page is a Pydantic model — a panel grid plus N positioned cells, each cell
+naming a plugin and carrying its options. The store is a JSON file at
+``data/core/pages.json`` keyed by page id.
+
+mypy --strict applies to this module — see pyproject.toml.
+"""
+
+from __future__ import annotations
+
+import json
+import threading
+from pathlib import Path
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
+
+
+class Panel(BaseModel):
+    """Panel dimensions in composition orientation (the panel's mounted form)."""
+
+    w: int = Field(..., gt=0)
+    h: int = Field(..., gt=0)
+
+
+class Cell(BaseModel):
+    """One positioned widget. Coordinates are in panel pixels."""
+
+    id: str
+    plugin: str
+    x: int = Field(..., ge=0)
+    y: int = Field(..., ge=0)
+    w: int = Field(..., gt=0)
+    h: int = Field(..., gt=0)
+    theme: str | None = None
+    font: str | None = None
+    options: dict[str, Any] = Field(default_factory=dict)
+    palette_overrides: dict[str, str] | None = None
+
+    @field_validator("palette_overrides")
+    @classmethod
+    def _validate_palette_overrides(cls, value: dict[str, str] | None) -> dict[str, str] | None:
+        if value is None:
+            return None
+        for k, v in value.items():
+            if not isinstance(v, str) or not v.startswith("#"):
+                raise ValueError(f"palette override {k!r}={v!r} must be a hex string")
+        return value
+
+
+class Page(BaseModel):
+    id: str
+    name: str
+    panel: Panel
+    cells: list[Cell] = Field(default_factory=list)
+    theme: str | None = None
+    font: str | None = None
+    gap: int = 0
+    corner_radius: int = 0
+    bleed_color: str = "#ffffff"
+
+
+class PageStore:
+    """Thread-safe, file-backed dictionary of pages.
+
+    The file is rewritten whole on every save — pages are small (a handful of
+    KB at most) and human-editable. No journaling; the OS-atomic rename keeps
+    the file consistent if the process dies mid-write.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self._path = path
+        self._lock = threading.Lock()
+        self._pages: dict[str, Page] = {}
+        self._load()
+
+    def _load(self) -> None:
+        if not self._path.exists():
+            return
+        raw = json.loads(self._path.read_text())
+        if not isinstance(raw, dict):
+            raise ValueError(f"{self._path} must contain a JSON object keyed by page id")
+        self._pages = {pid: Page.model_validate(p) for pid, p in raw.items()}
+
+    def _flush(self) -> None:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+        payload = {
+            pid: page.model_dump(mode="json", exclude_none=True)
+            for pid, page in self._pages.items()
+        }
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        tmp.replace(self._path)
+
+    def get(self, page_id: str) -> Page | None:
+        with self._lock:
+            return self._pages.get(page_id)
+
+    def list(self) -> list[Page]:
+        with self._lock:
+            return list(self._pages.values())
+
+    def save(self, page: Page) -> None:
+        with self._lock:
+            self._pages[page.id] = page
+            self._flush()
+
+    def delete(self, page_id: str) -> bool:
+        with self._lock:
+            existed = page_id in self._pages
+            self._pages.pop(page_id, None)
+            if existed:
+                self._flush()
+            return existed

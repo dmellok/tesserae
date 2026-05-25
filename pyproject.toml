@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tesserae"
+version = "0.1.0"
+description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "dmellok" }]
+dependencies = [
+    "flask>=3.0,<4",
+    "pydantic>=2.6,<3",
+    "jsonschema>=4.21,<5",
+    "pillow>=10.2,<12",
+    "numpy>=1.26,<3",
+    "paho-mqtt>=2.0,<3",
+    "playwright>=1.42,<2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "mypy>=1.9",
+    "ruff>=0.4",
+    "types-jsonschema",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["data*", "plugins*", "renderers*", "devices*", "tests*"]
+
+# ---------- ruff ----------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["data", "static/dist", "node_modules"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "RUF",      # ruff-specific
+]
+ignore = [
+    "E501",     # line length handled by formatter
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------- mypy ----------
+[tool.mypy]
+python_version = "3.11"
+warn_unused_ignores = true
+warn_redundant_casts = true
+ignore_missing_imports = true
+
+# Strict on the load-bearing contract modules. Everything else uses defaults.
+[[tool.mypy.overrides]]
+module = [
+    "app.state.*",
+    "app.push",
+    "app.plugin_loader",
+    "app.renderer_loader",
+    "app.device_loader",
+    "app.renderer",
+]
+strict = true
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["tests", "plugins", "renderers", "devices"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:flask.*",
+]

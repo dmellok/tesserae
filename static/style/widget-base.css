@@ -1,0 +1,151 @@
+/* Widget design baseline. Every widget links this file before its own
+ * client.css so every cell on the panel reads as one design system.
+ *
+ * Conventions:
+ *   .widget       outer wrapper, theme-aware bg + fg, container queries
+ *   .head         header strip: icon + uppercase title + accent place + meta
+ *   .body         scrollable / grid content area
+ *   .tile         card surface (background + border + radius)
+ *   .stat         compact stat card: icon | (label / value)
+ *   .state-empty  centered empty state
+ *   .state-error  centered error state
+ *
+ * Sizes use container queries (cqw/cqh/cqmin) so the same widget reads well
+ * across xs/sm/md/lg cells. Borders are thick (>=2 px) so Spectra 6 doesn't
+ * dither them into invisibility.
+ */
+
+:host { display: block; height: 100%; }
+
+.widget {
+  height: 100%;
+  width: 100%;
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+  display: grid;
+  gap: 2cqmin;
+  padding: 4cqmin;
+  box-sizing: border-box;
+  container-type: size;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 1.5cqw;
+  padding-bottom: 1cqh;
+  border-bottom: max(2px, 0.3cqmin) solid var(--theme-divider);
+  min-width: 0;
+}
+.head-icon {
+  font-size: min(4cqw, 6cqh);
+  color: var(--theme-accent);
+  align-self: center;
+  flex-shrink: 0;
+}
+.head-title {
+  font-size: min(3.2cqw, 5cqh);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--theme-fg);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.head-place {
+  font-size: min(3cqw, 4.6cqh);
+  font-weight: 600;
+  color: var(--theme-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.head-time,
+.head-meta {
+  margin-left: auto;
+  font-size: min(3cqw, 4.6cqh);
+  color: var(--theme-fgSoft);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tile {
+  background: var(--theme-surface);
+  border-radius: max(4px, 1.2cqmin);
+  padding: 2cqmin 2.5cqmin;
+  min-width: 0;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 1.5cqw;
+  padding: 1.5cqmin 2cqmin;
+  background: var(--theme-surface);
+  border-radius: max(4px, 1.2cqmin);
+  min-width: 0;
+}
+.stat-ico {
+  color: var(--theme-accent);
+  font-size: min(3.6cqw, 5.2cqh);
+  flex-shrink: 0;
+}
+.stat-text {
+  display: grid;
+  gap: 0.2cqh;
+  min-width: 0;
+}
+.stat-label {
+  font-size: min(2cqw, 3cqh);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stat-value {
+  font-size: min(3.4cqw, 5.2cqh);
+  font-weight: 700;
+  color: var(--theme-fg);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.state-empty,
+.state-error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 1cqh;
+  padding: 4cqmin;
+  color: var(--theme-fgSoft);
+}
+.state-empty .msg,
+.state-error .msg {
+  font-size: min(3cqw, 4.5cqh);
+  line-height: 1.4;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.2em 0.7em;
+  border-radius: 999px;
+  font-size: min(2.4cqw, 3.6cqh);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  background: var(--theme-surface2, var(--theme-surface));
+  color: var(--theme-fgSoft);
+}
+.pill.is-accent { background: var(--theme-accent); color: var(--theme-bg); }
+.pill.is-ok { color: var(--theme-ok); background: color-mix(in oklab, var(--theme-ok) 15%, transparent); }
+.pill.is-warn { color: var(--theme-warn); background: color-mix(in oklab, var(--theme-warn) 15%, transparent); }
+.pill.is-danger { color: var(--theme-danger); background: color-mix(in oklab, var(--theme-danger) 15%, transparent); }

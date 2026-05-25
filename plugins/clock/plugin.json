@@ -1,0 +1,38 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Clock",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Digital clock with optional date and seconds. Auto-fits the cell at any size.",
+  "icon": "ph-clock",
+  "supports": {
+    "sizes": ["xs", "sm", "md", "lg"]
+  },
+  "cell_options": [
+    {
+      "name": "format",
+      "type": "select",
+      "label": "Time format",
+      "default": "24h",
+      "choices": [
+        { "value": "24h", "label": "24-hour" },
+        { "value": "12h", "label": "12-hour" }
+      ]
+    },
+    {
+      "name": "show_seconds",
+      "type": "boolean",
+      "label": "Show seconds",
+      "default": false
+    },
+    {
+      "name": "show_date",
+      "type": "boolean",
+      "label": "Show date",
+      "default": true
+    }
+  ],
+  "render": {
+    "dither": "none"
+  }
+}

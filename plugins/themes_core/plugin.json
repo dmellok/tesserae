@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Core themes",
+  "version": "0.1.0",
+  "kind": "theme",
+  "description": "Built-in theme set. The 'default' (Paper) theme is always present; further themes will land in milestone 3.",
+  "supports": {
+    "sizes": ["xs", "sm", "md", "lg"]
+  },
+  "themes": [
+    {
+      "id": "default",
+      "name": "Paper",
+      "mode": "light",
+      "palette": {
+        "bg": "#ffffff",
+        "surface": "#e2d4b8",
+        "surface2": "#cab48a",
+        "fg": "#1a1612",
+        "fgSoft": "#5a4f44",
+        "muted": "#9a8e80",
+        "accent": "#d97757",
+        "accentSoft": "#aa5a3f",
+        "divider": "#b09870",
+        "danger": "#c97c70",
+        "warn": "#d4a957",
+        "ok": "#7da670"
+      }
+    }
+  ]
+}

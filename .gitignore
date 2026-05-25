@@ -1,0 +1,31 @@
+# Runtime state
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+dist/
+build/
+
+# Front-end build output
+node_modules/
+static/dist/
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
