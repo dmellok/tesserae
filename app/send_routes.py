@@ -26,9 +26,11 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app.panel import resolve_settings_panel
 from app.push import PushManager
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
+from app.state.settings_store import SettingsStore
 
 bp = Blueprint("send", __name__, url_prefix="/send")
 
@@ -43,6 +45,10 @@ def _events() -> EventLog:
 
 def _pages() -> PageStore:
     return current_app.config["PAGE_STORE"]  # type: ignore[no-any-return]
+
+
+def _settings() -> SettingsStore:
+    return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
 
 
 def _flash_result(label: str, status: str, error: str | None) -> None:
@@ -62,6 +68,7 @@ def index() -> str:
         "send.html",
         pages=pages,
         history=history,
+        panel=resolve_settings_panel(_settings()),
         tab=request.args.get("tab", "file"),
     )
 

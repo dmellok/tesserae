@@ -39,7 +39,7 @@ def test_empty_list_renders_with_create_link(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/pages").get_data(as_text=True)
-    assert "No pages yet" in body
+    assert "No dashboards yet" in body
     assert "/pages/new" in body
 
 

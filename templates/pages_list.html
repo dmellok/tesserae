@@ -1,15 +1,15 @@
 {% extends "_base.html" %}
 {% from "_components.html" import empty_state %}
-{% block title %}Pages — Tesserae{% endblock %}
+{% block title %}Dashboards — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-squares-four"></i> Pages
+  <h1><i class="ph ph-squares-four"></i> Dashboards
     <a class="header-action" href="{{ url_for('pages.new') }}">
-      <i class="ph ph-plus"></i><span>New page</span>
+      <i class="ph ph-plus"></i><span>New dashboard</span>
     </a>
   </h1>
   <p class="lede">
-    Saved dashboards. Each page is a panel-sized canvas of widget cells.
+    Each dashboard is a panel-sized canvas of widget cells.
     Push one from <a href="{{ url_for('send.index') }}">Send</a>, schedule
     it on <a href="{{ url_for('schedules.index') }}">Schedules</a>, or
     wire a HA button on
@@ -19,9 +19,9 @@
 
 {% if not pages %}
 {{ empty_state('squares-four',
-               title='No pages yet',
-               blurb='A page is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.',
-               action_label='Create your first page',
+               title='No dashboards yet',
+               blurb='A dashboard is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.',
+               action_label='Create your first dashboard',
                action_href=url_for('pages.new')) }}
 {% else %}
 <ul class="pages-list">
@@ -38,8 +38,8 @@
     </a>
     <div class="page-actions">
       <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
-            onsubmit="return confirm('Delete this page?');">
-        <button type="submit" class="ghost danger" title="Delete page">
+            onsubmit="return confirm('Delete this dashboard?');">
+        <button type="submit" class="ghost danger" title="Delete dashboard">
           <i class="ph ph-trash" aria-hidden="true"></i>
         </button>
       </form>

@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
-{% block title %}{{ page.name }} — Tesserae{% endblock %}
+{% block title %}{{ page.name }} — Dashboard editor — Tesserae{% endblock %}
 
 {% set PALETTE_TOKENS = ['bg','surface','surface2','fg','fgSoft','muted','accent','accentSoft','divider','danger','warn','ok'] %}
 
@@ -96,11 +96,11 @@
 
 {% block main %}
 <header class="editor-header">
-  <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to pages">
+  <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to dashboards">
     <i class="ph ph-arrow-left" aria-hidden="true"></i>
   </a>
   <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="inline-name-form" data-autosave>
-    <input type="text" name="name" value="{{ page.name }}" class="inline-name-input" aria-label="Page name">
+    <input type="text" name="name" value="{{ page.name }}" class="inline-name-input" aria-label="Dashboard name">
   </form>
   <span class="save-status" data-save-status data-state="saved">
     <i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>
@@ -132,7 +132,7 @@
 
   <div class="editor-column">
     <section class="card">
-      {{ card_head('Page', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
+      {{ card_head('Dashboard', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-autosave>
         <input type="hidden" name="name" value="{{ page.name }}">
         {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
@@ -182,8 +182,8 @@
     <section class="card">
       {{ card_head('Danger zone', icon_name='warning-octagon') }}
       <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}"
-            class="form" onsubmit="return confirm('Delete this page entirely?');">
-        <div class="actions">{{ button('Delete this page', variant='ghost danger', icon='trash') }}</div>
+            class="form" onsubmit="return confirm('Delete this dashboard entirely?');">
+        <div class="actions">{{ button('Delete this dashboard', variant='ghost danger', icon='trash') }}</div>
       </form>
     </section>
   </div>

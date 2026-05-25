@@ -51,11 +51,12 @@
     },
     {
       "name": "saturation",
-      "type": "number",
-      "label": "Client-side saturation (0-1)",
+      "type": "slider",
+      "label": "Client-side saturation",
       "default": 0.5,
       "min": 0,
-      "max": 1
+      "max": 1,
+      "step": 0.05
     },
     {
       "name": "transform_rotate_quarters",

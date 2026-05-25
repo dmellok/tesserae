@@ -1,14 +1,14 @@
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, color_input, button %}
-{% block title %}New page — Tesserae{% endblock %}
+{% block title %}New dashboard — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-plus-square"></i> New page</h1>
+  <h1><i class="ph ph-plus-square"></i> New dashboard</h1>
   <p class="lede">
-    A page is a panel-sized canvas. Pick a starting layout — every layout
+    A dashboard is a panel-sized canvas. Pick a starting layout — every layout
     creates positioned-but-unassigned cells you fill with widgets in the
     editor. Panel dims come from
-    <a href="{{ url_for('auth.settings_area', area='server') }}#app">Settings → Server</a>.
+    <a href="{{ url_for('auth.settings_area', area='server') }}#panel">Settings → Panel</a>.
   </p>
 </header>
 
@@ -42,7 +42,7 @@
 
     <div class="actions">
       <a class="ghost-link" href="{{ url_for('pages.index') }}">Cancel</a>
-      {{ button('Create page', icon='arrow-right') }}
+      {{ button('Create dashboard', icon='arrow-right') }}
     </div>
   </form>
 </section>

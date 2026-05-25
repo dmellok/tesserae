@@ -39,11 +39,25 @@
 <section class="card" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
   {{ card_head('Upload a file', icon_name='upload-simple') }}
   <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
-    <div class="field">
-      <label for="file-image">Image (PNG, JPEG, GIF, BMP)</label>
-      <input type="file" id="file-image" name="image" accept="image/*" required>
-      <p class="field-help">The renderers fit the upload to the configured panel size (set in Settings).</p>
-    </div>
+    <label class="dropzone" data-dropzone>
+      <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
+      <div class="dropzone-body" data-dropzone-body>
+        <i class="ph-duotone ph-duotone-cloud-arrow-up" aria-hidden="true"></i>
+        <p class="dropzone-title">Drag &amp; drop an image here</p>
+        <p class="dropzone-hint">or click to browse — PNG, JPEG, GIF, BMP up to 16 MiB</p>
+      </div>
+      <div class="dropzone-preview" data-dropzone-preview hidden>
+        <img alt="" data-dropzone-thumb>
+        <div class="dropzone-meta">
+          <strong data-dropzone-name></strong>
+          <span class="muted" data-dropzone-size></span>
+        </div>
+        <button type="button" class="ghost danger" data-dropzone-clear title="Remove">
+          <i class="ph ph-x" aria-hidden="true"></i>
+        </button>
+      </div>
+    </label>
+    <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
     <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
   </form>
 </section>
@@ -54,12 +68,12 @@
     <div class="field">
       <label for="saved-page">Dashboard</label>
       <select id="saved-page" name="page_id" required>
-        {% if not pages %}<option value="">(no saved pages yet)</option>{% endif %}
+        {% if not pages %}<option value="">(no saved dashboards yet)</option>{% endif %}
         {% for p in pages %}
-        <option value="{{ p.id }}">{{ p.name }} ({{ p.id }})</option>
+        <option value="{{ p.id }}">{{ p.name }}</option>
         {% endfor %}
       </select>
-      <p class="field-help">The page renders through the composer, then publishes through every loaded renderer.</p>
+      <p class="field-help">The dashboard renders through the composer, then publishes through every loaded renderer.</p>
     </div>
     <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
   </form>
@@ -88,13 +102,14 @@
     <div class="field-grid">
       <div class="field">
         <label for="webpage-w">Viewport width</label>
-        <input type="number" id="webpage-w" name="viewport_w" value="1600" min="200" step="1">
+        <input type="number" id="webpage-w" name="viewport_w" value="{{ panel.w }}" min="200" step="1">
       </div>
       <div class="field">
         <label for="webpage-h">Viewport height</label>
-        <input type="number" id="webpage-h" name="viewport_h" value="1200" min="200" step="1">
+        <input type="number" id="webpage-h" name="viewport_h" value="{{ panel.h }}" min="200" step="1">
       </div>
     </div>
+    <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
     <div class="actions">{{ button('Render & push', icon='browser') }}</div>
   </form>
 </section>
@@ -152,4 +167,54 @@
   </ul>
   {% endif %}
 </section>
+
+<script>
+  // File dropzone: drag-and-drop, click-to-browse, preview thumb.
+  (function () {
+    const zone = document.querySelector('[data-dropzone]');
+    if (!zone) return;
+    const input = zone.querySelector('[data-dropzone-input]');
+    const body = zone.querySelector('[data-dropzone-body]');
+    const preview = zone.querySelector('[data-dropzone-preview]');
+    const thumb = zone.querySelector('[data-dropzone-thumb]');
+    const nameEl = zone.querySelector('[data-dropzone-name]');
+    const sizeEl = zone.querySelector('[data-dropzone-size]');
+    const clear = zone.querySelector('[data-dropzone-clear]');
+
+    function fmt(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+    }
+    function showFile(file) {
+      if (!file) { body.hidden = false; preview.hidden = true; thumb.src = ''; return; }
+      nameEl.textContent = file.name;
+      sizeEl.textContent = fmt(file.size);
+      const url = URL.createObjectURL(file);
+      thumb.src = url;
+      body.hidden = true;
+      preview.hidden = false;
+    }
+    input.addEventListener('change', () => showFile(input.files[0]));
+    clear.addEventListener('click', (e) => {
+      e.preventDefault();
+      input.value = '';
+      showFile(null);
+    });
+    ['dragenter', 'dragover'].forEach((ev) => zone.addEventListener(ev, (e) => {
+      e.preventDefault(); zone.classList.add('is-dragging');
+    }));
+    ['dragleave', 'dragend', 'drop'].forEach((ev) => zone.addEventListener(ev, (e) => {
+      e.preventDefault(); zone.classList.remove('is-dragging');
+    }));
+    zone.addEventListener('drop', (e) => {
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!file) return;
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      showFile(file);
+    });
+  })();
+</script>
 {% endblock %}

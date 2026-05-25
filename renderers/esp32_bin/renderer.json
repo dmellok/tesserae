@@ -28,19 +28,21 @@
     },
     {
       "name": "saturation",
-      "type": "number",
+      "type": "slider",
       "label": "Pre-quantise saturation",
       "default": 1.0,
       "min": 0,
-      "max": 3
+      "max": 3,
+      "step": 0.05
     },
     {
       "name": "contrast",
-      "type": "number",
+      "type": "slider",
       "label": "Pre-quantise contrast",
       "default": 1.0,
       "min": 0,
-      "max": 3
+      "max": 3,
+      "step": 0.05
     }
   ]
 }

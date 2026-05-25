@@ -45,9 +45,9 @@
 <p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
 {% endif %}
 
-{% set KIND_ICONS = {'app':'desktop-tower','broker':'broadcast','renderer':'image-square','device':'device-mobile','plugin':'puzzle-piece'} %}
+{% set KIND_ICONS = {'app':'desktop-tower','panel':'frame-corners','broker':'broadcast','renderer':'image-square','device':'device-mobile','plugin':'puzzle-piece'} %}
 {% for section in sections %}
-<section class="card {% if section.id == 'app' %}panel-section{% endif %}" id="{{ section.id }}">
+<section class="card {% if section.kind == 'panel' %}panel-section{% endif %}" id="{{ section.id }}">
   <header class="card-head">
     <h2>
       <span class="icon-box"><i class="ph ph-{{ KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
@@ -84,7 +84,7 @@
     {% for field in section.fields %}
       {% set value = section.state.get(field.name, field.get('default', '')) %}
       {% set field_id = section.id ~ '-' ~ field.name %}
-      {% if section.id == 'app' and field.name in ('panel_w', 'panel_h') %}
+      {% if section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
         <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
       {% else %}
         {{ auto_field(field_id, field.name, field, value) }}

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from flask import (
@@ -138,6 +138,89 @@ def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Sche
     return Schedule.model_validate(payload)
 
 
+def _project_fires(schedule: Schedule, start: datetime, end: datetime) -> list[datetime]:
+    """Cheap, deterministic projection of when a schedule will fire in
+    [start, end). Used by the timeline visualisation only; the real
+    scheduler still decides what actually runs."""
+    if not schedule.enabled:
+        return []
+    fires: list[datetime] = []
+    cur = start.replace(second=0, microsecond=0)
+    if schedule.type == "daily":
+        assert schedule.fires_at is not None
+        target_t = schedule.fires_at.time()
+        day = cur.date()
+        while day <= end.date():
+            if day.weekday() in schedule.days_of_week:
+                candidate = datetime.combine(day, target_t)
+                if start <= candidate < end:
+                    fires.append(candidate)
+            day = day + timedelta(days=1)
+        return fires
+
+    assert schedule.interval_minutes is not None
+    step = timedelta(minutes=schedule.interval_minutes)
+    window_start = schedule.time_of_day_start
+    window_end = schedule.time_of_day_end
+
+    def _in_window(dt: datetime) -> bool:
+        if dt.weekday() not in schedule.days_of_week:
+            return False
+        if window_start is None and window_end is None:
+            return True
+        hhmm = dt.strftime("%H:%M")
+        if window_start and hhmm < window_start:
+            return False
+        return not (window_end and hhmm > window_end)
+
+    t = cur
+    safety = 0
+    while t < end and safety < 500:
+        if _in_window(t):
+            fires.append(t)
+        t = t + step
+        safety += 1
+    return fires
+
+
+def _build_timeline(schedules: Iterable[Schedule], hours: int = 24) -> dict[str, Any]:
+    """Bucket projected fires per schedule across the next ``hours``
+    hours, plus hour markers. Returned shape feeds straight into the
+    Jinja template."""
+    now = datetime.now()
+    end = now + timedelta(hours=hours)
+    total_seconds = (end - now).total_seconds()
+
+    def _pct(dt: datetime) -> float:
+        return max(0.0, min(100.0, (dt - now).total_seconds() / total_seconds * 100.0))
+
+    rows: list[dict[str, Any]] = []
+    for s in schedules:
+        fires = _project_fires(s, now, end)
+        rows.append(
+            {
+                "id": s.id,
+                "name": s.name,
+                "enabled": s.enabled,
+                "kind": s.type,
+                "fires": [{"at": dt, "pct": _pct(dt)} for dt in fires[:200]],
+                "count": len(fires),
+            }
+        )
+    hour_marks = [
+        {"hour": (now + timedelta(hours=h)).hour, "pct": (h / hours) * 100.0}
+        for h in range(hours + 1)
+        if h % 3 == 0
+    ]
+    return {
+        "start": now,
+        "end": end,
+        "rows": rows,
+        "hour_marks": hour_marks,
+        "any_fires": any(r["fires"] for r in rows),
+    }
+
+
 @bp.get("")
 def index() -> str:
     schedules = _store().all()
@@ -148,6 +231,7 @@ def index() -> str:
         schedules=schedules,
         status=status,
         pages=pages,
+        timeline=_build_timeline(schedules),
         edit_id=request.args.get("edit"),
     )
 

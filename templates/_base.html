@@ -16,14 +16,18 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">Tesserae</span>
     </a>
-    <nav class="topnav">
+    <button type="button" class="nav-toggle" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false">
+      <i class="ph ph-list" aria-hidden="true"></i>
+    </button>
+    <div class="nav-scrim" hidden></div>
+    <nav class="topnav" id="primary-nav">
       <a href="{{ url_for('send.index') }}"
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">
          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
       </a>
       <a href="{{ url_for('pages.index') }}"
          class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
-         <i class="ph ph-squares-four" aria-hidden="true"></i><span>Pages</span>
+         <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
       </a>
       <a href="{{ url_for('schedules.index') }}"
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
@@ -87,5 +91,29 @@
     {% block main %}{% endblock %}
   </main>
   <script src="{{ url_for('static', filename='components.js') }}"></script>
+  <script>
+    // Hamburger toggle for the right-side nav drawer.
+    (function () {
+      const btn = document.querySelector('.nav-toggle');
+      const nav = document.getElementById('primary-nav');
+      const scrim = document.querySelector('.nav-scrim');
+      if (!btn || !nav || !scrim) return;
+      function setOpen(open) {
+        document.body.classList.toggle('nav-open', open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        scrim.hidden = !open;
+      }
+      btn.addEventListener('click', () => setOpen(!document.body.classList.contains('nav-open')));
+      scrim.addEventListener('click', () => setOpen(false));
+      nav.addEventListener('click', (e) => {
+        // Close after navigating, but keep dropdown summaries interactive.
+        const a = e.target.closest('a');
+        if (a) setOpen(false);
+      });
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 900) setOpen(false);
+      });
+    })();
+  </script>
 </body>
 </html>

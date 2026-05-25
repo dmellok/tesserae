@@ -65,6 +65,31 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "timezone",
+        "type": "string",
+        "label": "Timezone (IANA name or 'system')",
+        "default": "system",
+        "help": (
+            "Used by the scheduler when interpreting daily fire times and "
+            "time-of-day windows. 'system' uses the host's local time; "
+            "anything else must be an IANA zone like 'Australia/Melbourne'."
+        ),
+    },
+    {
+        "name": "ha_discovery_enabled",
+        "type": "switch",
+        "label": "Home Assistant MQTT discovery",
+        "default": False,
+        "help": (
+            "Publish HA autodiscovery configs so a button per saved dashboard, "
+            "an image entity for the most-recent render, and diagnostic sensors "
+            "appear under a 'Tesserae' device in HA. Default off."
+        ),
+    },
+]
+
+PANEL_FIELDS: list[dict[str, Any]] = [
+    {
         "name": "panel_preset",
         "type": "select",
         "label": "Panel size",
@@ -99,28 +124,6 @@ APP_FIELDS: list[dict[str, Any]] = [
         "max": 3000,
         "step": 1,
         "unit": "px",
-    },
-    {
-        "name": "timezone",
-        "type": "string",
-        "label": "Timezone (IANA name or 'system')",
-        "default": "system",
-        "help": (
-            "Used by the scheduler when interpreting daily fire times and "
-            "time-of-day windows. 'system' uses the host's local time; "
-            "anything else must be an IANA zone like 'Australia/Melbourne'."
-        ),
-    },
-    {
-        "name": "ha_discovery_enabled",
-        "type": "switch",
-        "label": "Home Assistant MQTT discovery",
-        "default": False,
-        "help": (
-            "Publish HA autodiscovery configs so a button per saved dashboard, "
-            "an image entity for the most-recent render, and diagnostic sensors "
-            "appear under a 'Tesserae' device in HA. Default off."
-        ),
     },
 ]
 
@@ -334,7 +337,7 @@ _AREAS: tuple[tuple[str, str], ...] = (
 
 # Map area → section kinds that belong on that page.
 _AREA_KINDS: dict[str, set[str]] = {
-    "server": {"app", "broker"},
+    "server": {"app", "panel", "broker"},
     "renderers": {"renderer"},
     "devices": {"device"},
     "plugins": {"plugin"},
@@ -366,7 +369,7 @@ def _area_for_section_kind(section_kind: str) -> str:
     """Which sub-page a section belongs on. Drives the post-save redirect
     so the user lands back on the page they were editing instead of being
     bounced to the default Server page."""
-    if section_kind in ("app", "broker"):
+    if section_kind in ("app", "panel", "broker"):
         return "server"
     if section_kind.startswith("renderer-"):
         return "renderers"
@@ -395,16 +398,17 @@ def settings_update(section_kind: str) -> Response:
 
     handlers: dict[str, Callable[[], str]] = {
         "app": lambda: _update_core("app", APP_FIELDS),
+        "panel": lambda: _update_core("app", PANEL_FIELDS),
         "broker": lambda: _update_core("broker", BROKER_FIELDS),
     }
 
     if section_kind in handlers:
         message = handlers[section_kind]()
         flash(message, "ok")
-        # Broker / App changes both need a transport + HA-discovery
+        # Broker / App / Panel changes need a transport + HA-discovery
         # refresh to take effect without a restart (base_url, panel dims,
         # ha_discovery_enabled all flow through there).
-        if section_kind in ("broker", "app"):
+        if section_kind in ("broker", "app", "panel"):
             _apply_broker_change()
         return _redirect_to_section(section_kind)
 
@@ -573,6 +577,17 @@ def _build_sections() -> list[dict[str, Any]]:
             "fields": APP_FIELDS,
             "state": _values_for_core("app", APP_FIELDS, app_raw),
             "endpoint": url_for("auth.settings_update", section_kind="app"),
+        }
+    )
+    sections.append(
+        {
+            "id": "panel",
+            "kind": "panel",
+            "title": "Panel",
+            "blurb": "Pick a preset for your e-ink, or set a custom size. Portrait flips width and height.",
+            "fields": PANEL_FIELDS,
+            "state": _values_for_core("app", PANEL_FIELDS, app_raw),
+            "endpoint": url_for("auth.settings_update", section_kind="panel"),
         }
     )
 

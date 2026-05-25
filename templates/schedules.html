@@ -80,15 +80,52 @@
 
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-clock-clockwise"></i> Schedules</h1>
+  <h1><i class="ph ph-clock-clockwise"></i> Schedules
+    <button type="button" class="header-action" data-toggle-new-schedule>
+      <i class="ph ph-plus"></i><span>New schedule</span>
+    </button>
+  </h1>
   <p class="lede">
-    Each schedule fires a push for one saved page. Interval schedules
+    Each schedule fires a push for one saved dashboard. Interval schedules
     respect the day-of-week mask and the time-of-day window; daily
     schedules respect the mask only.
   </p>
 </header>
 
-<section class="card">
+<section class="card timeline-card">
+  {{ card_head('Next 24 hours', icon_name='timer', blurb='Projected fire times for every enabled schedule. Disabled schedules sit greyed out.') }}
+  {% if not schedules %}
+  <p class="lede">No schedules to plot — add one with <strong>New schedule</strong>.</p>
+  {% elif not timeline.any_fires %}
+  <p class="lede">Nothing scheduled to fire in the next 24 hours.</p>
+  {% else %}
+  <div class="timeline">
+    <div class="timeline-axis" aria-hidden="true">
+      {% for mark in timeline.hour_marks %}
+      <span class="timeline-tick" style="left: {{ '%.2f'|format(mark.pct) }}%;">{{ '%02d'|format(mark.hour) }}:00</span>
+      {% endfor %}
+    </div>
+    {% for row in timeline.rows %}
+    <div class="timeline-row {% if not row.enabled %}is-disabled{% endif %}">
+      <a class="timeline-label" href="{{ url_for('schedules.index', edit=row.id) }}">
+        <i class="ph ph-{{ 'clock' if row.kind == 'daily' else 'repeat' }}" aria-hidden="true"></i>
+        <span>{{ row.name }}</span>
+        <span class="muted">({{ row.count }})</span>
+      </a>
+      <div class="timeline-track">
+        {% for fire in row.fires %}
+        <span class="timeline-fire"
+              style="left: {{ '%.2f'|format(fire.pct) }}%;"
+              title="{{ fire.at.strftime('%a %H:%M') }}"></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+
+<section class="card" id="schedule-form-card" {% if not edit_id %}hidden{% endif %} data-new-schedule-form>
   {{ card_head('Edit schedule' if edit_id else 'New schedule',
                icon_name='pencil-simple' if edit_id else 'plus-circle') }}
   {% if edit_id %}
@@ -197,5 +234,18 @@
     sel.addEventListener('change', apply);
     apply();
   });
+
+  // New-schedule button reveals the form card and scrolls to it.
+  (function () {
+    const btn = document.querySelector('[data-toggle-new-schedule]');
+    const card = document.querySelector('[data-new-schedule-form]');
+    if (!btn || !card) return;
+    btn.addEventListener('click', () => {
+      card.hidden = false;
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const first = card.querySelector('input[name="name"]');
+      if (first) first.focus();
+    });
+  })();
 </script>
 {% endblock %}
