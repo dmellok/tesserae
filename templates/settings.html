@@ -1,6 +1,7 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button %}
+{% from "_components.html" import auto_field, button, card_head %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
+{% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
   'server':'Server-wide configuration: base URL, panel, MQTT broker, Home Assistant discovery.',
   'renderers':'Per-renderer transform + payload settings.',
@@ -10,7 +11,7 @@
 {% block title %}Settings: {{ AREA_TITLES[active_area] }} — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1>Settings</h1>
+  <h1><i class="ph ph-gear-six"></i> Settings</h1>
   <p class="lede">{{ AREA_BLURBS[active_area] }}</p>
 </header>
 
@@ -18,31 +19,24 @@
   {% for slug, label in areas %}
   <a href="{{ url_for('auth.settings_area', area=slug) }}"
      class="tab {% if active_area == slug %}is-active{% endif %}"
-     role="tab">{{ label }}</a>
+     role="tab">
+    <i class="ph ph-{{ AREA_ICONS[slug] }}" aria-hidden="true"></i><span>{{ label }}</span>
+  </a>
   {% endfor %}
 </nav>
 
 {% if active_area == 'server' %}
 <section class="card">
-  <header class="card-head">
-    <h2>Diagnostics</h2>
-    <p class="lede">Verify the saved broker config without touching the running transport.</p>
-  </header>
+  {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Verify the saved broker config without touching the running transport.') }}
   <form method="post" action="{{ url_for('auth.diagnostics_test_broker') }}" class="form">
-    <div class="actions">{{ button('Test broker connection', variant='ghost') }}</div>
+    <div class="actions">{{ button('Test broker connection', variant='ghost', icon='plugs-connected') }}</div>
   </form>
 </section>
 {% elif active_area == 'renderers' %}
 <section class="card">
-  <header class="card-head">
-    <h2>Diagnostics</h2>
-    <p class="lede">
-      Push a small synthetic image through every loaded renderer. Lands
-      in the Send-page history and the /events timeline.
-    </p>
-  </header>
+  {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Push a small synthetic image through every loaded renderer. Lands in the Send-page history and the /events timeline.') }}
   <form method="post" action="{{ url_for('auth.diagnostics_test_push') }}" class="form">
-    <div class="actions">{{ button('Test push (synthetic image)', variant='ghost') }}</div>
+    <div class="actions">{{ button('Test push (synthetic image)', variant='ghost', icon='paper-plane-tilt') }}</div>
   </form>
 </section>
 {% endif %}
@@ -51,10 +45,14 @@
 <p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
 {% endif %}
 
+{% set KIND_ICONS = {'app':'desktop-tower','broker':'broadcast','renderer':'image-square','device':'device-mobile','plugin':'puzzle-piece'} %}
 {% for section in sections %}
 <section class="card {% if section.id == 'app' %}panel-section{% endif %}" id="{{ section.id }}">
   <header class="card-head">
-    <h2>{{ section.title }}</h2>
+    <h2>
+      <span class="icon-box"><i class="ph ph-{{ KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
+      <span>{{ section.title }}</span>
+    </h2>
     {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
     {% if section.meta %}
     <dl class="meta">
@@ -92,7 +90,7 @@
         {{ auto_field(field_id, field.name, field, value) }}
       {% endif %}
     {% endfor %}
-    <div class="actions">{{ button('Save') }}</div>
+    <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
   </form>
   {% endif %}
 </section>

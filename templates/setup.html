@@ -1,12 +1,16 @@
 {% extends "_base.html" %}
+{% from "_components.html" import button %}
 {% block title %}Set a password — Tesserae{% endblock %}
 {% block main %}
 <section class="card narrow">
   <header class="card-head">
-    <h1>Welcome to Tesserae</h1>
+    <h1>
+      <span class="icon-box"><i class="ph ph-shield-check" aria-hidden="true"></i></span>
+      <span>Welcome to Tesserae</span>
+    </h1>
     <p class="lede">
       Pick a password to protect the admin. You can change it later from
-      <em>Settings → App</em>.
+      <em>Settings → Server</em>.
     </p>
   </header>
   <form method="post" class="form">
@@ -20,7 +24,7 @@
       <input type="password" id="password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
     </div>
     <div class="actions">
-      <button type="submit" class="primary">Set password &amp; continue</button>
+      {{ button('Set password & continue', icon='arrow-right') }}
     </div>
   </form>
 </section>

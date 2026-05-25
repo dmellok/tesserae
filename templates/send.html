@@ -1,7 +1,14 @@
 {% extends "_base.html" %}
+{% from "_components.html" import card_head, button %}
 {% block title %}Send — Tesserae{% endblock %}
 
-{% set TABS = [('file','File'),('saved','Saved'),('url','URL'),('webpage','Webpage'),('history','History')] %}
+{% set TABS = [
+  ('file','File','upload-simple'),
+  ('saved','Saved','squares-four'),
+  ('url','URL','link'),
+  ('webpage','Webpage','globe'),
+  ('history','History','clock-counter-clockwise'),
+] %}
 
 {% macro pill_status(status) %}
   {% if status == 'sent' %}<span class="pill is-ok">sent</span>
@@ -12,7 +19,7 @@
 
 {% block main %}
 <header class="page-head">
-  <h1>Send</h1>
+  <h1><i class="ph ph-paper-plane-tilt"></i> Send</h1>
   <p class="lede">
     Push anything to the panel. Source can be an upload, a saved
     dashboard, an image URL, or any webpage. Past pushes live under
@@ -21,26 +28,28 @@
 </header>
 
 <nav class="tabs" role="tablist">
-  {% for slug, label in TABS %}
+  {% for slug, label, ic in TABS %}
   <a href="?tab={{ slug }}" role="tab"
-     class="tab {% if tab == slug %}is-active{% endif %}">{{ label }}</a>
+     class="tab {% if tab == slug %}is-active{% endif %}">
+    <i class="ph ph-{{ ic }}" aria-hidden="true"></i><span>{{ label }}</span>
+  </a>
   {% endfor %}
 </nav>
 
 <section class="card" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
-  <header class="card-head"><h2>Upload a file</h2></header>
+  {{ card_head('Upload a file', icon_name='upload-simple') }}
   <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
     <div class="field">
       <label for="file-image">Image (PNG, JPEG, GIF, BMP)</label>
       <input type="file" id="file-image" name="image" accept="image/*" required>
       <p class="field-help">The renderers fit the upload to the configured panel size (set in Settings).</p>
     </div>
-    <div class="actions"><button type="submit" class="primary">Push file</button></div>
+    <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
   </form>
 </section>
 
 <section class="card" id="tab-saved" {% if tab != 'saved' %}hidden{% endif %}>
-  <header class="card-head"><h2>Saved dashboard</h2></header>
+  {{ card_head('Saved dashboard', icon_name='squares-four') }}
   <form method="post" action="{{ url_for('send.send_page') }}" class="form">
     <div class="field">
       <label for="saved-page">Dashboard</label>
@@ -52,24 +61,24 @@
       </select>
       <p class="field-help">The page renders through the composer, then publishes through every loaded renderer.</p>
     </div>
-    <div class="actions"><button type="submit" class="primary" {% if not pages %}disabled{% endif %}>Push dashboard</button></div>
+    <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
   </form>
 </section>
 
 <section class="card" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
-  <header class="card-head"><h2>Image URL</h2></header>
+  {{ card_head('Image URL', icon_name='link') }}
   <form method="post" action="{{ url_for('send.send_url') }}" class="form">
     <div class="field">
       <label for="url-input">URL</label>
       <input type="url" id="url-input" name="url" placeholder="https://..." required>
       <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
     </div>
-    <div class="actions"><button type="submit" class="primary">Fetch &amp; push</button></div>
+    <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
   </form>
 </section>
 
 <section class="card" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
-  <header class="card-head"><h2>Webpage</h2></header>
+  {{ card_head('Webpage', icon_name='globe') }}
   <form method="post" action="{{ url_for('send.send_webpage') }}" class="form">
     <div class="field">
       <label for="webpage-url">URL</label>
@@ -86,15 +95,13 @@
         <input type="number" id="webpage-h" name="viewport_h" value="1200" min="200" step="1">
       </div>
     </div>
-    <div class="actions"><button type="submit" class="primary">Render &amp; push</button></div>
+    <div class="actions">{{ button('Render & push', icon='browser') }}</div>
   </form>
 </section>
 
 <section class="card" id="tab-history" {% if tab != 'history' %}hidden{% endif %}>
-  <header class="card-head">
-    <h2>History</h2>
-    <p class="lede">Last {{ history|length }} push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.</p>
-  </header>
+  {{ card_head('History', icon_name='clock-counter-clockwise',
+               blurb='Last ' ~ history|length ~ ' push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
   {% if not history %}
   <p class="lede">No pushes yet.</p>
   {% else %}
@@ -130,10 +137,14 @@
       </div>
       <div class="history-actions">
         <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="inline">
-          <button type="submit" class="ghost" {% if not ev.digest %}disabled title="no composition PNG stored"{% endif %}>Resend</button>
+          <button type="submit" class="ghost" {% if not ev.digest %}disabled title="no composition PNG stored"{% endif %}>
+            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Resend</span>
+          </button>
         </form>
         <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="inline" onsubmit="return confirm('Delete this entry?');">
-          <button type="submit" class="ghost danger">Delete</button>
+          <button type="submit" class="ghost danger" title="Delete entry">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+          </button>
         </form>
       </div>
     </li>

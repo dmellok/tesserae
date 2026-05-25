@@ -17,8 +17,16 @@
   function setStatus(state) {
     if (!status) return;
     status.dataset.state = state;
-    status.textContent =
+    const label =
       state === "saving" ? "Saving…" : state === "error" ? "Save failed" : "Saved";
+    const iconClass =
+      state === "saving"
+        ? "ph ph-arrows-clockwise"
+        : state === "error"
+          ? "ph-fill ph-fill-warning-circle"
+          : "ph-fill ph-fill-check-circle";
+    status.innerHTML =
+      '<i class="' + iconClass + '" aria-hidden="true"></i><span>' + label + "</span>";
   }
 
   function reloadPreview() {

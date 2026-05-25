@@ -3,7 +3,7 @@
 {% block title %}New page — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1>New page</h1>
+  <h1><i class="ph ph-plus-square"></i> New page</h1>
   <p class="lede">
     A page is a panel-sized canvas. Pick a starting layout — every layout
     creates positioned-but-unassigned cells you fill with widgets in the
@@ -41,8 +41,8 @@
     </fieldset>
 
     <div class="actions">
-      {{ button('Create') }}
       <a class="ghost-link" href="{{ url_for('pages.index') }}">Cancel</a>
+      {{ button('Create page', icon='arrow-right') }}
     </div>
   </form>
 </section>

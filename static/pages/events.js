@@ -20,12 +20,16 @@
   function setLive(state) {
     if (!live) return;
     live.dataset.state = state;
-    live.textContent =
+    const label =
       state === "connected"
         ? "live"
         : state === "connecting"
           ? "connecting…"
           : "offline";
+    live.innerHTML =
+      '<i class="ph-fill ph-fill-circle" aria-hidden="true"></i><span>' +
+      label +
+      "</span>";
   }
 
   function escapeHtml(s) {

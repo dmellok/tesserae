@@ -1,8 +1,10 @@
 {% extends "_base.html" %}
+{% from "_components.html" import card_head %}
+{% set KIND_ICONS = {'widget':'puzzle-piece','renderer':'image-square','device':'device-mobile','theme':'palette','font':'text-aa'} %}
 {% block title %}Plugins — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1>Plugins</h1>
+  <h1><i class="ph ph-puzzle-piece"></i> Plugins</h1>
   <p class="lede">
     Every loaded plugin, regardless of kind. Drop a new folder under
     <code>plugins/&lt;id&gt;/</code> and restart to add one. Plugins with
@@ -13,10 +15,7 @@
 
 {% if errors %}
 <section class="card">
-  <header class="card-head">
-    <h2>Loader errors</h2>
-    <p class="lede">These plugins failed to load and were skipped.</p>
-  </header>
+  {{ card_head('Loader errors', icon_name='warning-octagon', blurb='These plugins failed to load and were skipped.') }}
   <ul class="error-list">
     {% for err in errors %}
     <li><code>{{ err.plugin_id }}</code> — {{ err.message }} <span class="muted">({{ err.path }})</span></li>
@@ -29,7 +28,11 @@
 {% for kind, items in kinds %}
 <section class="card">
   <header class="card-head">
-    <h2>{{ kind|capitalize }} <span class="muted">({{ items|length }})</span></h2>
+    <h2>
+      <span class="icon-box"><i class="ph ph-{{ KIND_ICONS.get(kind, 'puzzle-piece') }}" aria-hidden="true"></i></span>
+      <span>{{ kind|capitalize }}</span>
+      <span class="muted">({{ items|length }})</span>
+    </h2>
   </header>
   <ul class="plugin-list">
     {% for plugin in items %}
@@ -38,14 +41,16 @@
         <strong>{{ plugin.name }}</strong>
         <code class="muted">{{ plugin.id }}</code>
         <code class="muted">v{{ plugin.manifest.version }}</code>
-        {% if plugin.has_admin %}<span class="pill is-accent">admin page</span>{% endif %}
+        {% if plugin.has_admin %}<span class="pill is-accent"><i class="ph ph-gear-six" aria-hidden="true"></i> admin page</span>{% endif %}
       </div>
       {% if plugin.manifest.description %}
       <p class="plugin-row-desc">{{ plugin.manifest.description }}</p>
       {% endif %}
       {% if plugin.has_admin %}
       <div class="plugin-row-actions">
-        <a class="ghost-link" href="/plugins/{{ plugin.id }}/">Open admin →</a>
+        <a class="ghost-link" href="/plugins/{{ plugin.id }}/">
+          <i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open admin</span>
+        </a>
       </div>
       {% endif %}
     </li>

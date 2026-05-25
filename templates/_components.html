@@ -103,15 +103,66 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
-{%- macro button(label, variant='primary', type='submit', name=None, value=None, full_width=False, title=None, disabled=False) -%}
+{%- macro button(label, variant='primary', type='submit', name=None, value=None, full_width=False, title=None, disabled=False, icon=None) -%}
+{#- ``icon``: a Phosphor name like 'plus' or 'arrow-right'. The macro
+   renders it in the regular weight; for fill / bold / duotone styling
+   write the <button> by hand or pass icon='fill:check-circle'. -#}
 <button type="{{ type }}"
         class="{{ variant }}{% if full_width %} full-width{% endif %}"
         {% if name %}name="{{ name }}"{% endif %}
         {% if value %}value="{{ value }}"{% endif %}
         {% if title %}title="{{ title }}"{% endif %}
         {% if disabled %}disabled{% endif %}>
-  {{ label }}
+  {% if icon %}
+    {% if ':' in icon %}
+      {% set weight, name = icon.split(':', 1) %}
+      <i class="ph-{{ weight }} ph-{{ weight }}-{{ name }}" aria-hidden="true"></i>
+    {% else %}
+      <i class="ph ph-{{ icon }}" aria-hidden="true"></i>
+    {% endif %}
+  {% endif %}
+  <span>{{ label }}</span>
 </button>
+{%- endmacro -%}
+
+{%- macro icon(name, size=None, weight='regular', cls='') -%}
+{#- ``name`` is the bare Phosphor icon name (e.g. 'gear'). ``weight``
+   picks the font (regular, fill, bold, duotone, light, thin). Use
+   ``size`` for a one-off pixel size; otherwise pass cls='is-lg'
+   etc. for the predefined sizes. -#}
+{%- if weight == 'regular' -%}
+  <i class="ph ph-{{ name }} {{ cls }}" aria-hidden="true"
+     {% if size %}style="font-size: {{ size }}px;"{% endif %}></i>
+{%- else -%}
+  <i class="ph-{{ weight }} ph-{{ weight }}-{{ name }} {{ cls }}" aria-hidden="true"
+     {% if size %}style="font-size: {{ size }}px;"{% endif %}></i>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro card_head(title, icon_name=None, level=2, blurb=None, action=None) -%}
+{#- Card header with an optional icon-box on the left, blurb below, and
+   a right-aligned action slot (typically a small button or link). -#}
+<header class="card-head">
+  <div class="card-head-row">
+    <h{{ level }}>
+      {% if icon_name %}<span class="icon-box"><i class="ph ph-{{ icon_name }}" aria-hidden="true"></i></span>{% endif %}
+      <span>{{ title }}</span>
+    </h{{ level }}>
+    {% if action %}<div class="card-head-action">{{ action }}</div>{% endif %}
+  </div>
+  {% if blurb %}<p class="lede">{{ blurb }}</p>{% endif %}
+</header>
+{%- endmacro -%}
+
+{%- macro empty_state(icon_name, title, blurb=None, action_label=None, action_href=None) -%}
+<div class="empty-state">
+  <span class="empty-state-icon"><i class="ph-duotone ph-duotone-{{ icon_name }}" aria-hidden="true"></i></span>
+  <h3>{{ title }}</h3>
+  {% if blurb %}<p class="lede">{{ blurb }}</p>{% endif %}
+  {% if action_label and action_href %}
+    <a class="btn btn-primary" href="{{ action_href }}">{{ action_label }}</a>
+  {% endif %}
+</div>
 {%- endmacro -%}
 
 {#- Dispatch helper: pick the right macro based on a field-spec dict

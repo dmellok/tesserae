@@ -1,9 +1,13 @@
 {% extends "_base.html" %}
+{% from "_components.html" import button %}
 {% block title %}Sign in — Tesserae{% endblock %}
 {% block main %}
 <section class="card narrow">
   <header class="card-head">
-    <h1>Sign in</h1>
+    <h1>
+      <span class="icon-box"><i class="ph ph-sign-in" aria-hidden="true"></i></span>
+      <span>Sign in</span>
+    </h1>
   </header>
   <form method="post" class="form">
     <input type="hidden" name="next" value="{{ next }}">
@@ -12,7 +16,7 @@
       <input type="password" id="password" name="password" required autocomplete="current-password" autofocus>
     </div>
     <div class="actions">
-      <button type="submit" class="primary">Sign in</button>
+      {{ button('Sign in', icon='arrow-right') }}
     </div>
   </form>
 </section>

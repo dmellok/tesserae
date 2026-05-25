@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state %}
 {% block title %}Schedules — Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
@@ -71,7 +72,7 @@
   </div>
 
   <div class="actions">
-    <button type="submit" class="primary">{{ 'Save changes' if edit_mode else 'Create schedule' }}</button>
+    {{ button('Save changes' if edit_mode else 'Create schedule', icon='floppy-disk' if edit_mode else 'plus') }}
     {% if edit_mode %}<a class="ghost-link" href="{{ url_for('schedules.index') }}">Cancel</a>{% endif %}
   </div>
 </form>
@@ -79,7 +80,7 @@
 
 {% block main %}
 <header class="page-head">
-  <h1>Schedules</h1>
+  <h1><i class="ph ph-clock-clockwise"></i> Schedules</h1>
   <p class="lede">
     Each schedule fires a push for one saved page. Interval schedules
     respect the day-of-week mask and the time-of-day window; daily
@@ -88,9 +89,8 @@
 </header>
 
 <section class="card">
-  <header class="card-head">
-    <h2>{{ 'Edit schedule' if edit_id else 'New schedule' }}</h2>
-  </header>
+  {{ card_head('Edit schedule' if edit_id else 'New schedule',
+               icon_name='pencil-simple' if edit_id else 'plus-circle') }}
   {% if edit_id %}
     {% set editing = (schedules | selectattr('id', 'equalto', edit_id) | list | first) %}
     {% if editing %}
@@ -105,9 +105,7 @@
 </section>
 
 <section class="card">
-  <header class="card-head">
-    <h2>Saved schedules</h2>
-  </header>
+  {{ card_head('Saved schedules', icon_name='list-bullets') }}
   {% if not schedules %}
   <p class="lede">No schedules yet — create one above.</p>
   {% else %}
@@ -156,15 +154,25 @@
         </td>
         <td class="actions-col">
           <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="inline">
-            <button type="submit" class="ghost">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+            <button type="submit" class="ghost" title="{{ 'Disable' if s.enabled else 'Enable' }}">
+              <i class="ph ph-{{ 'pause' if s.enabled else 'play' }}" aria-hidden="true"></i>
+              <span>{{ 'Disable' if s.enabled else 'Enable' }}</span>
+            </button>
           </form>
           <form method="post" action="{{ url_for('schedules.fire', schedule_id=s.id) }}" class="inline">
-            <button type="submit" class="ghost">Fire now</button>
+            <button type="submit" class="ghost" title="Fire now">
+              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+              <span>Fire now</span>
+            </button>
           </form>
-          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">Edit</a>
+          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">
+            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+          </a>
           <form method="post" action="{{ url_for('schedules.delete', schedule_id=s.id) }}"
                 class="inline" onsubmit="return confirm('Delete this schedule?');">
-            <button type="submit" class="ghost danger">Delete</button>
+            <button type="submit" class="ghost danger" title="Delete">
+              <i class="ph ph-trash" aria-hidden="true"></i>
+            </button>
           </form>
         </td>
       </tr>

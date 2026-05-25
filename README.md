@@ -27,13 +27,21 @@ In active development. Tracked by milestone:
 | 8 | Generalise event log (renderer / device / scheduler events) | done |
 | 9 | Home Assistant MQTT discovery | done |
 | 10 | Port bedrock widgets (year_progress, sun_moon, weather, todo, calendar) | done |
+| 11 | Settings split into Server / Renderers / Devices / Plugins sub-pages | done |
+| 12 | Polish: timezone, test-broker, test-push, live SSE event stream | done |
+| 13 | Theme builder + curated v4 theme subset | done |
+| 14 | Form-driven page editor (CRUD pages + cells + live preview iframe) | done |
+| 15 | Editor redesign — pre-selectable layouts, auto-save, click-to-edit preview | done |
+| 16 | Reusable form components, sliders/switches, hidden IDs, panel-from-settings | done |
+| 17 | `/` redirects to `/send`; reorder nav; Plugins dropdown for admin pages | done |
+| 18 | Modern UI overhaul + locally vendored Phosphor icon set | done |
 
-All ten milestones from the build prompt are complete. 202 tests passing;
-ruff + mypy --strict (on contract modules) clean. Widget editor and
-remaining v4 widgets (aligner, apod, aqi_trend, countdown, day_view,
-gallery, genart, github_heatmap, hn, home_assistant, news, note,
-pollen_vic, ptv, qr, radar, reddit, starmap, trakt_watchlist, unsplash,
-webpage, wikipotd, world_clock, xkcd) are future work.
+All milestones from the build prompt + polish bundle are complete. 251 tests
+passing; ruff + mypy --strict (on contract modules) clean. Remaining v4 widgets
+(aligner, apod, aqi_trend, countdown, day_view, gallery, genart,
+github_heatmap, hn, home_assistant, news, note, pollen_vic, ptv, qr, radar,
+reddit, starmap, trakt_watchlist, unsplash, webpage, wikipotd, world_clock,
+xkcd) are future work.
 
 ## Architecture in one diagram
 
@@ -127,7 +135,8 @@ tesserae/
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
-  static/          Lit components, page entries, shared CSS, dist/
+  static/          Lit components, page entries, shared CSS, dist/, icons/
+                   (vendored Phosphor 2.1.1 — regular/fill/bold/duotone/light/thin, woff2 only, 1.5 MB)
   templates/       Jinja shells
   tests/           top-level tests
   scripts/         install.sh, run.sh, install-service.sh

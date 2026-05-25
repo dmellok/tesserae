@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{% from "_components.html" import card_head, button %}
 {% block title %}Themes — Tesserae{% endblock %}
 
 {% macro swatch_row(palette, tokens) %}
@@ -49,7 +50,7 @@
   </div>
 
   <div class="actions">
-    <button type="submit" class="primary">{{ 'Save changes' if is_edit else 'Create theme' }}</button>
+    {{ button('Save changes' if is_edit else 'Create theme', icon='floppy-disk' if is_edit else 'plus') }}
     {% if is_edit %}<a class="ghost-link" href="{{ url_for('themes.index') }}">Cancel</a>{% endif %}
   </div>
 </form>
@@ -57,7 +58,7 @@
 
 {% block main %}
 <header class="page-head">
-  <h1>Themes</h1>
+  <h1><i class="ph ph-palette"></i> Themes</h1>
   <p class="lede">
     {{ themes|length }} themes loaded — both built-ins from
     <code>plugins/themes_core/plugin.json</code> and any user themes
@@ -67,10 +68,9 @@
 </header>
 
 <section class="card">
-  <header class="card-head">
-    <h2>{{ 'Edit theme' if edit_theme else 'New theme' }}</h2>
-    {% if not edit_theme %}<p class="lede">Pick 12 colours, save. The Duplicate button on a built-in theme is the easiest way to start from something working.</p>{% endif %}
-  </header>
+  {{ card_head('Edit theme' if edit_theme else 'New theme',
+               icon_name='pencil-simple' if edit_theme else 'plus-circle',
+               blurb=None if edit_theme else 'Pick 12 colours, save. The Duplicate button on a built-in theme is the easiest way to start from something working.') }}
   {% if edit_theme %}
     {{ theme_form(edit_theme, url_for('themes.update', theme_id=edit_theme.id), true) }}
   {% else %}
@@ -79,7 +79,7 @@
 </section>
 
 <section class="card">
-  <header class="card-head"><h2>Loaded themes</h2></header>
+  {{ card_head('Loaded themes', icon_name='swatches') }}
   <ul class="theme-list">
     {% for theme in themes %}
     <li class="theme-card">
@@ -92,13 +92,19 @@
       {{ swatch_row(theme.palette, palette_tokens) }}
       <div class="theme-actions">
         {% if theme.is_user %}
-        <a class="ghost-link" href="{{ url_for('themes.index', edit=theme.id) }}">Edit</a>
+        <a class="ghost-link" href="{{ url_for('themes.index', edit=theme.id) }}">
+          <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+        </a>
         <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline" onsubmit="return confirm('Delete this theme?');">
-          <button type="submit" class="ghost danger">Delete</button>
+          <button type="submit" class="ghost danger" title="Delete">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+          </button>
         </form>
         {% else %}
         <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
-          <button type="submit" class="ghost">Duplicate</button>
+          <button type="submit" class="ghost">
+            <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
+          </button>
         </form>
         {% endif %}
       </div>

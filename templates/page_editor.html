@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field %}
+{% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
 {% block title %}{{ page.name }} — Tesserae{% endblock %}
 
 {% set PALETTE_TOKENS = ['bg','surface','surface2','fg','fgSoft','muted','accent','accentSoft','divider','danger','warn','ok'] %}
@@ -10,13 +10,13 @@
   <header class="card-head">
     <h2>
       <span class="cell-num">{{ idx }}</span>
-      Cell {{ idx }}
+      <span>Cell {{ idx }}</span>
       <span class="muted">·</span>
       <span class="cell-card-plugin">{{ cell.plugin or 'unassigned' }}</span>
     </h2>
     <form method="post" action="{{ url_for('pages.delete_cell', page_id=page.id, cell_id=cell.id) }}"
           class="inline" onsubmit="return confirm('Delete this cell?');">
-      {{ button('Delete cell', variant='ghost danger') }}
+      {{ button('Delete cell', variant='ghost danger', icon='trash') }}
     </form>
   </header>
 
@@ -96,22 +96,24 @@
 
 {% block main %}
 <header class="editor-header">
-  <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to pages">←</a>
+  <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to pages">
+    <i class="ph ph-arrow-left" aria-hidden="true"></i>
+  </a>
   <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="inline-name-form" data-autosave>
     <input type="text" name="name" value="{{ page.name }}" class="inline-name-input" aria-label="Page name">
   </form>
-  <span class="save-status" data-save-status data-state="saved">Saved</span>
+  <span class="save-status" data-save-status data-state="saved">
+    <i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>
+    <span>Saved</span>
+  </span>
   <span class="editor-spacer"></span>
-  <span class="page-id-tag">{{ panel.w }}×{{ panel.h }}</span>
+  <span class="page-id-tag"><i class="ph ph-frame-corners" aria-hidden="true"></i> {{ panel.w }}×{{ panel.h }}</span>
 </header>
 
 <div class="editor-grid" data-page-id="{{ page.id }}" data-cell-count="{{ page.cells|length }}">
 
   <section class="card preview-card">
-    <header class="card-head">
-      <h2>Live preview</h2>
-      <p class="lede">Click a cell to edit it. Updates after every change.</p>
-    </header>
+    {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
     <div class="preview-frame"
          style="width: {{ (panel.w * preview_scale)|round|int }}px;
                 height: {{ (panel.h * preview_scale)|round|int }}px;">
@@ -130,10 +132,7 @@
 
   <div class="editor-column">
     <section class="card">
-      <header class="card-head">
-        <h2>Page</h2>
-        <p class="lede">Theme + font + matting + spacing applied to every cell.</p>
-      </header>
+      {{ card_head('Page', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-autosave>
         <input type="hidden" name="name" value="{{ page.name }}">
         {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
@@ -150,10 +149,7 @@
     </section>
 
     <section class="card">
-      <header class="card-head">
-        <h2>Layout</h2>
-        <p class="lede">Pick a layout to (re)split the panel into cells. Existing cell assignments are reused in order.</p>
-      </header>
+      {{ card_head('Layout', icon_name='grid-four', blurb='Pick a layout to (re)split the panel into cells. Existing cell assignments are reused in order.') }}
       <div class="layout-grid">
         {% for layout in layouts %}
         <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
@@ -179,15 +175,15 @@
 
     <section class="card add-cell-card">
       <form method="post" action="{{ url_for('pages.create_cell', page_id=page.id) }}" class="form">
-        {{ button('+ Add empty cell', variant='ghost', full_width=True) }}
+        {{ button('Add empty cell', variant='ghost', full_width=True, icon='plus') }}
       </form>
     </section>
 
     <section class="card">
-      <header class="card-head"><h2>Danger zone</h2></header>
+      {{ card_head('Danger zone', icon_name='warning-octagon') }}
       <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}"
             class="form" onsubmit="return confirm('Delete this page entirely?');">
-        <div class="actions">{{ button('Delete this page', variant='ghost danger') }}</div>
+        <div class="actions">{{ button('Delete this page', variant='ghost danger', icon='trash') }}</div>
       </form>
     </section>
   </div>

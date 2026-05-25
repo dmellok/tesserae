@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Tesserae{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/admin.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
@@ -15,23 +18,40 @@
     </a>
     <nav class="topnav">
       <a href="{{ url_for('send.index') }}"
-         class="{% if request.blueprint == 'send' %}is-active{% endif %}">Send</a>
+         class="{% if request.blueprint == 'send' %}is-active{% endif %}">
+         <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
+      </a>
       <a href="{{ url_for('pages.index') }}"
-         class="{% if request.blueprint == 'pages' %}is-active{% endif %}">Pages</a>
+         class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
+         <i class="ph ph-squares-four" aria-hidden="true"></i><span>Pages</span>
+      </a>
       <a href="{{ url_for('schedules.index') }}"
-         class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">Schedules</a>
+         class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
+         <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Schedules</span>
+      </a>
       <a href="{{ url_for('events.index') }}"
-         class="{% if request.blueprint == 'events' %}is-active{% endif %}">Events</a>
+         class="{% if request.blueprint == 'events' %}is-active{% endif %}">
+         <i class="ph ph-pulse" aria-hidden="true"></i><span>Events</span>
+      </a>
       <a href="{{ url_for('themes.index') }}"
-         class="{% if request.blueprint == 'themes' %}is-active{% endif %}">Themes</a>
+         class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
+         <i class="ph ph-palette" aria-hidden="true"></i><span>Themes</span>
+      </a>
       <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
-        <summary>Plugins ▾</summary>
+        <summary>
+          <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Plugins</span>
+          <i class="ph ph-caret-down" aria-hidden="true" style="font-size:12px; opacity:.6;"></i>
+        </summary>
         <div class="nav-dropdown-panel">
-          <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">All plugins</a>
+          <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">
+            <i class="ph ph-list-bullets" aria-hidden="true"></i>All plugins
+          </a>
           {% if nav_admin_plugins %}
           <div class="nav-dropdown-sep">Admin pages</div>
           {% for p in nav_admin_plugins %}
-          <a class="nav-dropdown-link" href="/plugins/{{ p.id }}/">{{ p.name }}</a>
+          <a class="nav-dropdown-link" href="/plugins/{{ p.id }}/">
+            <i class="ph ph-{{ p.manifest.get('icon', 'ph-puzzle-piece').removeprefix('ph-') }}" aria-hidden="true"></i>{{ p.name }}
+          </a>
           {% endfor %}
           {% else %}
           <div class="nav-dropdown-hint">No plugins ship an admin page yet.</div>
@@ -39,7 +59,9 @@
         </div>
       </details>
       <a href="{{ url_for('auth.settings') }}"
-         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') %}is-active{% endif %}">Settings</a>
+         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') %}is-active{% endif %}">
+         <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
+      </a>
     </nav>
     {% if session.authed %}
     <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">
@@ -52,7 +74,10 @@
     {% if messages %}
     <div class="flashes" role="status">
       {% for category, message in messages %}
-      <div class="flash flash--{{ category }}">{{ message }}</div>
+      <div class="flash flash--{{ category }}">
+        <i class="ph-fill {% if category == 'ok' %}ph-fill-check-circle{% else %}ph-fill-warning-circle{% endif %}" aria-hidden="true"></i>
+        <span>{{ message }}</span>
+      </div>
       {% endfor %}
     </div>
     {% endif %}

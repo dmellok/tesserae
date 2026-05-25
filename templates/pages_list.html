@@ -1,21 +1,28 @@
 {% extends "_base.html" %}
+{% from "_components.html" import empty_state %}
 {% block title %}Pages — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1>Pages
-    <a class="header-action" href="{{ url_for('pages.new') }}">+ New page</a>
+  <h1><i class="ph ph-squares-four"></i> Pages
+    <a class="header-action" href="{{ url_for('pages.new') }}">
+      <i class="ph ph-plus"></i><span>New page</span>
+    </a>
   </h1>
   <p class="lede">
     Saved dashboards. Each page is a panel-sized canvas of widget cells.
-    Push one from the Send page, schedule it on /schedules, or wire a HA
-    button on /settings/server.
+    Push one from <a href="{{ url_for('send.index') }}">Send</a>, schedule
+    it on <a href="{{ url_for('schedules.index') }}">Schedules</a>, or
+    wire a HA button on
+    <a href="{{ url_for('auth.settings_area', area='server') }}">Settings</a>.
   </p>
 </header>
 
 {% if not pages %}
-<section class="card">
-  <p class="lede">No pages yet. <a class="ghost-link" href="{{ url_for('pages.new') }}">Create the first one.</a></p>
-</section>
+{{ empty_state('squares-four',
+               title='No pages yet',
+               blurb='A page is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.',
+               action_label='Create your first page',
+               action_href=url_for('pages.new')) }}
 {% else %}
 <ul class="pages-list">
   {% for page in pages %}
@@ -25,16 +32,16 @@
       <div class="page-meta">
         <code>{{ page.id }}</code>
         <span class="muted">·</span>
-        <span>{{ page.panel.w }}×{{ page.panel.h }}px</span>
-        <span class="muted">·</span>
-        <span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}</span>
-        {% if page.theme %}<span class="muted">·</span><span>theme: <code>{{ page.theme }}</code></span>{% endif %}
+        <span><i class="ph ph-grid-four"></i> {{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}</span>
+        {% if page.theme %}<span class="muted">·</span><span><i class="ph ph-palette"></i> {{ page.theme }}</span>{% endif %}
       </div>
     </a>
     <div class="page-actions">
       <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
             onsubmit="return confirm('Delete this page?');">
-        <button type="submit" class="ghost danger">Delete</button>
+        <button type="submit" class="ghost danger" title="Delete page">
+          <i class="ph ph-trash" aria-hidden="true"></i>
+        </button>
       </form>
     </div>
   </li>
