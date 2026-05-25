@@ -59,7 +59,7 @@ def resolve_settings_panel(settings: SettingsStore) -> Panel:
         # install with no settings still works.
         w = _int_or(app.get("panel_w"), 1600)
         h = _int_or(app.get("panel_h"), 1200)
-    if str(app.get("panel_orientation") or "landscape").lower() == "portrait":
+    if _is_portrait(app.get("panel_orientation")):
         w, h = h, w
     return Panel(w=max(1, w), h=max(1, h))
 
@@ -70,6 +70,19 @@ def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Pan
     if page_panel is not None:
         return page_panel
     return resolve_settings_panel(settings)
+
+
+def _is_portrait(value: object) -> bool:
+    """Tolerant truthy-check for the orientation field.
+
+    The switch input stores a real ``bool``, but older configs (and
+    raw form POSTs that bypassed the coercer) may have left a string
+    like ``"portrait"`` / ``"on"`` / ``"true"`` on disk."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("portrait", "on", "true", "1", "yes")
+    return False
 
 
 def _int_or(value: object, default: int) -> int:
