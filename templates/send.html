@@ -18,10 +18,10 @@
   {% else %}<span class="pill is-danger">failed</span>{% endif %}
 {% endmacro %}
 
-{# Bound both axes so a portrait panel doesn't push the preview card
-   into a 1000px-tall column. #}
-{% set _scale_w = (560.0 / panel.w) if panel.w > 560 else 1.0 %}
-{% set _scale_h = (560.0 / panel.h) if panel.h > 560 else 1.0 %}
+{# Match the editor preview cap (720px on each axis) so the panel
+   reads at the same physical size across both pages. #}
+{% set _scale_w = (720.0 / panel.w) if panel.w > 720 else 1.0 %}
+{% set _scale_h = (720.0 / panel.h) if panel.h > 720 else 1.0 %}
 {% set _preview_scale = [_scale_w, _scale_h]|min %}
 {% set _pw = (panel.w * _preview_scale)|round|int %}
 {% set _ph = (panel.h * _preview_scale)|round|int %}

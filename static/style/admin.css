@@ -319,9 +319,11 @@ a:hover { color: var(--t-accent-hover); }
   color: var(--t-muted);
 }
 
-/* Theme toggle — sits at the tail of the top nav (the drawer in
-   mobile). The text label only renders in the drawer; on desktop the
-   button is a compact icon square. */
+/* Theme toggle — rendered twice. The .theme-toggle--topbar variant
+   is a compact icon square pinned to the far right of the topbar on
+   desktop. The .theme-toggle--drawer variant is a full-width labelled
+   row inside the responsive drawer. CSS hides whichever isn't
+   appropriate for the current viewport. */
 .theme-toggle {
   display: inline-grid;
   place-items: center;
@@ -333,11 +335,13 @@ a:hover { color: var(--t-accent-hover); }
   cursor: pointer;
   color: var(--t-fg-soft);
   padding: 0;
-  margin-left: var(--t-space-2);
 }
 .theme-toggle:hover { color: var(--t-accent); background: var(--t-surface-sunk); }
 .theme-toggle .ph { font-size: 18px; }
 .theme-toggle-label { display: none; }
+
+.theme-toggle--topbar { margin-left: auto; }
+.theme-toggle--drawer { display: none; }
 
 /* Show/hide based on the current theme. Dark icon is visible only when
    data-theme=dark, light icon is visible only when it's absent. */
@@ -413,21 +417,22 @@ a:hover { color: var(--t-accent-hover); }
     margin-left: var(--t-space-4);
     border-left: 2px solid var(--t-border);
   }
-  /* Theme toggle becomes a full-width row at the bottom of the drawer. */
-  .topnav .theme-toggle {
+  /* Drawer-only theme toggle takes over inside the drawer. */
+  .theme-toggle--topbar { display: none; }
+  .theme-toggle--drawer {
+    display: inline-flex;
     width: 100%;
     height: auto;
+    align-items: center;
     justify-content: flex-start;
     padding: var(--t-space-3) var(--t-space-3);
     margin-top: auto;
     border-color: transparent;
     color: var(--t-fg-soft);
     gap: var(--t-space-2);
-    display: inline-flex;
-    align-items: center;
   }
-  .topnav .theme-toggle-label { display: inline; }
-  .topnav .theme-toggle:hover { background: var(--t-surface-sunk); }
+  .theme-toggle--drawer .theme-toggle-label { display: inline; }
+  .theme-toggle--drawer:hover { background: var(--t-surface-sunk); }
 }
 @media (min-width: 901px) {
   .nav-scrim { display: none; }
@@ -1143,6 +1148,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   display: grid;
   gap: var(--t-space-2);
 }
+.icon-picker-popover[hidden] { display: none !important; }
 .icon-picker-search {
   position: relative;
   display: flex;

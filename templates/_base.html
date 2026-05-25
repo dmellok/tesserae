@@ -70,12 +70,16 @@
          class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
-      <button type="button" class="theme-toggle" data-theme-toggle aria-label="Toggle dark mode">
+      <button type="button" class="theme-toggle theme-toggle--drawer" data-theme-toggle aria-label="Toggle dark mode">
         <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
         <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
         <span class="theme-toggle-label">Toggle theme</span>
       </button>
     </nav>
+    <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Toggle dark mode">
+      <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
+      <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
+    </button>
     {% if session.authed %}
     <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">
       <button type="submit" class="ghost">Sign out</button>
@@ -139,16 +143,16 @@
       });
     })();
     (function () {
-      const tbtn = document.querySelector('[data-theme-toggle]');
-      if (!tbtn) return;
-      tbtn.addEventListener('click', () => {
-        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-        if (next === 'dark') {
-          document.documentElement.setAttribute('data-theme', 'dark');
-        } else {
-          document.documentElement.removeAttribute('data-theme');
-        }
-        try { localStorage.setItem('tesserae-theme', next); } catch (e) { /* ignore */ }
+      document.querySelectorAll('[data-theme-toggle]').forEach((tbtn) => {
+        tbtn.addEventListener('click', () => {
+          const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+          if (next === 'dark') {
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+          }
+          try { localStorage.setItem('tesserae-theme', next); } catch (e) { /* ignore */ }
+        });
       });
     })();
   </script>
