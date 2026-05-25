@@ -39,6 +39,7 @@ from app import (
     settings_routes,
     themes_routes,
 )
+from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
 from app.push import PushManager
 from app.scheduler import Scheduler
@@ -259,10 +260,34 @@ def _rebuild_transport(
     broker_raw = settings.get_section("broker")
     host = str(broker_raw.get("host") or "")
 
+    # Optional in-process MQTT broker. If enabled and host isn't already
+    # set, default the transport to talk to it on localhost.
+    embedded_enabled = _truthy(broker_raw.get("embedded_enabled"))
+    embedded_port = int(broker_raw.get("embedded_port") or 1883)
+    old_embedded: EmbeddedBroker | None = app.config.get("EMBEDDED_BROKER")
+    if old_embedded is not None:
+        try:
+            old_embedded.stop()
+        except Exception:
+            logger.exception("stopping old embedded broker")
+        app.config.pop("EMBEDDED_BROKER", None)
+    if embedded_enabled and not testing:
+        embedded = EmbeddedBroker(bind="127.0.0.1", port=embedded_port)
+        try:
+            embedded.start()
+            app.config["EMBEDDED_BROKER"] = embedded
+            if not host:
+                host = "127.0.0.1"
+        except Exception:
+            logger.exception(
+                "embedded broker failed to start on port %s; transport will stay offline",
+                embedded_port,
+            )
+
     factory = _noop_client_factory if testing else None
     config = BrokerConfig(
         host=host or "localhost",
-        port=int(broker_raw.get("port") or 1883),
+        port=int(broker_raw.get("port") or embedded_port or 1883),
         username=broker_raw.get("username") or None,
         password=broker_raw.get("password_secret") or None,
         keepalive=int(broker_raw.get("keepalive") or 60),
@@ -388,6 +413,14 @@ class _NoopMqttClient:
 
     def subscribe(self, topic: str, qos: int) -> tuple[int, int]:
         return (0, 1)
+
+
+def _truthy(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
 
 
 def _noop_client_factory(client_id: str) -> _NoopMqttClient:

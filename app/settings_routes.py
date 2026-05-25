@@ -155,6 +155,27 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "label": "MQTT client id",
         "default": "tesserae",
     },
+    {
+        "name": "embedded_enabled",
+        "type": "switch",
+        "label": "Built-in broker",
+        "default": False,
+        "help": (
+            "Run an in-process MQTT broker (amqtt) bound to 127.0.0.1. "
+            "Convenient when you don't have a Mosquitto host handy; "
+            "leave off for any non-trivial deployment."
+        ),
+    },
+    {
+        "name": "embedded_port",
+        "type": "slider",
+        "label": "Built-in broker port",
+        "default": 1883,
+        "min": 1024,
+        "max": 65535,
+        "step": 1,
+        "help": "Port the built-in broker listens on. Tesserae's transport auto-connects here when host is empty.",
+    },
 ]
 
 
@@ -420,6 +441,12 @@ def settings_update(section_kind: str) -> Response:
         fields = list(renderer.manifest.get("settings", []))
         values = _values_from_form(fields)
         settings_store.update_for_namespace("renderers", rid, values, fields)
+        # Per-renderer Enabled toggle lives outside the manifest, so it's
+        # stored in a sibling section keyed by id.
+        if "_enabled" in request.form:
+            enabled = _coerce_form_value({"type": "switch"}, request.form.get("_enabled"))
+            existing = settings_store.get_section("renderers_enabled")
+            settings_store.patch_section("renderers_enabled", {**existing, rid: bool(enabled)})
         flash(f"{renderer.name} settings saved.", "ok")
         return _redirect_to_section(section_kind)
 
@@ -604,11 +631,14 @@ def _build_sections() -> list[dict[str, Any]]:
         }
     )
 
+    enabled_map = settings_store.get_section("renderers_enabled")
     for renderer in _renderers().all():
         fields = list(renderer.manifest.get("settings", []))
-        if not fields:
-            continue
         sid = f"renderer-{renderer.id}"
+        rid = renderer.id
+        is_enabled = enabled_map.get(rid)
+        if is_enabled is None:
+            is_enabled = True
         sections.append(
             {
                 "id": sid,
@@ -618,6 +648,8 @@ def _build_sections() -> list[dict[str, Any]]:
                 "fields": fields,
                 "state": _render_for_admin("renderers", renderer.id, fields),
                 "endpoint": url_for("auth.settings_update", section_kind=sid),
+                "enabled": bool(is_enabled),
+                "supports_toggle": True,
                 "meta": {
                     "Topic": renderer.topic,
                     "Retain": "yes" if renderer.retain else "no",

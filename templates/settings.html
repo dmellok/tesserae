@@ -73,6 +73,13 @@
 
   {% if section.endpoint %}
   <form method="post" action="{{ section.endpoint }}" class="form">
+    {% if section.supports_toggle %}
+      {{ auto_field(section.id ~ '-enabled', '_enabled', {
+          'type': 'switch',
+          'label': 'Enabled',
+          'help': 'Push pipeline skips this renderer when off — settings stay saved.',
+      }, section.enabled) }}
+    {% endif %}
     {% for field in section.fields %}
       {% set value = section.state.get(field.name, field.get('default', '')) %}
       {% set field_id = section.id ~ '-' ~ field.name %}

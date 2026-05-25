@@ -17,6 +17,7 @@ dependencies = [
     "numpy>=1.26,<3",
     "paho-mqtt>=2.0,<3",
     "playwright>=1.42,<2",
+    "amqtt>=0.11,<1",
 ]
 
 [project.optional-dependencies]

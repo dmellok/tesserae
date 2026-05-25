@@ -52,6 +52,15 @@ from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
 from app.transport import MqttTransport
 
+
+def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
+    """Renderer ids whose per-install ``Enabled`` flag is off.
+
+    Stored in the ``renderers_enabled`` settings section as a flat
+    ``{renderer_id: bool}`` dict; missing entries default to enabled."""
+    raw = settings.get_section("renderers_enabled")
+    return {rid for rid, enabled in raw.items() if enabled is False}
+
 logger = logging.getLogger(__name__)
 
 PushStatus = Literal["sent", "busy", "failed", "not_found"]
@@ -351,7 +360,10 @@ class PushManager:
 
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []
+        disabled = _disabled_renderer_ids(self._settings)
         for renderer in self._registry.all():
+            if renderer.id in disabled:
+                continue
             renderer_start = time.monotonic()
             try:
                 result = self._publish_artifact(renderer, composition_png, panel)
