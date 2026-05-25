@@ -20,6 +20,7 @@ template walks the same shape and asks no questions.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import time
 from collections.abc import Callable
@@ -31,10 +32,11 @@ from werkzeug.wrappers import Response
 from app import auth
 from app.device_loader import Device, DeviceRegistry
 from app.plugin_loader import PluginRegistry
+from app.push import PushManager
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
 from app.state.settings_store import SECRET_MASK, SettingsStore
-from app.transport import MqttTransport
+from app.transport import BrokerConfig, MqttTransport
 
 # How fresh a heartbeat has to be to read as "ok" in the UI. Past this it
 # decays through "warn" (2x) into "stale". Tuned for the typical pi_client
@@ -78,6 +80,18 @@ APP_FIELDS: list[dict[str, Any]] = [
         "label": "Default panel height (px)",
         "default": 1200,
         "min": 1,
+    },
+    {
+        "name": "timezone",
+        "type": "string",
+        "label": "Timezone (IANA name or 'system')",
+        "default": "system",
+        "help": (
+            "Used by the scheduler when interpreting daily fire times and "
+            "time-of-day windows. 'system' uses the host's local time; "
+            "anything else must be an IANA zone like 'Australia/Melbourne' "
+            "or 'Europe/London'."
+        ),
     },
     {
         "name": "ha_discovery_enabled",
@@ -132,6 +146,10 @@ def _device_status() -> dict[str, dict[str, Any]]:
 
 def _transport() -> MqttTransport:
     return current_app.config["MQTT_TRANSPORT"]  # type: ignore[no-any-return]
+
+
+def _push_manager() -> PushManager:
+    return current_app.config["PUSH_MANAGER"]  # type: ignore[no-any-return]
 
 
 def _events() -> EventLog:
@@ -409,6 +427,77 @@ def settings_update(section_kind: str) -> Response:
         return _redirect_to_section(section_kind)
 
     return Response(f"unknown section {section_kind!r}", status=404)
+
+
+# -- diagnostics ----------------------------------------------------
+
+
+@bp.post("/settings/diagnostics/test_broker")
+def diagnostics_test_broker() -> Response:
+    """Open a fresh connection with the currently-saved broker settings,
+    publish a no-op probe, then disconnect. Independent of the running
+    transport so it actually tests the saved values rather than whatever
+    the app currently has loaded."""
+    raw = _settings().get_section("broker")
+    host = str(raw.get("host") or "").strip()
+    if not host:
+        flash("Broker test: no host configured.", "error")
+        return redirect(url_for("auth.settings_area", area="server"))
+    config = BrokerConfig(
+        host=host,
+        port=int(raw.get("port") or 1883),
+        username=raw.get("username") or None,
+        password=raw.get("password_secret") or None,
+        keepalive=int(raw.get("keepalive") or 60),
+        client_id=str(raw.get("client_id") or "tesserae") + "-probe",
+    )
+    probe = MqttTransport(config)
+    try:
+        probe.connect()
+        probe.publish("tesserae/_probe", b"ping", qos=0, retain=False)
+    except Exception as exc:
+        flash(f"Broker test failed: {type(exc).__name__}: {exc}", "error")
+    else:
+        flash(f"Broker test ok: connected to {host}:{config.port} and published.", "ok")
+    finally:
+        with contextlib.suppress(Exception):
+            probe.disconnect()
+    return redirect(url_for("auth.settings_area", area="server"))
+
+
+@bp.post("/settings/diagnostics/test_push")
+def diagnostics_test_push() -> Response:
+    """Generate a small synthetic PNG and run it through PushManager.push_image.
+    Exercises every loaded renderer end-to-end (transform -> write -> publish)
+    + the event-log path, without needing a saved dashboard."""
+    import io
+
+    from PIL import Image, ImageDraw
+
+    panel = _settings().get_section("app")
+    w = int(panel.get("panel_w") or 400)
+    h = int(panel.get("panel_h") or 200)
+    img = Image.new("RGB", (w, h), (240, 240, 235))
+    draw = ImageDraw.Draw(img)
+    # Geometric tesserae mark so the test push looks distinct in the
+    # device's history.
+    draw.rectangle((20, 20, w - 20, h - 20), outline=(13, 140, 126), width=4)
+    draw.rectangle((w // 4, h // 4, 3 * w // 4, 3 * h // 4), fill=(13, 140, 126))
+    draw.text((30, h - 40), "tesserae test push", fill=(20, 20, 20))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    result = _push_manager().push_image(buf.getvalue(), source_label="diagnostics_test")
+    if result.status == "sent":
+        flash(
+            f"Test push ok: {len(result.renderers)} renderer(s) published "
+            f"in {result.duration_s:.2f}s.",
+            "ok",
+        )
+    elif result.status == "busy":
+        flash("Test push: another push is already in flight; try again.", "error")
+    else:
+        flash(f"Test push {result.status}: {result.error or '(no detail)'}", "error")
+    return redirect(url_for("auth.settings_area", area="renderers"))
 
 
 # -- internals ----------------------------------------------------------

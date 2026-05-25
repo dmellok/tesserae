@@ -26,7 +26,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable
-from datetime import UTC, datetime, time
+from datetime import UTC, datetime, time, tzinfo
 
 from app.push import PushManager, PushResult
 from app.state.event_log import EventLog
@@ -36,22 +36,27 @@ from app.state.schedule_store import ScheduleStore
 logger = logging.getLogger(__name__)
 
 
-def _local(now: datetime) -> datetime:
-    """Convert a UTC-aware datetime to the server's local clock.
-
-    The editor's time pickers don't carry a timezone — we treat the values
-    the user typed as wall-clock-local for the Tesserae host."""
-    return now.astimezone()
+# Returns the active tz or None for host-local. Resolved on every tick so
+# a settings change applies without restarting the scheduler thread.
+TimezoneProvider = Callable[[], tzinfo | None]
 
 
-def _matches_dow(schedule: Schedule, now: datetime) -> bool:
-    return _local(now).weekday() in schedule.days_of_week
+def _local(now: datetime, tz: tzinfo | None) -> datetime:
+    """Convert a UTC-aware datetime to the configured tz, falling back to
+    the host's local clock when no tz is set."""
+    if tz is None:
+        return now.astimezone()
+    return now.astimezone(tz)
 
 
-def _matches_window(schedule: Schedule, now: datetime) -> bool:
+def _matches_dow(schedule: Schedule, now: datetime, tz: tzinfo | None) -> bool:
+    return _local(now, tz).weekday() in schedule.days_of_week
+
+
+def _matches_window(schedule: Schedule, now: datetime, tz: tzinfo | None) -> bool:
     if schedule.time_of_day_start is None and schedule.time_of_day_end is None:
         return True
-    current = _local(now).time()
+    current = _local(now, tz).time()
     start = _parse_hhmm(schedule.time_of_day_start) if schedule.time_of_day_start else time(0, 0)
     end = _parse_hhmm(schedule.time_of_day_end) if schedule.time_of_day_end else time(23, 59, 59)
     if start <= end:
@@ -72,6 +77,7 @@ class Scheduler:
         store: ScheduleStore,
         push_manager: Callable[[], PushManager],
         event_log: EventLog | None = None,
+        timezone_provider: TimezoneProvider | None = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
@@ -80,10 +86,15 @@ class Scheduler:
         Tests pass ``lambda: my_pm`` for a fixed instance.
 
         ``event_log`` is optional so unit tests can construct a Scheduler
-        without a SQLite file. In production it's always wired."""
+        without a SQLite file. In production it's always wired.
+
+        ``timezone_provider`` is a zero-arg callable resolving the active
+        timezone (or None for host-local). Called on every tick so a
+        settings change applies without restarting the scheduler thread."""
         self._store = store
         self._push_factory = push_manager
         self._event_log = event_log
+        self._tz_provider = timezone_provider or (lambda: None)
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -122,15 +133,16 @@ class Scheduler:
         descending then id. Records each enabled schedule's first-observed
         timestamp so daily backfills are suppressed (see ``_observe``)."""
         now = now or datetime.now(UTC)
+        tz = self._tz_provider()
         self._observe(now)
         candidates: list[Schedule] = []
         for s in self._store.all():
             if not s.enabled:
                 continue
             if s.type == "interval":
-                if not _matches_dow(s, now):
+                if not _matches_dow(s, now, tz):
                     continue
-                if not _matches_window(s, now):
+                if not _matches_window(s, now, tz):
                     continue
                 if s.interval_minutes is None:
                     continue
@@ -141,10 +153,11 @@ class Scheduler:
             elif s.type == "daily":
                 if s.fires_at is None:
                     continue
-                if not _matches_dow(s, now):
+                if not _matches_dow(s, now, tz):
                     continue
-                # Target time is today (wall-clock local) at fires_at's HH:MM.
-                local_now = _local(now)
+                # Target time is today (wall-clock in the configured tz) at
+                # fires_at's HH:MM.
+                local_now = _local(now, tz)
                 target_local = local_now.replace(
                     hour=s.fires_at.hour,
                     minute=s.fires_at.minute,
@@ -164,7 +177,7 @@ class Scheduler:
                     continue
                 if last is not None:
                     last_dt = datetime.fromtimestamp(last, tz=UTC)
-                    if last_dt.astimezone().date() == local_now.date():
+                    if _local(last_dt, tz).date() == local_now.date():
                         continue  # already fired today (local terms)
                 candidates.append(s)
         candidates.sort(key=lambda s: (-s.priority, s.id))

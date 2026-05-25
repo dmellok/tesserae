@@ -17,13 +17,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import sqlite3
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -84,9 +87,33 @@ class EventLog:
         self._path = path
         self._cap = cap
         self._lock = threading.Lock()
+        # Per-row listeners — used by the SSE /events/stream endpoint.
+        # Fired after each successful insert, outside the DB lock.
+        self._listener_lock = threading.Lock()
+        self._listeners: list[Callable[[EventRow], None]] = []
         self._path.parent.mkdir(parents=True, exist_ok=True)
         with self._conn() as c:
             c.executescript(self.SCHEMA)
+
+    # -- listeners ------------------------------------------------------
+
+    def add_listener(self, callback: Callable[[EventRow], None]) -> None:
+        with self._listener_lock:
+            if callback not in self._listeners:
+                self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[EventRow], None]) -> None:
+        with self._listener_lock, contextlib.suppress(ValueError):
+            self._listeners.remove(callback)
+
+    def _fire(self, row: EventRow) -> None:
+        with self._listener_lock:
+            listeners = list(self._listeners)
+        for cb in listeners:
+            try:
+                cb(row)
+            except Exception:
+                logger.exception("event log listener %r raised", cb)
 
     @contextlib.contextmanager
     def _conn(self) -> Iterator[sqlite3.Connection]:
@@ -117,7 +144,9 @@ class EventLog:
         extra: dict[str, Any] | None = None,
     ) -> int:
         """Append a row, evict the oldest if over cap, return the new id."""
-        payload = json.dumps(extra or {}, default=str)
+        timestamp = time.time()
+        extra_dict = dict(extra or {})
+        payload = json.dumps(extra_dict, default=str)
         with self._lock, self._conn() as conn:
             cur = conn.execute(
                 "INSERT INTO events "
@@ -125,7 +154,7 @@ class EventLog:
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     type,
-                    time.time(),
+                    timestamp,
                     source,
                     target,
                     status,
@@ -138,7 +167,23 @@ class EventLog:
             new_id = int(cur.lastrowid or 0)
             self._evict(conn)
             conn.commit()
-            return new_id
+        # Fire listeners outside the DB lock so a slow subscriber can't
+        # back-pressure the writer.
+        self._fire(
+            EventRow(
+                id=new_id,
+                type=type,
+                timestamp=timestamp,
+                source=source,
+                target=target,
+                status=status,
+                digest=digest,
+                error=error,
+                duration_s=duration_s,
+                extra=extra_dict,
+            )
+        )
+        return new_id
 
     def _evict(self, conn: sqlite3.Connection) -> None:
         """Cap-based eviction. We over-delete in one shot rather than

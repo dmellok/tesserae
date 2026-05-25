@@ -10,11 +10,13 @@
 
 {% block main %}
 <header class="page-head">
-  <h1>Events</h1>
+  <h1>Events
+    <span class="live-dot" data-live-indicator data-state="connecting">connecting…</span>
+  </h1>
   <p class="lede">
     Cross-cutting timeline. Every push attempt, renderer transform, device
     heartbeat, scheduler fire, and auth event lands here. Newest first;
-    capped at {{ limit }}.
+    capped at {{ limit }}. New events stream in live via SSE.
   </p>
 </header>
 
@@ -34,7 +36,7 @@
 {% else %}
 <ul class="events">
   {% for ev in rows %}
-  <li class="event-row event--{{ ev.type }}">
+  <li class="event-row event--{{ ev.type }}" data-event-id="{{ ev.id }}">
     <div class="event-type">{{ ev.type }}</div>
     <div class="event-body">
       <div class="event-line">
@@ -61,4 +63,5 @@
   {% endfor %}
 </ul>
 {% endif %}
+<script src="{{ url_for('static', filename='pages/events.js') }}"></script>
 {% endblock %}

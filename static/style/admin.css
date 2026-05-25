@@ -695,3 +695,31 @@ button[disabled] {
   place-items: center;
 }
 .event-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Live indicator next to the Events heading. */
+.live-dot {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: 8px;
+  background: var(--t-surface-soft);
+  color: var(--t-muted);
+}
+.live-dot::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--t-muted);
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.live-dot[data-state="connected"] { color: var(--t-ok); background: color-mix(in oklab, var(--t-ok) 15%, transparent); }
+.live-dot[data-state="connected"]::before { background: var(--t-ok); }
+.live-dot[data-state="offline"] { color: var(--t-danger); background: color-mix(in oklab, var(--t-danger) 15%, transparent); }
+.live-dot[data-state="offline"]::before { background: var(--t-danger); }

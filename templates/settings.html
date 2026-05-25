@@ -21,6 +21,35 @@
   {% endfor %}
 </nav>
 
+{% if active_area == 'server' %}
+<section class="card">
+  <header class="card-head">
+    <h2>Diagnostics</h2>
+    <p class="lede">Verify the saved broker config without touching the running transport.</p>
+  </header>
+  <form method="post" action="{{ url_for('auth.diagnostics_test_broker') }}" class="form">
+    <div class="actions">
+      <button type="submit" class="ghost">Test broker connection</button>
+    </div>
+  </form>
+</section>
+{% elif active_area == 'renderers' %}
+<section class="card">
+  <header class="card-head">
+    <h2>Diagnostics</h2>
+    <p class="lede">
+      Pushes a small synthetic image through every loaded renderer. Lands
+      in the Send-page history and the /events timeline.
+    </p>
+  </header>
+  <form method="post" action="{{ url_for('auth.diagnostics_test_push') }}" class="form">
+    <div class="actions">
+      <button type="submit" class="ghost">Test push (synthetic image)</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
 {% if not sections %}
 <p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
 {% endif %}

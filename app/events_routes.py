@@ -4,21 +4,32 @@ A dedicated page that reads the same EventLog the Send-page history reads —
 but unfiltered. Chips at the top scope to one event type at a time.
 
 Types in v1: ``push``, ``renderer``, ``device``, ``scheduler``, ``auth``.
-New types (added by future plugins / integrations) appear automatically
-because the chip list is built from the rows currently in the log.
+
+The ``/events/stream`` endpoint is a Server-Sent Events feed: every new
+row written to the EventLog is pushed to subscribed clients. Dev werkzeug
+supports streaming responses out of the box (threaded=True is Flask's
+default). In production behind a reverse proxy, set
+``proxy_buffering off`` (nginx) — otherwise the proxy will queue events
+and the page won't feel live.
 """
 
 from __future__ import annotations
 
+import json
+import queue
+import time
+from collections.abc import Iterator
+
 from flask import (
     Blueprint,
     Flask,
+    Response,
     current_app,
     render_template,
     request,
 )
 
-from app.state.event_log import EventLog
+from app.state.event_log import EventLog, EventRow
 
 bp = Blueprint("events", __name__, url_prefix="/events")
 
@@ -57,6 +68,80 @@ def index() -> str:
         counts=counts,
         known_types=_KNOWN_TYPES,
         limit=limit,
+    )
+
+
+# SSE knobs. Keepalives prove the connection is alive when the log is
+# idle — without them, nginx / browsers eventually close the connection
+# and the page stops feeling live.
+_KEEPALIVE_INTERVAL_S: float = 15.0
+# Per-connection inbound queue. Generous because the page caps the DOM at
+# 200 rows so a burst that overflows here is moot.
+_QUEUE_MAX: int = 200
+
+
+def _serialise_row(row: EventRow) -> dict[str, object]:
+    return {
+        "id": row.id,
+        "type": row.type,
+        "timestamp": row.timestamp,
+        "source": row.source,
+        "target": row.target,
+        "status": row.status,
+        "digest": row.digest,
+        "error": row.error,
+        "duration_s": row.duration_s,
+        "extra": row.extra,
+    }
+
+
+@bp.get("/stream")
+def stream() -> Response:
+    """Server-Sent Events feed of new event rows. Optional ``?type=`` filter
+    scopes to one event type (matching the chips on /events)."""
+    log = _events()
+    type_filter = (request.args.get("type") or "").strip().lower() or None
+    q: queue.Queue[EventRow] = queue.Queue(maxsize=_QUEUE_MAX)
+
+    def on_event(row: EventRow) -> None:
+        if type_filter is not None and row.type != type_filter:
+            return
+        # put_nowait drops on overflow so a slow client can't backpressure
+        # the writer that recorded the event.
+        try:
+            q.put_nowait(row)
+        except queue.Full:
+            return
+
+    log.add_listener(on_event)
+
+    def generate() -> Iterator[str]:
+        # Initial comment frame so the client knows the connection is up
+        # before the first real event arrives.
+        yield ":connected\n\n"
+        last_send = time.monotonic()
+        try:
+            while True:
+                timeout = max(0.0, _KEEPALIVE_INTERVAL_S - (time.monotonic() - last_send))
+                try:
+                    row = q.get(timeout=timeout or 0.1)
+                    payload = json.dumps(_serialise_row(row), default=str)
+                    yield f"event: log\ndata: {payload}\n\n"
+                    last_send = time.monotonic()
+                except queue.Empty:
+                    yield ":keepalive\n\n"
+                    last_send = time.monotonic()
+        finally:
+            log.remove_listener(on_event)
+
+    return Response(
+        generate(),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # Proxies must not buffer; otherwise events arrive in bursts.
+            "X-Accel-Buffering": "no",
+        },
     )
 
 

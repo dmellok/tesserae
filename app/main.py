@@ -18,8 +18,10 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import tzinfo
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Flask, abort, send_from_directory
 from werkzeug.wrappers import Response
@@ -157,10 +159,24 @@ def create_app(
     # rebuild_transport replaces it on broker setting changes. The factory
     # resolves from app.config at fire-time so the scheduler always sees
     # the current instance.
+    def _resolve_timezone() -> tzinfo | None:
+        # Read at every tick so a settings change picks up without
+        # restarting the scheduler thread. 'system' (or empty) means
+        # host-local; anything else is parsed as an IANA name.
+        raw = str(settings.get_section("app").get("timezone") or "system").strip()
+        if not raw or raw.lower() == "system":
+            return None
+        try:
+            return ZoneInfo(raw)
+        except ZoneInfoNotFoundError:
+            logger.warning("settings.app.timezone=%r is not a known IANA zone", raw)
+            return None
+
     scheduler = Scheduler(
         store=schedule_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
+        timezone_provider=_resolve_timezone,
     )
     app.config["SCHEDULER"] = scheduler
     if not testing:
