@@ -157,9 +157,10 @@ a:hover { color: var(--t-accent-hover); }
   border-bottom: 1px solid var(--t-border);
   position: sticky;
   top: 0;
-  z-index: 40;
-  /* No backdrop-filter: it creates a containing block for fixed children,
-     which would trap the mobile drawer inside the header. */
+  /* Sit above the mobile-drawer scrim so the drawer (a child of topbar)
+     renders unblurred. No backdrop-filter — it would create a containing
+     block that traps `position: fixed` descendants inside the header. */
+  z-index: 60;
 }
 
 .brand {
@@ -312,8 +313,7 @@ a:hover { color: var(--t-accent-hover); }
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 32, 0.45);
-  backdrop-filter: blur(2px);
-  z-index: 49;
+  z-index: 30;
 }
 
 @media (max-width: 900px) {
@@ -562,6 +562,46 @@ a:hover { color: var(--t-accent-hover); }
   height: 38px;
   width: 60px;
   cursor: pointer;
+}
+
+/* Native selects shed their OS chrome and pick up a custom caret so
+   they read as a sibling of the other text inputs. */
+.field select,
+.dropzone-meta select,
+.saved-options select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
+    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.field select:focus,
+.field select:hover {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-accent) 50%),
+    linear-gradient(135deg, var(--t-accent) 50%, transparent 50%);
+}
+.field select[multiple] {
+  background-image: none;
+  padding-right: var(--t-space-3);
+  min-height: 120px;
+}
+.field select[multiple] option {
+  padding: 6px 10px;
+}
+.field select[multiple] option:checked {
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
 }
 
 .field input:hover,
@@ -1093,10 +1133,18 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   transform: scale(1.005);
 }
 .dropzone-input {
+  /* Visually-hidden but still focusable + form-submittable. The
+     surrounding <label> is what makes the dropzone clickable. */
   position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .dropzone-body {
   text-align: center;
@@ -1850,55 +1898,73 @@ button[disabled] {
 
 input[type="range"].slider {
   width: 100%;
-  margin: 6px 0 0;
+  margin: 8px 0 4px;
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
   cursor: pointer;
+  --slider-fill: 0%;
 }
 
 /* Track + thumb need vendor-prefixed selectors for cross-browser
-   styling because there's no standard yet. */
+   styling because there's no standard yet. The `--slider-fill`
+   custom property is updated live by static/components.js so the
+   filled portion paints in the accent colour. */
 
 input[type="range"].slider::-webkit-slider-runnable-track {
-  height: 6px;
-  background: var(--t-border-strong);
+  height: 8px;
   border-radius: 999px;
+  background:
+    linear-gradient(to right,
+      var(--t-accent) 0,
+      var(--t-accent) var(--slider-fill),
+      var(--t-surface-sunk) var(--slider-fill),
+      var(--t-surface-sunk) 100%);
+  border: 1px solid var(--t-border);
 }
 input[type="range"].slider::-moz-range-track {
-  height: 6px;
-  background: var(--t-border-strong);
+  height: 8px;
+  border-radius: 999px;
+  background: var(--t-surface-sunk);
+  border: 1px solid var(--t-border);
+}
+input[type="range"].slider::-moz-range-progress {
+  height: 8px;
+  background: var(--t-accent);
   border-radius: 999px;
 }
 
 input[type="range"].slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--t-accent);
-  border: 2px solid var(--t-surface);
-  margin-top: -6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  background: var(--t-surface);
+  border: 2px solid var(--t-accent);
+  margin-top: -7px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   cursor: pointer;
-  transition: transform 80ms ease;
+  transition: transform 80ms ease, box-shadow 80ms ease;
 }
 input[type="range"].slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
+  transform: scale(1.12);
 }
 input[type="range"].slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: var(--t-accent);
-  border: 2px solid var(--t-surface);
+  background: var(--t-surface);
+  border: 2px solid var(--t-accent);
   cursor: pointer;
 }
 
 input[type="range"].slider:focus { outline: none; }
 input[type="range"].slider:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 30%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 28%, transparent);
+}
+input[type="range"].slider:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 28%, transparent);
 }
 
 /* ----- Switch (boolean toggle) ----------------------------------- */

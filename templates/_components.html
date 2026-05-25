@@ -173,7 +173,7 @@ macro here instead.
   {% set ftype = spec.get('type', 'string') %}
   {% set label = spec.get('label', name) %}
   {% set help_text = help if help is not none else spec.get('help') %}
-  {% if ftype == 'boolean' %}
+  {% if ftype in ('boolean', 'switch') %}
     {{ switch(field_id, name, label, checked=value, help=help_text) }}
   {% elif ftype == 'select' %}
     {{ select_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}

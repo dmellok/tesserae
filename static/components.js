@@ -10,6 +10,15 @@
       const suffix = slider.dataset.outputSuffix || "";
       const sync = () => {
         if (output) output.value = slider.value + suffix;
+        // Paint the filled portion of the track in the accent colour
+        // (WebKit can't draw progress natively; Firefox uses
+        // ::-moz-range-progress for the same effect.)
+        const min = parseFloat(slider.min || "0");
+        const max = parseFloat(slider.max || "100");
+        const val = parseFloat(slider.value || "0");
+        const span = max - min;
+        const pct = span > 0 ? ((val - min) / span) * 100 : 0;
+        slider.style.setProperty("--slider-fill", pct + "%");
       };
       slider.addEventListener("input", sync);
       slider.addEventListener("change", sync);
