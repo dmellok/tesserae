@@ -87,7 +87,7 @@
   {% endwith %}
 
   <div class="nav-scrim" hidden></div>
-  <main class="page">
+  <main class="page {% block page_class %}{% endblock %}">
     {% block main %}{% endblock %}
   </main>
   <script src="{{ url_for('static', filename='components.js') }}"></script>

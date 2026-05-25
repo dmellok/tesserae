@@ -1,6 +1,7 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button %}
 {% block title %}Send — Tesserae{% endblock %}
+{% block page_class %}page-wide{% endblock %}
 
 {% set TABS = [
   ('file','File','upload-simple'),
@@ -15,6 +16,20 @@
   {% elif status == 'busy' %}<span class="pill is-warn">busy</span>
   {% elif status == 'not_found' %}<span class="pill is-danger">not found</span>
   {% else %}<span class="pill is-danger">failed</span>{% endif %}
+{% endmacro %}
+
+{% set _preview_scale = (560.0 / panel.w) if panel.w > 560 else 1.0 %}
+{% set _pw = (panel.w * _preview_scale)|round|int %}
+{% set _ph = (panel.h * _preview_scale)|round|int %}
+
+{% macro preview_card(title, blurb=None) %}
+<section class="card send-pair-preview">
+  {{ card_head(title, icon_name='monitor-play', blurb=blurb) }}
+  <div class="preview-frame" style="width: {{ _pw }}px; height: {{ _ph }}px;">
+    {{ caller() }}
+  </div>
+  <p class="muted preview-dims">{{ panel.w }} × {{ panel.h }}</p>
+</section>
 {% endmacro %}
 
 {% block main %}
@@ -36,34 +51,44 @@
   {% endfor %}
 </nav>
 
-<section class="card" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
-  {{ card_head('Upload a file', icon_name='upload-simple') }}
-  <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
-    <label class="dropzone" data-dropzone>
-      <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
-      <div class="dropzone-body" data-dropzone-body>
-        <span class="dropzone-icon"><i class="ph ph-image-square" aria-hidden="true"></i></span>
-        <p class="dropzone-title">Drop an image here</p>
-        <p class="dropzone-hint">PNG, JPEG, GIF, or BMP — up to 16 MiB</p>
-        <span class="dropzone-browse"><i class="ph ph-folder-open" aria-hidden="true"></i> or browse</span>
-      </div>
-      <div class="dropzone-preview" data-dropzone-preview hidden>
-        <img alt="" data-dropzone-thumb>
-        <div class="dropzone-meta">
-          <strong data-dropzone-name></strong>
-          <span class="muted" data-dropzone-size></span>
+{# ----- File tab ----- #}
+<div class="send-pair" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
+  <section class="card send-pair-options">
+    {{ card_head('Upload a file', icon_name='upload-simple') }}
+    <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
+      <label class="dropzone" data-dropzone>
+        <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
+        <div class="dropzone-body" data-dropzone-body>
+          <span class="dropzone-icon"><i class="ph ph-image-square" aria-hidden="true"></i></span>
+          <p class="dropzone-title">Drop an image here</p>
+          <p class="dropzone-hint">PNG, JPEG, GIF, or BMP — up to 16 MiB</p>
+          <span class="dropzone-browse"><i class="ph ph-folder-open" aria-hidden="true"></i> or browse</span>
         </div>
-        <button type="button" class="ghost danger" data-dropzone-clear title="Remove">
-          <i class="ph ph-x" aria-hidden="true"></i>
-        </button>
-      </div>
-    </label>
-    <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
-    <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
-  </form>
-</section>
+        <div class="dropzone-preview" data-dropzone-preview hidden>
+          <img alt="" data-dropzone-thumb>
+          <div class="dropzone-meta">
+            <strong data-dropzone-name></strong>
+            <span class="muted" data-dropzone-size></span>
+          </div>
+          <button type="button" class="ghost danger" data-dropzone-clear title="Remove">
+            <i class="ph ph-x" aria-hidden="true"></i>
+          </button>
+        </div>
+      </label>
+      <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
+      <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
+    </form>
+  </section>
+  {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
+    <img data-file-preview alt="" class="preview-image" hidden>
+    <div class="preview-placeholder" data-file-preview-placeholder>
+      <i class="ph-duotone ph-duotone-image" aria-hidden="true"></i>
+      <p>Drop a file to see the preview.</p>
+    </div>
+  {% endcall %}
+</div>
 
-{% set _preview_scale = (560.0 / panel.w) if panel.w > 560 else 1.0 %}
+{# ----- Saved tab ----- #}
 <div class="send-pair" id="tab-saved" {% if tab != 'saved' %}hidden{% endif %}>
   <section class="card send-pair-options">
     {{ card_head('Saved dashboard', icon_name='squares-four') }}
@@ -81,58 +106,83 @@
       <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
     </form>
   </section>
-  {% if pages %}
-  <section class="card send-pair-preview">
-    {{ card_head('Live preview', icon_name='monitor-play',
-                 blurb='Updates as you change the selection. ' ~ panel.w ~ ' × ' ~ panel.h) }}
-    <div class="preview-frame"
-         style="width: {{ (panel.w * _preview_scale)|round|int }}px;
-                height: {{ (panel.h * _preview_scale)|round|int }}px;">
-      <iframe data-saved-preview-iframe
-              src="{{ url_for('composer.compose', page_id=pages[0].id) }}?preview=1"
-              style="width: {{ panel.w }}px; height: {{ panel.h }}px;
-                     transform: scale({{ _preview_scale }}); transform-origin: 0 0;"
-              loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+  {% call preview_card('Live preview', blurb='Composer output as the panel will see it.') %}
+    {% if pages %}
+    <iframe data-saved-preview-iframe
+            src="{{ url_for('composer.compose', page_id=pages[0].id) }}?preview=1"
+            style="width: {{ panel.w }}px; height: {{ panel.h }}px;
+                   transform: scale({{ _preview_scale }}); transform-origin: 0 0;"
+            loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    {% else %}
+    <div class="preview-placeholder">
+      <i class="ph-duotone ph-duotone-squares-four" aria-hidden="true"></i>
+      <p>No saved dashboards yet — create one under Dashboards.</p>
     </div>
-  </section>
-  {% endif %}
+    {% endif %}
+  {% endcall %}
 </div>
 
-<section class="card" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
-  {{ card_head('Image URL', icon_name='link') }}
-  <form method="post" action="{{ url_for('send.send_url') }}" class="form">
-    <div class="field">
-      <label for="url-input">URL</label>
-      <input type="url" id="url-input" name="url" placeholder="https://..." required>
-      <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
-    </div>
-    <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
-  </form>
-</section>
-
-<section class="card" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
-  {{ card_head('Webpage', icon_name='globe') }}
-  <form method="post" action="{{ url_for('send.send_webpage') }}" class="form">
-    <div class="field">
-      <label for="webpage-url">URL</label>
-      <input type="url" id="webpage-url" name="url" placeholder="https://..." required>
-      <p class="field-help">Rendered headlessly with Chromium at the viewport below, then fit + pushed.</p>
-    </div>
-    <div class="field-grid">
+{# ----- URL tab ----- #}
+<div class="send-pair" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
+  <section class="card send-pair-options">
+    {{ card_head('Image URL', icon_name='link') }}
+    <form method="post" action="{{ url_for('send.send_url') }}" class="form">
       <div class="field">
-        <label for="webpage-w">Viewport width</label>
-        <input type="number" id="webpage-w" name="viewport_w" value="{{ panel.w }}" min="200" step="1">
+        <label for="url-input">URL</label>
+        <input type="url" id="url-input" name="url" placeholder="https://..." required data-url-preview-target>
+        <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
       </div>
-      <div class="field">
-        <label for="webpage-h">Viewport height</label>
-        <input type="number" id="webpage-h" name="viewport_h" value="{{ panel.h }}" min="200" step="1">
-      </div>
+      <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
+    </form>
+  </section>
+  {% call preview_card('Live preview', blurb='Loaded directly in your browser — final fit happens server-side.') %}
+    <img data-url-preview alt="" class="preview-image" hidden>
+    <div class="preview-placeholder" data-url-preview-placeholder>
+      <i class="ph-duotone ph-duotone-link" aria-hidden="true"></i>
+      <p>Paste an image URL to preview it.</p>
     </div>
-    <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
-    <div class="actions">{{ button('Render & push', icon='browser') }}</div>
-  </form>
-</section>
+  {% endcall %}
+</div>
 
+{# ----- Webpage tab ----- #}
+<div class="send-pair" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
+  <section class="card send-pair-options">
+    {{ card_head('Webpage', icon_name='globe') }}
+    <form method="post" action="{{ url_for('send.send_webpage') }}" class="form" target="webpage-preview-iframe">
+      <div class="field">
+        <label for="webpage-url">URL</label>
+        <input type="url" id="webpage-url" name="url" placeholder="https://..." required data-webpage-preview-target>
+        <p class="field-help">Rendered headlessly with Chromium at the viewport below, then fit + pushed.</p>
+      </div>
+      <div class="field-grid">
+        <div class="field">
+          <label for="webpage-w">Viewport width</label>
+          <input type="number" id="webpage-w" name="viewport_w" value="{{ panel.w }}" min="200" step="1">
+        </div>
+        <div class="field">
+          <label for="webpage-h">Viewport height</label>
+          <input type="number" id="webpage-h" name="viewport_h" value="{{ panel.h }}" min="200" step="1">
+        </div>
+      </div>
+      <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
+      <div class="actions">{{ button('Render & push', icon='browser') }}</div>
+    </form>
+  </section>
+  {% call preview_card('Live preview', blurb='Loaded in an iframe at your browser — the panel render uses headless Chromium server-side.') %}
+    <iframe data-webpage-preview-iframe
+            sandbox="allow-scripts"
+            referrerpolicy="no-referrer"
+            style="width: {{ panel.w }}px; height: {{ panel.h }}px;
+                   transform: scale({{ _preview_scale }}); transform-origin: 0 0; background: white;"
+            hidden></iframe>
+    <div class="preview-placeholder" data-webpage-preview-placeholder>
+      <i class="ph-duotone ph-duotone-globe" aria-hidden="true"></i>
+      <p>Enter a URL to preview it.</p>
+    </div>
+  {% endcall %}
+</div>
+
+{# ----- History tab (no preview) ----- #}
 <section class="card" id="tab-history" {% if tab != 'history' %}hidden{% endif %}>
   {{ card_head('History', icon_name='clock-counter-clockwise',
                blurb='Last ' ~ history|length ~ ' push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
@@ -199,6 +249,8 @@
     const nameEl = zone.querySelector('[data-dropzone-name]');
     const sizeEl = zone.querySelector('[data-dropzone-size]');
     const clear = zone.querySelector('[data-dropzone-clear]');
+    const filePreview = document.querySelector('[data-file-preview]');
+    const filePlaceholder = document.querySelector('[data-file-preview-placeholder]');
 
     function fmt(bytes) {
       if (bytes < 1024) return bytes + ' B';
@@ -206,13 +258,22 @@
       return (bytes / 1024 / 1024).toFixed(2) + ' MB';
     }
     function showFile(file) {
-      if (!file) { body.hidden = false; preview.hidden = true; thumb.src = ''; return; }
+      if (!file) {
+        body.hidden = false;
+        preview.hidden = true;
+        thumb.src = '';
+        if (filePreview) { filePreview.hidden = true; filePreview.src = ''; }
+        if (filePlaceholder) filePlaceholder.hidden = false;
+        return;
+      }
       nameEl.textContent = file.name;
       sizeEl.textContent = fmt(file.size);
       const url = URL.createObjectURL(file);
       thumb.src = url;
       body.hidden = true;
       preview.hidden = false;
+      if (filePreview) { filePreview.src = url; filePreview.hidden = false; }
+      if (filePlaceholder) filePlaceholder.hidden = true;
     }
     input.addEventListener('change', () => showFile(input.files[0]));
     clear.addEventListener('click', (e) => {
@@ -246,6 +307,47 @@
       const pid = select.value;
       if (!pid) return;
       iframe.src = base + pid + '?preview=1&_t=' + Date.now();
+    });
+  })();
+
+  // URL preview: client-side <img> attempt; falls back to placeholder on error.
+  (function () {
+    const input = document.querySelector('[data-url-preview-target]');
+    const img = document.querySelector('[data-url-preview]');
+    const ph = document.querySelector('[data-url-preview-placeholder]');
+    if (!input || !img || !ph) return;
+    let timer;
+    function load() {
+      const url = input.value.trim();
+      if (!url) { img.hidden = true; img.src = ''; ph.hidden = false; return; }
+      img.onerror = () => { img.hidden = true; ph.hidden = false; };
+      img.onload = () => { img.hidden = false; ph.hidden = true; };
+      img.src = url;
+    }
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(load, 500);
+    });
+  })();
+
+  // Webpage preview: load the URL in a sandboxed iframe as a rough proxy.
+  (function () {
+    const input = document.querySelector('[data-webpage-preview-target]');
+    const iframe = document.querySelector('[data-webpage-preview-iframe]');
+    const ph = document.querySelector('[data-webpage-preview-placeholder]');
+    if (!input || !iframe || !ph) return;
+    let timer;
+    function load() {
+      const url = input.value.trim();
+      if (!url) { iframe.hidden = true; iframe.src = 'about:blank'; ph.hidden = false; return; }
+      try { new URL(url); } catch (e) { return; }
+      iframe.src = url;
+      iframe.hidden = false;
+      ph.hidden = true;
+    }
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(load, 700);
     });
   })();
 </script>

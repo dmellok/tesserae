@@ -368,6 +368,8 @@ a:hover { color: var(--t-accent-hover); }
   padding: var(--t-space-7) var(--t-space-6) var(--t-space-8);
 }
 
+.page.page-wide { max-width: 1440px; }
+
 .page-head {
   margin-bottom: var(--t-space-6);
 }
@@ -1007,9 +1009,11 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: var(--t-space-5);
   align-items: start;
 }
-@media (min-width: 1000px) {
+@media (min-width: 900px) {
   .send-pair {
-    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+    /* Options get the flexible column; the preview card sizes to its
+       content (the panel-aspect frame). */
+    grid-template-columns: minmax(0, 1fr) min-content;
   }
 }
 .send-pair-options { min-width: 0; }
@@ -1017,8 +1021,38 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   display: grid;
   gap: var(--t-space-3);
   justify-items: center;
+  width: max-content;
+  max-width: 100%;
 }
-.send-pair-preview .preview-frame { margin: 0 auto; }
+.send-pair-preview .card-head { width: 100%; }
+.send-pair-preview .preview-frame { margin: 0; }
+.send-pair-preview .preview-dims {
+  margin: 0;
+  font-size: 12px;
+  align-self: end;
+}
+.send-pair-preview .preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: white;
+}
+.preview-placeholder {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--t-space-5);
+  color: var(--t-muted);
+}
+.preview-placeholder [class^="ph-duotone"] {
+  font-size: 56px;
+  color: var(--t-fg-soft);
+  margin-bottom: var(--t-space-2);
+  opacity: 0.6;
+}
+.preview-placeholder p { margin: 0; font-size: var(--t-size-sm); }
 
 /* ----- Schedules timeline ------------------------------------------ */
 
