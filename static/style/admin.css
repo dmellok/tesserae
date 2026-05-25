@@ -1700,19 +1700,47 @@ button[disabled] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 12px;
-  padding: 6px 12px;
+  margin-left: 14px;
+  padding: 7px 16px 7px 12px;
   background: var(--t-accent);
-  color: var(--t-surface);
-  border: 0;
-  border-radius: var(--t-radius-sm);
+  color: var(--t-accent-fg, #fff);
+  border: 1px solid color-mix(in oklab, var(--t-accent) 70%, black);
+  border-radius: var(--t-radius-pill);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--t-size-sm);
   font-weight: 600;
+  letter-spacing: -0.005em;
   cursor: pointer;
   vertical-align: middle;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 1px 2px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    0 0 0 0 color-mix(in oklab, var(--t-accent) 0%, transparent);
+  transition:
+    background var(--t-trans-fast),
+    box-shadow var(--t-trans-fast),
+    transform var(--t-trans-fast);
 }
-.header-action:hover { background: var(--t-accent-hover); color: var(--t-surface); }
+.header-action .ph {
+  font-size: 14px;
+  opacity: 0.95;
+}
+.header-action:hover {
+  background: var(--t-accent-hover);
+  color: var(--t-accent-fg, #fff);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 3px 8px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 18%, transparent);
+  transform: translateY(-1px);
+}
+.header-action:active { transform: translateY(0); }
+.header-action:focus-visible {
+  outline: none;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 30%, transparent);
+}
 
 .header-back {
   color: var(--t-fg-soft);
