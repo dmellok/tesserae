@@ -26,7 +26,14 @@ In active development. Tracked by milestone:
 | 7 | Send page | done |
 | 8 | Generalise event log (renderer / device / scheduler events) | done |
 | 9 | Home Assistant MQTT discovery | done |
-| 10 | Port remaining widgets | next |
+| 10 | Port bedrock widgets (year_progress, sun_moon, weather, todo, calendar) | done |
+
+All ten milestones from the build prompt are complete. 202 tests passing;
+ruff + mypy --strict (on contract modules) clean. Widget editor and
+remaining v4 widgets (aligner, apod, aqi_trend, countdown, day_view,
+gallery, genart, github_heatmap, hn, home_assistant, news, note,
+pollen_vic, ptv, qr, radar, reddit, starmap, trakt_watchlist, unsplash,
+webpage, wikipotd, world_clock, xkcd) are future work.
 
 ## Architecture in one diagram
 
