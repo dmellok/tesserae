@@ -158,6 +158,20 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
     panel_w = int(page_dict["panel"]["w"])
     panel_h = int(page_dict["panel"]["h"])
 
+    # Auto-rotate/scale cells if the saved layout doesn't match the
+    # current panel orientation (e.g. dashboard designed for landscape
+    # is being rendered for a flipped-to-portrait panel).
+    from app.panel import fit_cells_to_panel  # local import: avoid cycle
+    raw_coords = [(int(c["x"]), int(c["y"]), int(c["w"]), int(c["h"])) for c in page_dict["cells"]]
+    fitted = fit_cells_to_panel(raw_coords, panel_w, panel_h)
+    page_dict = {
+        **page_dict,
+        "cells": [
+            {**cell, "x": nx, "y": ny, "w": nw, "h": nh}
+            for cell, (nx, ny, nw, nh) in zip(page_dict["cells"], fitted, strict=True)
+        ],
+    }
+
     cells_out: list[dict[str, Any]] = []
     for cell in page_dict["cells"]:
         cell_palette = dict(

@@ -1598,7 +1598,11 @@ button[disabled] {
   border-radius: var(--t-radius-sm);
   background: var(--t-surface-soft);
   overflow: hidden;
-  max-width: 100%;
+  /* Explicit width/height come from inline style (computed server-side
+     from panel dims × preview scale). Don't let max-width:100% shrink
+     the frame independently of the scaled iframe inside, or the iframe
+     will overflow and the aspect ratio looks wrong. */
+  flex-shrink: 0;
 }
 
 .preview-frame iframe {
@@ -1771,6 +1775,10 @@ button[disabled] {
 .save-status .ph, .save-status [class^="ph-"] { font-size: 13px; }
 .save-status[data-state="saving"] { background: var(--t-surface-soft); color: var(--t-fg-soft); }
 .save-status[data-state="saving"] .ph { animation: ts-spin 0.9s linear infinite; }
+.save-status[data-state="dirty"] {
+  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
+  color: var(--t-warn);
+}
 .save-status[data-state="error"] { background: var(--t-danger-bg); color: var(--t-danger); }
 
 @keyframes ts-spin {
@@ -1778,6 +1786,14 @@ button[disabled] {
 }
 
 .editor-spacer { flex: 1; }
+
+.editor-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.editor-actions button { padding: 6px 12px; font-size: 13px; }
+.editor-actions button[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* ----- Editor grid: options on the left, preview pinned on the right - */
 

@@ -72,6 +72,58 @@ def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Pan
     return resolve_settings_panel(settings)
 
 
+def fit_cells_to_panel(
+    cells: list[tuple[int, int, int, int]],
+    target_w: int,
+    target_h: int,
+) -> list[tuple[int, int, int, int]]:
+    """Project cells onto the target panel, auto-rotating 90° if the
+    cells were laid out for the opposite orientation.
+
+    Each cell is ``(x, y, w, h)`` in panel pixels. The function picks
+    the "design panel" from the cells' bounding box (max x+w, max y+h)
+    and:
+
+    * Rotates the layout 90° if design orientation != target
+      orientation, so a landscape dashboard auto-fits a portrait panel
+      and vice-versa.
+    * Scales each cell by ``target_w / design_w`` and
+      ``target_h / design_h`` so the layout proportions are preserved
+      regardless of exact panel size differences (e.g. 1600x1200 →
+      800x600).
+
+    Pure function — no Cell objects, no I/O — so this is cheap to call
+    at every render/preview tick."""
+    if not cells:
+        return []
+    design_w = max(x + w for x, y, w, h in cells)
+    design_h = max(y + h for x, y, w, h in cells)
+    if design_w <= 0 or design_h <= 0:
+        return list(cells)
+
+    design_landscape = design_w >= design_h
+    target_landscape = target_w >= target_h
+    if design_landscape != target_landscape:
+        # Rotate 90° clockwise: (x, y) -> (design_h - y - h, x);
+        # the cell's (w, h) swap so it lines up after the rotation.
+        rotated: list[tuple[int, int, int, int]] = []
+        for x, y, w, h in cells:
+            rotated.append((design_h - y - h, x, h, w))
+        cells = rotated
+        design_w, design_h = design_h, design_w
+
+    sx = target_w / design_w
+    sy = target_h / design_h
+    out: list[tuple[int, int, int, int]] = []
+    for x, y, w, h in cells:
+        nx = max(0, min(target_w - 1, round(x * sx)))
+        ny = max(0, min(target_h - 1, round(y * sy)))
+        nw = max(1, min(target_w - nx, round(w * sx)))
+        nh = max(1, min(target_h - ny, round(h * sy)))
+        out.append((nx, ny, nw, nh))
+    return out
+
+
 def _is_portrait(value: object) -> bool:
     """Tolerant truthy-check for the orientation field.
 

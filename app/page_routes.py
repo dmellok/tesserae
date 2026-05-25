@@ -47,7 +47,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
-from app.panel import resolve_page_panel, resolve_settings_panel
+from app.panel import fit_cells_to_panel, resolve_page_panel, resolve_settings_panel
 from app.plugin_loader import Plugin, PluginRegistry
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
@@ -219,9 +219,29 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
     return out
 
 
+def _ensure_cells_fit_panel(page: Page, panel: Any) -> Page:
+    """If the saved cell coords don't fit the current panel (e.g. user
+    flipped to portrait after designing in landscape), auto-rotate and
+    rescale them to the new panel, persist, and return the updated page."""
+    if not page.cells:
+        return page
+    coords = [(c.x, c.y, c.w, c.h) for c in page.cells]
+    fitted = fit_cells_to_panel(coords, panel.w, panel.h)
+    if fitted == coords:
+        return page
+    new_cells = [
+        cell.model_copy(update={"x": nx, "y": ny, "w": nw, "h": nh})
+        for cell, (nx, ny, nw, nh) in zip(page.cells, fitted, strict=True)
+    ]
+    updated = page.model_copy(update={"cells": new_cells})
+    _store().save(updated)
+    return updated
+
+
 def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
     panel = resolve_page_panel(page.panel, _settings_store())
+    page = _ensure_cells_fit_panel(page, panel)
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
     active_layout = detect_layout(panel_cells, panel.w, panel.h)
     widgets = sorted(_plugins().widgets(), key=lambda p: p.name.lower())
@@ -234,15 +254,17 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "fonts": sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
-        "preview_scale": _preview_scale(panel.w),
+        "preview_scale": _preview_scale(panel.w, panel.h),
     }
 
 
-def _preview_scale(panel_w: int) -> float:
+def _preview_scale(panel_w: int, panel_h: int = 0) -> float:
+    """Pick a scale that fits both axes inside a roughly 720x720 box so
+    portrait panels don't blow the editor column out vertically."""
     target = 720.0
-    if panel_w <= target:
-        return 1.0
-    return target / panel_w
+    sw = target / panel_w if panel_w > target else 1.0
+    sh = target / panel_h if panel_h and panel_h > target else 1.0
+    return min(sw, sh)
 
 
 # -- page-level routes --------------------------------------------
