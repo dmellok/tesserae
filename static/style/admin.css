@@ -999,33 +999,26 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   margin-top: var(--t-space-3);
 }
 
-/* ----- Send saved-dashboard preview --------------------------------- */
+/* ----- Send tabs: paired options + preview cards -------------------- */
 
-.saved-grid {
+.send-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--t-space-5);
   align-items: start;
 }
-@media (min-width: 900px) {
-  .saved-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
+@media (min-width: 1000px) {
+  .send-pair {
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto);
   }
 }
-.saved-options { display: grid; gap: var(--t-space-4); align-content: start; }
-.saved-preview {
+.send-pair-options { min-width: 0; }
+.send-pair-preview {
   display: grid;
-  gap: var(--t-space-2);
+  gap: var(--t-space-3);
   justify-items: center;
 }
-.saved-preview-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--t-size-sm);
-  color: var(--t-fg-soft);
-}
-.saved-preview-label .muted { font-size: 11px; }
+.send-pair-preview .preview-frame { margin: 0 auto; }
 
 /* ----- Schedules timeline ------------------------------------------ */
 
@@ -1198,6 +1191,13 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: var(--t-space-4);
   align-items: center;
   width: 100%;
+}
+/* The HTML `hidden` attribute should win over `display: grid` above —
+   browsers map it to `display: none` only when no other display rule
+   targets the element, so spell it out. */
+.dropzone-preview[hidden],
+.dropzone-body[hidden] {
+  display: none !important;
 }
 .dropzone-preview img {
   width: 120px;
