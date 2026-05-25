@@ -1009,6 +1009,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   gap: var(--t-space-5);
   align-items: start;
 }
+.send-pair[hidden] { display: none !important; }
 @media (min-width: 900px) {
   .send-pair {
     /* Options get the flexible column; the preview card sizes to its
