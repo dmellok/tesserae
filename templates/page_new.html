@@ -4,23 +4,24 @@
 <header class="page-head">
   <h1>New page</h1>
   <p class="lede">
-    A page is a panel-sized canvas. Pick the panel dimensions in pixels
-    (most Inky Impression panels are 1600×1200 in composition orientation).
-    You can change everything later.
+    A page is a panel-sized canvas. Pick the panel dimensions and a
+    starting layout — every layout creates positioned-but-unassigned
+    cells you fill with widgets in the editor. Everything is editable
+    later.
   </p>
 </header>
 
-<section class="card narrow">
+<section class="card">
   <form method="post" action="{{ url_for('pages.create') }}" class="form">
-    <div class="field">
-      <label for="pf-name">Name</label>
-      <input type="text" id="pf-name" name="name" required autofocus>
-    </div>
-    <div class="field">
-      <label for="pf-id">Id (snake_case, optional)</label>
-      <input type="text" id="pf-id" name="id" placeholder="(derived from name)" pattern="[a-z0-9_][a-z0-9_-]*">
-    </div>
     <div class="field-grid">
+      <div class="field">
+        <label for="pf-name">Name</label>
+        <input type="text" id="pf-name" name="name" required autofocus>
+      </div>
+      <div class="field">
+        <label for="pf-id">Id (snake_case, optional)</label>
+        <input type="text" id="pf-id" name="id" placeholder="(derived from name)" pattern="[a-z0-9_][a-z0-9_-]*">
+      </div>
       <div class="field">
         <label for="pf-pw">Panel width (px)</label>
         <input type="number" id="pf-pw" name="panel_w" value="1600" min="1" required>
@@ -42,10 +43,40 @@
         <input type="color" id="pf-bleed" name="bleed_color" value="#ffffff">
       </div>
     </div>
+
+    <fieldset class="form-group">
+      <legend>Starting layout</legend>
+      <div class="layout-grid">
+        {% for layout in layouts %}
+        <label class="layout-card {% if loop.first %}is-active{% endif %}">
+          <input type="radio" name="layout" value="{{ layout.slug }}" {% if loop.first %}checked{% endif %}>
+          <span class="layout-thumb">
+            {% for x, y, w, h in layout.cells %}
+            <span class="layout-thumb-cell"
+                  style="left: {{ (x * 100)|round(1) }}%; top: {{ (y * 100)|round(1) }}%;
+                         width: {{ (w * 100)|round(1) }}%; height: {{ (h * 100)|round(1) }}%;"></span>
+            {% endfor %}
+          </span>
+          <span class="layout-name">{{ layout.name }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
     <div class="actions">
       <button type="submit" class="primary">Create</button>
       <a class="ghost-link" href="{{ url_for('pages.index') }}">Cancel</a>
     </div>
   </form>
 </section>
+
+<script>
+  // Radio cards: clicking a card visually highlights it.
+  document.querySelectorAll('.layout-grid input[type="radio"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      document.querySelectorAll('.layout-card').forEach((c) =>
+        c.classList.toggle('is-active', c.contains(r) && r.checked));
+    });
+  });
+</script>
 {% endblock %}

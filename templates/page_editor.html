@@ -1,0 +1,248 @@
+{% extends "_base.html" %}
+{% block title %}{{ page.name }} — Tesserae{% endblock %}
+
+{% set PALETTE_TOKENS = ['bg','surface','surface2','fg','fgSoft','muted','accent','accentSoft','divider','danger','warn','ok'] %}
+
+{% macro cell_form(cell, idx) %}
+{% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
+<section class="card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
+  <header class="card-head">
+    <h2>
+      <span class="cell-num">{{ idx }}</span>
+      Cell {{ idx }}
+      <span class="muted">·</span>
+      <span class="cell-card-plugin">{{ cell.plugin or 'unassigned' }}</span>
+    </h2>
+    <form method="post" action="{{ url_for('pages.delete_cell', page_id=page.id, cell_id=cell.id) }}"
+          class="inline" onsubmit="return confirm('Delete this cell?');">
+      <button type="submit" class="ghost danger">Delete cell</button>
+    </form>
+  </header>
+
+  <form method="post"
+        action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}"
+        class="form" data-autosave>
+    <div class="field">
+      <label for="cell-{{ cell.id }}-plugin">Plugin</label>
+      <select id="cell-{{ cell.id }}-plugin" name="plugin" data-reload-on-change>
+        <option value="" {% if not cell.plugin %}selected{% endif %}>(pick a widget)</option>
+        {% for p in plugins %}
+        <option value="{{ p.id }}" {% if cell.plugin == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    {% if plugin %}
+    <div class="field-grid">
+      <div class="field">
+        <label for="cell-{{ cell.id }}-theme">Theme override</label>
+        <select id="cell-{{ cell.id }}-theme" name="theme">
+          <option value="" {% if not cell.theme %}selected{% endif %}>Inherit page</option>
+          {% for theme in themes %}
+          <option value="{{ theme.id }}" {% if cell.theme == theme.id %}selected{% endif %}>{{ theme.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="cell-{{ cell.id }}-font">Font override</label>
+        <select id="cell-{{ cell.id }}-font" name="font">
+          <option value="" {% if not cell.font %}selected{% endif %}>Inherit page</option>
+          {% for font in fonts %}
+          <option value="{{ font.id }}" {% if cell.font == font.id %}selected{% endif %}>{{ font.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <fieldset class="form-group">
+      <legend>Position &amp; size (px)</legend>
+      <div class="field-grid">
+        <div class="field"><label>X</label><input type="number" name="x" value="{{ cell.x }}" min="0" max="{{ page.panel.w - 1 }}"></div>
+        <div class="field"><label>Y</label><input type="number" name="y" value="{{ cell.y }}" min="0" max="{{ page.panel.h - 1 }}"></div>
+        <div class="field"><label>Width</label><input type="number" name="w" value="{{ cell.w }}" min="1" max="{{ page.panel.w }}"></div>
+        <div class="field"><label>Height</label><input type="number" name="h" value="{{ cell.h }}" min="1" max="{{ page.panel.h }}"></div>
+      </div>
+    </fieldset>
+
+    {% if plugin.manifest.cell_options %}
+    <fieldset class="form-group">
+      <legend>{{ plugin.name }} options</legend>
+      {% for opt in plugin.manifest.cell_options %}
+      <div class="field field--{{ opt.type }}">
+        <label for="cell-{{ cell.id }}-opt-{{ opt.name }}">{{ opt.label }}</label>
+        {% set value = cell.options.get(opt.name, opt.get('default', '')) %}
+        {% if opt.type == 'boolean' %}
+          <input type="checkbox" id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}" {% if value %}checked{% endif %}>
+        {% elif opt.type == 'select' %}
+          <select id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}">
+            {% for choice in opt.choices %}
+            <option value="{{ choice.value }}" {% if value == choice.value %}selected{% endif %}>{{ choice.label }}</option>
+            {% endfor %}
+          </select>
+        {% elif opt.type == 'textarea' %}
+          <textarea id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}" rows="2">{{ value }}</textarea>
+        {% elif opt.type == 'number' %}
+          <input type="number" id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}" value="{{ value }}" step="any">
+        {% elif opt.type == 'color' %}
+          <input type="color" id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}" value="{{ value or '#000000' }}">
+        {% else %}
+          <input type="text" id="cell-{{ cell.id }}-opt-{{ opt.name }}" name="opt_{{ opt.name }}" value="{{ value }}">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+
+    <details class="form-group">
+      <summary>Per-cell colour overrides ({{ (cell.palette_overrides or {})|length }} of 12 overridden)</summary>
+      <div class="palette-grid">
+        {% set overrides = cell.palette_overrides or {} %}
+        {% for token in PALETTE_TOKENS %}
+        <div class="palette-field">
+          <label>
+            <input type="checkbox" name="override_{{ token }}_enabled" {% if token in overrides %}checked{% endif %}>
+            {{ token }}
+          </label>
+          <input type="color" name="override_{{ token }}" value="{{ overrides.get(token, '#000000') }}">
+        </div>
+        {% endfor %}
+      </div>
+    </details>
+    {% else %}
+    <p class="lede"><em>Pick a widget above to configure this cell.</em></p>
+    {% endif %}
+
+    <noscript><div class="actions"><button type="submit" class="primary">Save</button></div></noscript>
+  </form>
+</section>
+{% endmacro %}
+
+{% block main %}
+<header class="editor-header">
+  <a class="header-back" href="{{ url_for('pages.index') }}" aria-label="Back to pages">←</a>
+  <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="inline-name-form" data-autosave>
+    <input type="text" name="name" value="{{ page.name }}" class="inline-name-input" aria-label="Page name">
+  </form>
+  <span class="save-status" data-save-status data-state="saved">Saved</span>
+  <span class="editor-spacer"></span>
+  <code class="page-id-tag">{{ page.id }}</code>
+</header>
+
+<div class="editor-grid" data-page-id="{{ page.id }}" data-cell-count="{{ page.cells|length }}">
+
+  <section class="card preview-card">
+    <header class="card-head">
+      <h2>Live preview</h2>
+      <p class="lede">Click a cell to edit it. Updates after every change.</p>
+    </header>
+    <div class="preview-frame"
+         style="width: {{ (page.panel.w * preview_scale)|round|int }}px;
+                height: {{ (page.panel.h * preview_scale)|round|int }}px;">
+      <iframe id="preview-iframe"
+              src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1"
+              style="width: {{ page.panel.w }}px; height: {{ page.panel.h }}px;
+                     transform: scale({{ preview_scale }}); transform-origin: 0 0;"
+              loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <p class="muted preview-dims">{{ page.panel.w }} × {{ page.panel.h }}</p>
+  </section>
+
+  <div class="editor-column">
+    <section class="card">
+      <header class="card-head">
+        <h2>Page</h2>
+        <p class="lede">Theme + font + matting + spacing applied to every cell.</p>
+      </header>
+      <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-autosave>
+        <input type="hidden" name="name" value="{{ page.name }}">
+        <div class="field-grid">
+          <div class="field">
+            <label for="page-theme">Theme</label>
+            <select id="page-theme" name="theme">
+              <option value="" {% if not page.theme %}selected{% endif %}>(default)</option>
+              {% for theme in themes %}
+              <option value="{{ theme.id }}" {% if page.theme == theme.id %}selected{% endif %}>{{ theme.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="page-font">Font</label>
+            <select id="page-font" name="font">
+              <option value="" {% if not page.font %}selected{% endif %}>(default)</option>
+              {% for font in fonts %}
+              <option value="{{ font.id }}" {% if page.font == font.id %}selected{% endif %}>{{ font.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="page-bleed">Matting colour</label>
+            <input type="color" id="page-bleed" name="bleed_color" value="{{ page.bleed_color }}">
+          </div>
+          <div class="field">
+            <label for="page-pw">Panel width (px)</label>
+            <input type="number" id="page-pw" name="panel_w" value="{{ page.panel.w }}" min="1">
+          </div>
+          <div class="field">
+            <label for="page-ph">Panel height (px)</label>
+            <input type="number" id="page-ph" name="panel_h" value="{{ page.panel.h }}" min="1">
+          </div>
+          <div class="field">
+            <label for="page-gap">Gap (px)</label>
+            <input type="number" id="page-gap" name="gap" value="{{ page.gap }}" min="0">
+          </div>
+          <div class="field">
+            <label for="page-radius">Corner radius (px)</label>
+            <input type="number" id="page-radius" name="corner_radius" value="{{ page.corner_radius }}" min="0">
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <header class="card-head">
+        <h2>Layout</h2>
+        <p class="lede">Pick a layout to (re)split the panel into cells. Existing cell assignments are reused in order.</p>
+      </header>
+      <div class="layout-grid">
+        {% for layout in layouts %}
+        <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
+          <input type="hidden" name="layout" value="{{ layout.slug }}">
+          <button type="submit" class="layout-card {% if active_layout == layout.slug %}is-active{% endif %}" aria-label="Apply {{ layout.name }}">
+            <span class="layout-thumb">
+              {% for x, y, w, h in layout.cells %}
+              <span class="layout-thumb-cell"
+                    style="left: {{ (x * 100)|round(1) }}%; top: {{ (y * 100)|round(1) }}%;
+                           width: {{ (w * 100)|round(1) }}%; height: {{ (h * 100)|round(1) }}%;"></span>
+              {% endfor %}
+            </span>
+            <span class="layout-name">{{ layout.name }}</span>
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% for cell in page.cells %}
+      {{ cell_form(cell, loop.index) }}
+    {% endfor %}
+
+    <section class="card add-cell-card">
+      <form method="post" action="{{ url_for('pages.create_cell', page_id=page.id) }}" class="form">
+        <button type="submit" class="ghost full-width">+ Add empty cell</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <header class="card-head"><h2>Danger zone</h2></header>
+      <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}"
+            class="form" onsubmit="return confirm('Delete this page entirely?');">
+        <div class="actions">
+          <button type="submit" class="ghost danger">Delete this page</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='pages/editor.js') }}"></script>
+{% endblock %}

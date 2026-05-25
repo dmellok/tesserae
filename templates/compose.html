@@ -41,13 +41,32 @@
     }
     .cell.full-bleed { outline: 0; }
     .cell.error { outline: 2px solid {{ page.palette.danger }}; }
+    .cell--empty {
+      background: repeating-linear-gradient(
+        45deg,
+        rgba(0,0,0,0.03) 0 12px,
+        rgba(0,0,0,0.06) 12px 24px
+      );
+    }
+    .cell-empty-placeholder {
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      color: #888;
+      font: 13px/1.4 system-ui, sans-serif;
+      text-align: center;
+    }
+    .cell-empty-placeholder strong { color: #555; display: block; }
   </style>
 </head>
 <body data-for-push="{{ '1' if for_push else '0' }}">
   <div class="panel">
     {% for cell in page.cells %}
-    <div class="cell{% if cell.full_bleed %} full-bleed{% endif %}"
+    <div class="cell{% if cell.full_bleed %} full-bleed{% endif %}{% if not cell.plugin %} cell--empty{% endif %}"
          data-cell-id="{{ cell.id }}"
+         data-cell-index="{{ loop.index }}"
          data-plugin="{{ cell.plugin }}"
          data-options='{{ cell.options|tojson }}'
          data-data='{{ cell.data|tojson }}'
@@ -59,9 +78,92 @@
          data-font-family="{{ cell.font_family }}"
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;
                 font-family: '{{ cell.font_family }}', system-ui, sans-serif;
-                {% for key, val in cell.palette.items() %}--theme-{{ key }}: {{ val }};{% endfor %}"></div>
+                {% for key, val in cell.palette.items() %}--theme-{{ key }}: {{ val }};{% endfor %}">
+      {% if not cell.plugin %}
+      <div class="cell-empty-placeholder">
+        <strong>Cell {{ loop.index }}</strong>
+        <span>pick a widget</span>
+      </div>
+      {% endif %}
+    </div>
     {% endfor %}
   </div>
+
+  {% if preview_mode %}
+  <!-- Preview-mode overlay: per-cell number tag + click-to-edit shim.
+       Tags absolutely positioned over each cell using inline styles so
+       they stay aligned through the iframe's transform: scale. Clicking
+       a cell sends a postMessage to the parent editor window. -->
+  <style>
+    .cell-tag {
+      position: absolute;
+      background: rgba(20, 16, 12, 0.85);
+      color: #fff;
+      font: 600 11px/1 system-ui, sans-serif;
+      padding: 4px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      z-index: 9;
+    }
+    .cell-click-shim {
+      position: absolute;
+      cursor: pointer;
+      z-index: 8;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      transition: background 80ms ease, outline 80ms ease;
+    }
+    .cell-click-shim:hover {
+      background: rgba(217, 119, 87, 0.18);
+      outline: 2px solid var(--editor-accent, #d97757);
+      outline-offset: -2px;
+    }
+    .cell-click-shim.is-focused {
+      outline: 3px solid var(--editor-accent, #d97757);
+      outline-offset: -3px;
+    }
+  </style>
+  <div class="preview-tags">
+    {% for cell in page.cells %}
+    <div class="cell-tag" style="left: {{ cell.x + 6 }}px; top: {{ cell.y + 6 }}px;">
+      {{ loop.index }} · {{ cell.plugin or 'unassigned' }}
+    </div>
+    <button class="cell-click-shim"
+            type="button"
+            data-cell-id="{{ cell.id }}"
+            data-cell-index="{{ loop.index }}"
+            style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;"
+            aria-label="Edit cell {{ loop.index }}"></button>
+    {% endfor %}
+  </div>
+  <script>
+    // Notify the editor (parent window) when a cell is clicked.
+    document.querySelectorAll('.cell-click-shim').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        try {
+          window.parent.postMessage({
+            type: 'tesserae-cell-clicked',
+            cellId: btn.dataset.cellId,
+            cellIndex: Number(btn.dataset.cellIndex),
+          }, location.origin);
+        } catch (e) { /* no parent */ }
+      });
+    });
+    // Parent can post back which cell is currently focused; we mirror
+    // the focused outline so the user knows which preview cell matches
+    // their selected editor card.
+    window.addEventListener('message', (ev) => {
+      if (!ev.data || ev.data.type !== 'tesserae-focus-cell') return;
+      document.querySelectorAll('.cell-click-shim').forEach((b) => {
+        b.classList.toggle('is-focused', b.dataset.cellId === ev.data.cellId);
+      });
+    });
+  </script>
+  {% endif %}
+
   <script type="module" src="{{ url_for('static', filename='composer.js') }}"></script>
 </body>
 </html>

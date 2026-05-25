@@ -30,10 +30,15 @@ class Panel(BaseModel):
 
 
 class Cell(BaseModel):
-    """One positioned widget. Coordinates are in panel pixels."""
+    """One positioned widget. Coordinates are in panel pixels.
+
+    ``plugin`` is optional so the editor can apply a layout template
+    (which creates positioned-but-unassigned cells) before the user
+    picks which widget renders into each slot. The composer skips
+    cells where ``plugin`` is None / empty rather than 500-ing."""
 
     id: str
-    plugin: str
+    plugin: str | None = None
     x: int = Field(..., ge=0)
     y: int = Field(..., ge=0)
     w: int = Field(..., gt=0)

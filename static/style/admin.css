@@ -953,3 +953,194 @@ button[disabled] {
   margin-left: 8px;
   vertical-align: middle;
 }
+
+/* ----- Editor header (page name + save status) --------------------- */
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 16px;
+  margin: -20px 0 12px;
+  border-bottom: 1px solid var(--t-border);
+}
+
+.editor-header .header-back {
+  font-size: 22px;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--t-radius-sm);
+  color: var(--t-fg-soft);
+}
+.editor-header .header-back:hover { background: var(--t-surface-soft); color: var(--t-accent); }
+
+.inline-name-form { flex: 1; max-width: 480px; }
+.inline-name-input {
+  font: 700 18px/1.2 system-ui, sans-serif;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--t-radius-sm);
+  background: transparent;
+  width: 100%;
+  color: var(--t-fg);
+}
+.inline-name-input:hover { background: var(--t-surface-soft); }
+.inline-name-input:focus { background: var(--t-surface); border-color: var(--t-border-strong); outline: none; }
+
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--t-ok-bg);
+  color: var(--t-ok);
+}
+.save-status::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-ok);
+}
+.save-status[data-state="saving"] { background: var(--t-surface-soft); color: var(--t-fg-soft); }
+.save-status[data-state="saving"]::before { background: var(--t-muted); animation: pulse 1.2s ease-in-out infinite; }
+.save-status[data-state="error"] { background: var(--t-danger-bg); color: var(--t-danger); }
+.save-status[data-state="error"]::before { background: var(--t-danger); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.editor-spacer { flex: 1; }
+
+/* ----- Editor grid: preview on right (sticky), cards on left ------ */
+
+@media (min-width: 1100px) {
+  .page { max-width: 1280px; }
+  .editor-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 800px);
+    grid-template-areas: "column preview";
+    gap: 24px;
+    align-items: start;
+  }
+  .editor-column { grid-area: column; display: grid; gap: 14px; min-width: 0; }
+  .preview-card {
+    grid-area: preview;
+    position: sticky;
+    top: 16px;
+    margin: 0;
+  }
+}
+
+@media (max-width: 1099px) {
+  .editor-grid { display: grid; gap: 14px; }
+}
+
+.preview-card .preview-frame { margin: 0 auto; }
+.preview-dims {
+  text-align: right;
+  font-size: 12px;
+  margin: 8px 4px 0;
+}
+
+.cell-card { scroll-margin-top: 16px; transition: outline 200ms ease; }
+.cell-card.is-focused {
+  outline: 3px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.cell-card .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.cell-card .card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+.cell-num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 700 12px/1 system-ui, sans-serif;
+}
+.cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
+
+/* ----- Layout picker (thumbnails) --------------------------------- */
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.layout-form { margin: 0; }
+
+.layout-card {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  font: 12px/1.2 system-ui, sans-serif;
+  color: var(--t-fg);
+  transition: border-color 80ms ease, transform 80ms ease;
+}
+.layout-card:hover {
+  border-color: var(--t-accent);
+  transform: translateY(-1px);
+}
+.layout-card.is-active {
+  border-color: var(--t-accent);
+  background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+}
+
+.layout-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.layout-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--t-surface-soft);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.layout-thumb-cell {
+  position: absolute;
+  background: color-mix(in oklab, var(--t-accent) 45%, white);
+  outline: 1px solid var(--t-surface);
+  outline-offset: -1px;
+}
+
+.layout-name {
+  font-weight: 600;
+  color: var(--t-fg);
+}
+
+.add-cell-card .full-width {
+  width: 100%;
+  padding: 12px;
+  font-weight: 600;
+  border-style: dashed;
+}

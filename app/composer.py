@@ -167,8 +167,9 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
                 cell_palette[token] = hex_value
         cell_font = _resolve_font(cell["font"], registry) if cell.get("font") else page_font
         cell_font_family = cell_font.name if cell_font else page_font_family
-        resolved_options = _resolved_options(cell["plugin"], cell.get("options", {}))
-        plugin = registry.get(cell["plugin"])
+        plugin_id = cell.get("plugin") or None
+        plugin = registry.get(plugin_id) if plugin_id else None
+        resolved_options = _resolved_options(plugin_id, cell.get("options", {})) if plugin_id else {}
         full_bleed = bool(plugin and plugin.manifest.get("render", {}).get("full_bleed"))
         left_pad = outer_pad if cell["x"] == 0 else inner_pad
         top_pad = outer_pad if cell["y"] == 0 else inner_pad
@@ -181,9 +182,12 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
                 "y": cell["y"] + top_pad,
                 "w": max(1, cell["w"] - left_pad - right_pad),
                 "h": max(1, cell["h"] - top_pad - bottom_pad),
+                "plugin": plugin_id or "",
                 "options": resolved_options,
-                "data": _fetch_plugin_data(
-                    cell["plugin"], resolved_options, panel_w, panel_h, preview
+                "data": (
+                    _fetch_plugin_data(plugin_id, resolved_options, panel_w, panel_h, preview)
+                    if plugin_id
+                    else None
                 ),
                 "palette": cell_palette,
                 "font_family": cell_font_family,
@@ -211,6 +215,10 @@ def compose(page_id: str) -> str:
     if page is None:
         abort(404)
     for_push = request.args.get("for_push") == "1"
+    # preview=1 turns on the editor overlay: per-cell number tags + click-
+    # to-edit shims that postMessage the parent (the editor window). Off
+    # for_push so the rendered PNG never includes the overlay.
+    preview_mode = request.args.get("preview") == "1" and not for_push
     return render_template(
         "compose.html",
         page=_hydrate_page(
@@ -218,6 +226,7 @@ def compose(page_id: str) -> str:
             preview=not for_push,
         ),
         for_push=for_push,
+        preview_mode=preview_mode,
     )
 
 
@@ -262,4 +271,5 @@ def test_render() -> str:
         "compose.html",
         page=_hydrate_page(page, preview=True),
         for_push=False,
+        preview_mode=False,
     )

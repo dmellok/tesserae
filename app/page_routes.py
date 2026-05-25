@@ -1,34 +1,27 @@
-"""Dashboard editor — pages + cells CRUD.
+"""Dashboard editor — single-page form-driven editor with auto-save.
 
-Two layers:
+The /pages/<id> endpoint serves the whole editor: page metadata, layout
+picker, every cell's options, and the live preview iframe. The client
+auto-saves any form change via fetch POST to the same endpoints used
+for full-page submits, then asks the preview iframe to reload.
 
-* **Page** = a panel-sized canvas with metadata (name, panel dims, theme,
-  font, gap, corner radius, bleed colour) and an ordered list of cells.
-* **Cell** = one widget on the panel: which plugin renders it, its
-  position + size in panel pixels, optional theme / font override, and
-  the plugin's ``cell_options`` filled in.
+Cells whose ``plugin`` is None are valid — they're slots a layout
+template created that the user hasn't filled in yet. The composer
+renders them as a placeholder; the editor shows a plugin dropdown.
 
-URL shape:
+URLs:
 
-  GET  /pages                     list every saved page
-  GET  /pages/new                 new-page form
-  POST /pages/new                 create
-  GET  /pages/<id>                page edit (metadata + cells list + iframe)
-  POST /pages/<id>                update page metadata
-  POST /pages/<id>/delete         delete the page
-  POST /pages/<id>/cells          create a cell (picks the plugin, lands
-                                  on the cell edit page for the rest)
-  GET  /pages/<id>/cells/<cid>    edit one cell
-  POST /pages/<id>/cells/<cid>    update one cell
-  POST /pages/<id>/cells/<cid>/delete
-
-The live preview iframe points at ``/compose/<page_id>?preview=1`` —
-same route Playwright screenshots from. The auth gate (M14 change)
-now lets authed sessions hit /compose so the iframe works over the LAN.
-
-Plugin choice is locked at cell creation. Changing a cell's plugin
-means deleting + re-adding — the option schemas don't line up between
-plugins anyway, so a swap would always drop the cell_options.
+  GET  /pages                          page list
+  GET  /pages/new                      new-page form
+  POST /pages/new                      create page (optionally seeds
+                                       cells from a layout template)
+  GET  /pages/<id>                     editor (single page)
+  POST /pages/<id>                     update page metadata (autosave)
+  POST /pages/<id>/delete              delete the page
+  POST /pages/<id>/layout              apply a layout template
+  POST /pages/<id>/cells               add an empty cell at the end
+  POST /pages/<id>/cells/<cid>         update one cell (autosave)
+  POST /pages/<id>/cells/<cid>/delete  remove one cell
 """
 
 from __future__ import annotations
@@ -43,6 +36,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -51,6 +45,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
 from app.plugin_loader import Plugin, PluginRegistry
 from app.state.page_store import Cell, Page, PageStore, Panel
 
@@ -91,14 +86,8 @@ def _coerce_int(
 
 
 def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -> Any:
-    """Mirror of settings_routes._coerce_form_value but scoped to widget
-    cell_option types (string / textarea / number / boolean / select /
-    color). Form keys are prefixed with ``opt_`` so they can coexist
-    with the cell's position / theme fields under one submit."""
     ftype = field.get("type", "string")
     if ftype == "boolean":
-        # Checkboxes: present in form == True, absent == False. Match the
-        # prefixed name (opt_<field>) the template renders.
         return f"opt_{field['name']}" in all_form
     if ftype == "number":
         if raw is None or raw == "":
@@ -121,7 +110,6 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
         if raw and raw.startswith("#"):
             return raw
         return field.get("default", "")
-    # string / textarea
     return raw if raw is not None else ""
 
 
@@ -139,13 +127,73 @@ def _palette_overrides_from_form(form: Any) -> dict[str, str] | None:
 
     out: dict[str, str] = {}
     for token in PALETTE_TOKENS:
-        raw = (form.get(f"override_{token}") or "").strip()
-        if raw and raw != "":
-            out[token] = raw
+        # Override is opt-in via a checkbox so the colour picker's
+        # always-set default doesn't accidentally override every token.
+        if form.get(f"override_{token}_enabled") in ("on", "true", "1"):
+            raw = (form.get(f"override_{token}") or "").strip()
+            if raw and raw.startswith("#"):
+                out[token] = raw
     return out or None
 
 
-# -- page-level routes ---------------------------------------------------
+def _flash_save(ok: bool, message: str) -> Response:
+    """Return value for autosave endpoints: JSON for fetch callers, a
+    redirect for native form submits (e.g. JS-disabled fallback)."""
+    is_xhr = (request.headers.get("X-Requested-With") or "").lower() == "fetch"
+    if is_xhr:
+        return jsonify({"ok": ok, "message": message})
+    flash(message, "ok" if ok else "error")
+    return redirect(request.referrer or url_for("pages.index"))
+
+
+# -- helpers for the editor view -----------------------------------
+
+
+def _new_cell(*, x: int, y: int, w: int, h: int) -> Cell:
+    return Cell(id=uuid.uuid4().hex[:8], plugin=None, x=x, y=y, w=w, h=h, options={})
+
+
+def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
+    """Build a new cells list by reusing existing cells (plugin + options)
+    in order and repositioning them to match the layout's slots. Extra
+    slots get unassigned cells; surplus existing cells are dropped."""
+    layout = LAYOUTS_BY_SLUG.get(layout_slug)
+    if layout is None:
+        raise ValueError(f"unknown layout {layout_slug!r}")
+    positions = to_panel_pixels(layout, page.panel.w, page.panel.h)
+    out: list[Cell] = []
+    for i, (x, y, w, h) in enumerate(positions):
+        if i < len(page.cells):
+            existing = page.cells[i]
+            out.append(existing.model_copy(update={"x": x, "y": y, "w": w, "h": h}))
+        else:
+            out.append(_new_cell(x=x, y=y, w=w, h=h))
+    return out
+
+
+def _editor_context(page: Page) -> dict[str, Any]:
+    """Shared context for the editor."""
+    panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
+    active_layout = detect_layout(panel_cells, page.panel.w, page.panel.h)
+    return {
+        "page": page,
+        "plugins": sorted(_plugins().widgets(), key=lambda p: p.name.lower()),
+        "themes": sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
+        "fonts": sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
+        "layouts": LAYOUTS,
+        "active_layout": active_layout.slug if active_layout else None,
+        "preview_scale": _preview_scale(page),
+    }
+
+
+def _preview_scale(page: Page) -> float:
+    target = 720.0
+    if page.panel.w <= target:
+        return 1.0
+    return target / page.panel.w
+
+
+# -- page-level routes --------------------------------------------
 
 
 @bp.get("")
@@ -156,7 +204,7 @@ def index() -> str:
 
 @bp.get("/new")
 def new() -> str:
-    return render_template("page_new.html")
+    return render_template("page_new.html", layouts=LAYOUTS)
 
 
 @bp.post("/new")
@@ -174,15 +222,20 @@ def create() -> Response:
         flash(f"A page with id {page_id!r} already exists.", "error")
         return redirect(url_for("pages.new"))
 
+    panel_w = _coerce_int(form.get("panel_w"), 1600, lo=1)
+    panel_h = _coerce_int(form.get("panel_h"), 1200, lo=1)
+    layout_slug = (form.get("layout") or "1_cell").strip()
+    layout = LAYOUTS_BY_SLUG.get(layout_slug, LAYOUTS_BY_SLUG["1_cell"])
+    initial_cells = [
+        _new_cell(x=x, y=y, w=w, h=h) for x, y, w, h in to_panel_pixels(layout, panel_w, panel_h)
+    ]
+
     try:
         page = Page(
             id=page_id,
             name=name,
-            panel=Panel(
-                w=_coerce_int(form.get("panel_w"), 1600, lo=1),
-                h=_coerce_int(form.get("panel_h"), 1200, lo=1),
-            ),
-            cells=[],
+            panel=Panel(w=panel_w, h=panel_h),
+            cells=initial_cells,
             theme=(form.get("theme") or None),
             font=(form.get("font") or None),
             gap=_coerce_int(form.get("gap"), 0, lo=0),
@@ -194,7 +247,7 @@ def create() -> Response:
         return redirect(url_for("pages.new"))
 
     _store().save(page)
-    flash(f"Page {name!r} created.", "ok")
+    flash(f"Page {name!r} created with the {layout.name} layout.", "ok")
     return redirect(url_for("pages.edit", page_id=page.id))
 
 
@@ -203,14 +256,7 @@ def edit(page_id: str) -> str:
     page = _store().get(page_id)
     if page is None:
         abort(404)
-    return render_template(
-        "page_edit.html",
-        page=page,
-        plugins=_plugins().widgets(),
-        themes=sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
-        fonts=sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
-        preview_scale=_preview_scale(page),
-    )
+    return render_template("page_editor.html", **_editor_context(page))
 
 
 @bp.post("/<page_id>")
@@ -235,11 +281,9 @@ def update(page_id: str) -> Response:
             }
         )
     except ValidationError as exc:
-        flash(f"Invalid page: {exc.errors()[0]['msg']}", "error")
-        return redirect(url_for("pages.edit", page_id=page_id))
+        return _flash_save(False, f"Invalid page: {exc.errors()[0]['msg']}")
     _store().save(updated)
-    flash("Page metadata saved.", "ok")
-    return redirect(url_for("pages.edit", page_id=page_id))
+    return _flash_save(True, "Page saved.")
 
 
 @bp.post("/<page_id>/delete")
@@ -251,59 +295,35 @@ def delete(page_id: str) -> Response:
     return redirect(url_for("pages.index"))
 
 
-# -- cell routes ----------------------------------------------------
+@bp.post("/<page_id>/layout")
+def apply_layout(page_id: str) -> Response:
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    layout_slug = (request.form.get("layout") or "").strip()
+    if layout_slug not in LAYOUTS_BY_SLUG:
+        return _flash_save(False, f"Unknown layout {layout_slug!r}.")
+    new_cells = _apply_layout_to_cells(layout_slug, page)
+    _store().save(page.model_copy(update={"cells": new_cells}))
+    return _flash_save(True, f"{LAYOUTS_BY_SLUG[layout_slug].name} layout applied.")
+
+
+# -- cell routes -------------------------------------------------
 
 
 @bp.post("/<page_id>/cells")
 def create_cell(page_id: str) -> Response:
+    """Add an unassigned cell at the end. The user picks the plugin from
+    the cell card afterwards."""
     page = _store().get(page_id)
     if page is None:
         abort(404)
-    plugin_id = (request.form.get("plugin") or "").strip()
-    plugin = _plugins().get(plugin_id)
-    if plugin is None or plugin.kind != "widget":
-        flash("Pick a widget plugin first.", "error")
-        return redirect(url_for("pages.edit", page_id=page_id))
-
-    # Position: bottom-left of the panel by default so a fresh cell
-    # doesn't overlap existing ones. Caller can resize on the cell edit
-    # page.
     default_w = min(page.panel.w, 400)
     default_h = min(page.panel.h, 240)
-    cell_id = uuid.uuid4().hex[:8]
-    cell = Cell(
-        id=cell_id,
-        plugin=plugin_id,
-        x=0,
-        y=0,
-        w=default_w,
-        h=default_h,
-        options=plugin.cell_option_defaults(),
-    )
+    cell = _new_cell(x=0, y=0, w=default_w, h=default_h)
     updated = page.model_copy(update={"cells": [*page.cells, cell]})
     _store().save(updated)
-    flash(f"Added {plugin.name} cell.", "ok")
-    return redirect(url_for("pages.edit_cell", page_id=page_id, cell_id=cell_id))
-
-
-@bp.get("/<page_id>/cells/<cell_id>")
-def edit_cell(page_id: str, cell_id: str) -> str:
-    page = _store().get(page_id)
-    if page is None:
-        abort(404)
-    cell = next((c for c in page.cells if c.id == cell_id), None)
-    if cell is None:
-        abort(404)
-    plugin = _plugins().get(cell.plugin)
-    return render_template(
-        "cell_edit.html",
-        page=page,
-        cell=cell,
-        plugin=plugin,
-        themes=sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
-        fonts=sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
-        preview_scale=_preview_scale(page),
-    )
+    return _flash_save(True, "Cell added.")
 
 
 @bp.post("/<page_id>/cells/<cell_id>")
@@ -314,33 +334,43 @@ def update_cell(page_id: str, cell_id: str) -> Response:
     cell = next((c for c in page.cells if c.id == cell_id), None)
     if cell is None:
         abort(404)
-    plugin = _plugins().get(cell.plugin)
-    if plugin is None:
-        flash(f"Cell's plugin {cell.plugin!r} is no longer loaded.", "error")
-        return redirect(url_for("pages.edit", page_id=page_id))
 
     form = request.form
+    # Plugin can change. When it does, drop existing options and reseed
+    # from the new plugin's manifest defaults — the option schemas don't
+    # line up between plugins so a swap would always produce a stale form.
+    new_plugin_id = (form.get("plugin") or "").strip() or None
+    plugin_changed = new_plugin_id != cell.plugin
+    plugin = _plugins().get(new_plugin_id) if new_plugin_id else None
+
+    if plugin_changed:
+        options: dict[str, Any] = plugin.cell_option_defaults() if plugin else {}
+    elif plugin is not None:
+        options = _cell_options_from_form(plugin, form)
+    else:
+        options = {}
+
     try:
         updated_cell = cell.model_copy(
             update={
+                "plugin": new_plugin_id,
                 "x": _coerce_int(form.get("x"), cell.x, lo=0, hi=page.panel.w - 1),
                 "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=page.panel.h - 1),
                 "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=page.panel.w),
                 "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=page.panel.h),
                 "theme": (form.get("theme") or None),
                 "font": (form.get("font") or None),
-                "options": _cell_options_from_form(plugin, form),
+                "options": options,
                 "palette_overrides": _palette_overrides_from_form(form),
             }
         )
     except ValidationError as exc:
-        flash(f"Invalid cell: {exc.errors()[0]['msg']}", "error")
-        return redirect(url_for("pages.edit_cell", page_id=page_id, cell_id=cell_id))
+        return _flash_save(False, f"Invalid cell: {exc.errors()[0]['msg']}")
 
     new_cells = [updated_cell if c.id == cell_id else c for c in page.cells]
     _store().save(page.model_copy(update={"cells": new_cells}))
-    flash("Cell saved.", "ok")
-    return redirect(url_for("pages.edit_cell", page_id=page_id, cell_id=cell_id))
+    msg = "Plugin changed — options reset." if plugin_changed and plugin else "Cell saved."
+    return _flash_save(True, msg)
 
 
 @bp.post("/<page_id>/cells/<cell_id>/delete")
@@ -349,24 +379,10 @@ def delete_cell(page_id: str, cell_id: str) -> Response:
     if page is None:
         abort(404)
     if not any(c.id == cell_id for c in page.cells):
-        flash(f"No cell {cell_id!r} on this page.", "error")
-        return redirect(url_for("pages.edit", page_id=page_id))
+        return _flash_save(False, f"No cell {cell_id!r}.")
     new_cells = [c for c in page.cells if c.id != cell_id]
     _store().save(page.model_copy(update={"cells": new_cells}))
-    flash("Cell deleted.", "ok")
-    return redirect(url_for("pages.edit", page_id=page_id))
-
-
-# -- helpers ------------------------------------------------------
-
-
-def _preview_scale(page: Page) -> float:
-    """Pick a CSS transform scale so the iframe fits in a ~640px-wide
-    preview slot regardless of the panel's actual pixel size."""
-    target = 640.0
-    if page.panel.w <= target:
-        return 1.0
-    return target / page.panel.w
+    return _flash_save(True, "Cell deleted.")
 
 
 def register(app: Flask) -> None:
