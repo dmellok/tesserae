@@ -7,17 +7,13 @@
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
 <section class="card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
-  <header class="card-head">
+  <header class="card-head cell-card-head">
     <h2>
       <span class="cell-num">{{ idx }}</span>
       <span>Cell {{ idx }}</span>
       <span class="muted">·</span>
       <span class="cell-card-plugin">{{ cell.plugin or 'unassigned' }}</span>
     </h2>
-    <form method="post" action="{{ url_for('pages.delete_cell', page_id=page.id, cell_id=cell.id) }}"
-          class="inline" onsubmit="return confirm('Delete this cell?');">
-      {{ button('Delete cell', variant='ghost danger', icon='trash') }}
-    </form>
   </header>
 
   <form method="post"
@@ -187,12 +183,6 @@
     {% for cell in page.cells %}
       {{ cell_form(cell, loop.index) }}
     {% endfor %}
-
-    <section class="card add-cell-card">
-      <form method="post" action="{{ url_for('pages.create_cell', page_id=page.id) }}" class="form">
-        {{ button('Add empty cell', variant='ghost', full_width=True, icon='plus') }}
-      </form>
-    </section>
   </div>
 </div>
 

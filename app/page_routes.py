@@ -384,6 +384,7 @@ def apply_layout(page_id: str) -> Response:
         return _flash_save(False, f"Unknown layout {layout_slug!r}.")
     new_cells = _apply_layout_to_cells(layout_slug, page)
     _store().save(page.model_copy(update={"cells": new_cells}))
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _flash_save(True, f"{LAYOUTS_BY_SLUG[layout_slug].name} layout applied.")
 
 

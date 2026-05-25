@@ -156,10 +156,32 @@
     });
   }
 
+  // Layout picker — apply server-side (it reshapes cells), then reload
+  // the page so the cell list reflects the new layout. The iframe
+  // refreshes naturally on reload.
+  function watchLayoutForms() {
+    document.querySelectorAll(".layout-form").forEach((form) => {
+      if (form.dataset.layoutBound) return;
+      form.dataset.layoutBound = "1";
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        setStatus("saving");
+        try {
+          await submit(form);
+          location.reload();
+        } catch (err) {
+          setStatus("error");
+          console.error("[editor] layout swap failed:", err);
+        }
+      });
+    });
+  }
+
   if (saveBtn) {
     saveBtn.addEventListener("click", saveAll);
     saveBtn.disabled = true;
   }
   watchForms();
+  watchLayoutForms();
   setStatus("saved");
 })();
