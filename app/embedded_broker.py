@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import logging
 import threading
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -29,11 +31,28 @@ class EmbeddedBroker:
     The broker is fully async; we run it in a background thread so the
     Flask process can stay synchronous. ``start()`` is idempotent and
     returns after the broker has reported "started" (so callers can
-    immediately connect). ``stop()`` tears the broker down cleanly."""
+    immediately connect). ``stop()`` tears the broker down cleanly.
 
-    def __init__(self, bind: str = "127.0.0.1", port: int = 1883) -> None:
+    Auth: pass ``username`` + ``password`` to require credentials. A
+    SHA-512 password file is written to ``passwd_path`` (or a temp file
+    next to it) for amqtt's file auth plugin to consume. With no
+    creds, the broker accepts anonymous connections — combine that
+    with the default ``127.0.0.1`` bind to keep the broker safe."""
+
+    def __init__(
+        self,
+        bind: str = "127.0.0.1",
+        port: int = 1883,
+        *,
+        username: str | None = None,
+        password: str | None = None,
+        passwd_path: Path | None = None,
+    ) -> None:
         self._bind = bind
         self._port = port
+        self._username = (username or "").strip() or None
+        self._password = password or None
+        self._passwd_path = passwd_path
         self._thread: threading.Thread | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._broker: Any = None
@@ -87,20 +106,48 @@ class EmbeddedBroker:
         self._loop = None
         self._broker = None
 
+    def _write_passwd_file(self) -> Path | None:
+        """Write a SHA-512 ``user:hash`` password file amqtt's file auth
+        plugin can read. Returns the path (or None if no creds set)."""
+        if not (self._username and self._password):
+            return None
+        if self._passwd_path is None:
+            raise RuntimeError(
+                "embedded broker: passwd_path required when credentials are set"
+            )
+        digest = hashlib.sha512(self._password.encode("utf-8")).hexdigest()
+        self._passwd_path.parent.mkdir(parents=True, exist_ok=True)
+        # Mode 600 so the password hash isn't world-readable on a
+        # multi-user host.
+        self._passwd_path.write_text(f"{self._username}:{digest}\n")
+        with contextlib.suppress(Exception):
+            self._passwd_path.chmod(0o600)
+        return self._passwd_path
+
     def _run(self) -> None:
         from amqtt.broker import Broker
 
-        cfg = {
-            "listeners": {
-                "default": {
-                    "type": "tcp",
-                    "bind": f"{self._bind}:{self._port}",
-                },
+        listeners: dict[str, Any] = {
+            "default": {
+                "type": "tcp",
+                "bind": f"{self._bind}:{self._port}",
             },
-            # We accept anonymous connections — anyone reachable to the
-            # bind address can connect. Users who want auth should run
-            # Mosquitto and point the host setting at it.
-            "auth": {"allow-anonymous": True},
+        }
+        passwd_file = self._write_passwd_file()
+        if passwd_file is not None:
+            auth: dict[str, Any] = {
+                "allow-anonymous": False,
+                "password-file": str(passwd_file),
+                "plugins": ["auth_file"],
+            }
+        else:
+            auth = {
+                "allow-anonymous": True,
+                "plugins": ["auth_anonymous"],
+            }
+        cfg = {
+            "listeners": listeners,
+            "auth": auth,
             # Keep the broker quiet; amqtt is chatty at INFO.
             "topic-check": {"enabled": False},
         }

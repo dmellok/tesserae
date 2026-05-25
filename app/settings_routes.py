@@ -161,9 +161,9 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "label": "Built-in broker",
         "default": False,
         "help": (
-            "Run an in-process MQTT broker (amqtt) bound to 127.0.0.1. "
-            "Convenient when you don't have a Mosquitto host handy; "
-            "leave off for any non-trivial deployment."
+            "Run an in-process MQTT broker (amqtt). Convenient when you "
+            "don't have a Mosquitto host handy; leave off for any "
+            "non-trivial deployment."
         ),
     },
     {
@@ -175,6 +175,35 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "max": 65535,
         "step": 1,
         "help": "Port the built-in broker listens on. Tesserae's transport auto-connects here when host is empty.",
+    },
+    {
+        "name": "embedded_bind",
+        "type": "string",
+        "label": "Built-in broker bind address",
+        "default": "127.0.0.1",
+        "help": (
+            "127.0.0.1 keeps the broker loopback-only (only this host can "
+            "reach it). Set to 0.0.0.0 to accept connections from any LAN "
+            "client — set a username + password below if you do."
+        ),
+    },
+    {
+        "name": "embedded_username",
+        "type": "string",
+        "label": "Built-in broker username",
+        "default": "",
+        "help": (
+            "Optional. When set with a password, anonymous logins are "
+            "rejected. Leave both blank for an open broker."
+        ),
+    },
+    {
+        "name": "embedded_password",
+        "type": "string",
+        "label": "Built-in broker password",
+        "default": "",
+        "secret": True,
+        "help": "Stored on disk in a hashed password file the broker reads on start.",
     },
 ]
 

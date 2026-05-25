@@ -261,9 +261,14 @@ def _rebuild_transport(
     host = str(broker_raw.get("host") or "")
 
     # Optional in-process MQTT broker. If enabled and host isn't already
-    # set, default the transport to talk to it on localhost.
+    # set, default the transport to talk to it on the embedded bind
+    # address. When the operator's also set credentials we feed them
+    # back into the transport so it can auth against its own broker.
     embedded_enabled = _truthy(broker_raw.get("embedded_enabled"))
     embedded_port = int(broker_raw.get("embedded_port") or 1883)
+    embedded_bind = str(broker_raw.get("embedded_bind") or "127.0.0.1").strip() or "127.0.0.1"
+    embedded_user = (str(broker_raw.get("embedded_username") or "")).strip()
+    embedded_pass = str(broker_raw.get("embedded_password_secret") or "")
     old_embedded: EmbeddedBroker | None = app.config.get("EMBEDDED_BROKER")
     if old_embedded is not None:
         try:
@@ -271,25 +276,47 @@ def _rebuild_transport(
         except Exception:
             logger.exception("stopping old embedded broker")
         app.config.pop("EMBEDDED_BROKER", None)
+    embedded_self_connect = False
     if embedded_enabled and not testing:
-        embedded = EmbeddedBroker(bind="127.0.0.1", port=embedded_port)
+        # renders_dir lives at data_root/core/renders, so its parent is
+        # the right home for the broker's password file.
+        passwd_path = renders_dir.parent / ".amqtt-passwd"
+        embedded = EmbeddedBroker(
+            bind=embedded_bind,
+            port=embedded_port,
+            username=embedded_user or None,
+            password=embedded_pass or None,
+            passwd_path=passwd_path,
+        )
         try:
             embedded.start()
             app.config["EMBEDDED_BROKER"] = embedded
             if not host:
-                host = "127.0.0.1"
+                # Localhost loopback when broker binds there; otherwise
+                # use the same bind for consistency.
+                host = "127.0.0.1" if embedded_bind in ("127.0.0.1", "localhost") else embedded_bind
+                embedded_self_connect = True
         except Exception:
             logger.exception(
-                "embedded broker failed to start on port %s; transport will stay offline",
+                "embedded broker failed to start on %s:%s; transport will stay offline",
+                embedded_bind,
                 embedded_port,
             )
 
     factory = _noop_client_factory if testing else None
+    # When the transport is hitting our own embedded broker and the
+    # operator set creds for it, reuse those creds — no need to set
+    # them in two places.
+    transport_user = broker_raw.get("username") or None
+    transport_pass = broker_raw.get("password_secret") or None
+    if embedded_self_connect and embedded_user and not transport_user:
+        transport_user = embedded_user
+        transport_pass = embedded_pass or None
     config = BrokerConfig(
         host=host or "localhost",
         port=int(broker_raw.get("port") or embedded_port or 1883),
-        username=broker_raw.get("username") or None,
-        password=broker_raw.get("password_secret") or None,
+        username=transport_user,
+        password=transport_pass,
         keepalive=int(broker_raw.get("keepalive") or 60),
         client_id=str(broker_raw.get("client_id") or "tesserae"),
     )
