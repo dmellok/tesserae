@@ -18,8 +18,8 @@ In active development. Tracked by milestone:
 | # | Milestone | Status |
 |---|---|---|
 | 1 | Scaffold + plugin loader + composer + clock widget + smoke test | done |
-| 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | next |
-| 3 | `/settings` page generated from manifests + auth gate | — |
+| 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | done |
+| 3 | `/settings` page generated from manifests + auth gate | next |
 | 4 | `pi_bin` + `esp32_bin` renderers | — |
 | 5 | Device layer (`pi_listener` + `esp32_client`) | — |
 | 6 | Scheduler | — |
@@ -75,8 +75,8 @@ Grammar: `tesserae/<device-type>/<channel>[/<format>]`
 
 ## Running locally
 
-The app factory and plugin loader are in place. There's no admin UI yet, but
-you can boot the server and load the bundled clock widget into a test cell:
+The app factory, plugin loader, renderer loader, and push pipeline are in
+place. There's no admin UI yet, but you can:
 
 ```sh
 python3 -m venv .venv
@@ -87,13 +87,18 @@ python3 -m venv .venv
 Then open <http://127.0.0.1:8000/_test/render?plugin=clock&size=md> to see a
 single clock cell rendered through the composer.
 
-To run the test suite (loader contract + composer markup + per-widget smoke):
+To run the test suite (loader contracts + composer markup + transport +
+push pipeline + per-widget/renderer smoke):
 
 ```sh
 .venv/bin/pytest -q
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 .venv/bin/mypy app/
 ```
+
+The renderer + transport + push pipeline are exercised end-to-end against
+mocked broker and patched Playwright — no live broker or Chromium is
+required for tests.
 
 ## Tech stack
 

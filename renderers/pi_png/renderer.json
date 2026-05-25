@@ -1,0 +1,69 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Pi listener (PNG)",
+  "version": "0.1.0",
+  "description": "Composition PNG, rotated to the Pi listener's landscape-native pixel grid. Published non-retained to tesserae/pi/frame/png with the v3-frozen options payload (rotate / scale / bg / saturation) so an existing inky-dash listener works without firmware changes.",
+  "orientation": "landscape",
+  "mime": "image/png",
+  "extension": "png",
+  "topic_pattern": "tesserae/{device}/frame/png",
+  "device": "pi",
+  "retain": false,
+  "settings": [
+    {
+      "name": "rotate",
+      "type": "select",
+      "label": "Listener rotation (quarter-turns)",
+      "default": 0,
+      "choices": [
+        { "value": 0, "label": "0°" },
+        { "value": 1, "label": "90° CW" },
+        { "value": 2, "label": "180°" },
+        { "value": 3, "label": "270° CW" }
+      ]
+    },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Listener-side scale mode",
+      "default": "fit",
+      "choices": [
+        { "value": "fit", "label": "Fit" },
+        { "value": "fill", "label": "Fill" },
+        { "value": "stretch", "label": "Stretch" },
+        { "value": "center", "label": "Center" }
+      ]
+    },
+    {
+      "name": "bg",
+      "type": "select",
+      "label": "Letterbox colour",
+      "default": "white",
+      "choices": [
+        { "value": "white", "label": "White" },
+        { "value": "black", "label": "Black" },
+        { "value": "red", "label": "Red" },
+        { "value": "green", "label": "Green" },
+        { "value": "blue", "label": "Blue" },
+        { "value": "yellow", "label": "Yellow" },
+        { "value": "orange", "label": "Orange" }
+      ]
+    },
+    {
+      "name": "saturation",
+      "type": "number",
+      "label": "Listener-side saturation (0–1)",
+      "default": 0.5,
+      "min": 0,
+      "max": 1
+    },
+    {
+      "name": "transform_rotate_quarters",
+      "type": "number",
+      "label": "Server-side rotate before publish (quarter-turns)",
+      "default": 1,
+      "min": 0,
+      "max": 3
+    }
+  ]
+}

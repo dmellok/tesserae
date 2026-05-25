@@ -81,7 +81,7 @@ testpaths = ["tests", "plugins", "renderers", "devices"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --import-mode=importlib"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:flask.*",

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/renderer.schema.json",
+  "title": "Tesserae renderer manifest",
+  "description": "Shape of renderer.json. Declares the wire-side of a publish target: how to transform the composition PNG, what to publish, where, and whether to retain.",
+  "type": "object",
+  "required": [
+    "tesserae_compat",
+    "name",
+    "version",
+    "orientation",
+    "mime",
+    "extension",
+    "topic_pattern",
+    "device",
+    "retain"
+  ],
+  "properties": {
+    "tesserae_compat": {
+      "type": "string",
+      "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$",
+      "description": "Major version range this renderer works against (e.g. '1.x'). The loader rejects mismatches."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$" },
+    "description": { "type": "string" },
+    "orientation": {
+      "enum": ["composition", "landscape", "portrait"],
+      "description": "How transform() orients its output relative to the canonical composition PNG."
+    },
+    "mime": { "type": "string", "minLength": 3 },
+    "extension": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+$",
+      "description": "File extension for the artifact (e.g. 'png', 'bin')."
+    },
+    "topic_pattern": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MQTT topic the artifact is published to. '{device}' is substituted from the 'device' field at load time."
+    },
+    "device": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Device-type prefix this renderer targets (e.g. 'pi', 'esp32'). Must match the id of a device plugin that declares this renderer."
+    },
+    "retain": {
+      "type": "boolean",
+      "description": "Whether the broker should retain the publish so a freshly-woken subscriber sees it on first wake."
+    },
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "label"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "label": { "type": "string" },
+          "default": {},
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["value", "label"],
+              "properties": {
+                "value": {},
+                "label": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
