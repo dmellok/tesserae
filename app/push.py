@@ -28,6 +28,7 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import io
 import json
@@ -36,6 +37,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -120,17 +122,46 @@ class PushManager:
         self._renders_dir.mkdir(parents=True, exist_ok=True)
         self._base_url = base_url.rstrip("/")
         self._lock = threading.Lock()
+        # Listeners fire synchronously after every push attempt (success
+        # or failure). HA discovery uses this to follow pushes. Slow
+        # listeners block the request — keep them fast. Exceptions are
+        # logged and swallowed so a buggy subscriber can't break a push.
+        self._listener_lock = threading.Lock()
+        self._listeners: list[Callable[[PushResult], None]] = []
+
+    # -- listeners -------------------------------------------------------
+
+    def add_listener(self, callback: Callable[[PushResult], None]) -> None:
+        with self._listener_lock:
+            if callback not in self._listeners:
+                self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[PushResult], None]) -> None:
+        with self._listener_lock, contextlib.suppress(ValueError):
+            self._listeners.remove(callback)
+
+    def _notify(self, result: PushResult) -> None:
+        with self._listener_lock:
+            listeners = list(self._listeners)
+        for cb in listeners:
+            try:
+                cb(result)
+            except Exception:
+                logger.exception("push listener %r raised", cb)
 
     # -- public API ------------------------------------------------------
 
     def push(self, page_id: str) -> PushResult:
         """Render a saved Page through the composer and publish."""
         if not self._lock.acquire(blocking=False):
-            return self._log_busy(source="page", target=page_id)
-        try:
-            return self._push_page_locked(page_id)
-        finally:
-            self._lock.release()
+            result = self._log_busy(source="page", target=page_id)
+        else:
+            try:
+                result = self._push_page_locked(page_id)
+            finally:
+                self._lock.release()
+        self._notify(result)
+        return result
 
     def push_image(self, image_bytes: bytes, *, source_label: str) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
@@ -139,48 +170,61 @@ class PushManager:
         ``transform()`` is responsible for fitting the input to its panel
         dims (the bundled renderers do this via ``fit_to_panel``)."""
         if not self._lock.acquire(blocking=False):
-            return self._log_busy(source="file", target=source_label)
-        try:
-            return self._push_bytes_locked(image_bytes, source_label, source="file")
-        finally:
-            self._lock.release()
+            result = self._log_busy(source="file", target=source_label)
+        else:
+            try:
+                result = self._push_bytes_locked(image_bytes, source_label, source="file")
+            finally:
+                self._lock.release()
+        self._notify(result)
+        return result
 
     def push_url_image(self, url: str) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
         surface as failed events with the URL as the target."""
         if not self._lock.acquire(blocking=False):
-            return self._log_busy(source="url", target=url)
-        try:
+            result = self._log_busy(source="url", target=url)
+        else:
             try:
-                image_bytes = self._fetch_remote_image(url)
-            except Exception as err:
-                return self._log_failure(source="url", target=url, error=f"fetch: {err}")
-            return self._push_bytes_locked(image_bytes, url, source="url")
-        finally:
-            self._lock.release()
+                try:
+                    image_bytes = self._fetch_remote_image(url)
+                except Exception as err:
+                    result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
+                else:
+                    result = self._push_bytes_locked(image_bytes, url, source="url")
+            finally:
+                self._lock.release()
+        self._notify(result)
+        return result
 
     def push_webpage(
         self, url: str, *, viewport_w: int = 1600, viewport_h: int = 1200
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish."""
         if not self._lock.acquire(blocking=False):
-            return self._log_busy(source="webpage", target=url)
-        try:
-            started = time.monotonic()
+            result = self._log_busy(source="webpage", target=url)
+        else:
             try:
-                composition = render_to_png(
-                    RenderRequest(url=url, viewport_w=viewport_w, viewport_h=viewport_h)
-                )
-            except Exception as err:
-                return self._log_failure(
-                    source="webpage",
-                    target=url,
-                    error=f"render: {err}",
-                    duration_s=time.monotonic() - started,
-                )
-            return self._push_bytes_locked(composition, url, source="webpage", started=started)
-        finally:
-            self._lock.release()
+                started = time.monotonic()
+                try:
+                    composition = render_to_png(
+                        RenderRequest(url=url, viewport_w=viewport_w, viewport_h=viewport_h)
+                    )
+                except Exception as err:
+                    result = self._log_failure(
+                        source="webpage",
+                        target=url,
+                        error=f"render: {err}",
+                        duration_s=time.monotonic() - started,
+                    )
+                else:
+                    result = self._push_bytes_locked(
+                        composition, url, source="webpage", started=started
+                    )
+            finally:
+                self._lock.release()
+        self._notify(result)
+        return result
 
     def republish(self, event_id: int) -> PushResult:
         """Re-publish a past push from its stored composition PNG. No
@@ -188,29 +232,33 @@ class PushManager:
         ``source="resend"`` so history keeps the link to the original."""
         record = self._event_log.get(event_id)
         if record is None:
-            return PushResult(status="not_found", page_id="", error="history record not found")
-        if not record.digest:
-            return PushResult(
+            result = PushResult(status="not_found", page_id="", error="history record not found")
+        elif not record.digest:
+            result = PushResult(
                 status="failed", page_id=record.target, error="record has no composition digest"
             )
-        comp_path = self._renders_dir / f"{record.digest}.png"
-        if not comp_path.exists():
-            return PushResult(
-                status="failed",
-                page_id=record.target,
-                composition_digest=record.digest,
-                error="composition PNG evicted from disk",
-            )
-        if not self._lock.acquire(blocking=False):
-            return self._log_busy(source="resend", target=record.target)
-        try:
-            return self._push_bytes_locked(
-                comp_path.read_bytes(),
-                record.target,
-                source="resend",
-            )
-        finally:
-            self._lock.release()
+        else:
+            comp_path = self._renders_dir / f"{record.digest}.png"
+            if not comp_path.exists():
+                result = PushResult(
+                    status="failed",
+                    page_id=record.target,
+                    composition_digest=record.digest,
+                    error="composition PNG evicted from disk",
+                )
+            elif not self._lock.acquire(blocking=False):
+                result = self._log_busy(source="resend", target=record.target)
+            else:
+                try:
+                    result = self._push_bytes_locked(
+                        comp_path.read_bytes(),
+                        record.target,
+                        source="resend",
+                    )
+                finally:
+                    self._lock.release()
+        self._notify(result)
+        return result
 
     def delete_history(self, event_id: int) -> bool:
         """Delete a history row and, if no other rows still reference the

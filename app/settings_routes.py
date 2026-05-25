@@ -79,6 +79,17 @@ APP_FIELDS: list[dict[str, Any]] = [
         "default": 1200,
         "min": 1,
     },
+    {
+        "name": "ha_discovery_enabled",
+        "type": "boolean",
+        "label": "Home Assistant MQTT discovery",
+        "default": False,
+        "help": (
+            "Publish HA autodiscovery configs so a button per saved dashboard, "
+            "an image entity for the most-recent render, and diagnostic sensors "
+            "appear under a 'Tesserae' device in HA. Default off."
+        ),
+    },
 ]
 
 BROKER_FIELDS: list[dict[str, Any]] = [
@@ -284,6 +295,11 @@ def settings_update(section_kind: str) -> Response:
         flash(message, "ok")
         # Broker changes need transport rewiring — apply now, no restart.
         if section_kind == "broker":
+            _apply_broker_change()
+        elif section_kind == "app":
+            # base_url / panel dims / ha_discovery_enabled all need a
+            # transport + HA discovery refresh to take effect without a
+            # restart.
             _apply_broker_change()
         return redirect(url_for("auth.settings", _anchor=section_kind))
 

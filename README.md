@@ -25,8 +25,8 @@ In active development. Tracked by milestone:
 | 6 | Scheduler | done |
 | 7 | Send page | done |
 | 8 | Generalise event log (renderer / device / scheduler events) | done |
-| 9 | Home Assistant MQTT discovery | next |
-| 10 | Port remaining widgets | — |
+| 9 | Home Assistant MQTT discovery | done |
+| 10 | Port remaining widgets | next |
 
 ## Architecture in one diagram
 

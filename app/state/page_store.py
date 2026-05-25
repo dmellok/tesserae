@@ -9,12 +9,17 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 class Panel(BaseModel):
@@ -73,7 +78,30 @@ class PageStore:
         self._path = path
         self._lock = threading.Lock()
         self._pages: dict[str, Page] = {}
+        # Listeners fire after every save / delete. HA discovery uses
+        # this to refresh its per-page button entities. Exceptions are
+        # logged and swallowed.
+        self._listener_lock = threading.Lock()
+        self._listeners: list[Callable[[], None]] = []
         self._load()
+
+    def add_listener(self, callback: Callable[[], None]) -> None:
+        with self._listener_lock:
+            if callback not in self._listeners:
+                self._listeners.append(callback)
+
+    def remove_listener(self, callback: Callable[[], None]) -> None:
+        with self._listener_lock, contextlib.suppress(ValueError):
+            self._listeners.remove(callback)
+
+    def _notify(self) -> None:
+        with self._listener_lock:
+            listeners = list(self._listeners)
+        for cb in listeners:
+            try:
+                cb()
+            except Exception:
+                logger.exception("PageStore listener %r raised", cb)
 
     def _load(self) -> None:
         if not self._path.exists():
@@ -105,6 +133,7 @@ class PageStore:
         with self._lock:
             self._pages[page.id] = page
             self._flush()
+        self._notify()
 
     def delete(self, page_id: str) -> bool:
         with self._lock:
@@ -112,4 +141,6 @@ class PageStore:
             self._pages.pop(page_id, None)
             if existed:
                 self._flush()
-            return existed
+        if existed:
+            self._notify()
+        return existed

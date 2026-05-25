@@ -35,6 +35,7 @@ from app import (
     send_routes,
     settings_routes,
 )
+from app.ha_discovery import HomeAssistantDiscovery
 from app.push import PushManager
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
@@ -256,6 +257,32 @@ def _rebuild_transport(
         renders_dir=renders_dir,
         base_url=base_url,
     )
+
+    # HA discovery is opt-in. If previously running, stop it first so the
+    # old listeners detach from the previous PushManager (which has been
+    # replaced above). Then start fresh if the toggle is on.
+    old_ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
+    if old_ha is not None:
+        try:
+            old_ha.stop()
+        except Exception:
+            logger.exception("stopping previous HA discovery")
+    ha_enabled = bool(app_section.get("ha_discovery_enabled"))
+    if ha_enabled:
+        new_ha = HomeAssistantDiscovery(
+            transport=transport,
+            push_manager=app.config["PUSH_MANAGER"],
+            page_store=page_store,
+            base_url=base_url,
+        )
+        try:
+            new_ha.start()
+            app.config["HA_DISCOVERY"] = new_ha
+        except Exception:
+            logger.exception("starting HA discovery")
+            app.config["HA_DISCOVERY"] = None
+    else:
+        app.config["HA_DISCOVERY"] = None
 
 
 def _subscribe_device_status(
