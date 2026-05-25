@@ -20,8 +20,8 @@ In active development. Tracked by milestone:
 | 1 | Scaffold + plugin loader + composer + clock widget + smoke test | done |
 | 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | done |
 | 3 | `/settings` page generated from manifests + auth gate | done |
-| 4 | `pi_bin` + `esp32_bin` renderers | next |
-| 5 | Device layer (`pi_listener` + `esp32_client`) | — |
+| 4 | `pi_bin` + `esp32_bin` renderers | done |
+| 5 | Device layer (`pi_listener` + `esp32_client`) | next |
 | 6 | Scheduler | — |
 | 7 | Send page | — |
 | 8 | Push history (event log) | — |

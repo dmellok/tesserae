@@ -1,0 +1,46 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "ESP32 client (4-bpp .bin)",
+  "version": "0.1.0",
+  "description": "Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. Published retained to tesserae/esp32/frame/bin so a freshly-woken client sees the current frame on first wake.",
+  "orientation": "composition",
+  "mime": "application/octet-stream",
+  "extension": "bin",
+  "topic_pattern": "tesserae/{device}/frame/bin",
+  "device": "esp32",
+  "retain": true,
+  "settings": [
+    {
+      "name": "dither",
+      "type": "select",
+      "label": "Dither mode",
+      "default": "floyd-steinberg",
+      "choices": [
+        { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
+        { "value": "atkinson", "label": "Atkinson (contrasty, clean solids)" },
+        { "value": "jarvis", "label": "Jarvis-Judice-Ninke (smoothest)" },
+        { "value": "stucki", "label": "Stucki" },
+        { "value": "bayer-8x8", "label": "Bayer 8x8 (ordered)" },
+        { "value": "halftone", "label": "Halftone dots" },
+        { "value": "crosshatch", "label": "Crosshatch" },
+        { "value": "none", "label": "None (snap to palette)" }
+      ]
+    },
+    {
+      "name": "saturation",
+      "type": "number",
+      "label": "Pre-quantise saturation",
+      "default": 1.0,
+      "min": 0,
+      "max": 3
+    },
+    {
+      "name": "contrast",
+      "type": "number",
+      "label": "Pre-quantise contrast",
+      "default": 1.0,
+      "min": 0,
+      "max": 3
+    }
+  ]
+}
