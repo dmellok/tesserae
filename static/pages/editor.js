@@ -1,18 +1,26 @@
-// Dashboard editor — explicit save model.
+// Dashboard editor — explicit save with live preview.
 //
-// Every form tagged `data-editor-form` (page metadata, cells) is left
-// alone until the user clicks the Save button in the header. Clicking
-// Save fans out one fetch per form, refreshes the preview iframe, and
-// flips the save-status pill back to "Saved".
+// Each editor-form is left unsaved until the user clicks Save in the
+// header. As the user makes changes we debounce-POST the aggregated
+// form data to /pages/<id>/preview, which stashes a draft Page in the
+// app's PREVIEW_CACHE. The preview iframe re-loads the composer URL;
+// the composer reads from the cache first, so the user sees their
+// pending changes without anything being written to disk.
 //
-// The plugin <select> on a cell is a special case — when it changes
-// we still POST that one cell immediately so the option schema can
-// re-render against the new plugin. Everything else is held until Save.
+// Save → fans out one fetch per form to the real persist endpoints;
+// each persist clears the preview cache so the saved version becomes
+// authoritative again.
+//
+// The plugin <select> on a cell is still a special case — when it
+// changes we POST it immediately so the option schema can re-render
+// against the new plugin.
 
 (function () {
   const status = document.querySelector("[data-save-status]");
   const iframe = document.getElementById("preview-iframe");
   const saveBtn = document.querySelector("[data-save-all]");
+  const grid = document.querySelector(".editor-grid");
+  const pageId = grid ? grid.dataset.pageId : null;
   const forms = () => document.querySelectorAll("form[data-editor-form]");
 
   function setStatus(state) {
@@ -44,6 +52,51 @@
     iframe.src = url.pathname + url.search;
   }
 
+  // Build a single FormData containing every editor-form's fields,
+  // with each cell form's fields namespaced `cell_<id>__<field>` so
+  // the preview endpoint can demux them back to per-cell buckets.
+  function aggregateForms() {
+    const combined = new FormData();
+    forms().forEach((form) => {
+      const cellId = form.dataset.cellId || null;
+      const fd = new FormData(form);
+      for (const [key, value] of fd.entries()) {
+        const outKey = cellId ? `cell_${cellId}__${key}` : key;
+        combined.append(outKey, value);
+      }
+    });
+    return combined;
+  }
+
+  let previewTimer;
+  let previewInFlight = null;
+  function schedulePreview() {
+    if (!pageId || !iframe) return;
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(async () => {
+      // Coalesce: if one is already running, wait for it before issuing
+      // the next so the iframe doesn't thrash.
+      if (previewInFlight) await previewInFlight.catch(() => {});
+      previewInFlight = (async () => {
+        const resp = await fetch(`/pages/${pageId}/preview`, {
+          method: "POST",
+          body: aggregateForms(),
+          headers: { "X-Requested-With": "fetch" },
+          credentials: "same-origin",
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        reloadPreview();
+      })();
+      try {
+        await previewInFlight;
+      } catch (err) {
+        console.warn("[editor] preview update failed:", err);
+      } finally {
+        previewInFlight = null;
+      }
+    }, 250);
+  }
+
   async function submit(form) {
     const fd = new FormData(form);
     const resp = await fetch(form.action, {
@@ -73,16 +126,19 @@
     }
   }
 
-  // Dirty-tracking: any change in any editor-form flips the indicator.
   function watchForms() {
     forms().forEach((form) => {
       if (form.dataset.dirtyBound) return;
       form.dataset.dirtyBound = "1";
-      form.addEventListener("input", () => setDirty(true));
+      form.addEventListener("input", () => {
+        setDirty(true);
+        schedulePreview();
+      });
       form.addEventListener("change", (ev) => {
-        // The plugin picker reshapes the cell's option fields, so we
-        // POST it immediately and reload so the new schema appears.
         const field = ev.target;
+        // The plugin picker reshapes the cell's option fields, so we
+        // POST it immediately (persist) and reload so the new schema
+        // appears in the editor.
         if (field && field.dataset && field.dataset.reloadOnChange) {
           submit(form).then(() => location.reload()).catch((err) => {
             setStatus("error");
@@ -91,9 +147,8 @@
           return;
         }
         setDirty(true);
+        schedulePreview();
       });
-      // Hitting Enter inside a form should still save (instead of
-      // performing a native multipart submit that leaves the page).
       form.addEventListener("submit", (ev) => {
         ev.preventDefault();
         saveAll();

@@ -360,11 +360,13 @@ def update(page_id: str) -> Response:
     except ValidationError as exc:
         return _flash_save(False, f"Invalid page: {exc.errors()[0]['msg']}")
     _store().save(updated)
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _flash_save(True, "Page saved.")
 
 
 @bp.post("/<page_id>/delete")
 def delete(page_id: str) -> Response:
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     if _store().delete(page_id):
         flash("Page deleted.", "ok")
     else:
@@ -404,6 +406,99 @@ def create_cell(page_id: str) -> Response:
     return _flash_save(True, "Cell added.")
 
 
+def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
+    """Build an updated Cell from a form-shaped dict. Shared between
+    the persistent update_cell endpoint and the in-memory draft
+    preview path so the two stay in lock-step."""
+    new_plugin_id = (form.get("plugin") or "").strip() or None
+    plugin_changed = new_plugin_id != cell.plugin
+    plugin = _plugins().get(new_plugin_id) if new_plugin_id else None
+    if plugin_changed:
+        options: dict[str, Any] = plugin.cell_option_defaults() if plugin else {}
+    elif plugin is not None:
+        options = _cell_options_from_form(plugin, form)
+    else:
+        options = {}
+    return cell.model_copy(
+        update={
+            "plugin": new_plugin_id,
+            "x": _coerce_int(form.get("x"), cell.x, lo=0, hi=panel.w - 1),
+            "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=panel.h - 1),
+            "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
+            "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
+            "theme": (form.get("theme") or None),
+            "font": (form.get("font") or None),
+            "options": options,
+            "palette_overrides": _palette_overrides_from_form(form),
+        }
+    )
+
+
+@bp.post("/<page_id>/preview")
+def preview(page_id: str) -> Response:
+    """Build an in-memory draft Page from aggregated editor form data
+    and stash it in PREVIEW_CACHE so the next /compose/<id> hit
+    renders the draft instead of the persisted version.
+
+    Form field convention (set by editor.js):
+      ``name``, ``theme``, ``font``, ``bleed_color``, ``gap``,
+      ``corner_radius`` — page-level overrides.
+      ``cell_<id>__<field>`` — per-cell overrides (double-underscore
+      separates the cell id from the field name to disambiguate cell
+      ids containing underscores)."""
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    panel = resolve_page_panel(page.panel, _settings_store())
+    form = request.form
+
+    cell_buckets: dict[str, dict[str, Any]] = {}
+    for key in form:
+        if key.startswith("cell_"):
+            try:
+                rest = key[len("cell_"):]
+                cid, field = rest.split("__", 1)
+            except ValueError:
+                continue
+            bucket = cell_buckets.setdefault(cid, {})
+            bucket[field] = form.get(key)
+    # multi-value form fields (e.g. <select multiple>) — pick up lists
+    for cid, bucket in cell_buckets.items():
+        for field in list(bucket.keys()):
+            values = form.getlist(f"cell_{cid}__{field}")
+            if len(values) > 1:
+                bucket[field] = values
+
+    new_cells: list[Cell] = []
+    for cell in page.cells:
+        cell_bucket = cell_buckets.get(cell.id)
+        if cell_bucket is None:
+            new_cells.append(cell)
+            continue
+        try:
+            new_cells.append(_apply_cell_form(cell, cell_bucket, panel))
+        except ValidationError:
+            new_cells.append(cell)
+
+    try:
+        draft = page.model_copy(
+            update={
+                "name": (form.get("name") or page.name).strip() or page.name,
+                "theme": (form.get("theme") or None),
+                "font": (form.get("font") or None),
+                "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
+                "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
+                "bleed_color": (form.get("bleed_color") or page.bleed_color),
+                "cells": new_cells,
+            }
+        )
+    except ValidationError:
+        draft = page.model_copy(update={"cells": new_cells})
+
+    current_app.config.setdefault("PREVIEW_CACHE", {})[page_id] = draft
+    return _flash_save(True, "preview-ready")
+
+
 @bp.post("/<page_id>/cells/<cell_id>")
 def update_cell(page_id: str, cell_id: str) -> Response:
     page = _store().get(page_id)
@@ -414,40 +509,19 @@ def update_cell(page_id: str, cell_id: str) -> Response:
         abort(404)
 
     form = request.form
-    # Plugin can change. When it does, drop existing options and reseed
-    # from the new plugin's manifest defaults — the option schemas don't
-    # line up between plugins so a swap would always produce a stale form.
     new_plugin_id = (form.get("plugin") or "").strip() or None
     plugin_changed = new_plugin_id != cell.plugin
     plugin = _plugins().get(new_plugin_id) if new_plugin_id else None
-
-    if plugin_changed:
-        options: dict[str, Any] = plugin.cell_option_defaults() if plugin else {}
-    elif plugin is not None:
-        options = _cell_options_from_form(plugin, form)
-    else:
-        options = {}
-
     panel = resolve_page_panel(page.panel, _settings_store())
     try:
-        updated_cell = cell.model_copy(
-            update={
-                "plugin": new_plugin_id,
-                "x": _coerce_int(form.get("x"), cell.x, lo=0, hi=panel.w - 1),
-                "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=panel.h - 1),
-                "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
-                "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
-                "theme": (form.get("theme") or None),
-                "font": (form.get("font") or None),
-                "options": options,
-                "palette_overrides": _palette_overrides_from_form(form),
-            }
-        )
+        updated_cell = _apply_cell_form(cell, form, panel)
     except ValidationError as exc:
         return _flash_save(False, f"Invalid cell: {exc.errors()[0]['msg']}")
 
     new_cells = [updated_cell if c.id == cell_id else c for c in page.cells]
     _store().save(page.model_copy(update={"cells": new_cells}))
+    # Persisted page is now authoritative; drop any draft preview.
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     msg = "Plugin changed — options reset." if plugin_changed and plugin else "Cell saved."
     return _flash_save(True, msg)
 

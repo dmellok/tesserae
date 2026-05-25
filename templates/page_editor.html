@@ -22,7 +22,7 @@
 
   <form method="post"
         action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}"
-        class="form" data-editor-form>
+        class="form" data-editor-form data-cell-id="{{ cell.id }}">
     {% set plugin_options = [] %}
     {% for p in plugins %}
       {% set _ = plugin_options.append({'value': p.id, 'label': p.name ~ ' (' ~ p.id ~ ')'}) %}
