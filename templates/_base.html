@@ -16,6 +16,8 @@
     <nav class="topnav">
       <a href="{{ url_for('auth.settings') }}"
          class="{% if request.endpoint == 'auth.settings' %}is-active{% endif %}">Settings</a>
+      <a href="{{ url_for('schedules.index') }}"
+         class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">Schedules</a>
     </nav>
     {% if session.authed %}
     <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">

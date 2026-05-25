@@ -357,3 +357,100 @@ code {
   color: var(--t-fg);
   font-variant-numeric: tabular-nums;
 }
+
+/* ----- Schedules: form grid + table -------------------------------- */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 16px;
+}
+
+.dow-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.dow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--t-border-strong);
+  background: var(--t-surface);
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+.dow-chip:has(input:checked) {
+  background: var(--t-accent);
+  color: var(--t-surface);
+  border-color: var(--t-accent);
+}
+.dow-chip input {
+  appearance: none;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--t-border);
+  vertical-align: top;
+}
+
+.data-table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+  background: var(--t-surface-soft);
+}
+
+.data-table tr.is-disabled td { opacity: 0.55; }
+.data-table .muted-row { color: var(--t-muted); font-size: 11px; margin-top: 2px; }
+.data-table .actions-col {
+  white-space: nowrap;
+  width: 1%;
+}
+.data-table .actions-col form.inline { display: inline-block; margin: 0 2px 0 0; }
+.data-table .actions-col .ghost-link {
+  display: inline-block;
+  padding: 7px 10px;
+  font-size: inherit;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  border-radius: var(--t-radius-sm);
+}
+.data-table .actions-col .ghost-link:hover { color: var(--t-accent); }
+
+button.ghost.danger { color: var(--t-danger); }
+button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; }
+
+.ghost-link {
+  display: inline-block;
+  padding: 7px 14px;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-weight: 500;
+}
+.ghost-link:hover { color: var(--t-accent); }
+
+.muted { color: var(--t-muted); }
+.pill.is-ok.pill {
+  /* override the soft mix to keep enabled pill visible against the row */
+  background: color-mix(in oklab, var(--t-ok) 18%, transparent);
+}

@@ -30,10 +30,13 @@ from app import (
     device_loader,
     plugin_loader,
     renderer_loader,
+    schedule_routes,
     settings_routes,
 )
 from app.push import PushManager
+from app.scheduler import Scheduler
 from app.state.page_store import PageStore
+from app.state.schedule_store import ScheduleStore
 from app.state.settings_store import SettingsStore
 from app.transport import BrokerConfig, MqttTransport
 
@@ -105,6 +108,7 @@ def create_app(
         logger.warning("device loader: %s — %s", derr.device_id, derr.message)
 
     page_store = PageStore(data_root / "core" / "pages.json")
+    schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
 
     # Cache of the most recent parsed status heartbeat per device. The
     # MQTT subscription updates it; the settings page reads it. Plain dict
@@ -115,6 +119,7 @@ def create_app(
     app.config["RENDERER_REGISTRY"] = renderers
     app.config["DEVICE_REGISTRY"] = devices
     app.config["PAGE_STORE"] = page_store
+    app.config["SCHEDULE_STORE"] = schedule_store
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
@@ -138,9 +143,22 @@ def create_app(
     app.config["REBUILD_TRANSPORT"] = rebuild_transport
     rebuild_transport()
 
+    # The Scheduler doesn't hold a static PushManager reference because
+    # rebuild_transport replaces it on broker setting changes. The factory
+    # resolves from app.config at fire-time so the scheduler always sees
+    # the current instance.
+    scheduler = Scheduler(
+        store=schedule_store,
+        push_manager=lambda: app.config["PUSH_MANAGER"],
+    )
+    app.config["SCHEDULER"] = scheduler
+    if not testing:
+        scheduler.start()
+
     plugin_loader.register_routes(app, plugins)
     app.register_blueprint(composer.bp)
     settings_routes.register(app)
+    schedule_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)

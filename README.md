@@ -22,8 +22,8 @@ In active development. Tracked by milestone:
 | 3 | `/settings` page generated from manifests + auth gate | done |
 | 4 | `pi_bin` + `esp32_bin` renderers | done |
 | 5 | Device layer (`pi_client` + `esp32_client`) | done |
-| 6 | Scheduler | next |
-| 7 | Send page | — |
+| 6 | Scheduler | done |
+| 7 | Send page | next |
 | 8 | Push history (event log) | — |
 | 9 | Home Assistant MQTT discovery | — |
 | 10 | Port remaining widgets | — |

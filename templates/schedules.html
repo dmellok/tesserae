@@ -1,0 +1,199 @@
+{% extends "_base.html" %}
+{% block title %}Schedules — Tesserae{% endblock %}
+
+{% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+
+{% macro day_picker(name, selected) %}
+<div class="dow-picker">
+  {% for i in range(7) %}
+  <label class="dow-chip">
+    <input type="checkbox" name="{{ name }}" value="{{ i }}" {% if i in selected %}checked{% endif %}>
+    <span>{{ DAY_NAMES[i] }}</span>
+  </label>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro schedule_form(s, edit_mode, pages) %}
+<form method="post" class="form schedule-form"
+      action="{{ url_for('schedules.update', schedule_id=s.id) if edit_mode else url_for('schedules.create') }}">
+  <div class="field-grid">
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-name">Name</label>
+      <input type="text" id="sf-{{ s.id or 'new' }}-name" name="name" value="{{ s.name }}" required>
+    </div>
+    {% if not edit_mode %}
+    <div class="field">
+      <label for="sf-new-id">Id (snake_case)</label>
+      <input type="text" id="sf-new-id" name="id" value="" placeholder="(derived from name)" pattern="[a-z0-9_][a-z0-9_-]*">
+    </div>
+    {% endif %}
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-page">Page</label>
+      <select id="sf-{{ s.id or 'new' }}-page" name="page_id" required>
+        {% if not pages %}<option value="">(no saved pages yet)</option>{% endif %}
+        {% for p in pages %}
+        <option value="{{ p.id }}" {% if p.id == s.page_id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-type">Type</label>
+      <select id="sf-{{ s.id or 'new' }}-type" name="type" data-toggle-target>
+        <option value="interval" {% if s.type == 'interval' %}selected{% endif %}>Every N minutes</option>
+        <option value="daily" {% if s.type == 'daily' %}selected{% endif %}>Daily at HH:MM</option>
+      </select>
+    </div>
+    <div class="field type-interval">
+      <label for="sf-{{ s.id or 'new' }}-interval">Interval (minutes)</label>
+      <input type="number" id="sf-{{ s.id or 'new' }}-interval" name="interval_minutes"
+             value="{{ s.interval_minutes or 30 }}" min="1" max="10080">
+    </div>
+    <div class="field type-interval">
+      <label for="sf-{{ s.id or 'new' }}-start">Window start (HH:MM)</label>
+      <input type="time" id="sf-{{ s.id or 'new' }}-start" name="time_of_day_start" value="{{ s.time_of_day_start or '' }}">
+    </div>
+    <div class="field type-interval">
+      <label for="sf-{{ s.id or 'new' }}-end">Window end (HH:MM)</label>
+      <input type="time" id="sf-{{ s.id or 'new' }}-end" name="time_of_day_end" value="{{ s.time_of_day_end or '' }}">
+    </div>
+    <div class="field type-daily">
+      <label for="sf-{{ s.id or 'new' }}-fires-at">Fire at (HH:MM)</label>
+      <input type="time" id="sf-{{ s.id or 'new' }}-fires-at" name="fires_at" value="{{ s.fires_at.strftime('%H:%M') if s.fires_at else '07:00' }}">
+    </div>
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-priority">Priority</label>
+      <input type="number" id="sf-{{ s.id or 'new' }}-priority" name="priority" value="{{ s.priority }}" step="1">
+    </div>
+    <div class="field field--boolean">
+      <input type="checkbox" id="sf-{{ s.id or 'new' }}-enabled" name="enabled" {% if s.enabled %}checked{% endif %}>
+      <label for="sf-{{ s.id or 'new' }}-enabled">Enabled</label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Days of week</label>
+    {{ day_picker('days_of_week', s.days_of_week) }}
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="primary">{{ 'Save changes' if edit_mode else 'Create schedule' }}</button>
+    {% if edit_mode %}<a class="ghost-link" href="{{ url_for('schedules.index') }}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endmacro %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Schedules</h1>
+  <p class="lede">
+    Each schedule fires a push for one saved page. Interval schedules
+    respect the day-of-week mask and the time-of-day window; daily
+    schedules respect the mask only.
+  </p>
+</header>
+
+<section class="card">
+  <header class="card-head">
+    <h2>{{ 'Edit schedule' if edit_id else 'New schedule' }}</h2>
+  </header>
+  {% if edit_id %}
+    {% set editing = (schedules | selectattr('id', 'equalto', edit_id) | list | first) %}
+    {% if editing %}
+      {{ schedule_form(editing, true, pages) }}
+    {% else %}
+      <p class="lede">No schedule with that id.</p>
+    {% endif %}
+  {% else %}
+    {% set blank = {'id': '', 'name': '', 'page_id': '', 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6]} %}
+    {{ schedule_form(blank, false, pages) }}
+  {% endif %}
+</section>
+
+<section class="card">
+  <header class="card-head">
+    <h2>Saved schedules</h2>
+  </header>
+  {% if not schedules %}
+  <p class="lede">No schedules yet — create one above.</p>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Page</th>
+        <th>Cadence</th>
+        <th>Days</th>
+        <th>Last fired</th>
+        <th>State</th>
+        <th class="actions-col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in schedules %}
+      <tr {% if not s.enabled %}class="is-disabled"{% endif %}>
+        <td>
+          <strong>{{ s.name }}</strong>
+          <div class="muted-row"><code>{{ s.id }}</code></div>
+        </td>
+        <td><code>{{ s.page_id }}</code></td>
+        <td>
+          {% if s.type == 'interval' %}
+            every {{ s.interval_minutes }} min
+            {% if s.time_of_day_start or s.time_of_day_end %}
+            <div class="muted-row">
+              {{ s.time_of_day_start or '00:00' }} – {{ s.time_of_day_end or '23:59' }}
+            </div>
+            {% endif %}
+          {% else %}
+            daily {{ s.fires_at.strftime('%H:%M') if s.fires_at else '??:??' }}
+          {% endif %}
+        </td>
+        <td>
+          {% set days = s.days_of_week %}
+          {% if days|length == 7 %}every day{% else %}{% for d in days %}{{ DAY_NAMES[d] }}{% if not loop.last %} {% endif %}{% endfor %}{% endif %}
+        </td>
+        <td>
+          {% set last = status.get(s.id, {}).get('last_fired') %}
+          {% if last %}<time datetime="{{ last }}">{{ last|int }}</time>{% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% if s.enabled %}<span class="pill is-ok">enabled</span>{% else %}<span class="pill">disabled</span>{% endif %}
+        </td>
+        <td class="actions-col">
+          <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="inline">
+            <button type="submit" class="ghost">{{ 'Disable' if s.enabled else 'Enable' }}</button>
+          </form>
+          <form method="post" action="{{ url_for('schedules.fire', schedule_id=s.id) }}" class="inline">
+            <button type="submit" class="ghost">Fire now</button>
+          </form>
+          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">Edit</a>
+          <form method="post" action="{{ url_for('schedules.delete', schedule_id=s.id) }}"
+                class="inline" onsubmit="return confirm('Delete this schedule?');">
+            <button type="submit" class="ghost danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<script>
+  // Show / hide interval vs daily fields based on the type select.
+  document.querySelectorAll('select[data-toggle-target]').forEach((sel) => {
+    function apply() {
+      const form = sel.closest('form');
+      form.querySelectorAll('.type-interval').forEach((el) => {
+        el.style.display = sel.value === 'interval' ? '' : 'none';
+      });
+      form.querySelectorAll('.type-daily').forEach((el) => {
+        el.style.display = sel.value === 'daily' ? '' : 'none';
+      });
+    }
+    sel.addEventListener('change', apply);
+    apply();
+  });
+</script>
+{% endblock %}
