@@ -1701,11 +1701,11 @@ button[disabled] {
   align-items: center;
   gap: 6px;
   margin-left: 14px;
-  padding: 7px 16px 7px 12px;
+  padding: 7px 14px 7px 12px;
   background: var(--t-accent);
   color: var(--t-accent-fg, #fff);
   border: 1px solid color-mix(in oklab, var(--t-accent) 70%, black);
-  border-radius: var(--t-radius-pill);
+  border-radius: var(--t-radius-sm);
   text-decoration: none;
   font-size: var(--t-size-sm);
   font-weight: 600;
@@ -1722,8 +1722,8 @@ button[disabled] {
     transform var(--t-trans-fast);
 }
 .header-action .ph {
-  font-size: 14px;
-  opacity: 0.95;
+  font-size: 15px;
+  color: #fff;
 }
 .header-action:hover {
   background: var(--t-accent-hover);
