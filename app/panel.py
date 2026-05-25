@@ -65,10 +65,13 @@ def resolve_settings_panel(settings: SettingsStore) -> Panel:
 
 
 def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Panel:
-    """Resolve the panel for a page: explicit page-level panel wins
-    (legacy / advanced), otherwise pull from settings."""
-    if page_panel is not None:
-        return page_panel
+    """Resolve the panel for a page.
+
+    The settings panel always wins: pages are panel-agnostic so a
+    single Settings → Panel change re-fits every saved dashboard.
+    ``page_panel`` is accepted for backwards-compat with v1 pages that
+    persisted their own panel dims; it's ignored on render."""
+    del page_panel  # intentional — see docstring
     return resolve_settings_panel(settings)
 
 
