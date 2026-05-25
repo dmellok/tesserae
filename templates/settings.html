@@ -1,10 +1,11 @@
 {% extends "_base.html" %}
+{% from "_components.html" import auto_field, button %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_BLURBS = {
-  'server':'Server-wide configuration: base URL, panel defaults, MQTT broker, Home Assistant discovery.',
-  'renderers':'Per-renderer transform + payload settings. Renderers are discovered from renderers/<id>/.',
-  'devices':'Latest heartbeat + outbound config for each loaded device. Devices come from devices/<id>/.',
-  'plugins':'Settings declared by each widget plugin (API keys, source URLs, etc.). Secrets stay masked between saves.',
+  'server':'Server-wide configuration: base URL, panel, MQTT broker, Home Assistant discovery.',
+  'renderers':'Per-renderer transform + payload settings.',
+  'devices':'Latest heartbeat + outbound config for each loaded device.',
+  'plugins':'Settings declared by each widget plugin. Secrets stay masked between saves.',
 } %}
 {% block title %}Settings: {{ AREA_TITLES[active_area] }} — Tesserae{% endblock %}
 {% block main %}
@@ -28,9 +29,7 @@
     <p class="lede">Verify the saved broker config without touching the running transport.</p>
   </header>
   <form method="post" action="{{ url_for('auth.diagnostics_test_broker') }}" class="form">
-    <div class="actions">
-      <button type="submit" class="ghost">Test broker connection</button>
-    </div>
+    <div class="actions">{{ button('Test broker connection', variant='ghost') }}</div>
   </form>
 </section>
 {% elif active_area == 'renderers' %}
@@ -38,14 +37,12 @@
   <header class="card-head">
     <h2>Diagnostics</h2>
     <p class="lede">
-      Pushes a small synthetic image through every loaded renderer. Lands
+      Push a small synthetic image through every loaded renderer. Lands
       in the Send-page history and the /events timeline.
     </p>
   </header>
   <form method="post" action="{{ url_for('auth.diagnostics_test_push') }}" class="form">
-    <div class="actions">
-      <button type="submit" class="ghost">Test push (synthetic image)</button>
-    </div>
+    <div class="actions">{{ button('Test push (synthetic image)', variant='ghost') }}</div>
   </form>
 </section>
 {% endif %}
@@ -55,7 +52,7 @@
 {% endif %}
 
 {% for section in sections %}
-<section class="card" id="{{ section.id }}">
+<section class="card {% if section.id == 'app' %}panel-section{% endif %}" id="{{ section.id }}">
   <header class="card-head">
     <h2>{{ section.title }}</h2>
     {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
@@ -87,52 +84,33 @@
   {% if section.endpoint %}
   <form method="post" action="{{ section.endpoint }}" class="form">
     {% for field in section.fields %}
-    <div class="field field--{{ field.type }}">
-      <label for="{{ section.id }}-{{ field.name }}">{{ field.label }}</label>
       {% set value = section.state.get(field.name, field.get('default', '')) %}
-      {% if field.type == 'boolean' %}
-        <input type="checkbox"
-               id="{{ section.id }}-{{ field.name }}"
-               name="{{ field.name }}"
-               {% if value %}checked{% endif %}>
-      {% elif field.type == 'select' %}
-        <select id="{{ section.id }}-{{ field.name }}" name="{{ field.name }}">
-          {% for choice in field.choices %}
-          <option value="{{ choice.value }}" {% if value == choice.value %}selected{% endif %}>
-            {{ choice.label }}
-          </option>
-          {% endfor %}
-        </select>
-      {% elif field.type == 'textarea' %}
-        <textarea id="{{ section.id }}-{{ field.name }}" name="{{ field.name }}" rows="4">{{ value }}</textarea>
-      {% elif field.type == 'number' %}
-        <input type="number"
-               id="{{ section.id }}-{{ field.name }}"
-               name="{{ field.name }}"
-               value="{{ value }}"
-               {% if field.min is defined %}min="{{ field.min }}"{% endif %}
-               {% if field.max is defined %}max="{{ field.max }}"{% endif %}
-               step="any">
-      {% elif field.type == 'color' %}
-        <input type="color"
-               id="{{ section.id }}-{{ field.name }}"
-               name="{{ field.name }}"
-               value="{{ value or '#000000' }}">
+      {% set field_id = section.id ~ '-' ~ field.name %}
+      {% if section.id == 'app' and field.name in ('panel_w', 'panel_h') %}
+        <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
       {% else %}
-        <input type="{{ 'password' if field.get('secret') else 'text' }}"
-               id="{{ section.id }}-{{ field.name }}"
-               name="{{ field.name }}"
-               value="{{ value }}"
-               {% if field.get('secret') %}autocomplete="new-password"{% endif %}>
+        {{ auto_field(field_id, field.name, field, value) }}
       {% endif %}
-      {% if field.get('help') %}<p class="field-help">{{ field.help }}</p>{% endif %}
-    </div>
     {% endfor %}
-    <div class="actions">
-      <button type="submit" class="primary">Save</button>
-    </div>
+    <div class="actions">{{ button('Save') }}</div>
   </form>
   {% endif %}
 </section>
 {% endfor %}
+
+<script>
+  // Panel-preset dropdown hides the manual width/height sliders when a
+  // preset is selected — they're only meaningful for "Custom".
+  (function () {
+    const card = document.querySelector('.panel-section');
+    if (!card) return;
+    const preset = card.querySelector('select[name="panel_preset"]');
+    if (!preset) return;
+    function apply() {
+      card.classList.toggle('is-custom', preset.value === 'custom');
+    }
+    preset.addEventListener('change', apply);
+    apply();
+  })();
+</script>
 {% endblock %}

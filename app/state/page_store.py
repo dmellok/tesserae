@@ -60,9 +60,17 @@ class Cell(BaseModel):
 
 
 class Page(BaseModel):
+    """A saved dashboard.
+
+    ``panel`` is optional: when None, the page renders at the panel
+    dims from the app settings (see ``app.panel.resolve_page_panel``).
+    The editor never sets it — the field is here only so a per-page
+    override remains possible if anyone wants it later.
+    """
+
     id: str
     name: str
-    panel: Panel
+    panel: Panel | None = None
     cells: list[Cell] = Field(default_factory=list)
     theme: str | None = None
     font: str | None = None

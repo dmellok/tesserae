@@ -79,13 +79,24 @@ def _hhmm_to_today_dt(value: str) -> datetime:
     return datetime.combine(today, datetime.min.time()).replace(hour=int(h), minute=int(m))
 
 
+def _unique_schedule_id(base: str) -> str:
+    taken = {s.id for s in _store().all()}
+    candidate = base
+    n = 1
+    while candidate in taken:
+        n += 1
+        candidate = f"{base}_{n}"
+    return candidate
+
+
 def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Schedule:
     """Build a Schedule from a form dict. Raises ValidationError on bad
-    input — the caller flashes and re-renders."""
+    input — the caller flashes and re-renders.
+
+    Auto-generates an id from the name when creating; existing schedules
+    keep their id (pinned by the URL in the update route)."""
     name = (form.get("name") or "").strip()
-    schedule_id = (form.get("id") or "").strip().lower()
-    if not schedule_id:
-        schedule_id = existing_id or _slug_from(name)
+    schedule_id = existing_id if existing_id is not None else _unique_schedule_id(_slug_from(name))
     schedule_type = form.get("type", "interval")
 
     payload: dict[str, Any] = {

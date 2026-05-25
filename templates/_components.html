@@ -1,0 +1,147 @@
+{#-
+Reusable form-control macros. Every macro produces a self-contained
+``<div class="field">`` block with a label, a control, and optional
+help text. All inputs sit on the existing .field / .field-help CSS so
+nothing else has to change.
+
+Conventions:
+  * ``field_id`` is the unique DOM id (must be unique per page; usually
+    derived from the entity id, e.g. ``cell-{{cell.id}}-x``).
+  * ``name`` is the form field name (no prefix). It's submitted as-is.
+  * ``label`` is the human-readable label rendered above the control.
+  * Sliders take ``unit`` (e.g. ``'px'``, ``'s'``); the live value
+    badge sits next to the label and updates as the user drags via
+    static/components.js.
+  * Switches render a real <input type="checkbox"> hidden behind a
+    track/thumb so form submission semantics are unchanged.
+  * Buttons take ``variant`` (``primary`` | ``ghost`` | ``ghost danger``).
+
+If you find yourself reaching for the raw HTML for a form field, add a
+macro here instead.
+-#}
+
+{%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text') -%}
+<div class="field">
+  <label for="{{ field_id }}">{{ label }}</label>
+  <input type="{{ type }}" id="{{ field_id }}" name="{{ name }}"
+         value="{{ value|default('', true) }}"
+         {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+         {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
+         {% if required %}required{% endif %}
+         {% if autofocus %}autofocus{% endif %}>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None) -%}
+<div class="field">
+  <label for="{{ field_id }}">{{ label }}</label>
+  <input type="number" id="{{ field_id }}" name="{{ name }}" value="{{ value }}"
+         {% if min is not none %}min="{{ min }}"{% endif %}
+         {% if max is not none %}max="{{ max }}"{% endif %}
+         step="{{ step }}">
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro slider(field_id, name, label, value=0, min=0, max=100, step=1, unit='', help=None) -%}
+<div class="field field--slider">
+  <div class="slider-header">
+    <label for="{{ field_id }}">{{ label }}</label>
+    <output for="{{ field_id }}" class="slider-value">{{ value }}{{ unit }}</output>
+  </div>
+  <input type="range" class="slider" id="{{ field_id }}" name="{{ name }}"
+         value="{{ value }}" min="{{ min }}" max="{{ max }}" step="{{ step }}"
+         data-output-suffix="{{ unit }}">
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro switch(field_id, name, label, checked=False, help=None) -%}
+<div class="field field--switch">
+  <label class="switch" for="{{ field_id }}">
+    <input type="checkbox" id="{{ field_id }}" name="{{ name }}" {% if checked %}checked{% endif %}>
+    <span class="switch-track"><span class="switch-thumb"></span></span>
+    <span class="switch-label">{{ label }}</span>
+  </label>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro select_field(field_id, name, label, value='', options=[], help=None, blank_label=None) -%}
+{#- options: list of {value, label} dicts OR (value, label) tuples. -#}
+<div class="field">
+  <label for="{{ field_id }}">{{ label }}</label>
+  <select id="{{ field_id }}" name="{{ name }}">
+    {% if blank_label is not none %}
+    <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
+    {% endif %}
+    {% for opt in options %}
+      {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}
+      {% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% endif %}
+      <option value="{{ v }}" {% if value == v %}selected{% endif %}>{{ l }}</option>
+    {% endfor %}
+  </select>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro color_input(field_id, name, label, value='#000000', help=None) -%}
+<div class="field">
+  <label for="{{ field_id }}">{{ label }}</label>
+  <input type="color" id="{{ field_id }}" name="{{ name }}" value="{{ value or '#000000' }}">
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro textarea_field(field_id, name, label, value='', rows=3, placeholder='', help=None) -%}
+<div class="field">
+  <label for="{{ field_id }}">{{ label }}</label>
+  <textarea id="{{ field_id }}" name="{{ name }}" rows="{{ rows }}"
+            {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}>{{ value|default('', true) }}</textarea>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
+{%- macro button(label, variant='primary', type='submit', name=None, value=None, full_width=False, title=None, disabled=False) -%}
+<button type="{{ type }}"
+        class="{{ variant }}{% if full_width %} full-width{% endif %}"
+        {% if name %}name="{{ name }}"{% endif %}
+        {% if value %}value="{{ value }}"{% endif %}
+        {% if title %}title="{{ title }}"{% endif %}
+        {% if disabled %}disabled{% endif %}>
+  {{ label }}
+</button>
+{%- endmacro -%}
+
+{#- Dispatch helper: pick the right macro based on a field-spec dict
+   (the {name, type, label, default, choices, min, max, step, unit, help}
+   shape used by plugin / renderer / device manifests). Used by the
+   settings page so we don't have to keep a parallel rendering table. -#}
+{%- macro auto_field(field_id, name, spec, value, help=None) -%}
+  {% set ftype = spec.get('type', 'string') %}
+  {% set label = spec.get('label', name) %}
+  {% set help_text = help if help is not none else spec.get('help') %}
+  {% if ftype == 'boolean' %}
+    {{ switch(field_id, name, label, checked=value, help=help_text) }}
+  {% elif ftype == 'select' %}
+    {{ select_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
+  {% elif ftype == 'textarea' %}
+    {{ textarea_field(field_id, name, label, value=value, help=help_text) }}
+  {% elif ftype == 'slider' %}
+    {{ slider(field_id, name, label,
+              value=value if value is not none else spec.get('default', 0),
+              min=spec.get('min', 0), max=spec.get('max', 100),
+              step=spec.get('step', 1), unit=spec.get('unit', ''), help=help_text) }}
+  {% elif ftype == 'number' %}
+    {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
+                    min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text) }}
+  {% elif ftype == 'color' %}
+    {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
+  {% else %}
+    {{ text_input(field_id, name, label, value=value or '',
+                  type='password' if spec.get('secret') else 'text',
+                  autocomplete='new-password' if spec.get('secret') else None,
+                  help=help_text) }}
+  {% endif %}
+{%- endmacro -%}

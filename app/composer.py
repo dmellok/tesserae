@@ -17,6 +17,7 @@ from typing import Any
 
 from flask import Blueprint, abort, current_app, render_template, request
 
+from app.panel import resolve_page_panel
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
 
@@ -169,7 +170,9 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
         cell_font_family = cell_font.name if cell_font else page_font_family
         plugin_id = cell.get("plugin") or None
         plugin = registry.get(plugin_id) if plugin_id else None
-        resolved_options = _resolved_options(plugin_id, cell.get("options", {})) if plugin_id else {}
+        resolved_options = (
+            _resolved_options(plugin_id, cell.get("options", {})) if plugin_id else {}
+        )
         full_bleed = bool(plugin and plugin.manifest.get("render", {}).get("full_bleed"))
         left_pad = outer_pad if cell["x"] == 0 else inner_pad
         top_pad = outer_pad if cell["y"] == 0 else inner_pad
@@ -215,16 +218,17 @@ def compose(page_id: str) -> str:
     if page is None:
         abort(404)
     for_push = request.args.get("for_push") == "1"
-    # preview=1 turns on the editor overlay: per-cell number tags + click-
-    # to-edit shims that postMessage the parent (the editor window). Off
-    # for_push so the rendered PNG never includes the overlay.
     preview_mode = request.args.get("preview") == "1" and not for_push
+    # Inject the resolved panel before hydrate — _hydrate_page expects
+    # page_dict["panel"] to always be present. A page-level panel
+    # (legacy override) wins; otherwise we pull dims from settings.
+    page_dict = page.model_dump(mode="json", exclude_none=True)
+    settings_store = current_app.config["SETTINGS_STORE"]
+    panel = resolve_page_panel(page.panel, settings_store)
+    page_dict["panel"] = {"w": panel.w, "h": panel.h}
     return render_template(
         "compose.html",
-        page=_hydrate_page(
-            page.model_dump(mode="json", exclude_none=True),
-            preview=not for_push,
-        ),
+        page=_hydrate_page(page_dict, preview=not for_push),
         for_push=for_push,
         preview_mode=preview_mode,
     )

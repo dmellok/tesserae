@@ -31,6 +31,7 @@ from werkzeug.wrappers import Response
 
 from app import auth
 from app.device_loader import Device, DeviceRegistry
+from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
 from app.renderer_loader import RendererRegistry
@@ -64,22 +65,40 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "panel_preset",
+        "type": "select",
+        "label": "Panel size",
+        "default": DEFAULT_PRESET,
+        "choices": PANEL_PRESET_CHOICES,
+        "help": "Common Inky / Waveshare panels. Pick Custom to set width + height manually.",
+    },
+    {
+        "name": "panel_orientation",
+        "type": "switch",
+        "label": "Portrait orientation",
+        "default": False,
+        "help": "Swap the panel width + height. Default off renders the panel landscape-native.",
+    },
+    {
         "name": "panel_w",
-        "type": "number",
-        "label": "Default panel width (px)",
+        "type": "slider",
+        "label": "Panel width (px)",
         "default": 1600,
-        "min": 1,
-        "help": (
-            "Used for Send-page uploads that aren't a saved dashboard. Saved "
-            "dashboards always use their own panel dims."
-        ),
+        "min": 100,
+        "max": 3000,
+        "step": 1,
+        "unit": "px",
+        "help": "Only used when Panel size is Custom.",
     },
     {
         "name": "panel_h",
-        "type": "number",
-        "label": "Default panel height (px)",
+        "type": "slider",
+        "label": "Panel height (px)",
         "default": 1200,
-        "min": 1,
+        "min": 100,
+        "max": 3000,
+        "step": 1,
+        "unit": "px",
     },
     {
         "name": "timezone",
@@ -89,13 +108,12 @@ APP_FIELDS: list[dict[str, Any]] = [
         "help": (
             "Used by the scheduler when interpreting daily fire times and "
             "time-of-day windows. 'system' uses the host's local time; "
-            "anything else must be an IANA zone like 'Australia/Melbourne' "
-            "or 'Europe/London'."
+            "anything else must be an IANA zone like 'Australia/Melbourne'."
         ),
     },
     {
         "name": "ha_discovery_enabled",
-        "type": "boolean",
+        "type": "switch",
         "label": "Home Assistant MQTT discovery",
         "default": False,
         "help": (
@@ -108,10 +126,26 @@ APP_FIELDS: list[dict[str, Any]] = [
 
 BROKER_FIELDS: list[dict[str, Any]] = [
     {"name": "host", "type": "string", "label": "Host", "default": ""},
-    {"name": "port", "type": "number", "label": "Port", "default": 1883, "min": 1, "max": 65535},
+    {
+        "name": "port",
+        "type": "number",
+        "label": "Port",
+        "default": 1883,
+        "min": 1,
+        "max": 65535,
+    },
     {"name": "username", "type": "string", "label": "Username", "default": ""},
     {"name": "password", "type": "string", "label": "Password", "default": "", "secret": True},
-    {"name": "keepalive", "type": "number", "label": "Keepalive (s)", "default": 60, "min": 5},
+    {
+        "name": "keepalive",
+        "type": "slider",
+        "label": "Keepalive (seconds)",
+        "default": 60,
+        "min": 10,
+        "max": 600,
+        "step": 5,
+        "unit": "s",
+    },
     {
         "name": "client_id",
         "type": "string",
@@ -195,13 +229,13 @@ def _safe_next(target: str | None) -> str:
 
 def _coerce_form_value(field: dict[str, Any], raw: str | None) -> Any:
     """Turn a single form value (or ``None`` for unchecked boxes) into the
-    Python type the field declares. Bools come back as bools, numbers as
-    int/float, selects coerce to the choice-value's type, everything else
-    as string."""
+    Python type the field declares. ``slider`` aliases to ``number`` and
+    ``switch`` to ``boolean`` so the new component macros line up with
+    the same coercion rules."""
     ftype = field.get("type", "string")
-    if ftype == "boolean":
+    if ftype in ("boolean", "switch"):
         return raw in ("on", "true", "1")
-    if ftype == "number":
+    if ftype in ("number", "slider"):
         if raw is None or raw == "":
             return field.get("default")
         try:
@@ -212,9 +246,6 @@ def _coerce_form_value(field: dict[str, Any], raw: str | None) -> Any:
             except ValueError:
                 return field.get("default")
     if ftype == "select":
-        # Coerce to the choice values' type so an int-valued select
-        # round-trips as int through the form. Form values are strings, so
-        # we need to match by string-coerced equality.
         if raw is None:
             return field.get("default")
         for choice in field.get("choices", []):
@@ -228,7 +259,9 @@ def _values_from_form(fields: list[dict[str, Any]]) -> dict[str, Any]:
     values: dict[str, Any] = {}
     for field in fields:
         name = str(field["name"])
-        if field.get("type") == "boolean":
+        if field.get("type") in ("boolean", "switch"):
+            # Unchecked checkboxes are absent from the form, present ones
+            # send "on" — bare presence is what we use.
             values[name] = field["name"] in request.form
         else:
             values[name] = _coerce_form_value(field, request.form.get(name))

@@ -16,12 +16,6 @@
       <label for="tf-{{ theme.id or 'new' }}-name">Name</label>
       <input type="text" id="tf-{{ theme.id or 'new' }}-name" name="name" value="{{ theme.name }}" required>
     </div>
-    {% if not is_edit %}
-    <div class="field">
-      <label for="tf-new-id">Id (snake_case, optional)</label>
-      <input type="text" id="tf-new-id" name="id" value="" placeholder="(derived from name)">
-    </div>
-    {% endif %}
     <div class="field">
       <label for="tf-{{ theme.id or 'new' }}-mode">Mode</label>
       <select id="tf-{{ theme.id or 'new' }}-mode" name="mode">

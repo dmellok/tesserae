@@ -1144,3 +1144,139 @@ button[disabled] {
   font-weight: 600;
   border-style: dashed;
 }
+
+/* ----- Reusable form components (sliders + switches) -------------- */
+
+.field--slider .slider-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.slider-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  background: var(--t-surface-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+input[type="range"].slider {
+  width: 100%;
+  margin: 6px 0 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Track + thumb need vendor-prefixed selectors for cross-browser
+   styling because there's no standard yet. */
+
+input[type="range"].slider::-webkit-slider-runnable-track {
+  height: 6px;
+  background: var(--t-border-strong);
+  border-radius: 999px;
+}
+input[type="range"].slider::-moz-range-track {
+  height: 6px;
+  background: var(--t-border-strong);
+  border-radius: 999px;
+}
+
+input[type="range"].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--t-accent);
+  border: 2px solid var(--t-surface);
+  margin-top: -6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 80ms ease;
+}
+input[type="range"].slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+input[type="range"].slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--t-accent);
+  border: 2px solid var(--t-surface);
+  cursor: pointer;
+}
+
+input[type="range"].slider:focus { outline: none; }
+input[type="range"].slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 30%, transparent);
+}
+
+/* ----- Switch (boolean toggle) ----------------------------------- */
+
+.field--switch label.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--t-fg);
+}
+
+.field--switch input[type="checkbox"] {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--t-border-strong);
+  transition: background 120ms ease;
+  flex-shrink: 0;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--t-surface);
+  transition: transform 120ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.switch input:checked ~ .switch-track {
+  background: var(--t-accent);
+}
+.switch input:checked ~ .switch-track .switch-thumb {
+  transform: translateX(18px);
+}
+.switch input:focus-visible ~ .switch-track {
+  outline: 2px solid color-mix(in oklab, var(--t-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.switch-label {
+  flex: 1;
+  user-select: none;
+}
+
+/* The panel-preset section in /settings/server hides the custom w/h
+   sliders when a preset is selected. The .is-custom class is toggled
+   by static/pages/panel_settings.js based on the dropdown's value. */
+.panel-custom-fields { display: none; }
+.panel-section.is-custom .panel-custom-fields { display: contents; }

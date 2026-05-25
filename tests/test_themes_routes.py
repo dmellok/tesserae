@@ -154,34 +154,21 @@ def test_update_user_theme(app: Flask, tmp_path: Path) -> None:
     assert registry_theme.palette["accent"] == "#112233"
 
 
-def test_delete_user_theme_unshadows_builtin(app: Flask) -> None:
-    """If a user theme shadows a built-in id, deleting the user theme
-    re-exposes the original built-in. Important so users can experiment
-    without permanently overwriting the bundled themes."""
+def test_new_theme_with_same_name_as_builtin_uniquifies(app: Flask) -> None:
+    """The user can't pick an id, so a new theme named 'Cobalt' can't
+    accidentally shadow the built-in. It gets a suffix and the built-in
+    survives."""
     client = app.test_client()
     _sign_in(client)
-    # Duplicate the built-in 'cobalt' (creates a new id like cobalt_copy).
-    resp = client.post("/themes/cobalt/duplicate", follow_redirects=False)
-    assert resp.status_code == 302
-    edit_target = resp.location.split("edit=")[-1]
-    # Now upsert that user theme under the SAME id as the built-in
-    # (simulates a 'shadow this built-in' workflow). Use update with a
-    # different name/palette.
-    custom = {k: "#000000" for k in PALETTE_TOKENS}
-    client.post(
-        "/themes/new", data={"id": "cobalt", "name": "Cobalt mine", "mode": "light", **custom}
-    )
+    full = {token: "#abcdef" for token in PALETTE_TOKENS}
+    client.post("/themes/new", data={"name": "Cobalt", "mode": "light", **full})
     registry = app.config["PLUGIN_REGISTRY"]
-    cobalt = registry.get_theme("cobalt")
-    assert cobalt is not None and cobalt.is_user
-    # Delete shadow → built-in returns.
-    client.post("/themes/cobalt/delete")
-    cobalt_after = registry.get_theme("cobalt")
-    assert cobalt_after is not None
-    assert cobalt_after.is_user is False
-    assert cobalt_after.name == "Cobalt"
-    # Clean up the duplicate too.
-    client.post(f"/themes/{edit_target}/delete")
+    # Built-in 'cobalt' still there + unshadowed.
+    builtin = registry.get_theme("cobalt")
+    assert builtin is not None and builtin.is_user is False
+    # The new user theme got a suffix.
+    assert registry.get_theme("cobalt_2") is not None
+    assert registry.get_theme("cobalt_2").is_user is True
 
 
 def test_duplicate_builtin_creates_user_theme(app: Flask) -> None:

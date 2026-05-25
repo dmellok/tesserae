@@ -1,47 +1,24 @@
 {% extends "_base.html" %}
+{% from "_components.html" import text_input, slider, color_input, button %}
 {% block title %}New page — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
   <h1>New page</h1>
   <p class="lede">
-    A page is a panel-sized canvas. Pick the panel dimensions and a
-    starting layout — every layout creates positioned-but-unassigned
-    cells you fill with widgets in the editor. Everything is editable
-    later.
+    A page is a panel-sized canvas. Pick a starting layout — every layout
+    creates positioned-but-unassigned cells you fill with widgets in the
+    editor. Panel dims come from
+    <a href="{{ url_for('auth.settings_area', area='server') }}#app">Settings → Server</a>.
   </p>
 </header>
 
 <section class="card">
   <form method="post" action="{{ url_for('pages.create') }}" class="form">
+    {{ text_input('pf-name', 'name', 'Name', required=True, autofocus=True) }}
     <div class="field-grid">
-      <div class="field">
-        <label for="pf-name">Name</label>
-        <input type="text" id="pf-name" name="name" required autofocus>
-      </div>
-      <div class="field">
-        <label for="pf-id">Id (snake_case, optional)</label>
-        <input type="text" id="pf-id" name="id" placeholder="(derived from name)" pattern="[a-z0-9_][a-z0-9_-]*">
-      </div>
-      <div class="field">
-        <label for="pf-pw">Panel width (px)</label>
-        <input type="number" id="pf-pw" name="panel_w" value="1600" min="1" required>
-      </div>
-      <div class="field">
-        <label for="pf-ph">Panel height (px)</label>
-        <input type="number" id="pf-ph" name="panel_h" value="1200" min="1" required>
-      </div>
-      <div class="field">
-        <label for="pf-gap">Matting gap (px)</label>
-        <input type="number" id="pf-gap" name="gap" value="0" min="0">
-      </div>
-      <div class="field">
-        <label for="pf-radius">Corner radius (px)</label>
-        <input type="number" id="pf-radius" name="corner_radius" value="0" min="0">
-      </div>
-      <div class="field">
-        <label for="pf-bleed">Bleed colour</label>
-        <input type="color" id="pf-bleed" name="bleed_color" value="#ffffff">
-      </div>
+      {{ slider('pf-gap', 'gap', 'Matting gap', value=0, min=0, max=200, unit='px') }}
+      {{ slider('pf-radius', 'corner_radius', 'Corner radius', value=0, min=0, max=80, unit='px') }}
+      {{ color_input('pf-bleed', 'bleed_color', 'Bleed colour', value='#ffffff') }}
     </div>
 
     <fieldset class="form-group">
@@ -64,14 +41,13 @@
     </fieldset>
 
     <div class="actions">
-      <button type="submit" class="primary">Create</button>
+      {{ button('Create') }}
       <a class="ghost-link" href="{{ url_for('pages.index') }}">Cancel</a>
     </div>
   </form>
 </section>
 
 <script>
-  // Radio cards: clicking a card visually highlights it.
   document.querySelectorAll('.layout-grid input[type="radio"]').forEach((r) => {
     r.addEventListener('change', () => {
       document.querySelectorAll('.layout-card').forEach((c) =>

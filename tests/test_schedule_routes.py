@@ -57,22 +57,26 @@ def test_create_persists_and_lists(app: Flask) -> None:
     assert "every 15 min" in body
 
 
-def test_create_rejects_bad_id(app: Flask) -> None:
+def test_duplicate_name_uniquifies_id(app: Flask, tmp_path: Path) -> None:
+    """User never enters an id; submitting the same name twice produces
+    'x' and 'x_2', not an error."""
+    from app.state.schedule_store import ScheduleStore
+
     client = app.test_client()
     _sign_in(client)
-    resp = client.post(
-        "/schedules/new",
-        data={
-            "id": "Has Spaces",
-            "name": "Whatever",
-            "page_id": "home",
-            "type": "interval",
-            "interval_minutes": "15",
-        },
-        follow_redirects=True,
-    )
-    body = resp.get_data(as_text=True)
-    assert "snake_case" in body or "Invalid" in body
+    for _ in range(2):
+        client.post(
+            "/schedules/new",
+            data={
+                "name": "Morning refresh",
+                "page_id": "home",
+                "type": "interval",
+                "interval_minutes": "15",
+            },
+        )
+    store = ScheduleStore(tmp_path / "core" / "schedules.json")
+    ids = sorted(s.id for s in store.all())
+    assert ids == ["morning_refresh", "morning_refresh_2"]
 
 
 def test_toggle_flips_enabled(app: Flask, tmp_path: Path) -> None:

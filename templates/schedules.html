@@ -22,12 +22,6 @@
       <label for="sf-{{ s.id or 'new' }}-name">Name</label>
       <input type="text" id="sf-{{ s.id or 'new' }}-name" name="name" value="{{ s.name }}" required>
     </div>
-    {% if not edit_mode %}
-    <div class="field">
-      <label for="sf-new-id">Id (snake_case)</label>
-      <input type="text" id="sf-new-id" name="id" value="" placeholder="(derived from name)" pattern="[a-z0-9_][a-z0-9_-]*">
-    </div>
-    {% endif %}
     <div class="field">
       <label for="sf-{{ s.id or 'new' }}-page">Page</label>
       <select id="sf-{{ s.id or 'new' }}-page" name="page_id" required>

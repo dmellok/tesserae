@@ -116,8 +116,22 @@ def index() -> str:
     )
 
 
+def _unique_theme_id(base: str) -> str:
+    """slug_id + numeric suffix until the id is free across the merged
+    built-in + user theme registry. The user never picks the id."""
+    taken = set(_registry().themes.keys())
+    candidate = base
+    n = 1
+    while candidate in taken:
+        n += 1
+        candidate = f"{base}_{n}"
+    return candidate
+
+
 @bp.post("/new")
 def create() -> Response:
+    """Create a user theme. The id is derived from the name (with a
+    numeric suffix if it collides) — no user-facing id input."""
     form = request.form
     name = (form.get("name") or "").strip()
     if not name:
@@ -132,7 +146,7 @@ def create() -> Response:
     if err is not None:
         flash(f"Invalid palette: {err}", "error")
         return redirect(url_for("themes.index"))
-    theme_id = (form.get("id") or "").strip().lower() or slug_id(name)
+    theme_id = _unique_theme_id(slug_id(name))
     _user_store().upsert(UserTheme(id=theme_id, name=name, mode=mode, palette=palette))
     _rebuild_registry_themes()
     flash(f"Theme {name!r} saved.", "ok")

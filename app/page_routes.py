@@ -46,12 +46,12 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
+from app.panel import resolve_page_panel, resolve_settings_panel
 from app.plugin_loader import Plugin, PluginRegistry
-from app.state.page_store import Cell, Page, PageStore, Panel
+from app.state.page_store import Cell, Page, PageStore
+from app.state.settings_store import SettingsStore
 
 bp = Blueprint("pages", __name__, url_prefix="/pages")
-
-_ID_RE = re.compile(r"^[a-z0-9_][a-z0-9_-]*$")
 
 
 def _store() -> PageStore:
@@ -62,10 +62,26 @@ def _plugins() -> PluginRegistry:
     return current_app.config["PLUGIN_REGISTRY"]  # type: ignore[no-any-return]
 
 
+def _settings_store() -> SettingsStore:
+    return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
+
+
 def _slug_from(text: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "_", text.strip().lower())
     s = re.sub(r"_+", "_", s).strip("_")
     return s or "page"
+
+
+def _unique_id(base: str, taken: set[str]) -> str:
+    """Append _2, _3, … to base until it's not in ``taken``. Used wherever
+    we auto-generate ids from a free-text name — the user shouldn't have
+    to think about ids being globally unique."""
+    if base not in taken:
+        return base
+    n = 2
+    while f"{base}_{n}" in taken:
+        n += 1
+    return f"{base}_{n}"
 
 
 def _coerce_int(
@@ -160,7 +176,8 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     layout = LAYOUTS_BY_SLUG.get(layout_slug)
     if layout is None:
         raise ValueError(f"unknown layout {layout_slug!r}")
-    positions = to_panel_pixels(layout, page.panel.w, page.panel.h)
+    panel = resolve_page_panel(page.panel, _settings_store())
+    positions = to_panel_pixels(layout, panel.w, panel.h)
     out: list[Cell] = []
     for i, (x, y, w, h) in enumerate(positions):
         if i < len(page.cells):
@@ -173,24 +190,26 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
 
 def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
+    panel = resolve_page_panel(page.panel, _settings_store())
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
-    active_layout = detect_layout(panel_cells, page.panel.w, page.panel.h)
+    active_layout = detect_layout(panel_cells, panel.w, panel.h)
     return {
         "page": page,
+        "panel": panel,
         "plugins": sorted(_plugins().widgets(), key=lambda p: p.name.lower()),
         "themes": sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
         "fonts": sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
-        "preview_scale": _preview_scale(page),
+        "preview_scale": _preview_scale(panel.w),
     }
 
 
-def _preview_scale(page: Page) -> float:
+def _preview_scale(panel_w: int) -> float:
     target = 720.0
-    if page.panel.w <= target:
+    if panel_w <= target:
         return 1.0
-    return target / page.panel.w
+    return target / panel_w
 
 
 # -- page-level routes --------------------------------------------
@@ -209,32 +228,33 @@ def new() -> str:
 
 @bp.post("/new")
 def create() -> Response:
+    """Create a saved dashboard. The id is auto-generated from the name
+    (slug + numeric suffix on collision); the user never sees it as a
+    form input. Panel dims come from the app settings — pages aren't
+    panel-specific."""
     form = request.form
     name = (form.get("name") or "").strip()
     if not name:
         flash("Page name is required.", "error")
         return redirect(url_for("pages.new"))
-    page_id = (form.get("id") or "").strip().lower() or _slug_from(name)
-    if not _ID_RE.match(page_id):
-        flash(f"Bad id {page_id!r} (snake_case only).", "error")
-        return redirect(url_for("pages.new"))
-    if _store().get(page_id) is not None:
-        flash(f"A page with id {page_id!r} already exists.", "error")
-        return redirect(url_for("pages.new"))
 
-    panel_w = _coerce_int(form.get("panel_w"), 1600, lo=1)
-    panel_h = _coerce_int(form.get("panel_h"), 1200, lo=1)
+    taken = {p.id for p in _store().list()}
+    page_id = _unique_id(_slug_from(name), taken)
+
+    # Panel dims come from app settings; the new page inherits them.
+    panel = resolve_settings_panel(_settings_store())
     layout_slug = (form.get("layout") or "1_cell").strip()
     layout = LAYOUTS_BY_SLUG.get(layout_slug, LAYOUTS_BY_SLUG["1_cell"])
     initial_cells = [
-        _new_cell(x=x, y=y, w=w, h=h) for x, y, w, h in to_panel_pixels(layout, panel_w, panel_h)
+        _new_cell(x=x, y=y, w=w, h=h) for x, y, w, h in to_panel_pixels(layout, panel.w, panel.h)
     ]
 
     try:
         page = Page(
             id=page_id,
             name=name,
-            panel=Panel(w=panel_w, h=panel_h),
+            # panel left None on purpose — derived from settings at render
+            # time so changing the panel in settings updates every page.
             cells=initial_cells,
             theme=(form.get("theme") or None),
             font=(form.get("font") or None),
@@ -261,6 +281,8 @@ def edit(page_id: str) -> str:
 
 @bp.post("/<page_id>")
 def update(page_id: str) -> Response:
+    """Update page metadata. Panel dims come from settings, not from
+    the form — the editor no longer exposes them."""
     page = _store().get(page_id)
     if page is None:
         abort(404)
@@ -269,10 +291,6 @@ def update(page_id: str) -> Response:
         updated = page.model_copy(
             update={
                 "name": (form.get("name") or page.name).strip() or page.name,
-                "panel": Panel(
-                    w=_coerce_int(form.get("panel_w"), page.panel.w, lo=1),
-                    h=_coerce_int(form.get("panel_h"), page.panel.h, lo=1),
-                ),
                 "theme": (form.get("theme") or None),
                 "font": (form.get("font") or None),
                 "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
@@ -318,8 +336,9 @@ def create_cell(page_id: str) -> Response:
     page = _store().get(page_id)
     if page is None:
         abort(404)
-    default_w = min(page.panel.w, 400)
-    default_h = min(page.panel.h, 240)
+    panel = resolve_page_panel(page.panel, _settings_store())
+    default_w = min(panel.w, 400)
+    default_h = min(panel.h, 240)
     cell = _new_cell(x=0, y=0, w=default_w, h=default_h)
     updated = page.model_copy(update={"cells": [*page.cells, cell]})
     _store().save(updated)
@@ -350,14 +369,15 @@ def update_cell(page_id: str, cell_id: str) -> Response:
     else:
         options = {}
 
+    panel = resolve_page_panel(page.panel, _settings_store())
     try:
         updated_cell = cell.model_copy(
             update={
                 "plugin": new_plugin_id,
-                "x": _coerce_int(form.get("x"), cell.x, lo=0, hi=page.panel.w - 1),
-                "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=page.panel.h - 1),
-                "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=page.panel.w),
-                "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=page.panel.h),
+                "x": _coerce_int(form.get("x"), cell.x, lo=0, hi=panel.w - 1),
+                "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=panel.h - 1),
+                "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
+                "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
                 "theme": (form.get("theme") or None),
                 "font": (form.get("font") or None),
                 "options": options,

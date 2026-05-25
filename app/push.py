@@ -44,6 +44,7 @@ from typing import Literal
 
 from PIL import Image
 
+from app.panel import resolve_page_panel
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -286,15 +287,15 @@ class PushManager:
             return self._log_failure(
                 source="page", target=page_id, status="not_found", error="page not found"
             )
+        # Panel comes from settings unless the page has its own override.
+        # Same resolution path the composer uses, so the screenshot and
+        # the dashboard layout always agree on dims.
+        panel = resolve_page_panel(page.panel, self._settings)
 
         compose_url = to_loopback_url(f"{self._base_url}/compose/{page_id}?for_push=1")
         try:
             composition_png = render_to_png(
-                RenderRequest(
-                    url=compose_url,
-                    viewport_w=page.panel.w,
-                    viewport_h=page.panel.h,
-                )
+                RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h)
             )
         except Exception as err:
             return self._log_failure(
@@ -306,7 +307,7 @@ class PushManager:
 
         return self._fan_out(
             composition_png,
-            page.panel.model_dump(),
+            panel.model_dump(),
             source="page",
             target=page_id,
             started=started,

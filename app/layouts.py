@@ -121,9 +121,7 @@ LAYOUTS: tuple[Layout, ...] = (
 LAYOUTS_BY_SLUG: dict[str, Layout] = {layout.slug: layout for layout in LAYOUTS}
 
 
-def to_panel_pixels(
-    layout: Layout, panel_w: int, panel_h: int
-) -> list[tuple[int, int, int, int]]:
+def to_panel_pixels(layout: Layout, panel_w: int, panel_h: int) -> list[tuple[int, int, int, int]]:
     """Project a layout's fraction cells onto a panel grid. Last cell in
     each axis snaps to the panel edge so rounding errors don't leave a
     one-pixel gap or overlap. Returns (x, y, w, h) tuples."""
