@@ -29,3 +29,6 @@ static/dist/
 .idea/
 .vscode/
 *.swp
+
+# Working notes / build prompts for downstream projects
+notes/
