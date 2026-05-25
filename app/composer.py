@@ -117,7 +117,11 @@ def _fetch_plugin_data(
     if fetch_fn is None:
         return None
     settings_store = current_app.config.get("SETTINGS_STORE")
-    settings = settings_store.get(plugin_id) if settings_store else {}
+    settings: dict[str, Any] = {}
+    if settings_store is not None:
+        settings = settings_store.get_for_runtime(
+            "plugins", plugin_id, plugin.manifest.get("settings", [])
+        )
     try:
         return fetch_fn(
             options,

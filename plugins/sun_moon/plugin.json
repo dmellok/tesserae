@@ -1,0 +1,30 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Sun & Moon",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Sunrise / sunset for a configured lat-lon plus the current moon phase. Sun data from open-meteo.com (no API key); moon phase computed client-side.",
+  "icon": "ph-sun-horizon",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude",
+      "default": -37.6494
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude",
+      "default": 145.1004
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Place label",
+      "default": "South Morang"
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

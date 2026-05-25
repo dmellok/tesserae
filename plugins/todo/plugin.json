@@ -1,0 +1,19 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Todo",
+  "version": "0.2.0",
+  "kind": "widget",
+  "description": "Quick-entry todo lists. Each cell picks which list to show. Completed items linger 24h with strike-through, then auto-prune. Manage lists at /plugins/todo/.",
+  "icon": "ph-list-checks",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "list",
+      "type": "select",
+      "label": "List",
+      "default": "default",
+      "choices_from": "lists"
+    }
+  ],
+  "render": { "dither": "none" }
+}

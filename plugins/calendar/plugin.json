@@ -1,0 +1,56 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Calendar",
+  "version": "0.2.0",
+  "kind": "widget",
+  "description": "Month grid + upcoming events from one or more ICS feeds (Google Calendar, iCloud, Outlook, any standard .ics URL). Events are colour-coded to their source calendar via the left edge of each card. Layout switches automatically: events on the right in landscape cells, below the grid in portrait cells.",
+  "icon": "ph-calendar-blank",
+  "supports": { "sizes": ["md", "lg"] },
+  "cell_options": [
+    {
+      "name": "event_count",
+      "type": "number",
+      "label": "Upcoming events to show",
+      "default": 3
+    },
+    {
+      "name": "week_start",
+      "type": "select",
+      "label": "Week starts on",
+      "default": "sun",
+      "choices": [
+        { "value": "sun", "label": "Sunday" },
+        { "value": "mon", "label": "Monday" }
+      ]
+    },
+    {
+      "name": "highlight_today",
+      "type": "boolean",
+      "label": "Highlight today with accent circle",
+      "default": true
+    }
+  ],
+  "settings": [
+    {
+      "name": "calendars",
+      "type": "textarea",
+      "label": "Calendars (one per line: NAME | URL | #HEX or NAME | URL)",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "feed_url",
+      "type": "string",
+      "label": "Single ICS feed URL (legacy — use Calendars above for multiple)",
+      "default": "",
+      "secret": true
+    },
+    {
+      "name": "cache_ttl_minutes",
+      "type": "number",
+      "label": "Cache TTL (minutes)",
+      "default": 15
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

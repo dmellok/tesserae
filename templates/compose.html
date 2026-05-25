@@ -4,6 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.name|default("Compose") }}</title>
+  <!-- Phosphor icon webfont — widgets reference icons via <i class="ph ph-xxx">.
+       Vendored via CDN; swap for a local copy if you need to render offline. -->
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
   <style>
     {{ page.font_face_css|safe }}
 
