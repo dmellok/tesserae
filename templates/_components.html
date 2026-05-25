@@ -154,6 +154,28 @@ macro here instead.
 </header>
 {%- endmacro -%}
 
+{#- Settings-area tab strip. Used by /settings/* and /events so the
+   two pages share a single navigation. Pass the active area key
+   (one of: server, renderers, devices, plugins, events). -#}
+{%- macro settings_tabs(active) -%}
+{%- set tabs = [
+  ('server',    'Server',    'desktop-tower',     url_for('auth.settings_area', area='server')),
+  ('renderers', 'Renderers', 'image-square',      url_for('auth.settings_area', area='renderers')),
+  ('devices',   'Devices',   'devices',           url_for('auth.settings_area', area='devices')),
+  ('plugins',   'Plugins',   'puzzle-piece',      url_for('auth.settings_area', area='plugins')),
+  ('events',    'Events',    'pulse',             url_for('events.index')),
+] -%}
+<nav class="tabs" role="tablist">
+  {%- for slug, label, ic, href in tabs %}
+  <a href="{{ href }}"
+     class="tab {% if active == slug %}is-active{% endif %}"
+     role="tab">
+    <i class="ph ph-{{ ic }}" aria-hidden="true"></i><span>{{ label }}</span>
+  </a>
+  {%- endfor %}
+</nav>
+{%- endmacro -%}
+
 {%- macro empty_state(icon_name, title, blurb=None, action_label=None, action_href=None) -%}
 <div class="empty-state">
   <span class="empty-state-icon"><i class="ph-duotone ph-duotone-{{ icon_name }}" aria-hidden="true"></i></span>

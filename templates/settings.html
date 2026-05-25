@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head %}
+{% from "_components.html" import auto_field, button, card_head, settings_tabs %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
@@ -15,15 +15,7 @@
   <p class="lede">{{ AREA_BLURBS[active_area] }}</p>
 </header>
 
-<nav class="tabs" role="tablist">
-  {% for slug, label in areas %}
-  <a href="{{ url_for('auth.settings_area', area=slug) }}"
-     class="tab {% if active_area == slug %}is-active{% endif %}"
-     role="tab">
-    <i class="ph ph-{{ AREA_ICONS[slug] }}" aria-hidden="true"></i><span>{{ label }}</span>
-  </a>
-  {% endfor %}
-</nav>
+{{ settings_tabs(active_area) }}
 
 {% if active_area == 'server' %}
 <section class="card">

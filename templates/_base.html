@@ -32,10 +32,6 @@
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
          <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Schedules</span>
       </a>
-      <a href="{{ url_for('events.index') }}"
-         class="{% if request.blueprint == 'events' %}is-active{% endif %}">
-         <i class="ph ph-pulse" aria-hidden="true"></i><span>Events</span>
-      </a>
       <a href="{{ url_for('themes.index') }}"
          class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
          <i class="ph ph-palette" aria-hidden="true"></i><span>Themes</span>
@@ -62,7 +58,7 @@
         </div>
       </details>
       <a href="{{ url_for('auth.settings') }}"
-         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') %}is-active{% endif %}">
+         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>
       </a>
     </nav>

@@ -1470,6 +1470,50 @@ button[disabled] {
 }
 .event-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
+/* Events page toolbar (live pill + type-filter chips). */
+.events-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  margin: 0 0 var(--t-space-4);
+  flex-wrap: wrap;
+}
+.event-type-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.event-type-filter .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface-soft);
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.event-type-filter .chip .ph { font-size: 13px; opacity: 0.75; }
+.event-type-filter .chip .muted {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.event-type-filter .chip:hover {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+}
+.event-type-filter .chip.is-active {
+  color: var(--t-accent);
+  background: var(--t-accent-soft);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
+}
+.event-type-filter .chip.is-active .ph { opacity: 1; }
+
 /* Live indicator next to the Events heading. */
 .live-dot {
   display: inline-flex;

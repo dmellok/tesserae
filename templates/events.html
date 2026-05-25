@@ -1,4 +1,5 @@
 {% extends "_base.html" %}
+{% from "_components.html" import settings_tabs %}
 {% block title %}Events — Tesserae{% endblock %}
 
 {% macro status_pill(status) %}
@@ -11,30 +12,33 @@
 {% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast'} %}
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-pulse"></i> Events
-    <span class="live-dot" data-live-indicator data-state="connecting">
-      <i class="ph-fill ph-fill-circle" aria-hidden="true"></i><span>connecting…</span>
-    </span>
-  </h1>
+  <h1><i class="ph ph-gear-six"></i> Settings</h1>
   <p class="lede">
-    Cross-cutting timeline. Every push attempt, renderer transform, device
-    heartbeat, scheduler fire, and auth event lands here. Newest first;
-    capped at {{ limit }}. New events stream in live via SSE.
+    Cross-cutting event timeline. Every push attempt, renderer transform,
+    device heartbeat, scheduler fire, and auth event lands here. Newest
+    first; capped at {{ limit }}. New events stream in live via SSE.
   </p>
 </header>
 
-<nav class="tabs" role="tablist">
-  <a href="?type=all" role="tab" class="tab {% if selected == 'all' %}is-active{% endif %}">
-    <i class="ph ph-list-bullets" aria-hidden="true"></i>
-    <span>All</span><span class="muted">{{ counts.all }}</span>
-  </a>
-  {% for t in known_types %}
-  <a href="?type={{ t }}" role="tab" class="tab {% if selected == t %}is-active{% endif %}">
-    <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
-    <span>{{ t|capitalize }}</span><span class="muted">{{ counts[t] }}</span>
-  </a>
-  {% endfor %}
-</nav>
+{{ settings_tabs('events') }}
+
+<div class="events-toolbar">
+  <span class="live-dot" data-live-indicator data-state="connecting">
+    <i class="ph-fill ph-fill-circle" aria-hidden="true"></i><span>connecting…</span>
+  </span>
+  <nav class="event-type-filter" role="tablist">
+    <a href="?type=all" role="tab" class="chip {% if selected == 'all' %}is-active{% endif %}">
+      <i class="ph ph-list-bullets" aria-hidden="true"></i>
+      <span>All</span><span class="muted">{{ counts.all }}</span>
+    </a>
+    {% for t in known_types %}
+    <a href="?type={{ t }}" role="tab" class="chip {% if selected == t %}is-active{% endif %}">
+      <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
+      <span>{{ t|capitalize }}</span><span class="muted">{{ counts[t] }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+</div>
 
 {% if not rows %}
 <p class="lede">No events of this kind yet.</p>
