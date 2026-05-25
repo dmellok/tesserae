@@ -1,0 +1,304 @@
+/* Admin-page baseline. Single accent variable — swap once to retint the
+ * whole admin (top nav, primary button, focus ring, brand mark).
+ *
+ * Default: a calm deep teal that reads distinctly from the orange v4 used.
+ * Easy to change: edit --t-accent below.
+ */
+
+:root {
+  --t-accent: #0d8c7e;
+  --t-accent-hover: #0a6f63;
+  --t-accent-bg: #e6f3f1;
+
+  --t-bg: #fafaf6;
+  --t-surface: #ffffff;
+  --t-surface-soft: #f3efe4;
+  --t-fg: #1a1612;
+  --t-fg-soft: #5a4f44;
+  --t-muted: #8c8276;
+  --t-border: #e6e0d0;
+  --t-border-strong: #b6a988;
+
+  --t-danger: #c44a3a;
+  --t-danger-bg: #fbeae6;
+  --t-ok: #3a8848;
+  --t-ok-bg: #e6f1e7;
+  --t-warn: #c89028;
+
+  --t-radius: 10px;
+  --t-radius-sm: 6px;
+
+  --t-shadow: 0 1px 2px rgba(20, 16, 12, 0.04), 0 4px 14px rgba(20, 16, 12, 0.06);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body.admin {
+  background: var(--t-bg);
+  color: var(--t-fg);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* ----- Top bar ------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 28px;
+  background: var(--t-surface);
+  border-bottom: 1px solid var(--t-border);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--t-fg);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.brand-mark {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background:
+    linear-gradient(135deg, var(--t-accent) 0 50%, transparent 50% 100%),
+    linear-gradient(45deg, var(--t-accent-hover) 0 50%, transparent 50% 100%);
+  background-size: 50% 50%, 50% 50%;
+  background-position: top left, top right;
+  background-repeat: no-repeat;
+  border-radius: 3px;
+}
+
+.brand-name {
+  font-size: 16px;
+}
+
+.topnav {
+  display: flex;
+  gap: 18px;
+  margin-left: 16px;
+}
+
+.topnav a {
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 6px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.topnav a.is-active,
+.topnav a:hover {
+  color: var(--t-accent);
+  border-bottom-color: var(--t-accent);
+}
+
+.topbar-logout {
+  margin-left: auto;
+}
+
+/* ----- Layout -------------------------------------------------------- */
+
+.page {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.page-head {
+  margin-bottom: 24px;
+}
+
+.page-head h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+  letter-spacing: -0.01em;
+}
+
+.lede {
+  color: var(--t-fg-soft);
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+/* ----- Card ---------------------------------------------------------- */
+
+.card {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  box-shadow: var(--t-shadow);
+  padding: 22px 24px 24px;
+  margin: 0 0 18px;
+  scroll-margin-top: 80px;
+}
+
+.card.narrow {
+  max-width: 420px;
+  margin: 48px auto;
+}
+
+.card-head { margin-bottom: 18px; }
+
+.card-head h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+  letter-spacing: -0.01em;
+}
+
+.card-head h2 {
+  font-size: 18px;
+  margin: 0 0 6px;
+  letter-spacing: 0;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.meta div { display: contents; }
+.meta dt {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+  margin-right: 4px;
+}
+.meta dd {
+  margin: 0 12px 0 0;
+  font-size: 12px;
+  color: var(--t-fg);
+}
+
+/* ----- Form ---------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 4px;
+}
+
+.field label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--t-fg);
+}
+
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"],
+.field input[type="color"],
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  font: inherit;
+  color: var(--t-fg);
+}
+
+.field input[type="color"] {
+  padding: 2px;
+  height: 36px;
+  width: 60px;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 1px;
+  border-color: var(--t-accent);
+}
+
+.field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--t-accent);
+  margin: 4px 0 0;
+}
+
+.field--boolean {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.field--boolean label { order: 2; font-weight: 500; }
+.field--boolean input { order: 1; }
+
+.field-help {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--t-fg-soft);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--t-radius-sm);
+  padding: 8px 16px;
+  border: 1px solid var(--t-border-strong);
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+
+button.primary {
+  background: var(--t-accent);
+  color: var(--t-surface);
+  border-color: var(--t-accent);
+  font-weight: 600;
+}
+
+button.primary:hover { background: var(--t-accent-hover); border-color: var(--t-accent-hover); }
+button.ghost { background: transparent; border-color: transparent; color: var(--t-fg-soft); }
+button.ghost:hover { color: var(--t-accent); }
+
+code {
+  background: var(--t-surface-soft);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+/* ----- Flash messages ----------------------------------------------- */
+
+.flashes {
+  max-width: 820px;
+  margin: 16px auto 0;
+  padding: 0 24px;
+}
+
+.flash {
+  padding: 10px 14px;
+  border-radius: var(--t-radius-sm);
+  font-size: 14px;
+  margin-bottom: 8px;
+  border: 1px solid var(--t-border);
+}
+
+.flash--ok { background: var(--t-ok-bg); border-color: var(--t-ok); color: var(--t-ok); }
+.flash--error { background: var(--t-danger-bg); border-color: var(--t-danger); color: var(--t-danger); }

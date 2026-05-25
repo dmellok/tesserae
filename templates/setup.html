@@ -1,0 +1,27 @@
+{% extends "_base.html" %}
+{% block title %}Set a password — Tesserae{% endblock %}
+{% block main %}
+<section class="card narrow">
+  <header class="card-head">
+    <h1>Welcome to Tesserae</h1>
+    <p class="lede">
+      Pick a password to protect the admin. You can change it later from
+      <em>Settings → App</em>.
+    </p>
+  </header>
+  <form method="post" class="form">
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+      <p class="field-help">At least 8 characters.</p>
+    </div>
+    <div class="field">
+      <label for="password_confirm">Confirm password</label>
+      <input type="password" id="password_confirm" name="password_confirm" required minlength="8" autocomplete="new-password">
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Set password &amp; continue</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

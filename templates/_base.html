@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Tesserae{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/admin.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="admin">
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('auth.settings') }}">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Tesserae</span>
+    </a>
+    <nav class="topnav">
+      <a href="{{ url_for('auth.settings') }}"
+         class="{% if request.endpoint == 'auth.settings' %}is-active{% endif %}">Settings</a>
+    </nav>
+    {% if session.authed %}
+    <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">
+      <button type="submit" class="ghost">Sign out</button>
+    </form>
+    {% endif %}
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flashes" role="status">
+      {% for category, message in messages %}
+      <div class="flash flash--{{ category }}">{{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="page">
+    {% block main %}{% endblock %}
+  </main>
+</body>
+</html>

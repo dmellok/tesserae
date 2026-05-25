@@ -19,8 +19,8 @@ In active development. Tracked by milestone:
 |---|---|---|
 | 1 | Scaffold + plugin loader + composer + clock widget + smoke test | done |
 | 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | done |
-| 3 | `/settings` page generated from manifests + auth gate | next |
-| 4 | `pi_bin` + `esp32_bin` renderers | — |
+| 3 | `/settings` page generated from manifests + auth gate | done |
+| 4 | `pi_bin` + `esp32_bin` renderers | next |
 | 5 | Device layer (`pi_listener` + `esp32_client`) | — |
 | 6 | Scheduler | — |
 | 7 | Send page | — |
@@ -75,20 +75,23 @@ Grammar: `tesserae/<device-type>/<channel>[/<format>]`
 
 ## Running locally
 
-The app factory, plugin loader, renderer loader, and push pipeline are in
-place. There's no admin UI yet, but you can:
-
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 .venv/bin/python -m app.main
 ```
 
-Then open <http://127.0.0.1:8000/_test/render?plugin=clock&size=md> to see a
-single clock cell rendered through the composer.
+Open <http://127.0.0.1:8000/> — on first boot you'll be sent to `/setup`
+to pick an admin password. After that, sign in at `/login` and configure
+the broker + base URL at `/settings`. Renderers and plugins that declare
+settings show up as their own sections, generated from manifests.
 
-To run the test suite (loader contracts + composer markup + transport +
-push pipeline + per-widget/renderer smoke):
+To preview a single widget without composing a dashboard, hit
+<http://127.0.0.1:8000/_test/render?plugin=clock&size=md> from loopback
+(the auth gate keeps `/compose` and `/_test/render` reachable from
+`127.0.0.1` only).
+
+Run the test suite:
 
 ```sh
 .venv/bin/pytest -q
@@ -96,9 +99,8 @@ push pipeline + per-widget/renderer smoke):
 .venv/bin/mypy app/
 ```
 
-The renderer + transport + push pipeline are exercised end-to-end against
-mocked broker and patched Playwright — no live broker or Chromium is
-required for tests.
+The renderer + transport + push pipeline + auth + settings flow are all
+covered with no broker or Chromium dependency.
 
 ## Tech stack
 

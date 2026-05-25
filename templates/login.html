@@ -1,0 +1,19 @@
+{% extends "_base.html" %}
+{% block title %}Sign in — Tesserae{% endblock %}
+{% block main %}
+<section class="card narrow">
+  <header class="card-head">
+    <h1>Sign in</h1>
+  </header>
+  <form method="post" class="form">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" required autocomplete="current-password" autofocus>
+    </div>
+    <div class="actions">
+      <button type="submit" class="primary">Sign in</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

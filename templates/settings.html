@@ -1,0 +1,75 @@
+{% extends "_base.html" %}
+{% block title %}Settings — Tesserae{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1>Settings</h1>
+  <p class="lede">
+    Each section persists to <code>data/core/settings.json</code>.
+    Fields marked secret store as <code>&lt;name&gt;_secret</code> on disk
+    and stay masked in the UI between saves.
+  </p>
+</header>
+
+{% for section in sections %}
+<section class="card" id="{{ section.id }}">
+  <header class="card-head">
+    <h2>{{ section.title }}</h2>
+    {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
+    {% if section.meta %}
+    <dl class="meta">
+      {% for key, value in section.meta.items() %}
+      <div><dt>{{ key }}</dt><dd><code>{{ value }}</code></dd></div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+  </header>
+  <form method="post" action="{{ section.endpoint }}" class="form">
+    {% for field in section.fields %}
+    <div class="field field--{{ field.type }}">
+      <label for="{{ section.id }}-{{ field.name }}">{{ field.label }}</label>
+      {% set value = section.state.get(field.name, field.get('default', '')) %}
+      {% if field.type == 'boolean' %}
+        <input type="checkbox"
+               id="{{ section.id }}-{{ field.name }}"
+               name="{{ field.name }}"
+               {% if value %}checked{% endif %}>
+      {% elif field.type == 'select' %}
+        <select id="{{ section.id }}-{{ field.name }}" name="{{ field.name }}">
+          {% for choice in field.choices %}
+          <option value="{{ choice.value }}" {% if value == choice.value %}selected{% endif %}>
+            {{ choice.label }}
+          </option>
+          {% endfor %}
+        </select>
+      {% elif field.type == 'textarea' %}
+        <textarea id="{{ section.id }}-{{ field.name }}" name="{{ field.name }}" rows="4">{{ value }}</textarea>
+      {% elif field.type == 'number' %}
+        <input type="number"
+               id="{{ section.id }}-{{ field.name }}"
+               name="{{ field.name }}"
+               value="{{ value }}"
+               {% if field.min is defined %}min="{{ field.min }}"{% endif %}
+               {% if field.max is defined %}max="{{ field.max }}"{% endif %}
+               step="any">
+      {% elif field.type == 'color' %}
+        <input type="color"
+               id="{{ section.id }}-{{ field.name }}"
+               name="{{ field.name }}"
+               value="{{ value or '#000000' }}">
+      {% else %}
+        <input type="{{ 'password' if field.get('secret') else 'text' }}"
+               id="{{ section.id }}-{{ field.name }}"
+               name="{{ field.name }}"
+               value="{{ value }}"
+               {% if field.get('secret') %}autocomplete="new-password"{% endif %}>
+      {% endif %}
+      {% if field.get('help') %}<p class="field-help">{{ field.help }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    <div class="actions">
+      <button type="submit" class="primary">Save</button>
+    </div>
+  </form>
+</section>
+{% endfor %}
+{% endblock %}
