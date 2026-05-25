@@ -154,22 +154,23 @@
         {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
 
         <div class="field">
-          <label>Icon</label>
-          <div class="icon-picker">
-            <button type="button" class="icon-pick {% if not page.icon %}is-active{% endif %}"
-                    data-icon=""
-                    aria-label="No icon"
-                    title="No icon">
-              <i class="ph ph-prohibit" aria-hidden="true"></i>
+          <label for="icon-picker-button">Icon</label>
+          <div class="icon-picker" data-icon-picker>
+            <button type="button" id="icon-picker-button" class="icon-picker-trigger" data-icon-trigger>
+              <span class="icon-picker-current">
+                {% if page.icon %}<i class="ph ph-{{ page.icon }}" aria-hidden="true"></i>{% else %}<i class="ph ph-prohibit" aria-hidden="true"></i>{% endif %}
+              </span>
+              <span class="icon-picker-label" data-icon-label>{{ page.icon or 'No icon' }}</span>
+              <i class="ph ph-caret-down" aria-hidden="true" style="font-size:13px; opacity:.6; margin-left:auto;"></i>
             </button>
-            {% for ic in dashboard_icons %}
-            <button type="button" class="icon-pick {% if page.icon == ic %}is-active{% endif %}"
-                    data-icon="{{ ic }}"
-                    aria-label="{{ ic }}"
-                    title="{{ ic }}">
-              <i class="ph ph-{{ ic }}" aria-hidden="true"></i>
-            </button>
-            {% endfor %}
+            <div class="icon-picker-popover" data-icon-popover hidden>
+              <div class="icon-picker-search">
+                <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" placeholder="Search icons…" data-icon-search autocomplete="off" spellcheck="false">
+              </div>
+              <div class="icon-picker-grid" data-icon-grid></div>
+              <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
+            </div>
           </div>
         </div>
 

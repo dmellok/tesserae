@@ -319,23 +319,25 @@ a:hover { color: var(--t-accent-hover); }
   color: var(--t-muted);
 }
 
-/* Theme toggle — sits between the nav and the sign-out button. */
+/* Theme toggle — sits at the tail of the top nav (the drawer in
+   mobile). The text label only renders in the drawer; on desktop the
+   button is a compact icon square. */
 .theme-toggle {
-  margin-left: auto;
-  width: 36px;
-  height: 36px;
   display: inline-grid;
   place-items: center;
+  width: 36px;
+  height: 36px;
   background: transparent;
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
   cursor: pointer;
   color: var(--t-fg-soft);
   padding: 0;
+  margin-left: var(--t-space-2);
 }
 .theme-toggle:hover { color: var(--t-accent); background: var(--t-surface-sunk); }
 .theme-toggle .ph { font-size: 18px; }
-.theme-toggle + .topbar-logout { margin-left: 8px; }
+.theme-toggle-label { display: none; }
 
 /* Show/hide based on the current theme. Dark icon is visible only when
    data-theme=dark, light icon is visible only when it's absent. */
@@ -411,6 +413,21 @@ a:hover { color: var(--t-accent-hover); }
     margin-left: var(--t-space-4);
     border-left: 2px solid var(--t-border);
   }
+  /* Theme toggle becomes a full-width row at the bottom of the drawer. */
+  .topnav .theme-toggle {
+    width: 100%;
+    height: auto;
+    justify-content: flex-start;
+    padding: var(--t-space-3) var(--t-space-3);
+    margin-top: auto;
+    border-color: transparent;
+    color: var(--t-fg-soft);
+    gap: var(--t-space-2);
+    display: inline-flex;
+    align-items: center;
+  }
+  .topnav .theme-toggle-label { display: inline; }
+  .topnav .theme-toggle:hover { background: var(--t-surface-sunk); }
 }
 @media (min-width: 901px) {
   .nav-scrim { display: none; }
@@ -1076,15 +1093,91 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 /* ----- Dashboard icon picker --------------------------------------- */
 
 .icon-picker {
+  position: relative;
+  display: block;
+}
+.icon-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  width: 100%;
+  padding: var(--t-space-2) var(--t-space-3);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: var(--t-fg);
+  text-align: left;
+}
+.icon-picker-trigger:hover { border-color: var(--t-border-strong); }
+.icon-picker.is-open .icon-picker-trigger {
+  border-color: var(--t-accent);
+  box-shadow: var(--t-ring);
+}
+.icon-picker-current {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--t-accent);
+}
+.icon-picker-current .ph { font-size: 18px; }
+.icon-picker-label {
+  font-size: var(--t-size-md);
+  color: var(--t-fg-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-lg);
+  padding: var(--t-space-2);
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-  gap: 6px;
-  max-height: 240px;
-  overflow-y: auto;
-  padding: 6px;
+  gap: var(--t-space-2);
+}
+.icon-picker-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.icon-picker-search .ph {
+  position: absolute;
+  left: 10px;
+  font-size: 14px;
+  color: var(--t-muted);
+  pointer-events: none;
+}
+.icon-picker-search input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  font: inherit;
+  font-size: var(--t-size-md);
   background: var(--t-surface-soft);
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
+  color: var(--t-fg);
+}
+.icon-picker-search input:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  background: var(--t-surface);
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
 }
 .icon-pick {
   display: inline-grid;
@@ -1099,13 +1192,19 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 .icon-pick .ph { font-size: 18px; }
 .icon-pick:hover {
-  background: var(--t-surface);
+  background: var(--t-surface-soft);
   color: var(--t-accent);
 }
 .icon-pick.is-active {
   background: var(--t-accent-soft);
   border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
   color: var(--t-accent);
+}
+.icon-picker-empty {
+  padding: var(--t-space-3);
+  text-align: center;
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
 }
 
 /* ----- Send tabs: paired options + preview cards -------------------- */
@@ -1872,12 +1971,11 @@ button[disabled] {
     box-shadow var(--t-trans-fast),
     transform var(--t-trans-fast);
 }
-/* Match the regular and bold weights — earlier markup used `.ph`,
-   current markup uses `.ph-bold` for crisper visibility. */
 .header-action .ph,
 .header-action [class*="ph-"] {
-  font-size: 16px;
+  font-size: 18px;
   color: #fff !important;
+  font-weight: bold;
 }
 .header-action:hover {
   background: var(--t-accent-hover);

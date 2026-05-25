@@ -55,22 +55,6 @@ from app.state.settings_store import SettingsStore
 logger = logging.getLogger(__name__)
 
 
-# Curated set of Phosphor icon names suitable as a dashboard glyph.
-# Keep it short — too many choices make the picker noisy. Names are the
-# bare Phosphor slug (no `ph-` prefix), used as `<i class="ph ph-<slug>">`.
-DASHBOARD_ICONS: list[str] = [
-    "squares-four", "grid-four", "layout", "frame-corners", "browsers",
-    "house", "office-chair", "bed", "couch", "garage",
-    "gauge", "chart-line", "chart-bar", "presentation-chart", "trend-up",
-    "calendar", "clock", "alarm", "hourglass", "timer",
-    "sun", "moon-stars", "cloud-sun", "thermometer-simple", "wind",
-    "bell", "envelope", "chat-circle-dots", "newspaper", "rss",
-    "music-notes", "film-strip", "image", "camera", "palette",
-    "compass", "map-trifold", "airplane", "train", "car",
-    "leaf", "flower", "tree-evergreen", "mountains", "binoculars",
-    "barbell", "bicycle", "soccer-ball", "trophy", "person-simple-run",
-    "books", "graduation-cap", "lightbulb", "rocket", "puzzle-piece",
-]
 
 bp = Blueprint("pages", __name__, url_prefix="/pages")
 
@@ -273,7 +257,6 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
         "preview_scale": _preview_scale(panel.w, panel.h),
-        "dashboard_icons": DASHBOARD_ICONS,
     }
 
 
