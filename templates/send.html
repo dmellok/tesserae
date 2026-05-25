@@ -18,18 +18,14 @@
   {% else %}<span class="pill is-danger">failed</span>{% endif %}
 {% endmacro %}
 
-{# Match the editor preview cap (720px on each axis) so the panel
-   reads at the same physical size across both pages. #}
-{% set _scale_w = (720.0 / panel.w) if panel.w > 720 else 1.0 %}
-{% set _scale_h = (720.0 / panel.h) if panel.h > 720 else 1.0 %}
-{% set _preview_scale = [_scale_w, _scale_h]|min %}
-{% set _pw = (panel.w * _preview_scale)|round|int %}
-{% set _ph = (panel.h * _preview_scale)|round|int %}
-
 {% macro preview_card(title, blurb=None) %}
 <section class="card send-pair-preview">
   {{ card_head(title, icon_name='monitor-play', blurb=blurb) }}
-  <div class="preview-frame" style="width: {{ _pw }}px; height: {{ _ph }}px;">
+  <div class="preview-frame"
+       data-fit-preview
+       data-panel-w="{{ panel.w }}"
+       data-panel-h="{{ panel.h }}"
+       style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
     {{ caller() }}
   </div>
   <p class="muted preview-dims">{{ panel.w }} × {{ panel.h }}</p>
@@ -114,8 +110,7 @@
     {% if pages %}
     <iframe data-saved-preview-iframe
             src="{{ url_for('composer.compose', page_id=pages[0].id) }}?preview=1"
-            style="width: {{ panel.w }}px; height: {{ panel.h }}px;
-                   transform: scale({{ _preview_scale }}); transform-origin: 0 0;"
+            style="width: {{ panel.w }}px; height: {{ panel.h }}px;"
             loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
     {% else %}
     <div class="preview-placeholder">
@@ -176,8 +171,7 @@
     <iframe data-webpage-preview-iframe
             sandbox="allow-scripts"
             referrerpolicy="no-referrer"
-            style="width: {{ panel.w }}px; height: {{ panel.h }}px;
-                   transform: scale({{ _preview_scale }}); transform-origin: 0 0; background: white;"
+            style="width: {{ panel.w }}px; height: {{ panel.h }}px; background: white;"
             hidden></iframe>
     <div class="preview-placeholder" data-webpage-preview-placeholder>
       <i class="ph-duotone ph-duotone-globe" aria-hidden="true"></i>

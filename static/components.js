@@ -27,10 +27,44 @@
     });
   }
 
+  // Fluid preview frames: the iframe / image inside is sized to the
+  // panel's native pixel dims (so the composer renders unscaled).
+  // We watch each frame's container width and apply a matching CSS
+  // transform so the preview always fits without overflowing.
+  function fitPreview(frame) {
+    const panelW = parseInt(frame.dataset.panelW || "0", 10);
+    if (!panelW) return;
+    const rect = frame.getBoundingClientRect();
+    if (!rect.width) return;
+    const scale = rect.width / panelW;
+    frame.querySelectorAll("iframe, img.preview-image").forEach((el) => {
+      el.style.transform = `scale(${scale})`;
+    });
+  }
+
+  function attachPreviewFit(root) {
+    const frames = root.querySelectorAll("[data-fit-preview]:not([data-fit-bound])");
+    if (!frames.length) return;
+    if (typeof ResizeObserver === "undefined") {
+      frames.forEach((f) => { f.dataset.fitBound = "1"; fitPreview(f); });
+      window.addEventListener("resize", () => frames.forEach(fitPreview));
+      return;
+    }
+    const ro = new ResizeObserver((entries) => {
+      entries.forEach((e) => fitPreview(e.target));
+    });
+    frames.forEach((f) => {
+      f.dataset.fitBound = "1";
+      ro.observe(f);
+      fitPreview(f);
+    });
+  }
+
   // Initial attach on DOMContentLoaded; re-attach when the editor reloads
   // its preview iframe (a side-effect of a save).
   function init() {
     attachSliders(document);
+    attachPreviewFit(document);
   }
 
   if (document.readyState === "loading") {
@@ -42,5 +76,5 @@
   // Observe future additions (the page editor swaps cell forms in/out on
   // plugin change). Skipping mutation observer for now since editor.js
   // currently full-reloads on plugin change — re-init isn't needed mid-page.
-  window.tesseraeComponents = { attachSliders };
+  window.tesseraeComponents = { attachSliders, attachPreviewFit, fitPreview };
 })();

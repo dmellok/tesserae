@@ -129,12 +129,13 @@
   <section class="card preview-card">
     {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
     <div class="preview-frame"
-         style="width: {{ (panel.w * preview_scale)|round|int }}px;
-                height: {{ (panel.h * preview_scale)|round|int }}px;">
+         data-fit-preview
+         data-panel-w="{{ panel.w }}"
+         data-panel-h="{{ panel.h }}"
+         style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
       <iframe id="preview-iframe"
               src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1"
-              style="width: {{ panel.w }}px; height: {{ panel.h }}px;
-                     transform: scale({{ preview_scale }}); transform-origin: 0 0;"
+              style="width: {{ panel.w }}px; height: {{ panel.h }}px;"
               loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>
     <p class="muted preview-dims">
