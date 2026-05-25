@@ -1,11 +1,16 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core themes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "theme",
-  "description": "Built-in theme set. The 'default' (Paper) theme is always present; further themes will land in milestone 3.",
+  "description": "Curated subset of 12 themes covering the lightness range. 'Paper' is the canonical default. Use the /themes builder to add or tweak; user themes are saved under data/plugins/themes_core/user.json and survive restarts.",
   "supports": {
-    "sizes": ["xs", "sm", "md", "lg"]
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
   },
   "themes": [
     {
@@ -25,6 +30,215 @@
         "danger": "#c97c70",
         "warn": "#d4a957",
         "ok": "#7da670"
+      }
+    },
+    {
+      "id": "cobalt",
+      "name": "Cobalt",
+      "mode": "light",
+      "palette": {
+        "bg": "#ffffff",
+        "surface": "#c8c8c8",
+        "surface2": "#a8a8a8",
+        "fg": "#0d0d0d",
+        "fgSoft": "#5a5a5a",
+        "muted": "#9a9a9a",
+        "divider": "#909090",
+        "danger": "#c4292c",
+        "warn": "#c8941a",
+        "ok": "#2e8848",
+        "accent": "#1c4eef",
+        "accentSoft": "#143ab3"
+      }
+    },
+    {
+      "id": "flame",
+      "name": "Flame",
+      "mode": "light",
+      "palette": {
+        "bg": "#ffffff",
+        "surface": "#c8c8c8",
+        "surface2": "#a8a8a8",
+        "fg": "#0d0d0d",
+        "fgSoft": "#5a5a5a",
+        "muted": "#9a9a9a",
+        "divider": "#909090",
+        "danger": "#c4292c",
+        "warn": "#c8941a",
+        "ok": "#2e8848",
+        "accent": "#ec5a16",
+        "accentSoft": "#b8430a"
+      }
+    },
+    {
+      "id": "cherry",
+      "name": "Cherry",
+      "mode": "light",
+      "palette": {
+        "bg": "#ffffff",
+        "surface": "#c8c8c8",
+        "surface2": "#a8a8a8",
+        "fg": "#0d0d0d",
+        "fgSoft": "#5a5a5a",
+        "muted": "#9a9a9a",
+        "divider": "#909090",
+        "danger": "#c4292c",
+        "warn": "#c8941a",
+        "ok": "#2e8848",
+        "accent": "#d4193a",
+        "accentSoft": "#a4112c"
+      }
+    },
+    {
+      "id": "sage",
+      "name": "Sage",
+      "mode": "light",
+      "palette": {
+        "bg": "#d6e0d2",
+        "surface": "#ecf0e8",
+        "surface2": "#c0cdb8",
+        "fg": "#1a2418",
+        "fgSoft": "#4a5a45",
+        "muted": "#758270",
+        "accent": "#5a7a3a",
+        "accentSoft": "#3d5826",
+        "divider": "#adbca5",
+        "danger": "#a85a4a",
+        "warn": "#b8923a",
+        "ok": "#4a7a3a"
+      }
+    },
+    {
+      "id": "slate",
+      "name": "Slate",
+      "mode": "light",
+      "palette": {
+        "bg": "#c8d0d8",
+        "surface": "#e0e6ec",
+        "surface2": "#b0bac4",
+        "fg": "#0f1620",
+        "fgSoft": "#46505a",
+        "muted": "#6a7480",
+        "accent": "#2860a8",
+        "accentSoft": "#1a4480",
+        "divider": "#9aa6b2",
+        "danger": "#b04a44",
+        "warn": "#b08a36",
+        "ok": "#4a8266"
+      }
+    },
+    {
+      "id": "saffron",
+      "name": "Saffron",
+      "mode": "light",
+      "palette": {
+        "bg": "#c8b870",
+        "surface": "#d4c688",
+        "surface2": "#a89858",
+        "fg": "#1a0f3a",
+        "fgSoft": "#383058",
+        "muted": "#585078",
+        "accent": "#8a7028",
+        "accentSoft": "#4a3a8a",
+        "divider": "#a89858",
+        "danger": "#a8483a",
+        "warn": "#b06820",
+        "ok": "#487848"
+      }
+    },
+    {
+      "id": "ink",
+      "name": "Ink",
+      "mode": "light",
+      "palette": {
+        "bg": "#e8dfc6",
+        "surface": "#d6c9a8",
+        "surface2": "#beac82",
+        "fg": "#0a2463",
+        "fgSoft": "#34487a",
+        "muted": "#6a7d9e",
+        "divider": "#6e7da0",
+        "danger": "#b21c2d",
+        "warn": "#b87913",
+        "ok": "#2a6b3a",
+        "accent": "#1c4eef",
+        "accentSoft": "#143ab3"
+      }
+    },
+    {
+      "id": "burgundy",
+      "name": "Burgundy",
+      "mode": "light",
+      "palette": {
+        "bg": "#ecdcb6",
+        "surface": "#e0cb96",
+        "surface2": "#c8a76b",
+        "fg": "#5a0f1e",
+        "fgSoft": "#7e3949",
+        "muted": "#a47780",
+        "divider": "#8a6e5c",
+        "danger": "#b21c2d",
+        "warn": "#b87913",
+        "ok": "#336b3a",
+        "accent": "#9a1c39",
+        "accentSoft": "#6f0f24"
+      }
+    },
+    {
+      "id": "embers",
+      "name": "Embers",
+      "mode": "dark",
+      "palette": {
+        "bg": "#1a0d05",
+        "surface": "#2a1808",
+        "surface2": "#3d240e",
+        "fg": "#f0a060",
+        "fgSoft": "#c9824a",
+        "muted": "#886042",
+        "divider": "#5a3f28",
+        "danger": "#ff6b6b",
+        "warn": "#ffcc44",
+        "ok": "#88c060",
+        "accent": "#ff7733",
+        "accentSoft": "#d05a1a"
+      }
+    },
+    {
+      "id": "cyber",
+      "name": "Cyber",
+      "mode": "dark",
+      "palette": {
+        "bg": "#050a08",
+        "surface": "#0e1812",
+        "surface2": "#1a2820",
+        "fg": "#00ff88",
+        "fgSoft": "#4ad9a4",
+        "muted": "#5a9a7a",
+        "divider": "#1f3d2e",
+        "danger": "#ff3366",
+        "warn": "#ffcc00",
+        "ok": "#00ff88",
+        "accent": "#ff00aa",
+        "accentSoft": "#c00080"
+      }
+    },
+    {
+      "id": "reef",
+      "name": "Reef",
+      "mode": "dark",
+      "palette": {
+        "bg": "#0a0608",
+        "surface": "#1a1012",
+        "surface2": "#2a1c1f",
+        "fg": "#ff6f61",
+        "fgSoft": "#d05a4f",
+        "muted": "#7a4540",
+        "divider": "#3a2428",
+        "danger": "#ff3060",
+        "warn": "#ffb030",
+        "ok": "#66dd88",
+        "accent": "#ffb088",
+        "accentSoft": "#d08868"
       }
     }
   ]

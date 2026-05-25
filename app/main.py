@@ -36,6 +36,7 @@ from app import (
     schedule_routes,
     send_routes,
     settings_routes,
+    themes_routes,
 )
 from app.ha_discovery import HomeAssistantDiscovery
 from app.push import PushManager
@@ -188,6 +189,7 @@ def create_app(
     schedule_routes.register(app)
     send_routes.register(app)
     events_routes.register(app)
+    themes_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)

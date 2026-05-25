@@ -260,6 +260,24 @@ def discover(
                     continue
                 registry.themes[theme.id] = theme
 
+            # Also pick up user-created themes saved via the /themes builder.
+            # They live in the plugin's data_dir so a user can back them
+            # up alongside everything else under data/.
+            from app.state.user_themes import UserThemeStore
+
+            user_store = UserThemeStore(data_dir / "user.json")
+            for ut in user_store.load():
+                # User themes can shadow built-ins by id — that's a feature
+                # (tweak a built-in without forking it).
+                registry.themes[ut.id] = Theme(
+                    id=ut.id,
+                    name=ut.name,
+                    mode=ut.mode,
+                    palette=dict(ut.palette),
+                    plugin_id=plugin_id,
+                    is_user=True,
+                )
+
         if plugin.kind == "font":
             for raw_font in manifest.get("fonts", []):
                 files_map = {
