@@ -9,21 +9,35 @@
 </head>
 <body class="admin">
   <header class="topbar">
-    <a class="brand" href="{{ url_for('auth.settings') }}">
+    <a class="brand" href="/">
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">Tesserae</span>
     </a>
     <nav class="topnav">
-      <a href="{{ url_for('pages.index') }}"
-         class="{% if request.blueprint == 'pages' %}is-active{% endif %}">Pages</a>
       <a href="{{ url_for('send.index') }}"
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">Send</a>
+      <a href="{{ url_for('pages.index') }}"
+         class="{% if request.blueprint == 'pages' %}is-active{% endif %}">Pages</a>
       <a href="{{ url_for('schedules.index') }}"
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">Schedules</a>
       <a href="{{ url_for('events.index') }}"
          class="{% if request.blueprint == 'events' %}is-active{% endif %}">Events</a>
       <a href="{{ url_for('themes.index') }}"
          class="{% if request.blueprint == 'themes' %}is-active{% endif %}">Themes</a>
+      <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
+        <summary>Plugins ▾</summary>
+        <div class="nav-dropdown-panel">
+          <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">All plugins</a>
+          {% if nav_admin_plugins %}
+          <div class="nav-dropdown-sep">Admin pages</div>
+          {% for p in nav_admin_plugins %}
+          <a class="nav-dropdown-link" href="/plugins/{{ p.id }}/">{{ p.name }}</a>
+          {% endfor %}
+          {% else %}
+          <div class="nav-dropdown-hint">No plugins ship an admin page yet.</div>
+          {% endif %}
+        </div>
+      </details>
       <a href="{{ url_for('auth.settings') }}"
          class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') %}is-active{% endif %}">Settings</a>
     </nav>

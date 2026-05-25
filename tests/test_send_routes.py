@@ -154,3 +154,13 @@ def test_nav_links_to_send(app: Flask) -> None:
     _sign_in(client)
     body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     assert "/send" in body
+
+
+def test_root_redirects_to_send(app: Flask) -> None:
+    """The brand logo + a bare URL hit / — both should land on Send,
+    the most common post-login destination."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.location.endswith("/send")

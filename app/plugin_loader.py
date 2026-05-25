@@ -33,7 +33,7 @@ from types import ModuleType
 from typing import Any
 
 import jsonschema
-from flask import Blueprint, Flask, abort, send_from_directory
+from flask import Blueprint, Flask, abort, render_template, send_from_directory
 from werkzeug.wrappers import Response
 
 logger = logging.getLogger(__name__)
@@ -107,6 +107,16 @@ class Plugin:
             if "default" in opt:
                 defaults[str(opt["name"])] = opt["default"]
         return defaults
+
+    @property
+    def has_admin(self) -> bool:
+        """True when the plugin's server.py exports a Flask ``blueprint()``
+        — register_routes mounts it at /plugins/<id>/ as the plugin's
+        admin page. The top-nav Plugins dropdown uses this to enumerate
+        which plugins have a UI."""
+        if self.server_module is None:
+            return False
+        return callable(getattr(self.server_module, "blueprint", None))
 
 
 @dataclass
@@ -307,6 +317,15 @@ def discover(
 def register_routes(app: Flask, registry: PluginRegistry) -> None:
     """Register per-plugin static asset routes and any plugin-provided blueprints."""
     bp = Blueprint("plugins", __name__)
+
+    @bp.get("/")
+    def plugins_index() -> str:
+        """Top-level page listing every loaded plugin + loader errors."""
+        return render_template(
+            "plugins_index.html",
+            plugins=sorted(registry.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
+            errors=registry.errors,
+        )
 
     @bp.get("/<plugin_id>/<path:asset>")
     def plugin_asset(plugin_id: str, asset: str) -> Response:

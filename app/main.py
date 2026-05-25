@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Flask, abort, send_from_directory
+from flask import Flask, abort, redirect, send_from_directory, url_for
 from werkzeug.wrappers import Response
 
 from app import (
@@ -195,6 +195,25 @@ def create_app(
 
     if not testing:
         auth.install_gate(app, settings)
+
+    @app.context_processor
+    def _inject_nav_data() -> dict[str, Any]:
+        """Make the list of admin-equipped plugins available to every
+        template — the top-nav Plugins dropdown enumerates them."""
+        registry = app.config["PLUGIN_REGISTRY"]
+        return {
+            "nav_admin_plugins": sorted(
+                (p for p in registry.plugins.values() if p.has_admin),
+                key=lambda p: p.name.lower(),
+            ),
+        }
+
+    @app.get("/")
+    def index() -> Response:
+        # Send is the most common landing destination — first-run after
+        # /setup, link clicks from HA, etc. all want to push something.
+        # /pages is one nav hop away.
+        return redirect(url_for("send.index"))
 
     @app.get("/renders/<path:filename>")
     def renders(filename: str) -> Response:
