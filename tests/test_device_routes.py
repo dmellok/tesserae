@@ -38,7 +38,7 @@ def _sign_in(client) -> None:
 def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/settings")
+    resp = client.get("/settings/devices")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     # Both shipped devices appear, with the "no heartbeat" status state.
@@ -68,7 +68,7 @@ def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
     }
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/settings").get_data(as_text=True)
+    body = client.get("/settings/devices").get_data(as_text=True)
     # Fresh heartbeat -> "ok" status dot + parsed fields visible.
     assert "is-ok" in body
     assert "3820" in body
@@ -82,7 +82,7 @@ def test_stale_heartbeat_renders_warn(app: Flask) -> None:
     }
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/settings").get_data(as_text=True)
+    body = client.get("/settings/devices").get_data(as_text=True)
     assert "is-warn" in body
 
 

@@ -181,6 +181,6 @@ def test_fire_now_invokes_push(app: Flask) -> None:
 def test_nav_links_to_schedules(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/settings").get_data(as_text=True)
+    body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     assert "Schedules" in body
     assert "/schedules" in body

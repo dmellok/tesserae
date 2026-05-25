@@ -271,18 +271,75 @@ def logout_view() -> Response:
     return redirect(url_for("auth.login_view"))
 
 
+# Sub-page taxonomy. The 'app' and 'broker' sections live together under
+# 'server' because they're both server-config; renderers / devices /
+# plugins each get their own page since their lists grow independently.
+_AREAS: tuple[tuple[str, str], ...] = (
+    ("server", "Server"),
+    ("renderers", "Renderers"),
+    ("devices", "Devices"),
+    ("plugins", "Plugins"),
+)
+
+# Map area → section kinds that belong on that page.
+_AREA_KINDS: dict[str, set[str]] = {
+    "server": {"app", "broker"},
+    "renderers": {"renderer"},
+    "devices": {"device"},
+    "plugins": {"plugin"},
+}
+
+
 @bp.get("/settings")
-def settings() -> str:
-    """Render every editable section. The template takes a homogeneous
-    list of ``Section`` dicts and walks each one's fields uniformly."""
-    sections = _build_sections()
-    return render_template("settings.html", sections=sections)
+def settings() -> Response:
+    """Land on the Server sub-page by default."""
+    return redirect(url_for("auth.settings_area", area="server"))
+
+
+@bp.get("/settings/<area>", endpoint="settings_area")
+def settings_area(area: str) -> str | Response:
+    """Render one sub-page of /settings, scoped to a single area
+    (server / renderers / devices / plugins)."""
+    if area not in _AREA_KINDS:
+        return Response(f"unknown settings area {area!r}", status=404)
+    sections = [s for s in _build_sections() if s["kind"] in _AREA_KINDS[area]]
+    return render_template(
+        "settings.html",
+        sections=sections,
+        active_area=area,
+        areas=_AREAS,
+    )
+
+
+def _area_for_section_kind(section_kind: str) -> str:
+    """Which sub-page a section belongs on. Drives the post-save redirect
+    so the user lands back on the page they were editing instead of being
+    bounced to the default Server page."""
+    if section_kind in ("app", "broker"):
+        return "server"
+    if section_kind.startswith("renderer-"):
+        return "renderers"
+    if section_kind.startswith("device-"):
+        return "devices"
+    if section_kind.startswith("plugin-"):
+        return "plugins"
+    return "server"
+
+
+def _redirect_to_section(section_kind: str) -> Response:
+    return redirect(
+        url_for(
+            "auth.settings_area",
+            area=_area_for_section_kind(section_kind),
+            _anchor=section_kind,
+        )
+    )
 
 
 @bp.post("/settings/<section_kind>")
 def settings_update(section_kind: str) -> Response:
     """Persist a single section. ``section_kind`` is one of ``app``,
-    ``broker``, ``renderer-<id>``, or ``plugin-<id>``."""
+    ``broker``, ``renderer-<id>``, ``device-<id>``, or ``plugin-<id>``."""
     settings_store = _settings()
 
     handlers: dict[str, Callable[[], str]] = {
@@ -293,15 +350,12 @@ def settings_update(section_kind: str) -> Response:
     if section_kind in handlers:
         message = handlers[section_kind]()
         flash(message, "ok")
-        # Broker changes need transport rewiring — apply now, no restart.
-        if section_kind == "broker":
+        # Broker / App changes both need a transport + HA-discovery
+        # refresh to take effect without a restart (base_url, panel dims,
+        # ha_discovery_enabled all flow through there).
+        if section_kind in ("broker", "app"):
             _apply_broker_change()
-        elif section_kind == "app":
-            # base_url / panel dims / ha_discovery_enabled all need a
-            # transport + HA discovery refresh to take effect without a
-            # restart.
-            _apply_broker_change()
-        return redirect(url_for("auth.settings", _anchor=section_kind))
+        return _redirect_to_section(section_kind)
 
     if section_kind.startswith("renderer-"):
         rid = section_kind.removeprefix("renderer-")
@@ -312,7 +366,7 @@ def settings_update(section_kind: str) -> Response:
         values = _values_from_form(fields)
         settings_store.update_for_namespace("renderers", rid, values, fields)
         flash(f"{renderer.name} settings saved.", "ok")
-        return redirect(url_for("auth.settings", _anchor=section_kind))
+        return _redirect_to_section(section_kind)
 
     if section_kind.startswith("plugin-"):
         pid = section_kind.removeprefix("plugin-")
@@ -323,7 +377,7 @@ def settings_update(section_kind: str) -> Response:
         values = _values_from_form(fields)
         settings_store.update_for_namespace("plugins", pid, values, fields)
         flash(f"{plugin.name} settings saved.", "ok")
-        return redirect(url_for("auth.settings", _anchor=section_kind))
+        return _redirect_to_section(section_kind)
 
     if section_kind.startswith("device-"):
         did = section_kind.removeprefix("device-")
@@ -337,7 +391,7 @@ def settings_update(section_kind: str) -> Response:
         ok, err = device.validate_config(values)
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
-            return redirect(url_for("auth.settings", _anchor=section_kind))
+            return _redirect_to_section(section_kind)
         settings_store.update_for_namespace("devices", did, values, fields)
         transport = _transport()
         try:
@@ -352,7 +406,7 @@ def settings_update(section_kind: str) -> Response:
             # Saved-but-not-published: the next broker connect will retain
             # the saved value, but tell the user the publish didn't land.
             flash(f"{device.name} config saved, publish failed: {exc}", "error")
-        return redirect(url_for("auth.settings", _anchor=section_kind))
+        return _redirect_to_section(section_kind)
 
     return Response(f"unknown section {section_kind!r}", status=404)
 

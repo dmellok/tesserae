@@ -47,9 +47,11 @@ def test_setup_sets_password_and_signs_in(app_with_gate: Flask, tmp_path: Path) 
         follow_redirects=False,
     )
     assert resp.status_code == 302
+    # /setup -> /settings -> /settings/server (the default sub-page)
     assert resp.location.endswith("/settings")
-    # Auth state visible to the next request.
-    resp = client.get("/settings")
+    # Auth state visible to the next request; /settings redirects to the
+    # Server sub-page, which renders for an authed user.
+    resp = client.get("/settings", follow_redirects=True)
     assert resp.status_code == 200
     # Password really persisted.
     store = SettingsStore(tmp_path / "core" / "settings.json")
@@ -133,13 +135,38 @@ def test_compose_blocked_from_non_loopback(app_with_gate: Flask) -> None:
 def test_settings_page_lists_loaded_renderers(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
-    resp = client.get("/settings")
+    resp = client.get("/settings/renderers")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # pi_png renderer should show up as a section because it declares
-    # settings in its manifest.
     assert "Renderer: Pi client (PNG)" in body
     assert "tesserae/pi/frame/png" in body  # topic shown in meta
+
+
+def test_settings_redirects_to_server_subpage(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.get("/settings", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.location.endswith("/settings/server")
+
+
+def test_unknown_settings_area_404s(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.get("/settings/nope", follow_redirects=False)
+    assert resp.status_code == 404
+
+
+def test_subpage_only_shows_its_own_sections(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    server_body = client.get("/settings/server").get_data(as_text=True)
+    plugins_body = client.get("/settings/plugins").get_data(as_text=True)
+    # Server section content stays out of the Plugins sub-page.
+    assert "MQTT broker" in server_body
+    assert "MQTT broker" not in plugins_body
+    # And vice versa: plugin sections don't bleed into the Server page.
+    assert "Plugin:" not in server_body
 
 
 def test_broker_update_persists_and_rebuilds_transport(

@@ -21,7 +21,7 @@
       <a href="{{ url_for('events.index') }}"
          class="{% if request.blueprint == 'events' %}is-active{% endif %}">Events</a>
       <a href="{{ url_for('auth.settings') }}"
-         class="{% if request.endpoint == 'auth.settings' %}is-active{% endif %}">Settings</a>
+         class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') %}is-active{% endif %}">Settings</a>
     </nav>
     {% if session.authed %}
     <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">

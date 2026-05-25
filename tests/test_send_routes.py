@@ -152,5 +152,5 @@ def test_delete_invokes_delete_history(app: Flask) -> None:
 def test_nav_links_to_send(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/settings").get_data(as_text=True)
+    body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     assert "/send" in body

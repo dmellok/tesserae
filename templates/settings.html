@@ -1,14 +1,29 @@
 {% extends "_base.html" %}
-{% block title %}Settings — Tesserae{% endblock %}
+{% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
+{% set AREA_BLURBS = {
+  'server':'Server-wide configuration: base URL, panel defaults, MQTT broker, Home Assistant discovery.',
+  'renderers':'Per-renderer transform + payload settings. Renderers are discovered from renderers/<id>/.',
+  'devices':'Latest heartbeat + outbound config for each loaded device. Devices come from devices/<id>/.',
+  'plugins':'Settings declared by each widget plugin (API keys, source URLs, etc.). Secrets stay masked between saves.',
+} %}
+{% block title %}Settings: {{ AREA_TITLES[active_area] }} — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
   <h1>Settings</h1>
-  <p class="lede">
-    Each section persists to <code>data/core/settings.json</code>.
-    Fields marked secret store as <code>&lt;name&gt;_secret</code> on disk
-    and stay masked in the UI between saves.
-  </p>
+  <p class="lede">{{ AREA_BLURBS[active_area] }}</p>
 </header>
+
+<nav class="tabs" role="tablist">
+  {% for slug, label in areas %}
+  <a href="{{ url_for('auth.settings_area', area=slug) }}"
+     class="tab {% if active_area == slug %}is-active{% endif %}"
+     role="tab">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% if not sections %}
+<p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
+{% endif %}
 
 {% for section in sections %}
 <section class="card" id="{{ section.id }}">
