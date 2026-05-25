@@ -1864,16 +1864,23 @@ button[disabled] {
 
 .layout-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
+  /* Each card centres a fixed-height thumbnail in the panel aspect.
+     The aspect is set inline from the current panel so portrait flips
+     show portrait thumbnails. */
+  --panel-aspect: 4 / 3;
+  --thumb-h: 96px;
 }
 
 .layout-form { margin: 0; }
 
 .layout-card {
   display: grid;
-  gap: 6px;
-  padding: 8px;
+  grid-template-rows: var(--thumb-h) auto;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
   background: var(--t-surface);
@@ -1883,6 +1890,8 @@ button[disabled] {
   font: 12px/1.2 system-ui, sans-serif;
   color: var(--t-fg);
   transition: border-color 80ms ease, transform 80ms ease;
+  /* Reset the global button inline-flex so the grid-rows take effect. */
+  white-space: normal;
 }
 .layout-card:hover {
   border-color: var(--t-accent);
@@ -1902,9 +1911,10 @@ button[disabled] {
 .layout-thumb {
   position: relative;
   display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
+  height: var(--thumb-h);
+  aspect-ratio: var(--panel-aspect);
   background: var(--t-surface-soft);
+  border: 1px solid var(--t-border);
   border-radius: 4px;
   overflow: hidden;
 }

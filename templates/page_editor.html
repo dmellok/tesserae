@@ -49,15 +49,12 @@
                       blank_label='Inherit page') }}
     </div>
 
-    <fieldset class="form-group">
-      <legend>Position &amp; size</legend>
-      <div class="field-grid">
-        {{ slider('cell-' ~ cell.id ~ '-x', 'x', 'X', value=cell.x, min=0, max=panel.w - 1, unit='px') }}
-        {{ slider('cell-' ~ cell.id ~ '-y', 'y', 'Y', value=cell.y, min=0, max=panel.h - 1, unit='px') }}
-        {{ slider('cell-' ~ cell.id ~ '-w', 'w', 'Width', value=cell.w, min=1, max=panel.w, unit='px') }}
-        {{ slider('cell-' ~ cell.id ~ '-h', 'h', 'Height', value=cell.h, min=1, max=panel.h, unit='px') }}
-      </div>
-    </fieldset>
+    {# Position + size come from the Layout picker — keep the values in
+       the form so the preview/save endpoints don't lose them on submit. #}
+    <input type="hidden" name="x" value="{{ cell.x }}">
+    <input type="hidden" name="y" value="{{ cell.y }}">
+    <input type="hidden" name="w" value="{{ cell.w }}">
+    <input type="hidden" name="h" value="{{ cell.h }}">
 
     {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
     {% if cell_opts %}
@@ -168,7 +165,7 @@
 
     <section class="card">
       {{ card_head('Layout', icon_name='grid-four', blurb='Pick a layout to (re)split the panel into cells. Existing cell assignments are reused in order.') }}
-      <div class="layout-grid">
+      <div class="layout-grid" style="--panel-aspect: {{ panel.w }} / {{ panel.h }};">
         {% for layout in layouts %}
         <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
           <input type="hidden" name="layout" value="{{ layout.slug }}">
