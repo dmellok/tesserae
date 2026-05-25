@@ -161,9 +161,14 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         # Open paths and static assets are always reachable.
         if _path_is_open(path):
             return None
-        # Compose / renders only need to work from the loopback renderer.
+        # Compose / renders are reachable from loopback (the in-process
+        # Playwright renderer + panel-side artifact fetches) OR from an
+        # authed admin session (the editor's preview iframe loads /compose
+        # over the LAN). Unauthed LAN traffic still gets 403'd.
         if _path_is_loopback_only(path):
             if _is_loopback():
+                return None
+            if is_authed():
                 return None
             return Response("forbidden", status=403)
         # First-run: no password yet — redirect everything to setup.

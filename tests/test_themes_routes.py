@@ -18,7 +18,6 @@ from app.state.user_themes import (
     validate_palette,
 )
 
-
 _FULL_PALETTE = {token: "#abcdef" for token in PALETTE_TOKENS}
 
 

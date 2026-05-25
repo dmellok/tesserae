@@ -31,6 +31,7 @@ from app import (
     composer,
     device_loader,
     events_routes,
+    page_routes,
     plugin_loader,
     renderer_loader,
     schedule_routes,
@@ -190,6 +191,7 @@ def create_app(
     send_routes.register(app)
     events_routes.register(app)
     themes_routes.register(app)
+    page_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)
