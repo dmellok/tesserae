@@ -28,6 +28,7 @@ from app import (
     auth,
     composer,
     device_loader,
+    events_routes,
     plugin_loader,
     renderer_loader,
     schedule_routes,
@@ -111,7 +112,10 @@ def create_app(
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
-    event_log = EventLog(data_root / "core" / "events.db")
+    # cap bumped from EventLog's default 500 to 2000 so per-renderer rows
+    # (one per push per renderer) and device heartbeats (every minute or
+    # so) don't crowd out the push history.
+    event_log = EventLog(data_root / "core" / "events.db", cap=2000)
 
     # Cache of the most recent parsed status heartbeat per device. The
     # MQTT subscription updates it; the settings page reads it. Plain dict
@@ -155,6 +159,7 @@ def create_app(
     scheduler = Scheduler(
         store=schedule_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
+        event_log=event_log,
     )
     app.config["SCHEDULER"] = scheduler
     if not testing:
@@ -165,6 +170,7 @@ def create_app(
     settings_routes.register(app)
     schedule_routes.register(app)
     send_routes.register(app)
+    events_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)
@@ -235,7 +241,7 @@ def _rebuild_transport(
     # client. Each callback closes over its device so parse_status routes
     # to the right module.
     for device in devices.all():
-        _subscribe_device_status(transport, device, status_cache)
+        _subscribe_device_status(transport, device, status_cache, event_log)
 
     app_section = settings.get_section("app")
     base_url = str(app_section.get("base_url") or "http://127.0.0.1:8000")
@@ -256,15 +262,30 @@ def _subscribe_device_status(
     transport: MqttTransport,
     device: device_loader.Device,
     status_cache: dict[str, dict[str, Any]],
+    event_log: EventLog,
 ) -> None:
-    """Register the per-device status callback on the transport."""
+    """Register the per-device status callback on the transport.
+
+    Every heartbeat updates the in-memory status cache (read by the
+    settings page) and writes one ``device`` event row (read by /events).
+    The event-log write is dedup-free for now; cap-based eviction handles
+    a flood of frequent heartbeats."""
 
     def on_status(topic: str, payload: bytes) -> None:
         del topic
+        parsed = device.parse_status(payload)
         status_cache[device.id] = {
             "received_at": time.time(),
-            "parsed": device.parse_status(payload),
+            "parsed": parsed,
         }
+        event_log.record(
+            type="device",
+            source=device.id,
+            target=device.status_topic,
+            status="error" if "error" in parsed else "ok",
+            error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
+            extra={"parsed": parsed},
+        )
 
     transport.subscribe(device.status_topic, on_status, qos=1)
 

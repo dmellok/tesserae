@@ -24,8 +24,8 @@ In active development. Tracked by milestone:
 | 5 | Device layer (`pi_client` + `esp32_client`) | done |
 | 6 | Scheduler | done |
 | 7 | Send page | done |
-| 8 | Generalise event log (renderer / device / scheduler events) | next |
-| 9 | Home Assistant MQTT discovery | — |
+| 8 | Generalise event log (renderer / device / scheduler events) | done |
+| 9 | Home Assistant MQTT discovery | next |
 | 10 | Port remaining widgets | — |
 
 ## Architecture in one diagram

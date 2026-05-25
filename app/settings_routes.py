@@ -32,6 +32,7 @@ from app import auth
 from app.device_loader import Device, DeviceRegistry
 from app.plugin_loader import PluginRegistry
 from app.renderer_loader import RendererRegistry
+from app.state.event_log import EventLog
 from app.state.settings_store import SECRET_MASK, SettingsStore
 from app.transport import MqttTransport
 
@@ -120,6 +121,23 @@ def _device_status() -> dict[str, dict[str, Any]]:
 
 def _transport() -> MqttTransport:
     return current_app.config["MQTT_TRANSPORT"]  # type: ignore[no-any-return]
+
+
+def _events() -> EventLog:
+    return current_app.config["EVENT_LOG"]  # type: ignore[no-any-return]
+
+
+def _log_auth(action: str, status: str, error: str | None = None) -> None:
+    """Record an auth event. Target is always 'session' since we have one
+    shared admin login — no per-user concept."""
+    _events().record(
+        type="auth",
+        source=action,
+        target="session",
+        status=status,
+        error=error,
+        extra={"remote_addr": request.remote_addr or "(unknown)"},
+    )
 
 
 def _config_fields_from_schema(schema: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -212,6 +230,7 @@ def setup() -> Response | str:
         else:
             auth.set_password(settings, pw)
             auth.login()
+            _log_auth("setup", "ok")
             return redirect(url_for("auth.settings"))
     return render_template("setup.html")
 
@@ -227,7 +246,9 @@ def login_view() -> Response | str:
         pw = request.form.get("password", "")
         if auth.verify_password(settings, pw):
             auth.login()
+            _log_auth("login", "ok")
             return redirect(_safe_next(request.form.get("next")))
+        _log_auth("login", "denied", error="incorrect password")
         flash("Incorrect password.", "error")
     return render_template("login.html", next=request.args.get("next", ""))
 
@@ -235,6 +256,7 @@ def login_view() -> Response | str:
 @bp.post("/logout")
 def logout_view() -> Response:
     auth.logout()
+    _log_auth("logout", "ok")
     return redirect(url_for("auth.login_view"))
 
 

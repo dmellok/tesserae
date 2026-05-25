@@ -303,20 +303,38 @@ class PushManager:
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []
         for renderer in self._registry.all():
+            renderer_start = time.monotonic()
             try:
-                results.append(self._publish_artifact(renderer, composition_png, panel))
+                result = self._publish_artifact(renderer, composition_png, panel)
             except Exception as err:
                 logger.exception("renderer %s failed", renderer.id)
-                results.append(
-                    RendererResult(
-                        renderer_id=renderer.id,
-                        topic=renderer.topic,
-                        digest="",
-                        url="",
-                        bytes_written=0,
-                        error=f"{type(err).__name__}: {err}",
-                    )
+                result = RendererResult(
+                    renderer_id=renderer.id,
+                    topic=renderer.topic,
+                    digest="",
+                    url="",
+                    bytes_written=0,
+                    error=f"{type(err).__name__}: {err}",
                 )
+            results.append(result)
+            # One event per renderer per push: lets /events filter for a
+            # single renderer's history without scanning every push's
+            # nested extras.
+            self._event_log.record(
+                type="renderer",
+                source=renderer.id,
+                target=renderer.topic,
+                status="sent" if result.error is None else "failed",
+                digest=result.digest or None,
+                error=result.error,
+                duration_s=time.monotonic() - renderer_start,
+                extra={
+                    "url": result.url,
+                    "bytes_written": result.bytes_written,
+                    "retain": renderer.retain,
+                    "composition_digest": comp_digest,
+                },
+            )
 
         duration = time.monotonic() - started
         if not results:

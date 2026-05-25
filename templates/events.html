@@ -1,0 +1,64 @@
+{% extends "_base.html" %}
+{% block title %}Events — Tesserae{% endblock %}
+
+{% macro status_pill(status) %}
+  {% if status in ('sent','ok') %}<span class="pill is-ok">{{ status }}</span>
+  {% elif status == 'busy' %}<span class="pill is-warn">{{ status }}</span>
+  {% elif status == 'denied' %}<span class="pill is-warn">{{ status }}</span>
+  {% else %}<span class="pill is-danger">{{ status }}</span>{% endif %}
+{% endmacro %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Events</h1>
+  <p class="lede">
+    Cross-cutting timeline. Every push attempt, renderer transform, device
+    heartbeat, scheduler fire, and auth event lands here. Newest first;
+    capped at {{ limit }}.
+  </p>
+</header>
+
+<nav class="tabs" role="tablist">
+  <a href="?type=all" role="tab" class="tab {% if selected == 'all' %}is-active{% endif %}">
+    All <span class="muted">{{ counts.all }}</span>
+  </a>
+  {% for t in known_types %}
+  <a href="?type={{ t }}" role="tab" class="tab {% if selected == t %}is-active{% endif %}">
+    {{ t|capitalize }} <span class="muted">{{ counts[t] }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+{% if not rows %}
+<p class="lede">No events of this kind yet.</p>
+{% else %}
+<ul class="events">
+  {% for ev in rows %}
+  <li class="event-row event--{{ ev.type }}">
+    <div class="event-type">{{ ev.type }}</div>
+    <div class="event-body">
+      <div class="event-line">
+        {{ status_pill(ev.status) }}
+        <span class="event-source">{{ ev.source }}</span>
+        <code class="event-target">{{ ev.target }}</code>
+      </div>
+      <div class="event-sub">
+        <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|int }}</time>
+        {% if ev.duration_s %}<span class="muted">·</span><span>{{ '%.3f'|format(ev.duration_s) }} s</span>{% endif %}
+        {% if ev.digest %}<span class="muted">·</span><code class="digest">{{ ev.digest }}</code>{% endif %}
+        {% if ev.error %}<span class="muted">·</span><span class="event-err">{{ ev.error }}</span>{% endif %}
+      </div>
+      {% if ev.extra and (ev.type != 'push') %}
+      <pre class="event-extra">{{ ev.extra|tojson }}</pre>
+      {% endif %}
+    </div>
+    {% if ev.type == 'push' and ev.digest %}
+    <a class="event-thumb" href="/renders/{{ ev.digest }}.png" target="_blank">
+      <img src="/renders/{{ ev.digest }}.png" alt="">
+    </a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

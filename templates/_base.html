@@ -18,6 +18,8 @@
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">Send</a>
       <a href="{{ url_for('schedules.index') }}"
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">Schedules</a>
+      <a href="{{ url_for('events.index') }}"
+         class="{% if request.blueprint == 'events' %}is-active{% endif %}">Events</a>
       <a href="{{ url_for('auth.settings') }}"
          class="{% if request.endpoint == 'auth.settings' %}is-active{% endif %}">Settings</a>
     </nav>

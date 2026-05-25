@@ -29,6 +29,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, time
 
 from app.push import PushManager, PushResult
+from app.state.event_log import EventLog
 from app.state.schedule_model import Schedule
 from app.state.schedule_store import ScheduleStore
 
@@ -70,14 +71,19 @@ class Scheduler:
         *,
         store: ScheduleStore,
         push_manager: Callable[[], PushManager],
+        event_log: EventLog | None = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
         currently-installed PushManager. We can't hold the instance because
         broker setting changes rebuild it — see app.main._rebuild_transport.
-        Tests pass ``lambda: my_pm`` for a fixed instance."""
+        Tests pass ``lambda: my_pm`` for a fixed instance.
+
+        ``event_log`` is optional so unit tests can construct a Scheduler
+        without a SQLite file. In production it's always wired."""
         self._store = store
         self._push_factory = push_manager
+        self._event_log = event_log
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -189,6 +195,22 @@ class Scheduler:
         if result.status == "sent":
             with self._lock:
                 self._last_fired[schedule.id] = now.timestamp()
+        if self._event_log is not None:
+            # The scheduler row links to the push event it caused, so /events
+            # can click through "this schedule fired -> this push happened".
+            self._event_log.record(
+                type="scheduler",
+                source="scheduler",
+                target=schedule.id,
+                status=result.status,
+                error=result.error,
+                duration_s=result.duration_s,
+                extra={
+                    "schedule_name": schedule.name,
+                    "page_id": schedule.page_id,
+                    "push_event_id": result.event_id,
+                },
+            )
         return result
 
     # -- helpers for tests / manual fire ---------------------------------
