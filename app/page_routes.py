@@ -26,6 +26,7 @@ URLs:
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
 from typing import Any
@@ -50,6 +51,8 @@ from app.panel import resolve_page_panel, resolve_settings_panel
 from app.plugin_loader import Plugin, PluginRegistry
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("pages", __name__, url_prefix="/pages")
 
@@ -188,15 +191,45 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     return out
 
 
+def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, Any]]]:
+    """For each widget plugin, return its cell_options spec with any
+    ``choices_from`` fields swapped to concrete ``choices`` lists by
+    calling the plugin's ``choices(name)`` function.
+
+    Plugins that don't expose ``choices`` (or that raise) get an empty
+    list — the editor will render an empty dropdown rather than break."""
+    out: dict[str, list[dict[str, Any]]] = {}
+    for plugin in plugins:
+        options = list(plugin.manifest.get("cell_options", []))
+        resolver = getattr(plugin.server_module, "choices", None) if plugin.server_module else None
+        materialized: list[dict[str, Any]] = []
+        for opt in options:
+            spec = dict(opt)
+            source = spec.pop("choices_from", None)
+            if source and callable(resolver):
+                try:
+                    spec["choices"] = list(resolver(source))
+                except Exception:
+                    logger.exception(
+                        "plugin %s: choices(%r) raised; rendering as empty", plugin.id, source
+                    )
+                    spec["choices"] = []
+            materialized.append(spec)
+        out[plugin.id] = materialized
+    return out
+
+
 def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
     panel = resolve_page_panel(page.panel, _settings_store())
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
     active_layout = detect_layout(panel_cells, panel.w, panel.h)
+    widgets = sorted(_plugins().widgets(), key=lambda p: p.name.lower())
     return {
         "page": page,
         "panel": panel,
-        "plugins": sorted(_plugins().widgets(), key=lambda p: p.name.lower()),
+        "plugins": widgets,
+        "plugin_cell_options": _materialize_cell_options(widgets),
         "themes": sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
         "fonts": sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
@@ -222,21 +255,26 @@ def index() -> str:
 
 
 @bp.get("/new")
-def new() -> str:
-    return render_template("page_new.html", layouts=LAYOUTS)
+def new() -> Response:
+    """Visiting /new in a browser short-circuits straight to a freshly
+    created dashboard so the user lands in the editor without a
+    metadata form to fill in first."""
+    return create()
 
 
 @bp.post("/new")
 def create() -> Response:
-    """Create a saved dashboard. The id is auto-generated from the name
-    (slug + numeric suffix on collision); the user never sees it as a
-    form input. Panel dims come from the app settings — pages aren't
-    panel-specific."""
+    """Create a saved dashboard and drop the user into the editor.
+
+    The id is auto-generated from the name (slug + numeric suffix on
+    collision); the user never sees it as a form input. The form is
+    optional — if no fields are POSTed (e.g. the "New dashboard" button
+    in the nav) we seed an "Untitled" 1-cell dashboard so the editor is
+    the only place the user has to think.
+
+    Panel dims come from app settings — pages aren't panel-specific."""
     form = request.form
-    name = (form.get("name") or "").strip()
-    if not name:
-        flash("Page name is required.", "error")
-        return redirect(url_for("pages.new"))
+    name = (form.get("name") or "").strip() or "Untitled dashboard"
 
     taken = {p.id for p in _store().list()}
     page_id = _unique_id(_slug_from(name), taken)
@@ -263,11 +301,10 @@ def create() -> Response:
             bleed_color=(form.get("bleed_color") or "#ffffff"),
         )
     except ValidationError as exc:
-        flash(f"Invalid page: {exc.errors()[0]['msg']}", "error")
-        return redirect(url_for("pages.new"))
+        flash(f"Could not create dashboard: {exc.errors()[0]['msg']}", "error")
+        return redirect(url_for("pages.index"))
 
     _store().save(page)
-    flash(f"Page {name!r} created with the {layout.name} layout.", "ok")
     return redirect(url_for("pages.edit", page_id=page.id))
 
 

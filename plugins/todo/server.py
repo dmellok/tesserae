@@ -224,230 +224,118 @@ def choices(name: str) -> list[dict[str, Any]]:
 
 
 _TEMPLATE = """
-<!doctype html>
-<html lang="en"><head>
-  <meta charset="utf-8">
-  <title>Todo — Inky Dash</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/icons/phosphor.css">
-  <link rel="stylesheet" href="/static/style/tokens.css">
-  <script>
-    (function () {
-      try {
-        var theme = localStorage.getItem('inky_theme') || 'auto';
-        var accent = localStorage.getItem('inky_accent');
-        var root = document.documentElement;
-        var isDark =
-          theme === 'dark' ||
-          (theme === 'auto' &&
-            window.matchMedia &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
-        if (isDark) root.dataset.theme = 'dark';
-        else root.removeAttribute('data-theme');
-        if (accent) root.style.setProperty('--id-accent', accent);
-      } catch (_) {}
-    })();
-  </script>
-  <script type="module" src="/static/dist/_components.js"></script>
-  <style>
-    body {
-      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    }
-    .container { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; }
-    h1 { font-size: 22px; margin: 0 0 16px; }
+{% extends "_base.html" %}
+{% from "_components.html" import card_head %}
+{% block title %}Todo — Tesserae{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-list-checks"></i> Todo</h1>
+  <p class="lede">
+    Quick-entry lists. Mark items done to strike them through; completed
+    items linger for 24h, then auto-prune. Each dashboard cell using the
+    Todo widget can pick which list it shows.
+  </p>
+</header>
 
-    /* List tabs strip + add-list inline form */
-    .lists-bar {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid var(--id-divider);
-    }
-    .lists-bar a.tab,
-    .lists-bar form.add-list {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .lists-bar a.tab {
-      padding: 8px 14px;
-      border-radius: 999px;
-      text-decoration: none;
-      color: var(--id-fg-soft);
-      font-weight: 600;
-      font-size: 14px;
-      border: 2px solid transparent;
-    }
-    .lists-bar a.tab:hover { background: var(--id-surface2); }
-    .lists-bar a.tab.active {
-      background: var(--id-surface);
-      color: var(--id-fg);
-      border-color: var(--id-accent);
-    }
-    .lists-bar a.tab .count {
-      font-size: 12px;
-      color: var(--id-fg-soft);
-      font-weight: 500;
-    }
-    .lists-bar form.add-list input {
-      padding: 6px 10px; min-height: 32px; box-sizing: border-box;
-      border: 2px solid var(--id-divider); border-radius: 6px;
-      background: var(--id-surface); color: var(--id-fg);
-      font: inherit; font-size: 13px; width: 140px;
-    }
-    .lists-bar form.add-list button,
-    .list-actions form button {
-      padding: 6px 10px; min-height: 32px;
-      border: 2px solid var(--id-divider); border-radius: 6px;
-      background: var(--id-surface); color: var(--id-fg);
-      cursor: pointer; font: inherit; font-size: 13px;
-      display: inline-flex; align-items: center; gap: 4px;
-    }
-    .lists-bar form.add-list button:hover,
-    .list-actions form button:hover { background: var(--id-surface2); }
-
-    .list-header {
-      display: flex; justify-content: space-between; align-items: center;
-      gap: 8px; margin-bottom: 12px;
-    }
-    .list-name {
-      font-size: 18px; font-weight: 700; color: var(--id-fg);
-    }
-    .list-actions {
-      display: flex; gap: 6px;
-    }
-
-    form.add { display: flex; gap: 8px; margin-bottom: 24px; }
-    form.add input[type=text] {
-      flex: 1; padding: 10px 12px; border: 2px solid var(--id-divider);
-      border-radius: 6px; font: inherit; min-height: 44px; box-sizing: border-box;
-      background: var(--id-surface); color: var(--id-fg);
-    }
-    form.add button {
-      padding: 0 16px; min-height: 44px; border: 0; border-radius: 6px;
-      background: var(--id-accent); color: white; font: inherit;
-      font-weight: 600; cursor: pointer; display: inline-flex;
-      align-items: center; gap: 6px;
-    }
-    form.add button:hover { background: var(--id-accent-soft); }
-    .section-title {
-      font-size: 13px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.05em; color: var(--id-fg-soft);
-      margin: 24px 0 8px;
-    }
-    ul.items {
-      list-style: none; padding: 0; margin: 0;
-      background: var(--id-surface);
-      border: 2px solid var(--id-divider); border-radius: 8px; overflow: hidden;
-    }
-    ul.items li {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; border-bottom: 2px solid var(--id-divider);
-    }
-    ul.items li:last-child { border-bottom: 0; }
-    ul.items li form { display: contents; }
-    ul.items li button {
-      padding: 6px 12px; border: 2px solid var(--id-divider);
-      border-radius: 6px; background: var(--id-surface); color: var(--id-fg);
-      font: inherit; font-size: 13px; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 4px;
-    }
-    ul.items li button:hover { background: var(--id-surface2); }
-    ul.items li.done { color: var(--id-fg-soft); }
-    ul.items li.done .text { text-decoration: line-through; }
-    .text { flex: 1; }
-    .meta { font-size: 12px; color: var(--id-fg-soft); white-space: nowrap; }
-    .empty {
-      color: var(--id-fg-soft); font-style: italic; padding: 32px 16px;
-      text-align: center; background: var(--id-surface);
-      border: 2px dashed var(--id-divider); border-radius: 8px;
-    }
-    .hint {
-      font-size: 12px; color: var(--id-fg-soft);
-      margin-top: 16px; text-align: center;
-    }
-  </style>
-</head><body>
-  <id-nav></id-nav>
-  <div class="container">
-    <h1><i class="ph ph-list-checks" style="color: var(--id-accent);"></i> Todo</h1>
-
-    <div class="lists-bar">
-      {% for lst in lists %}
-        <a class="tab {% if lst.id == active.id %}active{% endif %}"
-           href="/plugins/todo/?list={{ lst.id }}">
-          {{ lst.name }} <span class="count">{{ lst.open_count }}</span>
-        </a>
-      {% endfor %}
-      <form class="add-list" method="post" action="/plugins/todo/lists/add">
-        <input type="text" name="name" placeholder="New list…" maxlength="40" required>
-        <button type="submit"><i class="ph ph-plus"></i> Add list</button>
-      </form>
-    </div>
-
-    <div class="list-header">
-      <div class="list-name">{{ active.name }}</div>
-      <div class="list-actions">
-        <form method="post" action="/plugins/todo/lists/rename/{{ active.id }}"
-              onsubmit="var n=prompt('Rename list',{{ active.name|tojson }});if(!n)return false;this.elements.name.value=n;">
-          <input type="hidden" name="name" value="">
-          <button type="submit" {% if lists|length == 1 and active.id == 'default' %}disabled title="Rename the only list once you've added another"{% endif %}>
-            <i class="ph ph-pencil-simple"></i> Rename
-          </button>
-        </form>
-        <form method="post" action="/plugins/todo/lists/delete/{{ active.id }}"
-              onsubmit="return confirm('Delete the {{ active.name }} list and all its items?');">
-          <button type="submit" {% if lists|length <= 1 %}disabled title="Add another list before deleting this one"{% endif %}>
-            <i class="ph ph-trash"></i> Delete list
-          </button>
-        </form>
+<section class="card">
+  {{ card_head('Lists', icon_name='folders') }}
+  <nav class="tabs todo-lists">
+    {% for lst in lists %}
+    <a class="tab {% if lst.id == active.id %}is-active{% endif %}"
+       href="/plugins/todo/?list={{ lst.id }}">
+      <i class="ph ph-list" aria-hidden="true"></i>
+      <span>{{ lst.name }}</span>
+      <span class="muted">{{ lst.open_count }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+  <form class="form" method="post" action="/plugins/todo/lists/add">
+    <div class="field-grid">
+      <div class="field">
+        <label for="todo-new-list">New list name</label>
+        <input type="text" id="todo-new-list" name="name" placeholder="Groceries" maxlength="40" required>
+      </div>
+      <div class="actions" style="align-self: end;">
+        <button type="submit" class="ghost"><i class="ph ph-plus" aria-hidden="true"></i><span>Add list</span></button>
       </div>
     </div>
+  </form>
+</section>
 
-    <form class="add" method="post" action="/plugins/todo/{{ active.id }}/add">
-      <input type="text" name="text" placeholder="What needs doing?" autofocus required maxlength="200">
-      <button type="submit"><i class="ph ph-plus"></i> Add</button>
-    </form>
-    {% if open_items %}
-    <ul class="items">
-      {% for item in open_items %}
-      <li>
-        <span class="text">{{ item.text }}</span>
-        <form method="post" action="/plugins/todo/{{ active.id }}/done/{{ item.id }}">
-          <button type="submit"><i class="ph ph-check"></i> Done</button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="empty">All done. Add an item above.</p>
-    {% endif %}
+<section class="card">
+  <header class="card-head">
+    <h2>
+      <span class="icon-box"><i class="ph ph-list-checks" aria-hidden="true"></i></span>
+      <span>{{ active.name }}</span>
+    </h2>
+    <div class="card-head-action">
+      <form method="post" action="/plugins/todo/lists/rename/{{ active.id }}" class="inline"
+            onsubmit="var n=prompt('Rename list', {{ active.name|tojson }}); if(!n) return false; this.elements.name.value=n;">
+        <input type="hidden" name="name" value="">
+        <button type="submit" class="ghost" {% if lists|length == 1 and active.id == 'default' %}disabled title="Rename the only list once you've added another"{% endif %}>
+          <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Rename</span>
+        </button>
+      </form>
+      <form method="post" action="/plugins/todo/lists/delete/{{ active.id }}" class="inline"
+            onsubmit="return confirm('Delete the {{ active.name }} list and all its items?');">
+        <button type="submit" class="ghost danger" {% if lists|length <= 1 %}disabled title="Add another list before deleting this one"{% endif %}>
+          <i class="ph ph-trash" aria-hidden="true"></i>
+        </button>
+      </form>
+    </div>
+  </header>
 
-    {% if done_items %}
-    <p class="section-title">Recently done · auto-prunes after 24h</p>
-    <ul class="items">
-      {% for item in done_items %}
-      <li class="done">
-        <i class="ph ph-check-circle-fill" style="color: var(--id-ok, #16a34a);"></i>
-        <span class="text">{{ item.text }}</span>
-        <span class="meta">{{ item.completed_age }}</span>
-        <form method="post" action="/plugins/todo/{{ active.id }}/undone/{{ item.id }}">
-          <button type="submit"><i class="ph ph-arrow-counter-clockwise"></i> Undo</button>
-        </form>
-        <form method="post" action="/plugins/todo/{{ active.id }}/delete/{{ item.id }}">
-          <button type="submit" title="Delete now"><i class="ph ph-trash"></i></button>
-        </form>
-      </li>
-      {% endfor %}
-    </ul>
-    {% endif %}
+  <form method="post" action="/plugins/todo/{{ active.id }}/add" class="form todo-add">
+    <input type="text" name="text" placeholder="What needs doing?" autofocus required maxlength="200">
+    <button type="submit" class="primary">
+      <i class="ph ph-plus" aria-hidden="true"></i><span>Add</span>
+    </button>
+  </form>
 
-    <p class="hint">Completed items linger for 24 hours, then prune themselves.</p>
+  {% if open_items %}
+  <ul class="todo-items">
+    {% for item in open_items %}
+    <li>
+      <form method="post" action="/plugins/todo/{{ active.id }}/done/{{ item.id }}" class="inline todo-toggle">
+        <button type="submit" class="todo-check" aria-label="Mark done">
+          <i class="ph ph-circle" aria-hidden="true"></i>
+        </button>
+      </form>
+      <span class="todo-text">{{ item.text }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="empty-state empty-state--inline">
+    <span class="empty-state-icon"><i class="ph-duotone ph-duotone-check-circle" aria-hidden="true"></i></span>
+    <h3>All done</h3>
+    <p class="lede">Nothing left on this list. Add something above.</p>
   </div>
-</body></html>
+  {% endif %}
+
+  {% if done_items %}
+  <h3 class="todo-section-title">Recently done <span class="muted">· auto-prunes after 24h</span></h3>
+  <ul class="todo-items is-done">
+    {% for item in done_items %}
+    <li>
+      <form method="post" action="/plugins/todo/{{ active.id }}/undone/{{ item.id }}" class="inline todo-toggle">
+        <button type="submit" class="todo-check is-done" aria-label="Undo">
+          <i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>
+        </button>
+      </form>
+      <span class="todo-text">{{ item.text }}</span>
+      <span class="muted todo-age">{{ item.completed_age }}</span>
+      <form method="post" action="/plugins/todo/{{ active.id }}/delete/{{ item.id }}" class="inline">
+        <button type="submit" class="ghost danger" title="Delete now">
+          <i class="ph ph-trash" aria-hidden="true"></i>
+        </button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}
 """
 
 

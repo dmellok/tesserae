@@ -4,9 +4,11 @@
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-squares-four"></i> Dashboards
-    <a class="header-action" href="{{ url_for('pages.new') }}">
-      <i class="ph ph-plus"></i><span>New dashboard</span>
-    </a>
+    <form method="post" action="{{ url_for('pages.create') }}" class="inline">
+      <button type="submit" class="header-action">
+        <i class="ph ph-plus"></i><span>New dashboard</span>
+      </button>
+    </form>
   </h1>
   <p class="lede">
     Each dashboard is a panel-sized canvas of widget cells.
@@ -18,11 +20,14 @@
 </header>
 
 {% if not pages %}
-{{ empty_state('squares-four',
-               title='No dashboards yet',
-               blurb='A dashboard is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.',
-               action_label='Create your first dashboard',
-               action_href=url_for('pages.new')) }}
+<div class="empty-state">
+  <span class="empty-state-icon"><i class="ph-duotone ph-duotone-squares-four" aria-hidden="true"></i></span>
+  <h3>No dashboards yet</h3>
+  <p class="lede">A dashboard is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.</p>
+  <form method="post" action="{{ url_for('pages.create') }}" class="inline">
+    <button type="submit" class="btn btn-primary">Create your first dashboard</button>
+  </form>
+</div>
 {% else %}
 <ul class="pages-list">
   {% for page in pages %}

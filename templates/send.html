@@ -42,9 +42,10 @@
     <label class="dropzone" data-dropzone>
       <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
       <div class="dropzone-body" data-dropzone-body>
-        <i class="ph-duotone ph-duotone-cloud-arrow-up" aria-hidden="true"></i>
-        <p class="dropzone-title">Drag &amp; drop an image here</p>
-        <p class="dropzone-hint">or click to browse — PNG, JPEG, GIF, BMP up to 16 MiB</p>
+        <span class="dropzone-icon"><i class="ph ph-image-square" aria-hidden="true"></i></span>
+        <p class="dropzone-title">Drop an image here</p>
+        <p class="dropzone-hint">PNG, JPEG, GIF, or BMP — up to 16 MiB</p>
+        <span class="dropzone-browse"><i class="ph ph-folder-open" aria-hidden="true"></i> or browse</span>
       </div>
       <div class="dropzone-preview" data-dropzone-preview hidden>
         <img alt="" data-dropzone-thumb>
@@ -62,20 +63,43 @@
   </form>
 </section>
 
+{% set _preview_scale = (560.0 / panel.w) if panel.w > 560 else 1.0 %}
 <section class="card" id="tab-saved" {% if tab != 'saved' %}hidden{% endif %}>
   {{ card_head('Saved dashboard', icon_name='squares-four') }}
   <form method="post" action="{{ url_for('send.send_page') }}" class="form">
-    <div class="field">
-      <label for="saved-page">Dashboard</label>
-      <select id="saved-page" name="page_id" required>
-        {% if not pages %}<option value="">(no saved dashboards yet)</option>{% endif %}
-        {% for p in pages %}
-        <option value="{{ p.id }}">{{ p.name }}</option>
-        {% endfor %}
-      </select>
-      <p class="field-help">The dashboard renders through the composer, then publishes through every loaded renderer.</p>
+    <div class="saved-grid">
+      <div class="saved-options">
+        <div class="field">
+          <label for="saved-page">Dashboard</label>
+          <select id="saved-page" name="page_id" required data-saved-preview-target>
+            {% if not pages %}<option value="">(no saved dashboards yet)</option>{% endif %}
+            {% for p in pages %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+          <p class="field-help">The dashboard renders through the composer, then publishes through every loaded renderer.</p>
+        </div>
+        <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
+      </div>
+      {% if pages %}
+      <div class="saved-preview">
+        <div class="saved-preview-label">
+          <i class="ph ph-monitor-play" aria-hidden="true"></i>
+          <span>Live preview</span>
+          <span class="muted">{{ panel.w }} × {{ panel.h }}</span>
+        </div>
+        <div class="preview-frame"
+             style="width: {{ (panel.w * _preview_scale)|round|int }}px;
+                    height: {{ (panel.h * _preview_scale)|round|int }}px;">
+          <iframe data-saved-preview-iframe
+                  src="{{ url_for('composer.compose', page_id=pages[0].id) }}?preview=1"
+                  style="width: {{ panel.w }}px; height: {{ panel.h }}px;
+                         transform: scale({{ _preview_scale }}); transform-origin: 0 0;"
+                  loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+        </div>
+      </div>
+      {% endif %}
     </div>
-    <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
   </form>
 </section>
 
@@ -214,6 +238,19 @@
       dt.items.add(file);
       input.files = dt.files;
       showFile(file);
+    });
+  })();
+
+  // Saved-dashboard preview: swap iframe src when the select changes.
+  (function () {
+    const select = document.querySelector('[data-saved-preview-target]');
+    const iframe = document.querySelector('[data-saved-preview-iframe]');
+    if (!select || !iframe) return;
+    const base = '{{ url_for("composer.compose", page_id="__PID__") }}'.replace('__PID__', '');
+    select.addEventListener('change', () => {
+      const pid = select.value;
+      if (!pid) return;
+      iframe.src = base + pid + '?preview=1&_t=' + Date.now();
     });
   })();
 </script>

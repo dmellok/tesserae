@@ -158,8 +158,8 @@ a:hover { color: var(--t-accent-hover); }
   position: sticky;
   top: 0;
   z-index: 40;
-  backdrop-filter: saturate(180%) blur(6px);
-  background: color-mix(in srgb, var(--t-surface) 92%, transparent);
+  /* No backdrop-filter: it creates a containing block for fixed children,
+     which would trap the mobile drawer inside the header. */
 }
 
 .brand {
@@ -878,6 +878,115 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 .tab.is-active .ph { opacity: 1; }
 .tab:hover { color: var(--t-fg); }
 
+/* ----- Todo plugin admin ------------------------------------------- */
+
+.todo-lists {
+  margin-bottom: var(--t-space-3);
+  flex-wrap: wrap;
+}
+.todo-add {
+  display: flex;
+  gap: var(--t-space-2);
+  margin-top: var(--t-space-3);
+}
+.todo-add input[type="text"] {
+  flex: 1;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: var(--t-size-md);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+.todo-add input[type="text"]:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  box-shadow: var(--t-ring);
+}
+.todo-items {
+  list-style: none;
+  padding: 0;
+  margin: var(--t-space-3) 0 0;
+  display: grid;
+  gap: 4px;
+}
+.todo-items li {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: var(--t-space-3);
+  padding: 10px var(--t-space-3);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+}
+.todo-items.is-done li { background: var(--t-surface-soft); }
+.todo-toggle { display: contents; }
+.todo-check {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  font-size: 22px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--t-fg-soft);
+  padding: 0;
+}
+.todo-check:hover { color: var(--t-accent); }
+.todo-check.is-done { color: var(--t-ok); }
+.todo-text { font-size: var(--t-size-md); color: var(--t-fg); }
+.todo-items.is-done .todo-text {
+  color: var(--t-fg-soft);
+  text-decoration: line-through;
+}
+.todo-age { font-size: 12px; white-space: nowrap; }
+.todo-section-title {
+  font-size: var(--t-size-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-fg-soft);
+  margin: var(--t-space-5) 0 var(--t-space-2);
+}
+.empty-state--inline {
+  padding: var(--t-space-5) var(--t-space-4);
+  border: 1px dashed var(--t-border);
+  border-radius: var(--t-radius-md);
+  background: var(--t-surface-soft);
+  margin-top: var(--t-space-3);
+}
+
+/* ----- Send saved-dashboard preview --------------------------------- */
+
+.saved-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--t-space-5);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .saved-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, auto);
+  }
+}
+.saved-options { display: grid; gap: var(--t-space-4); align-content: start; }
+.saved-preview {
+  display: grid;
+  gap: var(--t-space-2);
+  justify-items: center;
+}
+.saved-preview-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+}
+.saved-preview-label .muted { font-size: 11px; }
+
 /* ----- Schedules timeline ------------------------------------------ */
 
 .timeline {
@@ -958,18 +1067,30 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 /* ----- File dropzone ----------------------------------------------- */
 
 .dropzone {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: relative;
+  min-height: 280px;
   border: 2px dashed var(--t-border-strong);
-  border-radius: var(--t-radius-md);
+  border-radius: var(--t-radius-lg);
   padding: var(--t-space-7) var(--t-space-5);
-  background: var(--t-surface-soft);
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 8%, transparent), transparent 70%),
+    var(--t-surface-soft);
   cursor: pointer;
-  transition: border-color var(--t-trans-fast), background var(--t-trans-fast);
+  transition: border-color var(--t-trans-fast), background var(--t-trans-fast), transform var(--t-trans-fast);
 }
-.dropzone:hover, .dropzone.is-dragging {
+.dropzone:hover {
   border-color: var(--t-accent);
-  background: color-mix(in oklab, var(--t-accent) 6%, var(--t-surface-soft));
+}
+.dropzone.is-dragging {
+  border-color: var(--t-accent);
+  border-style: solid;
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 18%, transparent), transparent 65%),
+    var(--t-accent-soft);
+  transform: scale(1.005);
 }
 .dropzone-input {
   position: absolute;
@@ -980,40 +1101,72 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 .dropzone-body {
   text-align: center;
   pointer-events: none;
+  display: grid;
+  justify-items: center;
+  gap: var(--t-space-3);
 }
-.dropzone-body [class^="ph-duotone"] {
-  font-size: 56px;
+.dropzone-body .dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--t-accent-soft);
   color: var(--t-accent);
-  display: block;
-  margin: 0 auto var(--t-space-3);
+  font-size: 48px;
+  transition: transform var(--t-trans-fast);
+}
+.dropzone.is-dragging .dropzone-icon {
+  transform: scale(1.08);
 }
 .dropzone-title {
-  font-size: var(--t-size-lg);
+  font-size: var(--t-size-xl);
   font-weight: 600;
-  margin: 0 0 4px;
+  margin: 0;
   color: var(--t-fg);
+  letter-spacing: -0.01em;
 }
 .dropzone-hint {
   margin: 0;
   color: var(--t-muted);
   font-size: var(--t-size-sm);
 }
+.dropzone-browse {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  margin-top: var(--t-space-2);
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  color: var(--t-fg-soft);
+}
 .dropzone-preview {
   display: grid;
-  grid-template-columns: 96px 1fr auto;
+  grid-template-columns: 120px 1fr auto;
   gap: var(--t-space-4);
   align-items: center;
+  width: 100%;
 }
 .dropzone-preview img {
-  width: 96px;
-  height: 96px;
+  width: 120px;
+  height: 120px;
   object-fit: contain;
   background: var(--t-surface);
   border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border);
+  padding: 6px;
 }
-.dropzone-meta { display: grid; gap: 2px; min-width: 0; }
-.dropzone-meta strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dropzone-meta { display: grid; gap: 4px; min-width: 0; }
+.dropzone-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-size-md);
+}
 .dropzone-preview button { position: relative; z-index: 1; }
 
 /* ----- History ------------------------------------------------------ */

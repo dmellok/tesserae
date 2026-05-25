@@ -59,10 +59,11 @@
       </div>
     </fieldset>
 
-    {% if plugin.manifest.cell_options %}
+    {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
+    {% if cell_opts %}
     <fieldset class="form-group">
       <legend>{{ plugin.name }} options</legend>
-      {% for opt in plugin.manifest.cell_options %}
+      {% for opt in cell_opts %}
         {% set field_id = 'cell-' ~ cell.id ~ '-opt-' ~ opt.name %}
         {% set value = cell.options.get(opt.name, opt.get('default', '')) %}
         {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value) }}

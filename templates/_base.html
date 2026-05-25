@@ -19,7 +19,6 @@
     <button type="button" class="nav-toggle" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false">
       <i class="ph ph-list" aria-hidden="true"></i>
     </button>
-    <div class="nav-scrim" hidden></div>
     <nav class="topnav" id="primary-nav">
       <a href="{{ url_for('send.index') }}"
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">
@@ -87,6 +86,7 @@
     {% endif %}
   {% endwith %}
 
+  <div class="nav-scrim" hidden></div>
   <main class="page">
     {% block main %}{% endblock %}
   </main>
