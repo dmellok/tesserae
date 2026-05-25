@@ -1,0 +1,144 @@
+{% extends "_base.html" %}
+{% block title %}Send — Tesserae{% endblock %}
+
+{% set TABS = [('file','File'),('saved','Saved'),('url','URL'),('webpage','Webpage'),('history','History')] %}
+
+{% macro pill_status(status) %}
+  {% if status == 'sent' %}<span class="pill is-ok">sent</span>
+  {% elif status == 'busy' %}<span class="pill is-warn">busy</span>
+  {% elif status == 'not_found' %}<span class="pill is-danger">not found</span>
+  {% else %}<span class="pill is-danger">failed</span>{% endif %}
+{% endmacro %}
+
+{% block main %}
+<header class="page-head">
+  <h1>Send</h1>
+  <p class="lede">
+    Push anything to the panel. Source can be an upload, a saved
+    dashboard, an image URL, or any webpage. Past pushes live under
+    History.
+  </p>
+</header>
+
+<nav class="tabs" role="tablist">
+  {% for slug, label in TABS %}
+  <a href="?tab={{ slug }}" role="tab"
+     class="tab {% if tab == slug %}is-active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+<section class="card" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
+  <header class="card-head"><h2>Upload a file</h2></header>
+  <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
+    <div class="field">
+      <label for="file-image">Image (PNG, JPEG, GIF, BMP)</label>
+      <input type="file" id="file-image" name="image" accept="image/*" required>
+      <p class="field-help">The renderers fit the upload to the configured panel size (set in Settings).</p>
+    </div>
+    <div class="actions"><button type="submit" class="primary">Push file</button></div>
+  </form>
+</section>
+
+<section class="card" id="tab-saved" {% if tab != 'saved' %}hidden{% endif %}>
+  <header class="card-head"><h2>Saved dashboard</h2></header>
+  <form method="post" action="{{ url_for('send.send_page') }}" class="form">
+    <div class="field">
+      <label for="saved-page">Dashboard</label>
+      <select id="saved-page" name="page_id" required>
+        {% if not pages %}<option value="">(no saved pages yet)</option>{% endif %}
+        {% for p in pages %}
+        <option value="{{ p.id }}">{{ p.name }} ({{ p.id }})</option>
+        {% endfor %}
+      </select>
+      <p class="field-help">The page renders through the composer, then publishes through every loaded renderer.</p>
+    </div>
+    <div class="actions"><button type="submit" class="primary" {% if not pages %}disabled{% endif %}>Push dashboard</button></div>
+  </form>
+</section>
+
+<section class="card" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
+  <header class="card-head"><h2>Image URL</h2></header>
+  <form method="post" action="{{ url_for('send.send_url') }}" class="form">
+    <div class="field">
+      <label for="url-input">URL</label>
+      <input type="url" id="url-input" name="url" placeholder="https://..." required>
+      <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
+    </div>
+    <div class="actions"><button type="submit" class="primary">Fetch &amp; push</button></div>
+  </form>
+</section>
+
+<section class="card" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
+  <header class="card-head"><h2>Webpage</h2></header>
+  <form method="post" action="{{ url_for('send.send_webpage') }}" class="form">
+    <div class="field">
+      <label for="webpage-url">URL</label>
+      <input type="url" id="webpage-url" name="url" placeholder="https://..." required>
+      <p class="field-help">Rendered headlessly with Chromium at the viewport below, then fit + pushed.</p>
+    </div>
+    <div class="field-grid">
+      <div class="field">
+        <label for="webpage-w">Viewport width</label>
+        <input type="number" id="webpage-w" name="viewport_w" value="1600" min="200" step="1">
+      </div>
+      <div class="field">
+        <label for="webpage-h">Viewport height</label>
+        <input type="number" id="webpage-h" name="viewport_h" value="1200" min="200" step="1">
+      </div>
+    </div>
+    <div class="actions"><button type="submit" class="primary">Render &amp; push</button></div>
+  </form>
+</section>
+
+<section class="card" id="tab-history" {% if tab != 'history' %}hidden{% endif %}>
+  <header class="card-head">
+    <h2>History</h2>
+    <p class="lede">Last {{ history|length }} push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.</p>
+  </header>
+  {% if not history %}
+  <p class="lede">No pushes yet.</p>
+  {% else %}
+  <ul class="history">
+    {% for ev in history %}
+    <li class="history-row">
+      <a class="history-thumb" {% if ev.digest %}href="/renders/{{ ev.digest }}.png" target="_blank"{% endif %}>
+        {% if ev.digest %}
+        <img src="/renders/{{ ev.digest }}.png" alt="">
+        {% else %}
+        <span class="history-thumb-empty">no preview</span>
+        {% endif %}
+      </a>
+      <div class="history-meta">
+        <div class="history-top">
+          {{ pill_status(ev.status) }}
+          <span class="history-source">{{ ev.source }}</span>
+          <code class="history-target">{{ ev.target }}</code>
+        </div>
+        <div class="history-sub">
+          <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|int }}</time>
+          <span class="muted">·</span>
+          <span>{{ '%.2f'|format(ev.duration_s) }} s</span>
+          {% if ev.error %}<span class="muted">·</span><span class="history-err">{{ ev.error }}</span>{% endif %}
+        </div>
+        {% if ev.extra.renderers %}
+        <div class="history-renderers">
+          {% for r in ev.extra.renderers %}
+          <span class="pill {% if r.error %}is-danger{% endif %}">{{ r.renderer_id }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      <div class="history-actions">
+        <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="inline">
+          <button type="submit" class="ghost" {% if not ev.digest %}disabled title="no composition PNG stored"{% endif %}>Resend</button>
+        </form>
+        <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="inline" onsubmit="return confirm('Delete this entry?');">
+          <button type="submit" class="ghost danger">Delete</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endblock %}

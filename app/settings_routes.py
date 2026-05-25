@@ -59,7 +59,25 @@ APP_FIELDS: list[dict[str, Any]] = [
             "Public URL the panel listeners use to fetch artifacts. Use the host's "
             "LAN address (e.g. http://192.168.1.10:8000) so the Pi / ESP32 can reach it."
         ),
-    }
+    },
+    {
+        "name": "panel_w",
+        "type": "number",
+        "label": "Default panel width (px)",
+        "default": 1600,
+        "min": 1,
+        "help": (
+            "Used for Send-page uploads that aren't a saved dashboard. Saved "
+            "dashboards always use their own panel dims."
+        ),
+    },
+    {
+        "name": "panel_h",
+        "type": "number",
+        "label": "Default panel height (px)",
+        "default": 1200,
+        "min": 1,
+    },
 ]
 
 BROKER_FIELDS: list[dict[str, Any]] = [

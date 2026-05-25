@@ -18,7 +18,9 @@ from PIL import Image
 
 from app.push import PushManager
 from app.renderer_loader import Renderer, RendererRegistry
+from app.state.event_log import EventLog
 from app.state.page_store import Page, PageStore, Panel
+from app.state.settings_store import SettingsStore
 from app.transport import BrokerConfig, MqttTransport
 
 
@@ -114,6 +116,8 @@ def _wired(tmp_path: Path, composition_png: bytes, renderers: list[Renderer]):
         registry=registry,
         page_store=page_store,
         transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url="http://broker.local:8000",
     )

@@ -31,10 +31,12 @@ from app import (
     plugin_loader,
     renderer_loader,
     schedule_routes,
+    send_routes,
     settings_routes,
 )
 from app.push import PushManager
 from app.scheduler import Scheduler
+from app.state.event_log import EventLog
 from app.state.page_store import PageStore
 from app.state.schedule_store import ScheduleStore
 from app.state.settings_store import SettingsStore
@@ -109,6 +111,7 @@ def create_app(
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
+    event_log = EventLog(data_root / "core" / "events.db")
 
     # Cache of the most recent parsed status heartbeat per device. The
     # MQTT subscription updates it; the settings page reads it. Plain dict
@@ -120,6 +123,7 @@ def create_app(
     app.config["DEVICE_REGISTRY"] = devices
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
+    app.config["EVENT_LOG"] = event_log
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
@@ -136,6 +140,7 @@ def create_app(
             devices,
             status_cache,
             page_store,
+            event_log,
             renders_dir,
             testing=testing,
         )
@@ -159,6 +164,7 @@ def create_app(
     app.register_blueprint(composer.bp)
     settings_routes.register(app)
     schedule_routes.register(app)
+    send_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)
@@ -186,6 +192,7 @@ def _rebuild_transport(
     devices: device_loader.DeviceRegistry,
     status_cache: dict[str, dict[str, Any]],
     page_store: PageStore,
+    event_log: EventLog,
     renders_dir: Path,
     *,
     testing: bool,
@@ -238,6 +245,8 @@ def _rebuild_transport(
         registry=renderers,
         page_store=page_store,
         transport=transport,
+        settings=settings,
+        event_log=event_log,
         renders_dir=renders_dir,
         base_url=base_url,
     )

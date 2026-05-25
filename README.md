@@ -23,8 +23,8 @@ In active development. Tracked by milestone:
 | 4 | `pi_bin` + `esp32_bin` renderers | done |
 | 5 | Device layer (`pi_client` + `esp32_client`) | done |
 | 6 | Scheduler | done |
-| 7 | Send page | next |
-| 8 | Push history (event log) | — |
+| 7 | Send page | done |
+| 8 | Generalise event log (renderer / device / scheduler events) | next |
 | 9 | Home Assistant MQTT discovery | — |
 | 10 | Port remaining widgets | — |
 
