@@ -1,8 +1,8 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Pi listener (PNG)",
+  "name": "Pi client (PNG)",
   "version": "0.1.0",
-  "description": "Composition PNG, rotated to the Pi listener's landscape-native pixel grid. Published non-retained to tesserae/pi/frame/png with the v3-frozen options payload (rotate / scale / bg / saturation) so an existing inky-dash listener works without firmware changes.",
+  "description": "Composition PNG, rotated to the Pi client's landscape-native pixel grid. Published non-retained to tesserae/pi/frame/png with the v3-frozen options payload (rotate / scale / bg / saturation) so an existing inky-dash listener works without firmware changes.",
   "orientation": "landscape",
   "mime": "image/png",
   "extension": "png",
@@ -13,7 +13,7 @@
     {
       "name": "rotate",
       "type": "select",
-      "label": "Listener rotation (quarter-turns)",
+      "label": "Client rotation (quarter-turns)",
       "default": 0,
       "choices": [
         { "value": 0, "label": "0°" },
@@ -25,7 +25,7 @@
     {
       "name": "scale",
       "type": "select",
-      "label": "Listener-side scale mode",
+      "label": "Client-side scale mode",
       "default": "fit",
       "choices": [
         { "value": "fit", "label": "Fit" },
@@ -52,7 +52,7 @@
     {
       "name": "saturation",
       "type": "number",
-      "label": "Listener-side saturation (0–1)",
+      "label": "Client-side saturation (0-1)",
       "default": 0.5,
       "min": 0,
       "max": 1

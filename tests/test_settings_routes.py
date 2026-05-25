@@ -138,7 +138,7 @@ def test_settings_page_lists_loaded_renderers(app_with_gate: Flask) -> None:
     body = resp.get_data(as_text=True)
     # pi_png renderer should show up as a section because it declares
     # settings in its manifest.
-    assert "Renderer: Pi listener (PNG)" in body
+    assert "Renderer: Pi client (PNG)" in body
     assert "tesserae/pi/frame/png" in body  # topic shown in meta
 
 

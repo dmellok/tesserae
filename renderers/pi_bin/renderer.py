@@ -1,7 +1,7 @@
 """pi_bin renderer.
 
 Composition PNG packed into the Waveshare E6 4-bpp buffer for the
-``.bin``-mode Pi listener. Identical packed bytes to ``esp32_bin``;
+``.bin``-mode Pi client. Identical packed bytes to ``esp32_bin``;
 content-addressed disk storage means both renderers share a single file
 on disk when both targets are active.
 """

@@ -1,8 +1,8 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Pi listener (4-bpp .bin)",
+  "name": "Pi client (4-bpp .bin)",
   "version": "0.1.0",
-  "description": "Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi listener consumes. Published non-retained to tesserae/pi/frame/bin. Shares its packed bytes (and on-disk file) with esp32_bin when both targets are active.",
+  "description": "Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. Published non-retained to tesserae/pi/frame/bin. Shares its packed bytes (and on-disk file) with esp32_bin when both targets are active.",
   "orientation": "composition",
   "mime": "application/octet-stream",
   "extension": "bin",

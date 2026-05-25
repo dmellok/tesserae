@@ -23,6 +23,24 @@
     </dl>
     {% endif %}
   </header>
+
+  {% if section.kind == 'device' and section.status %}
+  <div class="device-status">
+    <div class="status-line">
+      <span class="status-dot is-{{ section.status.health }}" aria-hidden="true"></span>
+      <span class="status-label">{{ section.status.relative }}</span>
+    </div>
+    {% if section.status.parsed %}
+    <dl class="status-fields">
+      {% for key, value in section.status.parsed.items() %}
+      <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
+      {% endfor %}
+    </dl>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if section.endpoint %}
   <form method="post" action="{{ section.endpoint }}" class="form">
     {% for field in section.fields %}
     <div class="field field--{{ field.type }}">
@@ -70,6 +88,7 @@
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
+  {% endif %}
 </section>
 {% endfor %}
 {% endblock %}

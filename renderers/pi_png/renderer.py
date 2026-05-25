@@ -1,7 +1,7 @@
 """pi_png renderer.
 
 Takes the composition-orientation PNG produced by the composer, rotates it to
-the Pi listener's landscape-native pixel grid, and publishes the v3-frozen
+the Pi client's landscape-native pixel grid, and publishes the v3-frozen
 ``{url, rotate, scale, bg, saturation}`` payload.
 
 The payload shape is byte-compatible with the long-standing
@@ -32,8 +32,8 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     """Rotate the composition PNG to landscape orientation.
 
-    ``transform_rotate_quarters`` defaults to 1 (a single 90° CW turn) — the
-    Pi panel's mounted orientation is portrait but the listener expects
+    ``transform_rotate_quarters`` defaults to 1 (a single 90deg CW turn) —
+    the Pi panel's mounted orientation is portrait but the client expects
     landscape. Override per install if the panel is mounted landscape.
     """
     del panel  # rotation count is fixed at the renderer level; panel dims unused
@@ -42,7 +42,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
 
 def payload(digest: str, base_url: str, *, settings: dict[str, Any]) -> dict[str, Any]:
-    """Build the v3-frozen Pi listener payload. ``url`` points at the
+    """Build the v3-frozen Pi client payload. ``url`` points at the
     artifact this renderer just wrote."""
     return {
         "url": f"{base_url.rstrip('/')}/renders/{digest}.png",

@@ -1,7 +1,7 @@
 # Tesserae
 
 E-ink dashboard companion. Compose tile-based dashboards in the browser, render
-headless, push the resulting frame to one or more devices (Pi listener, ESP32
+headless, push the resulting frame to one or more devices (Pi client, ESP32
 client) over MQTT.
 
 Sibling rebuild of [inky-dash](https://github.com/dmellok/inky-dash). Same job,
@@ -21,8 +21,8 @@ In active development. Tracked by milestone:
 | 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | done |
 | 3 | `/settings` page generated from manifests + auth gate | done |
 | 4 | `pi_bin` + `esp32_bin` renderers | done |
-| 5 | Device layer (`pi_listener` + `esp32_client`) | next |
-| 6 | Scheduler | — |
+| 5 | Device layer (`pi_client` + `esp32_client`) | done |
+| 6 | Scheduler | next |
 | 7 | Send page | — |
 | 8 | Push history (event log) | — |
 | 9 | Home Assistant MQTT discovery | — |
@@ -50,7 +50,7 @@ In active development. Tracked by milestone:
 │                  Broker                                             │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Devices        Devices (drop-a-folder)                             │
-│                    ├─ pi_listener  (subscribes tesserae/pi/status)  │
+│                    ├─ pi_client    (subscribes tesserae/pi/status)  │
 │                    └─ esp32_client (subs status, pub/sub config)    │
 └─────────────────────────────────────────────────────────────────────┘
 ```

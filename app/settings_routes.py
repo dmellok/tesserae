@@ -20,6 +20,8 @@ template walks the same shape and asks no questions.
 
 from __future__ import annotations
 
+import json
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -27,9 +29,18 @@ from flask import Blueprint, Flask, current_app, flash, redirect, render_templat
 from werkzeug.wrappers import Response
 
 from app import auth
+from app.device_loader import Device, DeviceRegistry
 from app.plugin_loader import PluginRegistry
 from app.renderer_loader import RendererRegistry
 from app.state.settings_store import SECRET_MASK, SettingsStore
+from app.transport import MqttTransport
+
+# How fresh a heartbeat has to be to read as "ok" in the UI. Past this it
+# decays through "warn" (2x) into "stale". Tuned for the typical pi_client
+# 60s heartbeat — esp32_client wakes far less often but the broker-retained
+# last value is still informative.
+STATUS_FRESH_S: int = 90
+STATUS_WARN_S: int = 5 * 60
 
 bp = Blueprint("auth", __name__)
 
@@ -79,6 +90,33 @@ def _plugins() -> PluginRegistry:
 
 def _renderers() -> RendererRegistry:
     return current_app.config["RENDERER_REGISTRY"]  # type: ignore[no-any-return]
+
+
+def _devices() -> DeviceRegistry:
+    return current_app.config["DEVICE_REGISTRY"]  # type: ignore[no-any-return]
+
+
+def _device_status() -> dict[str, dict[str, Any]]:
+    return current_app.config["DEVICE_STATUS"]  # type: ignore[no-any-return]
+
+
+def _transport() -> MqttTransport:
+    return current_app.config["MQTT_TRANSPORT"]  # type: ignore[no-any-return]
+
+
+def _config_fields_from_schema(schema: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Translate a device's config_schema into the field-spec shape the
+    settings template walks. ``int`` / ``float`` types collapse to
+    ``number`` so the form rendering is uniform."""
+    fields: list[dict[str, Any]] = []
+    for name, spec in schema.items():
+        out = dict(spec)
+        out["name"] = name
+        if out.get("type") in ("int", "float"):
+            out["type"] = "number"
+        out.setdefault("label", name.replace("_", " ").capitalize())
+        fields.append(out)
+    return fields
 
 
 def _safe_next(target: str | None) -> str:
@@ -231,6 +269,35 @@ def settings_update(section_kind: str) -> Response:
         flash(f"{plugin.name} settings saved.", "ok")
         return redirect(url_for("auth.settings", _anchor=section_kind))
 
+    if section_kind.startswith("device-"):
+        did = section_kind.removeprefix("device-")
+        device = _devices().get(did)
+        if device is None:
+            return Response(f"unknown device {did!r}", status=404)
+        if device.config_topic is None:
+            return Response(f"device {did!r} has no config topic", status=400)
+        fields = _config_fields_from_schema(device.config_schema)
+        values = _values_from_form(fields)
+        ok, err = device.validate_config(values)
+        if not ok:
+            flash(f"Invalid {device.name} config: {err}", "error")
+            return redirect(url_for("auth.settings", _anchor=section_kind))
+        settings_store.update_for_namespace("devices", did, values, fields)
+        transport = _transport()
+        try:
+            transport.publish(
+                device.config_topic,
+                json.dumps(values).encode("utf-8"),
+                qos=1,
+                retain=True,
+            )
+            flash(f"{device.name} config saved and published.", "ok")
+        except RuntimeError as exc:
+            # Saved-but-not-published: the next broker connect will retain
+            # the saved value, but tell the user the publish didn't land.
+            flash(f"{device.name} config saved, publish failed: {exc}", "error")
+        return redirect(url_for("auth.settings", _anchor=section_kind))
+
     return Response(f"unknown section {section_kind!r}", status=404)
 
 
@@ -312,6 +379,29 @@ def _build_sections() -> list[dict[str, Any]]:
             }
         )
 
+    for device in _devices().all():
+        sid = f"device-{device.id}"
+        fields = _config_fields_from_schema(device.config_schema)
+        sections.append(
+            {
+                "id": sid,
+                "kind": "device",
+                "title": f"Device: {device.name}",
+                "blurb": device.manifest.get("description") or "",
+                "fields": fields,
+                "state": (
+                    settings_store.get_for_runtime("devices", device.id, fields) if fields else {}
+                ),
+                "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
+                "meta": {
+                    "Renderers": ", ".join(device.renderer_ids),
+                    "Status topic": device.status_topic,
+                    "Config topic": device.config_topic or "—",
+                },
+                "status": _status_view(device),
+            }
+        )
+
     for plugin in _plugins().plugins.values():
         fields = list(plugin.manifest.get("settings", []))
         if not fields:
@@ -330,6 +420,39 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _status_view(device: Device) -> dict[str, Any]:
+    """Build the status-block dict the template renders above the config
+    form: freshness class (ok / warn / stale / unknown), relative time,
+    and the parsed key/value pairs."""
+    cache = _device_status().get(device.id)
+    if cache is None:
+        return {"health": "unknown", "relative": "no heartbeat received yet", "parsed": {}}
+    age = max(0.0, time.time() - float(cache.get("received_at", 0)))
+    if age <= STATUS_FRESH_S:
+        health = "ok"
+    elif age <= STATUS_WARN_S:
+        health = "warn"
+    else:
+        health = "stale"
+    return {
+        "health": health,
+        "relative": _format_relative(age),
+        "parsed": cache.get("parsed", {}),
+    }
+
+
+def _format_relative(seconds: float) -> str:
+    if seconds < 5:
+        return "just now"
+    if seconds < 60:
+        return f"{int(seconds)} s ago"
+    if seconds < 3600:
+        return f"{int(seconds / 60)} min ago"
+    if seconds < 86400:
+        return f"{int(seconds / 3600)} h ago"
+    return f"{int(seconds / 86400)} d ago"
 
 
 def _values_for_core(

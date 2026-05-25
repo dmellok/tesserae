@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/device.schema.json",
+  "title": "Tesserae device manifest",
+  "description": "Shape of device.json. A device is the consumer side of one or more renderers: it subscribes to a status heartbeat topic, optionally publishes to a config topic, and (informationally) lists which renderers it can ingest.",
+  "type": "object",
+  "required": ["tesserae_compat", "name", "version", "renderers", "status_topic"],
+  "properties": {
+    "tesserae_compat": {
+      "type": "string",
+      "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$"
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$" },
+    "description": { "type": "string" },
+    "renderers": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Renderer ids this device consumes. Informational for the UI; renderers run regardless of which devices are loaded."
+    },
+    "status_topic": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MQTT topic the device publishes its heartbeat to. Tesserae subscribes and parses payloads through device.parse_status()."
+    },
+    "config_topic": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MQTT topic for outbound config. Omit if the device has no configurable knobs."
+    },
+    "config_schema": {
+      "type": "object",
+      "description": "Field definitions for the config form. Each value is a {type, default, min?, max?, label?, choices?} dict.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["int", "float", "string", "boolean", "select"] },
+          "label": { "type": "string" },
+          "default": {},
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["value", "label"],
+              "properties": { "value": {}, "label": { "type": "string" } }
+            }
+          }
+        }
+      }
+    }
+  }
+}
