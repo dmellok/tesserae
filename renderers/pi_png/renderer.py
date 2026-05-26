@@ -21,7 +21,10 @@ DEFAULTS: dict[str, Any] = {
     "scale": "fit",
     "bg": "white",
     "saturation": 0.5,
-    "transform_rotate_quarters": 1,
+    # 3 CW quarter-turns = 1 CCW turn. Matches pi_bin (M47): composition
+    # is portrait-native, panel is landscape-native, and the ribbon-cable-up
+    # mount needs CCW to land right-side-up. Flip to 1 for ribbon-cable-down.
+    "transform_rotate_quarters": 3,
 }
 
 

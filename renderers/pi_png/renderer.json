@@ -61,10 +61,11 @@
     {
       "name": "transform_rotate_quarters",
       "type": "number",
-      "label": "Server-side rotate before publish (quarter-turns)",
-      "default": 1,
+      "label": "Server-side rotate before publish (quarter-turns CW)",
+      "default": 3,
       "min": 0,
-      "max": 3
+      "max": 3,
+      "help": "Composition is portrait-up; the panel is landscape-native. Default 3 (= one 90° CCW turn) lines up with a ribbon-cable-up portrait mount — match pi_bin. Use 1 if the panel is mounted with the cable down."
     }
   ]
 }
