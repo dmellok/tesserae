@@ -62,10 +62,10 @@
       "name": "transform_rotate_quarters",
       "type": "number",
       "label": "Server-side rotate before publish (quarter-turns CW)",
-      "default": 1,
+      "default": 3,
       "min": 0,
       "max": 3,
-      "help": "Composition is portrait-up; the panel is landscape-native. 1 (default) suits the ribbon-cable-up portrait mount when using the inky lib's set_image() pipeline. Note the asymmetry vs pi_bin: pi_bin writes raw landscape pixels into the panel buffer so it needs the opposite direction; pi_png goes through set_image() which applies its own mount-aware rotation."
+      "help": "Composition is portrait-up; the panel is landscape-native. 3 (= one 90° CCW turn) lines up with the ribbon-cable-up portrait mount and matches pi_bin's direction. Use 1 for ribbon-cable-down."
     }
   ]
 }
