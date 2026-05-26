@@ -461,11 +461,11 @@ def settings_update(section_kind: str) -> Response:
         values = _values_from_form(fields)
         settings_store.update_for_namespace("renderers", rid, values, fields)
         # Per-renderer Enabled toggle lives outside the manifest, so it's
-        # stored in a sibling section keyed by id.
-        if "_enabled" in request.form:
-            enabled = _coerce_form_value({"type": "switch"}, request.form.get("_enabled"))
-            existing = settings_store.get_section("renderers_enabled")
-            settings_store.patch_section("renderers_enabled", {**existing, rid: bool(enabled)})
+        # stored in a sibling section keyed by id. Browsers don't submit
+        # unchecked checkboxes — treat the field's absence as "off".
+        enabled = _coerce_form_value({"type": "switch"}, request.form.get("_enabled"))
+        existing = settings_store.get_section("renderers_enabled")
+        settings_store.patch_section("renderers_enabled", {**existing, rid: bool(enabled)})
         flash(f"{renderer.name} settings saved.", "ok")
         return _redirect_to_section(section_kind)
 
