@@ -1,4 +1,5 @@
-/* weather_hourly — header chips + line chart + rain strip. */
+/* weather_hourly — flat layout. Header chips, chart, rain strip — all
+   on the cell background, no nested cards. */
 
 :host {
   display: block;
@@ -13,24 +14,14 @@
   width: 100%;
   height: 100%;
   display: grid;
-  gap: clamp(6px, 1.2cqw, 12px);
-  padding: clamp(6px, 1.2cqw, 14px);
+  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
   box-sizing: border-box;
+  gap: clamp(4px, 0.8cqw, 10px);
 }
 
 .size-sm { grid-template-rows: 1fr; }
 .size-md { grid-template-rows: auto 1fr auto; }
 .size-lg { grid-template-rows: auto 1fr auto; }
-
-.panel {
-  background: var(--theme-surface);
-  border: 1px solid var(--theme-divider);
-  border-radius: clamp(6px, 1cqw, 12px);
-  padding: clamp(6px, 1.2cqw, 14px);
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-}
 
 /* ---------- header ---------- */
 
@@ -38,54 +29,52 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: clamp(6px, 1.2cqw, 14px);
-  padding: 2px clamp(2px, 0.6cqw, 6px);
+  gap: clamp(8px, 1.6cqw, 16px);
+  min-width: 0;
 }
 .head-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: clamp(11px, 2cqw, 16px);
-  font-weight: 600;
+  font-size: clamp(12px, 2.2cqw, 17px);
+  font-weight: 700;
   color: var(--theme-fg);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   min-width: 0;
 }
-.head-title .ph { color: var(--theme-accent); font-size: 1.2em; }
+.head-title .ph-fill {
+  font-size: 1.4em;
+  /* colour set inline */
+}
 .head-place {
   color: var(--theme-fgSoft);
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
+  margin-left: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .head-chips {
   display: inline-flex;
-  gap: 6px;
+  gap: clamp(4px, 1cqw, 10px);
   flex-shrink: 0;
 }
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  font-size: clamp(11px, 1.8cqw, 14px);
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--theme-surface2);
+  gap: 4px;
+  font-size: clamp(12px, 2cqw, 16px);
+  font-weight: 700;
   color: var(--theme-fg);
-  border: 1px solid var(--theme-divider);
 }
-.chip-max { color: var(--theme-fg); }
-.chip-max .ph { color: var(--theme-accent); }
-.chip-min .ph { color: var(--theme-fgSoft); }
+.chip .ph-fill { font-size: 1em; }
 
 /* ---------- chart ---------- */
 
-.chart-panel {
+.chart-wrap {
   position: relative;
   min-height: 0;
   overflow: hidden;
@@ -99,22 +88,29 @@
 /* ---------- rain strip ---------- */
 
 .rain-strip {
-  display: flex;
-  align-items: stretch;
-  gap: 2px;
-  padding: clamp(6px, 1.2cqw, 12px) clamp(6px, 1.2cqw, 14px);
-  height: clamp(22px, 4.5cqw, 36px);
-  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: clamp(6px, 1.4cqw, 14px);
+  padding-top: clamp(4px, 0.8cqw, 8px);
+  border-top: 1px solid var(--theme-divider);
 }
-.rain-strip::before {
-  content: "PRECIP";
-  position: absolute;
-  top: 1px;
-  left: 6px;
-  font-size: clamp(7px, 1.4cqw, 9px);
+.rain-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(9px, 1.6cqw, 11px);
   letter-spacing: 0.1em;
   font-weight: 700;
   color: var(--theme-muted);
+  white-space: nowrap;
+}
+.rain-label .ph-fill { font-size: 1.2em; }
+.rain-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5px;
+  height: clamp(20px, 4cqw, 32px);
 }
 .rain-bar {
   flex: 1;
@@ -122,14 +118,13 @@
   align-self: end;
   height: var(--rain, 0%);
   min-height: 1px;
-  background: var(--theme-accent);
-  border-radius: 1px;
-  opacity: 0.85;
+  background: var(--theme-accentSoft);
+  border-radius: 2px;
+  opacity: 0.6;
 }
-.rain-bar[style*="--rain: 0%"] {
-  background: var(--theme-divider);
-  height: 1px;
-  opacity: 0.5;
+.rain-bar.is-wet {
+  background: var(--theme-accent);
+  opacity: 1;
 }
 
 /* ---------- error state ---------- */

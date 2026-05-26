@@ -1,4 +1,6 @@
-/* weather_forecast — 5 day-cards laid out left-to-right. */
+/* weather_forecast — 5 day-columns laid out left-to-right. Today's
+   column highlighted with surface2 + accent stripe; no nested cards
+   for the others. */
 
 :host {
   display: block;
@@ -13,9 +15,9 @@
   width: 100%;
   height: 100%;
   display: grid;
-  gap: clamp(6px, 1.2cqw, 12px);
-  padding: clamp(6px, 1.2cqw, 14px);
+  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
   box-sizing: border-box;
+  gap: clamp(4px, 0.8cqw, 10px);
 }
 
 .size-sm { grid-template-rows: 1fr; }
@@ -28,55 +30,49 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 4px;
 }
 .head-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: clamp(11px, 2cqw, 16px);
-  font-weight: 600;
+  font-size: clamp(12px, 2.2cqw, 17px);
+  font-weight: 700;
   color: var(--theme-fg);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.head-title .ph { color: var(--theme-accent); font-size: 1.2em; }
+.head-title .ph-fill { font-size: 1.4em; }
 .head-place {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: clamp(10px, 1.8cqw, 14px);
+  font-size: clamp(11px, 2cqw, 14px);
   color: var(--theme-fgSoft);
   font-weight: 500;
   white-space: nowrap;
 }
-.head-place .ph { color: var(--theme-accent); }
 
-/* ---------- day-card row ---------- */
+/* ---------- day columns ---------- */
 
 .days {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: clamp(4px, 1cqw, 10px);
+  gap: clamp(2px, 0.6cqw, 6px);
+  border-top: 1px solid var(--theme-divider);
+  padding-top: clamp(4px, 0.8cqw, 10px);
   min-height: 0;
 }
 
 .day {
-  background: var(--theme-surface);
-  border: 1px solid var(--theme-divider);
-  border-radius: clamp(6px, 1.2cqw, 14px);
-  padding: clamp(6px, 1.2cqw, 14px) clamp(4px, 0.8cqw, 10px);
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
+  grid-template-rows: auto 1fr auto auto auto auto;
   align-items: center;
   justify-items: center;
   gap: clamp(2px, 0.5cqw, 6px);
   text-align: center;
+  padding: clamp(4px, 0.8cqw, 10px) 2px;
   min-width: 0;
+  border-radius: clamp(4px, 0.8cqw, 10px);
 }
 .day.is-today {
   background: var(--theme-surface2);
-  border-color: var(--theme-accent);
 }
 
 .day-name {
@@ -85,13 +81,16 @@
   color: var(--theme-fgSoft);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  white-space: nowrap;
 }
-.day.is-today .day-name { color: var(--theme-accent); }
+.day.is-today .day-name {
+  color: var(--theme-accent);
+}
 
 .day-icon {
-  font-size: clamp(26px, 6cqw, 52px);
+  font-size: clamp(32px, 8cqw, 72px);
   line-height: 1;
-  color: var(--theme-accent);
+  /* colour set inline via tone */
 }
 
 .day-cond {
@@ -100,52 +99,47 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  line-height: 1.2;
+  line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 
-.day-temps {
-  display: flex;
-  align-items: center;
-  gap: clamp(4px, 1cqw, 10px);
-  font-size: clamp(13px, 2.4cqw, 18px);
-  font-weight: 600;
+.day-high {
+  font-size: clamp(16px, 3.2cqw, 24px);
+  font-weight: 700;
+  color: var(--theme-fg);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.day-low {
+  font-size: clamp(12px, 2.2cqw, 16px);
+  font-weight: 500;
+  color: var(--theme-fgSoft);
   line-height: 1.1;
 }
-.day-temps .ph { font-size: 0.85em; }
-.t-high { color: var(--theme-fg); }
-.t-high .ph { color: var(--theme-accent); }
-.t-low { color: var(--theme-fgSoft); }
-.t-low .ph { color: var(--theme-fgSoft); }
 
 .day-rain {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: clamp(9px, 1.6cqw, 12px);
+  font-size: clamp(10px, 1.8cqw, 13px);
   font-weight: 600;
   color: var(--theme-muted);
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: transparent;
+  margin-top: 2px;
 }
-.day-rain .ph { font-size: 0.95em; }
+.day-rain .ph-fill { font-size: 1.1em; opacity: 0.55; }
 .day-rain.is-wet {
   color: var(--theme-accent);
-  background: var(--theme-accentSoft);
-  /* accentSoft is a hex, not rgba — fall back if the cell host
-     overrides it with a non-translucent value. */
 }
-.day-rain.is-wet { color: #ffffff; }
-.day-rain.is-wet .ph { color: #ffffff; }
+.day-rain.is-wet .ph-fill { opacity: 1; }
 
-/* sm: drop the rain row + condition word; 5 cards still fit but tighter. */
+/* sm: skip the condition word, shrink icons. */
 .size-sm .day-cond { display: none; }
-.size-sm .day-icon { font-size: clamp(22px, 6.5cqw, 36px); }
-.size-sm .day { padding: 4px; }
+.size-sm .day-icon { font-size: clamp(26px, 9cqw, 44px); }
+.size-sm .day { padding: 2px; gap: 1px; }
+.size-sm .day-name { font-size: 9px; }
 
 /* ---------- error state ---------- */
 

@@ -1,5 +1,5 @@
-/* weather_now — modern card layout with subpanels.
-   Sizes from the cell host via class .size-xs / sm / md / lg. */
+/* weather_now — flat layout. Big condition icon, colour-tinted stats.
+   The cell is the card; sections separate with thin rules + spacing. */
 
 :host {
   display: block;
@@ -14,199 +14,167 @@
   width: 100%;
   height: 100%;
   display: grid;
-  gap: clamp(6px, 1.6cqw, 14px);
-  padding: clamp(6px, 1.6cqw, 14px);
+  grid-template-rows: auto 1fr auto auto;
+  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
   box-sizing: border-box;
+  gap: clamp(4px, 0.8cqw, 10px);
 }
 
-/* ---------- panels ---------- */
+/* ---------- header (place) ---------- */
 
-.panel {
-  background: var(--theme-surface);
-  border: 1px solid var(--theme-divider);
-  border-radius: clamp(6px, 1.2cqw, 14px);
-  padding: clamp(8px, 1.8cqw, 18px);
+.head {
   display: flex;
-  flex-direction: column;
-  gap: clamp(4px, 0.8cqw, 10px);
-  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
   min-height: 0;
 }
-
-/* ---------- hero ---------- */
-
-.hero {
-  position: relative;
-  justify-content: center;
-  align-items: stretch;
-  overflow: hidden;
-}
-.hero-place {
+.place {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  color: var(--theme-fgSoft);
-  font-size: clamp(11px, 2.2cqw, 16px);
+  gap: 5px;
+  font-size: clamp(10px, 1.7cqw, 13px);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-.hero-place .ph { font-size: 1.1em; color: var(--theme-accent); }
-.hero-icon {
-  font-size: clamp(48px, 18cqw, 132px);
-  line-height: 1;
-  color: var(--theme-accent);
-  align-self: center;
-  margin: clamp(2px, 0.8cqw, 8px) 0;
-}
-.hero-temp {
-  font-size: clamp(40px, 14cqw, 96px);
-  line-height: 1;
+  letter-spacing: 0.1em;
   font-weight: 700;
-  color: var(--theme-fg);
-  letter-spacing: -0.02em;
-  text-align: center;
-}
-.hero-cond {
-  text-align: center;
-  font-size: clamp(13px, 2.6cqw, 20px);
   color: var(--theme-fgSoft);
-  font-weight: 500;
 }
-.hero-range {
-  display: flex;
-  justify-content: center;
-  gap: clamp(8px, 2cqw, 18px);
-  font-size: clamp(11px, 2.1cqw, 15px);
-  color: var(--theme-fgSoft);
-  margin-top: clamp(2px, 0.6cqw, 6px);
-}
-.hero-range span { display: inline-flex; align-items: center; gap: 3px; }
-.hero-range .ph { color: var(--theme-accent); font-size: 1.1em; }
+.place .ph { color: var(--theme-accent); font-size: 1.1em; }
 
-/* ---------- stats grid ---------- */
+/* ---------- now (icon + temp + condition + range) ---------- */
 
-.stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(6px, 1.4cqw, 12px);
-  min-height: 0;
-}
-.stat {
-  background: var(--theme-surface);
-  border: 1px solid var(--theme-divider);
-  border-radius: clamp(6px, 1.2cqw, 14px);
-  padding: clamp(8px, 1.6cqw, 14px);
+.now {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: clamp(6px, 1.4cqw, 12px);
+  gap: clamp(10px, 2.4cqw, 22px);
+  min-height: 0;
+}
+.now-icon {
+  font-size: clamp(64px, 18cqw, 144px);
+  line-height: 1;
+  /* colour set inline via condition tone */
+}
+.now-body { min-width: 0; }
+.now-temp {
+  font-size: clamp(42px, 13cqw, 104px);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--theme-fg);
+  letter-spacing: -0.025em;
+}
+.now-cond {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 500;
+  color: var(--theme-fgSoft);
+  margin-top: clamp(2px, 0.6cqw, 6px);
+}
+.now-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(8px, 1.8cqw, 16px);
+  font-size: clamp(12px, 2.2cqw, 16px);
+  font-weight: 600;
+  margin-top: clamp(4px, 0.8cqw, 8px);
+}
+.now-range span { display: inline-flex; align-items: center; gap: 3px; }
+.now-range .ph-fill { font-size: 1em; }
+
+/* ---------- stats (4 columns) ---------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(6px, 1.4cqw, 14px);
+  padding-top: clamp(6px, 1cqw, 10px);
+  border-top: 1px solid var(--theme-divider);
+}
+.stat {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: clamp(4px, 1cqw, 10px);
   min-width: 0;
 }
 .stat-icon {
-  font-size: clamp(20px, 4cqw, 32px);
-  color: var(--theme-accent);
+  font-size: clamp(22px, 4.6cqw, 36px);
+  line-height: 1;
+  /* colour set inline via tone */
 }
 .stat-body { min-width: 0; }
 .stat-label {
-  font-size: clamp(9px, 1.8cqw, 12px);
-  color: var(--theme-muted);
+  font-size: clamp(9px, 1.6cqw, 11px);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--theme-muted);
   line-height: 1.2;
+  white-space: nowrap;
 }
 .stat-value {
-  font-size: clamp(18px, 4cqw, 28px);
-  color: var(--theme-fg);
+  font-size: clamp(15px, 3cqw, 24px);
   font-weight: 700;
   line-height: 1.1;
   letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* colour set inline via tone, or inherits theme-fg */
 }
 .stat-sub {
-  font-size: clamp(9px, 1.7cqw, 12px);
+  font-size: clamp(9px, 1.6cqw, 11px);
   color: var(--theme-fgSoft);
   line-height: 1.2;
   margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* ---------- sun panel ---------- */
+/* ---------- sun row ---------- */
 
 .sun {
-  flex-direction: row;
-  align-items: center;
+  display: flex;
   justify-content: space-around;
-  gap: clamp(10px, 2cqw, 20px);
-  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.8cqw, 18px);
+  align-items: center;
+  gap: clamp(10px, 2.4cqw, 22px);
+  padding-top: clamp(6px, 1cqw, 10px);
+  border-top: 1px solid var(--theme-divider);
 }
 .sun-row {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: clamp(6px, 1.4cqw, 12px);
+  gap: 8px;
+  font-size: clamp(14px, 2.6cqw, 20px);
+  font-weight: 600;
+  color: var(--theme-fg);
 }
 .sun-row .ph-duotone {
-  font-size: clamp(22px, 4.4cqw, 36px);
   color: var(--theme-accent);
-}
-.sun-meta { display: flex; flex-direction: column; line-height: 1.2; }
-.sun-label {
-  font-size: clamp(9px, 1.6cqw, 11px);
-  color: var(--theme-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-.sun-time {
-  font-size: clamp(13px, 2.6cqw, 20px);
-  color: var(--theme-fg);
-  font-weight: 600;
+  font-size: 1.45em;
 }
 
-/* ---------- size variants ---------- */
+/* ---------- size adaptations ---------- */
 
-/* xs: hero only, compressed. */
+/* xs: just the condition icon + temp. */
 .size-xs {
-  grid-template-areas: "hero";
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr;
+  padding: 8px 10px;
+  gap: 4px;
 }
 .size-xs .stats, .size-xs .sun { display: none; }
-.size-xs .hero-range { display: none; }
-.size-xs .hero-place { font-size: 10px; }
+.size-xs .now-range { display: none; }
+.size-xs .now-icon { font-size: clamp(44px, 22cqw, 80px); }
+.size-xs .now-temp { font-size: clamp(34px, 16cqw, 64px); }
+.size-xs .now-cond { display: none; }
+.size-xs .place { font-size: 9px; }
 
-/* sm: hero only with range. */
+/* sm: head + now + range, no stats/sun. */
 .size-sm {
-  grid-template-areas: "hero";
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr;
 }
 .size-sm .stats, .size-sm .sun { display: none; }
 
-/* md: hero (left) + stats (right). */
-.size-md {
-  grid-template-areas:
-    "hero stats"
-    "hero sun";
-  grid-template-columns: 5fr 4fr;
-  grid-template-rows: 1fr auto;
-}
-.size-md .hero { grid-area: hero; }
-.size-md .stats { grid-area: stats; }
-.size-md .sun { grid-area: sun; }
-.size-md .sun { padding: clamp(4px, 1cqw, 8px) clamp(8px, 1.6cqw, 14px); }
-.size-md .sun-row .ph-duotone { font-size: 22px; }
-
-/* lg: full layout. */
-.size-lg {
-  grid-template-areas:
-    "hero stats"
-    "hero sun";
-  grid-template-columns: 5fr 6fr;
-  grid-template-rows: 1fr auto;
-}
-.size-lg .hero { grid-area: hero; }
-.size-lg .stats { grid-area: stats; }
-.size-lg .sun { grid-area: sun; }
+/* md / lg: full layout — same template, clamp() handles sizing. */
 
 /* ---------- error state ---------- */
 
@@ -217,6 +185,7 @@
   color: var(--theme-danger);
   padding: 16px;
   gap: 8px;
+  grid-template-rows: auto auto;
 }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; }

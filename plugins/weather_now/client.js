@@ -1,10 +1,8 @@
-// weather_now — current conditions hero + stat grid + sun times.
-// Adapts xs/sm/md/lg via a size class on .root; CSS does the rest.
+// weather_now — flat, dense, theme-aware. The cell is the card; no
+// nested panels. Adapts xs/sm/md/lg via a .size-* class on .root.
 
 // WMO weather code → Phosphor icon name + readable label.
-// https://open-meteo.com/en/docs#weathervariables
-// We pick day/night variants where Phosphor offers them; client.js gets
-// is_day from the server.
+// Day/night variants where Phosphor offers them.
 const WMO = {
   0:  { day: "sun",             night: "moon",            label: "Clear" },
   1:  { day: "sun",             night: "moon",            label: "Mostly clear" },
@@ -41,12 +39,31 @@ function describe(code, isDay) {
   return { icon: isDay ? entry.day : entry.night, label: entry.label };
 }
 
+// Theme token to colour the condition icon by — leans on the existing
+// palette so it works on every user theme without hard-coded hex.
+function conditionTone(code, isDay) {
+  if (code === 0 || code === 1) return isDay ? "warn" : "accent";   // clear sun / moon
+  if (code === 2) return "accent";                                   // partly cloudy
+  if (code === 3 || code === 45 || code === 48) return "muted";      // overcast / fog
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "accent"; // rain
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "fgSoft"; // snow
+  if (code >= 95) return "danger";                                   // thunderstorm
+  return "accent";
+}
+
+function uvTone(uv) {
+  if (uv == null) return "fgSoft";
+  if (uv < 3) return "ok";
+  if (uv < 8) return "warn";
+  return "danger";
+}
+
 function uvBand(uv) {
   if (uv == null) return "—";
   if (uv < 3) return "Low";
-  if (uv < 6) return "Moderate";
+  if (uv < 6) return "Mod";
   if (uv < 8) return "High";
-  if (uv < 11) return "Very High";
+  if (uv < 11) return "V High";
   return "Extreme";
 }
 
@@ -56,17 +73,12 @@ function windCompass(deg) {
   return dirs[Math.round(deg / 45) % 8];
 }
 
-function fmtTemp(v) {
-  return v == null ? "—" : Math.round(v) + "°";
-}
-
+function fmtTemp(v) { return v == null ? "—" : Math.round(v) + "°"; }
 function fmtTime(iso) {
   if (!iso) return "—";
   try {
     return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  } catch (_e) {
-    return "—";
-  }
+  } catch (_e) { return "—"; }
 }
 
 function escapeHtml(s) {
@@ -75,13 +87,14 @@ function escapeHtml(s) {
   }[c]));
 }
 
-function statCard(icon, label, value, sub) {
+function statColumn(icon, label, value, sub, tone) {
+  const toneStyle = tone ? ` style="color: var(--theme-${tone})"` : "";
   return `
     <div class="stat">
-      <i class="ph ph-${icon} stat-icon" aria-hidden="true"></i>
+      <i class="ph-fill ph-fill-${icon} stat-icon"${toneStyle} aria-hidden="true"></i>
       <div class="stat-body">
         <div class="stat-label">${escapeHtml(label)}</div>
-        <div class="stat-value">${escapeHtml(value)}</div>
+        <div class="stat-value"${toneStyle}>${escapeHtml(value)}</div>
         ${sub ? `<div class="stat-sub">${escapeHtml(sub)}</div>` : ""}
       </div>
     </div>
@@ -105,14 +118,15 @@ export default async function render(shadow, ctx) {
     shadow.innerHTML = renderError(data.error);
     return;
   }
-
   const size = ctx.cell.size;
   const units = ctx.cell.options.units === "imperial" ? "imperial" : "metric";
   const windUnit = units === "imperial" ? "mph" : "km/h";
-  const { icon, label } = describe(data.code, data.is_day !== false);
-  const wind = data.wind != null ? `${Math.round(data.wind)}` : "—";
+  const isDay = data.is_day !== false;
+  const { icon, label } = describe(data.code, isDay);
+  const condTone = conditionTone(data.code, isDay);
+  const windVal = data.wind != null ? `${Math.round(data.wind)}` : "—";
   const windSub = data.wind != null
-    ? `${windUnit}${data.wind_dir != null ? " · " + windCompass(data.wind_dir) : ""}`
+    ? `${windUnit}${data.wind_dir != null ? " " + windCompass(data.wind_dir) : ""}`
     : "";
 
   shadow.innerHTML = `
@@ -121,45 +135,44 @@ export default async function render(shadow, ctx) {
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
     <link rel="stylesheet" href="/plugins/weather_now/client.css">
     <div class="root size-${size}">
-      <section class="panel hero">
-        <div class="hero-place">
+      <header class="head">
+        <span class="place">
           <i class="ph ph-map-pin" aria-hidden="true"></i>
           <span>${escapeHtml(data.label || "—")}</span>
+        </span>
+      </header>
+      <section class="now">
+        <i class="ph-fill ph-fill-${icon} now-icon" style="color: var(--theme-${condTone})" aria-hidden="true"></i>
+        <div class="now-body">
+          <div class="now-temp">${fmtTemp(data.temp)}</div>
+          <div class="now-cond">${escapeHtml(label)}</div>
+          <div class="now-range">
+            ${data.today_max != null ? `
+              <span><i class="ph-fill ph-fill-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.today_max)}</span>
+              <span><i class="ph-fill ph-fill-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.today_min)}</span>
+            ` : ""}
+            ${data.rain_chance != null ? `<span class="rain"><i class="ph-fill ph-fill-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>${Math.round(data.rain_chance)}%</span>` : ""}
+          </div>
         </div>
-        <i class="ph-fill ph-fill-${icon} hero-icon" aria-hidden="true"></i>
-        <div class="hero-temp">${fmtTemp(data.temp)}</div>
-        <div class="hero-cond">${escapeHtml(label)}</div>
-        ${data.today_max != null ? `
-        <div class="hero-range">
-          <span><i class="ph ph-arrow-up" aria-hidden="true"></i>${fmtTemp(data.today_max)}</span>
-          <span><i class="ph ph-arrow-down" aria-hidden="true"></i>${fmtTemp(data.today_min)}</span>
-          ${data.rain_chance != null ? `<span><i class="ph ph-drop" aria-hidden="true"></i>${Math.round(data.rain_chance)}%</span>` : ""}
-        </div>` : ""}
       </section>
-      <section class="stats" aria-label="Current stats">
-        ${statCard("thermometer-simple", "Feels like", fmtTemp(data.feels))}
-        ${statCard("drop-half", "Humidity",
-                   data.humidity != null ? `${Math.round(data.humidity)}%` : "—")}
-        ${statCard("wind", "Wind", wind, windSub)}
-        ${statCard("sun-dim", "UV",
-                   data.uv != null ? data.uv.toFixed(1) : "—",
-                   uvBand(data.uv))}
+      <section class="stats">
+        ${statColumn("thermometer-simple", "Feels", fmtTemp(data.feels), null, "warn")}
+        ${statColumn("drop-half", "Humidity",
+                     data.humidity != null ? `${Math.round(data.humidity)}%` : "—", null, "accent")}
+        ${statColumn("wind", "Wind", windVal, windSub, "fgSoft")}
+        ${statColumn("sun-dim", "UV",
+                     data.uv != null ? data.uv.toFixed(1) : "—",
+                     uvBand(data.uv), uvTone(data.uv))}
       </section>
-      <section class="panel sun" aria-label="Sun times">
-        <div class="sun-row">
+      <section class="sun">
+        <span class="sun-row">
           <i class="ph-duotone ph-duotone-sun-horizon" aria-hidden="true"></i>
-          <div class="sun-meta">
-            <div class="sun-label">Sunrise</div>
-            <div class="sun-time">${fmtTime(data.sunrise)}</div>
-          </div>
-        </div>
-        <div class="sun-row">
+          <span class="sun-time">${fmtTime(data.sunrise)}</span>
+        </span>
+        <span class="sun-row">
           <i class="ph-duotone ph-duotone-moon-stars" aria-hidden="true"></i>
-          <div class="sun-meta">
-            <div class="sun-label">Sunset</div>
-            <div class="sun-time">${fmtTime(data.sunset)}</div>
-          </div>
-        </div>
+          <span class="sun-time">${fmtTime(data.sunset)}</span>
+        </span>
       </section>
     </div>
   `;

@@ -1,9 +1,8 @@
-// weather_hourly — Chart.js line of temperature for the next N hours +
-// rain-probability strip below.
+// weather_hourly — Chart.js line of next N hours of temperature, plus
+// a rain-probability strip below. Flat layout — the cell is the card.
 
-// Lazy + memoised Chart.js loader. The UMD bundle sets `window.Chart`
-// when loaded; subsequent widgets reuse the same promise so it only
-// downloads once per page.
+// Lazy + memoised Chart.js loader. The UMD bundle sets `window.Chart`;
+// subsequent widgets on the same page reuse the load.
 function loadChart() {
   if (window.Chart) return Promise.resolve(window.Chart);
   if (window.__tesseraeChartJs) return window.__tesseraeChartJs;
@@ -26,9 +25,7 @@ function hexToRgba(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function fmtTemp(v) {
-  return v == null ? "—" : Math.round(v) + "°";
-}
+function fmtTemp(v) { return v == null ? "—" : Math.round(v) + "°"; }
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -76,22 +73,25 @@ export default async function render(shadow, ctx) {
     <div class="root size-${size}">
       ${showHeader ? `
       <header class="head">
-        <div class="head-title">
-          <i class="ph ph-chart-line" aria-hidden="true"></i>
+        <span class="head-title">
+          <i class="ph-fill ph-fill-chart-line-up" style="color: var(--theme-accent)" aria-hidden="true"></i>
           <span>Next ${data.hours || 24} hours</span>
-          ${data.label ? `<span class="head-place">· ${escapeHtml(data.label)}</span>` : ""}
-        </div>
-        <div class="head-chips">
-          <span class="chip chip-max"><i class="ph ph-arrow-up" aria-hidden="true"></i>${fmtTemp(data.max)}</span>
-          <span class="chip chip-min"><i class="ph ph-arrow-down" aria-hidden="true"></i>${fmtTemp(data.min)}</span>
-        </div>
+          ${data.label ? `<span class="head-place">${escapeHtml(data.label)}</span>` : ""}
+        </span>
+        <span class="head-chips">
+          <span class="chip"><i class="ph-fill ph-fill-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.max)}</span>
+          <span class="chip"><i class="ph-fill ph-fill-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.min)}</span>
+        </span>
       </header>` : ""}
-      <section class="panel chart-panel">
+      <section class="chart-wrap">
         <canvas class="chart"></canvas>
       </section>
       ${showRain ? `
-      <section class="panel rain-strip" aria-label="Rain probability">
-        ${renderRainBars(points)}
+      <section class="rain-strip" aria-label="Rain probability">
+        <span class="rain-label"><i class="ph-fill ph-fill-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>RAIN</span>
+        <span class="rain-bars">
+          ${renderRainBars(points)}
+        </span>
       </section>` : ""}
     </div>
   `;
@@ -111,12 +111,9 @@ export default async function render(shadow, ctx) {
   const labels = points.map((p, i) => (i % step === 0 ? `${p.hour}:00` : ""));
   const temps = points.map((p) => p.temp);
 
-  // Pin the chart's canvas dimensions to its container so Chart.js's
-  // own DPR handling is the only resize source — without this it tends
-  // to grow unboundedly on every redraw.
   const fontFamily =
     ctx.font?.family || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const baseFont = { family: fontFamily, size: size === "lg" ? 12 : 10 };
+  const baseFont = { family: fontFamily, size: size === "lg" ? 13 : 11 };
 
   new Chart(canvas.getContext("2d"), {
     type: "line",
@@ -126,8 +123,8 @@ export default async function render(shadow, ctx) {
         {
           data: temps,
           borderColor: t.accent,
-          backgroundColor: hexToRgba(t.accent, 0.18),
-          borderWidth: 2,
+          backgroundColor: hexToRgba(t.accent, 0.22),
+          borderWidth: 2.5,
           tension: 0.35,
           fill: true,
           pointRadius: 0,
@@ -145,20 +142,20 @@ export default async function render(shadow, ctx) {
       },
       scales: {
         x: {
-          grid: { color: hexToRgba(t.divider, 0.45), drawTicks: false },
+          grid: { color: hexToRgba(t.divider, 0.4), drawTicks: false },
           border: { display: false },
           ticks: {
             color: t.fgSoft,
             font: baseFont,
             autoSkip: false,
             maxRotation: 0,
-            callback(value, index) {
+            callback(_value, index) {
               return labels[index] || "";
             },
           },
         },
         y: {
-          grid: { color: hexToRgba(t.divider, 0.35), drawTicks: false },
+          grid: { color: hexToRgba(t.divider, 0.3), drawTicks: false },
           border: { display: false },
           ticks: {
             color: t.fgSoft,
@@ -168,19 +165,17 @@ export default async function render(shadow, ctx) {
           },
         },
       },
-      layout: {
-        padding: { top: 4, right: 8, bottom: 0, left: 0 },
-      },
+      layout: { padding: { top: 4, right: 6, bottom: 0, left: 0 } },
     },
   });
 }
 
 function renderRainBars(points) {
-  const max = 100;
   return points
     .map((p) => {
-      const pct = p.rain == null ? 0 : Math.max(0, Math.min(max, p.rain));
-      return `<span class="rain-bar" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
+      const pct = p.rain == null ? 0 : Math.max(0, Math.min(100, p.rain));
+      const wet = pct >= 30;
+      return `<span class="rain-bar${wet ? " is-wet" : ""}" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
     })
     .join("");
 }
