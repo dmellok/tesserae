@@ -93,11 +93,29 @@ Grammar: `tesserae/<device-type>/<channel>[/<format>]`
 The server publishes; something downstream paints the panel. Three reference
 clients live in their own repos — pick whichever matches your hardware.
 
-| Client | Pairs with renderer | What it is | What it isn't |
-|---|---|---|---|
-| [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client) | `pi_png` | Pi-side Python daemon. Subscribes to `tesserae/pi/frame/png`, hands PNGs to [`inky`](https://github.com/pimoroni/inky)'s high-level `set_image()` — works on every panel the inky lib supports (pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", 2/3/6/7 colour). Wire-compatible with the inky-dash v3/v4 listener protocol. | The slow path — PIL + palette projection happen on the Pi every frame. If you've got an Impression on Spectra 6, prefer `pi_bin`. |
-| [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client) | `pi_bin` | Pi-side Python daemon. Subscribes to `tesserae/pi/frame/bin` and writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf` — no PIL on the Pi. Fastest Pi path. | Spectra 6 / Waveshare E6 only. Depends on an inky internal (`_buf`), so the `inky` version is pinned exactly — bumps need regression on real hardware. |
-| [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client) | `esp32_bin` | Battery-powered ESP32-S3-WROOM-2 firmware for the Waveshare 13.3" Spectra 6. Deep-sleeps between wakes; subscribes to the retained `tesserae/esp32/frame/bin` topic; skips the download if the URL hash hasn't changed. Months of battery life from a single Li-Po. | Not a Pi daemon. Not for any panel other than the Waveshare 13.3" Spectra 6. Not always-on — refresh cadence is set by `sleep_interval_s` on the `tesserae/esp32/config` topic. |
+**[tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client)**
+pairs with the `pi_png` renderer. A Pi-side Python daemon that subscribes to
+`tesserae/pi/frame/png` and hands incoming PNGs to
+[`inky`](https://github.com/pimoroni/inky)'s high-level `set_image()`, so it
+works on every panel the inky lib supports — pHAT, wHAT, Impression 4"/5.7"/
+7.3"/13.3", 2/3/6/7 colour. Quantising on the Pi every frame makes it the
+slower of the two Pi paths, but it stays wire-compatible with the inky-dash
+v3/v4 listener protocol.
+
+**[tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client)**
+pairs with the `pi_bin` renderer. Same Pi-side daemon shape, but it subscribes
+to `tesserae/pi/frame/bin` and writes the server's already-packed 4-bpp buffer
+straight into inky's internal `_buf` — no PIL on the Pi paint path. The result
+is the fastest path on a Pimoroni Inky Impression (Spectra 6 / Waveshare E6,
+any of the four sizes — auto-detected via the HAT EEPROM). The trade is a
+private-API dependency: the `inky` version is pinned exactly.
+
+**[tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client)**
+pairs with the `esp32_bin` renderer. Battery-powered ESP32-S3-WROOM-2 firmware
+for the Waveshare 13.3" Spectra 6 panel: deep-sleeps between wakes, subscribes
+to the retained `tesserae/esp32/frame/bin` topic, and skips the download when
+the URL hash hasn't changed. Months of battery life from a single Li-Po;
+refresh cadence is set by `sleep_interval_s` on `tesserae/esp32/config`.
 
 ## Running locally
 
