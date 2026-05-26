@@ -5,14 +5,18 @@
  *   .widget       outer wrapper, theme-aware bg + fg, container queries
  *   .head         header strip: icon + uppercase title + accent place + meta
  *   .body         scrollable / grid content area
- *   .tile         card surface (background + border + radius)
+ *   .tile         card surface (background + radius). Lifts via surface
+ *                 contrast, no border.
  *   .stat         compact stat card: icon | (label / value)
  *   .state-empty  centered empty state
  *   .state-error  centered error state
  *
  * Sizes use container queries (cqw/cqh/cqmin) so the same widget reads well
- * across xs/sm/md/lg cells. Borders are thick (>=2 px) so Spectra 6 doesn't
- * dither them into invisibility.
+ * across xs/sm/md/lg cells.
+ *
+ * No-borders design language: themes are tuned so bg vs surface contrast
+ * defines shapes. Don't draw divider lines — let the surface colour do
+ * the work. Solid drawn borders quantise badly on Spectra 6 anyway.
  */
 
 :host { display: block; height: 100%; }
@@ -36,7 +40,6 @@
   align-items: baseline;
   gap: 1.5cqw;
   padding-bottom: 1cqh;
-  border-bottom: max(2px, 0.3cqmin) solid var(--theme-divider);
   min-width: 0;
 }
 .head-icon {

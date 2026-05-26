@@ -222,7 +222,7 @@ hard-coded hex in widgets, ever.
 | `muted`     | labels, supporting metadata                        |
 | `accent`    | brand highlight — icons, links, charts             |
 | `accentSoft`| accent fill at low contrast (chart areas, pills)   |
-| `divider`   | borders, hairlines, grid lines                     |
+| `divider`   | chart grid lines + axes only — **not** for card borders (see no-borders note below) |
 | `danger`    | errors, very-high warnings                         |
 | `warn`      | caution, hot temps, high UV                        |
 | `ok`        | success, low UV                                    |
@@ -330,7 +330,9 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 ## Optional design baseline — `widget-base.css`
 
 [`static/style/widget-base.css`](../static/style/widget-base.css)
-defines a tiny vocabulary you can opt into:
+defines a tiny vocabulary you can opt into. Aligned with the
+no-borders design language: every "card" element gets its shape from
+its surface colour, not from a drawn outline.
 
 * `.widget` — outer wrapper (grid + container queries + theme bg/fg)
 * `.head` + `.head-icon` + `.head-title` + `.head-place` + `.head-time`
@@ -362,8 +364,12 @@ yellow, red, blue, green.
 
 * Use the theme tokens — themes already map to palette-friendly hex
   ranges. Don't sample colours outside the palette.
-* Borders thinner than 2 px sometimes dither into invisibility on
-  Spectra 6. `widget-base.css` uses `max(2px, 0.3cqmin)`.
+* **No drawn borders.** Themes are tuned so `bg` vs `surface` contrast
+  defines card shapes — sections rise through colour, not lines. Thin
+  borders dither into invisibility on Spectra 6 anyway, and the
+  no-borders pattern reads cleaner in the admin too. Use spacing,
+  background shifts, and type hierarchy instead of `border:` rules.
+  `divider` token survives for chart axes and grid lines only.
 * Refresh time is ~25 s on the 13.3" panel. Static, dense layouts
   win; busy gradients quantise into noise.
 * Tabular numerics align cleanly: `font-variant-numeric: tabular-nums`.

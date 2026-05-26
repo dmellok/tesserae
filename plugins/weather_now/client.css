@@ -85,8 +85,8 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: clamp(6px, 1.4cqw, 14px);
-  padding-top: clamp(6px, 1cqw, 10px);
-  border-top: 1px solid var(--theme-divider);
+  padding-top: clamp(8px, 1.4cqw, 14px);
+  margin-top: clamp(2px, 0.4cqw, 4px);
 }
 .stat {
   display: grid;
@@ -137,8 +137,8 @@
   justify-content: space-around;
   align-items: center;
   gap: clamp(10px, 2.4cqw, 22px);
-  padding-top: clamp(6px, 1cqw, 10px);
-  border-top: 1px solid var(--theme-divider);
+  padding-top: clamp(8px, 1.4cqw, 14px);
+  margin-top: clamp(2px, 0.4cqw, 4px);
 }
 .sun-row {
   display: inline-flex;

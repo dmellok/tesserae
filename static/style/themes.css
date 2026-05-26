@@ -185,7 +185,11 @@
 /* ===== Live theme preview (the mini admin-shell mock) =====
    Everything inside reads from --theme-* set on the wrapper, so the
    same DOM renders any palette. The builder updates these via JS; the
-   gallery cards just inline the saved palette. */
+   gallery cards just inline the saved palette.
+
+   No-borders design language: shapes come from bg vs surface contrast,
+   not drawn lines. Each theme is tuned so surface contrasts cleanly
+   with bg, so cards "raise" through colour alone. */
 
 .theme-preview {
   background: var(--theme-bg);
@@ -194,7 +198,6 @@
   padding: 10px;
   display: grid;
   gap: 8px;
-  border: 1px solid var(--theme-divider);
   font-family: var(--t-font);
   overflow: hidden;
 }
@@ -210,7 +213,6 @@
   padding: 5px 9px;
   background: var(--theme-surface);
   border-radius: var(--t-radius-sm);
-  border: 1px solid var(--theme-divider);
 }
 .theme-preview--lg .tp-head { padding: 7px 12px; }
 
@@ -241,7 +243,6 @@
   background: var(--theme-surface);
   border-radius: var(--t-radius-sm);
   padding: 9px 11px;
-  border: 1px solid var(--theme-divider);
   display: grid;
   gap: 8px;
 }
@@ -279,12 +280,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Chart fragment */
+/* Chart fragment — bare against the surface, separated by spacing only. */
 .tp-chart {
   height: 42px;
-  border-top: 1px solid var(--theme-divider);
-  border-bottom: 1px solid var(--theme-divider);
-  padding: 4px 0;
+  padding: 2px 0;
+  margin: 2px 0;
 }
 .theme-preview--sm .tp-chart { height: 34px; }
 .tp-chart svg { width: 100%; height: 100%; display: block; }
@@ -329,7 +329,7 @@
 .tp-pill--warn { background: var(--theme-warn); color: var(--theme-bg); }
 .tp-pill--danger { background: var(--theme-danger); color: var(--theme-bg); }
 
-/* Button row — non-interactive in the preview but visually full */
+/* Button row — non-interactive in the preview; shapes from bg alone. */
 .tp-actions {
   display: flex;
   gap: 5px;
@@ -340,7 +340,6 @@
   font-weight: 600;
   padding: 4px 10px;
   border-radius: var(--t-radius-sm);
-  border: 1px solid var(--theme-divider);
   background: var(--theme-surface2);
   color: var(--theme-fg);
   display: inline-block;
@@ -348,7 +347,6 @@
 .tp-btn--primary {
   background: var(--theme-accent);
   color: var(--theme-bg);
-  border-color: var(--theme-accent);
 }
 .tp-btn--ghost {
   background: transparent;
@@ -357,5 +355,4 @@
 .tp-btn--danger {
   background: var(--theme-danger);
   color: var(--theme-bg);
-  border-color: var(--theme-danger);
 }

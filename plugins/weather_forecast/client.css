@@ -55,8 +55,8 @@
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: clamp(2px, 0.6cqw, 6px);
-  border-top: 1px solid var(--theme-divider);
-  padding-top: clamp(4px, 0.8cqw, 10px);
+  padding-top: clamp(6px, 1.2cqw, 12px);
+  margin-top: clamp(2px, 0.4cqw, 4px);
   min-height: 0;
 }
 

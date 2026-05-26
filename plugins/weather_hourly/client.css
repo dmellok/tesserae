@@ -92,8 +92,8 @@
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: clamp(6px, 1.4cqw, 14px);
-  padding-top: clamp(4px, 0.8cqw, 8px);
-  border-top: 1px solid var(--theme-divider);
+  padding-top: clamp(6px, 1cqw, 10px);
+  margin-top: clamp(2px, 0.4cqw, 4px);
 }
 .rain-label {
   display: inline-flex;
