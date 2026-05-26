@@ -30,7 +30,6 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-import io
 import json
 import logging
 import threading
@@ -42,9 +41,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from PIL import Image
-
-from app.panel import resolve_page_panel
+from app.panel import resolve_page_panel, resolve_settings_panel
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -466,21 +463,13 @@ class PushManager:
     def _panel_dims_for_send(self, image_bytes: bytes) -> dict[str, int]:
         """Pick panel dims for a Send-page push.
 
-        Order of preference: explicit app.panel_w / app.panel_h settings,
-        then the image's own dimensions (the source is canonical when no
-        panel is configured)."""
-        app = self._settings.get_section("app")
-        w_raw = app.get("panel_w")
-        h_raw = app.get("panel_h")
-        if (
-            isinstance(w_raw, int | float)
-            and isinstance(h_raw, int | float)
-            and int(w_raw) > 0
-            and int(h_raw) > 0
-        ):
-            return {"w": int(w_raw), "h": int(h_raw)}
-        img = Image.open(io.BytesIO(image_bytes))
-        return {"w": img.size[0], "h": img.size[1]}
+        Always uses ``resolve_settings_panel`` so the preset, custom
+        dims, and portrait orientation are honoured identically to
+        every other code path. ``image_bytes`` is unused — kept for
+        backwards-compat with the older signature."""
+        del image_bytes
+        panel = resolve_settings_panel(self._settings)
+        return {"w": panel.w, "h": panel.h}
 
     def _fetch_remote_image(self, url: str) -> bytes:
         """Download an image URL with bounded size + timeout."""
