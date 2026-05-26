@@ -206,6 +206,7 @@ def create_app(
         the default 8000). On first request, also refresh HA discovery
         configs so HA's stored URLs pick up the new port."""
         from flask import request
+
         previous = app.config.get("DETECTED_HTTP_PORT")
         port = request.host.split(":", 1)[1] if ":" in request.host else None
         if not port or not port.isdigit():
@@ -362,6 +363,7 @@ def _rebuild_transport(
         _subscribe_device_status(transport, device, status_cache, event_log)
 
     app_section = settings.get_section("app")
+
     # Auto-detected from the host's primary outbound interface — panel
     # listeners need a LAN IP, not localhost. The port is captured
     # below from the first incoming HTTP request so we always emit the

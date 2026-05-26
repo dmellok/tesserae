@@ -58,6 +58,7 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
     raw = settings.get_section("renderers_enabled")
     return {rid for rid, enabled in raw.items() if enabled is False}
 
+
 logger = logging.getLogger(__name__)
 
 PushStatus = Literal["sent", "busy", "failed", "not_found"]

@@ -162,6 +162,7 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
     # current panel orientation (e.g. dashboard designed for landscape
     # is being rendered for a flipped-to-portrait panel).
     from app.panel import fit_cells_to_panel  # local import: avoid cycle
+
     raw_coords = [(int(c["x"]), int(c["y"]), int(c["w"]), int(c["h"])) for c in page_dict["cells"]]
     fitted = fit_cells_to_panel(raw_coords, panel_w, panel_h)
     page_dict = {

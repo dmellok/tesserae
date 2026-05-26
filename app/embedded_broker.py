@@ -112,9 +112,7 @@ class EmbeddedBroker:
         if not (self._username and self._password):
             return None
         if self._passwd_path is None:
-            raise RuntimeError(
-                "embedded broker: passwd_path required when credentials are set"
-            )
+            raise RuntimeError("embedded broker: passwd_path required when credentials are set")
         digest = hashlib.sha512(self._password.encode("utf-8")).hexdigest()
         self._passwd_path.parent.mkdir(parents=True, exist_ok=True)
         # Mode 600 so the password hash isn't world-readable on a

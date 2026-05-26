@@ -88,6 +88,17 @@ Grammar: `tesserae/<device-type>/<channel>[/<format>]`
 | `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
 
+## Clients
+
+The server publishes; something downstream paints the panel. Three reference
+clients live in their own repos — pick whichever matches your hardware.
+
+| Client | Pairs with renderer | What it is | What it isn't |
+|---|---|---|---|
+| [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client) | `pi_png` | Pi-side Python daemon. Subscribes to `tesserae/pi/frame/png`, hands PNGs to [`inky`](https://github.com/pimoroni/inky)'s high-level `set_image()` — works on every panel the inky lib supports (pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", 2/3/6/7 colour). Wire-compatible with the inky-dash v3/v4 listener protocol. | The slow path — PIL + palette projection happen on the Pi every frame. If you've got an Impression on Spectra 6, prefer `pi_bin`. |
+| [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client) | `pi_bin` | Pi-side Python daemon. Subscribes to `tesserae/pi/frame/bin` and writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf` — no PIL on the Pi. Fastest Pi path. | Spectra 6 / Waveshare E6 only. Depends on an inky internal (`_buf`), so the `inky` version is pinned exactly — bumps need regression on real hardware. |
+| [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client) | `esp32_bin` | Battery-powered ESP32-S3-WROOM-2 firmware for the Waveshare 13.3" Spectra 6. Deep-sleeps between wakes; subscribes to the retained `tesserae/esp32/frame/bin` topic; skips the download if the URL hash hasn't changed. Months of battery life from a single Li-Po. | Not a Pi daemon. Not for any panel other than the Waveshare 13.3" Spectra 6. Not always-on — refresh cadence is set by `sleep_interval_s` on the `tesserae/esp32/config` topic. |
+
 ## Running locally
 
 ```sh
@@ -139,11 +150,9 @@ tesserae/
                    (vendored Phosphor 2.1.1 — regular/fill/bold/duotone/light/thin, woff2 only, 1.5 MB)
   templates/       Jinja shells
   tests/           top-level tests
-  scripts/         install.sh, run.sh, install-service.sh
-  docs/            architecture.md, contracts/{plugins,renderers,devices}.md
   data/            runtime state (gitignored)
 ```
 
 ## License
 
-Not yet set. Will land before public release.
+MIT — see [LICENSE](LICENSE).

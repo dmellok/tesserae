@@ -55,7 +55,6 @@ from app.state.settings_store import SettingsStore
 logger = logging.getLogger(__name__)
 
 
-
 bp = Blueprint("pages", __name__, url_prefix="/pages")
 
 
@@ -460,7 +459,7 @@ def preview(page_id: str) -> Response:
     for key in form:
         if key.startswith("cell_"):
             try:
-                rest = key[len("cell_"):]
+                rest = key[len("cell_") :]
                 cid, field = rest.split("__", 1)
             except ValueError:
                 continue
