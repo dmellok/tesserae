@@ -41,6 +41,7 @@ from app import (
 )
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
+from app.network import detect_base_url
 from app.push import PushManager
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
@@ -336,7 +337,10 @@ def _rebuild_transport(
         _subscribe_device_status(transport, device, status_cache, event_log)
 
     app_section = settings.get_section("app")
-    base_url = str(app_section.get("base_url") or "http://127.0.0.1:8000")
+    # Auto-detected from the host's primary outbound interface — panel
+    # listeners need a LAN IP, not localhost. Override via
+    # TESSERAE_HOST_IP / TESSERAE_HTTP_PORT env vars.
+    base_url = detect_base_url()
 
     app.config["MQTT_TRANSPORT"] = transport
     app.config["PUSH_MANAGER"] = PushManager(

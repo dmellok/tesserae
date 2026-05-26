@@ -2403,3 +2403,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
    by static/pages/panel_settings.js based on the dropdown's value. */
 .panel-custom-fields { display: none; }
 .panel-section.is-custom .panel-custom-fields { display: contents; }
+
+/* Built-in broker fields — hidden when the master switch is off. */
+.embedded-broker-fields { display: contents; }
+.embedded-broker-fields.is-collapsed { display: none; }

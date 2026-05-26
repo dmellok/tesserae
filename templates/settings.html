@@ -80,15 +80,27 @@
           'help': 'Push pipeline skips this renderer when off — settings stay saved.',
       }, section.enabled) }}
     {% endif %}
+    {% set ns = namespace(in_embedded_group=false) %}
     {% for field in section.fields %}
       {% set value = section.state.get(field.name, field.get('default', '')) %}
       {% set field_id = section.id ~ '-' ~ field.name %}
+      {% set embedded_secondary = field.name in (
+          'embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password'
+      ) %}
+      {% if embedded_secondary and not ns.in_embedded_group %}
+        <div class="embedded-broker-fields">
+        {% set ns.in_embedded_group = true %}
+      {% elif not embedded_secondary and ns.in_embedded_group %}
+        </div>
+        {% set ns.in_embedded_group = false %}
+      {% endif %}
       {% if section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
         <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
       {% else %}
         {{ auto_field(field_id, field.name, field, value) }}
       {% endif %}
     {% endfor %}
+    {% if ns.in_embedded_group %}</div>{% endif %}
     <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
   </form>
   {% endif %}
@@ -96,6 +108,22 @@
 {% endfor %}
 
 <script>
+  // Embedded broker: hide the bind/port/auth fields unless the
+  // master switch is on. The fields stay in the DOM (still POSTed)
+  // so flipping the switch back doesn't blow away previously-typed
+  // values.
+  (function () {
+    const group = document.querySelector('.embedded-broker-fields');
+    if (!group) return;
+    const toggle = document.querySelector('input[name="embedded_enabled"]');
+    if (!toggle) return;
+    function apply() {
+      group.classList.toggle('is-collapsed', !toggle.checked);
+    }
+    toggle.addEventListener('change', apply);
+    apply();
+  })();
+
   // Panel-preset dropdown hides the manual width/height sliders when a
   // preset is selected — they're only meaningful for "Custom".
   (function () {

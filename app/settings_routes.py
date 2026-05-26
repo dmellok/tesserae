@@ -55,16 +55,6 @@ bp = Blueprint("auth", __name__)
 
 APP_FIELDS: list[dict[str, Any]] = [
     {
-        "name": "base_url",
-        "type": "string",
-        "label": "Base URL",
-        "default": "http://127.0.0.1:8000",
-        "help": (
-            "Public URL the panel listeners use to fetch artifacts. Use the host's "
-            "LAN address (e.g. http://192.168.1.10:8000) so the Pi / ESP32 can reach it."
-        ),
-    },
-    {
         "name": "timezone",
         "type": "string",
         "label": "Timezone (IANA name or 'system')",
@@ -168,7 +158,7 @@ BROKER_FIELDS: list[dict[str, Any]] = [
     },
     {
         "name": "embedded_port",
-        "type": "slider",
+        "type": "number",
         "label": "Built-in broker port",
         "default": 1883,
         "min": 1024,
