@@ -84,8 +84,9 @@ def test_themes_page_lists_builtin_themes(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/themes").get_data(as_text=True)
-    # The curated subset shipped with M13.
-    for name in ("Paper", "Cobalt", "Embers", "Cyber"):
+    # One from each visual register in the curated set: cool-default,
+    # mono+ink-red, the dark CRT one, and the deep-blue dark one.
+    for name in ("Paper", "Newsprint", "Terminal", "Midnight"):
         assert name in body
     # All built-ins; no user themes yet.
     assert "built-in" in body
@@ -174,7 +175,7 @@ def test_new_theme_with_same_name_as_builtin_uniquifies(app: Flask) -> None:
 def test_duplicate_builtin_creates_user_theme(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    resp = client.post("/themes/embers/duplicate", follow_redirects=False)
+    resp = client.post("/themes/terminal/duplicate", follow_redirects=False)
     assert resp.status_code == 302
     # Redirect URL includes ?edit=<new_id>.
     assert "edit=" in resp.location
@@ -184,7 +185,7 @@ def test_duplicate_builtin_creates_user_theme(app: Flask) -> None:
     assert new_theme is not None
     assert new_theme.is_user
     # Palette copied verbatim from the built-in.
-    builtin = next(t for t in registry.themes.values() if t.id == "embers" and not t.is_user)
+    builtin = next(t for t in registry.themes.values() if t.id == "terminal" and not t.is_user)
     # The freshly duplicated user theme should match the original's palette.
     # Note: if we just shadowed, builtin would be None — but we generated
     # a distinct id, so the built-in is still present.
