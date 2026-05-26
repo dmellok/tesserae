@@ -198,6 +198,31 @@ def create_app(
     if not testing:
         auth.install_gate(app, settings)
 
+    @app.before_request
+    def _capture_http_port() -> None:
+        """Stash the actual HTTP port the server is bound to so the
+        base_url emitted in MQTT payloads matches reality (the user
+        might have started us with `flask run --port 5050` instead of
+        the default 8000). On first request, also refresh HA discovery
+        configs so HA's stored URLs pick up the new port."""
+        from flask import request
+        previous = app.config.get("DETECTED_HTTP_PORT")
+        port = request.host.split(":", 1)[1] if ":" in request.host else None
+        if not port or not port.isdigit():
+            return
+        port_n = int(port)
+        if port_n == previous:
+            return
+        app.config["DETECTED_HTTP_PORT"] = port_n
+        # HA's stored entity configs include image_url / configuration_url
+        # which embed the URL — re-publish if discovery is running.
+        ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
+        if ha is not None:
+            try:
+                ha.refresh_entity_configs()
+            except Exception:
+                logger.exception("refreshing HA configs after port capture")
+
     @app.context_processor
     def _inject_nav_data() -> dict[str, Any]:
         """Make the list of admin-equipped plugins available to every
@@ -338,10 +363,14 @@ def _rebuild_transport(
 
     app_section = settings.get_section("app")
     # Auto-detected from the host's primary outbound interface — panel
-    # listeners need a LAN IP, not localhost. Override via
-    # TESSERAE_HOST_IP / TESSERAE_HTTP_PORT env vars.
-    base_url = detect_base_url()
+    # listeners need a LAN IP, not localhost. The port is captured
+    # below from the first incoming HTTP request so we always emit the
+    # actual bind port even when `flask run --port` is non-default.
+    # Override via TESSERAE_HOST_IP / TESSERAE_HTTP_PORT env vars.
+    def _base_url() -> str:
+        return detect_base_url(app.config.get("DETECTED_HTTP_PORT"))
 
+    app.config["BASE_URL_FN"] = _base_url
     app.config["MQTT_TRANSPORT"] = transport
     app.config["PUSH_MANAGER"] = PushManager(
         registry=renderers,
@@ -350,7 +379,7 @@ def _rebuild_transport(
         settings=settings,
         event_log=event_log,
         renders_dir=renders_dir,
-        base_url=base_url,
+        base_url_fn=_base_url,
     )
 
     # HA discovery is opt-in. If previously running, stop it first so the
@@ -368,7 +397,7 @@ def _rebuild_transport(
             transport=transport,
             push_manager=app.config["PUSH_MANAGER"],
             page_store=page_store,
-            base_url=base_url,
+            base_url_fn=_base_url,
         )
         try:
             new_ha.start()

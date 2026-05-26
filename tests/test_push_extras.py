@@ -114,7 +114,7 @@ def _wire(tmp_path: Path, panel_png: bytes):
         settings=settings,
         event_log=event_log,
         renders_dir=tmp_path / "renders",
-        base_url="http://broker.local:8000",
+        base_url_fn=lambda: "http://broker.local:8000",
     )
     return manager, event_log, factories["client"], tmp_path / "renders"
 

@@ -119,7 +119,7 @@ def _wired(tmp_path: Path, composition_png: bytes, renderers: list[Renderer]):
         settings=SettingsStore(tmp_path / "settings.json"),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
-        base_url="http://broker.local:8000",
+        base_url_fn=lambda: "http://broker.local:8000",
     )
 
     return manager, fakes["client"], composition_png

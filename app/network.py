@@ -46,13 +46,15 @@ def detect_local_ip(fallback: str = "127.0.0.1") -> str:
         sock.close()
 
 
-def detect_base_url(port: int = 8000) -> str:
+def detect_base_url(port: int | None = None) -> str:
     """``http://<lan-ip>:<port>`` for the panel listeners.
 
-    Port defaults to 8000 (the documented dev port). Override via the
-    ``TESSERAE_HTTP_PORT`` env var if you're running on a different one.
+    ``port`` defaults to the value captured at first-request time by
+    ``app/main.py`` (so it tracks the actual Flask bind port, whatever
+    it is), and falls back to 8000 / the ``TESSERAE_HTTP_PORT`` env
+    var if nothing has been captured yet.
     """
-    env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
-    if env_port.isdigit():
-        port = int(env_port)
+    if port is None:
+        env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
+        port = int(env_port) if env_port.isdigit() else 8000
     return f"http://{detect_local_ip()}:{port}"

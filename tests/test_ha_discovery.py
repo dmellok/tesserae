@@ -76,7 +76,7 @@ def _wire(tmp_path: Path):
         transport=transport,
         push_manager=pm,
         page_store=page_store,
-        base_url="http://lan.test:8000",
+        base_url_fn=lambda: "http://lan.test:8000",
     )
     return ha, fakes["client"], pm, page_store
 

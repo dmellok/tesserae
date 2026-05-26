@@ -107,9 +107,10 @@ class PushManager:
       * ``event_log`` — EventLog. Every push attempt writes a row.
       * ``renders_dir`` — where to write composition PNGs + per-renderer
         artifacts. Created if missing.
-      * ``base_url`` — the URL prefix the panel listener uses to fetch
-        artifacts. Each renderer's ``payload()`` builds the final URL
-        from this + digest + extension.
+      * ``base_url_fn`` — callable returning the current URL prefix the
+        panel listener uses to fetch artifacts. Called on every push so
+        the port can be captured from the first incoming HTTP request
+        rather than hard-coded at construction time.
     """
 
     def __init__(
@@ -121,7 +122,7 @@ class PushManager:
         settings: SettingsStore,
         event_log: EventLog,
         renders_dir: Path,
-        base_url: str,
+        base_url_fn: Callable[[], str],
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -130,7 +131,7 @@ class PushManager:
         self._event_log = event_log
         self._renders_dir = renders_dir
         self._renders_dir.mkdir(parents=True, exist_ok=True)
-        self._base_url = base_url.rstrip("/")
+        self._base_url_fn = base_url_fn
         self._lock = threading.Lock()
         # Listeners fire synchronously after every push attempt (success
         # or failure). HA discovery uses this to follow pushes. Slow
@@ -301,7 +302,8 @@ class PushManager:
         # the dashboard layout always agree on dims.
         panel = resolve_page_panel(page.panel, self._settings)
 
-        compose_url = to_loopback_url(f"{self._base_url}/compose/{page_id}?for_push=1")
+        base_url = self._base_url_fn().rstrip("/")
+        compose_url = to_loopback_url(f"{base_url}/compose/{page_id}?for_push=1")
         try:
             composition_png = render_to_png(
                 RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h)
@@ -445,7 +447,7 @@ class PushManager:
         else:
             path.touch()
 
-        payload = renderer.payload(digest, self._base_url, settings=settings)
+        payload = renderer.payload(digest, self._base_url_fn().rstrip("/"), settings=settings)
         url = str(payload.get("url", ""))
         self._transport.publish(
             renderer.topic,

@@ -37,6 +37,7 @@ import contextlib
 import json
 import logging
 import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
@@ -208,12 +209,12 @@ class HomeAssistantDiscovery:
         transport: MqttTransport,
         push_manager: PushManager,
         page_store: PageStore,
-        base_url: str,
+        base_url_fn: Callable[[], str],
     ) -> None:
         self._transport = transport
         self._push_manager = push_manager
         self._page_store = page_store
-        self._base_url = base_url.rstrip("/")
+        self._base_url_fn = base_url_fn
         self._started = False
         self._lock = threading.Lock()
         # Per-UTC-day push counter. In-memory only; resets on restart
@@ -262,10 +263,15 @@ class HomeAssistantDiscovery:
         self._published_button_ids.clear()
         self._publish_str(AVAILABILITY_TOPIC, "offline", retain=True)
 
-    def set_base_url(self, base_url: str) -> None:
-        self._base_url = base_url.rstrip("/")
+    def refresh_entity_configs(self) -> None:
+        """Re-publish entity configs — call after the base URL has
+        changed (e.g. when the HTTP port was captured from a request)
+        so HA's stored image_url / configuration_url stay correct."""
         if self._started:
             self._publish_entity_configs()
+
+    def _base_url(self) -> str:
+        return self._base_url_fn().rstrip("/")
 
     # -- listener hooks -------------------------------------------------
 
@@ -280,7 +286,7 @@ class HomeAssistantDiscovery:
                     # The composition PNG is the canonical thumbnail and
                     # is always written for a successful push (see
                     # PushManager._fan_out).
-                    image_url = f"{self._base_url}/renders/{result.composition_digest}.png"
+                    image_url = f"{self._base_url()}/renders/{result.composition_digest}.png"
                     self._publish_str(STATE_TOPIC_IMAGE_URL, image_url, retain=True)
                 today = now.strftime("%Y-%m-%d")
                 if today != self._push_count_day:
@@ -331,7 +337,7 @@ class HomeAssistantDiscovery:
         seen_ids: set[str] = set()
 
         for page in pages:
-            topic, payload = build_button_config(page.id, page.name, base_url=self._base_url)
+            topic, payload = build_button_config(page.id, page.name, base_url=self._base_url())
             self._publish_json(topic, payload, retain=True)
             seen_ids.add(page.id)
 
@@ -342,13 +348,13 @@ class HomeAssistantDiscovery:
         self._published_button_ids = seen_ids
 
         page_ids = sorted(p.id for p in pages)
-        topic, payload = build_select_config(page_ids, base_url=self._base_url)
+        topic, payload = build_select_config(page_ids, base_url=self._base_url())
         self._publish_json(topic, payload, retain=True)
 
-        topic, payload = build_image_config(base_url=self._base_url)
+        topic, payload = build_image_config(base_url=self._base_url())
         self._publish_json(topic, payload, retain=True)
 
-        for topic, payload in build_diagnostic_configs(base_url=self._base_url):
+        for topic, payload in build_diagnostic_configs(base_url=self._base_url()):
             self._publish_json(topic, payload, retain=True)
 
     def _every_object_id_kind(self) -> list[tuple[str, str]]:
