@@ -132,6 +132,41 @@ def test_compose_blocked_from_non_loopback(app_with_gate: Flask) -> None:
     assert resp.status_code == 403
 
 
+def test_plugin_asset_loopback_bypass(app_with_gate: Flask) -> None:
+    """The Playwright renderer pulls /plugins/<id>/client.js while it
+    renders /compose/<id> — no session is available, so this path must
+    bypass the gate from loopback (same as /compose/). Without this,
+    dynamic imports inside the composer fail and the panel push errors
+    with 'failed to fetch dynamically imported module'."""
+    client = app_with_gate.test_client()
+    resp = client.get(
+        "/plugins/themes_core/client.js",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    # themes_core has no client.js, so the asset route should 404. The
+    # important thing is we hit the route — not a 302 to /login or /setup.
+    assert resp.status_code in (200, 404)
+
+
+def test_plugin_asset_blocked_from_non_loopback(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    resp = client.get(
+        "/plugins/themes_core/client.js",
+        environ_overrides={"REMOTE_ADDR": "10.0.0.5"},
+    )
+    assert resp.status_code == 403
+
+
+def test_plugin_index_still_gated(app_with_gate: Flask) -> None:
+    """/plugins/ (admin index) lists plugin internals and loader errors —
+    must stay behind auth, even from loopback."""
+    client = app_with_gate.test_client()
+    resp = client.get("/plugins/", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    # First-run (no password yet) sends every unauthed request to /setup.
+    assert resp.status_code == 302
+    assert "/setup" in resp.location or "/login" in resp.location
+
+
 def test_settings_page_lists_loaded_renderers(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

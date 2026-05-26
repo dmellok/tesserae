@@ -40,11 +40,17 @@ SESSION_KEY: Final[str] = "authed"
 
 # Routes that bypass the auth gate entirely. Static + setup + login are
 # reachable from anywhere; compose is reachable from loopback (the
-# embedded renderer); renders is reachable from any private-network
-# client (the Pi / ESP32 fetching frame artifacts).
+# embedded Playwright renderer); renders is reachable from any private-
+# network client (the Pi / ESP32 fetching frame artifacts).
 _OPEN_PATHS: Final[tuple[str, ...]] = ("/static/", "/setup", "/login", "/logout", "/healthz")
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/",)
+# Plugin assets — /plugins/<id>/<asset> only, NOT /plugins/ (the admin
+# index, which stays authed). The composer's dynamic import pulls
+# /plugins/<id>/client.js while rendering from loopback, so it has to
+# pass without a session. The index page is sensitive enough (lists
+# loader errors, plugin contents) to keep behind auth.
+_PLUGIN_ASSET_PREFIX: Final[str] = "/plugins/"
 _LOOPBACK_HOSTS: Final[frozenset[str]] = frozenset({"127.0.0.1", "::1", "localhost"})
 # RFC1918 + loopback + link-local: addresses that can only originate
 # from a trusted local network. /renders/ payloads are content-addressed
@@ -174,7 +180,15 @@ def _path_is_open(path: str) -> bool:
 
 
 def _path_is_loopback_only(path: str) -> bool:
-    return any(path.startswith(p) for p in _LOOPBACK_PATHS)
+    if any(path.startswith(p) for p in _LOOPBACK_PATHS):
+        return True
+    # /plugins/<id>/<asset> bypasses for the renderer; bare /plugins/
+    # (admin index) does not. Require at least two more segments after
+    # the prefix so the index is still gated.
+    if path.startswith(_PLUGIN_ASSET_PREFIX):
+        tail = path[len(_PLUGIN_ASSET_PREFIX) :]
+        return "/" in tail and tail.split("/", 1)[0] != ""
+    return False
 
 
 def _path_is_lan_reachable(path: str) -> bool:
