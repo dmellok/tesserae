@@ -30,6 +30,8 @@ PALETTE_TOKENS: tuple[str, ...] = (
     "fgSoft",
     "muted",
     "accent",
+    "accent2",
+    "accent3",
     "accentSoft",
     "divider",
     "danger",

@@ -229,7 +229,7 @@
   display: inline-block;
   width: 1em;
   height: 1em;
-  background: var(--theme-warn);
+  background: var(--theme-accent2);
 }
 .tp-place { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tp-time { white-space: nowrap; }
@@ -279,7 +279,7 @@
   letter-spacing: 0.06em;
   color: var(--theme-fg);
 }
-.tp-range-high { color: var(--theme-danger); }
+.tp-range-high { color: var(--theme-accent3); }
 .tp-range-low,
 .tp-range-feels { color: var(--theme-fg); opacity: 0.85; }
 
@@ -315,6 +315,9 @@
 .tp-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  /* Match the weather widget — thick black bauhaus rule above the
+     stat row. */
+  border-top: 3px solid var(--theme-fg);
 }
 .tp-stat {
   padding: 0.55em 0.75em;
@@ -342,8 +345,8 @@
 
 .tp-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
 .tp-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
-.tp-stat--warn { background: var(--theme-warn); color: var(--theme-fg); }
-.tp-stat--danger { background: var(--theme-danger); color: var(--theme-bg); }
+.tp-stat--accent2 { background: var(--theme-accent2); color: var(--theme-fg); }
+.tp-stat--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
 
 /* --- sun row: accent / inverse pair --- */
 

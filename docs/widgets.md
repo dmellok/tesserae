@@ -220,12 +220,23 @@ hard-coded hex in widgets, ever.
 | `fg`        | primary text                                       |
 | `fgSoft`    | secondary text                                     |
 | `muted`     | labels, supporting metadata                        |
-| `accent`    | brand highlight — icons, links, charts             |
+| `accent`    | primary brand colour — icons, links, charts, the first colour-block |
+| `accent2`   | second decorative colour, theme-coordinated. Paints the second colour-block in bauhaus-style multi-block layouts. |
+| `accent3`   | third decorative colour, theme-coordinated. Paints the third colour-block. |
 | `accentSoft`| accent fill at low contrast (chart areas, pills)   |
 | `divider`   | chart grid lines + axes only — **not** for card borders (see no-borders note below) |
-| `danger`    | errors, very-high warnings                         |
-| `warn`      | caution, hot temps, high UV                        |
-| `ok`        | success, low UV                                    |
+| `danger`    | **semantic only** — errors, alarm states. Never used for normal decorative blocks; use `accent3` for visual variety instead. |
+| `warn`      | **semantic only** — caution / warning badges. Use `accent2` for normal decorative blocks. |
+| `ok`        | **semantic only** — success badges, "all good" indicators. |
+
+Decorative vs semantic: `accent` / `accent2` / `accent3` are the
+**three theme-coordinated colour blocks** widgets paint regular UI in
+(humidity / wind / UV / rain blocks, day cards, chip rows). Each
+theme picks them to feel coherent together — Bauhaus primaries on
+Paper, green family on Botanical, warm spectrum on Citrus, etc.
+`warn` / `danger` / `ok` exist for actual semantic states only —
+"low battery" pill, "broker offline" error — and stay distinct from
+the decorative trio.
 
 Source: [`schema/plugin.schema.json`](../schema/plugin.schema.json)
 → `themes.palette`.

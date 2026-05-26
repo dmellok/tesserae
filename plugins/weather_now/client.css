@@ -39,7 +39,7 @@
   display: inline-block;
   width: clamp(10px, 1.6cqw, 14px);
   height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-warn);
+  background: var(--theme-accent2);
 }
 .wn-place {
   min-width: 0;
@@ -95,7 +95,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.wn-range-high { color: var(--theme-danger); }
+.wn-range-high { color: var(--theme-accent3); }
 .wn-range-low,
 .wn-range-feels { color: var(--theme-fg); }
 
@@ -135,6 +135,9 @@
 .wn-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  /* Thick black rule separating the stat row from the hero — sparing
+     use of bauhaus heavy lines to anchor the layout. */
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
 }
 .wn-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.8cqw, 18px);
@@ -169,8 +172,8 @@
 
 .wn-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
 .wn-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
-.wn-stat--warn { background: var(--theme-warn); color: var(--theme-fg); }
-.wn-stat--danger { background: var(--theme-danger); color: var(--theme-bg); }
+.wn-stat--accent2 { background: var(--theme-accent2); color: var(--theme-fg); }
+.wn-stat--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
 
 /* --- sunrise/sunset row (md, lg only) --- */
 

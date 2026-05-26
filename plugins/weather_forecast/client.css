@@ -37,7 +37,7 @@
   display: inline-block;
   width: clamp(10px, 1.6cqw, 14px);
   height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-warn);
+  background: var(--theme-accent2);
 }
 .wf-title {
   min-width: 0;
@@ -47,12 +47,41 @@
 }
 .wf-time { white-space: nowrap; }
 
-/* --- 5 day columns --- */
+/* --- 5 day blocks: columns on wide cells, rows on tall cells ---
+   The cell sets `container-type: size`, so we can swap layouts based
+   on the cell's aspect ratio. Tall cells (portrait or square-tall) get
+   the row layout — each day becomes a wide horizontal strip instead
+   of a narrow vertical column, which uses the available height better
+   and stops the icons / text from getting stretched. */
 
 .wf-days {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   min-height: 0;
+}
+
+@container (max-aspect-ratio: 1) {
+  .wf-days {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(5, 1fr);
+  }
+  .wf-day {
+    grid-template-columns: minmax(60px, auto) minmax(auto, 1fr) minmax(0, 2fr) auto auto;
+    grid-template-rows: auto;
+    justify-items: start;
+    align-items: center;
+    text-align: left;
+    gap: clamp(8px, 1.6cqw, 18px);
+    padding: clamp(6px, 1cqw, 14px) clamp(10px, 1.8cqw, 20px);
+  }
+  .wf-day .wf-day-name { font-size: clamp(11px, 2cqw, 15px); }
+  .wf-day .wf-day-icon { font-size: clamp(34px, 8cqh, 64px); justify-self: center; }
+  .wf-day .wf-day-cond { display: none; }
+  .wf-day .wf-day-range { width: 100%; max-width: none; height: clamp(6px, 1.2cqh, 10px); }
+  .wf-day .wf-day-temps { gap: clamp(8px, 1.4cqw, 18px); }
+  .wf-day .wf-day-high { font-size: clamp(20px, 4cqh, 32px); }
+  .wf-day .wf-day-low { font-size: clamp(14px, 3cqh, 22px); }
+  .wf-day .wf-day-rain { font-size: clamp(11px, 2cqh, 16px); }
 }
 
 .wf-day {

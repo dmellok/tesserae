@@ -13,10 +13,12 @@
   width: 100%;
   height: 100%;
   display: grid;
-  /* header / chart / cond strip / rain / chips — chart takes the
-     flexible row, everything else is auto. Cond + rain only render at
-     md+ so at sm the layout collapses to header / chart / chips. */
-  grid-template-rows: auto 1fr auto auto auto;
+  /* header / cond strip / chart / rain / chips — chart takes the
+     flexible row, everything else is auto. Cond strip + rain only
+     render at md+ so at sm the layout collapses to header / chart
+     / chips. Icons up top so the eye picks the conditions before
+     reading the trace below. */
+  grid-template-rows: auto auto 1fr auto auto;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -41,7 +43,7 @@
   display: inline-block;
   width: clamp(10px, 1.6cqw, 14px);
   height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-warn);
+  background: var(--theme-accent2);
 }
 .wh-title {
   min-width: 0;
@@ -137,6 +139,9 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   grid-auto-flow: column;
+  /* Thick black bauhaus rule separating the chip strip from the rain
+     row above. Reads as the closing band of the widget. */
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
 }
 .wh-chip {
   padding: clamp(5px, 1cqw, 10px) clamp(8px, 1.6cqw, 16px);
@@ -158,7 +163,7 @@
   letter-spacing: -0.02em;
   line-height: 1;
 }
-.wh-chip--high { background: var(--theme-danger); color: var(--theme-bg); }
+.wh-chip--high { background: var(--theme-accent3); color: var(--theme-bg); }
 .wh-chip--low { background: var(--theme-surface); color: var(--theme-fg); }
 .wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
 

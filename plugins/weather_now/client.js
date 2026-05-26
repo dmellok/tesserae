@@ -125,11 +125,11 @@ export default async function render(shadow, ctx) {
           <span class="wn-stat-label">Wind</span>
           <span class="wn-stat-value">${fmtInt(data.wind)}<small>${windUnit}</small></span>
         </div>
-        <div class="wn-stat wn-stat--warn">
+        <div class="wn-stat wn-stat--accent2">
           <span class="wn-stat-label">UV Index</span>
           <span class="wn-stat-value">${fmtUv(data.uv)}</span>
         </div>
-        <div class="wn-stat wn-stat--danger">
+        <div class="wn-stat wn-stat--accent3">
           <span class="wn-stat-label">Rain</span>
           <span class="wn-stat-value">${fmtInt(data.rain_chance)}<small>%</small></span>
         </div>

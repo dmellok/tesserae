@@ -220,7 +220,8 @@ macro here instead.
    inline values via JS for live updates; the gallery cards just
    render the saved values. -#}
 {%- set tokens = ['bg', 'surface', 'surface2', 'fg', 'fgSoft', 'muted',
-                  'accent', 'accentSoft', 'divider', 'danger', 'warn', 'ok'] -%}
+                  'accent', 'accent2', 'accent3', 'accentSoft',
+                  'divider', 'danger', 'warn', 'ok'] -%}
 <div class="theme-preview theme-preview--{{ variant }}" data-theme-preview style="
   {%- for t in tokens -%}
     --theme-{{ t }}: {{ palette.get(t, '#000000') }};
@@ -255,11 +256,11 @@ macro here instead.
       <span class="tp-stat-label">Wind</span>
       <span class="tp-stat-value">14<small>km/h</small></span>
     </div>
-    <div class="tp-stat tp-stat--warn">
+    <div class="tp-stat tp-stat--accent2">
       <span class="tp-stat-label">UV Index</span>
       <span class="tp-stat-value">6.4</span>
     </div>
-    <div class="tp-stat tp-stat--danger">
+    <div class="tp-stat tp-stat--accent3">
       <span class="tp-stat-label">Rain</span>
       <span class="tp-stat-value">20%</span>
     </div>

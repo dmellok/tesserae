@@ -161,13 +161,13 @@ export default async function render(shadow, ctx) {
         <span class="wh-title">${data.label ? escapeHtml(data.label) + " · " : ""}Next ${data.hours || 24} hr</span>
         <span class="wh-time">${nowTime()}</span>
       </header>
-      <section class="wh-chart">
-        <canvas class="chart"></canvas>
-      </section>
       ${showStrip ? `
       <section class="wh-cond-strip" aria-label="Hourly conditions">
         ${renderConditionStrip(points, size)}
       </section>` : ""}
+      <section class="wh-chart">
+        <canvas class="chart"></canvas>
+      </section>
       ${showRain ? `
       <section class="wh-rain">
         <span class="wh-rain-label">Rain</span>

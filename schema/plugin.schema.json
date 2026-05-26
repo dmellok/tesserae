@@ -110,12 +110,12 @@
             "required": [
               "bg", "surface", "surface2",
               "fg", "fgSoft", "muted",
-              "accent", "accentSoft",
+              "accent", "accent2", "accent3", "accentSoft",
               "divider", "danger", "warn", "ok"
             ],
             "additionalProperties": false,
             "patternProperties": {
-              "^(bg|surface|surface2|fg|fgSoft|muted|accent|accentSoft|divider|danger|warn|ok)$": {
+              "^(bg|surface|surface2|fg|fgSoft|muted|accent|accent2|accent3|accentSoft|divider|danger|warn|ok)$": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
               }
