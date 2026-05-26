@@ -1,5 +1,4 @@
-/* weather_hourly — flat layout. Header chips, chart, rain strip — all
-   on the cell background, no nested cards. */
+/* weather_hourly — Bauhaus hourly card. */
 
 :host {
   display: block;
@@ -14,68 +13,78 @@
   width: 100%;
   height: 100%;
   display: grid;
-  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
+  grid-template-rows: auto auto 1fr auto;
   box-sizing: border-box;
-  gap: clamp(4px, 0.8cqw, 10px);
+  overflow: hidden;
 }
+.root.size-sm { grid-template-rows: auto auto 1fr; }
 
-.size-sm { grid-template-rows: 1fr; }
-.size-md { grid-template-rows: auto 1fr auto; }
-.size-lg { grid-template-rows: auto 1fr auto; }
+/* --- header bar (same shape as weather_now) --- */
 
-/* ---------- header ---------- */
-
-.head {
-  display: flex;
+.wh-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(8px, 1.6cqw, 16px);
-  min-width: 0;
-}
-.head-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: clamp(12px, 2.2cqw, 17px);
-  font-weight: 700;
-  color: var(--theme-fg);
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
+}
+.wh-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-warn);
+}
+.wh-title {
   min-width: 0;
-}
-.head-title .ph-bold {
-  font-size: 1.4em;
-  /* colour set inline */
-}
-.head-place {
-  color: var(--theme-fgSoft);
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: 0;
-  margin-left: 4px;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.head-chips {
-  display: inline-flex;
-  gap: clamp(4px, 1cqw, 10px);
-  flex-shrink: 0;
+.wh-time { white-space: nowrap; }
+
+/* --- chip strip: High / Low / Now --- */
+
+.wh-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
 }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: clamp(12px, 2cqw, 16px);
+.wh-chip {
+  padding: clamp(5px, 1cqw, 10px) clamp(8px, 1.6cqw, 16px);
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.wh-chip-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
   font-weight: 700;
-  color: var(--theme-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
 }
-.chip .ph-bold { font-size: 1em; }
+.wh-chip-value {
+  font-size: clamp(18px, 3.4cqw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.wh-chip--high { background: var(--theme-danger); color: var(--theme-bg); }
+.wh-chip--low { background: var(--theme-surface); color: var(--theme-fg); }
+.wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
 
-/* ---------- chart ---------- */
+/* --- chart on the main surface --- */
 
-.chart-wrap {
+.wh-chart {
   position: relative;
+  background: var(--theme-surface);
+  padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 16px);
   min-height: 0;
   overflow: hidden;
 }
@@ -85,53 +94,51 @@
   height: 100% !important;
 }
 
-/* ---------- rain strip ---------- */
+/* --- rain probability blocks (md/lg) --- */
 
-.rain-strip {
+.wh-rain {
   display: grid;
   grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: clamp(6px, 1.4cqw, 14px);
-  padding-top: clamp(6px, 1cqw, 10px);
-  margin-top: clamp(2px, 0.4cqw, 4px);
+  align-items: stretch;
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  min-height: clamp(28px, 5cqw, 44px);
 }
-.rain-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: clamp(9px, 1.6cqw, 11px);
-  letter-spacing: 0.1em;
-  font-weight: 700;
-  color: var(--theme-muted);
-  white-space: nowrap;
+.wh-rain-label {
+  align-self: center;
+  padding: 0 clamp(10px, 1.6cqw, 18px);
+  font-size: clamp(10px, 1.6cqw, 13px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
-.rain-label .ph-bold { font-size: 1.2em; }
-.rain-bars {
+.wh-rain-bars {
   display: flex;
   align-items: stretch;
-  gap: 1.5px;
-  height: clamp(20px, 4cqw, 32px);
+  gap: 1px;
+  padding: clamp(5px, 0.9cqw, 8px) clamp(6px, 1cqw, 10px);
+  background: var(--theme-fg);
 }
-.rain-bar {
+.wh-rain-bar {
   flex: 1;
   display: block;
   align-self: end;
   height: var(--rain, 0%);
-  min-height: 1px;
-  background: var(--theme-accentSoft);
-  border-radius: 2px;
-  opacity: 0.6;
+  min-height: 2px;
+  background: var(--theme-surface2);
 }
-.rain-bar.is-wet {
-  background: var(--theme-accent);
-  opacity: 1;
-}
+.wh-rain-bar.is-wet { background: var(--theme-accent); }
 
-/* ---------- error state ---------- */
+/* --- size adaptations --- */
+
+.root.size-sm .wh-chips { display: none; }
+.root.size-sm .wh-chart { padding: 6px 8px; }
+
+/* --- error state --- */
 
 .root.error {
-  align-content: center;
-  justify-items: center;
+  display: grid;
+  place-items: center;
   text-align: center;
   color: var(--theme-danger);
   padding: 16px;

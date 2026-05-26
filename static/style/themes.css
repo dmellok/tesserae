@@ -182,177 +182,188 @@
   margin-top: 2px;
 }
 
-/* ===== Live theme preview (the mini admin-shell mock) =====
-   Everything inside reads from --theme-* set on the wrapper, so the
-   same DOM renders any palette. The builder updates these via JS; the
-   gallery cards just inline the saved palette.
+/* ===== Live theme preview (Bauhaus weather widget mock) =====
+   The mock is a real weather widget rendering — same shape as the
+   weather_now widget — so what you see in the gallery IS how that
+   theme will look on a panel. Every colour comes from a --theme-*
+   custom property set inline on the wrapper.
 
-   No-borders design language: shapes come from bg vs surface contrast,
-   not drawn lines. Each theme is tuned so surface contrasts cleanly
-   with bg, so cards "raise" through colour alone. */
+   Bauhaus semantic mapping (primary triad maps to semantic tokens):
+   * humidity block -> --theme-accent (blue)
+   * UV block       -> --theme-warn   (yellow)
+   * rain block     -> --theme-danger (red)
+   * wind block     -> --theme-surface (neutral)
+   * top bar        -> --theme-fg inverted (high-contrast strip)
+*/
 
 .theme-preview {
   background: var(--theme-bg);
   color: var(--theme-fg);
   border-radius: var(--t-radius-md);
-  padding: 10px;
   display: grid;
-  gap: 8px;
+  grid-template-rows: auto 1fr auto auto;
   font-family: var(--t-font);
   overflow: hidden;
-}
-
-.theme-preview--lg { padding: 14px; gap: 12px; font-size: 13px; }
-.theme-preview--sm { padding: 8px; gap: 6px; font-size: 10px; }
-
-.tp-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 5px 9px;
-  background: var(--theme-surface);
-  border-radius: var(--t-radius-sm);
-}
-.theme-preview--lg .tp-head { padding: 7px 12px; }
-
-.tp-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 700;
-  color: var(--theme-fg);
-  font-size: 1.05em;
-}
-.tp-brand .ph-bold {
-  color: var(--theme-accent);
-  font-size: 1.35em;
-}
-.tp-tag {
-  font-size: 0.78em;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--theme-accent);
-  color: var(--theme-bg);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.tp-body {
-  background: var(--theme-surface);
-  border-radius: var(--t-radius-sm);
-  padding: 9px 11px;
-  display: grid;
-  gap: 8px;
-}
-.theme-preview--lg .tp-body { padding: 12px 14px; gap: 11px; }
-
-/* Stats row */
-.tp-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.tp-stat {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
-}
-.tp-stat .ph-bold {
-  color: var(--theme-accent);
-  font-size: 1.5em;
-}
-.tp-stat-text { display: grid; line-height: 1.15; min-width: 0; }
-.tp-stat-label {
-  font-size: 0.78em;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  color: var(--theme-muted);
-  text-transform: uppercase;
-}
-.tp-stat-value {
-  font-size: 1.25em;
-  font-weight: 700;
-  color: var(--theme-fg);
   font-variant-numeric: tabular-nums;
 }
 
-/* Chart fragment — bare against the surface, separated by spacing only. */
-.tp-chart {
-  height: 42px;
-  padding: 2px 0;
-  margin: 2px 0;
-}
-.theme-preview--sm .tp-chart { height: 34px; }
-.tp-chart svg { width: 100%; height: 100%; display: block; }
-.tp-chart-fill { fill: var(--theme-accentSoft); opacity: 0.55; }
-.tp-chart-line {
-  stroke: var(--theme-accent);
-  stroke-width: 2;
-  stroke-linejoin: round;
-  fill: none;
-  vector-effect: non-scaling-stroke;
-}
+.theme-preview--lg { font-size: 13px; }
+.theme-preview--sm { font-size: 10px; }
 
-/* List rows with semantic pills */
-.tp-list { display: grid; gap: 4px; }
-.tp-list-row {
+/* --- top bar: inverted strip (fg bg, bg text) + warn accent square --- */
+
+.tp-bar {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 7px;
-  font-size: 0.95em;
+  gap: 0.6em;
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: 0.5em 0.75em;
+  font-size: 0.78em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
-.tp-li-bullet { font-size: 1.1em; }
-.tp-li-ok { color: var(--theme-ok); }
-.tp-li-warn { color: var(--theme-warn); }
-.tp-li-danger { color: var(--theme-danger); }
-.tp-li-text {
-  color: var(--theme-fgSoft);
+.tp-mark {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background: var(--theme-warn);
+}
+.tp-place { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tp-time { white-space: nowrap; }
+
+/* --- hero: big temp + condition icon on a subtle surface --- */
+
+.tp-hero {
+  position: relative;
+  background: var(--theme-surface);
+  padding: 0.85em 0.95em;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.6em;
+  min-height: 0;
+  min-width: 0;
+}
+.tp-hero-text {
+  display: grid;
+  gap: 0.35em;
+  min-width: 0;
+}
+.tp-temp {
+  font-size: 2.6em;
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.045em;
+  color: var(--theme-fg);
+}
+.theme-preview--lg .tp-temp { font-size: 3.4em; }
+.tp-cond {
+  font-size: 0.85em;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--theme-fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.tp-pill {
-  font-size: 0.72em;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.tp-pill--ok { background: var(--theme-ok); color: var(--theme-bg); }
-.tp-pill--warn { background: var(--theme-warn); color: var(--theme-bg); }
-.tp-pill--danger { background: var(--theme-danger); color: var(--theme-bg); }
-
-/* Button row — non-interactive in the preview; shapes from bg alone. */
-.tp-actions {
+.tp-range {
   display: flex;
-  gap: 5px;
-  flex-wrap: wrap;
+  gap: 0.7em;
+  font-size: 0.68em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--theme-fg);
 }
-.tp-btn {
-  font-size: 0.82em;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--t-radius-sm);
+.tp-range-high { color: var(--theme-danger); }
+.tp-range-low,
+.tp-range-feels { color: var(--theme-fg); opacity: 0.85; }
+
+.tp-hero-icon {
   background: var(--theme-surface2);
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 0 0.8em;
+  margin: -0.85em -0.95em -0.85em 0;
+}
+.tp-hero-icon .ph-bold {
+  font-size: 3em;
   color: var(--theme-fg);
-  display: inline-block;
 }
-.tp-btn--primary {
-  background: var(--theme-accent);
-  color: var(--theme-bg);
-}
-.tp-btn--ghost {
-  background: transparent;
+.theme-preview--lg .tp-hero-icon .ph-bold { font-size: 4em; }
+
+.tp-rain-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--theme-surface);
   color: var(--theme-fg);
+  padding: 0.2em 0.6em;
+  font-size: 0.65em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
-.tp-btn--danger {
-  background: var(--theme-danger);
-  color: var(--theme-bg);
+
+/* --- 4-up stats row: humidity / wind / UV / rain --- */
+
+.tp-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
 }
+.tp-stat {
+  padding: 0.55em 0.75em;
+  display: grid;
+  gap: 0.15em;
+  min-width: 0;
+}
+.tp-stat-label {
+  font-size: 0.62em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tp-stat-value {
+  font-size: 1.15em;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.tp-stat-value small { font-size: 0.65em; font-weight: 700; margin-left: 0.15em; }
+
+.tp-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
+.tp-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
+.tp-stat--warn { background: var(--theme-warn); color: var(--theme-fg); }
+.tp-stat--danger { background: var(--theme-danger); color: var(--theme-bg); }
+
+/* --- sun row: accent / inverse pair --- */
+
+.tp-sun {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.tp-sun-cell {
+  padding: 0.4em 0.7em;
+  font-size: 0.7em;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+}
+.tp-sun-cell .ph { font-size: 1.2em; }
+.tp-sun-label { opacity: 0.85; }
+.tp-sun-time { margin-left: auto; font-weight: 800; white-space: nowrap; }
+.tp-sun-cell--accent { background: var(--theme-accent); color: var(--theme-bg); }
+.tp-sun-cell--inverse { background: var(--theme-fg); color: var(--theme-bg); }

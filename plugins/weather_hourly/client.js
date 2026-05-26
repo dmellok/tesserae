@@ -1,8 +1,7 @@
-// weather_hourly — Chart.js line of next N hours of temperature, plus
-// a rain-probability strip below. Flat layout — the cell is the card.
+// weather_hourly — Bauhaus hourly card. Inverted header strip with
+// place + window label + HI/LO chips on the right, Chart.js line on
+// the surface, rain probability blocks at the bottom (md/lg only).
 
-// Lazy + memoised Chart.js loader. The UMD bundle sets `window.Chart`;
-// subsequent widgets on the same page reuse the load.
 function loadChart() {
   if (window.Chart) return Promise.resolve(window.Chart);
   if (window.__tesseraeChartJs) return window.__tesseraeChartJs;
@@ -26,6 +25,9 @@ function hexToRgba(hex, alpha) {
 }
 
 function fmtTemp(v) { return v == null ? "—" : Math.round(v) + "°"; }
+function nowTime() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -44,7 +46,6 @@ function renderError(msg) {
   `;
 }
 
-// Pick label-step so x-axis ticks don't crowd: aim for ~6-8 visible labels.
 function labelEvery(points, size) {
   const target = size === "sm" ? 4 : size === "md" ? 6 : 8;
   return Math.max(1, Math.ceil(points.length / target));
@@ -63,7 +64,6 @@ export default async function render(shadow, ctx) {
   }
 
   const size = ctx.cell.size;
-  const showHeader = size !== "sm";
   const showRain = size === "md" || size === "lg";
 
   shadow.innerHTML = `
@@ -71,27 +71,35 @@ export default async function render(shadow, ctx) {
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_hourly/client.css">
     <div class="root size-${size}">
-      ${showHeader ? `
-      <header class="head">
-        <span class="head-title">
-          <i class="ph-bold ph-bold-chart-line-up" style="color: var(--theme-accent)" aria-hidden="true"></i>
-          <span>Next ${data.hours || 24} hours</span>
-          ${data.label ? `<span class="head-place">${escapeHtml(data.label)}</span>` : ""}
-        </span>
-        <span class="head-chips">
-          <span class="chip"><i class="ph-bold ph-bold-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.max)}</span>
-          <span class="chip"><i class="ph-bold ph-bold-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.min)}</span>
-        </span>
-      </header>` : ""}
-      <section class="chart-wrap">
+      <header class="wh-bar">
+        <span class="wh-mark" aria-hidden="true"></span>
+        <span class="wh-title">${data.label ? escapeHtml(data.label) + " · " : ""}Next ${data.hours || 24} hr</span>
+        <span class="wh-time">${nowTime()}</span>
+      </header>
+      <section class="wh-chips">
+        <div class="wh-chip wh-chip--high">
+          <span class="wh-chip-label">High</span>
+          <span class="wh-chip-value">${fmtTemp(data.max)}</span>
+        </div>
+        <div class="wh-chip wh-chip--low">
+          <span class="wh-chip-label">Low</span>
+          <span class="wh-chip-value">${fmtTemp(data.min)}</span>
+        </div>
+        ${data.current != null ? `
+        <div class="wh-chip wh-chip--current">
+          <span class="wh-chip-label">Now</span>
+          <span class="wh-chip-value">${fmtTemp(data.current)}</span>
+        </div>` : ""}
+      </section>
+      <section class="wh-chart">
         <canvas class="chart"></canvas>
       </section>
       ${showRain ? `
-      <section class="rain-strip" aria-label="Rain probability">
-        <span class="rain-label"><i class="ph-bold ph-bold-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>RAIN</span>
-        <span class="rain-bars">
+      <section class="wh-rain">
+        <span class="wh-rain-label">Rain</span>
+        <div class="wh-rain-bars">
           ${renderRainBars(points)}
-        </span>
+        </div>
       </section>` : ""}
     </div>
   `;
@@ -113,7 +121,11 @@ export default async function render(shadow, ctx) {
 
   const fontFamily =
     ctx.font?.family || 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-  const baseFont = { family: fontFamily, size: size === "lg" ? 13 : 11 };
+  const baseFont = {
+    family: fontFamily,
+    size: size === "lg" ? 13 : 11,
+    weight: "700",
+  };
 
   new Chart(canvas.getContext("2d"), {
     type: "line",
@@ -123,8 +135,8 @@ export default async function render(shadow, ctx) {
         {
           data: temps,
           borderColor: t.accent,
-          backgroundColor: hexToRgba(t.accent, 0.22),
-          borderWidth: 2.5,
+          backgroundColor: hexToRgba(t.accent, 0.16),
+          borderWidth: 3,
           tension: 0.35,
           fill: true,
           pointRadius: 0,
@@ -142,20 +154,18 @@ export default async function render(shadow, ctx) {
       },
       scales: {
         x: {
-          grid: { color: hexToRgba(t.divider, 0.4), drawTicks: false },
+          grid: { display: false },
           border: { display: false },
           ticks: {
             color: t.fgSoft,
             font: baseFont,
             autoSkip: false,
             maxRotation: 0,
-            callback(_value, index) {
-              return labels[index] || "";
-            },
+            callback(_value, index) { return labels[index] || ""; },
           },
         },
         y: {
-          grid: { color: hexToRgba(t.divider, 0.3), drawTicks: false },
+          grid: { display: false },
           border: { display: false },
           ticks: {
             color: t.fgSoft,
@@ -165,7 +175,7 @@ export default async function render(shadow, ctx) {
           },
         },
       },
-      layout: { padding: { top: 4, right: 6, bottom: 0, left: 0 } },
+      layout: { padding: { top: 8, right: 12, bottom: 0, left: 0 } },
     },
   });
 }
@@ -175,7 +185,7 @@ function renderRainBars(points) {
     .map((p) => {
       const pct = p.rain == null ? 0 : Math.max(0, Math.min(100, p.rain));
       const wet = pct >= 30;
-      return `<span class="rain-bar${wet ? " is-wet" : ""}" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
+      return `<span class="wh-rain-bar${wet ? " is-wet" : ""}" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
     })
     .join("");
 }

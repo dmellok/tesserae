@@ -1,6 +1,4 @@
-/* weather_forecast — 5 day-columns laid out left-to-right. Today's
-   column highlighted with surface2 + accent stripe; no nested cards
-   for the others. */
+/* weather_forecast — Bauhaus 5-day card. */
 
 :host {
   display: block;
@@ -15,137 +13,132 @@
   width: 100%;
   height: 100%;
   display: grid;
-  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
+  grid-template-rows: auto 1fr;
   box-sizing: border-box;
-  gap: clamp(4px, 0.8cqw, 10px);
+  overflow: hidden;
 }
 
-.size-sm { grid-template-rows: 1fr; }
-.size-md, .size-lg { grid-template-rows: auto 1fr; }
+/* --- header bar --- */
 
-/* ---------- header ---------- */
-
-.head {
-  display: flex;
+.wf-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.head-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: clamp(12px, 2.2cqw, 17px);
-  font-weight: 700;
-  color: var(--theme-fg);
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
 }
-.head-title .ph-bold { font-size: 1.4em; }
-.head-place {
-  font-size: clamp(11px, 2cqw, 14px);
-  color: var(--theme-fgSoft);
-  font-weight: 500;
+.wf-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-warn);
+}
+.wf-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
+.wf-time { white-space: nowrap; }
 
-/* ---------- day columns ---------- */
+/* --- 5 day columns --- */
 
-.days {
+.wf-days {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: clamp(2px, 0.6cqw, 6px);
-  padding-top: clamp(6px, 1.2cqw, 12px);
-  margin-top: clamp(2px, 0.4cqw, 4px);
   min-height: 0;
 }
 
-.day {
+.wf-day {
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto auto;
+  grid-template-rows: auto 1fr auto auto auto;
   align-items: center;
   justify-items: center;
-  gap: clamp(2px, 0.5cqw, 6px);
-  text-align: center;
-  padding: clamp(4px, 0.8cqw, 10px) 2px;
+  gap: clamp(2px, 0.6cqw, 8px);
+  padding: clamp(8px, 1.4cqw, 16px) clamp(4px, 0.8cqw, 10px);
   min-width: 0;
-  border-radius: clamp(4px, 0.8cqw, 10px);
+  overflow: hidden;
+  text-align: center;
 }
-.day.is-today {
-  background: var(--theme-surface2);
-}
+.wf-day--accent  { background: var(--theme-accent);  color: var(--theme-bg); }
+.wf-day--surface { background: var(--theme-surface); color: var(--theme-fg); }
+.wf-day--surface2 { background: var(--theme-surface2); color: var(--theme-fg); }
 
-.day-name {
-  font-size: clamp(10px, 1.8cqw, 14px);
-  font-weight: 700;
-  color: var(--theme-fgSoft);
+.wf-day-name {
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   white-space: nowrap;
+  opacity: 0.85;
 }
-.day.is-today .day-name {
-  color: var(--theme-accent);
-}
+.wf-day.is-today .wf-day-name { opacity: 1; }
 
-.day-icon {
-  font-size: clamp(32px, 8cqw, 72px);
+.wf-day-icon {
+  font-size: clamp(34px, 9cqw, 84px);
   line-height: 1;
-  /* colour set inline via tone */
 }
 
-.day-cond {
+.wf-day-cond {
   font-size: clamp(9px, 1.5cqw, 12px);
-  color: var(--theme-muted);
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
+  letter-spacing: 0.06em;
+  opacity: 0.75;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
 }
 
-.day-high {
-  font-size: clamp(16px, 3.2cqw, 24px);
-  font-weight: 700;
-  color: var(--theme-fg);
-  line-height: 1.1;
-  letter-spacing: -0.01em;
+.wf-day-temps {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: clamp(6px, 1.2cqw, 14px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
 }
-.day-low {
-  font-size: clamp(12px, 2.2cqw, 16px);
-  font-weight: 500;
-  color: var(--theme-fgSoft);
-  line-height: 1.1;
+.wf-day-high {
+  font-size: clamp(18px, 3.6cqw, 30px);
+}
+.wf-day-low {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  opacity: 0.65;
 }
 
-.day-rain {
+.wf-day-rain {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: clamp(10px, 1.8cqw, 13px);
-  font-weight: 600;
-  color: var(--theme-muted);
-  margin-top: 2px;
+  gap: 4px;
+  font-size: clamp(10px, 1.7cqw, 13px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.6;
 }
-.day-rain .ph-bold { font-size: 1.1em; opacity: 0.55; }
-.day-rain.is-wet {
-  color: var(--theme-accent);
-}
-.day-rain.is-wet .ph-bold { opacity: 1; }
+.wf-day-rain .ph-bold { font-size: 1.1em; }
+.wf-day-rain.is-wet { opacity: 1; }
 
-/* sm: skip the condition word, shrink icons. */
-.size-sm .day-cond { display: none; }
-.size-sm .day-icon { font-size: clamp(26px, 9cqw, 44px); }
-.size-sm .day { padding: 2px; gap: 1px; }
-.size-sm .day-name { font-size: 9px; }
+/* --- size adaptations --- */
 
-/* ---------- error state ---------- */
+.root.size-sm .wf-day-cond { display: none; }
+.root.size-sm .wf-day { padding: 6px 4px; gap: 4px; }
+.root.size-sm .wf-day-icon { font-size: clamp(28px, 10cqw, 48px); }
+.root.size-sm .wf-day-name { font-size: 10px; }
+
+/* --- error state --- */
 
 .root.error {
-  align-content: center;
-  justify-items: center;
+  display: grid;
+  place-items: center;
   text-align: center;
   color: var(--theme-danger);
   padding: 16px;

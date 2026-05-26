@@ -1,5 +1,7 @@
-// weather_forecast — 5 days as columns of (label, icon, high, low, rain).
-// Flat layout; today's column gets a subtle highlight.
+// weather_forecast — Bauhaus 5-day card. Inverted header strip, then
+// 5 colour-blocked day columns. Today's column takes the accent block;
+// remaining days alternate between surface and surface2 so the row
+// reads as a clear primary-coloured rhythm without any drawn lines.
 
 const WMO = {
   0:  ["sun",             "Clear"],
@@ -31,26 +33,17 @@ const WMO = {
   96: ["cloud-lightning", "Storm"],
   99: ["cloud-lightning", "Storm"],
 };
-
 const DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function describe(code) { return WMO[code] || ["cloud", "—"]; }
-
-function conditionTone(code) {
-  if (code === 0 || code === 1) return "warn";              // clear
-  if (code === 2) return "accent";                          // partly cloudy
-  if (code === 3 || code === 45 || code === 48) return "muted"; // overcast / fog
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return "accent"; // rain
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "fgSoft"; // snow
-  if (code >= 95) return "danger";                          // storm
-  return "accent";
-}
-
 function fmtTemp(v) { return v == null ? "—" : Math.round(v) + "°"; }
 function dayLabel(idx, position) {
   if (position === 0) return "Today";
-  if (position === 1) return "Tomorrow";
+  if (position === 1) return "Tom";
   return idx >= 0 && idx < 7 ? DAY_NAMES[idx] : "—";
+}
+function nowTime() {
+  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 function escapeHtml(s) {
@@ -70,25 +63,33 @@ function renderError(msg) {
   `;
 }
 
-function dayColumn(day, position, showRain) {
+// Day-block colour: today gets the accent, the rest alternate between
+// surface and surface2 so the row has a Bauhaus colour-block rhythm.
+function dayTone(position) {
+  if (position === 0) return "accent";
+  return position % 2 === 1 ? "surface" : "surface2";
+}
+
+function dayBlock(day, position, showRain) {
   const [icon, label] = describe(day.code);
-  const tone = conditionTone(day.code);
-  const isToday = position === 0;
+  const tone = dayTone(position);
   const rainPct = day.rain == null ? null : Math.round(day.rain);
   const rainWet = rainPct != null && rainPct >= 30;
   return `
-    <div class="day${isToday ? " is-today" : ""}">
-      <div class="day-name">${escapeHtml(dayLabel(day.weekday, position))}</div>
-      <i class="ph-bold ph-bold-${icon} day-icon" style="color: var(--theme-${tone})" aria-hidden="true"></i>
-      <div class="day-cond">${escapeHtml(label)}</div>
-      <div class="day-high">${fmtTemp(day.high)}</div>
-      <div class="day-low">${fmtTemp(day.low)}</div>
-      ${showRain ? `
-      <div class="day-rain${rainWet ? " is-wet" : ""}">
+    <article class="wf-day wf-day--${tone}${position === 0 ? " is-today" : ""}">
+      <div class="wf-day-name">${escapeHtml(dayLabel(day.weekday, position))}</div>
+      <i class="ph-bold ph-bold-${icon} wf-day-icon" aria-hidden="true"></i>
+      <div class="wf-day-cond">${escapeHtml(label)}</div>
+      <div class="wf-day-temps">
+        <span class="wf-day-high">${fmtTemp(day.high)}</span>
+        <span class="wf-day-low">${fmtTemp(day.low)}</span>
+      </div>
+      ${showRain && rainPct != null ? `
+      <div class="wf-day-rain${rainWet ? " is-wet" : ""}">
         <i class="ph-bold ph-bold-drop" aria-hidden="true"></i>
-        <span>${rainPct == null ? "—" : rainPct + "%"}</span>
+        <span>${rainPct}%</span>
       </div>` : ""}
-    </div>
+    </article>
   `;
 }
 
@@ -103,8 +104,8 @@ export default async function render(shadow, ctx) {
     shadow.innerHTML = renderError("no forecast data");
     return;
   }
+
   const size = ctx.cell.size;
-  const showHeader = size !== "sm";
   const showRain = size === "md" || size === "lg";
 
   shadow.innerHTML = `
@@ -112,16 +113,13 @@ export default async function render(shadow, ctx) {
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_forecast/client.css">
     <div class="root size-${size}">
-      ${showHeader ? `
-      <header class="head">
-        <span class="head-title">
-          <i class="ph-bold ph-bold-calendar-dots" style="color: var(--theme-accent)" aria-hidden="true"></i>
-          <span>5-day forecast</span>
-        </span>
-        ${data.label ? `<span class="head-place">${escapeHtml(data.label)}</span>` : ""}
-      </header>` : ""}
-      <section class="days">
-        ${days.map((d, i) => dayColumn(d, i, showRain)).join("")}
+      <header class="wf-bar">
+        <span class="wf-mark" aria-hidden="true"></span>
+        <span class="wf-title">${data.label ? escapeHtml(data.label) + " · " : ""}5-day forecast</span>
+        <span class="wf-time">${nowTime()}</span>
+      </header>
+      <section class="wf-days">
+        ${days.map((d, i) => dayBlock(d, i, showRain)).join("")}
       </section>
     </div>
   `;

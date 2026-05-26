@@ -1,5 +1,4 @@
-/* weather_now — flat layout. Big condition icon, colour-tinted stats.
-   The cell is the card; sections separate with thin rules + spacing. */
+/* weather_now — Bauhaus weather card. */
 
 :host {
   display: block;
@@ -15,177 +14,211 @@
   height: 100%;
   display: grid;
   grid-template-rows: auto 1fr auto auto;
-  padding: clamp(8px, 1.4cqw, 14px) clamp(10px, 1.8cqw, 18px);
   box-sizing: border-box;
-  gap: clamp(4px, 0.8cqw, 10px);
+  overflow: hidden;
 }
+.root.size-xs,
+.root.size-sm { grid-template-rows: auto 1fr auto; }
 
-/* ---------- header (place) ---------- */
+/* --- header bar: inverted strip + warn-coloured mark + place + time --- */
 
-.head {
-  display: flex;
+.wn-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  min-height: 0;
-}
-.place {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: clamp(10px, 1.7cqw, 13px);
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-weight: 700;
-  color: var(--theme-fgSoft);
+  letter-spacing: 0.12em;
 }
-.place .ph { color: var(--theme-accent); font-size: 1.1em; }
+.wn-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-warn);
+}
+.wn-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wn-time { white-space: nowrap; }
 
-/* ---------- now (icon + temp + condition + range) ---------- */
+/* --- hero: temp + condition + cloud icon panel --- */
 
-.now {
+.wn-hero {
+  position: relative;
+  background: var(--theme-surface);
+  padding: clamp(10px, 2cqw, 22px) clamp(12px, 2.4cqw, 26px);
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  gap: clamp(10px, 2.4cqw, 22px);
+  gap: clamp(8px, 1.6cqw, 18px);
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
-.now-icon {
-  font-size: clamp(64px, 18cqw, 144px);
-  line-height: 1;
-  /* colour set inline via condition tone */
-}
-.now-body { min-width: 0; }
-.now-temp {
-  font-size: clamp(42px, 13cqw, 104px);
-  line-height: 1;
-  font-weight: 700;
-  color: var(--theme-fg);
-  letter-spacing: -0.025em;
-}
-.now-cond {
-  font-size: clamp(13px, 2.4cqw, 20px);
-  font-weight: 500;
-  color: var(--theme-fgSoft);
-  margin-top: clamp(2px, 0.6cqw, 6px);
-}
-.now-range {
-  display: flex;
-  flex-wrap: wrap;
-  gap: clamp(8px, 1.8cqw, 16px);
-  font-size: clamp(12px, 2.2cqw, 16px);
-  font-weight: 600;
-  margin-top: clamp(4px, 0.8cqw, 8px);
-}
-.now-range span { display: inline-flex; align-items: center; gap: 3px; }
-.now-range .ph-bold { font-size: 1em; }
-
-/* ---------- stats (4 columns) ---------- */
-
-.stats {
+.wn-hero-text {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: clamp(6px, 1.4cqw, 14px);
-  padding-top: clamp(8px, 1.4cqw, 14px);
-  margin-top: clamp(2px, 0.4cqw, 4px);
-}
-.stat {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: clamp(4px, 1cqw, 10px);
+  gap: clamp(4px, 0.8cqw, 8px);
   min-width: 0;
 }
-.stat-icon {
-  font-size: clamp(22px, 4.6cqw, 36px);
-  line-height: 1;
-  /* colour set inline via tone */
-}
-.stat-body { min-width: 0; }
-.stat-label {
-  font-size: clamp(9px, 1.6cqw, 11px);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700;
-  color: var(--theme-muted);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-.stat-value {
-  font-size: clamp(15px, 3cqw, 24px);
-  font-weight: 700;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  /* colour set inline via tone, or inherits theme-fg */
-}
-.stat-sub {
-  font-size: clamp(9px, 1.6cqw, 11px);
-  color: var(--theme-fgSoft);
-  line-height: 1.2;
-  margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* ---------- sun row ---------- */
-
-.sun {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  gap: clamp(10px, 2.4cqw, 22px);
-  padding-top: clamp(8px, 1.4cqw, 14px);
-  margin-top: clamp(2px, 0.4cqw, 4px);
-}
-.sun-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: clamp(14px, 2.6cqw, 20px);
-  font-weight: 600;
+.wn-temp {
+  font-size: clamp(48px, 14cqw, 132px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
   color: var(--theme-fg);
 }
-.sun-row .ph-duotone {
-  color: var(--theme-accent);
-  font-size: 1.45em;
+.wn-cond {
+  font-size: clamp(13px, 2.4cqw, 22px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--theme-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wn-range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 1.4cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.wn-range-high { color: var(--theme-danger); }
+.wn-range-low,
+.wn-range-feels { color: var(--theme-fg); }
+
+.wn-hero-icon {
+  background: var(--theme-surface2);
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  padding: 0 clamp(12px, 2.4cqw, 28px);
+  margin: calc(clamp(10px, 2cqw, 22px) * -1) calc(clamp(12px, 2.4cqw, 26px) * -1)
+          calc(clamp(10px, 2cqw, 22px) * -1) 0;
+}
+.wn-hero-icon .ph-bold {
+  font-size: clamp(56px, 18cqw, 180px);
+  color: var(--theme-fg);
+  line-height: 1;
 }
 
-/* ---------- size adaptations ---------- */
-
-/* xs: just the condition icon + temp. */
-.size-xs {
-  grid-template-rows: auto 1fr;
-  padding: 8px 10px;
-  gap: 4px;
+.wn-rain-tag {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--theme-surface);
+  color: var(--theme-fg);
+  padding: clamp(3px, 0.6cqw, 6px) clamp(8px, 1.4cqw, 14px);
+  font-size: clamp(10px, 1.6cqw, 13px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
-.size-xs .stats, .size-xs .sun { display: none; }
-.size-xs .now-range { display: none; }
-.size-xs .now-icon { font-size: clamp(44px, 22cqw, 80px); }
-.size-xs .now-temp { font-size: clamp(34px, 16cqw, 64px); }
-.size-xs .now-cond { display: none; }
-.size-xs .place { font-size: 9px; }
 
-/* sm: head + now + range, no stats/sun. */
-.size-sm {
-  grid-template-rows: auto 1fr;
+/* --- four-up stats row --- */
+
+.wn-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
 }
-.size-sm .stats, .size-sm .sun { display: none; }
+.wn-stat {
+  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.8cqw, 18px);
+  display: grid;
+  gap: clamp(2px, 0.4cqw, 6px);
+  min-width: 0;
+  overflow: hidden;
+}
+.wn-stat-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wn-stat-value {
+  font-size: clamp(16px, 3cqw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.wn-stat-value small {
+  font-size: 0.6em;
+  font-weight: 700;
+  margin-left: 0.15em;
+  opacity: 0.85;
+}
 
-/* md / lg: full layout — same template, clamp() handles sizing. */
+.wn-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
+.wn-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
+.wn-stat--warn { background: var(--theme-warn); color: var(--theme-fg); }
+.wn-stat--danger { background: var(--theme-danger); color: var(--theme-bg); }
 
-/* ---------- error state ---------- */
+/* --- sunrise/sunset row (md, lg only) --- */
+
+.wn-sun {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.wn-sun-cell {
+  padding: clamp(5px, 1cqw, 10px) clamp(10px, 1.8cqw, 18px);
+  font-size: clamp(11px, 1.9cqw, 15px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1cqw, 10px);
+  min-width: 0;
+}
+.wn-sun-cell .ph { font-size: 1.3em; }
+.wn-sun-label { opacity: 0.85; }
+.wn-sun-time { margin-left: auto; font-weight: 800; }
+.wn-sun-cell--accent { background: var(--theme-accent); color: var(--theme-bg); }
+.wn-sun-cell--inverse { background: var(--theme-fg); color: var(--theme-bg); }
+
+/* --- size adaptations --- */
+
+/* xs: trim everything that doesn't fit — drop the rain tag, drop the
+   range line, hide the wind/uv labels inside their tiny blocks. */
+.root.size-xs .wn-rain-tag { display: none; }
+.root.size-xs .wn-range { display: none; }
+.root.size-xs .wn-hero { padding: 8px 10px; gap: 6px; }
+.root.size-xs .wn-hero-icon { padding: 0 8px; margin: -8px -10px -8px 0; }
+.root.size-xs .wn-temp { font-size: clamp(34px, 18cqw, 60px); }
+.root.size-xs .wn-cond { font-size: 10px; }
+.root.size-xs .wn-stat { padding: 4px 6px; }
+.root.size-xs .wn-stat-label { font-size: 8px; }
+.root.size-xs .wn-stat-value { font-size: 14px; }
+.root.size-xs .wn-stat-value small { display: none; }
+.root.size-xs .wn-bar { font-size: 8px; padding: 3px 6px; }
+
+/* sm: keep range + rain tag, no sun row. Stats stay 4-up. */
+.root.size-sm .wn-temp { font-size: clamp(40px, 14cqw, 64px); }
+
+/* --- error state --- */
 
 .root.error {
-  align-content: center;
-  justify-items: center;
+  display: grid;
+  place-items: center;
   text-align: center;
   color: var(--theme-danger);
   padding: 16px;
   gap: 8px;
-  grid-template-rows: auto auto;
 }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; }
