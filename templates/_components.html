@@ -213,6 +213,82 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{%- macro theme_preview(palette, variant='lg') -%}
+{#- Mini admin-shell mock for the themes page. Renders entirely off
+   `--theme-*` custom properties set inline below, so the same DOM
+   reads as whichever palette is passed. The builder swaps these
+   inline values via JS for live updates; the gallery cards just
+   render the saved values. -#}
+{%- set tokens = ['bg', 'surface', 'surface2', 'fg', 'fgSoft', 'muted',
+                  'accent', 'accentSoft', 'divider', 'danger', 'warn', 'ok'] -%}
+<div class="theme-preview theme-preview--{{ variant }}" data-theme-preview style="
+  {%- for t in tokens -%}
+    --theme-{{ t }}: {{ palette.get(t, '#000000') }};
+  {%- endfor -%}
+">
+  <header class="tp-head">
+    <span class="tp-brand">
+      <i class="ph-fill ph-fill-grid-four" aria-hidden="true"></i>
+      <span>Tesserae</span>
+    </span>
+    <span class="tp-tag">Preview</span>
+  </header>
+  <div class="tp-body">
+    <section class="tp-stats">
+      <div class="tp-stat">
+        <i class="ph-fill ph-fill-thermometer-simple" aria-hidden="true"></i>
+        <div class="tp-stat-text">
+          <span class="tp-stat-label">Temp</span>
+          <span class="tp-stat-value">25°</span>
+        </div>
+      </div>
+      <div class="tp-stat">
+        <i class="ph-fill ph-fill-drop-half" aria-hidden="true"></i>
+        <div class="tp-stat-text">
+          <span class="tp-stat-label">Humid</span>
+          <span class="tp-stat-value">65%</span>
+        </div>
+      </div>
+      <div class="tp-stat">
+        <i class="ph-fill ph-fill-wind" aria-hidden="true"></i>
+        <div class="tp-stat-text">
+          <span class="tp-stat-label">Wind</span>
+          <span class="tp-stat-value">12</span>
+        </div>
+      </div>
+    </section>
+    <section class="tp-chart" aria-hidden="true">
+      <svg viewBox="0 0 200 50" preserveAspectRatio="none">
+        <path class="tp-chart-fill" d="M0,40 L20,32 L40,28 L60,22 L80,18 L100,14 L120,18 L140,12 L160,8 L180,12 L200,16 L200,50 L0,50 Z" />
+        <polyline class="tp-chart-line" points="0,40 20,32 40,28 60,22 80,18 100,14 120,18 140,12 160,8 180,12 200,16" />
+      </svg>
+    </section>
+    <section class="tp-list">
+      <div class="tp-list-row">
+        <i class="ph-fill ph-fill-check-circle tp-li-bullet tp-li-ok" aria-hidden="true"></i>
+        <span class="tp-li-text">Push pipeline online</span>
+        <span class="tp-pill tp-pill--ok">OK</span>
+      </div>
+      <div class="tp-list-row">
+        <i class="ph-fill ph-fill-warning-circle tp-li-bullet tp-li-warn" aria-hidden="true"></i>
+        <span class="tp-li-text">Battery getting low</span>
+        <span class="tp-pill tp-pill--warn">Warn</span>
+      </div>
+      <div class="tp-list-row">
+        <i class="ph-fill ph-fill-x-circle tp-li-bullet tp-li-danger" aria-hidden="true"></i>
+        <span class="tp-li-text">Broker disconnected</span>
+        <span class="tp-pill tp-pill--danger">!</span>
+      </div>
+    </section>
+    <section class="tp-actions">
+      <span class="tp-btn tp-btn--primary">Save</span>
+      <span class="tp-btn tp-btn--ghost">Cancel</span>
+      <span class="tp-btn tp-btn--danger">Delete</span>
+    </section>
+  </div>
+</div>
+{%- endmacro -%}
+
 {#- Dispatch helper: pick the right macro based on a field-spec dict
    (the {name, type, label, default, choices, min, max, step, unit, help}
    shape used by plugin / renderer / device manifests). Used by the

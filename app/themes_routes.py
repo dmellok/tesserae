@@ -105,7 +105,17 @@ def index() -> str:
         existing = _user_store().get(edit_id)
         if existing is not None:
             edit_theme = existing
-    blank = UserTheme(id="", name="", mode="light", palette={t: "#000000" for t in PALETTE_TOKENS})
+    # Seed the "New theme" form with the default theme's palette so the
+    # live preview renders something legible from frame zero — a freshly
+    # opened builder shows a working theme the user can tweak, rather
+    # than an all-black void.
+    default_theme = _registry().get_theme("default")
+    blank_palette: dict[str, str] = (
+        dict(default_theme.palette)
+        if default_theme is not None
+        else {t: "#000000" for t in PALETTE_TOKENS}
+    )
+    blank = UserTheme(id="", name="", mode="light", palette=blank_palette)
     return render_template(
         "themes.html",
         themes=themes,

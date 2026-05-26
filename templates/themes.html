@@ -1,53 +1,79 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button %}
+{% from "_components.html" import card_head, button, theme_preview %}
 {% block title %}Themes — Tesserae{% endblock %}
 
-{% macro swatch_row(palette, tokens) %}
-<div class="swatch-row">
-  {% for t in tokens %}
-  <span class="swatch" style="background:{{ palette[t]|default('#000000') }};" title="{{ t }}: {{ palette[t] }}"></span>
-  {% endfor %}
+{# Sectioned palette: groups the 12 tokens by role so the builder form
+   doesn't dump all 12 colour pickers at once. Each (title, icon, blurb,
+   tokens) tuple becomes a fieldset. #}
+{% set PALETTE_SECTIONS = [
+  ('Neutrals & surfaces', 'square-half',
+   'Page background, card surfaces, text, dividers. Set these first — every other token reads in relation to them.',
+   ['bg', 'surface', 'surface2', 'divider', 'fg', 'fgSoft', 'muted']),
+  ('Accent', 'sparkle',
+   'Brand highlight + low-contrast fill. Used by icons, links, chart strokes, primary buttons.',
+   ['accent', 'accentSoft']),
+  ('Semantic', 'traffic-cone',
+   'Success, caution, and error tones. Pills, status dots, alarm states.',
+   ['ok', 'warn', 'danger']),
+] %}
+
+{% macro palette_field(theme, token) %}
+<div class="palette-field">
+  <label for="tf-{{ theme.id or 'new' }}-{{ token }}">{{ token }}</label>
+  <div class="palette-input">
+    <input type="color"
+           id="tf-{{ theme.id or 'new' }}-{{ token }}"
+           name="{{ token }}"
+           value="{{ theme.palette.get(token, '#000000') }}"
+           data-token="{{ token }}">
+    <input type="text"
+           name="{{ token }}_hex"
+           value="{{ theme.palette.get(token, '#000000') }}"
+           data-pair="{{ token }}"
+           pattern="^#[0-9a-fA-F]{6}$"
+           class="palette-hex"
+           aria-label="{{ token }} hex value">
+  </div>
 </div>
 {% endmacro %}
 
 {% macro theme_form(theme, action, is_edit) %}
-<form method="post" action="{{ action }}" class="form theme-form">
-  <div class="field-grid">
-    <div class="field">
-      <label for="tf-{{ theme.id or 'new' }}-name">Name</label>
-      <input type="text" id="tf-{{ theme.id or 'new' }}-name" name="name" value="{{ theme.name }}" required>
-    </div>
-    <div class="field">
-      <label for="tf-{{ theme.id or 'new' }}-mode">Mode</label>
-      <select id="tf-{{ theme.id or 'new' }}-mode" name="mode">
-        {% for m in modes %}
-        <option value="{{ m }}" {% if theme.mode == m %}selected{% endif %}>{{ m|capitalize }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-
-  <div class="palette-grid">
-    {% for t in palette_tokens %}
-    <div class="palette-field">
-      <label for="tf-{{ theme.id or 'new' }}-{{ t }}">{{ t }}</label>
-      <div class="palette-input">
-        <input type="color"
-               id="tf-{{ theme.id or 'new' }}-{{ t }}"
-               name="{{ t }}"
-               value="{{ theme.palette.get(t, '#000000') }}"
-               data-token="{{ t }}">
-        <input type="text"
-               name="{{ t }}_hex"
-               value="{{ theme.palette.get(t, '#000000') }}"
-               data-pair="{{ t }}"
-               pattern="^#[0-9a-fA-F]{6}$"
-               class="palette-hex"
-               aria-label="{{ t }} hex value">
+<form method="post" action="{{ action }}" class="form theme-form" data-theme-form>
+  <fieldset class="form-group">
+    <legend>
+      <i class="ph ph-identification-card" aria-hidden="true"></i>
+      <span>Identity</span>
+    </legend>
+    <div class="field-grid">
+      <div class="field">
+        <label for="tf-{{ theme.id or 'new' }}-name">Name</label>
+        <input type="text" id="tf-{{ theme.id or 'new' }}-name" name="name" value="{{ theme.name }}" required autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="tf-{{ theme.id or 'new' }}-mode">Mode</label>
+        <select id="tf-{{ theme.id or 'new' }}-mode" name="mode">
+          {% for m in modes %}
+          <option value="{{ m }}" {% if theme.mode == m %}selected{% endif %}>{{ m|capitalize }}</option>
+          {% endfor %}
+        </select>
       </div>
     </div>
-    {% endfor %}
-  </div>
+  </fieldset>
+
+  {% for title, icon_name, blurb, tokens in PALETTE_SECTIONS %}
+  <fieldset class="form-group">
+    <legend>
+      <i class="ph ph-{{ icon_name }}" aria-hidden="true"></i>
+      <span>{{ title }}</span>
+    </legend>
+    {% if blurb %}<p class="legend-blurb">{{ blurb }}</p>{% endif %}
+    <div class="palette-grid">
+      {% for t in tokens %}
+        {{ palette_field(theme, t) }}
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
 
   <div class="actions">
     {{ button('Save changes' if is_edit else 'Create theme', icon='floppy-disk' if is_edit else 'plus') }}
@@ -56,74 +82,140 @@
 </form>
 {% endmacro %}
 
+{% set user_themes = themes | selectattr('is_user') | list %}
+{% set builtin_themes = themes | rejectattr('is_user') | list %}
+
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-palette"></i> Themes</h1>
   <p class="lede">
-    {{ themes|length }} themes loaded — both built-ins from
-    <code>plugins/themes_core/plugin.json</code> and any user themes
-    from <code>data/plugins/themes_core/user.json</code>. The
-    <strong>default</strong> theme applies when no page or cell picks one.
+    {{ themes|length }} themes loaded — built-ins ship with the app, user themes live in
+    <code>data/plugins/themes_core/user.json</code>. The <strong>default</strong> theme
+    applies when no page or cell picks one.
   </p>
 </header>
 
-<section class="card">
-  {{ card_head('Edit theme' if edit_theme else 'New theme',
-               icon_name='pencil-simple' if edit_theme else 'plus-circle',
-               blurb=None if edit_theme else 'Pick 12 colours, save. The Duplicate button on a built-in theme is the easiest way to start from something working.') }}
-  {% if edit_theme %}
-    {{ theme_form(edit_theme, url_for('themes.update', theme_id=edit_theme.id), true) }}
-  {% else %}
-    {{ theme_form(blank_theme, url_for('themes.create'), false) }}
-  {% endif %}
+{# ---- Builder: form left, sticky live preview right ---- #}
+<section class="card builder-card">
+  {{ card_head(
+       'Edit theme' if edit_theme else 'New theme',
+       icon_name='pencil-simple' if edit_theme else 'plus-circle',
+       blurb=('Live preview on the right updates as you change colours.' if not edit_theme else None)
+     ) }}
+  <div class="builder-grid">
+    <div class="builder-form">
+      {% if edit_theme %}
+        {{ theme_form(edit_theme, url_for('themes.update', theme_id=edit_theme.id), true) }}
+      {% else %}
+        {{ theme_form(blank_theme, url_for('themes.create'), false) }}
+      {% endif %}
+    </div>
+    <aside class="builder-preview">
+      <div class="builder-preview-sticky">
+        <div class="builder-preview-label">Live preview</div>
+        {{ theme_preview((edit_theme or blank_theme).palette, variant='lg') }}
+      </div>
+    </aside>
+  </div>
 </section>
 
+{# ---- Your themes (user) ---- #}
+{% if user_themes %}
 <section class="card">
-  {{ card_head('Loaded themes', icon_name='swatches') }}
-  <ul class="theme-list">
-    {% for theme in themes %}
-    <li class="theme-card">
-      <div class="theme-card-head">
-        <span class="theme-name">{{ theme.name }}</span>
+  {{ card_head('Your themes (' ~ user_themes|length ~ ')', icon_name='star') }}
+  <div class="theme-grid">
+    {% for theme in user_themes %}
+    <article class="theme-card is-user">
+      <a class="theme-card-link" href="{{ url_for('themes.index', edit=theme.id) }}" title="Edit {{ theme.name }}">
+        {{ theme_preview(theme.palette, variant='sm') }}
+      </a>
+      <div class="theme-card-meta">
+        <div class="theme-card-title">
+          <span class="theme-name">{{ theme.name }}</span>
+          <span class="pill is-accent">user</span>
+          {% if theme.mode %}<span class="pill">{{ theme.mode }}</span>{% endif %}
+        </div>
         <code class="theme-id">{{ theme.id }}</code>
-        {% if theme.is_user %}<span class="pill is-accent">user</span>{% else %}<span class="pill">built-in</span>{% endif %}
-        {% if theme.mode %}<span class="pill">{{ theme.mode }}</span>{% endif %}
+        <div class="theme-actions">
+          <a class="ghost-link" href="{{ url_for('themes.index', edit=theme.id) }}">
+            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+          </a>
+          <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline" onsubmit="return confirm('Delete this theme?');">
+            <button type="submit" class="ghost danger" title="Delete">
+              <i class="ph ph-trash" aria-hidden="true"></i>
+            </button>
+          </form>
+        </div>
       </div>
-      {{ swatch_row(theme.palette, palette_tokens) }}
-      <div class="theme-actions">
-        {% if theme.is_user %}
-        <a class="ghost-link" href="{{ url_for('themes.index', edit=theme.id) }}">
-          <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
-        </a>
-        <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline" onsubmit="return confirm('Delete this theme?');">
-          <button type="submit" class="ghost danger" title="Delete">
-            <i class="ph ph-trash" aria-hidden="true"></i>
-          </button>
-        </form>
-        {% else %}
-        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
-          <button type="submit" class="ghost">
-            <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
-          </button>
-        </form>
-        {% endif %}
-      </div>
-    </li>
+    </article>
     {% endfor %}
-  </ul>
+  </div>
+</section>
+{% endif %}
+
+{# ---- Built-ins ---- #}
+<section class="card">
+  {{ card_head('Built-in themes (' ~ builtin_themes|length ~ ')',
+               icon_name='swatches',
+               blurb='Read-only. Duplicate one to make a user theme you can edit.') }}
+  <div class="theme-grid">
+    {% for theme in builtin_themes %}
+    <article class="theme-card">
+      <div class="theme-card-preview">
+        {{ theme_preview(theme.palette, variant='sm') }}
+      </div>
+      <div class="theme-card-meta">
+        <div class="theme-card-title">
+          <span class="theme-name">{{ theme.name }}</span>
+          <span class="pill">built-in</span>
+          {% if theme.mode %}<span class="pill">{{ theme.mode }}</span>{% endif %}
+        </div>
+        <code class="theme-id">{{ theme.id }}</code>
+        <div class="theme-actions">
+          <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
+            <button type="submit" class="ghost">
+              <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate to edit</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
 </section>
 
 <script>
-  // Keep the color picker and the hex text input in sync — typing a hex
-  // updates the swatch, and dragging the swatch updates the hex.
-  document.querySelectorAll('.palette-field').forEach((field) => {
-    const color = field.querySelector('input[type="color"]');
-    const hex = field.querySelector('.palette-hex');
-    if (!color || !hex) return;
-    color.addEventListener('input', () => { hex.value = color.value; });
-    hex.addEventListener('change', () => {
-      if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) color.value = hex.value;
+  // Two-way sync between each <input type="color"> and its hex-text
+  // partner, plus live-update the builder preview's --theme-* custom
+  // properties as the user types/drags. Uses 'input' on both sides
+  // (instead of 'change' on hex) so submitting without tabbing out
+  // still POSTs the right value.
+  (function () {
+    const form = document.querySelector('[data-theme-form]');
+    const preview = document.querySelector('.builder-preview [data-theme-preview]');
+    if (!form) return;
+
+    function applyToken(token, value) {
+      if (!/^#[0-9a-fA-F]{6}$/.test(value)) return;
+      if (preview) preview.style.setProperty('--theme-' + token, value);
+    }
+
+    form.querySelectorAll('input[type="color"]').forEach((picker) => {
+      const token = picker.dataset.token;
+      const hex = form.querySelector('input[data-pair="' + token + '"]');
+      picker.addEventListener('input', () => {
+        if (hex) hex.value = picker.value;
+        applyToken(token, picker.value);
+      });
+      if (hex) {
+        hex.addEventListener('input', () => {
+          if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) {
+            picker.value = hex.value;
+            applyToken(token, hex.value);
+          }
+        });
+      }
     });
-  });
+  })();
 </script>
 {% endblock %}
