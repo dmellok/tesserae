@@ -28,16 +28,36 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
+    """Pack a composition PNG into the panel's native landscape 4-bpp buffer.
+
+    The Inky / Waveshare E6 panels are always landscape-native (the
+    pixel grid is W>H). Even when the user wants their dashboard
+    displayed portrait, the buffer the firmware reads back has to be
+    laid out in landscape — same byte count either way, but a portrait
+    layout has the wrong row stride and the panel prints rotated +
+    ghosted scanlines.
+
+    So: take the composition (whatever orientation it arrived in),
+    rotate 90° CW if it's portrait, and always pack at the panel's
+    native landscape dimensions.
+    """
     img = Image.open(io.BytesIO(png_bytes))
-    if img.size != (panel.w, panel.h):
-        # The composer hands us panel-sized output; the Send page (M7) feeds
-        # arbitrary uploads through here. Fit before packing — the firmware
-        # rejects any buffer size that isn't exactly panel.w * panel.h * 4bpp.
-        img = fit_to_panel(img, target_w=panel.w, target_h=panel.h, scale="fit", bg="white")
+    # Native landscape dims regardless of which way the user has the
+    # panel oriented in settings.
+    native_w = max(panel.w, panel.h)
+    native_h = min(panel.w, panel.h)
+    if img.size[0] < img.size[1]:
+        # Portrait input → rotate 90° CW so the top of the rendered
+        # composition lines up with the panel's right edge (the
+        # conventional "portrait mount = ribbon-cable-down" wiring).
+        img = img.rotate(-90, expand=True)
+    if img.size != (native_w, native_h):
+        # Send-page uploads aren't panel-sized; fit before packing.
+        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")
     return pack_to_panel_bin(
         img,
-        width=panel.w,
-        height=panel.h,
+        width=native_w,
+        height=native_h,
         dither=_setting(settings, "dither"),
         saturation=float(_setting(settings, "saturation")),
         contrast=float(_setting(settings, "contrast")),
