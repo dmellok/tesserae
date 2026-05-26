@@ -64,11 +64,36 @@
     });
   }
 
+  // Numeric field paired with a preset dropdown + "Custom…" option that
+  // reveals the underlying number input. The number input always carries
+  // the field's name — submission picks up whichever value the user
+  // last touched.
+  function attachPresetNumbers(root) {
+    root.querySelectorAll("[data-preset-field]:not([data-preset-bound])").forEach((field) => {
+      const select = field.querySelector("[data-preset-select]");
+      const custom = field.querySelector("[data-preset-custom]");
+      if (!select || !custom) return;
+      const sync = (focusCustom) => {
+        if (select.value === "__custom__") {
+          custom.hidden = false;
+          if (focusCustom) custom.focus();
+        } else {
+          custom.value = select.value;
+          custom.hidden = true;
+        }
+      };
+      select.addEventListener("change", () => sync(true));
+      sync(false);
+      field.dataset.presetBound = "1";
+    });
+  }
+
   // Initial attach on DOMContentLoaded; re-attach when the editor reloads
   // its preview iframe (a side-effect of a save).
   function init() {
     attachSliders(document);
     attachPreviewFit(document);
+    attachPresetNumbers(document);
   }
 
   if (document.readyState === "loading") {
@@ -80,5 +105,5 @@
   // Observe future additions (the page editor swaps cell forms in/out on
   // plugin change). Skipping mutation observer for now since editor.js
   // currently full-reloads on plugin change — re-init isn't needed mid-page.
-  window.tesseraeComponents = { attachSliders, attachPreviewFit, fitPreview };
+  window.tesseraeComponents = { attachSliders, attachPreviewFit, attachPresetNumbers, fitPreview };
 })();

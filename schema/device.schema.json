@@ -49,7 +49,17 @@
               "required": ["value", "label"],
               "properties": { "value": {}, "label": { "type": "string" } }
             }
-          }
+          },
+          "presets": {
+            "type": "array",
+            "description": "For numeric fields: a set of named preset values shown in a dropdown alongside a 'Custom…' option that reveals a number input. Submitted value is whichever the user landed on.",
+            "items": {
+              "type": "object",
+              "required": ["value", "label"],
+              "properties": { "value": { "type": "number" }, "label": { "type": "string" } }
+            }
+          },
+          "help": { "type": "string" }
         }
       }
     }

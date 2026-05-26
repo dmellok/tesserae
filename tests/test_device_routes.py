@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from flask import Flask
 
-from app.main import REPO_ROOT, create_app
+from app.main import REPO_ROOT, create_app, merge_status_parsed
 from app.state.settings_store import SettingsStore
 
 
@@ -46,7 +46,8 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     assert "Device: ESP32 client" in body
     assert "no heartbeat received yet" in body
     # ESP32 client config form (sleep_interval_s) shows up.
-    assert "Sleep interval (seconds)" in body
+    assert "Sleep interval" in body
+    assert 'name="sleep_interval_s"' in body
     # pi_client has no config_topic — no Save button rendered for its form.
     pi_idx = body.index("Device: Pi client")
     esp_idx = body.index("Device: ESP32 client")
@@ -73,6 +74,32 @@ def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
     assert "is-ok" in body
     assert "3820" in body
     assert "10.0.0.42" in body
+
+
+def test_merge_keeps_prev_values_when_new_is_none() -> None:
+    """An LWT typically carries only state=offline; merge must preserve
+    the last known battery / rssi / ip rather than blanking them."""
+    prev = {"battery_mv": 3820, "battery_pct": 67, "rssi": -58, "ip": "10.0.0.42"}
+    lwt = {"battery_mv": None, "battery_pct": None, "rssi": None, "ip": None, "state": "offline"}
+    merged = merge_status_parsed(prev, lwt)
+    assert merged["battery_mv"] == 3820
+    assert merged["battery_pct"] == 67
+    assert merged["rssi"] == -58
+    assert merged["ip"] == "10.0.0.42"
+    assert merged["state"] == "offline"
+
+
+def test_merge_takes_new_values_when_present() -> None:
+    """A fresh heartbeat with numbers wins over the cached snapshot."""
+    prev = {"battery_mv": 3820, "battery_pct": 67, "state": "offline"}
+    new = {"battery_mv": 3700, "battery_pct": 55, "rssi": -60, "ip": "10.0.0.42"}
+    merged = merge_status_parsed(prev, new)
+    assert merged["battery_mv"] == 3700
+    assert merged["battery_pct"] == 55
+    assert merged["rssi"] == -60
+    # Keys absent from new are preserved (state lingers until something
+    # overwrites it — accepted limitation; firmware can re-publish state).
+    assert merged["state"] == "offline"
 
 
 def test_stale_heartbeat_renders_warn(app: Flask) -> None:

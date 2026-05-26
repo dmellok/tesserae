@@ -44,6 +44,32 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{%- macro preset_or_number(field_id, name, label, value=0, presets=[], min=None, max=None, step=1, help=None) -%}
+{#- Numeric field with a preset dropdown. If the current value matches
+   one of the presets, that preset is selected and the number input
+   stays hidden. Otherwise the dropdown sits on "Custom…" and the
+   number input is visible. components.js wires the toggle. -#}
+{%- set preset_values = presets | map(attribute='value') | list -%}
+{%- set is_custom = value is not none and value not in preset_values -%}
+<div class="field field--preset" data-preset-field>
+  <label for="{{ field_id }}-preset">{{ label }}</label>
+  <select id="{{ field_id }}-preset" class="preset-select" data-preset-select>
+    {% for preset in presets %}
+    <option value="{{ preset.value }}" {% if not is_custom and preset.value == value %}selected{% endif %}>{{ preset.label }}</option>
+    {% endfor %}
+    <option value="__custom__" {% if is_custom %}selected{% endif %}>Custom…</option>
+  </select>
+  <input type="number" id="{{ field_id }}" name="{{ name }}"
+         class="preset-custom-input" data-preset-custom
+         value="{{ value }}"
+         {% if min is not none %}min="{{ min }}"{% endif %}
+         {% if max is not none %}max="{{ max }}"{% endif %}
+         step="{{ step }}"
+         {% if not is_custom %}hidden{% endif %}>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
 {%- macro slider(field_id, name, label, value=0, min=0, max=100, step=1, unit='', help=None) -%}
 <div class="field field--slider">
   <div class="slider-header">
@@ -207,8 +233,16 @@ macro here instead.
               min=spec.get('min', 0), max=spec.get('max', 100),
               step=spec.get('step', 1), unit=spec.get('unit', ''), help=help_text) }}
   {% elif ftype == 'number' %}
-    {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
-                    min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text) }}
+    {% if spec.get('presets') %}
+      {{ preset_or_number(field_id, name, label,
+                          value=value if value is not none else spec.get('default', 0),
+                          presets=spec.get('presets'),
+                          min=spec.get('min'), max=spec.get('max'),
+                          step=spec.get('step', 1), help=help_text) }}
+    {% else %}
+      {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
+                      min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text) }}
+    {% endif %}
   {% elif ftype == 'color' %}
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
   {% else %}

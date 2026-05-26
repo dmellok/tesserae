@@ -411,6 +411,27 @@ def _rebuild_transport(
         app.config["HA_DISCOVERY"] = None
 
 
+def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
+    """Merge a freshly-parsed heartbeat into the prior cached dict.
+
+    Why merge instead of overwrite: an MQTT last-will message (or any
+    partial heartbeat) typically carries only a subset of the well-known
+    fields — e.g. ``{"state": "offline"}`` published by the broker when
+    the firmware disconnects. ``parse_status`` fills the absent fields
+    with ``None``. Overwriting would blank the last-known battery / rssi
+    / ip from the previous good heartbeat. Merging keeps them visible.
+
+    Rules: a ``None`` in ``new`` doesn't overwrite a non-None in
+    ``prev``. Everything else takes the new value, so a real heartbeat
+    that brings a fresh number always wins."""
+    merged: dict[str, Any] = dict(prev)
+    for key, value in new.items():
+        if value is None and merged.get(key) is not None:
+            continue
+        merged[key] = value
+    return merged
+
+
 def _subscribe_device_status(
     transport: MqttTransport,
     device: device_loader.Device,
@@ -427,9 +448,11 @@ def _subscribe_device_status(
     def on_status(topic: str, payload: bytes) -> None:
         del topic
         parsed = device.parse_status(payload)
+        prev = status_cache.get(device.id, {}).get("parsed", {})
+        merged = merge_status_parsed(prev, parsed)
         status_cache[device.id] = {
             "received_at": time.time(),
-            "parsed": parsed,
+            "parsed": merged,
         }
         event_log.record(
             type="device",
@@ -437,7 +460,7 @@ def _subscribe_device_status(
             target=device.status_topic,
             status="error" if "error" in parsed else "ok",
             error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
-            extra={"parsed": parsed},
+            extra={"parsed": merged},
         )
 
     transport.subscribe(device.status_topic, on_status, qos=1)
