@@ -68,19 +68,19 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
+    <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_hourly/client.css">
     <div class="root size-${size}">
       ${showHeader ? `
       <header class="head">
         <span class="head-title">
-          <i class="ph-fill ph-fill-chart-line-up" style="color: var(--theme-accent)" aria-hidden="true"></i>
+          <i class="ph-bold ph-bold-chart-line-up" style="color: var(--theme-accent)" aria-hidden="true"></i>
           <span>Next ${data.hours || 24} hours</span>
           ${data.label ? `<span class="head-place">${escapeHtml(data.label)}</span>` : ""}
         </span>
         <span class="head-chips">
-          <span class="chip"><i class="ph-fill ph-fill-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.max)}</span>
-          <span class="chip"><i class="ph-fill ph-fill-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.min)}</span>
+          <span class="chip"><i class="ph-bold ph-bold-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.max)}</span>
+          <span class="chip"><i class="ph-bold ph-bold-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.min)}</span>
         </span>
       </header>` : ""}
       <section class="chart-wrap">
@@ -88,7 +88,7 @@ export default async function render(shadow, ctx) {
       </section>
       ${showRain ? `
       <section class="rain-strip" aria-label="Rain probability">
-        <span class="rain-label"><i class="ph-fill ph-fill-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>RAIN</span>
+        <span class="rain-label"><i class="ph-bold ph-bold-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>RAIN</span>
         <span class="rain-bars">
           ${renderRainBars(points)}
         </span>

@@ -224,7 +224,7 @@
   color: var(--theme-fg);
   font-size: 1.05em;
 }
-.tp-brand .ph-fill {
+.tp-brand .ph-bold {
   color: var(--theme-accent);
   font-size: 1.35em;
 }
@@ -261,7 +261,7 @@
   gap: 5px;
   min-width: 0;
 }
-.tp-stat .ph-fill {
+.tp-stat .ph-bold {
   color: var(--theme-accent);
   font-size: 1.5em;
 }

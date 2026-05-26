@@ -265,18 +265,22 @@ Vendored locally under `/static/icons/phosphor/`. Six weights:
 
 | weight   | usage                                            |
 |----------|---------------------------------------------------|
-| regular  | default; everywhere unless noted                  |
-| fill     | hero / emphasis icons, big condition markers      |
-| duotone  | special accents (sun-horizon, moon-stars)         |
-| bold     | rarely; arrows can pick this up                   |
-| light    | rarely; subtle iconography                        |
-| thin     | rarely                                            |
+| regular  | inline icons, small icons that need to flow with text |
+| bold     | **default for prominent icons** — hero icons, big condition markers, anything that should "read big". Outline-with-presence rather than solid shape. |
+| duotone  | two-tone accent moments (sun-horizon, moon-stars). Use sparingly. |
+| fill     | **avoid in new widgets** — solid shapes can quantise into blobs on Spectra 6 and read heavier than they should. Bold reads cleaner. |
+| light, thin | special design needs; rare. |
+
+Make prominent icons **big and bold** — that's the design language. A
+hero condition icon at clamp(72px, 20cqw, 160px) in `ph-bold` reads as
+a confident graphic; the same icon at the same size in `ph-fill` reads
+as a blob.
 
 Markup:
 
 ```html
 <i class="ph ph-cloud-sun" aria-hidden="true"></i>
-<i class="ph-fill ph-fill-warning-circle" aria-hidden="true"></i>
+<i class="ph-bold ph-bold-warning-circle" aria-hidden="true"></i>
 <i class="ph-duotone ph-duotone-sun-horizon" aria-hidden="true"></i>
 ```
 
@@ -285,16 +289,109 @@ Inside Shadow DOM you must load the weights you use:
 ```js
 shadow.innerHTML = `
   <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-  <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
-  <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
+  <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
   ...`;
 ```
 
 Each `<link>` is ~10 KB CSS + a ~250 KB woff2 font. Only load the
 weights you actually use — `regular` is almost always required;
-`fill` is the next most useful; everything else is opt-in.
+`bold` is the next most useful; everything else is opt-in.
 
 Icon name reference: <https://phosphoricons.com/>.
+
+---
+
+## Custom colours — escape hatch
+
+The "always use theme tokens" rule has a narrow carve-out: when the
+data you're rendering has an **inherent visual identity that the user
+expects to see**, you can hard-code hex values. Examples:
+
+* **F1 team colours** — Ferrari red `#DC0000`, Mercedes silver/black
+  `#27F4D2`, Red Bull `#1E41FF`. Painting Ferrari in `--theme-accent`
+  reads wrong; the data carries its own colour.
+* **Brand logos and indicators** — Spotify green, GitHub black,
+  particular calendar-tag colours.
+* **Real-world flag colours** — country flags on race countdowns.
+* **Established conventions** — gold / silver / bronze on podiums
+  (though even those are sometimes better expressed as
+  `warn` / `fgSoft` / `accent`).
+
+Bar to clear: the colour is **part of the data**, not a design choice.
+"It would look nice in red" doesn't pass; "this is Ferrari's red"
+does.
+
+Implementation:
+
+```js
+const TEAM_COLOURS = {
+  ferrari:   "#DC0000",
+  mercedes:  "#27F4D2",
+  red_bull:  "#1E41FF",
+  // ...
+};
+
+// Apply via inline style so it slots alongside palette-token elements.
+`<span class="team-chip" style="background: ${TEAM_COLOURS[team] || 'var(--theme-surface2)'}">...</span>`
+```
+
+Fall back to a theme token (`surface2` or `accent`) for unknown values
+so the widget never produces a blank/black square.
+
+For dark mode: many brand colours need a fallback variant. Define
+both in a lookup and switch based on a hint (e.g. is the theme dark?
+inspect `getComputedStyle(host).getPropertyValue('--theme-bg')` and
+choose). Document the choice in the widget's brief.
+
+---
+
+## Plugin static assets
+
+Widgets can ship arbitrary static files alongside the source — useful
+for things the icon font doesn't cover: race-track SVGs, team logos,
+country flags, calendar service logos.
+
+Drop them under `plugins/<id>/static/` or `plugins/<id>/files/`. The
+plugin asset route serves anything matching those prefixes:
+
+```
+plugins/f1_next_race/
+  static/
+    circuits/
+      silverstone.svg
+      monza.svg
+      ...
+    flags/
+      uk.svg
+      it.svg
+```
+
+Reference at `/plugins/<id>/static/...`:
+
+```js
+shadow.innerHTML = `
+  <img src="/plugins/f1_next_race/static/circuits/${slug}.svg"
+       alt="${trackName}" class="circuit-map">
+`;
+```
+
+Conventions:
+
+* **SVG preferred over raster** — scales cleanly, ditches well on
+  Spectra 6, no woff2-weight cost.
+* **Monochrome SVGs that pick up `currentColor`** if you want them to
+  theme automatically: `<svg fill="currentColor" stroke="currentColor">`
+  in your SVG file, then set `color: var(--theme-fg)` on the parent.
+* **Bake brand colours into the SVG** when the data IS the colour
+  (team logo, flag).
+* **Keep files small** — under 10 KB each ideally. The renderer waits
+  for `networkidle`; large images stretch the screenshot.
+* **Phosphor first** — if there's a Phosphor icon for what you want,
+  use that. Custom SVG is for things Phosphor doesn't have: circuit
+  outlines, team logos, country flags.
+
+The asset route is loopback-bypassed (same gate as `/compose/`) — so
+the Playwright renderer can fetch them without a session.
 
 ---
 

@@ -33,6 +33,83 @@ Three docs are the canonical contract. Read each before drafting:
 
 ---
 
+## Critical: icons are big and bold (and not filled)
+
+Use Phosphor at the **`bold`** weight for any icon that should "read
+big" — hero condition icons, day icons, podium markers, race-status
+icons. **Do not use `ph-fill`.** Solid filled icons read as blobs at
+size and quantise badly on Spectra 6. Bold-outline at large sizes
+reads as a confident graphic.
+
+Inline icons (small, flowing with text) stay at regular weight. The
+distinction:
+
+* **Bold, big** (clamp ~32-160 px depending on cell) — the visual
+  anchor of a section. One or two per widget at most.
+* **Regular, small** (~1em) — accompanying inline icons next to
+  labels, stat values, table rows.
+
+Duotone is fine for special two-tone accent moments (sun-horizon,
+moon-stars). Avoid it for the primary identity icon.
+
+Browse [phosphoricons.com](https://phosphoricons.com) — every icon
+is available in all six weights.
+
+---
+
+## Custom colours — escape hatch
+
+The default rule "use theme tokens only, no hex" has a carve-out:
+when the data has an **inherent visual identity that the user expects
+to see**, hard-code the hex. Examples:
+
+* F1 team colours (Ferrari red, Mercedes teal, Red Bull dark-blue)
+* Brand logos / service indicators
+* Country flag colours on race countdowns
+* Podium gold/silver/bronze (where appropriate — sometimes
+  `warn` / `fgSoft` / `accent` reads better)
+
+Bar to clear: the colour is **part of the data**, not a design
+choice. Document each custom colour in the brief's notes section
+with the data field it's tied to.
+
+Fall back to a theme token (`surface2` or `accent`) for unknown
+values so the widget never produces a blank square. For dark themes,
+plan a fallback variant of each brand colour if the original reads
+poorly against dark surfaces.
+
+See `docs/widgets.md` → "Custom colours — escape hatch" for the full
+contract.
+
+---
+
+## Plugin static assets
+
+Widgets can ship arbitrary static files (SVGs preferred): drop them
+under `plugins/<id>/static/`, reference at `/plugins/<id>/static/...`.
+
+Useful for:
+
+* **Race circuit outlines** — vector SVG of each F1 track
+* **Country flags** — small SVG flag per ISO code
+* **Service logos** — when no Phosphor equivalent
+
+Rules:
+
+* **Phosphor first** — only ship a custom asset if there's no
+  reasonable Phosphor icon. Custom SVGs are for things the icon font
+  can't represent (circuit outlines, flags, team logos).
+* **SVG preferred over raster** — scales, themes via `currentColor`
+  if appropriate.
+* **Keep files small** (< 10 KB each typically).
+
+In the brief, list every asset you intend to ship in section 12
+(Notes), with file path + purpose + approximate size.
+
+See `docs/widgets.md` → "Plugin static assets" for examples.
+
+---
+
 ## Critical: no-borders design language
 
 The theme system was reworked. **Drawn borders are out.** Card shapes
@@ -194,6 +271,43 @@ Layout:
 - Each row: position chip, name (driver code or team initials), points
   (`fg`, tabular-numerics). Leader gets `surface2` background.
 
+### Batch C — propose 3-5 more widgets
+
+After the explicit list above, **propose 3-5 additional widgets** you
+think would be useful for a self-hosted e-ink dashboard. Don't ask
+permission — pick what's interesting and brief them properly.
+
+Ground rules for the proposals:
+
+* Public data source (no required API key OR an obviously-paid model
+  like Spotify is fine if it adds enough value).
+* Different in shape from anything already covered — a second weather
+  widget doesn't count; a different *kind* of widget does.
+* Each one should justify its existence: who's the user, why is this
+  better than just looking at their phone?
+
+A few directions worth considering (not a shopping list — pick or
+invent):
+
+* **Time / date** — analogue clock, year-progress bar, "days until X"
+  countdown, world clocks (multi-timezone strip).
+* **News / feeds** — Hacker News top headlines, RSS reader, Reddit
+  subreddit hottest.
+* **Astronomy / nature** — NASA Astronomy Picture of the Day, moon
+  phase strip, aurora forecast, ISS pass tracker, tide schedule.
+* **Transit** — local train/bus arrivals (any public GTFS feed),
+  flight status by tail number.
+* **Finance** — stock or crypto price strip, your-portfolio summary.
+* **Health / activity** — Strava recent activities, step count.
+* **Smart home** — Home Assistant entity tiles, room temperatures,
+  energy use.
+* **System / dev** — GitHub commit heatmap, CI status, deployment
+  list, server uptime.
+* **Domestic** — laundry done?, bin day reminder, pet feeding log.
+
+Brief each proposed widget with the same 0-12 section template. In
+section 0 (one-line summary) include why it earns a slot.
+
 ---
 
 ## Output format
@@ -216,7 +330,11 @@ it back for build.
 ## Hard constraints — things to AVOID
 
 - Drawn borders of any kind. No `border:` rules on layout elements.
-- Hard-coded hex colours. Always reference a palette token.
+- `ph-fill` weight icons. Use `ph-bold` for prominent icons; regular
+  for small inline ones.
+- Hard-coded hex colours **except for the documented data-identity
+  cases** (team colours, brand colours, flags — documented in section
+  12 of the brief).
 - Per-widget chrome that fights the cell. The cell is the card.
 - Animations / transitions. These get caught mid-frame by the
   screenshot pipeline. `animation: false` on Chart.js too.
@@ -224,3 +342,5 @@ it back for build.
 - Custom font loading. `font-family: inherit` on `:host`.
 - Tone rules that map to the `divider` token. That token is for chart
   axes only — if you want a separator, use spacing or a surface shift.
+- Bundling huge custom assets. SVG preferred, <10 KB each, Phosphor
+  first.

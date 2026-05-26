@@ -43,7 +43,7 @@
   letter-spacing: 0.06em;
   min-width: 0;
 }
-.head-title .ph-fill {
+.head-title .ph-bold {
   font-size: 1.4em;
   /* colour set inline */
 }
@@ -70,7 +70,7 @@
   font-weight: 700;
   color: var(--theme-fg);
 }
-.chip .ph-fill { font-size: 1em; }
+.chip .ph-bold { font-size: 1em; }
 
 /* ---------- chart ---------- */
 
@@ -105,7 +105,7 @@
   color: var(--theme-muted);
   white-space: nowrap;
 }
-.rain-label .ph-fill { font-size: 1.2em; }
+.rain-label .ph-bold { font-size: 1.2em; }
 .rain-bars {
   display: flex;
   align-items: stretch;

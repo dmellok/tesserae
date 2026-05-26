@@ -77,7 +77,7 @@
   margin-top: clamp(4px, 0.8cqw, 8px);
 }
 .now-range span { display: inline-flex; align-items: center; gap: 3px; }
-.now-range .ph-fill { font-size: 1em; }
+.now-range .ph-bold { font-size: 1em; }
 
 /* ---------- stats (4 columns) ---------- */
 

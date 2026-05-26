@@ -91,7 +91,7 @@ function statColumn(icon, label, value, sub, tone) {
   const toneStyle = tone ? ` style="color: var(--theme-${tone})"` : "";
   return `
     <div class="stat">
-      <i class="ph-fill ph-fill-${icon} stat-icon"${toneStyle} aria-hidden="true"></i>
+      <i class="ph-bold ph-bold-${icon} stat-icon"${toneStyle} aria-hidden="true"></i>
       <div class="stat-body">
         <div class="stat-label">${escapeHtml(label)}</div>
         <div class="stat-value"${toneStyle}>${escapeHtml(value)}</div>
@@ -131,7 +131,7 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
+    <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
     <link rel="stylesheet" href="/plugins/weather_now/client.css">
     <div class="root size-${size}">
@@ -142,16 +142,16 @@ export default async function render(shadow, ctx) {
         </span>
       </header>
       <section class="now">
-        <i class="ph-fill ph-fill-${icon} now-icon" style="color: var(--theme-${condTone})" aria-hidden="true"></i>
+        <i class="ph-bold ph-bold-${icon} now-icon" style="color: var(--theme-${condTone})" aria-hidden="true"></i>
         <div class="now-body">
           <div class="now-temp">${fmtTemp(data.temp)}</div>
           <div class="now-cond">${escapeHtml(label)}</div>
           <div class="now-range">
             ${data.today_max != null ? `
-              <span><i class="ph-fill ph-fill-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.today_max)}</span>
-              <span><i class="ph-fill ph-fill-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.today_min)}</span>
+              <span><i class="ph-bold ph-bold-arrow-up" style="color: var(--theme-warn)" aria-hidden="true"></i>${fmtTemp(data.today_max)}</span>
+              <span><i class="ph-bold ph-bold-arrow-down" style="color: var(--theme-fgSoft)" aria-hidden="true"></i>${fmtTemp(data.today_min)}</span>
             ` : ""}
-            ${data.rain_chance != null ? `<span class="rain"><i class="ph-fill ph-fill-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>${Math.round(data.rain_chance)}%</span>` : ""}
+            ${data.rain_chance != null ? `<span class="rain"><i class="ph-bold ph-bold-drop" style="color: var(--theme-accent)" aria-hidden="true"></i>${Math.round(data.rain_chance)}%</span>` : ""}
           </div>
         </div>
       </section>

@@ -41,7 +41,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.head-title .ph-fill { font-size: 1.4em; }
+.head-title .ph-bold { font-size: 1.4em; }
 .head-place {
   font-size: clamp(11px, 2cqw, 14px);
   color: var(--theme-fgSoft);
@@ -129,11 +129,11 @@
   color: var(--theme-muted);
   margin-top: 2px;
 }
-.day-rain .ph-fill { font-size: 1.1em; opacity: 0.55; }
+.day-rain .ph-bold { font-size: 1.1em; opacity: 0.55; }
 .day-rain.is-wet {
   color: var(--theme-accent);
 }
-.day-rain.is-wet .ph-fill { opacity: 1; }
+.day-rain.is-wet .ph-bold { opacity: 1; }
 
 /* sm: skip the condition word, shrink icons. */
 .size-sm .day-cond { display: none; }

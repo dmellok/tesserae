@@ -79,13 +79,13 @@ function dayColumn(day, position, showRain) {
   return `
     <div class="day${isToday ? " is-today" : ""}">
       <div class="day-name">${escapeHtml(dayLabel(day.weekday, position))}</div>
-      <i class="ph-fill ph-fill-${icon} day-icon" style="color: var(--theme-${tone})" aria-hidden="true"></i>
+      <i class="ph-bold ph-bold-${icon} day-icon" style="color: var(--theme-${tone})" aria-hidden="true"></i>
       <div class="day-cond">${escapeHtml(label)}</div>
       <div class="day-high">${fmtTemp(day.high)}</div>
       <div class="day-low">${fmtTemp(day.low)}</div>
       ${showRain ? `
       <div class="day-rain${rainWet ? " is-wet" : ""}">
-        <i class="ph-fill ph-fill-drop" aria-hidden="true"></i>
+        <i class="ph-bold ph-bold-drop" aria-hidden="true"></i>
         <span>${rainPct == null ? "—" : rainPct + "%"}</span>
       </div>` : ""}
     </div>
@@ -109,13 +109,13 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
+    <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_forecast/client.css">
     <div class="root size-${size}">
       ${showHeader ? `
       <header class="head">
         <span class="head-title">
-          <i class="ph-fill ph-fill-calendar-dots" style="color: var(--theme-accent)" aria-hidden="true"></i>
+          <i class="ph-bold ph-bold-calendar-dots" style="color: var(--theme-accent)" aria-hidden="true"></i>
           <span>5-day forecast</span>
         </span>
         ${data.label ? `<span class="head-place">${escapeHtml(data.label)}</span>` : ""}
