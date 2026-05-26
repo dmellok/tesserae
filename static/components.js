@@ -37,7 +37,11 @@
     const rect = frame.getBoundingClientRect();
     if (!rect.width) return;
     const scale = rect.width / panelW;
-    frame.querySelectorAll("iframe, img.preview-image").forEach((el) => {
+    // Iframes are sized at the panel's native CSS pixels so the
+    // composer renders unscaled — they need a transform to fit. Raster
+    // images use object-fit (no transform) so they letterbox cleanly
+    // regardless of the source's aspect ratio.
+    frame.querySelectorAll("iframe").forEach((el) => {
       el.style.transform = `scale(${scale})`;
     });
   }

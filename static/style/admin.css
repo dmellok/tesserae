@@ -1865,8 +1865,7 @@ button[disabled] {
   aspect-ratio: 4 / 3; /* fallback; inline style overrides */
 }
 
-.preview-frame > iframe,
-.preview-frame > img.preview-image {
+.preview-frame > iframe {
   position: absolute;
   top: 0;
   left: 0;
@@ -1874,6 +1873,19 @@ button[disabled] {
   display: block;
   background: white;
   transform-origin: 0 0;
+}
+.preview-frame > img.preview-image {
+  /* Raster previews fit the frame with letterboxing; the source is
+     panel-content already so we don't need the iframe's transform
+     trick. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: white;
+  object-fit: contain;
 }
 .preview-frame > .preview-placeholder {
   position: absolute;
