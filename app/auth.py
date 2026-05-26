@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import os
 import secrets
 from dataclasses import dataclass
-from typing import Final
+from typing import Any, Final
 
 from flask import Flask, redirect, request, session, url_for
 from werkzeug.wrappers import Response
@@ -38,11 +39,26 @@ KEY_BYTES: Final[int] = 32
 SESSION_KEY: Final[str] = "authed"
 
 # Routes that bypass the auth gate entirely. Static + setup + login are
-# reachable from anywhere; compose + renders are reachable only from
-# loopback (the embedded renderer).
+# reachable from anywhere; compose is reachable from loopback (the
+# embedded renderer); renders is reachable from any private-network
+# client (the Pi / ESP32 fetching frame artifacts).
 _OPEN_PATHS: Final[tuple[str, ...]] = ("/static/", "/setup", "/login", "/logout", "/healthz")
-_LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/", "/renders/")
+_LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
+_LAN_PATHS: Final[tuple[str, ...]] = ("/renders/",)
 _LOOPBACK_HOSTS: Final[frozenset[str]] = frozenset({"127.0.0.1", "::1", "localhost"})
+# RFC1918 + loopback + link-local: addresses that can only originate
+# from a trusted local network. /renders/ payloads are content-addressed
+# (digest in the URL) so guessing one requires knowing what was rendered.
+_PRIVATE_NETWORKS: Final[tuple[Any, ...]] = (
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+)
 
 
 @dataclass(frozen=True)
@@ -142,12 +158,27 @@ def _is_loopback() -> bool:
     return request.remote_addr in _LOOPBACK_HOSTS
 
 
+def _is_private_client() -> bool:
+    addr = request.remote_addr
+    if not addr:
+        return False
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        return False
+    return any(ip in net for net in _PRIVATE_NETWORKS)
+
+
 def _path_is_open(path: str) -> bool:
     return any(path == p or path.startswith(p) for p in _OPEN_PATHS)
 
 
 def _path_is_loopback_only(path: str) -> bool:
     return any(path.startswith(p) for p in _LOOPBACK_PATHS)
+
+
+def _path_is_lan_reachable(path: str) -> bool:
+    return any(path.startswith(p) for p in _LAN_PATHS)
 
 
 def install_gate(app: Flask, settings: SettingsStore) -> None:
@@ -161,12 +192,19 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         # Open paths and static assets are always reachable.
         if _path_is_open(path):
             return None
-        # Compose / renders are reachable from loopback (the in-process
-        # Playwright renderer + panel-side artifact fetches) OR from an
-        # authed admin session (the editor's preview iframe loads /compose
-        # over the LAN). Unauthed LAN traffic still gets 403'd.
+        # Compose is loopback-only (the in-process Playwright renderer)
+        # OR authed (the editor's preview iframe loads it over the LAN).
         if _path_is_loopback_only(path):
             if _is_loopback():
+                return None
+            if is_authed():
+                return None
+            return Response("forbidden", status=403)
+        # /renders/ is reachable from any private-network client so the
+        # Pi / ESP32 can fetch frame artifacts without a session. Still
+        # blocked for anything coming in on a public IP.
+        if _path_is_lan_reachable(path):
+            if _is_private_client():
                 return None
             if is_authed():
                 return None
