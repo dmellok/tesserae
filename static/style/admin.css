@@ -1871,20 +1871,23 @@ button[disabled] {
   left: 0;
   border: 0;
   display: block;
-  background: white;
+  /* The composed panel content sets its own bleed colour and paints
+     over this; we only see this background while the iframe loads.
+     Use the themed surface so dark mode doesn't flash bright white. */
+  background: var(--t-surface-soft);
   transform-origin: 0 0;
 }
 .preview-frame > img.preview-image {
   /* Raster previews fit the frame with letterboxing; the source is
      panel-content already so we don't need the iframe's transform
-     trick. */
+     trick. The letterbox bars use the themed surface. */
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   border: 0;
   display: block;
-  background: white;
+  background: var(--t-surface-soft);
   object-fit: contain;
 }
 .preview-frame > .preview-placeholder {
