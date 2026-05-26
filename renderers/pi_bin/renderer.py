@@ -47,10 +47,10 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     native_w = max(panel.w, panel.h)
     native_h = min(panel.w, panel.h)
     if img.size[0] < img.size[1]:
-        # Portrait input → rotate 90° CW so the top of the rendered
-        # composition lines up with the panel's right edge (the
-        # conventional "portrait mount = ribbon-cable-down" wiring).
-        img = img.rotate(-90, expand=True)
+        # Portrait input → rotate 90° CCW so the top of the rendered
+        # composition lines up with the panel's left edge (matches the
+        # standard "ribbon-cable-up" portrait mount on Inky Impressions).
+        img = img.rotate(90, expand=True)
     if img.size != (native_w, native_h):
         # Send-page uploads aren't panel-sized; fit before packing.
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")
