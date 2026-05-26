@@ -1,0 +1,36 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Weather — Hourly",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.",
+  "icon": "ph-chart-line",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "latitude", "type": "number", "label": "Latitude", "default": -37.8136 },
+    { "name": "longitude", "type": "number", "label": "Longitude", "default": 144.9631 },
+    { "name": "label", "type": "string", "label": "Place label", "default": "Melbourne" },
+    {
+      "name": "units",
+      "type": "select",
+      "label": "Units",
+      "default": "metric",
+      "choices": [
+        { "value": "metric", "label": "Metric (°C)" },
+        { "value": "imperial", "label": "Imperial (°F)" }
+      ]
+    },
+    {
+      "name": "hours",
+      "type": "select",
+      "label": "Window",
+      "default": "24",
+      "choices": [
+        { "value": "12", "label": "12 hours" },
+        { "value": "24", "label": "24 hours" },
+        { "value": "48", "label": "48 hours" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

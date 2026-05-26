@@ -1,0 +1,146 @@
+/* weather_hourly — header chips + line chart + rain strip. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(6px, 1.2cqw, 14px);
+  box-sizing: border-box;
+}
+
+.size-sm { grid-template-rows: 1fr; }
+.size-md { grid-template-rows: auto 1fr auto; }
+.size-lg { grid-template-rows: auto 1fr auto; }
+
+.panel {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-divider);
+  border-radius: clamp(6px, 1cqw, 12px);
+  padding: clamp(6px, 1.2cqw, 14px);
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- header ---------- */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 1.2cqw, 14px);
+  padding: 2px clamp(2px, 0.6cqw, 6px);
+}
+.head-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: clamp(11px, 2cqw, 16px);
+  font-weight: 600;
+  color: var(--theme-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  min-width: 0;
+}
+.head-title .ph { color: var(--theme-accent); font-size: 1.2em; }
+.head-place {
+  color: var(--theme-fgSoft);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.head-chips {
+  display: inline-flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: clamp(11px, 1.8cqw, 14px);
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--theme-surface2);
+  color: var(--theme-fg);
+  border: 1px solid var(--theme-divider);
+}
+.chip-max { color: var(--theme-fg); }
+.chip-max .ph { color: var(--theme-accent); }
+.chip-min .ph { color: var(--theme-fgSoft); }
+
+/* ---------- chart ---------- */
+
+.chart-panel {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.chart {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---------- rain strip ---------- */
+
+.rain-strip {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: clamp(6px, 1.2cqw, 12px) clamp(6px, 1.2cqw, 14px);
+  height: clamp(22px, 4.5cqw, 36px);
+  position: relative;
+}
+.rain-strip::before {
+  content: "PRECIP";
+  position: absolute;
+  top: 1px;
+  left: 6px;
+  font-size: clamp(7px, 1.4cqw, 9px);
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--theme-muted);
+}
+.rain-bar {
+  flex: 1;
+  display: block;
+  align-self: end;
+  height: var(--rain, 0%);
+  min-height: 1px;
+  background: var(--theme-accent);
+  border-radius: 1px;
+  opacity: 0.85;
+}
+.rain-bar[style*="--rain: 0%"] {
+  background: var(--theme-divider);
+  height: 1px;
+  opacity: 0.5;
+}
+
+/* ---------- error state ---------- */
+
+.root.error {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

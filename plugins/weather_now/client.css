@@ -1,0 +1,222 @@
+/* weather_now — modern card layout with subpanels.
+   Sizes from the cell host via class .size-xs / sm / md / lg. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: clamp(6px, 1.6cqw, 14px);
+  padding: clamp(6px, 1.6cqw, 14px);
+  box-sizing: border-box;
+}
+
+/* ---------- panels ---------- */
+
+.panel {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-divider);
+  border-radius: clamp(6px, 1.2cqw, 14px);
+  padding: clamp(8px, 1.8cqw, 18px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 0.8cqw, 10px);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- hero ---------- */
+
+.hero {
+  position: relative;
+  justify-content: center;
+  align-items: stretch;
+  overflow: hidden;
+}
+.hero-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--theme-fgSoft);
+  font-size: clamp(11px, 2.2cqw, 16px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.hero-place .ph { font-size: 1.1em; color: var(--theme-accent); }
+.hero-icon {
+  font-size: clamp(48px, 18cqw, 132px);
+  line-height: 1;
+  color: var(--theme-accent);
+  align-self: center;
+  margin: clamp(2px, 0.8cqw, 8px) 0;
+}
+.hero-temp {
+  font-size: clamp(40px, 14cqw, 96px);
+  line-height: 1;
+  font-weight: 700;
+  color: var(--theme-fg);
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.hero-cond {
+  text-align: center;
+  font-size: clamp(13px, 2.6cqw, 20px);
+  color: var(--theme-fgSoft);
+  font-weight: 500;
+}
+.hero-range {
+  display: flex;
+  justify-content: center;
+  gap: clamp(8px, 2cqw, 18px);
+  font-size: clamp(11px, 2.1cqw, 15px);
+  color: var(--theme-fgSoft);
+  margin-top: clamp(2px, 0.6cqw, 6px);
+}
+.hero-range span { display: inline-flex; align-items: center; gap: 3px; }
+.hero-range .ph { color: var(--theme-accent); font-size: 1.1em; }
+
+/* ---------- stats grid ---------- */
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(6px, 1.4cqw, 12px);
+  min-height: 0;
+}
+.stat {
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-divider);
+  border-radius: clamp(6px, 1.2cqw, 14px);
+  padding: clamp(8px, 1.6cqw, 14px);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: clamp(6px, 1.4cqw, 12px);
+  min-width: 0;
+}
+.stat-icon {
+  font-size: clamp(20px, 4cqw, 32px);
+  color: var(--theme-accent);
+}
+.stat-body { min-width: 0; }
+.stat-label {
+  font-size: clamp(9px, 1.8cqw, 12px);
+  color: var(--theme-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.stat-value {
+  font-size: clamp(18px, 4cqw, 28px);
+  color: var(--theme-fg);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.stat-sub {
+  font-size: clamp(9px, 1.7cqw, 12px);
+  color: var(--theme-fgSoft);
+  line-height: 1.2;
+  margin-top: 1px;
+}
+
+/* ---------- sun panel ---------- */
+
+.sun {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  gap: clamp(10px, 2cqw, 20px);
+  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.8cqw, 18px);
+}
+.sun-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.4cqw, 12px);
+}
+.sun-row .ph-duotone {
+  font-size: clamp(22px, 4.4cqw, 36px);
+  color: var(--theme-accent);
+}
+.sun-meta { display: flex; flex-direction: column; line-height: 1.2; }
+.sun-label {
+  font-size: clamp(9px, 1.6cqw, 11px);
+  color: var(--theme-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.sun-time {
+  font-size: clamp(13px, 2.6cqw, 20px);
+  color: var(--theme-fg);
+  font-weight: 600;
+}
+
+/* ---------- size variants ---------- */
+
+/* xs: hero only, compressed. */
+.size-xs {
+  grid-template-areas: "hero";
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.size-xs .stats, .size-xs .sun { display: none; }
+.size-xs .hero-range { display: none; }
+.size-xs .hero-place { font-size: 10px; }
+
+/* sm: hero only with range. */
+.size-sm {
+  grid-template-areas: "hero";
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.size-sm .stats, .size-sm .sun { display: none; }
+
+/* md: hero (left) + stats (right). */
+.size-md {
+  grid-template-areas:
+    "hero stats"
+    "hero sun";
+  grid-template-columns: 5fr 4fr;
+  grid-template-rows: 1fr auto;
+}
+.size-md .hero { grid-area: hero; }
+.size-md .stats { grid-area: stats; }
+.size-md .sun { grid-area: sun; }
+.size-md .sun { padding: clamp(4px, 1cqw, 8px) clamp(8px, 1.6cqw, 14px); }
+.size-md .sun-row .ph-duotone { font-size: 22px; }
+
+/* lg: full layout. */
+.size-lg {
+  grid-template-areas:
+    "hero stats"
+    "hero sun";
+  grid-template-columns: 5fr 6fr;
+  grid-template-rows: 1fr auto;
+}
+.size-lg .hero { grid-area: hero; }
+.size-lg .stats { grid-area: stats; }
+.size-lg .sun { grid-area: sun; }
+
+/* ---------- error state ---------- */
+
+.root.error {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Weather — Now",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",
+  "icon": "ph-cloud-sun",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "latitude", "type": "number", "label": "Latitude", "default": -37.8136 },
+    { "name": "longitude", "type": "number", "label": "Longitude", "default": 144.9631 },
+    { "name": "label", "type": "string", "label": "Place label", "default": "Melbourne" },
+    {
+      "name": "units",
+      "type": "select",
+      "label": "Units",
+      "default": "metric",
+      "choices": [
+        { "value": "metric", "label": "Metric (°C, km/h)" },
+        { "value": "imperial", "label": "Imperial (°F, mph)" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
