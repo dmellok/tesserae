@@ -13,11 +13,14 @@
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  /* header / chart / cond strip / rain / chips — chart takes the
+     flexible row, everything else is auto. Cond + rain only render at
+     md+ so at sm the layout collapses to header / chart / chips. */
+  grid-template-rows: auto 1fr auto auto auto;
   box-sizing: border-box;
   overflow: hidden;
 }
-.root.size-sm { grid-template-rows: auto auto 1fr; }
+.root.size-sm { grid-template-rows: auto 1fr auto; }
 
 /* --- header bar (same shape as weather_now) --- */
 
@@ -48,38 +51,7 @@
 }
 .wh-time { white-space: nowrap; }
 
-/* --- chip strip: High / Low / Now --- */
-
-.wh-chips {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  grid-auto-flow: column;
-}
-.wh-chip {
-  padding: clamp(5px, 1cqw, 10px) clamp(8px, 1.6cqw, 16px);
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-  overflow: hidden;
-}
-.wh-chip-label {
-  font-size: clamp(9px, 1.5cqw, 12px);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  opacity: 0.85;
-}
-.wh-chip-value {
-  font-size: clamp(18px, 3.4cqw, 32px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-}
-.wh-chip--high { background: var(--theme-danger); color: var(--theme-bg); }
-.wh-chip--low { background: var(--theme-surface); color: var(--theme-fg); }
-.wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
-
-/* --- chart on the main surface --- */
+/* --- chart panel --- */
 
 .wh-chart {
   position: relative;
@@ -94,7 +66,37 @@
   height: 100% !important;
 }
 
-/* --- rain probability blocks (md/lg) --- */
+/* --- condition icon strip --- */
+
+.wh-cond-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: center;
+  gap: clamp(2px, 0.5cqw, 6px);
+  padding: clamp(4px, 0.9cqw, 10px) clamp(6px, 1.2cqw, 14px);
+  background: var(--theme-surface2);
+}
+.wh-cond-cell {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.wh-cond-cell .ph-bold {
+  font-size: clamp(18px, 3.4cqw, 30px);
+  color: var(--theme-fg);
+  line-height: 1;
+}
+.wh-cond-hour {
+  font-size: clamp(9px, 1.4cqw, 11px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.7;
+}
+
+/* --- rain probability blocks --- */
 
 .wh-rain {
   display: grid;
@@ -129,10 +131,36 @@
 }
 .wh-rain-bar.is-wet { background: var(--theme-accent); }
 
-/* --- size adaptations --- */
+/* --- chip strip at the BOTTOM --- */
 
-.root.size-sm .wh-chips { display: none; }
-.root.size-sm .wh-chart { padding: 6px 8px; }
+.wh-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-auto-flow: column;
+}
+.wh-chip {
+  padding: clamp(5px, 1cqw, 10px) clamp(8px, 1.6cqw, 16px);
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+}
+.wh-chip-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+.wh-chip-value {
+  font-size: clamp(18px, 3.4cqw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.wh-chip--high { background: var(--theme-danger); color: var(--theme-bg); }
+.wh-chip--low { background: var(--theme-surface); color: var(--theme-fg); }
+.wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
 
 /* --- error state --- */
 

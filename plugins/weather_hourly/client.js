@@ -1,6 +1,15 @@
-// weather_hourly — Bauhaus hourly card. Inverted header strip with
-// place + window label + HI/LO chips on the right, Chart.js line on
-// the surface, rain probability blocks at the bottom (md/lg only).
+// weather_hourly — Bauhaus hourly card.
+//
+// Layout (top to bottom):
+//   1. Inverted header bar (place + window + time)
+//   2. Chart.js line — bold accent stroke on theme-surface
+//   3. Weather-condition icon strip (md/lg) — one ph icon per sampled hour
+//   4. Rain probability blocks (md/lg)
+//   5. High / Low / Now chip strip
+//
+// The chips are at the bottom so the eye reads the chart first; the
+// icons strip below the chart maps directly to the chart's x-axis so
+// you can tell at a glance "rain at 3PM" without reading the trace.
 
 function loadChart() {
   if (window.Chart) return Promise.resolve(window.Chart);
@@ -14,6 +23,44 @@ function loadChart() {
     document.head.appendChild(s);
   });
   return window.__tesseraeChartJs;
+}
+
+// WMO code -> { day, night } Phosphor icon names.
+const WMO_ICON = {
+  0:  { day: "sun",             night: "moon" },
+  1:  { day: "sun",             night: "moon" },
+  2:  { day: "cloud-sun",       night: "cloud-moon" },
+  3:  { day: "cloud",           night: "cloud" },
+  45: { day: "cloud-fog",       night: "cloud-fog" },
+  48: { day: "cloud-fog",       night: "cloud-fog" },
+  51: { day: "cloud-rain",      night: "cloud-rain" },
+  53: { day: "cloud-rain",      night: "cloud-rain" },
+  55: { day: "cloud-rain",      night: "cloud-rain" },
+  56: { day: "snowflake",       night: "snowflake" },
+  57: { day: "snowflake",       night: "snowflake" },
+  61: { day: "cloud-rain",      night: "cloud-rain" },
+  63: { day: "cloud-rain",      night: "cloud-rain" },
+  65: { day: "cloud-rain",      night: "cloud-rain" },
+  66: { day: "snowflake",       night: "snowflake" },
+  67: { day: "snowflake",       night: "snowflake" },
+  71: { day: "snowflake",       night: "snowflake" },
+  73: { day: "snowflake",       night: "snowflake" },
+  75: { day: "snowflake",       night: "snowflake" },
+  77: { day: "snowflake",       night: "snowflake" },
+  80: { day: "cloud-rain",      night: "cloud-rain" },
+  81: { day: "cloud-rain",      night: "cloud-rain" },
+  82: { day: "cloud-rain",      night: "cloud-rain" },
+  85: { day: "snowflake",       night: "snowflake" },
+  86: { day: "snowflake",       night: "snowflake" },
+  95: { day: "cloud-lightning", night: "cloud-lightning" },
+  96: { day: "cloud-lightning", night: "cloud-lightning" },
+  99: { day: "cloud-lightning", night: "cloud-lightning" },
+};
+
+function iconForPoint(p) {
+  const entry = WMO_ICON[p.code];
+  if (!entry) return "cloud";
+  return p.is_day !== false ? entry.day : entry.night;
 }
 
 function hexToRgba(hex, alpha) {
@@ -51,6 +98,43 @@ function labelEvery(points, size) {
   return Math.max(1, Math.ceil(points.length / target));
 }
 
+// Pick N evenly-spaced indexes from a points array.
+function sampleIndexes(total, want) {
+  if (total <= want) return Array.from({ length: total }, (_, i) => i);
+  const out = [];
+  for (let i = 0; i < want; i++) {
+    out.push(Math.round((i / (want - 1)) * (total - 1)));
+  }
+  return out;
+}
+
+function renderConditionStrip(points, size) {
+  const want = size === "md" ? 8 : 12;
+  const idxs = sampleIndexes(points.length, want);
+  return idxs
+    .map((i) => {
+      const p = points[i];
+      const icon = iconForPoint(p);
+      return `
+        <div class="wh-cond-cell">
+          <i class="ph-bold ph-${icon}" aria-hidden="true"></i>
+          <span class="wh-cond-hour">${p.hour}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderRainBars(points) {
+  return points
+    .map((p) => {
+      const pct = p.rain == null ? 0 : Math.max(0, Math.min(100, p.rain));
+      const wet = pct >= 30;
+      return `<span class="wh-rain-bar${wet ? " is-wet" : ""}" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
+    })
+    .join("");
+}
+
 export default async function render(shadow, ctx) {
   const data = ctx.data || {};
   if (data.error) {
@@ -64,6 +148,7 @@ export default async function render(shadow, ctx) {
   }
 
   const size = ctx.cell.size;
+  const showStrip = size === "md" || size === "lg";
   const showRain = size === "md" || size === "lg";
 
   shadow.innerHTML = `
@@ -76,6 +161,20 @@ export default async function render(shadow, ctx) {
         <span class="wh-title">${data.label ? escapeHtml(data.label) + " · " : ""}Next ${data.hours || 24} hr</span>
         <span class="wh-time">${nowTime()}</span>
       </header>
+      <section class="wh-chart">
+        <canvas class="chart"></canvas>
+      </section>
+      ${showStrip ? `
+      <section class="wh-cond-strip" aria-label="Hourly conditions">
+        ${renderConditionStrip(points, size)}
+      </section>` : ""}
+      ${showRain ? `
+      <section class="wh-rain">
+        <span class="wh-rain-label">Rain</span>
+        <div class="wh-rain-bars">
+          ${renderRainBars(points)}
+        </div>
+      </section>` : ""}
       <section class="wh-chips">
         <div class="wh-chip wh-chip--high">
           <span class="wh-chip-label">High</span>
@@ -91,16 +190,6 @@ export default async function render(shadow, ctx) {
           <span class="wh-chip-value">${fmtTemp(data.current)}</span>
         </div>` : ""}
       </section>
-      <section class="wh-chart">
-        <canvas class="chart"></canvas>
-      </section>
-      ${showRain ? `
-      <section class="wh-rain">
-        <span class="wh-rain-label">Rain</span>
-        <div class="wh-rain-bars">
-          ${renderRainBars(points)}
-        </div>
-      </section>` : ""}
     </div>
   `;
 
@@ -178,14 +267,4 @@ export default async function render(shadow, ctx) {
       layout: { padding: { top: 8, right: 12, bottom: 0, left: 0 } },
     },
   });
-}
-
-function renderRainBars(points) {
-  return points
-    .map((p) => {
-      const pct = p.rain == null ? 0 : Math.max(0, Math.min(100, p.rain));
-      const wet = pct >= 30;
-      return `<span class="wh-rain-bar${wet ? " is-wet" : ""}" style="--rain: ${pct}%" title="${pct}% at ${p.hour}:00"></span>`;
-    })
-    .join("");
 }

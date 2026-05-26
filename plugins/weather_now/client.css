@@ -54,11 +54,11 @@
 .wn-hero {
   position: relative;
   background: var(--theme-surface);
-  padding: clamp(10px, 2cqw, 22px) clamp(12px, 2.4cqw, 26px);
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* 50/50 split: text on the left, icon panel on the right takes
+     equal space. Bauhaus colour-block proportions. */
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  gap: clamp(8px, 1.6cqw, 18px);
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -67,6 +67,7 @@
   display: grid;
   gap: clamp(4px, 0.8cqw, 8px);
   min-width: 0;
+  padding: clamp(10px, 2cqw, 22px) clamp(12px, 2.4cqw, 26px);
 }
 .wn-temp {
   font-size: clamp(48px, 14cqw, 132px);
@@ -103,12 +104,15 @@
   align-self: stretch;
   display: grid;
   place-items: center;
-  padding: 0 clamp(12px, 2.4cqw, 28px);
-  margin: calc(clamp(10px, 2cqw, 22px) * -1) calc(clamp(12px, 2.4cqw, 26px) * -1)
-          calc(clamp(10px, 2cqw, 22px) * -1) 0;
+  /* Thick black line separating the text panel from the icon panel —
+     sparing use of bauhaus heavy rules to anchor the composition. */
+  border-left: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  padding: clamp(10px, 2cqw, 22px);
+  min-width: 0;
+  overflow: hidden;
 }
 .wn-hero-icon .ph-bold {
-  font-size: clamp(56px, 18cqw, 180px);
+  font-size: clamp(80px, 28cqw, 280px);
   color: var(--theme-fg);
   line-height: 1;
 }
@@ -197,8 +201,9 @@
    range line, hide the wind/uv labels inside their tiny blocks. */
 .root.size-xs .wn-rain-tag { display: none; }
 .root.size-xs .wn-range { display: none; }
-.root.size-xs .wn-hero { padding: 8px 10px; gap: 6px; }
-.root.size-xs .wn-hero-icon { padding: 0 8px; margin: -8px -10px -8px 0; }
+.root.size-xs .wn-hero-text { padding: 6px 8px; gap: 4px; }
+.root.size-xs .wn-hero-icon { padding: 6px; border-left-width: 2px; }
+.root.size-xs .wn-hero-icon .ph-bold { font-size: clamp(36px, 22cqw, 64px); }
 .root.size-xs .wn-temp { font-size: clamp(34px, 18cqw, 60px); }
 .root.size-xs .wn-cond { font-size: 10px; }
 .root.size-xs .wn-stat { padding: 4px 6px; }
@@ -209,6 +214,7 @@
 
 /* sm: keep range + rain tag, no sun row. Stats stay 4-up. */
 .root.size-sm .wn-temp { font-size: clamp(40px, 14cqw, 64px); }
+.root.size-sm .wn-hero-icon .ph-bold { font-size: clamp(64px, 24cqw, 120px); }
 
 /* --- error state --- */
 

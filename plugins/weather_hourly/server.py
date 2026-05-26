@@ -95,31 +95,47 @@ def fetch(
     times: list[str] = hourly.get("time") or []
     temps: list[float | None] = hourly.get("temperature_2m") or []
     rain: list[float | None] = hourly.get("precipitation_probability") or []
+    codes: list[int | None] = hourly.get("weather_code") or []
 
     start = _window_start_index(times, current.get("time"))
     end = start + hours
     points: list[dict[str, Any]] = []
     max_t: float | None = None
     min_t: float | None = None
-    for iso, temp, p in zip(times[start:end], temps[start:end], rain[start:end], strict=False):
+    for iso, temp, p, code in zip(
+        times[start:end],
+        temps[start:end],
+        rain[start:end],
+        codes[start:end],
+        strict=False,
+    ):
         if temp is None:
             continue
         try:
-            hour = datetime.fromisoformat(iso).strftime("%H")
+            parsed_dt = datetime.fromisoformat(iso)
+            hour = parsed_dt.strftime("%H")
+            hour_int = parsed_dt.hour
         except (ValueError, TypeError):
             hour = ""
+            hour_int = -1
         try:
             t_val = float(temp)
         except (TypeError, ValueError):
             continue
         max_t = t_val if max_t is None else max(max_t, t_val)
         min_t = t_val if min_t is None else min(min_t, t_val)
+        # Approximate day/night from local hour — Open-Meteo's `is_day`
+        # is only on the `current` reading, not per-hour. 6-18 = day,
+        # otherwise night.
+        is_day = 6 <= hour_int < 18 if hour_int >= 0 else True
         points.append(
             {
                 "iso": iso,
                 "hour": hour,
                 "temp": t_val,
                 "rain": int(p) if isinstance(p, int | float) else None,
+                "code": int(code) if isinstance(code, int | float) else None,
+                "is_day": is_day,
             }
         )
 

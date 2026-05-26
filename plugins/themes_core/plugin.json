@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core themes",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "theme",
-  "description": "Curated theme set tuned for the no-borders design language — every theme has a tinted bg + brighter surface so cards 'raise' through contrast alone, no divider lines needed. 'Paper' is the default. User themes save under data/plugins/themes_core/user.json.",
+  "description": "Curated theme set with a coherent Bauhaus-primary semantic triad — warn = yellow, danger = red, ok = green — held constant across every theme so a widget reads the same way no matter which theme is picked. Each theme's identity comes from its accent + bg/surface choices. User themes survive restarts under data/plugins/themes_core/user.json.",
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },
@@ -23,8 +23,8 @@
         "accentSoft": "#dbeafe",
         "divider": "#cbd5e1",
         "danger": "#dc2626",
-        "warn": "#ea580c",
-        "ok": "#15803d"
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     },
     {
@@ -38,12 +38,12 @@
         "fg": "#171717",
         "fgSoft": "#404040",
         "muted": "#737373",
-        "accent": "#b91c1c",
-        "accentSoft": "#fecaca",
+        "accent": "#171717",
+        "accentSoft": "#404040",
         "divider": "#d4d4d4",
-        "danger": "#991b1b",
-        "warn": "#a16207",
-        "ok": "#166534"
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     },
     {
@@ -61,8 +61,8 @@
         "accentSoft": "#c7d2fe",
         "divider": "#94a3b8",
         "danger": "#dc2626",
-        "warn": "#d97706",
-        "ok": "#059669"
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     },
     {
@@ -76,12 +76,12 @@
         "fg": "#162610",
         "fgSoft": "#355331",
         "muted": "#5e7a58",
-        "accent": "#16803c",
+        "accent": "#15803d",
         "accentSoft": "#bbf7d0",
         "divider": "#9bb893",
-        "danger": "#b91c1c",
-        "warn": "#b45309",
-        "ok": "#166534"
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     },
     {
@@ -95,11 +95,11 @@
         "fg": "#171717",
         "fgSoft": "#404040",
         "muted": "#6b6b6b",
-        "accent": "#ca8a04",
-        "accentSoft": "#fde68a",
+        "accent": "#ea580c",
+        "accentSoft": "#fed7aa",
         "divider": "#a3a3a3",
         "danger": "#dc2626",
-        "warn": "#ea580c",
+        "warn": "#facc15",
         "ok": "#16a34a"
       }
     },
@@ -117,9 +117,9 @@
         "accent": "#be185d",
         "accentSoft": "#fbcfe8",
         "divider": "#fda4af",
-        "danger": "#9f1239",
-        "warn": "#c2410c",
-        "ok": "#15803d"
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     },
     {
@@ -137,7 +137,7 @@
         "accentSoft": "#164e63",
         "divider": "#404040",
         "danger": "#f87171",
-        "warn": "#fbbf24",
+        "warn": "#facc15",
         "ok": "#4ade80"
       }
     },
@@ -156,8 +156,8 @@
         "accentSoft": "#365314",
         "divider": "#15803d",
         "danger": "#f87171",
-        "warn": "#fde047",
-        "ok": "#a3e635"
+        "warn": "#facc15",
+        "ok": "#4ade80"
       }
     },
     {
@@ -175,7 +175,7 @@
         "accentSoft": "#1e3a8a",
         "divider": "#334155",
         "danger": "#f87171",
-        "warn": "#fbbf24",
+        "warn": "#facc15",
         "ok": "#4ade80"
       }
     }

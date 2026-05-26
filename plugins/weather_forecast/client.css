@@ -57,7 +57,7 @@
 
 .wf-day {
   display: grid;
-  grid-template-rows: auto 1fr auto auto auto;
+  grid-template-rows: auto 1fr auto auto auto auto;
   align-items: center;
   justify-items: center;
   gap: clamp(2px, 0.6cqw, 8px);
@@ -97,6 +97,23 @@
   max-width: 100%;
 }
 
+/* Range bar: width-relative position of this day's low..high inside
+   the week's overall min..max. Track is constant width per day so
+   the bars are comparable. */
+.wf-day-range {
+  position: relative;
+  width: 100%;
+  height: clamp(4px, 0.8cqw, 7px);
+  background: color-mix(in oklab, currentColor 18%, transparent);
+  margin: clamp(2px, 0.5cqw, 6px) 0;
+}
+.wf-day-range-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: currentColor;
+}
+
 .wf-day-temps {
   display: flex;
   align-items: baseline;
@@ -130,6 +147,7 @@
 /* --- size adaptations --- */
 
 .root.size-sm .wf-day-cond { display: none; }
+.root.size-sm .wf-day-range { display: none; }
 .root.size-sm .wf-day { padding: 6px 4px; gap: 4px; }
 .root.size-sm .wf-day-icon { font-size: clamp(28px, 10cqw, 48px); }
 .root.size-sm .wf-day-name { font-size: 10px; }

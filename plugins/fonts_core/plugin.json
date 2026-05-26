@@ -1,0 +1,61 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Core fonts",
+  "version": "0.1.0",
+  "kind": "font",
+  "description": "Curated open-source font set vendored locally. Five families covering modern sans (Inter), geometric display (Space Grotesk), heavy display (Archivo Black, fits the Bauhaus aesthetic), mono (JetBrains Mono), and elegant serif display (DM Serif Display). All Latin subset, woff2.",
+  "supports": {
+    "sizes": ["xs", "sm", "md", "lg"]
+  },
+  "fonts": [
+    {
+      "id": "inter",
+      "name": "Inter",
+      "category": "sans",
+      "weights": [400, 700, 800],
+      "files": {
+        "400": "/plugins/fonts_core/static/inter/400.woff2",
+        "700": "/plugins/fonts_core/static/inter/700.woff2",
+        "800": "/plugins/fonts_core/static/inter/800.woff2"
+      }
+    },
+    {
+      "id": "space_grotesk",
+      "name": "Space Grotesk",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "/plugins/fonts_core/static/space-grotesk/400.woff2",
+        "700": "/plugins/fonts_core/static/space-grotesk/700.woff2"
+      }
+    },
+    {
+      "id": "archivo_black",
+      "name": "Archivo Black",
+      "category": "display",
+      "weights": [400],
+      "files": {
+        "400": "/plugins/fonts_core/static/archivo-black/400.woff2"
+      }
+    },
+    {
+      "id": "jetbrains_mono",
+      "name": "JetBrains Mono",
+      "category": "mono",
+      "weights": [400, 700],
+      "files": {
+        "400": "/plugins/fonts_core/static/jetbrains-mono/400.woff2",
+        "700": "/plugins/fonts_core/static/jetbrains-mono/700.woff2"
+      }
+    },
+    {
+      "id": "dm_serif_display",
+      "name": "DM Serif Display",
+      "category": "serif",
+      "weights": [400],
+      "files": {
+        "400": "/plugins/fonts_core/static/dm-serif-display/400.woff2"
+      }
+    }
+  ]
+}

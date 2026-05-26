@@ -1,7 +1,10 @@
-// weather_forecast — Bauhaus 5-day card. Inverted header strip, then
-// 5 colour-blocked day columns. Today's column takes the accent block;
-// remaining days alternate between surface and surface2 so the row
-// reads as a clear primary-coloured rhythm without any drawn lines.
+// weather_forecast — Bauhaus 5-day card.
+//
+// Each day is a colour-blocked column: name, big icon, a horizontal
+// range bar (normalised to the week's overall min/max so you can see
+// at a glance which days are hotter / colder), high/low temps, and a
+// rain pill. Today claims the accent block; remaining days alternate
+// surface / surface2.
 
 const WMO = {
   0:  ["sun",             "Clear"],
@@ -63,14 +66,30 @@ function renderError(msg) {
   `;
 }
 
-// Day-block colour: today gets the accent, the rest alternate between
-// surface and surface2 so the row has a Bauhaus colour-block rhythm.
+// Day-block colour: today gets the accent, the rest alternate.
 function dayTone(position) {
   if (position === 0) return "accent";
   return position % 2 === 1 ? "surface" : "surface2";
 }
 
-function dayBlock(day, position, showRain) {
+// Compute per-day range bar styles relative to the week's overall
+// min / max so the bars are comparable across days.
+function computeRangeBars(days) {
+  const lows = days.map((d) => (typeof d.low === "number" ? d.low : null)).filter((v) => v != null);
+  const highs = days.map((d) => (typeof d.high === "number" ? d.high : null)).filter((v) => v != null);
+  if (!lows.length || !highs.length) return days.map(() => null);
+  const weekMin = Math.min(...lows);
+  const weekMax = Math.max(...highs);
+  const span = weekMax - weekMin || 1; // avoid div-by-zero on a flat week
+  return days.map((d) => {
+    if (typeof d.low !== "number" || typeof d.high !== "number") return null;
+    const left = ((d.low - weekMin) / span) * 100;
+    const right = 100 - ((d.high - weekMin) / span) * 100;
+    return { left: left.toFixed(1), right: right.toFixed(1) };
+  });
+}
+
+function dayBlock(day, position, showRain, rangeBar) {
   const [icon, label] = describe(day.code);
   const tone = dayTone(position);
   const rainPct = day.rain == null ? null : Math.round(day.rain);
@@ -80,6 +99,10 @@ function dayBlock(day, position, showRain) {
       <div class="wf-day-name">${escapeHtml(dayLabel(day.weekday, position))}</div>
       <i class="ph-bold ph-${icon} wf-day-icon" aria-hidden="true"></i>
       <div class="wf-day-cond">${escapeHtml(label)}</div>
+      ${rangeBar ? `
+      <div class="wf-day-range" aria-hidden="true">
+        <span class="wf-day-range-fill" style="left: ${rangeBar.left}%; right: ${rangeBar.right}%"></span>
+      </div>` : ""}
       <div class="wf-day-temps">
         <span class="wf-day-high">${fmtTemp(day.high)}</span>
         <span class="wf-day-low">${fmtTemp(day.low)}</span>
@@ -107,6 +130,7 @@ export default async function render(shadow, ctx) {
 
   const size = ctx.cell.size;
   const showRain = size === "md" || size === "lg";
+  const rangeBars = computeRangeBars(days);
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
@@ -119,7 +143,7 @@ export default async function render(shadow, ctx) {
         <span class="wf-time">${nowTime()}</span>
       </header>
       <section class="wf-days">
-        ${days.map((d, i) => dayBlock(d, i, showRain)).join("")}
+        ${days.map((d, i) => dayBlock(d, i, showRain, rangeBars[i])).join("")}
       </section>
     </div>
   `;
