@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 from flask import Flask
@@ -11,12 +14,45 @@ from app.main import REPO_ROOT, create_app
 from app.state.page_store import PageStore
 
 
+def _write_test_plugin(plugin_dir: Path, *, cell_options: list[dict[str, Any]]) -> None:
+    """Drop a minimal widget plugin at ``plugin_dir`` for editor tests
+    that only need a valid plugin id + cell_option defaults."""
+    plugin_dir.mkdir(parents=True)
+    manifest = {
+        "tesserae_compat": "1.x",
+        "name": plugin_dir.name.replace("_", " ").title(),
+        "version": "0.0.1",
+        "kind": "widget",
+        "supports": {"sizes": ["sm", "md", "lg"]},
+        "cell_options": cell_options,
+    }
+    (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+    (plugin_dir / "client.js").write_text("export default function () {}\n")
+
+
 @pytest.fixture
 def app(tmp_path: Path) -> Flask:
+    # Synthetic plugin sandbox: the editor tests need plugin ids that
+    # exist + carry known cell-option defaults, but nothing renders here,
+    # so we don't need the bundled widget set. themes_core is copied in
+    # because the editor's compose route resolves a default theme.
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_test_plugin(
+        plugins_dir / "widget_a",
+        cell_options=[
+            {"name": "format", "type": "string", "label": "Format", "default": "24h"},
+            {"name": "show_date", "type": "boolean", "label": "Show date", "default": True},
+            {"name": "show_seconds", "type": "boolean", "label": "Show seconds", "default": False},
+        ],
+    )
+    _write_test_plugin(plugins_dir / "widget_b", cell_options=[])
+    shutil.copytree(REPO_ROOT / "plugins" / "themes_core", plugins_dir / "themes_core")
+
     a = create_app(
         testing=False,
-        data_root=tmp_path,
-        plugins_dir=REPO_ROOT / "plugins",
+        data_root=tmp_path / "data",
+        plugins_dir=plugins_dir,
         renderers_dir=REPO_ROOT / "renderers",
         devices_dir=REPO_ROOT / "devices",
     )
@@ -29,7 +65,7 @@ def _sign_in(client) -> None:
 
 
 def _store(tmp_path: Path) -> PageStore:
-    return PageStore(tmp_path / "core" / "pages.json")
+    return PageStore(tmp_path / "data" / "core" / "pages.json")
 
 
 # -- /pages list + new -----------------------------------------------
@@ -165,12 +201,12 @@ def test_apply_layout_reuses_existing_cells(app: Flask, tmp_path: Path) -> None:
     cell_id = page.cells[0].id
     client.post(
         f"/pages/home/cells/{cell_id}",
-        data={"plugin": "clock", "x": "0", "y": "0", "w": "800", "h": "600"},
+        data={"plugin": "widget_a", "x": "0", "y": "0", "w": "800", "h": "600"},
     )
     client.post("/pages/home/layout", data={"layout": "2x2_grid"})
     page = _store(tmp_path).get("home")
     assert len(page.cells) == 4
-    assert page.cells[0].plugin == "clock"
+    assert page.cells[0].plugin == "widget_a"
     assert (page.cells[0].x, page.cells[0].y, page.cells[0].w, page.cells[0].h) == (0, 0, 400, 300)
     assert all(c.plugin is None for c in page.cells[1:])
 
@@ -227,10 +263,10 @@ def test_assign_plugin_seeds_options(app: Flask, tmp_path: Path) -> None:
     cell_id = _store(tmp_path).get("home").cells[0].id
     client.post(
         f"/pages/home/cells/{cell_id}",
-        data={"plugin": "clock", "x": "0", "y": "0", "w": "400", "h": "300"},
+        data={"plugin": "widget_a", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
     cell = _store(tmp_path).get("home").cells[0]
-    assert cell.plugin == "clock"
+    assert cell.plugin == "widget_a"
     assert cell.options.get("format") == "24h"
     assert cell.options.get("show_date") is True
 
@@ -248,20 +284,20 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
         data={"name": "Home", "layout": "1_cell"},
     )
     cell_id = _store(tmp_path).get("home").cells[0].id
-    # Step 1: assign the plugin. Options are seeded from clock defaults.
+    # Step 1: assign widget_a. Options are seeded from widget_a's defaults.
     client.post(
         f"/pages/home/cells/{cell_id}",
-        data={"plugin": "clock", "x": "0", "y": "0", "w": "400", "h": "300"},
+        data={"plugin": "widget_a", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
     cell = _store(tmp_path).get("home").cells[0]
-    assert cell.plugin == "clock"
+    assert cell.plugin == "widget_a"
     assert cell.options["format"] == "24h"
     assert cell.options["show_seconds"] is False
     # Step 2: edit an option. plugin unchanged -> options come from the form.
     client.post(
         f"/pages/home/cells/{cell_id}",
         data={
-            "plugin": "clock",
+            "plugin": "widget_a",
             "x": "0",
             "y": "0",
             "w": "400",
@@ -273,13 +309,13 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
     cell = _store(tmp_path).get("home").cells[0]
     assert cell.options["show_seconds"] is True
     assert cell.options["format"] == "12h"
-    # Step 3: swap plugins -> clock's options shouldn't carry over.
+    # Step 3: swap to widget_b -> widget_a's options shouldn't carry over.
     client.post(
         f"/pages/home/cells/{cell_id}",
-        data={"plugin": "year_progress", "x": "0", "y": "0", "w": "400", "h": "300"},
+        data={"plugin": "widget_b", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
     cell = _store(tmp_path).get("home").cells[0]
-    assert cell.plugin == "year_progress"
+    assert cell.plugin == "widget_b"
     assert "show_seconds" not in cell.options
     assert "format" not in cell.options
 
@@ -292,7 +328,7 @@ def test_update_cell_clamps_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     cell_id = _store(tmp_path).get("home").cells[0].id
     client.post(
         f"/pages/home/cells/{cell_id}",
-        data={"plugin": "clock", "x": "999", "y": "-50", "w": "5000", "h": "5000"},
+        data={"plugin": "widget_a", "x": "999", "y": "-50", "w": "5000", "h": "5000"},
     )
     cell = _store(tmp_path).get("home").cells[0]
     assert cell.x == 399
@@ -326,7 +362,7 @@ def test_cell_palette_overrides_round_trip(app: Flask, tmp_path: Path) -> None:
     client.post(
         f"/pages/home/cells/{cell_id}",
         data={
-            "plugin": "clock",
+            "plugin": "widget_a",
             "x": "0",
             "y": "0",
             "w": "100",

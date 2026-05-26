@@ -26,7 +26,7 @@ In active development. Tracked by milestone:
 | 7 | Send page | done |
 | 8 | Generalise event log (renderer / device / scheduler events) | done |
 | 9 | Home Assistant MQTT discovery | done |
-| 10 | Port bedrock widgets (year_progress, sun_moon, weather, todo, calendar) | done |
+| 10 | ~~Port bedrock widgets (year_progress, sun_moon, weather, todo, calendar)~~ — dropped, rebuilding fresh | superseded |
 | 11 | Settings split into Server / Renderers / Devices / Plugins sub-pages | done |
 | 12 | Polish: timezone, test-broker, test-push, live SSE event stream | done |
 | 13 | Theme builder + curated v4 theme subset | done |
@@ -36,12 +36,12 @@ In active development. Tracked by milestone:
 | 17 | `/` redirects to `/send`; reorder nav; Plugins dropdown for admin pages | done |
 | 18 | Modern UI overhaul + locally vendored Phosphor icon set | done |
 
-All milestones from the build prompt + polish bundle are complete. 251 tests
-passing; ruff + mypy --strict (on contract modules) clean. Remaining v4 widgets
-(aligner, apod, aqi_trend, countdown, day_view, gallery, genart,
-github_heatmap, hn, home_assistant, news, note, pollen_vic, ptv, qr, radar,
-reddit, starmap, trakt_watchlist, unsplash, webpage, wikipotd, world_clock,
-xkcd) are future work.
+Server, renderers, devices, scheduler, HA discovery, settings, theme builder,
+page editor, and the modern UI are all in. Tests + ruff + mypy --strict (on
+contract modules) clean.
+
+The first-cut bedrock widget set (M10) has been dropped to rebuild fresh —
+the plugins/ directory now ships only `themes_core`. Widgets are next.
 
 ## Architecture in one diagram
 
@@ -160,7 +160,8 @@ covered with no broker or Chromium dependency.
 ```
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
-  plugins/<id>/    widget plugins (drop-a-folder)
+  plugins/<id>/    widget + theme plugins (drop-a-folder). Currently only
+                   themes_core ships bundled; widgets are being rebuilt.
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
