@@ -21,10 +21,13 @@ DEFAULTS: dict[str, Any] = {
     "scale": "fit",
     "bg": "white",
     "saturation": 0.5,
-    # 3 CW quarter-turns = 1 CCW turn. Matches pi_bin (M47): composition
-    # is portrait-native, panel is landscape-native, and the ribbon-cable-up
-    # mount needs CCW to land right-side-up. Flip to 1 for ribbon-cable-down.
-    "transform_rotate_quarters": 3,
+    # 1 CW quarter-turn for ribbon-cable-up portrait mount. NOTE: this
+    # is the opposite direction from pi_bin's renderer-side rotation —
+    # pi_bin writes raw landscape pixels into the panel buffer, while
+    # pi_png hands the image to inky.set_image() which applies its own
+    # mount-aware rotation. The two paths compound differently, so the
+    # server-side rotations end up being opposites.
+    "transform_rotate_quarters": 1,
 }
 
 
