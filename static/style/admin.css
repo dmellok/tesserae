@@ -1891,6 +1891,7 @@ button[disabled] {
   position: absolute;
   inset: 0;
 }
+.preview-placeholder[hidden] { display: none !important; }
 
 .pages-list {
   list-style: none;
