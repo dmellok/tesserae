@@ -307,7 +307,7 @@ _TEMPLATE = """
   </ul>
   {% else %}
   <div class="empty-state empty-state--inline">
-    <span class="empty-state-icon"><i class="ph-duotone ph-duotone-check-circle" aria-hidden="true"></i></span>
+    <span class="empty-state-icon"><i class="ph-duotone ph-check-circle" aria-hidden="true"></i></span>
     <h3>All done</h3>
     <p class="lede">Nothing left on this list. Add something above.</p>
   </div>
@@ -320,7 +320,7 @@ _TEMPLATE = """
     <li>
       <form method="post" action="/plugins/todo/{{ active.id }}/undone/{{ item.id }}" class="inline todo-toggle">
         <button type="submit" class="todo-check is-done" aria-label="Undo">
-          <i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>
+          <i class="ph-fill ph-check-circle" aria-hidden="true"></i>
         </button>
       </form>
       <span class="todo-text">{{ item.text }}</span>

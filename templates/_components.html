@@ -178,7 +178,7 @@ macro here instead.
 
 {%- macro empty_state(icon_name, title, blurb=None, action_label=None, action_href=None) -%}
 <div class="empty-state">
-  <span class="empty-state-icon"><i class="ph-duotone ph-duotone-{{ icon_name }}" aria-hidden="true"></i></span>
+  <span class="empty-state-icon"><i class="ph-duotone ph-{{ icon_name }}" aria-hidden="true"></i></span>
   <h3>{{ title }}</h3>
   {% if blurb %}<p class="lede">{{ blurb }}</p>{% endif %}
   {% if action_label and action_href %}

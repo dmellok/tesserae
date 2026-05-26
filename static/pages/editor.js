@@ -33,9 +33,9 @@
       "Saved";
     const iconClass =
       state === "saving" ? "ph ph-arrows-clockwise" :
-      state === "error" ? "ph-fill ph-fill-warning-circle" :
+      state === "error" ? "ph-fill ph-warning-circle" :
       state === "dirty" ? "ph ph-circle-dashed" :
-      "ph-fill ph-fill-check-circle";
+      "ph-fill ph-check-circle";
     status.innerHTML =
       '<i class="' + iconClass + '" aria-hidden="true"></i><span>' + label + "</span>";
   }

@@ -82,7 +82,7 @@
   {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
     <img data-file-preview alt="" class="preview-image" hidden>
     <div class="preview-placeholder" data-file-preview-placeholder>
-      <i class="ph-duotone ph-duotone-image" aria-hidden="true"></i>
+      <i class="ph-duotone ph-image" aria-hidden="true"></i>
       <p>Drop a file to see the preview.</p>
     </div>
   {% endcall %}
@@ -114,7 +114,7 @@
             loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
     {% else %}
     <div class="preview-placeholder">
-      <i class="ph-duotone ph-duotone-squares-four" aria-hidden="true"></i>
+      <i class="ph-duotone ph-squares-four" aria-hidden="true"></i>
       <p>No saved dashboards yet — create one under Dashboards.</p>
     </div>
     {% endif %}
@@ -137,7 +137,7 @@
   {% call preview_card('Live preview', blurb='Loaded directly in your browser — final fit happens server-side.') %}
     <img data-url-preview alt="" class="preview-image" hidden>
     <div class="preview-placeholder" data-url-preview-placeholder>
-      <i class="ph-duotone ph-duotone-link" aria-hidden="true"></i>
+      <i class="ph-duotone ph-link" aria-hidden="true"></i>
       <p>Paste an image URL to preview it.</p>
     </div>
   {% endcall %}
@@ -174,7 +174,7 @@
             style="width: {{ panel.w }}px; height: {{ panel.h }}px; background: white;"
             hidden></iframe>
     <div class="preview-placeholder" data-webpage-preview-placeholder>
-      <i class="ph-duotone ph-duotone-globe" aria-hidden="true"></i>
+      <i class="ph-duotone ph-globe" aria-hidden="true"></i>
       <p>Enter a URL to preview it.</p>
     </div>
   {% endcall %}

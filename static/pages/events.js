@@ -27,7 +27,7 @@
           ? "connecting…"
           : "offline";
     live.innerHTML =
-      '<i class="ph-fill ph-fill-circle" aria-hidden="true"></i><span>' +
+      '<i class="ph-fill ph-circle" aria-hidden="true"></i><span>' +
       label +
       "</span>";
   }
