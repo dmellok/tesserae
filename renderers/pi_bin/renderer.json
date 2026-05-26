@@ -30,10 +30,11 @@
       "name": "saturation",
       "type": "slider",
       "label": "Pre-quantise saturation",
-      "default": 1.0,
+      "default": 1.4,
       "min": 0,
       "max": 3,
-      "step": 0.05
+      "step": 0.05,
+      "help": "Spectra 6 has only six pure colours; boosting saturation before the dither pass pushes near-palette tones onto exact palette values, killing speckle. 1.4 is the recommended out-of-the-box value; bump to 1.6+ for photos."
     },
     {
       "name": "contrast",

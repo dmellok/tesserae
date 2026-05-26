@@ -18,7 +18,9 @@ from app.state.page_store import Panel
 
 DEFAULTS: dict[str, Any] = {
     "dither": "floyd-steinberg",
-    "saturation": 1.0,
+    # Match renderer.json — Spectra 6's tiny palette needs a boost
+    # before quantise to avoid washed-out output.
+    "saturation": 1.4,
     "contrast": 1.0,
 }
 
