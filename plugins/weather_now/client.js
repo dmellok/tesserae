@@ -112,7 +112,7 @@ export default async function render(shadow, ctx) {
           </div>` : ""}
         </div>
         <div class="wn-hero-icon" aria-hidden="true">
-          <i class="ph-bold ph-bold-${icon}"></i>
+          <i class="ph-bold ph-${icon}"></i>
         </div>
         ${showRainTag ? `<span class="wn-rain-tag">${Math.round(data.rain_chance)}% Rain</span>` : ""}
       </section>

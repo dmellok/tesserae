@@ -78,7 +78,7 @@ function dayBlock(day, position, showRain) {
   return `
     <article class="wf-day wf-day--${tone}${position === 0 ? " is-today" : ""}">
       <div class="wf-day-name">${escapeHtml(dayLabel(day.weekday, position))}</div>
-      <i class="ph-bold ph-bold-${icon} wf-day-icon" aria-hidden="true"></i>
+      <i class="ph-bold ph-${icon} wf-day-icon" aria-hidden="true"></i>
       <div class="wf-day-cond">${escapeHtml(label)}</div>
       <div class="wf-day-temps">
         <span class="wf-day-high">${fmtTemp(day.high)}</span>
@@ -86,7 +86,7 @@ function dayBlock(day, position, showRain) {
       </div>
       ${showRain && rainPct != null ? `
       <div class="wf-day-rain${rainWet ? " is-wet" : ""}">
-        <i class="ph-bold ph-bold-drop" aria-hidden="true"></i>
+        <i class="ph-bold ph-drop" aria-hidden="true"></i>
         <span>${rainPct}%</span>
       </div>` : ""}
     </article>

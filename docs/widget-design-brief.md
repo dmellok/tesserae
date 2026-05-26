@@ -158,8 +158,8 @@ grouping, and which theme token / icon goes where.
 [1] place label — uppercase, weight 700, fgSoft. ph-map-pin (regular,
     accent) before the text.
 [2] stats — 4 columns. label uppercase muted; value weight 700.
-    Icons (left of each value): ph-fill-thermometer-simple (warn),
-    ph-fill-drop-half (accent), ph-fill-wind (fgSoft), ph-fill-sun-dim
+    Icons (left of each value): ph-thermometer-simple at bold weight (warn),
+    ph-drop-half at bold (accent), ph-wind at bold (fgSoft), ph-sun-dim at bold
     (tone by UV band).
 [3] sun row — ph-duotone-sun-horizon + ph-duotone-moon-stars (accent).
 ```

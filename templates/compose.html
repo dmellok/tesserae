@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.name|default("Compose") }}</title>
   <!-- Phosphor icon webfont — widgets reference icons via <i class="ph ph-xxx">
-       (regular) or <i class="ph-fill ph-fill-xxx">. Vendored locally so the
+       (regular) or <i class="ph-bold ph-xxx"> (bold) or <i class="ph-fill ph-xxx">
+       (fill, discouraged). The weight class + icon-name class form a compound
+       selector — both classes carry the bare icon name. Vendored locally so the
        renderer paints without network access. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">

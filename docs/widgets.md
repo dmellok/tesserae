@@ -280,9 +280,14 @@ Markup:
 
 ```html
 <i class="ph ph-cloud-sun" aria-hidden="true"></i>
-<i class="ph-bold ph-bold-warning-circle" aria-hidden="true"></i>
-<i class="ph-duotone ph-duotone-sun-horizon" aria-hidden="true"></i>
+<i class="ph-bold ph-warning-circle" aria-hidden="true"></i>
+<i class="ph-duotone ph-sun-horizon" aria-hidden="true"></i>
 ```
+
+The class form is **compound**: a weight class (`ph-bold`, `ph-fill`,
+`ph-duotone`) **plus** the bare icon-name class (`ph-cloud-sun`,
+`ph-warning-circle`). Both carry the bare icon name — `ph-bold-cloud-sun`
+as a single class does NOT exist and won't render.
 
 Inside Shadow DOM you must load the weights you use:
 
