@@ -21,6 +21,11 @@ from typing import Any, Protocol
 
 logger = logging.getLogger(__name__)
 
+# paho-mqtt rc=4 is MQTT_ERR_NO_CONN. With qos>=1 the message is queued
+# in paho's outbound store and replayed on reconnect, so it's not a real
+# delivery failure — only a "didn't go out on this call" signal.
+_MQTT_ERR_NO_CONN = 4
+
 
 SubscribeCallback = Callable[[str, bytes], None]
 
@@ -147,6 +152,17 @@ class MqttTransport:
             raise RuntimeError(f"transport not connected; can't publish to {topic!r}")
         result = self._client.publish(topic, payload, qos=qos, retain=retain)
         rc = getattr(result, "rc", 0)
+        if rc == _MQTT_ERR_NO_CONN and qos >= 1:
+            # Broker not currently connected, but paho has queued the
+            # message and will replay it on reconnect. With qos=0 the
+            # publish would be lost, so we keep raising in that case.
+            logger.warning(
+                "MQTT publish %s queued — broker not connected (qos=%d, %d bytes)",
+                topic,
+                qos,
+                len(payload),
+            )
+            return
         if rc != 0:
             raise RuntimeError(f"mqtt publish to {topic!r} failed: rc={rc}")
         logger.debug(

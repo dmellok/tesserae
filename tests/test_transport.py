@@ -98,16 +98,46 @@ def test_publish_before_connect_raises(fakes) -> None:
 
 
 def test_publish_propagates_paho_rc(fakes) -> None:
+    """Non-recoverable rc values (anything other than NO_CONN) still raise."""
     holder, factory = fakes
     t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
     t.connect()
 
     def failing_publish(topic, payload, qos, retain):
-        return _FakePublish(rc=4)
+        return _FakePublish(rc=2)  # MQTT_ERR_PROTOCOL — actually broken
 
     holder["client"].publish = failing_publish  # type: ignore[method-assign]
-    with pytest.raises(RuntimeError, match="rc=4"):
+    with pytest.raises(RuntimeError, match="rc=2"):
         t.publish("x", b"y")
+
+
+def test_publish_no_conn_at_qos1_is_queued_not_raised(fakes) -> None:
+    """rc=4 on qos>=1 means paho queued the message for replay on
+    reconnect — surface as a warning, not an exception."""
+    holder, factory = fakes
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    t.connect()
+
+    def no_conn_publish(topic, payload, qos, retain):
+        return _FakePublish(rc=4)
+
+    holder["client"].publish = no_conn_publish  # type: ignore[method-assign]
+    # Should not raise.
+    t.publish("x", b"y", qos=1)
+
+
+def test_publish_no_conn_at_qos0_still_raises(fakes) -> None:
+    """qos=0 is fire-and-forget — paho doesn't queue, so rc=4 means lost."""
+    holder, factory = fakes
+    t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
+    t.connect()
+
+    def no_conn_publish(topic, payload, qos, retain):
+        return _FakePublish(rc=4)
+
+    holder["client"].publish = no_conn_publish  # type: ignore[method-assign]
+    with pytest.raises(RuntimeError, match="rc=4"):
+        t.publish("x", b"y", qos=0)
 
 
 def test_subscribe_dispatch_matches_wildcards(fakes) -> None:
