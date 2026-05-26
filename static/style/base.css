@@ -1,0 +1,181 @@
+/*
+ * Tesserae admin design system.
+ *
+ * Tokens first — colours, spacing, radius, shadow, typography. Swap
+ * --t-accent to retint the whole admin (nav, buttons, focus ring,
+ * brand mark, slider thumb, switch on-state, link hover).
+ *
+ * Neutrals follow a zinc-ish 50→900 scale; surfaces are 50/100 (warm
+ * neutral grey, not the v1 warm-cream which clashed with cooler
+ * accents). The Phosphor icon font is loaded by _base.html — every
+ * <i class="ph ph-xxx"> tag inside the admin shell picks up the styles
+ * below.
+ */
+
+:root {
+  /* Accent — deep teal that reads as both serious and warm. */
+  --t-accent: #0d8c7e;
+  --t-accent-hover: #0a6f63;
+  --t-accent-soft: #e6f3f1;
+  --t-accent-fg: #ffffff;
+
+  /* Neutral scale */
+  --t-50:  #fafafa;
+  --t-100: #f4f4f5;
+  --t-200: #e4e4e7;
+  --t-300: #d4d4d8;
+  --t-400: #a1a1aa;
+  --t-500: #71717a;
+  --t-600: #52525b;
+  --t-700: #3f3f46;
+  --t-800: #27272a;
+  --t-900: #18181b;
+
+  --t-bg:            var(--t-100);
+  --t-surface:       #ffffff;
+  --t-surface-soft:  var(--t-50);
+  --t-surface-sunk:  var(--t-100);
+  --t-fg:            var(--t-900);
+  --t-fg-soft:       var(--t-600);
+  --t-muted:         var(--t-500);
+  --t-border:        var(--t-200);
+  --t-border-strong: var(--t-300);
+
+  --t-danger:    #dc2626;
+  --t-danger-bg: #fef2f2;
+  --t-warn:      #d97706;
+  --t-warn-bg:   #fffbeb;
+  --t-ok:        #16a34a;
+  --t-ok-bg:     #f0fdf4;
+
+  /* Typography */
+  --t-font:      ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+                 Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --t-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --t-size-xs:  11px;
+  --t-size-sm:  12px;
+  --t-size-md:  13px;
+  --t-size-base:14px;
+  --t-size-lg:  16px;
+  --t-size-xl:  18px;
+  --t-size-2xl: 22px;
+  --t-size-3xl: 28px;
+
+  /* Spacing — 4px base */
+  --t-space-1: 4px;
+  --t-space-2: 8px;
+  --t-space-3: 12px;
+  --t-space-4: 16px;
+  --t-space-5: 20px;
+  --t-space-6: 24px;
+  --t-space-7: 32px;
+  --t-space-8: 48px;
+
+  /* Radius */
+  --t-radius-sm:  6px;
+  --t-radius:     10px;
+  --t-radius-md:  10px;
+  --t-radius-lg:  16px;
+  --t-radius-pill: 999px;
+
+  /* Shadow */
+  --t-shadow-sm: 0 1px 2px rgba(20,16,12,.04);
+  --t-shadow:    0 1px 2px rgba(20,16,12,.04), 0 1px 3px rgba(20,16,12,.04);
+  --t-shadow-md: 0 1px 2px rgba(20,16,12,.04), 0 4px 14px rgba(20,16,12,.06);
+  --t-shadow-lg: 0 8px 24px rgba(20,16,12,.10);
+  --t-ring:      0 0 0 3px color-mix(in oklab, var(--t-accent) 25%, transparent);
+
+  --t-trans:      150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --t-trans-fast: 80ms ease;
+  color-scheme: light;
+}
+
+/* Dark theme — toggled via <html data-theme="dark">. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --t-bg:            #0f1115;
+  --t-surface:       #181b21;
+  --t-surface-soft:  #1f232b;
+  --t-surface-sunk:  #14171c;
+  --t-fg:            #e7e9ee;
+  --t-fg-soft:       #b6bcc7;
+  --t-muted:         #8b93a1;
+  --t-border:        #2a2f38;
+  --t-border-strong: #3a4150;
+
+  --t-accent:        #2dd4bf;
+  --t-accent-hover:  #14b8a6;
+  --t-accent-soft:   color-mix(in oklab, #2dd4bf 18%, #181b21);
+  --t-accent-fg:     #04241f;
+
+  --t-danger:    #f87171;
+  --t-danger-bg: color-mix(in oklab, #f87171 18%, #181b21);
+  --t-warn:      #fbbf24;
+  --t-warn-bg:   color-mix(in oklab, #fbbf24 18%, #181b21);
+  --t-ok:        #4ade80;
+  --t-ok-bg:     color-mix(in oklab, #4ade80 18%, #181b21);
+
+  --t-shadow-sm: 0 1px 2px rgba(0,0,0,.30);
+  --t-shadow:    0 1px 2px rgba(0,0,0,.30), 0 1px 3px rgba(0,0,0,.35);
+  --t-shadow-md: 0 1px 2px rgba(0,0,0,.30), 0 4px 14px rgba(0,0,0,.45);
+  --t-shadow-lg: 0 12px 28px rgba(0,0,0,.55);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body.admin {
+  background: var(--t-bg);
+  color: var(--t-fg);
+  font: 400 var(--t-size-base)/1.5 var(--t-font);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--t-accent); text-decoration: none; }
+a:hover { color: var(--t-accent-hover); }
+
+/* ----- Icons (Phosphor) ----------------------------------------------
+   Inline icons inherit colour + sit on the baseline. Standalone icons
+   (in card-head, empty states) bump up via .ph-lg / .ph-2x classes. */
+
+.ph,
+.ph-fill,
+.ph-bold,
+.ph-duotone,
+.ph-light,
+.ph-thin {
+  vertical-align: -0.125em;
+  font-size: 1.05em;
+  line-height: 1;
+}
+.ph.is-lg { font-size: 1.5em; }
+.ph.is-xl { font-size: 2em; }
+.ph.is-2x { font-size: 32px; }
+.ph.is-3x { font-size: 48px; }
+.ph.is-accent { color: var(--t-accent); }
+.ph.is-muted  { color: var(--t-muted); }
+.ph.is-soft   { color: var(--t-fg-soft); }
+.ph.is-ok     { color: var(--t-ok); }
+.ph.is-warn   { color: var(--t-warn); }
+.ph.is-danger { color: var(--t-danger); }
+
+.icon-box {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.icon-box.is-sm { width: 24px; height: 24px; font-size: 14px; }
+.icon-box.is-lg { width: 40px; height: 40px; font-size: 22px; }
+.icon-box.is-muted { background: var(--t-surface-sunk); color: var(--t-fg-soft); }
+

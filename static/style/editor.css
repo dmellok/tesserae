@@ -1,0 +1,425 @@
+/* ----- Editor (pages + cells) -------------------------------------- */
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+/* Fluid panel-shaped preview. The frame fills its column width up to
+   a sensible cap, height tracks via aspect-ratio (set inline from the
+   panel dims). The inner iframe/img is sized to the panel's native
+   pixels so the composer renders unscaled; static/components.js
+   (fitPreview) sets a `transform: scale(...)` to fit. */
+.preview-frame {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface-soft);
+  overflow: hidden;
+  aspect-ratio: 4 / 3; /* fallback; inline style overrides */
+}
+
+.preview-frame > iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  display: block;
+  /* The composed panel content sets its own bleed colour and paints
+     over this; we only see this background while the iframe loads.
+     Use the themed surface so dark mode doesn't flash bright white. */
+  background: var(--t-surface-soft);
+  transform-origin: 0 0;
+}
+.preview-frame > img.preview-image {
+  /* Raster previews fit the frame with letterboxing; the source is
+     panel-content already so we don't need the iframe's transform
+     trick. The letterbox bars use the themed surface. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: var(--t-surface-soft);
+  object-fit: contain;
+}
+.preview-frame > .preview-placeholder {
+  position: absolute;
+  inset: 0;
+}
+.preview-placeholder[hidden] { display: none !important; }
+
+.pages-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.page-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+}
+
+.page-card-link {
+  text-decoration: none;
+  color: var(--t-fg);
+  display: block;
+  min-width: 0;
+}
+
+.page-name { font-weight: 700; font-size: 15px; }
+.page-meta { font-size: 12px; color: var(--t-fg-soft); margin-top: 2px; }
+
+.page-actions { display: flex; gap: 6px; }
+
+.cell-list {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.cell-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--t-surface-soft);
+  border-radius: var(--t-radius-sm);
+}
+
+.cell-row-link {
+  text-decoration: none;
+  color: var(--t-fg);
+  min-width: 0;
+}
+
+.cell-row-name { font-weight: 600; font-size: 14px; }
+.cell-row-meta { font-size: 12px; }
+
+.add-cell { padding-top: 4px; border-top: 1px dashed var(--t-border); margin-top: 4px; }
+
+.form-group {
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  padding: 12px 14px;
+  margin: 0 0 14px;
+}
+.form-group > legend {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-fg-soft);
+  padding: 0 6px;
+}
+.form-group summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-fg-soft);
+  padding: 4px 0;
+}
+.form-group[open] summary { margin-bottom: 10px; }
+
+.header-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 14px;
+  padding: 7px 14px 7px 12px;
+  background: var(--t-accent);
+  color: var(--t-accent-fg, #fff);
+  border: 1px solid color-mix(in oklab, var(--t-accent) 70%, black);
+  border-radius: var(--t-radius-sm);
+  text-decoration: none;
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  cursor: pointer;
+  vertical-align: middle;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 1px 2px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    0 0 0 0 color-mix(in oklab, var(--t-accent) 0%, transparent);
+  transition:
+    background var(--t-trans-fast),
+    box-shadow var(--t-trans-fast),
+    transform var(--t-trans-fast);
+}
+.header-action .ph,
+.header-action [class*="ph-"] {
+  font-size: 18px;
+  color: #fff !important;
+  font-weight: bold;
+}
+.header-action:hover {
+  background: var(--t-accent-hover);
+  color: var(--t-accent-fg, #fff);
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 3px 8px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 18%, transparent);
+  transform: translateY(-1px);
+}
+.header-action:active { transform: translateY(0); }
+.header-action:focus-visible {
+  outline: none;
+  box-shadow:
+    0 1px 0 color-mix(in oklab, white 35%, transparent) inset,
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 30%, transparent);
+}
+
+.header-back {
+  color: var(--t-fg-soft);
+  text-decoration: none;
+}
+.header-back:hover { color: var(--t-accent); }
+
+.page-id-tag {
+  font-size: 13px;
+  color: var(--t-muted);
+  font-weight: 400;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+/* ----- Editor header (page name + save status) --------------------- */
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 16px;
+  margin: -20px 0 12px;
+  border-bottom: 1px solid var(--t-border);
+}
+
+.editor-header .header-back {
+  font-size: 22px;
+  text-decoration: none;
+  padding: 4px 10px;
+  border-radius: var(--t-radius-sm);
+  color: var(--t-fg-soft);
+}
+.editor-header .header-back:hover { background: var(--t-surface-soft); color: var(--t-accent); }
+
+.editor-name-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.editor-name-icon:empty { display: none; }
+
+.inline-name-form { flex: 1; max-width: 480px; }
+.inline-name-input {
+  font: 700 18px/1.2 system-ui, sans-serif;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--t-radius-sm);
+  background: transparent;
+  width: 100%;
+  color: var(--t-fg);
+}
+.inline-name-input:hover { background: var(--t-surface-soft); }
+.inline-name-input:focus { background: var(--t-surface); border-color: var(--t-border-strong); outline: none; }
+
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--t-ok-bg);
+  color: var(--t-ok);
+}
+.save-status .ph, .save-status [class^="ph-"] { font-size: 13px; }
+.save-status[data-state="saving"] { background: var(--t-surface-soft); color: var(--t-fg-soft); }
+.save-status[data-state="saving"] .ph { animation: ts-spin 0.9s linear infinite; }
+.save-status[data-state="dirty"] {
+  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
+  color: var(--t-warn);
+}
+.save-status[data-state="error"] { background: var(--t-danger-bg); color: var(--t-danger); }
+
+@keyframes ts-spin {
+  to { transform: rotate(360deg); }
+}
+
+.editor-spacer { flex: 1; }
+
+.editor-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.editor-actions button { padding: 6px 12px; font-size: 13px; }
+.editor-actions button[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ----- Editor grid: options on the left, preview pinned on the right - */
+
+@media (min-width: 1100px) {
+  body.admin .page { max-width: 1440px; }
+  .editor-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 620px);
+    grid-template-areas: "column preview";
+    gap: 24px;
+    align-items: start;
+  }
+  .editor-column {
+    grid-area: column;
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+  .preview-card {
+    grid-area: preview;
+    position: sticky;
+    top: calc(var(--t-space-6) + 60px);
+    margin: 0;
+    align-self: start;
+  }
+}
+
+@media (max-width: 1099px) {
+  .editor-grid { gap: 14px; }
+}
+
+.preview-card .preview-frame { margin: 0 auto; }
+.preview-dims {
+  text-align: right;
+  font-size: 12px;
+  margin: 8px 4px 0;
+}
+
+.cell-card { scroll-margin-top: 16px; transition: outline 200ms ease; }
+.cell-card.is-focused {
+  outline: 3px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.cell-card .card-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.cell-card .card-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+}
+.cell-num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--t-fg);
+  color: var(--t-bg);
+  font: 700 12px/1 system-ui, sans-serif;
+}
+.cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
+
+/* ----- Layout picker (thumbnails) --------------------------------- */
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  /* Each card centres a fixed-height thumbnail in the panel aspect.
+     The aspect is set inline from the current panel so portrait flips
+     show portrait thumbnails. */
+  --panel-aspect: 4 / 3;
+  --thumb-h: 96px;
+}
+
+.layout-form { margin: 0; }
+
+.layout-card {
+  display: grid;
+  grid-template-rows: var(--thumb-h) auto;
+  justify-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  cursor: pointer;
+  width: 100%;
+  text-align: center;
+  font: 12px/1.2 system-ui, sans-serif;
+  color: var(--t-fg);
+  transition: border-color 80ms ease, transform 80ms ease;
+  /* Reset the global button inline-flex so the grid-rows take effect. */
+  white-space: normal;
+}
+.layout-card:hover {
+  border-color: var(--t-accent);
+  transform: translateY(-1px);
+}
+.layout-card.is-active {
+  border-color: var(--t-accent);
+  background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+}
+
+.layout-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.layout-thumb {
+  position: relative;
+  display: block;
+  height: var(--thumb-h);
+  aspect-ratio: var(--panel-aspect);
+  background: var(--t-surface-soft);
+  border: 1px solid var(--t-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.layout-thumb-cell {
+  position: absolute;
+  background: color-mix(in oklab, var(--t-accent) 45%, white);
+  outline: 1px solid var(--t-surface);
+  outline-offset: -1px;
+}
+
+.layout-name {
+  font-weight: 600;
+  color: var(--t-fg);
+}
+
+.add-cell-card .full-width {
+  width: 100%;
+  padding: 12px;
+  font-weight: 600;
+  border-style: dashed;
+}
+

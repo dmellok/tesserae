@@ -1,0 +1,466 @@
+/* ----- Top bar ------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-5);
+  padding: var(--t-space-3) var(--t-space-6);
+  background: var(--t-surface);
+  border-bottom: 1px solid var(--t-border);
+  position: sticky;
+  top: 0;
+  /* Sit above the mobile-drawer scrim so the drawer (a child of topbar)
+     renders unblurred. No backdrop-filter — it would create a containing
+     block that traps `position: fixed` descendants inside the header. */
+  z-index: 60;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  text-decoration: none;
+  color: var(--t-fg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-size: var(--t-size-lg);
+}
+.brand:hover { color: var(--t-accent); }
+
+.brand-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--t-accent), var(--t-accent-hover));
+  color: var(--t-accent-fg);
+  font-size: 16px;
+  position: relative;
+}
+/* Tessellated dot pattern in the brand mark. Pure CSS, no image. */
+.brand-mark::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background:
+    conic-gradient(from 0deg at 50% 50%, currentColor 0 25%, transparent 0 50%,
+                   currentColor 0 75%, transparent 0 100%);
+  opacity: 0.85;
+  border-radius: 3px;
+}
+
+.brand-name { font-size: var(--t-size-lg); }
+
+.topnav {
+  display: flex;
+  gap: var(--t-space-1);
+  margin-left: var(--t-space-3);
+  flex-wrap: wrap;
+}
+
+.topnav a,
+.topnav .nav-dropdown summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: var(--t-size-md);
+  padding: var(--t-space-2) var(--t-space-3);
+  border-radius: var(--t-radius-sm);
+  transition: background var(--t-trans-fast), color var(--t-trans-fast);
+}
+.topnav a .ph,
+.topnav .nav-dropdown summary .ph {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.topnav a:hover,
+.topnav .nav-dropdown summary:hover {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+}
+
+.topnav a.is-active,
+.topnav .nav-dropdown.is-active summary,
+.topnav .nav-dropdown[open] summary {
+  color: var(--t-accent);
+  background: var(--t-accent-soft);
+}
+
+/* Plugin dropdown — anchored panel, not inline block. */
+.nav-dropdown { position: relative; }
+.nav-dropdown summary {
+  list-style: none;
+  cursor: pointer;
+}
+.nav-dropdown summary::-webkit-details-marker { display: none; }
+.nav-dropdown-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 220px;
+  display: grid;
+  gap: 2px;
+  padding: var(--t-space-2);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-lg);
+  z-index: 50;
+}
+.nav-dropdown-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  border-radius: var(--t-radius-sm);
+  font-size: var(--t-size-md);
+  white-space: nowrap;
+}
+.nav-dropdown-link:hover { background: var(--t-surface-sunk); color: var(--t-accent); }
+.nav-dropdown-sep {
+  padding: var(--t-space-2) var(--t-space-3) 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+}
+.nav-dropdown-hint {
+  padding: var(--t-space-2) var(--t-space-3);
+  font-size: 12px;
+  color: var(--t-muted);
+}
+
+/* Theme toggle — rendered twice. The .theme-toggle--topbar variant
+   is a compact icon square pinned to the far right of the topbar on
+   desktop. The .theme-toggle--drawer variant is a full-width labelled
+   row inside the responsive drawer. CSS hides whichever isn't
+   appropriate for the current viewport. */
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  color: var(--t-fg-soft);
+  padding: 0;
+}
+.theme-toggle:hover { color: var(--t-accent); background: var(--t-surface-sunk); }
+.theme-toggle .ph { font-size: 18px; }
+.theme-toggle-label { display: none; }
+
+.theme-toggle--topbar { margin-left: auto; }
+.theme-toggle--drawer { display: none; }
+
+/* Show/hide based on the current theme. Dark icon is visible only when
+   data-theme=dark, light icon is visible only when it's absent. */
+:root[data-theme="dark"] .is-light-only { display: none; }
+:root:not([data-theme="dark"]) .is-dark-only { display: none; }
+
+.topbar-logout { margin-left: auto; }
+.topbar-logout button {
+  padding: var(--t-space-2) var(--t-space-3);
+  font-size: var(--t-size-md);
+}
+
+/* Hamburger + sidebar (mobile/tablet) ------------------------------ */
+
+.nav-toggle {
+  display: none;
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  background: transparent;
+  color: var(--t-fg);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+}
+.nav-toggle:hover { background: var(--t-surface-sunk); }
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 32, 0.45);
+  z-index: 30;
+}
+
+@media (max-width: 900px) {
+  .nav-toggle { display: inline-flex; }
+  .topbar-logout { display: none; }
+  .topnav {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(320px, 86vw);
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--t-space-1);
+    margin: 0;
+    padding: var(--t-space-5) var(--t-space-4);
+    background: var(--t-surface);
+    border-left: 1px solid var(--t-border);
+    box-shadow: var(--t-shadow-lg);
+    transform: translateX(100%);
+    transition: transform 200ms ease;
+    overflow-y: auto;
+    z-index: 60;
+    flex-wrap: nowrap;
+  }
+  body.nav-open .topnav { transform: translateX(0); }
+  .topnav a, .topnav .nav-dropdown summary {
+    padding: var(--t-space-3) var(--t-space-3);
+    font-size: var(--t-size-md);
+    justify-content: flex-start;
+  }
+  /* In the drawer, the dropdown panel expands inline rather than absolute. */
+  .topnav .nav-dropdown-panel {
+    position: static;
+    box-shadow: none;
+    border: 0;
+    background: transparent;
+    padding: var(--t-space-1) var(--t-space-3);
+    margin-left: var(--t-space-4);
+    border-left: 2px solid var(--t-border);
+  }
+  /* Drawer-only theme toggle takes over inside the drawer. */
+  .theme-toggle--topbar { display: none; }
+  .theme-toggle--drawer {
+    display: inline-flex;
+    width: 100%;
+    height: auto;
+    align-items: center;
+    justify-content: flex-start;
+    padding: var(--t-space-3) var(--t-space-3);
+    margin-top: auto;
+    border-color: transparent;
+    color: var(--t-fg-soft);
+    gap: var(--t-space-2);
+  }
+  .theme-toggle--drawer .theme-toggle-label { display: inline; }
+  .theme-toggle--drawer:hover { background: var(--t-surface-sunk); }
+}
+@media (min-width: 901px) {
+  .nav-scrim { display: none; }
+}
+
+/* ----- Layout -------------------------------------------------------- */
+
+.page {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--t-space-7) var(--t-space-6) var(--t-space-8);
+}
+
+.page.page-wide { max-width: 1440px; }
+
+.page-head {
+  margin-bottom: var(--t-space-6);
+}
+
+.page-head h1 {
+  font-size: var(--t-size-3xl);
+  font-weight: 700;
+  margin: 0 0 var(--t-space-2);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+
+.page-head h1 .ph { font-size: 0.85em; color: var(--t-accent); }
+
+.lede {
+  color: var(--t-fg-soft);
+  margin: 0 0 var(--t-space-2);
+  font-size: var(--t-size-md);
+  line-height: 1.55;
+}
+
+/* ----- Card ---------------------------------------------------------- */
+
+.card {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  padding: var(--t-space-5) var(--t-space-6) var(--t-space-6);
+  margin: 0 0 var(--t-space-4);
+  scroll-margin-top: 80px;
+  transition: border-color var(--t-trans-fast);
+}
+
+.card.narrow {
+  max-width: 440px;
+  margin: var(--t-space-8) auto;
+  padding: var(--t-space-6);
+}
+
+.card-head {
+  margin-bottom: var(--t-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-1);
+}
+
+.card-head h1 {
+  font-size: var(--t-size-2xl);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.015em;
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+
+.card-head h2 {
+  font-size: var(--t-size-lg);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.005em;
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+}
+.card-head h2 .icon-box { margin-right: var(--t-space-1); }
+
+.card-head .lede { margin-top: var(--t-space-1); }
+
+.card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+}
+
+.card-head-action {
+  flex-shrink: 0;
+}
+
+/* ----- Empty states -------------------------------------------------- */
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-7) var(--t-space-4);
+  color: var(--t-fg-soft);
+}
+
+.empty-state-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--t-radius-lg);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  margin-bottom: var(--t-space-2);
+}
+
+.empty-state h3 {
+  margin: 0;
+  font-size: var(--t-size-lg);
+  font-weight: 600;
+  color: var(--t-fg);
+}
+
+.empty-state .lede {
+  max-width: 360px;
+  margin: 0;
+}
+
+.empty-state .btn,
+.empty-state button {
+  margin-top: var(--t-space-3);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-1) var(--t-space-5);
+  margin: var(--t-space-2) 0 0;
+  padding: 0;
+}
+
+.meta div { display: contents; }
+.meta dt {
+  font-size: var(--t-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+  margin-right: var(--t-space-1);
+}
+.meta dd {
+  margin: 0 var(--t-space-3) 0 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg);
+}
+
+/* ----- Tabs --------------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  border-bottom: 1px solid var(--t-border);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab .ph { font-size: 15px; opacity: 0.75; }
+.tab .muted {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--t-surface-soft);
+  margin-left: 4px;
+}
+.tab.is-active {
+  color: var(--t-accent);
+  border-bottom-color: var(--t-accent);
+}
+.tab.is-active .ph { opacity: 1; }
+.tab:hover { color: var(--t-fg); }
+
+.page-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.page-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 16px;
+}
+

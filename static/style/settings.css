@@ -1,0 +1,55 @@
+/* ----- Device status block ------------------------------------------ */
+
+.device-status {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  background: var(--t-surface-soft);
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-border);
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--t-fg-soft);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--t-muted);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-muted) 25%, transparent);
+}
+.status-dot.is-ok { background: var(--t-ok); box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-ok) 25%, transparent); }
+.status-dot.is-warn { background: var(--t-warn); box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-warn) 25%, transparent); }
+.status-dot.is-stale { background: var(--t-danger); box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-danger) 25%, transparent); }
+.status-dot.is-unknown { background: var(--t-muted); box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-muted) 25%, transparent); }
+
+.status-label { font-weight: 600; color: var(--t-fg); }
+
+.status-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 12px;
+}
+
+.status-fields div { display: contents; }
+.status-fields dt {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+}
+.status-fields dd {
+  margin: 0;
+  color: var(--t-fg);
+  font-variant-numeric: tabular-nums;
+}
+

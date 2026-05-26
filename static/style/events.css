@@ -1,0 +1,182 @@
+/* ----- Events timeline --------------------------------------------- */
+
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.event-row {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+}
+
+.event-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+  padding: 4px 6px;
+  background: var(--t-surface-soft);
+  border-radius: 4px;
+  text-align: center;
+  align-self: start;
+}
+
+.event--push .event-type { color: var(--t-accent); }
+.event--renderer .event-type { color: var(--t-fg-soft); }
+.event--device .event-type { color: var(--t-ok); }
+.event--scheduler .event-type { color: var(--t-warn); }
+.event--auth .event-type { color: var(--t-danger); }
+
+.event-body {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.event-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-source {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.event-target {
+  font-size: 12px;
+  color: var(--t-fg-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.event-sub {
+  font-size: 11px;
+  color: var(--t-fg-soft);
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.event-err {
+  color: var(--t-danger);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+
+.digest {
+  font-size: 11px;
+  color: var(--t-muted);
+}
+
+.event-extra {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  background: var(--t-surface-soft);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 120px;
+}
+
+.event-thumb {
+  width: 56px;
+  height: 42px;
+  background: var(--t-surface-soft);
+  border-radius: 4px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.event-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Events page toolbar (live pill + type-filter chips). */
+.events-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  margin: 0 0 var(--t-space-4);
+  flex-wrap: wrap;
+}
+.event-type-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.event-type-filter .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface-soft);
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.event-type-filter .chip .ph { font-size: 13px; opacity: 0.75; }
+.event-type-filter .chip .muted {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+}
+.event-type-filter .chip:hover {
+  color: var(--t-fg);
+  background: var(--t-surface-sunk);
+}
+.event-type-filter .chip.is-active {
+  color: var(--t-accent);
+  background: var(--t-accent-soft);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
+}
+.event-type-filter .chip.is-active .ph { opacity: 1; }
+
+/* Live indicator next to the Events heading. */
+.live-dot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  vertical-align: middle;
+  margin-left: 8px;
+  background: var(--t-surface-soft);
+  color: var(--t-muted);
+}
+.live-dot .ph-fill, .live-dot [class^="ph-fill"] {
+  font-size: 8px;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+.live-dot[data-state="connected"] { color: var(--t-ok); background: color-mix(in oklab, var(--t-ok) 15%, transparent); }
+.live-dot[data-state="offline"] { color: var(--t-danger); background: color-mix(in oklab, var(--t-danger) 15%, transparent); }
+

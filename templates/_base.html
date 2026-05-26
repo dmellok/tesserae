@@ -16,7 +16,19 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style/admin.css') }}">
+  {# Admin stylesheet — split by concern. Foundation files first so later
+     files can override; page-specific files at the end. Cascade order
+     matches the legacy single-file admin.css (verified byte-identical at
+     the split commit). #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/shell.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/forms.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/settings.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/schedules.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/send.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/events.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/editor.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
 <body class="admin">

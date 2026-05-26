@@ -1,0 +1,88 @@
+/* ----- Themes page ------------------------------------------------- */
+
+.theme-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  padding: 12px 14px;
+  background: var(--t-surface);
+  display: grid;
+  gap: 10px;
+}
+
+.theme-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.theme-name { font-weight: 700; font-size: 14px; }
+.theme-id { font-size: 11px; color: var(--t-muted); }
+
+.swatch-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 2px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.swatch {
+  height: 22px;
+  border: 1px solid color-mix(in oklab, var(--t-fg) 8%, transparent);
+}
+
+.theme-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.palette-field {
+  display: grid;
+  gap: 4px;
+}
+
+.palette-field label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-fg-soft);
+}
+
+.palette-input {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 6px;
+  align-items: center;
+}
+
+.palette-input input[type="color"] {
+  width: 36px;
+  height: 32px;
+  padding: 2px;
+  margin: 0;
+}
+
+.palette-hex {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  text-transform: lowercase;
+}
+

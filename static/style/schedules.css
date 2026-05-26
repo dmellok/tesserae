@@ -1,0 +1,178 @@
+/* ----- Schedules: form grid + table -------------------------------- */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 16px;
+}
+
+.dow-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.dow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--t-border-strong);
+  background: var(--t-surface);
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+}
+.dow-chip:has(input:checked) {
+  background: var(--t-accent);
+  color: var(--t-surface);
+  border-color: var(--t-accent);
+}
+.dow-chip input {
+  appearance: none;
+  width: 0;
+  height: 0;
+  margin: 0;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--t-border);
+  vertical-align: top;
+}
+
+.data-table th {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+  background: var(--t-surface-soft);
+}
+
+.data-table tr.is-disabled td { opacity: 0.55; }
+.data-table .muted-row { color: var(--t-muted); font-size: 11px; margin-top: 2px; }
+.data-table .actions-col {
+  white-space: nowrap;
+  width: 1%;
+}
+.data-table .actions-col form.inline { display: inline-block; margin: 0 2px 0 0; }
+.data-table .actions-col .ghost-link {
+  display: inline-block;
+  padding: 7px 10px;
+  font-size: inherit;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  border-radius: var(--t-radius-sm);
+}
+.data-table .actions-col .ghost-link:hover { color: var(--t-accent); }
+
+button.ghost.danger { color: var(--t-danger); }
+button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; }
+
+.ghost-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  font-weight: 500;
+  border-radius: var(--t-radius-sm);
+}
+.ghost-link:hover { color: var(--t-accent); background: var(--t-surface-soft); }
+.ghost-link .ph { font-size: 14px; }
+
+.muted { color: var(--t-muted); }
+.pill.is-ok.pill {
+  /* override the soft mix to keep enabled pill visible against the row */
+  background: color-mix(in oklab, var(--t-ok) 18%, transparent);
+}
+
+/* ----- Schedules timeline ------------------------------------------ */
+
+.timeline {
+  display: grid;
+  gap: 6px;
+  padding-top: 24px;
+}
+.timeline-axis {
+  position: relative;
+  height: 16px;
+  margin-left: 180px;
+  border-bottom: 1px dashed var(--t-border);
+  margin-bottom: 4px;
+}
+.timeline-tick {
+  position: absolute;
+  top: -18px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--t-muted);
+  font-variant-numeric: tabular-nums;
+}
+.timeline-tick::after {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 1px;
+  height: 6px;
+  background: var(--t-border);
+}
+.timeline-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: var(--t-space-3);
+  min-height: 30px;
+}
+.timeline-row.is-disabled { opacity: 0.45; }
+.timeline-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 4px 8px;
+  border-radius: var(--t-radius-sm);
+}
+.timeline-label:hover { background: var(--t-surface-sunk); color: var(--t-accent); }
+.timeline-label .ph { font-size: 13px; opacity: 0.7; }
+.timeline-track {
+  position: relative;
+  height: 22px;
+  background: var(--t-surface-soft);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.timeline-fire {
+  position: absolute;
+  top: 3px;
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--t-accent);
+  transform: translateX(-50%);
+}
+.timeline-row.is-disabled .timeline-fire { background: var(--t-muted); }
+
+@media (max-width: 720px) {
+  .timeline-row { grid-template-columns: 120px 1fr; }
+  .timeline-axis { margin-left: 132px; }
+}
+

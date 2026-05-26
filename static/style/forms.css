@@ -1,0 +1,608 @@
+/* ----- Form ---------------------------------------------------------- */
+
+.form {
+  display: grid;
+  gap: var(--t-space-4);
+}
+
+.field {
+  display: grid;
+  gap: var(--t-space-1);
+}
+
+.field > label,
+.field-label {
+  font-weight: 500;
+  font-size: var(--t-size-md);
+  color: var(--t-fg);
+  letter-spacing: -0.005em;
+}
+
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"],
+.field input[type="url"],
+.field input[type="email"],
+.field input[type="time"],
+.field input[type="date"],
+.field input[type="search"],
+.field input[type="color"],
+.field input[type="file"],
+.field select,
+.field textarea {
+  width: 100%;
+  padding: var(--t-space-2) var(--t-space-3);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  font: inherit;
+  font-size: var(--t-size-base);
+  color: var(--t-fg);
+  transition: border-color var(--t-trans-fast), box-shadow var(--t-trans-fast);
+}
+
+.field input[type="color"] {
+  padding: 2px;
+  height: 38px;
+  width: 60px;
+  cursor: pointer;
+}
+
+/* Native selects shed their OS chrome and pick up a custom caret so
+   they read as a sibling of the other text inputs. */
+.field select,
+.dropzone-meta select,
+.saved-options select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
+    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  padding-right: 32px;
+  cursor: pointer;
+}
+.field select:focus,
+.field select:hover {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-accent) 50%),
+    linear-gradient(135deg, var(--t-accent) 50%, transparent 50%);
+}
+.field select[multiple] {
+  background-image: none;
+  padding-right: var(--t-space-3);
+  min-height: 120px;
+}
+.field select[multiple] option {
+  padding: 6px 10px;
+}
+.field select[multiple] option:checked {
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+}
+
+.field input:hover,
+.field select:hover,
+.field textarea:hover {
+  border-color: var(--t-border-strong);
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  box-shadow: var(--t-ring);
+}
+
+.field input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--t-accent);
+  margin: var(--t-space-1) 0 0;
+}
+
+.field--boolean {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+.field--boolean label { order: 2; font-weight: 500; }
+.field--boolean input { order: 1; }
+
+.field-help {
+  margin: var(--t-space-1) 0 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  gap: var(--t-space-2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.actions .ghost-link { margin-right: auto; }
+
+/* ----- Buttons ------------------------------------------------------- */
+
+button,
+.btn {
+  font: inherit;
+  font-size: var(--t-size-md);
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--t-radius-sm);
+  padding: var(--t-space-2) var(--t-space-4);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--t-space-2);
+  line-height: 1.2;
+  transition: background var(--t-trans-fast), border-color var(--t-trans-fast),
+              color var(--t-trans-fast), box-shadow var(--t-trans-fast),
+              transform var(--t-trans-fast);
+  user-select: none;
+  white-space: nowrap;
+}
+button:hover { border-color: var(--t-border-strong); background: var(--t-surface-sunk); }
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: none; box-shadow: var(--t-ring); }
+
+button .ph { font-size: 16px; }
+
+button.primary,
+.btn-primary {
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+  border-color: var(--t-accent);
+  font-weight: 600;
+}
+
+button.primary:hover { background: var(--t-accent-hover); border-color: var(--t-accent-hover); }
+button.ghost { background: transparent; border-color: transparent; color: var(--t-fg-soft); }
+button.ghost:hover { color: var(--t-accent); }
+
+code {
+  background: var(--t-surface-sunk);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font: 0.92em var(--t-font-mono);
+  color: var(--t-fg-soft);
+}
+
+/* ----- Flash messages ----------------------------------------------- */
+
+.flashes {
+  max-width: 880px;
+  margin: var(--t-space-4) auto 0;
+  padding: 0 var(--t-space-6);
+  display: grid;
+  gap: var(--t-space-2);
+}
+
+.flash {
+  padding: var(--t-space-3) var(--t-space-4);
+  border-radius: var(--t-radius-md);
+  font-size: var(--t-size-md);
+  border: 1px solid var(--t-border);
+  background: var(--t-surface);
+  color: var(--t-fg);
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  box-shadow: var(--t-shadow-sm);
+}
+
+.flash .ph { font-size: 18px; flex-shrink: 0; }
+.flash--ok    { border-color: color-mix(in oklab, var(--t-ok) 30%, var(--t-border)); }
+.flash--ok    .ph { color: var(--t-ok); }
+.flash--error { border-color: color-mix(in oklab, var(--t-danger) 30%, var(--t-border)); }
+.flash--error .ph { color: var(--t-danger); }
+
+/* ----- Dashboard icon picker --------------------------------------- */
+
+.icon-picker {
+  position: relative;
+  display: block;
+}
+.icon-picker-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  width: 100%;
+  padding: var(--t-space-2) var(--t-space-3);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: var(--t-fg);
+  text-align: left;
+}
+.icon-picker-trigger:hover { border-color: var(--t-border-strong); }
+.icon-picker.is-open .icon-picker-trigger {
+  border-color: var(--t-accent);
+  box-shadow: var(--t-ring);
+}
+.icon-picker-current {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--t-accent);
+}
+.icon-picker-current .ph { font-size: 18px; }
+.icon-picker-label {
+  font-size: var(--t-size-md);
+  color: var(--t-fg-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.icon-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 80;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-lg);
+  padding: var(--t-space-2);
+  display: grid;
+  gap: var(--t-space-2);
+}
+.icon-picker-popover[hidden] { display: none !important; }
+.icon-picker-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.icon-picker-search .ph {
+  position: absolute;
+  left: 10px;
+  font-size: 14px;
+  color: var(--t-muted);
+  pointer-events: none;
+}
+.icon-picker-search input {
+  width: 100%;
+  padding: 8px 10px 8px 32px;
+  font: inherit;
+  font-size: var(--t-size-md);
+  background: var(--t-surface-soft);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  color: var(--t-fg);
+}
+.icon-picker-search input:focus {
+  outline: none;
+  border-color: var(--t-accent);
+  background: var(--t-surface);
+}
+
+.icon-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+.icon-pick {
+  display: inline-grid;
+  place-items: center;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: var(--t-radius-sm);
+  background: transparent;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.icon-pick .ph { font-size: 18px; }
+.icon-pick:hover {
+  background: var(--t-surface-soft);
+  color: var(--t-accent);
+}
+.icon-pick.is-active {
+  background: var(--t-accent-soft);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, transparent);
+  color: var(--t-accent);
+}
+.icon-picker-empty {
+  padding: var(--t-space-3);
+  text-align: center;
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
+}
+
+/* ----- File dropzone ----------------------------------------------- */
+
+.dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  min-height: 280px;
+  border: 2px dashed var(--t-border-strong);
+  border-radius: var(--t-radius-lg);
+  padding: var(--t-space-7) var(--t-space-5);
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 8%, transparent), transparent 70%),
+    var(--t-surface-soft);
+  cursor: pointer;
+  transition: border-color var(--t-trans-fast), background var(--t-trans-fast), transform var(--t-trans-fast);
+}
+.dropzone:hover {
+  border-color: var(--t-accent);
+}
+.dropzone.is-dragging {
+  border-color: var(--t-accent);
+  border-style: solid;
+  background:
+    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 18%, transparent), transparent 65%),
+    var(--t-accent-soft);
+  transform: scale(1.005);
+}
+.dropzone-input {
+  /* Visually-hidden but still focusable + form-submittable. The
+     surrounding <label> is what makes the dropzone clickable. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.dropzone-body {
+  text-align: center;
+  pointer-events: none;
+  display: grid;
+  justify-items: center;
+  gap: var(--t-space-3);
+}
+.dropzone-body .dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--t-accent-soft);
+  color: var(--t-accent);
+  font-size: 48px;
+  transition: transform var(--t-trans-fast);
+}
+.dropzone.is-dragging .dropzone-icon {
+  transform: scale(1.08);
+}
+.dropzone-title {
+  font-size: var(--t-size-xl);
+  font-weight: 600;
+  margin: 0;
+  color: var(--t-fg);
+  letter-spacing: -0.01em;
+}
+.dropzone-hint {
+  margin: 0;
+  color: var(--t-muted);
+  font-size: var(--t-size-sm);
+}
+.dropzone-browse {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  margin-top: var(--t-space-2);
+  border-radius: var(--t-radius-pill);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border-strong);
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  color: var(--t-fg-soft);
+}
+.dropzone-preview {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: var(--t-space-4);
+  align-items: center;
+  width: 100%;
+}
+/* The HTML `hidden` attribute should win over `display: grid` above —
+   browsers map it to `display: none` only when no other display rule
+   targets the element, so spell it out. */
+.dropzone-preview[hidden],
+.dropzone-body[hidden] {
+  display: none !important;
+}
+.dropzone-preview img {
+  width: 120px;
+  height: 120px;
+  object-fit: contain;
+  background: var(--t-surface);
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-border);
+  padding: 6px;
+}
+.dropzone-meta { display: grid; gap: 4px; min-width: 0; }
+.dropzone-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-size-md);
+}
+.dropzone-preview button { position: relative; z-index: 1; }
+
+/* ----- Reusable form components (sliders + switches) -------------- */
+
+.field--slider .slider-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.slider-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  background: var(--t-surface-soft);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+input[type="range"].slider {
+  width: 100%;
+  margin: 8px 0 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  --slider-fill: 0%;
+}
+
+/* Track + thumb need vendor-prefixed selectors for cross-browser
+   styling because there's no standard yet. The `--slider-fill`
+   custom property is updated live by static/components.js so the
+   filled portion paints in the accent colour. */
+
+input[type="range"].slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background:
+    linear-gradient(to right,
+      var(--t-accent) 0,
+      var(--t-accent) var(--slider-fill),
+      var(--t-surface-sunk) var(--slider-fill),
+      var(--t-surface-sunk) 100%);
+  border: 1px solid var(--t-border);
+}
+input[type="range"].slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--t-surface-sunk);
+  border: 1px solid var(--t-border);
+}
+input[type="range"].slider::-moz-range-progress {
+  height: 8px;
+  background: var(--t-accent);
+  border-radius: 999px;
+}
+
+input[type="range"].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--t-surface);
+  border: 2px solid var(--t-accent);
+  margin-top: -7px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+input[type="range"].slider::-webkit-slider-thumb:hover {
+  transform: scale(1.12);
+}
+input[type="range"].slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--t-surface);
+  border: 2px solid var(--t-accent);
+  cursor: pointer;
+}
+
+input[type="range"].slider:focus { outline: none; }
+input[type="range"].slider:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 28%, transparent);
+}
+input[type="range"].slider:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-accent) 28%, transparent);
+}
+
+/* ----- Switch (boolean toggle) ----------------------------------- */
+
+.field--switch label.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--t-fg);
+}
+
+.field--switch input[type="checkbox"] {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.switch-track {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--t-border-strong);
+  transition: background 120ms ease;
+  flex-shrink: 0;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--t-surface);
+  transition: transform 120ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.switch input:checked ~ .switch-track {
+  background: var(--t-accent);
+}
+.switch input:checked ~ .switch-track .switch-thumb {
+  transform: translateX(18px);
+}
+.switch input:focus-visible ~ .switch-track {
+  outline: 2px solid color-mix(in oklab, var(--t-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.switch-label {
+  flex: 1;
+  user-select: none;
+}
+
+/* The panel-preset section in /settings/server hides the custom w/h
+   sliders when a preset is selected. The .is-custom class is toggled
+   by static/pages/panel_settings.js based on the dropdown's value. */
+.panel-custom-fields { display: none; }
+.panel-section.is-custom .panel-custom-fields { display: contents; }
+
+/* Built-in broker fields — hidden when the master switch is off. */
+.embedded-broker-fields { display: contents; }
+.embedded-broker-fields.is-collapsed { display: none; }
