@@ -464,3 +464,47 @@
   font-size: 16px;
 }
 
+
+/* ----- Lightbox ---------------------------------------------------- */
+/* Click any <a data-lightbox> to view the image in-page. Backdrop
+   dims everything else; image scales to fit the viewport. */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.85);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: lightbox-fade 120ms ease-out;
+}
+.lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+  background: #000;
+}
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  transition: background 120ms ease;
+}
+.lightbox-close:hover { background: rgba(255, 255, 255, 0.22); }
+body.lightbox-open { overflow: hidden; }
+@keyframes lightbox-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

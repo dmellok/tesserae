@@ -190,7 +190,7 @@
   <ul class="history">
     {% for ev in history %}
     <li class="history-row">
-      <a class="history-thumb" {% if ev.digest %}href="/renders/{{ ev.digest }}.png" target="_blank"{% endif %}>
+      <a class="history-thumb" {% if ev.digest %}href="/renders/{{ ev.digest }}.png" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
         {% if ev.digest %}
         <img src="/renders/{{ ev.digest }}.png" alt="">
         {% else %}

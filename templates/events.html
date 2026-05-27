@@ -64,7 +64,7 @@
       {% endif %}
     </div>
     {% if ev.type == 'push' and ev.digest %}
-    <a class="event-thumb" href="/renders/{{ ev.digest }}.png" target="_blank">
+    <a class="event-thumb" href="/renders/{{ ev.digest }}.png" data-lightbox aria-label="Event #{{ ev.id }}">
       <img src="/renders/{{ ev.digest }}.png" alt="">
     </a>
     {% endif %}

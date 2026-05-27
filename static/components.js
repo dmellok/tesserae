@@ -88,12 +88,66 @@
     });
   }
 
+  // Lightbox — delegated click handler that intercepts any
+  // `<a data-lightbox href="...">` and shows the image in an in-page
+  // overlay instead of a new tab. ESC or backdrop click closes.
+  function attachLightbox() {
+    if (document.body.dataset.lightboxBound) return;
+    document.body.dataset.lightboxBound = "1";
+
+    function close() {
+      const overlay = document.querySelector(".lightbox");
+      if (!overlay) return;
+      overlay.remove();
+      document.body.classList.remove("lightbox-open");
+    }
+
+    function open(src, label) {
+      close();
+      const overlay = document.createElement("div");
+      overlay.className = "lightbox";
+      overlay.setAttribute("role", "dialog");
+      overlay.setAttribute("aria-modal", "true");
+      if (label) overlay.setAttribute("aria-label", label);
+      overlay.innerHTML =
+        '<button type="button" class="lightbox-close" aria-label="Close">' +
+        '<i class="ph ph-x" aria-hidden="true"></i></button>' +
+        '<img class="lightbox-img" alt="" />';
+      const img = overlay.querySelector(".lightbox-img");
+      img.src = src;
+      if (label) img.alt = label;
+      overlay.addEventListener("click", (ev) => {
+        // Backdrop click closes; clicks on the image itself do not.
+        if (ev.target === overlay || ev.target.closest(".lightbox-close")) {
+          close();
+        }
+      });
+      document.body.appendChild(overlay);
+      document.body.classList.add("lightbox-open");
+    }
+
+    document.addEventListener("click", (ev) => {
+      const a = ev.target.closest && ev.target.closest("a[data-lightbox]");
+      if (!a) return;
+      ev.preventDefault();
+      const src = a.getAttribute("href");
+      if (!src) return;
+      const img = a.querySelector("img");
+      open(src, (img && img.alt) || a.getAttribute("aria-label") || "");
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") close();
+    });
+  }
+
   // Initial attach on DOMContentLoaded; re-attach when the editor reloads
   // its preview iframe (a side-effect of a save).
   function init() {
     attachSliders(document);
     attachPreviewFit(document);
     attachPresetNumbers(document);
+    attachLightbox();
   }
 
   if (document.readyState === "loading") {

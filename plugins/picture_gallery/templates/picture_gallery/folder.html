@@ -36,14 +36,19 @@
   <div class="pg-grid">
     {% for img in images %}
     <div class="pg-tile">
-      <a href="{{ url_for('picture_gallery_admin.serve_image', folder=folder_id, filename=img.name) }}" target="_blank">
+      <a href="{{ url_for('picture_gallery_admin.serve_image', folder=folder_id, filename=img.name) }}" data-lightbox aria-label="{{ img.name }}">
         <img src="{{ url_for('picture_gallery_admin.serve_thumbnail', folder=folder_id, filename=img.name) }}" alt="{{ img.name }}" loading="lazy">
       </a>
       <div class="pg-tile-row">
         <span class="pg-tile-name" title="{{ img.name }}">{{ img.name }}</span>
+        <form method="post" action="{{ url_for('picture_gallery_admin.send_image', folder=folder_id, filename=img.name) }}" class="pg-tile-send" onsubmit="return confirm('Push {{ img.name }} to all renderers?');">
+          <button type="submit" class="pg-tile-iconbtn" aria-label="Push to renderers" title="Push to renderers">
+            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+          </button>
+        </form>
         {% if not external %}
         <form method="post" action="{{ url_for('picture_gallery_admin.delete_image', folder=folder_id, filename=img.name) }}" class="pg-tile-delete" onsubmit="return confirm('Delete {{ img.name }}?');">
-          <button type="submit" class="pg-tile-delbtn" aria-label="Delete" title="Delete">
+          <button type="submit" class="pg-tile-iconbtn pg-tile-iconbtn--danger" aria-label="Delete" title="Delete">
             <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
@@ -104,9 +109,9 @@
   }
   .pg-tile-row {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto auto;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     padding: 4px 8px;
     font-size: 11px;
     color: var(--t-fg-soft);
@@ -118,8 +123,8 @@
     text-overflow: ellipsis;
     font-family: ui-monospace, monospace;
   }
-  .pg-tile-delete { margin: 0; }
-  .pg-tile-delbtn {
+  .pg-tile-row > form { margin: 0; }
+  .pg-tile-iconbtn {
     background: none;
     border: none;
     cursor: pointer;
@@ -129,7 +134,8 @@
     border-radius: 4px;
     line-height: 1;
   }
-  .pg-tile-delbtn:hover { color: var(--t-danger); background: var(--t-surface-hover); }
+  .pg-tile-iconbtn:hover { color: var(--t-accent); background: var(--t-surface-hover); }
+  .pg-tile-iconbtn--danger:hover { color: var(--t-danger); }
   .card-empty {
     color: var(--t-fg-soft);
     padding: 12px 16px;

@@ -476,6 +476,43 @@ def blueprint() -> Blueprint:
             flash(f"Skipped: {', '.join(skipped)}", "warn")
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
+    @bp.post("/folders/<folder>/images/<path:filename>/send")
+    def send_image(folder: str, filename: str) -> Response:
+        """Push a single image to every loaded renderer, bypassing the
+        dashboard composer. Same path as the Send page's File tab — we
+        hand the bytes to PushManager.push_image and let each renderer
+        fit the image to its panel."""
+        data_dir = _data_dir()
+        target_dir = _folder_path(folder, data_dir)
+        if target_dir is None:
+            abort(404)
+        safe = secure_filename(filename)
+        if not safe:
+            abort(404)
+        path = target_dir / safe
+        if not path.is_file() or path.suffix.lower() not in ALLOWED_SUFFIXES:
+            abort(404)
+        try:
+            blob = path.read_bytes()
+        except OSError as err:
+            flash(f"Could not read {safe}: {err}", "error")
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+        push = current_app.config.get("PUSH_MANAGER")
+        if push is None:
+            flash("Push manager unavailable.", "error")
+            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+        label = f"gallery:{folder}/{safe}"
+        result = push.push_image(blob, source_label=label)
+        if getattr(result, "status", "ok") == "ok":
+            flash(f"Pushed {safe}.", "ok")
+        else:
+            flash(
+                f"Push of {safe} returned {getattr(result, 'status', '?')}"
+                + (f": {result.error}" if getattr(result, "error", None) else ""),
+                "warn" if result.status == "busy" else "error",
+            )
+        return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+
     @bp.post("/folders/<folder>/images/<path:filename>/delete")
     def delete_image(folder: str, filename: str) -> Response:
         data_dir = _data_dir()
