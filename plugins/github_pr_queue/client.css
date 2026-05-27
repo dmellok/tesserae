@@ -1,62 +1,137 @@
 :host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
-.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto auto 1fr; box-sizing: border-box; overflow: hidden; }
 .pq-bar {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
+  gap: clamp(8px, 1.4cqw, 12px);
   background: var(--theme-fg); color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
+  padding: clamp(6px, 1.2cqw, 12px) clamp(10px, 2cqw, 18px);
+  font-size: clamp(12px, 2.2cqw, 18px); font-weight: 900;
   text-transform: uppercase; letter-spacing: 0.1em;
 }
-.pq-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.pq-mark { display: inline-block; width: clamp(12px, 2cqw, 18px); height: clamp(12px, 2cqw, 18px); background: var(--theme-accent2); }
 .pq-title-bar { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pq-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); }
+.pq-bar-icon { font-size: clamp(18px, 3cqw, 28px); }
+
+/* --- Four-up derived stats strip ----------------------------------- */
+.pq-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.pq-stat {
+  padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 14px);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: clamp(6px, 1cqw, 10px);
+  row-gap: 1px;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+.pq-stat .ph-bold { grid-row: 1 / span 2; font-size: clamp(18px, 3cqw, 28px); }
+.pq-v {
+  font: 900 clamp(15px, 2.6cqw, 22px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: -0.03em;
+}
+.pq-l {
+  font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pq-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
+.pq-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.pq-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.pq-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
 
 .pq-body { background: var(--theme-surface); min-height: 0; overflow: hidden; }
 .pq-section { display: grid; grid-auto-rows: min-content; }
 .pq-section-head {
   display: grid; grid-template-columns: auto 1fr auto;
-  align-items: center; gap: 6px;
-  padding: clamp(3px, 0.6cqh, 6px) clamp(10px, 1.6cqw, 16px);
+  align-items: center; gap: 8px;
+  padding: clamp(5px, 1cqh, 10px) clamp(12px, 2cqw, 22px);
   background: var(--theme-surface2);
-  font-size: clamp(9px, 1.4cqw, 11px); font-weight: 800;
+  font-size: clamp(11px, 1.7cqw, 14px); font-weight: 900;
   text-transform: uppercase; letter-spacing: 0.1em;
   color: var(--theme-fgSoft);
 }
 .pq-section-head--review { background: var(--theme-accent2); color: var(--theme-fg); }
 .pq-section-head--yours  { background: var(--theme-accent);  color: var(--theme-bg); }
-.pq-section-head .ph-bold { font-size: 1.1em; }
-.pq-count { font-variant-numeric: tabular-nums; }
+.pq-section-head .ph-bold { font-size: 1.2em; }
+.pq-count {
+  font-variant-numeric: tabular-nums;
+  background: rgba(0,0,0,0.18);
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.9em;
+}
 
 .pq-row {
-  display: grid; grid-template-columns: auto auto 1fr auto auto;
-  align-items: center; gap: clamp(6px, 1.2cqw, 12px);
-  padding: clamp(3px, 0.6cqh, 6px) clamp(10px, 1.6cqw, 16px);
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto auto;
+  align-items: center; gap: clamp(8px, 1.4cqw, 14px);
+  padding: clamp(6px, 1.2cqh, 12px) clamp(12px, 2cqw, 22px);
   border-top: 1px solid var(--theme-divider);
   min-width: 0;
 }
-.pq-icon { font-size: clamp(13px, 2.2cqw, 18px); color: var(--theme-accent); }
+.pq-row:first-child { border-top: 0; }
+.pq-icon { font-size: clamp(15px, 2.6cqw, 22px); color: var(--theme-accent); }
 .pq-icon--draft { color: var(--theme-fgSoft); }
 .pq-num {
-  font: 700 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
+  font: 700 clamp(11px, 1.7cqw, 14px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--theme-fgSoft);
 }
 .pq-title {
-  font-size: clamp(11px, 1.7cqw, 14px); font-weight: 600;
+  font-size: clamp(13px, 2.1cqw, 17px); font-weight: 700;
+  letter-spacing: -0.005em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pq-repo {
-  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  font: 700 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--theme-fgSoft);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   max-width: clamp(80px, 18cqw, 200px);
 }
-.pq-when {
-  font: 700 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+.pq-com {
+  display: inline-flex; align-items: center; gap: 3px;
+  font: 800 clamp(10px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--theme-fgSoft);
 }
+.pq-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 999px;
+  font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  background: var(--theme-surface2); color: var(--theme-fgSoft);
+}
+.pq-pill--draft { background: var(--theme-surface2); }
 
-.pq-empty { padding: 32px; text-align: center; color: var(--theme-fgSoft); font-size: 12px; }
+/* Age tier pills — colour codes how long the PR has been sitting. */
+.pq-age {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px;
+  font: 800 clamp(10px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  white-space: nowrap;
+}
+.pq-age .ph-bold { font-size: 1.1em; }
+.pq-age--fresh    { background: var(--theme-accent);  color: var(--theme-bg); }
+.pq-age--warming  { background: var(--theme-surface2); color: var(--theme-fgSoft); }
+.pq-age--stale    { background: var(--theme-accent2); color: var(--theme-fg); }
+.pq-age--ancient  { background: var(--theme-accent3); color: var(--theme-bg); }
+
+/* Row gets a faint left stripe matching its age tier so the whole row
+   reads at-a-glance. */
+.pq-row--ancient { box-shadow: inset 3px 0 0 var(--theme-accent3); }
+.pq-row--stale   { box-shadow: inset 3px 0 0 var(--theme-accent2); }
+.pq-row--warming { box-shadow: inset 3px 0 0 var(--theme-fgSoft); }
+.pq-row--fresh   { box-shadow: inset 3px 0 0 var(--theme-accent); }
+
+.pq-empty {
+  padding: 40px 20px; text-align: center;
+  color: var(--theme-fgSoft); font-size: 16px; font-weight: 700;
+  display: grid; place-items: center; gap: 8px;
+}
+.pq-empty .ph-duotone { font-size: 48px; color: var(--theme-accent); }
 .root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }

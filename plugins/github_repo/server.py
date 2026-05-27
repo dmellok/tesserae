@@ -40,8 +40,37 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
             releases = core.request_json(f"https://api.github.com/repos/{repo}/releases/latest")
         except Exception:
             releases = None
+        try:
+            langs = core.request_json(f"https://api.github.com/repos/{repo}/languages")
+        except Exception:
+            langs = {}
+        try:
+            # 52-week commit activity — list of {"week", "total", "days"}.
+            # First request often returns 202 (computing); the next hit
+            # is cached. Accept whatever shape comes back.
+            activity = core.request_json(
+                f"https://api.github.com/repos/{repo}/stats/commit_activity"
+            )
+        except Exception:
+            activity = []
     except Exception as err:
         return {"error": core.coerce_error(err)}
+
+    # Language breakdown — top-5 by byte count + an "Other" rollup so
+    # the bar sums to 100% without the long-tail dominating.
+    lang_items: list[dict[str, Any]] = []
+    if isinstance(langs, dict) and langs:
+        total = sum(int(v) for v in langs.values()) or 1
+        sorted_langs = sorted(langs.items(), key=lambda kv: kv[1], reverse=True)
+        for name, b in sorted_langs[:5]:
+            lang_items.append({"name": name, "pct": round(int(b) / total * 100, 1)})
+        tail = sum(v for _, v in sorted_langs[5:])
+        if tail:
+            lang_items.append({"name": "Other", "pct": round(tail / total * 100, 1)})
+
+    commit_weeks: list[int] = []
+    if isinstance(activity, list):
+        commit_weeks = [int(w.get("total") or 0) for w in activity if isinstance(w, dict)]
 
     result = {
         "repo":         info.get("full_name") or repo,
@@ -56,6 +85,10 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         "is_archived":  bool(info.get("archived")),
         "latest_release": (releases or {}).get("tag_name") or "",
         "license":      ((info.get("license") or {}).get("spdx_id")) or "",
+        "languages":    lang_items,
+        "commit_weeks": commit_weeks,
+        "commits_year": sum(commit_weeks),
+        "busiest_week": max(commit_weeks) if commit_weeks else 0,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

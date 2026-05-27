@@ -1,5 +1,85 @@
 :host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
-.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto auto 1fr; box-sizing: border-box; overflow: hidden; }
+
+/* --- Success-rate gauge + summary tiles ---------------------------- */
+.ga-summary {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: clamp(10px, 2cqw, 24px);
+  padding: clamp(10px, 2cqw, 22px);
+  background: var(--theme-surface);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  align-items: center;
+}
+.ga-gauge {
+  --ring: 0deg;
+  width: clamp(72px, 14cqw, 110px);
+  height: clamp(72px, 14cqw, 110px);
+  border-radius: 50%;
+  display: grid; place-items: center;
+  background:
+    conic-gradient(
+      var(--gauge-fill, var(--theme-accent)) 0 var(--ring),
+      var(--theme-surface2) var(--ring) 360deg
+    );
+  position: relative;
+}
+.ga-gauge::after {
+  content: "";
+  position: absolute; inset: 12%;
+  border-radius: 50%;
+  background: var(--theme-surface);
+  z-index: 0;
+}
+.ga-gauge-v {
+  position: relative; z-index: 1;
+  font: 900 clamp(20px, 4cqw, 32px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: -0.04em;
+  color: var(--theme-fg);
+}
+.ga-gauge-v small { font-size: 0.5em; font-weight: 700; margin-left: 2px; opacity: 0.7; }
+.ga-gauge-l {
+  position: relative; z-index: 1;
+  font: 800 clamp(8px, 1.3cqw, 10px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+  margin-top: 3px;
+}
+.ga-gauge.gauge--ok    { --gauge-fill: var(--theme-accent); }
+.ga-gauge.gauge--mixed { --gauge-fill: var(--theme-accent2); }
+.ga-gauge.gauge--fail  { --gauge-fill: var(--theme-accent3); }
+.ga-gauge.gauge--run   { --gauge-fill: var(--theme-accent2); animation: ga-spin 4s linear infinite; }
+.ga-gauge.gauge--idle  { --gauge-fill: var(--theme-fgSoft); }
+
+.ga-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 1fr 1fr;
+  gap: clamp(4px, 0.8cqw, 8px);
+  min-width: 0;
+}
+.ga-summary-stat {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1cqw, 10px);
+  padding: clamp(4px, 0.8cqw, 8px) clamp(8px, 1.4cqw, 12px);
+  border-radius: 4px;
+}
+.ga-summary-stat .ph-bold { font-size: clamp(14px, 2.2cqw, 18px); }
+.ga-summary-stat span {
+  font: 900 clamp(13px, 2.2cqw, 18px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: -0.02em;
+}
+.ga-summary-stat small {
+  font: 800 clamp(8px, 1.3cqw, 10px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.ga-summary-stat--ok    { background: var(--theme-accent);   color: var(--theme-bg); }
+.ga-summary-stat--fail  { background: var(--theme-accent3);  color: var(--theme-bg); }
+.ga-summary-stat--run   { background: var(--theme-accent2);  color: var(--theme-fg); }
+.ga-summary-stat--total { background: var(--theme-surface2); color: var(--theme-fg); }
+.ga-summary-stat--run .ph-bold { animation: ga-spin 1.2s linear infinite; }
 .ga-bar {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: clamp(6px, 1.2cqw, 10px);

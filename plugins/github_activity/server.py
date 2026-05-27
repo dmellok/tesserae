@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -91,12 +92,56 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         return cached
 
     try:
-        raw = core.request_json(f"https://api.github.com/users/{user}/events/public?per_page=50")
+        # Fetch the max GitHub serves on the public events endpoint
+        # (100) so the derived stats span a useful window even though
+        # the visible list is shorter.
+        raw = core.request_json(f"https://api.github.com/users/{user}/events/public?per_page=100")
     except Exception as err:
         return {"error": core.coerce_error(err), "events": []}
 
-    events = [_slim_event(ev) for ev in (raw or [])][:max_events]
-    result = {"user": user, "events": events, "count": len(events)}
+    all_events = [_slim_event(ev) for ev in (raw or [])]
+
+    # Derived stats from the full window:
+    #  * 7-day daily activity bars (for a mini histogram)
+    #  * per-type counts (commits / PRs / issues / other)
+    #  * unique repos touched
+    from datetime import datetime
+    now = datetime.now(UTC)
+    seven_days = [0] * 7
+    type_counts = {"PushEvent": 0, "PullRequestEvent": 0, "IssuesEvent": 0, "ReleaseEvent": 0, "other": 0}
+    repos_set: set[str] = set()
+    for ev_raw, ev in zip((raw or []), all_events, strict=False):
+        repos_set.add(ev.get("repo") or "")
+        kind = ev_raw.get("type") or ""
+        if kind in type_counts:
+            type_counts[kind] += 1
+        else:
+            type_counts["other"] += 1
+        # Daily bucket — UTC days back from today.
+        at = ev.get("at")
+        if not at:
+            continue
+        try:
+            dt = datetime.fromisoformat(at.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        delta_days = (now.date() - dt.date()).days
+        if 0 <= delta_days < 7:
+            seven_days[6 - delta_days] += 1  # oldest first → newest last
+
+    events = all_events[:max_events]
+    result = {
+        "user":         user,
+        "events":       events,
+        "count":        len(events),
+        "total_30":     len(all_events),
+        "daily":        seven_days,
+        "repos_count":  len([r for r in repos_set if r]),
+        "type_commits": type_counts.get("PushEvent", 0),
+        "type_prs":     type_counts.get("PullRequestEvent", 0),
+        "type_issues":  type_counts.get("IssuesEvent", 0),
+        "type_releases":type_counts.get("ReleaseEvent", 0),
+    }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))
     return result

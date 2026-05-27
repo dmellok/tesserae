@@ -55,12 +55,20 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)
-    cache = data_dir / f"contrib_{user}.json"
+    # v2 cache key — bump when the payload shape changes so a stale
+    # cached v1 file (without the streak/busiest fields) doesn't keep
+    # serving until the TTL expires.
+    cache = data_dir / f"contrib_v2_{user}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
             return json.loads(cache.read_text())
         except (json.JSONDecodeError, OSError):
             pass
+    # Drop any v1 file lying around from earlier versions.
+    legacy = data_dir / f"contrib_{user}.json"
+    if legacy.exists():
+        with contextlib.suppress(OSError):
+            legacy.unlink()
 
     try:
         payload = core.request_graphql(QUERY, {"user": user})
@@ -84,10 +92,53 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
             })
         weeks.append(days)
 
+    # Derived stats — current streak (consecutive days with count > 0,
+    # ending today), longest streak in the year, busiest day, this week
+    # / month totals. All from the flat sorted day list.
+    flat = sorted(
+        (d for w in weeks for d in w),
+        key=lambda d: d.get("date") or "",
+    )
+    longest = 0
+    run = 0
+    busiest = {"date": "", "count": 0}
+    for d in flat:
+        c = d.get("count") or 0
+        if c > 0:
+            run += 1
+            longest = max(longest, run)
+        else:
+            run = 0
+        if c > busiest["count"]:
+            busiest = {"date": d.get("date") or "", "count": c}
+
+    # Current streak — walk backward from today over days with > 0,
+    # tolerate today being zero (still-early-in-day) by skipping it
+    # when counting; the streak only breaks on a confirmed past-day zero.
+    current_streak = 0
+    for d in reversed(flat):
+        if (d.get("count") or 0) > 0:
+            current_streak += 1
+        else:
+            # Allow today itself to be zero without breaking the streak;
+            # any earlier zero breaks it.
+            if d is flat[-1]:
+                continue
+            break
+
+    this_week = sum((d.get("count") or 0) for d in flat[-7:])
+    this_month = sum((d.get("count") or 0) for d in flat[-30:])
+
     result = {
-        "user":   user,
-        "total":  cal.get("totalContributions") or 0,
-        "weeks":  weeks,
+        "user":            user,
+        "total":           cal.get("totalContributions") or 0,
+        "weeks":           weeks,
+        "current_streak":  current_streak,
+        "longest_streak":  longest,
+        "busiest_date":    busiest["date"],
+        "busiest_count":   busiest["count"],
+        "this_week":       this_week,
+        "this_month":      this_month,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

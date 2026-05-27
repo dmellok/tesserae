@@ -27,12 +27,39 @@ export default async function render(shadow, ctx) {
   }
   const size = ctx.cell.size;
   const releases = Array.isArray(data.releases) ? data.releases : [];
-  const rows = releases.map((r) => `
-    <div class="gr-row">
-      <i class="ph-bold ph-tag gr-icon"></i>
-      <span class="gr-repo" title="${escapeHtml(r.repo)}">${escapeHtml(r.repo)}</span>
-      <span class="gr-tag">${escapeHtml(r.tag)}${r.prerelease ? ' <span class="gr-pre">pre</span>' : ""}</span>
-      <span class="gr-when">${escapeHtml(ago(r.published_at))}</span>
+
+  // Age tier — fresh (<14d) gets accent, recent (<60d) accent2, stale
+  // (>180d) accent3, otherwise surface. Used to colour-code the pill
+  // on the right side of each row.
+  function ageTier(iso) {
+    if (!iso) return "stale";
+    const days = (Date.now() - new Date(iso).getTime()) / 86400000;
+    if (days < 14)  return "fresh";
+    if (days < 60)  return "recent";
+    if (days < 180) return "older";
+    return "stale";
+  }
+  function daysAgo(iso) {
+    if (!iso) return "—";
+    const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+    if (d === 0) return "today";
+    if (d === 1) return "1 day";
+    return `${d} days`;
+  }
+
+  // Latest-overall summary across watched repos.
+  const newestIso = releases.length ? releases[0].published_at : null;
+  const newestTier = ageTier(newestIso);
+  const newestRepo = releases.length ? releases[0].repo : "";
+
+  const rows = releases.map((r, i) => `
+    <div class="rl-row ${i === 0 ? 'rl-row--latest' : ''}">
+      <i class="ph-bold ph-tag rl-icon"></i>
+      <span class="rl-repo" title="${escapeHtml(r.repo)}">${escapeHtml(r.repo)}</span>
+      <span class="rl-tag">${escapeHtml(r.tag)}${r.prerelease ? ' <span class="rl-pre">pre</span>' : ""}</span>
+      <span class="rl-age rl-age--${ageTier(r.published_at)}">
+        <i class="ph-bold ph-clock"></i>${escapeHtml(daysAgo(r.published_at))}
+      </span>
     </div>
   `).join("");
 
@@ -41,12 +68,21 @@ export default async function render(shadow, ctx) {
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/github_releases/client.css">
     <div class="root size-${size}">
-      <header class="gr-bar">
-        <span class="gr-mark" aria-hidden="true"></span>
-        <span class="gr-title">Releases</span>
-        <i class="ph-bold ph-github-logo gr-bar-icon"></i>
+      <header class="rl-bar">
+        <span class="rl-mark" aria-hidden="true"></span>
+        <span class="rl-title">Releases · ${releases.length}</span>
+        <i class="ph-bold ph-github-logo rl-bar-icon"></i>
       </header>
-      <section class="gr-list">${rows || `<div class="gr-empty">No releases.</div>`}</section>
+      ${releases.length ? `
+        <section class="rl-summary rl-summary--${newestTier}">
+          <div class="rl-summary-lbl">Newest release</div>
+          <div class="rl-summary-tag">${escapeHtml(releases[0].tag || "—")}</div>
+          <div class="rl-summary-meta">
+            <span class="rl-summary-repo">${escapeHtml(newestRepo)}</span>
+            <span class="rl-summary-age"><i class="ph-bold ph-clock"></i>${escapeHtml(daysAgo(newestIso))}</span>
+          </div>
+        </section>` : ""}
+      <section class="rl-list">${rows || `<div class="rl-empty">No releases.</div>`}</section>
     </div>
   `;
 }

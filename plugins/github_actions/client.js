@@ -38,6 +38,40 @@ export default async function render(shadow, ctx) {
   const size = ctx.cell.size;
   const runs = Array.isArray(data.runs) ? data.runs : [];
 
+  // Derived stats from the visible window — success rate, run counts
+  // by outcome, currently-running flag.
+  const total = runs.length;
+  const passed = runs.filter((r) => r.conclusion === "success").length;
+  const failed = runs.filter((r) => r.conclusion === "failure").length;
+  const running = runs.filter((r) => r.status === "in_progress" || r.status === "queued").length;
+  const successRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+
+  // Health tier — drives the colour of the gauge ring.
+  let healthClass = "gauge--ok";
+  if (running > 0) healthClass = "gauge--run";
+  else if (total === 0) healthClass = "gauge--idle";
+  else if (failed > total / 3) healthClass = "gauge--fail";
+  else if (failed > 0) healthClass = "gauge--mixed";
+
+  // Render a circular gauge as a conic-gradient — much cheaper than
+  // SVG and looks crisp at any size.
+  const ringDeg = successRate * 3.6;
+
+  const statBlock = total > 0 ? `
+    <section class="ga-summary">
+      <div class="ga-gauge ${healthClass}" style="--ring:${ringDeg}deg">
+        <span class="ga-gauge-v">${successRate}<small>%</small></span>
+        <span class="ga-gauge-l">Success</span>
+      </div>
+      <div class="ga-summary-stats">
+        <div class="ga-summary-stat ga-summary-stat--ok"><i class="ph-bold ph-check-circle"></i><span>${passed}</span><small>Pass</small></div>
+        <div class="ga-summary-stat ga-summary-stat--fail"><i class="ph-bold ph-x-circle"></i><span>${failed}</span><small>Fail</small></div>
+        <div class="ga-summary-stat ga-summary-stat--run"><i class="ph-bold ph-circle-notch"></i><span>${running}</span><small>Live</small></div>
+        <div class="ga-summary-stat ga-summary-stat--total"><i class="ph-bold ph-list-numbers"></i><span>${total}</span><small>Runs</small></div>
+      </div>
+    </section>
+  ` : "";
+
   const rows = runs.map((r) => {
     const s = status(r);
     return `
@@ -61,6 +95,7 @@ export default async function render(shadow, ctx) {
         <span class="ga-title">CI Runs</span>
         <i class="ph-bold ph-play-circle ga-bar-icon"></i>
       </header>
+      ${statBlock}
       <section class="ga-list">${rows || `<div class="ga-empty">No recent runs.</div>`}</section>
     </div>
   `;

@@ -1,5 +1,77 @@
 :host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
-.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto auto auto 1fr; box-sizing: border-box; overflow: hidden; }
+
+/* --- Four-up derived stats strip ----------------------------------- */
+.ga-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.ga-stat {
+  padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 14px);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: clamp(6px, 1cqw, 10px);
+  row-gap: 1px;
+  align-items: center;
+  position: relative;
+  min-width: 0;
+}
+.ga-stat .ph-bold { grid-row: 1 / span 2; font-size: clamp(18px, 3cqw, 28px); }
+.ga-v {
+  font: 900 clamp(15px, 2.6cqw, 22px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: -0.03em;
+}
+.ga-l {
+  font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.85;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ga-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
+.ga-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.ga-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.ga-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
+
+/* --- 7-day histogram ----------------------------------------------- */
+.ga-hist {
+  padding: clamp(6px, 1cqw, 12px) clamp(10px, 1.6cqw, 16px);
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-divider);
+  display: grid; gap: 4px;
+}
+.ga-hist-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+}
+.ga-hist-total { display: inline-flex; gap: 4px; align-items: center; color: var(--theme-fg); }
+.ga-hist-total .ph-bold { color: var(--theme-accent); font-size: 1.2em; }
+.ga-hist-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: clamp(3px, 0.6cqw, 6px);
+  height: clamp(32px, 7cqh, 56px);
+}
+.ga-dcol {
+  flex: 1 1 0;
+  display: grid; grid-template-rows: 1fr auto;
+  height: 100%;
+  justify-items: center;
+  gap: 2px;
+}
+.ga-dbar {
+  display: block;
+  width: 100%;
+  background: var(--theme-accent);
+  border-radius: 3px 3px 0 0;
+  align-self: end;
+}
+.ga-dlbl {
+  font: 700 clamp(8px, 1.2cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fgSoft);
+}
 .ga-bar {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
   gap: clamp(6px, 1.2cqw, 10px);

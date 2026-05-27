@@ -1,5 +1,62 @@
 :host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
-.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto auto; box-sizing: border-box; overflow: hidden; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto auto auto; box-sizing: border-box; overflow: hidden; }
+
+/* --- Language stacked bar + legend chips --------------------------- */
+.gr-langs { display: grid; gap: 6px; margin-top: clamp(6px, 1cqh, 12px); }
+.gr-langbar {
+  display: flex;
+  height: clamp(8px, 1.4cqh, 14px);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--theme-surface2);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.gr-langseg { display: block; height: 100%; }
+.gr-langlegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(6px, 1cqw, 10px);
+  font: 700 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fgSoft);
+}
+.gr-langchip { display: inline-flex; align-items: center; gap: 4px; }
+.gr-langdot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+/* Six-colour palette cycling the decorative tokens — works for any
+   theme since we pull from --theme-* only. */
+.lang-c1 { background: var(--theme-accent); }
+.lang-c2 { background: var(--theme-accent2); }
+.lang-c3 { background: var(--theme-accent3); }
+.lang-c4 { background: var(--theme-fg); opacity: 0.85; }
+.lang-c5 { background: color-mix(in oklab, var(--theme-accent) 60%, var(--theme-accent3)); }
+.lang-c6 { background: var(--theme-fgSoft); }
+
+/* --- 52-week commit-activity sparkline ----------------------------- */
+.gr-spark {
+  display: grid; gap: 4px;
+  padding: clamp(6px, 1cqw, 12px) clamp(10px, 1.6cqw, 16px);
+  background: var(--theme-surface2);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.gr-spark-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+}
+.gr-spark-total { display: inline-flex; align-items: center; gap: 4px; color: var(--theme-fg); }
+.gr-spark-total .ph-bold { color: var(--theme-accent); font-size: 1.2em; }
+.gr-spark-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: clamp(32px, 7cqh, 60px);
+}
+.gr-wbar {
+  flex: 1 1 0;
+  min-height: 2px;
+  background: var(--theme-accent);
+  border-radius: 2px 2px 0 0;
+}
 
 .gr-bar {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center;
