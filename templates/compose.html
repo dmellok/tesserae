@@ -83,6 +83,8 @@
          data-font-family="{{ cell.font_family }}"
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;
                 font-family: '{{ cell.font_family }}', system-ui, sans-serif;
+                --theme-font: '{{ cell.font_family }}', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+                --theme-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
                 {% for key, val in cell.palette.items() %}--theme-{{ key }}: {{ val }};{% endfor %}">
       {% if not cell.plugin %}
       <div class="cell-empty-placeholder">
