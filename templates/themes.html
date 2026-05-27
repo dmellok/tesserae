@@ -2,80 +2,157 @@
 {% from "_components.html" import card_head, button, theme_preview %}
 {% block title %}Themes — Tesserae{% endblock %}
 
-{# Sectioned palette: groups the 12 tokens by role so the builder form
-   doesn't dump all 12 colour pickers at once. Each (title, icon, blurb,
-   tokens) tuple becomes a fieldset. #}
+{# Palette tokens grouped by role. Click a tile to edit the colour
+   directly; click again with eyedropper armed to pick from the uploaded
+   image. Order within each section drives left-to-right tile layout. #}
 {% set PALETTE_SECTIONS = [
-  ('Neutrals & surfaces', 'square-half',
-   'Page background, card surfaces, text, dividers. Set these first — every other token reads in relation to them.',
-   ['bg', 'surface', 'surface2', 'divider', 'fg', 'fgSoft', 'muted']),
-  ('Accent', 'sparkle',
-   'Brand highlight + low-contrast fill. Used by icons, links, chart strokes, primary buttons.',
-   ['accent', 'accentSoft']),
+  ('Surfaces', 'square-half',
+   'Page and card backgrounds. Set these first — every other token reads in contrast to them.',
+   ['bg', 'surface', 'surface2']),
+  ('Text', 'text-aa',
+   'Body copy, secondary text, dividers between rows.',
+   ['fg', 'fgSoft', 'muted', 'divider']),
+  ('Accents', 'sparkle',
+   'Brand colour + two decorative siblings the widgets use for colour-blocked layouts. accentSoft is the low-contrast fill.',
+   ['accent', 'accent2', 'accent3', 'accentSoft']),
   ('Semantic', 'traffic-cone',
-   'Success, caution, and error tones. Pills, status dots, alarm states.',
+   'Reserved for actual state — success badges, warnings, error pills. Not derived from uploaded images.',
    ['ok', 'warn', 'danger']),
 ] %}
 
-{% macro palette_field(theme, token) %}
-<div class="palette-field">
-  <label for="tf-{{ theme.id or 'new' }}-{{ token }}">{{ token }}</label>
-  <div class="palette-input">
-    <input type="color"
-           id="tf-{{ theme.id or 'new' }}-{{ token }}"
-           name="{{ token }}"
-           value="{{ theme.palette.get(token, '#000000') }}"
-           data-token="{{ token }}">
+{% macro palette_tile(theme, token) %}
+<div class="tk-tile" data-token-tile data-token="{{ token }}">
+  <button type="button"
+          class="tk-swatch"
+          data-tk-swatch
+          aria-label="{{ token }} colour, click to edit or eyedrop"
+          style="--tk-fill: {{ theme.palette.get(token, '#000000') }};">
+    <span class="tk-armed-icon" aria-hidden="true">
+      <i class="ph-bold ph-eyedropper"></i>
+    </span>
+  </button>
+  <input type="color"
+         class="tk-color-input"
+         id="tf-{{ theme.id or 'new' }}-{{ token }}"
+         name="{{ token }}"
+         value="{{ theme.palette.get(token, '#000000') }}"
+         data-tk-color>
+  <div class="tk-meta">
+    <span class="tk-label">{{ token }}</span>
     <input type="text"
+           class="tk-hex"
            name="{{ token }}_hex"
            value="{{ theme.palette.get(token, '#000000') }}"
-           data-pair="{{ token }}"
            pattern="^#[0-9a-fA-F]{6}$"
-           class="palette-hex"
-           aria-label="{{ token }} hex value">
+           aria-label="{{ token }} hex value"
+           data-tk-hex>
   </div>
 </div>
 {% endmacro %}
 
 {% macro theme_form(theme, action, is_edit) %}
-<form method="post" action="{{ action }}" class="form theme-form" data-theme-form>
-  <fieldset class="form-group">
-    <legend>
-      <i class="ph ph-identification-card" aria-hidden="true"></i>
-      <span>Identity</span>
-    </legend>
-    <div class="field-grid">
-      <div class="field">
-        <label for="tf-{{ theme.id or 'new' }}-name">Name</label>
-        <input type="text" id="tf-{{ theme.id or 'new' }}-name" name="name" value="{{ theme.name }}" required autocomplete="off">
+<form method="post"
+      action="{{ action }}"
+      class="tk-form"
+      data-theme-form
+      data-theme-mode="{{ theme.mode or 'light' }}">
+
+  <div class="tk-identity">
+    <div class="tk-field">
+      <label for="tf-{{ theme.id or 'new' }}-name">Name</label>
+      <input type="text"
+             id="tf-{{ theme.id or 'new' }}-name"
+             name="name"
+             value="{{ theme.name }}"
+             required
+             autocomplete="off"
+             placeholder="My theme">
+    </div>
+    <div class="tk-field">
+      <label for="tf-{{ theme.id or 'new' }}-mode">Mode</label>
+      <select id="tf-{{ theme.id or 'new' }}-mode" name="mode" data-mode-select>
+        {% for m in modes %}
+        <option value="{{ m }}" {% if theme.mode == m %}selected{% endif %}>{{ m|capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  {# Image-to-palette panel. Closed by default — a single button. When
+     opened, exposes the dropzone (and, once an image is loaded, the
+     image preview with click-to-eyedrop wired up by JS). #}
+  <section class="tk-imgpanel" data-imgpanel hidden>
+    <div class="tk-imgpanel-head">
+      <span class="tk-imgpanel-title">
+        <i class="ph-bold ph-image-square" aria-hidden="true"></i>
+        Generate from image
+      </span>
+      <button type="button" class="tk-imgpanel-close ghost" data-imgpanel-close aria-label="Close image panel">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <label class="tk-dropzone" data-imgpanel-drop>
+      <input type="file"
+             accept="image/png,image/jpeg,image/webp,image/gif"
+             class="tk-dropzone-input"
+             data-imgpanel-input>
+      <span class="tk-dropzone-body">
+        <i class="ph-bold ph-upload-simple" aria-hidden="true"></i>
+        <span class="tk-dropzone-title">Drop or click to upload</span>
+        <span class="tk-dropzone-sub">PNG, JPEG, WebP, GIF — up to 8 MiB</span>
+      </span>
+    </label>
+
+    <div class="tk-imgview" data-imgpanel-view hidden>
+      <div class="tk-imgview-canvas" data-imgpanel-canvas-wrap>
+        <img class="tk-imgview-img" data-imgpanel-img alt="">
+        <canvas class="tk-imgview-canvas-buf" data-imgpanel-canvas></canvas>
+        <div class="tk-imgview-loupe" data-imgpanel-loupe hidden>
+          <span class="tk-imgview-loupe-color" data-imgpanel-loupe-color></span>
+          <code class="tk-imgview-loupe-hex" data-imgpanel-loupe-hex></code>
+        </div>
       </div>
-      <div class="field">
-        <label for="tf-{{ theme.id or 'new' }}-mode">Mode</label>
-        <select id="tf-{{ theme.id or 'new' }}-mode" name="mode">
-          {% for m in modes %}
-          <option value="{{ m }}" {% if theme.mode == m %}selected{% endif %}>{{ m|capitalize }}</option>
-          {% endfor %}
-        </select>
+      <div class="tk-imgview-meta">
+        <span class="tk-imgview-armed" data-imgpanel-armed hidden>
+          <i class="ph-bold ph-eyedropper" aria-hidden="true"></i>
+          <span>Arming <strong data-imgpanel-armed-token></strong> — click the image, or Esc to cancel.</span>
+        </span>
+        <button type="button" class="tk-imgview-clear ghost" data-imgpanel-clear>
+          <i class="ph ph-x" aria-hidden="true"></i><span>Remove image</span>
+        </button>
       </div>
     </div>
-  </fieldset>
+  </section>
 
+  {# Toggle button — opens the panel above when the user wants to
+     generate a palette from an image. Shows the auto-extraction
+     workflow without consuming form space when not in use. #}
+  <button type="button" class="tk-imgpanel-toggle" data-imgpanel-toggle>
+    <i class="ph-bold ph-image-square" aria-hidden="true"></i>
+    <span class="tk-imgpanel-toggle-label">Generate from image</span>
+    <span class="tk-imgpanel-toggle-sub">Auto-fill the palette from a photo</span>
+  </button>
+
+  {# Palette sections — tiles per token, grouped by role. #}
   {% for title, icon_name, blurb, tokens in PALETTE_SECTIONS %}
-  <fieldset class="form-group">
-    <legend>
-      <i class="ph ph-{{ icon_name }}" aria-hidden="true"></i>
-      <span>{{ title }}</span>
-    </legend>
-    {% if blurb %}<p class="legend-blurb">{{ blurb }}</p>{% endif %}
-    <div class="palette-grid">
+  <section class="tk-section">
+    <header class="tk-section-head">
+      <h3>
+        <i class="ph-bold ph-{{ icon_name }}" aria-hidden="true"></i>
+        <span>{{ title }}</span>
+      </h3>
+      {% if blurb %}<p class="tk-section-blurb">{{ blurb }}</p>{% endif %}
+    </header>
+    <div class="tk-tiles">
       {% for t in tokens %}
-        {{ palette_field(theme, t) }}
+        {{ palette_tile(theme, t) }}
       {% endfor %}
     </div>
-  </fieldset>
+  </section>
   {% endfor %}
 
-  <div class="actions">
+  <div class="tk-actions">
     {{ button('Save changes' if is_edit else 'Create theme', icon='floppy-disk' if is_edit else 'plus') }}
     {% if is_edit %}<a class="ghost-link" href="{{ url_for('themes.index') }}">Cancel</a>{% endif %}
   </div>
@@ -96,23 +173,23 @@
 </header>
 
 {# ---- Builder: form left, sticky live preview right ---- #}
-<section class="card builder-card">
+<section class="card tk-builder">
   {{ card_head(
        'Edit theme' if edit_theme else 'New theme',
        icon_name='pencil-simple' if edit_theme else 'plus-circle',
-       blurb=('Live preview on the right updates as you change colours.' if not edit_theme else None)
+       blurb='Click any colour tile to edit. Upload an image to auto-fill the palette, then click a tile and pick a pixel to refine.'
      ) }}
-  <div class="builder-grid">
-    <div class="builder-form">
+  <div class="tk-grid">
+    <div class="tk-formcol">
       {% if edit_theme %}
         {{ theme_form(edit_theme, url_for('themes.update', theme_id=edit_theme.id), true) }}
       {% else %}
         {{ theme_form(blank_theme, url_for('themes.create'), false) }}
       {% endif %}
     </div>
-    <aside class="builder-preview">
-      <div class="builder-preview-sticky">
-        <div class="builder-preview-label">Live preview</div>
+    <aside class="tk-previewcol">
+      <div class="tk-previewcol-sticky">
+        <div class="tk-previewcol-label">Live preview</div>
         {{ theme_preview((edit_theme or blank_theme).palette, variant='lg') }}
       </div>
     </aside>
@@ -123,20 +200,19 @@
 {% if user_themes %}
 <section class="card">
   {{ card_head('Your themes (' ~ user_themes|length ~ ')', icon_name='star') }}
-  <div class="theme-grid">
+  <div class="tk-gallery">
     {% for theme in user_themes %}
-    <article class="theme-card is-user">
-      <a class="theme-card-link" href="{{ url_for('themes.index', edit=theme.id) }}" title="Edit {{ theme.name }}">
+    <article class="tk-card is-user">
+      <a class="tk-card-preview" href="{{ url_for('themes.index', edit=theme.id) }}" title="Edit {{ theme.name }}">
         {{ theme_preview(theme.palette, variant='sm') }}
       </a>
-      <div class="theme-card-meta">
-        <div class="theme-card-title">
-          <span class="theme-name">{{ theme.name }}</span>
+      <div class="tk-card-foot">
+        <div class="tk-card-title">
+          <span class="tk-card-name">{{ theme.name }}</span>
           <span class="pill is-accent">user</span>
           {% if theme.mode %}<span class="pill">{{ theme.mode }}</span>{% endif %}
         </div>
-        <code class="theme-id">{{ theme.id }}</code>
-        <div class="theme-actions">
+        <div class="tk-card-actions">
           <a class="ghost-link" href="{{ url_for('themes.index', edit=theme.id) }}">
             <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
           </a>
@@ -158,20 +234,19 @@
   {{ card_head('Built-in themes (' ~ builtin_themes|length ~ ')',
                icon_name='swatches',
                blurb='Read-only. Duplicate one to make a user theme you can edit.') }}
-  <div class="theme-grid">
+  <div class="tk-gallery">
     {% for theme in builtin_themes %}
-    <article class="theme-card">
-      <div class="theme-card-preview">
+    <article class="tk-card">
+      <div class="tk-card-preview">
         {{ theme_preview(theme.palette, variant='sm') }}
       </div>
-      <div class="theme-card-meta">
-        <div class="theme-card-title">
-          <span class="theme-name">{{ theme.name }}</span>
+      <div class="tk-card-foot">
+        <div class="tk-card-title">
+          <span class="tk-card-name">{{ theme.name }}</span>
           <span class="pill">built-in</span>
           {% if theme.mode %}<span class="pill">{{ theme.mode }}</span>{% endif %}
         </div>
-        <code class="theme-id">{{ theme.id }}</code>
-        <div class="theme-actions">
+        <div class="tk-card-actions">
           <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
             <button type="submit" class="ghost">
               <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate to edit</span>
@@ -185,36 +260,242 @@
 </section>
 
 <script>
-  // Two-way sync between each <input type="color"> and its hex-text
-  // partner, plus live-update the builder preview's --theme-* custom
-  // properties as the user types/drags. Uses 'input' on both sides
-  // (instead of 'change' on hex) so submitting without tabbing out
-  // still POSTs the right value.
+  // ---------- Theme builder script ------------------------------------
+  // Three interrelated pieces:
+  //   1. Tile <-> hex sync + live-preview update as colours change
+  //   2. Image upload -> POST to /themes/extract-palette -> auto-fill
+  //   3. Eyedropper: click tile to arm, click image pixel to assign
   (function () {
     const form = document.querySelector('[data-theme-form]');
-    const preview = document.querySelector('.builder-preview [data-theme-preview]');
     if (!form) return;
+    const preview = document.querySelector('.tk-previewcol [data-theme-preview]');
+    const tiles = form.querySelectorAll('[data-token-tile]');
+    const modeSelect = form.querySelector('[data-mode-select]');
+    const panel = form.querySelector('[data-imgpanel]');
+    const panelToggle = form.querySelector('[data-imgpanel-toggle]');
+    const panelClose = panel?.querySelector('[data-imgpanel-close]');
+    const fileInput = panel?.querySelector('[data-imgpanel-input]');
+    const dropLabel = panel?.querySelector('[data-imgpanel-drop]');
+    const view = panel?.querySelector('[data-imgpanel-view]');
+    const imgEl = panel?.querySelector('[data-imgpanel-img]');
+    const canvas = panel?.querySelector('[data-imgpanel-canvas]');
+    const canvasWrap = panel?.querySelector('[data-imgpanel-canvas-wrap]');
+    const loupe = panel?.querySelector('[data-imgpanel-loupe]');
+    const loupeColor = panel?.querySelector('[data-imgpanel-loupe-color]');
+    const loupeHex = panel?.querySelector('[data-imgpanel-loupe-hex]');
+    const armedBanner = panel?.querySelector('[data-imgpanel-armed]');
+    const armedTokenEl = panel?.querySelector('[data-imgpanel-armed-token]');
+    const clearBtn = panel?.querySelector('[data-imgpanel-clear]');
 
-    function applyToken(token, value) {
-      if (!/^#[0-9a-fA-F]{6}$/.test(value)) return;
-      if (preview) preview.style.setProperty('--theme-' + token, value);
+    let armed = null;          // currently armed token name
+    let imageLoaded = false;
+    let canvasCtx = null;
+
+    // 0. Image panel show/hide toggle ------------------------------------
+    function setPanelOpen(open) {
+      if (!panel || !panelToggle) return;
+      panel.hidden = !open;
+      panelToggle.hidden = open;
+    }
+    panelToggle?.addEventListener('click', () => setPanelOpen(true));
+    panelClose?.addEventListener('click', () => {
+      // Closing the panel doesn't clear the loaded image — re-opening
+      // brings you back to where you left off.
+      setPanelOpen(false);
+      armToken(null);
+    });
+
+    function isHex(v) { return /^#[0-9a-fA-F]{6}$/.test(v); }
+
+    function applyToPreview(token, value) {
+      if (preview && isHex(value)) {
+        preview.style.setProperty('--theme-' + token, value);
+      }
     }
 
-    form.querySelectorAll('input[type="color"]').forEach((picker) => {
-      const token = picker.dataset.token;
-      const hex = form.querySelector('input[data-pair="' + token + '"]');
-      picker.addEventListener('input', () => {
-        if (hex) hex.value = picker.value;
-        applyToken(token, picker.value);
+    function setTokenValue(token, value) {
+      if (!isHex(value)) return;
+      const tile = form.querySelector(`[data-token-tile][data-token="${token}"]`);
+      if (!tile) return;
+      const swatch = tile.querySelector('[data-tk-swatch]');
+      const color = tile.querySelector('[data-tk-color]');
+      const hex = tile.querySelector('[data-tk-hex]');
+      if (swatch) swatch.style.setProperty('--tk-fill', value);
+      if (color) color.value = value;
+      if (hex) hex.value = value;
+      applyToPreview(token, value);
+    }
+
+    // 1. Tile interactions ------------------------------------------------
+    tiles.forEach((tile) => {
+      const token = tile.dataset.token;
+      const swatch = tile.querySelector('[data-tk-swatch]');
+      const color = tile.querySelector('[data-tk-color]');
+      const hex = tile.querySelector('[data-tk-hex]');
+
+      swatch.addEventListener('click', () => {
+        if (imageLoaded) {
+          // Arm/disarm eyedropper. Don't also open native picker.
+          armToken(armed === token ? null : token);
+        } else {
+          color.click();  // delegate to native picker
+        }
       });
+
+      color.addEventListener('input', () => {
+        const v = color.value;
+        if (hex) hex.value = v;
+        swatch.style.setProperty('--tk-fill', v);
+        applyToPreview(token, v);
+      });
+
       if (hex) {
         hex.addEventListener('input', () => {
-          if (/^#[0-9a-fA-F]{6}$/.test(hex.value)) {
-            picker.value = hex.value;
-            applyToken(token, hex.value);
-          }
+          const v = hex.value;
+          if (!isHex(v)) return;
+          color.value = v;
+          swatch.style.setProperty('--tk-fill', v);
+          applyToPreview(token, v);
         });
       }
+    });
+
+    // 2. Image upload -> palette extraction --------------------------------
+    function postExtract(file) {
+      const fd = new FormData();
+      fd.append('image', file);
+      fd.append('mode', modeSelect?.value || 'light');
+      return fetch('{{ url_for("themes.extract_palette") }}', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+      }).then(async (r) => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${r.status}`);
+        }
+        return r.json();
+      });
+    }
+
+    function loadIntoCanvas(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvasCtx = canvas.getContext('2d');
+          canvasCtx.drawImage(img, 0, 0);
+          imgEl.src = dataUrl;
+          imageLoaded = true;
+          resolve();
+        };
+        img.onerror = (e) => reject(e);
+        img.src = dataUrl;
+      });
+    }
+
+    async function handleFile(file) {
+      if (!file) return;
+      dropLabel.classList.add('is-busy');
+      try {
+        const result = await postExtract(file);
+        await loadIntoCanvas(result.image_data_url);
+        // Apply suggested palette into the form.
+        Object.entries(result.palette).forEach(([token, value]) => setTokenValue(token, value));
+        dropLabel.hidden = true;
+        view.hidden = false;
+      } catch (e) {
+        alert('Could not extract palette: ' + e.message);
+      } finally {
+        dropLabel.classList.remove('is-busy');
+      }
+    }
+
+    fileInput?.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+    // Drag-and-drop on the dropzone label.
+    ['dragenter', 'dragover'].forEach((ev) => {
+      dropLabel?.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropLabel.classList.add('is-dragging');
+      });
+    });
+    ['dragleave', 'dragend', 'drop'].forEach((ev) => {
+      dropLabel?.addEventListener(ev, () => dropLabel.classList.remove('is-dragging'));
+    });
+    dropLabel?.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if (f) handleFile(f);
+    });
+
+    clearBtn?.addEventListener('click', () => {
+      imageLoaded = false;
+      canvasCtx = null;
+      imgEl.src = '';
+      view.hidden = true;
+      dropLabel.hidden = false;
+      fileInput.value = '';
+      armToken(null);
+    });
+
+    // 3. Eyedropper --------------------------------------------------------
+    function armToken(token) {
+      armed = token;
+      tiles.forEach((t) => t.classList.toggle('is-armed', t.dataset.token === token));
+      if (token && imageLoaded) {
+        armedBanner.hidden = false;
+        armedTokenEl.textContent = token;
+        canvasWrap.classList.add('is-armed');
+      } else {
+        armedBanner.hidden = true;
+        canvasWrap?.classList.remove('is-armed');
+        if (loupe) loupe.hidden = true;
+      }
+    }
+
+    function pixelAt(clientX, clientY) {
+      if (!canvasCtx || !imgEl) return null;
+      const rect = imgEl.getBoundingClientRect();
+      const x = Math.floor(((clientX - rect.left) / rect.width) * canvas.width);
+      const y = Math.floor(((clientY - rect.top) / rect.height) * canvas.height);
+      if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null;
+      const d = canvasCtx.getImageData(x, y, 1, 1).data;
+      return [d[0], d[1], d[2]];
+    }
+
+    function rgbToHex([r, g, b]) {
+      return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    canvasWrap?.addEventListener('mousemove', (e) => {
+      if (!imageLoaded || !armed) return;
+      const px = pixelAt(e.clientX, e.clientY);
+      if (!px) return;
+      const hex = rgbToHex(px);
+      const wrapRect = canvasWrap.getBoundingClientRect();
+      loupe.hidden = false;
+      loupe.style.left = (e.clientX - wrapRect.left + 14) + 'px';
+      loupe.style.top = (e.clientY - wrapRect.top + 14) + 'px';
+      loupeColor.style.background = hex;
+      loupeHex.textContent = hex;
+    });
+    canvasWrap?.addEventListener('mouseleave', () => {
+      if (loupe) loupe.hidden = true;
+    });
+
+    canvasWrap?.addEventListener('click', (e) => {
+      if (!imageLoaded || !armed) return;
+      const px = pixelAt(e.clientX, e.clientY);
+      if (!px) return;
+      setTokenValue(armed, rgbToHex(px));
+      armToken(null);  // disarm after pick
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && armed) armToken(null);
     });
   })();
 </script>
