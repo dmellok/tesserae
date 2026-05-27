@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Clock — Word grid",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "QLOCKTWO-inspired letter-grid clock. An 11×10 matrix of letters where the words for the current time light up; everything else stays dim. Pure client-side, no fetch. Rounds to the nearest 5 minutes.",
+  "icon": "ph-grid-four",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "lit_color",
+      "type": "select",
+      "label": "Lit colour",
+      "default": "fg",
+      "choices": [
+        { "value": "fg",      "label": "Foreground (cleanest)" },
+        { "value": "accent",  "label": "Accent" },
+        { "value": "accent2", "label": "Accent 2" },
+        { "value": "accent3", "label": "Accent 3" }
+      ]
+    },
+    {
+      "name": "show_corners",
+      "type": "boolean",
+      "label": "Show corner dots (per-minute precision)",
+      "default": true,
+      "help": "Four dots in the corners that count 1-4 minutes past the current 5-minute step, so the clock reads to ±1 minute."
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

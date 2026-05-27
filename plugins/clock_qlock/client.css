@@ -1,0 +1,97 @@
+/* clock_qlock — QLOCKTWO letter-grid clock.
+   The grid is a fixed 11×10 cells centred in a square stage; the
+   stage itself shrinks to fit the cell while staying square (a
+   landscape cell leaves vertical gutters, a portrait cell leaves
+   horizontal ones). Corner dots are pinned to the stage corners,
+   so they always frame the grid even at odd aspect ratios. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: clamp(8px, 2cqw, 24px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.qk-stage {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  width: min(100%, 100cqh);
+  max-height: 100%;
+}
+
+.qk-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(11, 1fr);
+  grid-template-rows: repeat(10, 1fr);
+  /* Padding inset so the corner dots have a clear margin around the
+     grid without overlapping any letters. */
+  padding: clamp(6px, 4cqw, 28px);
+  box-sizing: border-box;
+}
+
+.qk-cell {
+  display: grid;
+  place-items: center;
+  font: 700 clamp(8px, 4.5cqw, 56px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.04em;
+  /* Dim default — barely-there at 8% of fg. Active cells flip to
+     full fg / accent via .is-lit (see .lit-* roots below). */
+  color: color-mix(in oklab, var(--theme-fg) 18%, transparent);
+  user-select: none;
+  transition: color 200ms ease;
+}
+.qk-cell.is-lit { color: var(--theme-fg); }
+
+/* Per-theme tint for lit cells. Defaults to fg; the cell option flips
+   the root class to a different token so the active letters paint in
+   the accent triad if the user wants colour. */
+.lit-accent  .qk-cell.is-lit { color: var(--theme-accent); }
+.lit-accent2 .qk-cell.is-lit { color: var(--theme-accent2); }
+.lit-accent3 .qk-cell.is-lit { color: var(--theme-accent3); }
+
+/* Corner dots — minute-precision indicator.
+   Each lit dot = 1 minute past the displayed 5-minute step. Ordered
+   top-left → top-right → bottom-right → bottom-left so the eye reads
+   them like a 4-step ring. */
+.qk-corners {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.qk-corner {
+  position: absolute;
+  width: clamp(4px, 1.4cqw, 12px);
+  height: clamp(4px, 1.4cqw, 12px);
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--theme-fg) 18%, transparent);
+  transition: background 200ms ease;
+}
+.qk-corner.is-lit { background: var(--theme-fg); }
+.lit-accent  .qk-corner.is-lit { background: var(--theme-accent); }
+.lit-accent2 .qk-corner.is-lit { background: var(--theme-accent2); }
+.lit-accent3 .qk-corner.is-lit { background: var(--theme-accent3); }
+.qk-corner--tl { top:    clamp(6px, 2cqw, 16px); left:  clamp(6px, 2cqw, 16px); }
+.qk-corner--tr { top:    clamp(6px, 2cqw, 16px); right: clamp(6px, 2cqw, 16px); }
+.qk-corner--bl { bottom: clamp(6px, 2cqw, 16px); left:  clamp(6px, 2cqw, 16px); }
+.qk-corner--br { bottom: clamp(6px, 2cqw, 16px); right: clamp(6px, 2cqw, 16px); }
+
+/* --- size adaptations --- */
+
+.root.size-xs .qk-grid { padding: 4px; }
+.root.size-xs .qk-cell { font-size: clamp(7px, 6cqw, 14px); letter-spacing: 0.02em; }
+.root.size-xs .qk-corner { width: 3px; height: 3px; }
+
+.root.size-sm .qk-cell { font-size: clamp(10px, 5cqw, 22px); }
