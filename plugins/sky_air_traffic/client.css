@@ -1,0 +1,54 @@
+:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
+.at-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg); color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.at-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.at-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); color: var(--theme-accent2); }
+
+.at-list { display: grid; grid-auto-rows: min-content; align-content: start; background: var(--theme-surface); min-height: 0; overflow: hidden; }
+.at-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(4px, 0.8cqh, 8px) clamp(10px, 1.6cqw, 18px);
+  border-top: 1px solid var(--theme-divider);
+  min-width: 0;
+}
+.at-row:first-child { border-top: 0; }
+.at-row.is-ground { opacity: 0.5; }
+.at-icon { font-size: clamp(13px, 2.2cqw, 18px); color: var(--theme-accent); transition: transform 200ms ease; }
+.at-call {
+  font: 800 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.02em;
+}
+.at-country {
+  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--theme-fgSoft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.at-alt, .at-spd, .at-dist {
+  font: 700 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fgSoft); white-space: nowrap;
+}
+.at-alt { color: var(--theme-fg); }
+
+.at-empty {
+  display: grid; place-content: center; text-align: center;
+  gap: clamp(4px, 1cqw, 10px);
+  padding: clamp(12px, 2.4cqw, 28px);
+  background: var(--theme-surface);
+}
+.at-empty .ph-duotone { font-size: clamp(28px, 8cqw, 64px); color: var(--theme-fg); opacity: 0.55; }
+.at-empty-primary { font-size: clamp(13px, 2.4cqw, 20px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.at-empty-secondary { font-size: clamp(10px, 1.7cqw, 13px); color: var(--theme-fgSoft); }
+
+.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }
