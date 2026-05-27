@@ -1,4 +1,5 @@
-// news_rss — N headlines from one feed.
+// news_rss — N headlines from one feed. Bauhaus shape: accent lede
+// block for the top headline, neutral list of the rest.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -20,7 +21,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
+      <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/news_rss/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -31,13 +32,37 @@ export default async function render(shadow, ctx) {
   const showSource = ctx.cell.options.show_source !== false;
   const title = showSource && data.feed_title ? data.feed_title : "Headlines";
 
-  const rows = items.map((it, i) => `
-    <div class="nr-row">
-      <span class="nr-num">${i + 1}</span>
-      <span class="nr-title" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</span>
-      <span class="nr-when">${escapeHtml(ago(it.published))}</span>
-    </div>
-  `).join("");
+  const lede = items[0];
+  const rest = items.slice(1);
+
+  const ledeHtml = lede ? `
+    <article class="nr-lede">
+      <div class="nr-lede-num">01</div>
+      <div class="nr-lede-body">
+        <h3 class="nr-lede-title" title="${escapeHtml(lede.title)}">${escapeHtml(lede.title)}</h3>
+        ${lede.published ? `
+        <div class="nr-meta nr-meta--lede">
+          <span class="nr-when"><i class="ph-bold ph-clock"></i>${escapeHtml(ago(lede.published))}</span>
+        </div>` : ""}
+      </div>
+    </article>
+  ` : "";
+
+  const restHtml = rest.map((it, i) => {
+    const n = String(i + 2).padStart(2, "0");
+    return `
+      <article class="nr-row">
+        <span class="nr-num">${n}</span>
+        <div class="nr-body">
+          <div class="nr-title" title="${escapeHtml(it.title)}">${escapeHtml(it.title)}</div>
+          ${it.published ? `
+          <div class="nr-meta">
+            <span class="nr-when"><i class="ph-bold ph-clock"></i>${escapeHtml(ago(it.published))}</span>
+          </div>` : ""}
+        </div>
+      </article>
+    `;
+  }).join("");
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
@@ -50,7 +75,8 @@ export default async function render(shadow, ctx) {
         <span class="wb-title">${escapeHtml(title)}</span>
         <i class="ph-bold ph-rss wb-bar-icon"></i>
       </header>
-      <section class="nr-list">${rows || `<div class="nr-empty">No headlines.</div>`}</section>
+      ${ledeHtml}
+      <section class="nr-list">${restHtml || (!lede ? `<div class="nr-empty">No headlines.</div>` : "")}</section>
     </div>
   `;
 }
