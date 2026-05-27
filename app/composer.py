@@ -292,3 +292,36 @@ def test_render() -> str:
         for_push=False,
         preview_mode=False,
     )
+
+
+@bp.get("/_test/widgets")
+def test_widget_gallery() -> str:
+    """All widgets at every supported size, iframed via /_test/render.
+
+    Dev-only review surface — lets you scan every widget's render in
+    one place so you can spot regressions or queue tweaks. Each iframe
+    is lazy-loaded so opening the page doesn't fire 100+ widget fetches
+    at once.
+    """
+    if not (current_app.debug or current_app.testing):
+        abort(404)
+    widgets = sorted(_registry().widgets(), key=lambda p: p.name.lower())
+    rows = []
+    for plugin in widgets:
+        supported = plugin.manifest.get("supports", {}).get("sizes") or ["md"]
+        sizes = [s for s in ("xs", "sm", "md", "lg") if s in supported]
+        rows.append(
+            {
+                "id": plugin.id,
+                "name": plugin.name,
+                "description": plugin.manifest.get("description") or "",
+                "icon": plugin.manifest.get("icon"),
+                "version": plugin.manifest.get("version") or "",
+                "sizes": sizes,
+            }
+        )
+    return render_template(
+        "widget_gallery.html",
+        widgets=rows,
+        size_dims=SIZE_DIMENSIONS,
+    )
