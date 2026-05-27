@@ -14,9 +14,9 @@
       "category": "sans",
       "weights": [400, 700, 800],
       "files": {
-        "400": "/plugins/fonts_core/static/inter/400.woff2",
-        "700": "/plugins/fonts_core/static/inter/700.woff2",
-        "800": "/plugins/fonts_core/static/inter/800.woff2"
+        "400": "static/inter/400.woff2",
+        "700": "static/inter/700.woff2",
+        "800": "static/inter/800.woff2"
       }
     },
     {
@@ -25,8 +25,8 @@
       "category": "sans",
       "weights": [400, 700],
       "files": {
-        "400": "/plugins/fonts_core/static/space-grotesk/400.woff2",
-        "700": "/plugins/fonts_core/static/space-grotesk/700.woff2"
+        "400": "static/space-grotesk/400.woff2",
+        "700": "static/space-grotesk/700.woff2"
       }
     },
     {
@@ -35,7 +35,7 @@
       "category": "display",
       "weights": [400],
       "files": {
-        "400": "/plugins/fonts_core/static/archivo-black/400.woff2"
+        "400": "static/archivo-black/400.woff2"
       }
     },
     {
@@ -44,8 +44,8 @@
       "category": "mono",
       "weights": [400, 700],
       "files": {
-        "400": "/plugins/fonts_core/static/jetbrains-mono/400.woff2",
-        "700": "/plugins/fonts_core/static/jetbrains-mono/700.woff2"
+        "400": "static/jetbrains-mono/400.woff2",
+        "700": "static/jetbrains-mono/700.woff2"
       }
     },
     {
@@ -54,7 +54,7 @@
       "category": "serif",
       "weights": [400],
       "files": {
-        "400": "/plugins/fonts_core/static/dm-serif-display/400.woff2"
+        "400": "static/dm-serif-display/400.woff2"
       }
     }
   ]
