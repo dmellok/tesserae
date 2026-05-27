@@ -48,10 +48,15 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # panel oriented in settings.
     native_w = max(panel.w, panel.h)
     native_h = min(panel.w, panel.h)
-    if img.size[0] < img.size[1]:
-        # Portrait input → rotate 90° CCW so the top of the rendered
-        # composition lines up with the panel's left edge (matches the
-        # standard "ribbon-cable-up" portrait mount on Inky Impressions).
+    if panel.w < panel.h:
+        # Panel is mounted portrait — every composition (portrait OR
+        # square) needs a 90° CCW pre-rotation so the top of the
+        # composition maps to the left edge of the landscape buffer the
+        # firmware reads. The previous heuristic conditioned on input
+        # aspect (img w < img h) and silently skipped squares, so a
+        # square image (e.g. a gallery photo at 1000×1000 fitted into
+        # 1600×1200) landed in the buffer un-rotated and the
+        # mount-rotation made it appear sideways on the panel.
         img = img.rotate(90, expand=True)
     if img.size != (native_w, native_h):
         # Send-page uploads aren't panel-sized; fit before packing.

@@ -476,38 +476,48 @@ def blueprint() -> Blueprint:
             flash(f"Skipped: {', '.join(skipped)}", "warn")
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
+    def _resolve_existing_image(folder: str, filename: str) -> Path | None:
+        """Map (folder, filename) to an on-disk image path. Uses
+        ``safe_join`` so spaces / unicode in the filename round-trip
+        (``secure_filename`` would mangle them and miss the file)
+        while still rejecting traversal attempts."""
+        target_dir = _folder_path(folder, _data_dir())
+        if target_dir is None or not target_dir.exists() or not target_dir.is_dir():
+            return None
+        joined = safe_join(str(target_dir), filename)
+        if joined is None:
+            return None
+        path = Path(joined)
+        if not path.is_file() or path.suffix.lower() not in ALLOWED_SUFFIXES:
+            return None
+        return path
+
     @bp.post("/folders/<folder>/images/<path:filename>/send")
     def send_image(folder: str, filename: str) -> Response:
         """Push a single image to every loaded renderer, bypassing the
         dashboard composer. Same path as the Send page's File tab — we
         hand the bytes to PushManager.push_image and let each renderer
         fit the image to its panel."""
-        data_dir = _data_dir()
-        target_dir = _folder_path(folder, data_dir)
-        if target_dir is None:
+        path = _resolve_existing_image(folder, filename)
+        if path is None:
             abort(404)
-        safe = secure_filename(filename)
-        if not safe:
-            abort(404)
-        path = target_dir / safe
-        if not path.is_file() or path.suffix.lower() not in ALLOWED_SUFFIXES:
-            abort(404)
+        display_name = path.name
         try:
             blob = path.read_bytes()
         except OSError as err:
-            flash(f"Could not read {safe}: {err}", "error")
+            flash(f"Could not read {display_name}: {err}", "error")
             return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
         push = current_app.config.get("PUSH_MANAGER")
         if push is None:
             flash("Push manager unavailable.", "error")
             return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
-        label = f"gallery:{folder}/{safe}"
+        label = f"gallery:{folder}/{display_name}"
         result = push.push_image(blob, source_label=label)
         if getattr(result, "status", "ok") == "ok":
-            flash(f"Pushed {safe}.", "ok")
+            flash(f"Pushed {display_name}.", "ok")
         else:
             flash(
-                f"Push of {safe} returned {getattr(result, 'status', '?')}"
+                f"Push of {display_name} returned {getattr(result, 'status', '?')}"
                 + (f": {result.error}" if getattr(result, "error", None) else ""),
                 "warn" if result.status == "busy" else "error",
             )
@@ -515,18 +525,11 @@ def blueprint() -> Blueprint:
 
     @bp.post("/folders/<folder>/images/<path:filename>/delete")
     def delete_image(folder: str, filename: str) -> Response:
-        data_dir = _data_dir()
-        if folder != ROOT_FOLDER_VALUE and _is_external(folder, data_dir):
+        if folder != ROOT_FOLDER_VALUE and _is_external(folder, _data_dir()):
             flash("Deletes for external folders aren't allowed.", "warn")
             return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
-        target_dir = _folder_path(folder, data_dir)
-        if target_dir is None:
-            abort(404)
-        safe = secure_filename(filename)
-        if not safe:
-            abort(404)
-        path = target_dir / safe
-        if not path.exists() or not path.is_file():
+        path = _resolve_existing_image(folder, filename)
+        if path is None:
             abort(404)
         path.unlink()
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
