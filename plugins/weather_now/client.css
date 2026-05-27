@@ -104,9 +104,6 @@
   align-self: stretch;
   display: grid;
   place-items: center;
-  /* Thick black line separating the text panel from the icon panel —
-     sparing use of bauhaus heavy rules to anchor the composition. */
-  border-left: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
   padding: clamp(10px, 2cqw, 22px);
   min-width: 0;
   overflow: hidden;
@@ -171,7 +168,7 @@
 }
 
 .wn-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
-.wn-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
+.wn-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
 .wn-stat--accent2 { background: var(--theme-accent2); color: var(--theme-fg); }
 .wn-stat--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
 
@@ -205,7 +202,7 @@
 .root.size-xs .wn-rain-tag { display: none; }
 .root.size-xs .wn-range { display: none; }
 .root.size-xs .wn-hero-text { padding: 6px 8px; gap: 4px; }
-.root.size-xs .wn-hero-icon { padding: 6px; border-left-width: 2px; }
+.root.size-xs .wn-hero-icon { padding: 6px; }
 .root.size-xs .wn-hero-icon .ph-bold { font-size: clamp(36px, 22cqw, 64px); }
 .root.size-xs .wn-temp { font-size: clamp(34px, 18cqw, 60px); }
 .root.size-xs .wn-cond { font-size: 10px; }

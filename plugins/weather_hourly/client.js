@@ -125,6 +125,30 @@ function renderConditionStrip(points, size) {
     .join("");
 }
 
+// Vertical hourly list — shown on tall cells via the CSS container
+// query (the wide-layout chart hides instead). Samples ~12 hours from
+// the data so the list fills available height without scrolling.
+function renderHourlyList(points) {
+  const idxs = sampleIndexes(points.length, 12);
+  return idxs
+    .map((i) => {
+      const p = points[i];
+      const icon = iconForPoint(p);
+      const rainPct = p.rain == null ? 0 : Math.max(0, Math.min(100, p.rain));
+      return `
+        <div class="wh-hour">
+          <i class="ph-bold ph-${icon} wh-hour-icon" aria-hidden="true"></i>
+          <span class="wh-hour-label">${p.hour}:00</span>
+          <span class="wh-hour-temp">${Math.round(p.temp)}°</span>
+          <div class="wh-hour-rain" aria-hidden="true">
+            <span class="wh-hour-rain-fill" style="width: ${rainPct}%"></span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function renderRainBars(points) {
   return points
     .map((p) => {
@@ -167,6 +191,9 @@ export default async function render(shadow, ctx) {
       </section>` : ""}
       <section class="wh-chart">
         <canvas class="chart"></canvas>
+      </section>
+      <section class="wh-hours" aria-label="Hourly breakdown">
+        ${renderHourlyList(points)}
       </section>
       ${showRain ? `
       <section class="wh-rain">

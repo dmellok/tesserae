@@ -344,7 +344,7 @@
 .tp-stat-value small { font-size: 0.65em; font-weight: 700; margin-left: 0.15em; }
 
 .tp-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
-.tp-stat--surface { background: var(--theme-surface); color: var(--theme-fg); }
+.tp-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
 .tp-stat--accent2 { background: var(--theme-accent2); color: var(--theme-fg); }
 .tp-stat--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
 

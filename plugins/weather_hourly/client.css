@@ -133,6 +133,62 @@
 }
 .wh-rain-bar.is-wet { background: var(--theme-accent); }
 
+/* --- vertical hourly list (tall-cell layout only) ---
+   Hidden by default; the container-aspect-ratio query at the bottom
+   of this file shows it and hides the chart / cond strip / rain row
+   when the cell is taller than wide. */
+
+.wh-hours {
+  display: none;
+  background: var(--theme-surface);
+  padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 18px);
+  grid-auto-rows: min-content;
+  align-content: start;
+  row-gap: clamp(2px, 0.4cqh, 6px);
+  min-height: 0;
+  overflow: hidden;
+}
+.wh-hour {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.4cqw, 16px);
+  min-width: 0;
+}
+.wh-hour-icon {
+  font-size: clamp(20px, 3.6cqh, 32px);
+  color: var(--theme-fg);
+  line-height: 1;
+  justify-self: center;
+}
+.wh-hour-label {
+  font-size: clamp(11px, 1.9cqh, 14px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+}
+.wh-hour-temp {
+  font-size: clamp(16px, 2.8cqh, 24px);
+  font-weight: 800;
+  color: var(--theme-fg);
+  letter-spacing: -0.01em;
+  justify-self: end;
+  margin-right: clamp(6px, 1cqw, 12px);
+}
+.wh-hour-rain {
+  position: relative;
+  height: clamp(6px, 1.2cqh, 10px);
+  background: var(--theme-surface2);
+  width: clamp(60px, 18cqw, 140px);
+  justify-self: end;
+}
+.wh-hour-rain-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  background: var(--theme-accent);
+}
+
 /* --- chip strip at the BOTTOM --- */
 
 .wh-chips {
@@ -164,8 +220,27 @@
   line-height: 1;
 }
 .wh-chip--high { background: var(--theme-accent3); color: var(--theme-bg); }
-.wh-chip--low { background: var(--theme-surface); color: var(--theme-fg); }
+.wh-chip--low { background: var(--theme-surface2); color: var(--theme-fg); }
 .wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
+
+/* --- tall-cell layout switch ---
+   Cell is taller than wide -> swap to a vertical hourly list. Chart,
+   condition strip, and rain row hide; the list fills the freed
+   vertical space. Header + chips stay so the eye still gets
+   top-line context. */
+
+@container (max-aspect-ratio: 1) {
+  .wh-cond-strip,
+  .wh-chart,
+  .wh-rain {
+    display: none;
+  }
+  .wh-hours { display: grid; }
+  /* Header row stays auto; hours list takes the flex row; chips
+     auto at the bottom. */
+  .root.size-md,
+  .root.size-lg { grid-template-rows: auto 1fr auto; }
+}
 
 /* --- error state --- */
 
