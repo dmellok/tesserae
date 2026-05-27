@@ -75,22 +75,33 @@ def fetch(
     latest = now[-1]
     current_kp = float(latest.get("kp_index") or latest.get("estimated_kp") or 0)
 
-    # 3-day forecast — first row is headers, subsequent rows are
-    # ["timestamp", "kp", "observed|estimated|predicted"].
+    # 3-day forecast — NOAA returns a list of dicts:
+    # [{"time_tag": ..., "kp": ..., "observed": "observed|predicted",
+    #   "noaa_scale": ...}, ...]. Earlier the endpoint shipped a
+    # list-of-lists with a header row; we accept both shapes so an
+    # accidentally-rolled-back API doesn't break the widget.
     forecast_rows: list[dict[str, Any]] = []
     try:
         fc = _get(KP_FORECAST_URL)
     except Exception:
         fc = []
-    if isinstance(fc, list) and len(fc) > 1:
-        for row in fc[1:]:
-            if len(row) >= 3:
-                with contextlib.suppress(ValueError, TypeError):
+    if isinstance(fc, list):
+        for entry in fc:
+            with contextlib.suppress(ValueError, TypeError, KeyError):
+                if isinstance(entry, dict):
                     forecast_rows.append(
                         {
-                            "time": row[0],
-                            "kp": float(row[1]),
-                            "kind": row[2],
+                            "time": str(entry.get("time_tag") or ""),
+                            "kp": float(entry.get("kp") or 0),
+                            "kind": str(entry.get("observed") or "predicted"),
+                        }
+                    )
+                elif isinstance(entry, list) and len(entry) >= 3 and entry[0] != "time_tag":
+                    forecast_rows.append(
+                        {
+                            "time": str(entry[0]),
+                            "kp": float(entry[1]),
+                            "kind": str(entry[2]),
                         }
                     )
     forecast_rows.sort(key=lambda r: r.get("time") or "")
