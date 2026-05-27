@@ -4,23 +4,40 @@
   display: flex;
   align-items: center;
   gap: var(--t-space-5);
-  padding: var(--t-space-3) var(--t-space-6);
-  /* Translucent + blurred — the page bg has a subtle grid + radial
-     gradient that you see faintly through the topbar. Mobile drawer
-     is opened over the topbar (position:fixed) so the backdrop-filter
-     on topbar wouldn't affect the drawer either way. */
+  /* Bar spans the viewport (for the border + blur), but its children
+     align to .page's content edge (inside its --t-space-6 padding) so
+     the brand sits over the body's left content edge and the toggle
+     over its right. Tracks the page width responsively. */
+  padding-block: var(--t-space-3);
+  padding-inline: max(var(--t-space-6), calc(50% - var(--t-page-max) / 2 + var(--t-space-6)));
   background: color-mix(in oklab, var(--t-surface) 80%, transparent);
-  backdrop-filter: saturate(180%) blur(14px);
-  -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
   position: sticky;
   top: 0;
-  z-index: 60;
+  /* High z-index so the mobile drawer (nested inside this stacking
+     context) paints above everything in main, including popovers and
+     flash notifications. Lightbox (1000) is the only thing on top. */
+  z-index: 500;
+  /* NOTE: backdrop-filter lives on ::before, NOT on .topbar itself.
+     Putting it on .topbar makes the bar a containing block for
+     fixed-positioned descendants — which traps the mobile drawer
+     inside the topbar's ~64px box. */
+  isolation: isolate;
+}
+.topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  pointer-events: none;
 }
 /* Solid fallback when the browser can't blur so the topbar never reads
    as washed-out. */
 @supports not (backdrop-filter: blur(1px)) {
   .topbar { background: var(--t-surface); }
+  .topbar::before { display: none; }
 }
 
 .brand {
@@ -181,7 +198,7 @@
   width: 36px;
   height: 36px;
   background: transparent;
-  border: 1px solid var(--t-border);
+  border: 0;
   border-radius: var(--t-radius-sm);
   cursor: pointer;
   color: var(--t-fg-soft);
@@ -198,12 +215,6 @@
    data-theme=dark, light icon is visible only when it's absent. */
 :root[data-theme="dark"] .is-light-only { display: none; }
 :root:not([data-theme="dark"]) .is-dark-only { display: none; }
-
-.topbar-logout { margin-left: auto; }
-.topbar-logout button {
-  padding: var(--t-space-2) var(--t-space-3);
-  font-size: var(--t-size-md);
-}
 
 /* Hamburger + sidebar (mobile/tablet) ------------------------------ */
 
@@ -226,12 +237,12 @@
   position: fixed;
   inset: 0;
   background: rgba(15, 23, 32, 0.45);
-  z-index: 30;
+  /* Just below the topbar (500) so the drawer sits above it. */
+  z-index: 499;
 }
 
 @media (max-width: 900px) {
   .nav-toggle { display: inline-flex; }
-  .topbar-logout { display: none; }
   .topnav {
     position: fixed;
     top: 0;
@@ -291,8 +302,13 @@
 
 /* ----- Layout -------------------------------------------------------- */
 
+/* Page column width — defined as a variable so the topbar can mirror
+   it (see .topbar above). editor.css bumps this at ≥ 1100px because
+   the editor needs the room and admin pages followed along. */
+:root { --t-page-max: 880px; }
+
 .page {
-  max-width: 880px;
+  max-width: var(--t-page-max);
   margin: 0 auto;
   padding: var(--t-space-7) var(--t-space-6) var(--t-space-8);
 }
@@ -397,10 +413,7 @@
 }
 
 /* ----- Empty states --------------------------------------------------
-   Empty states are first-class — every list / panel that can be empty
-   should render one. The icon halo is a layered radial gradient + a
-   slowly-pulsing accent ring so the eye is drawn to the illustration
-   before the helper copy. */
+   Flat icon tile + helper copy. No glow, no pulse ring. */
 
 .empty-state {
   display: grid;
@@ -412,44 +425,15 @@
 }
 
 .empty-state-icon {
-  position: relative;
   width: 72px;
   height: 72px;
   border-radius: var(--t-radius-xl);
-  background:
-    radial-gradient(circle at 30% 30%, rgba(255,255,255,.45), transparent 60%),
-    linear-gradient(135deg,
-      color-mix(in oklab, var(--t-accent) 18%, var(--t-surface)),
-      var(--t-accent-soft));
+  background: var(--t-surface-sunk);
   color: var(--t-accent);
   display: grid;
   place-items: center;
   font-size: 32px;
   margin-bottom: var(--t-space-3);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.45),
-    0 4px 14px color-mix(in oklab, var(--t-accent) 18%, transparent);
-}
-.empty-state-icon::before,
-.empty-state-icon::after {
-  content: "";
-  position: absolute;
-  inset: -6px;
-  border-radius: inherit;
-  border: 1.5px solid color-mix(in oklab, var(--t-accent) 30%, transparent);
-  opacity: 0;
-  animation: empty-pulse 3.6s var(--t-ease-snappy) infinite;
-  pointer-events: none;
-}
-.empty-state-icon::after { animation-delay: 1.8s; }
-@keyframes empty-pulse {
-  0%   { transform: scale(0.92); opacity: 0; }
-  40%  { opacity: 0.55; }
-  100% { transform: scale(1.18); opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .empty-state-icon::before,
-  .empty-state-icon::after { animation: none; }
 }
 
 .empty-state h3 {

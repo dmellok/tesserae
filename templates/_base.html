@@ -93,20 +93,18 @@
       <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
       <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>
     </button>
-    {% if session.authed %}
-    <form method="post" action="{{ url_for('auth.logout_view') }}" class="topbar-logout">
-      <button type="submit" class="ghost">Sign out</button>
-    </form>
-    {% endif %}
   </header>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="flashes" role="status">
+    <div class="flashes" role="status" aria-live="polite" data-flashes>
       {% for category, message in messages %}
-      <div class="flash flash--{{ category }}">
+      <div class="flash flash--{{ category }}" data-flash>
         <i class="ph-fill {% if category == 'ok' %}ph-fill-check-circle{% else %}ph-fill-warning-circle{% endif %}" aria-hidden="true"></i>
-        <span>{{ message }}</span>
+        <span class="flash-msg">{{ message }}</span>
+        <button type="button" class="flash-close" aria-label="Dismiss" data-flash-close>
+          <i class="ph ph-x" aria-hidden="true"></i>
+        </button>
       </div>
       {% endfor %}
     </div>
@@ -153,6 +151,24 @@
       });
       window.addEventListener('resize', () => {
         if (window.innerWidth > 900) setOpen(false);
+      });
+    })();
+    // Flash notifications: each card auto-dismisses after 5s, or
+    // immediately on close-button click. The CSS `.is-leaving` class
+    // drives the slide-out + fade-out transition; we remove the node
+    // once it ends.
+    (function () {
+      const cards = document.querySelectorAll('[data-flash]');
+      if (!cards.length) return;
+      function dismiss(card) {
+        if (card.classList.contains('is-leaving')) return;
+        card.classList.add('is-leaving');
+        card.addEventListener('transitionend', () => card.remove(), { once: true });
+      }
+      cards.forEach((card, i) => {
+        card.querySelector('[data-flash-close]')?.addEventListener('click', () => dismiss(card));
+        // Stagger so multiple flashes don't all whoosh out simultaneously.
+        setTimeout(() => dismiss(card), 5000 + i * 400);
       });
     })();
     (function () {

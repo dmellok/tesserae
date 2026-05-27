@@ -24,6 +24,14 @@
     <div class="actions">{{ button('Test broker connection', variant='ghost', icon='plugs-connected') }}</div>
   </form>
 </section>
+{% if session.authed %}
+<section class="card">
+  {{ card_head('Session', icon_name='sign-out', blurb='End the current admin session on this browser.') }}
+  <form method="post" action="{{ url_for('auth.logout_view') }}" class="form">
+    <div class="actions">{{ button('Sign out', variant='ghost', icon='sign-out') }}</div>
+  </form>
+</section>
+{% endif %}
 {% elif active_area == 'renderers' %}
 <section class="card">
   {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Push a small synthetic image through every loaded renderer. Lands in the Send-page history and the /events timeline.') }}

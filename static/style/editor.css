@@ -341,7 +341,9 @@
 /* ----- Editor grid: options on the left, preview pinned on the right - */
 
 @media (min-width: 1100px) {
-  body.admin .page { max-width: 1440px; }
+  /* Bumps the shared page-column variable so .page and the topbar's
+     padding-inline both pick up the wider column. */
+  :root { --t-page-max: 1440px; }
   .editor-grid {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 620px);
     grid-template-areas: "column preview";
