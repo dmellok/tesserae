@@ -1,0 +1,13 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "GitHub — Contributions",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "The familiar 53-week contributions heatmap for a user. Requires a PAT in Plugins → GitHub Core (uses GitHub's GraphQL API which doesn't accept unauthenticated requests).",
+  "icon": "ph-grid-four",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "user", "type": "string", "label": "Username (blank = github_core default)", "default": "" }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

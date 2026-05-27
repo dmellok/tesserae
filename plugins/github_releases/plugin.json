@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "GitHub — Releases",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Latest releases from a list of watched repos. Useful for tracking your dependencies' versions. Public repos work without a token.",
+  "icon": "ph-tag",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "repos",       "type": "textarea", "label": "Repos (one per line, owner/repo)", "default": "torvalds/linux\nvercel/next.js" },
+    { "name": "max_results", "type": "number",   "label": "Max releases per repo",            "default": 1 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "GitHub — PR Queue",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Your open PRs across orgs + PRs awaiting your review. Requires a PAT in Plugins → GitHub Core (search API needs auth). Two sections: 'Yours' and 'Awaiting review'.",
+  "icon": "ph-git-pull-request",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "user",        "type": "string", "label": "Username (blank = github_core default)", "default": "" },
+    { "name": "max_results", "type": "number", "label": "Max PRs per section",                    "default": 6 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

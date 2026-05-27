@@ -1,0 +1,59 @@
+:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; box-sizing: border-box; overflow: hidden; }
+.gc-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg); color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.gc-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.gc-title { font-family: var(--theme-font-mono, ui-monospace); text-transform: none; letter-spacing: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-total { font-variant-numeric: tabular-nums; }
+
+.gc-grid {
+  display: flex; gap: clamp(1px, 0.2cqw, 3px);
+  padding: clamp(8px, 1.4cqw, 16px);
+  background: var(--theme-surface);
+  min-height: 0; overflow: hidden;
+  justify-content: center; align-items: center;
+}
+.gc-week {
+  display: grid;
+  grid-template-rows: repeat(7, 1fr);
+  gap: clamp(1px, 0.2cqw, 3px);
+  flex: 1 1 0;
+  min-width: 0; height: 100%;
+}
+.gc-cell {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: clamp(1px, 0.2cqw, 2px);
+  background: var(--theme-surface2);
+}
+.gc-cell[data-lvl="0"] { background: var(--theme-surface2); }
+.gc-cell[data-lvl="1"] { background: color-mix(in oklab, var(--theme-accent) 30%, var(--theme-surface2)); }
+.gc-cell[data-lvl="2"] { background: color-mix(in oklab, var(--theme-accent) 55%, var(--theme-surface)); }
+.gc-cell[data-lvl="3"] { background: color-mix(in oklab, var(--theme-accent) 80%, var(--theme-surface)); }
+.gc-cell[data-lvl="4"] { background: var(--theme-accent); }
+
+.gc-legend {
+  display: flex; align-items: center; gap: 4px;
+  padding: clamp(4px, 0.8cqh, 8px) clamp(10px, 1.6cqw, 16px);
+  background: var(--theme-surface); border-top: 1px solid var(--theme-divider);
+  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  color: var(--theme-fgSoft);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  justify-content: flex-end;
+}
+.gc-legend .gc-cell {
+  width: clamp(8px, 1.4cqw, 12px);
+  height: clamp(8px, 1.4cqw, 12px);
+  aspect-ratio: 1 / 1;
+}
+
+.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }

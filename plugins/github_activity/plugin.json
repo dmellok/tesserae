@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "GitHub — Activity",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Recent public activity for a GitHub user — pushes, pull requests, issues, releases. Defaults to the username configured in Plugins → GitHub Core; override per cell.",
+  "icon": "ph-git-commit",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "user",        "type": "string", "label": "Username (blank = github_core default)", "default": "" },
+    { "name": "max_events",  "type": "number", "label": "Max events",                              "default": 10 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

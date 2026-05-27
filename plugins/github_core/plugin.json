@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "GitHub Core",
+  "version": "0.1.0",
+  "kind": "data",
+  "description": "Shared GitHub credentials for the github_* widget family. Paste a Personal Access Token (Settings → Developer settings → Personal access tokens) once here and every github widget picks it up. The token is optional for widgets that only read public data (60 req/hr unauthenticated, 5000 req/hr with a token).",
+  "icon": "ph-github-logo",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "settings": [
+    { "name": "username", "type": "string", "label": "GitHub username (used as default for widgets that need one)", "default": "" },
+    { "name": "token",    "type": "string", "label": "Personal Access Token",                                       "secret":  true, "default": "" }
+  ],
+  "render": { "needs_network": true }
+}
