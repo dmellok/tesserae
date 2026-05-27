@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Finance — Crypto",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Single crypto with current price, 24h change, and a 24h sparkline. Data from CoinGecko (free, no API key). Coin ID is the lowercase slug from coingecko.com (e.g. bitcoin, ethereum, solana).",
+  "icon": "ph-currency-btc",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "coin",      "type": "string", "label": "Coin ID (CoinGecko slug)", "default": "bitcoin" },
+    { "name": "vs",        "type": "string", "label": "Quote currency (lowercase)", "default": "usd" }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Finance — Currency (FX)",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Single FX pair (e.g. AUD/USD) with current rate + 30-day sparkline. Data from frankfurter.app (free, no key, sourced from European Central Bank). ISO 4217 currency codes.",
+  "icon": "ph-currency-dollar",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "base",  "type": "string", "label": "From (3-letter ISO code)", "default": "AUD" },
+    { "name": "quote", "type": "string", "label": "To (3-letter ISO code)",   "default": "USD" }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
