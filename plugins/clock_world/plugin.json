@@ -1,0 +1,28 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Clock — World",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Multiple cities in one cell, each with its current time in the configured IANA timezone. Pure client-side — uses the browser's Intl.DateTimeFormat with the cell's timezone list.",
+  "icon": "ph-globe",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "cities",
+      "type": "textarea",
+      "label": "Cities (one per line: label|IANA tz)",
+      "default": "Melbourne|Australia/Melbourne\nNew York|America/New_York\nLondon|Europe/London\nTokyo|Asia/Tokyo"
+    },
+    {
+      "name": "format",
+      "type": "select",
+      "label": "Time format",
+      "default": "24h",
+      "choices": [
+        { "value": "24h", "label": "24-hour" },
+        { "value": "12h", "label": "12-hour with AM/PM" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

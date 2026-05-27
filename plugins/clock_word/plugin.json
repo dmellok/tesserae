@@ -1,0 +1,13 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Clock — Word",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Word clock — reads the time as English text, rounded to the nearest five minutes ('Twenty past three'). Pure client-side, ticks every 30 seconds.",
+  "icon": "ph-text-aa",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "show_seconds_dot", "type": "boolean", "label": "Show pulsing dot for seconds", "default": true }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

@@ -1,0 +1,54 @@
+:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; box-sizing: border-box; overflow: hidden; }
+.ss-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg); color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.ss-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.ss-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); color: var(--theme-accent2); }
+
+.ss-hero {
+  background: var(--theme-surface);
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: clamp(4px, 0.8cqh, 12px);
+  padding: clamp(10px, 2cqw, 22px);
+  min-height: 0;
+}
+.ss-svg { width: 100%; height: 100%; max-height: clamp(70px, 16cqh, 160px); display: block; margin: 0 auto; }
+.ss-arc-future { fill: none; stroke: var(--theme-surface2); stroke-width: 3; }
+.ss-arc-past   { fill: none; stroke: var(--theme-accent);   stroke-width: 4; }
+.ss-horizon    { stroke: var(--theme-fg); stroke-width: 1.5; stroke-dasharray: 3 3; opacity: 0.4; }
+.ss-sun        { fill: var(--theme-accent2); stroke: var(--theme-fg); stroke-width: 2; }
+
+.ss-times { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(6px, 1.2cqw, 12px); }
+.ss-t {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: 6px;
+  padding: clamp(5px, 1cqh, 10px) clamp(8px, 1.2cqw, 14px);
+  border-radius: var(--theme-radius, 6px);
+}
+.ss-t .ph-bold { font-size: clamp(14px, 2.4cqw, 22px); }
+.ss-t-lbl { font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace); text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.8; }
+.ss-t-v { font: 900 clamp(15px, 2.6cqw, 22px)/1 var(--theme-font-mono, ui-monospace); letter-spacing: -0.02em; justify-self: end; }
+.ss-t--rise { background: var(--theme-accent2); color: var(--theme-fg); }
+.ss-t--set  { background: var(--theme-fg);      color: var(--theme-bg); }
+
+.ss-foot {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: clamp(4px, 0.8cqh, 8px) clamp(10px, 1.6cqw, 16px);
+  background: var(--theme-surface2); border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  font: 700 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fg);
+}
+.ss-foot .ph { font-size: 1.2em; }
+
+.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }

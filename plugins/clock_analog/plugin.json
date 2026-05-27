@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Clock — Analog",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Analog clock face. Pure SVG, no network. Five face styles — pick the one that suits the rest of your dashboard.",
+  "icon": "ph-clock",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "face",
+      "type": "select",
+      "label": "Face style",
+      "default": "minimalist",
+      "choices": [
+        { "value": "minimalist", "label": "Minimalist — hour ticks only" },
+        { "value": "swiss",      "label": "Swiss railway — chunky red second hand" },
+        { "value": "bauhaus",    "label": "Bauhaus — geometric, primary triad" },
+        { "value": "brutalist",  "label": "Brutalist — heavy bars + numerals" },
+        { "value": "skeleton",   "label": "Skeleton — just the hands" }
+      ]
+    },
+    { "name": "show_seconds", "type": "boolean", "label": "Show second hand", "default": true }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}
