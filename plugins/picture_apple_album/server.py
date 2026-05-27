@@ -44,18 +44,19 @@ USER_AGENT = (
     "Chrome/56.0.2924.87 Safari/537.36"
 )
 REQ_HEADERS = {
-    "Origin":         "https://www.icloud.com",
+    "Origin": "https://www.icloud.com",
     "Accept-Language": "en-US,en;q=0.8",
-    "User-Agent":      USER_AGENT,
-    "Content-Type":    "text/plain",
-    "Accept":          "*/*",
-    "Referer":         "https://www.icloud.com/sharedalbum/",
-    "Connection":      "keep-alive",
+    "User-Agent": USER_AGENT,
+    "Content-Type": "text/plain",
+    "Accept": "*/*",
+    "Referer": "https://www.icloud.com/sharedalbum/",
+    "Connection": "keep-alive",
 }
 TOKEN_RE = re.compile(r"^[A-Za-z0-9;]+$")
 
 
 # ----- token parsing + URL derivation --------------------------------
+
 
 def _parse_token(raw: str) -> str:
     """Extract the album token from either the full share link
@@ -94,6 +95,7 @@ def _initial_base_url(token: str) -> str:
 
 
 # ----- HTTP helpers --------------------------------------------------
+
 
 def _post_json(url: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     req = urllib.request.Request(
@@ -137,6 +139,7 @@ def _resolve_base_url(token: str) -> tuple[str, dict[str, Any]]:
 
 # ----- manifest cache ------------------------------------------------
 
+
 def _safe_cache_key(token: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]", "_", token)[:40]
 
@@ -172,37 +175,38 @@ def _load_manifest(token: str, data_dir: Path) -> dict[str, Any]:
         for size_key, d in derivatives.items():
             if not isinstance(d, dict) or not d.get("checksum"):
                 continue
-            slim_derivs.append({
-                "size_key": size_key,
-                "checksum": d["checksum"],
-                "width":    int(d.get("width") or 0),
-                "height":   int(d.get("height") or 0),
-                "fileSize": int(d.get("fileSize") or 0),
-            })
+            slim_derivs.append(
+                {
+                    "size_key": size_key,
+                    "checksum": d["checksum"],
+                    "width": int(d.get("width") or 0),
+                    "height": int(d.get("height") or 0),
+                    "fileSize": int(d.get("fileSize") or 0),
+                }
+            )
         if not slim_derivs:
             continue
-        slim_photos.append({
-            "guid":        p.get("photoGuid"),
-            "width":       int(p.get("width") or 0),
-            "height":      int(p.get("height") or 0),
-            "dateCreated": p.get("dateCreated"),
-            "derivatives": slim_derivs,
-        })
+        slim_photos.append(
+            {
+                "guid": p.get("photoGuid"),
+                "width": int(p.get("width") or 0),
+                "height": int(p.get("height") or 0),
+                "dateCreated": p.get("dateCreated"),
+                "derivatives": slim_derivs,
+            }
+        )
     manifest = {
-        "base":       base,
-        "stream":     body.get("streamName") or "",
-        "owner":      f"{body.get('userFirstName') or ''} "
-                      f"{body.get('userLastName') or ''}".strip(),
-        "photos":     slim_photos,
+        "base": base,
+        "stream": body.get("streamName") or "",
+        "owner": f"{body.get('userFirstName') or ''} {body.get('userLastName') or ''}".strip(),
+        "photos": slim_photos,
         "fetched_at": int(time.time()),
     }
     _write_cache(cache_path, manifest)
     return manifest
 
 
-def _asset_url_for(
-    base: str, token: str, photo: dict[str, Any], data_dir: Path
-) -> str | None:
+def _asset_url_for(base: str, token: str, photo: dict[str, Any], data_dir: Path) -> str | None:
     """Resolve the signed URL for a photo's largest derivative.
     Caches per-photo for ASSET_TTL_S so a render burst doesn't
     repeatedly hit /webasseturls."""
@@ -241,6 +245,7 @@ def _asset_url_for(
 
 # ----- orientation filter -------------------------------------------
 
+
 def _orientation_of(p: dict[str, Any]) -> str:
     w = int(p.get("width") or 0)
     h = int(p.get("height") or 0)
@@ -260,6 +265,7 @@ def _filter_orientation(photos: list[dict[str, Any]], wanted: str) -> list[dict[
 
 # ----- plugin contract ----------------------------------------------
 
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -267,10 +273,9 @@ def fetch(
     token = _parse_token(options.get("album") or "")
     if not token:
         return {
-            "error":
-                "Paste the share link from a public iCloud Shared Album "
-                "(https://www.icloud.com/sharedalbum/#B0…). Enable "
-                "'Public Website' on the album in Photos to get the link.",
+            "error": "Paste the share link from a public iCloud Shared Album "
+            "(https://www.icloud.com/sharedalbum/#B0…). Enable "
+            "'Public Website' on the album in Photos to get the link.",
             "url": None,
         }
     if not TOKEN_RE.match(token):
@@ -316,10 +321,10 @@ def fetch(
         return {"error": "Could not resolve a signed URL for the picked photo.", "url": None}
 
     return {
-        "url":         url,
-        "guid":        photo.get("guid"),
-        "date":        photo.get("dateCreated"),
-        "stream":      manifest.get("stream"),
-        "owner":       manifest.get("owner"),
-        "count":       len(filtered),
+        "url": url,
+        "guid": photo.get("guid"),
+        "date": photo.get("dateCreated"),
+        "stream": manifest.get("stream"),
+        "owner": manifest.get("owner"),
+        "count": len(filtered),
     }

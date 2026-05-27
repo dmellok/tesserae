@@ -46,7 +46,9 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * R * math.asin(math.sqrt(a))
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     lat = float(options.get("latitude") or 0.0)
     lon = float(options.get("longitude") or 0.0)
@@ -87,26 +89,28 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         d = _haversine_km(lat, lon, f_lat, f_lon)
         if d > radius:
             continue
-        flights.append({
-            "callsign":  (s[S_CALLSIGN] or "").strip() if len(s) > S_CALLSIGN else "",
-            "country":   (s[S_COUNTRY] or "").strip() if len(s) > S_COUNTRY else "",
-            "altitude":  s[S_BARO_ALT] if len(s) > S_BARO_ALT else None,
-            "velocity":  s[S_VELOCITY] if len(s) > S_VELOCITY else None,
-            "track":     s[S_TRACK] if len(s) > S_TRACK else None,
-            "on_ground": bool(s[S_ON_GROUND]) if len(s) > S_ON_GROUND else False,
-            "lat":       f_lat,
-            "lon":       f_lon,
-            "distance_km": round(d, 1),
-        })
+        flights.append(
+            {
+                "callsign": (s[S_CALLSIGN] or "").strip() if len(s) > S_CALLSIGN else "",
+                "country": (s[S_COUNTRY] or "").strip() if len(s) > S_COUNTRY else "",
+                "altitude": s[S_BARO_ALT] if len(s) > S_BARO_ALT else None,
+                "velocity": s[S_VELOCITY] if len(s) > S_VELOCITY else None,
+                "track": s[S_TRACK] if len(s) > S_TRACK else None,
+                "on_ground": bool(s[S_ON_GROUND]) if len(s) > S_ON_GROUND else False,
+                "lat": f_lat,
+                "lon": f_lon,
+                "distance_km": round(d, 1),
+            }
+        )
     flights.sort(key=lambda f: f["distance_km"])
     flights = flights[:max_results]
 
     result = {
-        "lat":     lat,
-        "lon":     lon,
-        "radius":  radius,
-        "count":   len(states),  # total in bounding box (incl out-of-radius)
-        "shown":   len(flights),
+        "lat": lat,
+        "lon": lon,
+        "radius": radius,
+        "count": len(states),  # total in bounding box (incl out-of-radius)
+        "shown": len(flights),
         "flights": flights,
     }
     with contextlib.suppress(OSError):

@@ -33,27 +33,31 @@ def fetch(
     end = now + timedelta(hours=hours_ahead)
     try:
         events = core.server_module.load_events(
-            feeds_filter, now, end, data_dir=Path(core.data_dir),
+            feeds_filter,
+            now,
+            end,
+            data_dir=Path(core.data_dir),
         )
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "events": []}
 
     slim = [
         {
-            "summary":  e["summary"],
+            "summary": e["summary"],
             "location": e.get("location") or "",
-            "start":    e["start"],
-            "end":      e.get("end"),
-            "all_day":  e.get("all_day", False),
-            "colour":   e.get("feed_colour"),
-            "feed":     e.get("feed_name"),
-        } for e in events
+            "start": e["start"],
+            "end": e.get("end"),
+            "all_day": e.get("all_day", False),
+            "colour": e.get("feed_colour"),
+            "feed": e.get("feed_name"),
+        }
+        for e in events
     ]
     if max_events > 0:
         slim = slim[:max_events]
     return {
-        "now":    now.isoformat(),
-        "date":   now.date().isoformat(),
+        "now": now.isoformat(),
+        "date": now.date().isoformat(),
         "events": slim,
-        "count":  len(slim),
+        "count": len(slim),
     }

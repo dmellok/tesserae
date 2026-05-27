@@ -84,10 +84,10 @@ def fetch(
         }
 
     result = {
-        "url":        chosen["_image_url"],
-        "title":      chosen.get("title", ""),
-        "date":       chosen.get("date", ""),
-        "copyright":  (chosen.get("copyright") or "").strip(),
+        "url": chosen["_image_url"],
+        "title": chosen.get("title", ""),
+        "date": chosen.get("date", ""),
+        "copyright": (chosen.get("copyright") or "").strip(),
         "fetched_at": int(time.time()),
     }
     with contextlib.suppress(OSError):

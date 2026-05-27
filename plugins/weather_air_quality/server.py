@@ -65,16 +65,16 @@ def fetch(
     current = payload.get("current") or {}
 
     result: dict[str, Any] = {
-        "label":     options.get("label", ""),
-        "scale":     scale,
+        "label": options.get("label", ""),
+        "scale": scale,
         "european_aqi": current.get("european_aqi"),
-        "us_aqi":       current.get("us_aqi"),
-        "pm2_5":        current.get("pm2_5"),
-        "pm10":         current.get("pm10"),
-        "ozone":        current.get("ozone"),
-        "no2":          current.get("nitrogen_dioxide"),
-        "so2":          current.get("sulphur_dioxide"),
-        "co":           current.get("carbon_monoxide"),
+        "us_aqi": current.get("us_aqi"),
+        "pm2_5": current.get("pm2_5"),
+        "pm10": current.get("pm10"),
+        "ozone": current.get("ozone"),
+        "no2": current.get("nitrogen_dioxide"),
+        "so2": current.get("sulphur_dioxide"),
+        "co": current.get("carbon_monoxide"),
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))

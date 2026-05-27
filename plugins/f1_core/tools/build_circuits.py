@@ -26,31 +26,31 @@ from typing import Any
 # Covers the 2026 calendar and a handful of recently-active circuits
 # so older results / standings widgets can still draw a track.
 CIRCUIT_MAP: dict[str, str] = {
-    "albert_park":   "au-1953",
-    "shanghai":      "cn-2004",
-    "suzuka":        "jp-1962",
-    "bahrain":       "bh-2002",
-    "jeddah":        "sa-2021",
-    "miami":         "us-2022",
-    "imola":         "it-1953",
-    "monaco":        "mc-1929",
-    "catalunya":     "es-1991",
-    "villeneuve":    "ca-1978",
+    "albert_park": "au-1953",
+    "shanghai": "cn-2004",
+    "suzuka": "jp-1962",
+    "bahrain": "bh-2002",
+    "jeddah": "sa-2021",
+    "miami": "us-2022",
+    "imola": "it-1953",
+    "monaco": "mc-1929",
+    "catalunya": "es-1991",
+    "villeneuve": "ca-1978",
     "red_bull_ring": "at-1969",
-    "silverstone":   "gb-1948",
-    "spa":           "be-1925",
-    "hungaroring":   "hu-1986",
-    "zandvoort":     "nl-1948",
-    "monza":         "it-1922",
-    "madring":       "es-2026",
-    "baku":          "az-2016",
-    "marina_bay":    "sg-2008",
-    "americas":      "us-2012",
-    "rodriguez":     "mx-1962",
-    "interlagos":    "br-1977",
-    "vegas":         "us-2023",
-    "losail":        "qa-2004",
-    "yas_marina":    "ae-2009",
+    "silverstone": "gb-1948",
+    "spa": "be-1925",
+    "hungaroring": "hu-1986",
+    "zandvoort": "nl-1948",
+    "monza": "it-1922",
+    "madring": "es-2026",
+    "baku": "az-2016",
+    "marina_bay": "sg-2008",
+    "americas": "us-2012",
+    "rodriguez": "mx-1962",
+    "interlagos": "br-1977",
+    "vegas": "us-2023",
+    "losail": "qa-2004",
+    "yas_marina": "ae-2009",
 }
 
 BACINGER_RAW = "https://raw.githubusercontent.com/bacinger/f1-circuits/master/circuits/{}.geojson"
@@ -92,10 +92,7 @@ def project(coords: list[list[float]]) -> tuple[str, str]:
     inner_h = span_y * scale
     h = inner_h + 2 * PADDING
 
-    out_pts = [
-        (PADDING + px * scale, PADDING + inner_h + py * scale)
-        for px, py in pts
-    ]
+    out_pts = [(PADDING + px * scale, PADDING + inner_h + py * scale) for px, py in pts]
     # Round to 1dp — invisible at any reasonable cell size, ~30% smaller JSON.
     d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in out_pts) + " Z"
     viewBox = f"0 0 {VIEWBOX_W} {h:.1f}"
@@ -127,11 +124,11 @@ def main() -> None:
         viewBox, d = project(coords)
         props = feat.get("properties") or {}
         out[circuit_id] = {
-            "name":     props.get("Name") or "",
+            "name": props.get("Name") or "",
             "location": props.get("Location") or "",
             "length_m": props.get("length") or 0,
-            "viewBox":  viewBox,
-            "d":        d,
+            "viewBox": viewBox,
+            "d": d,
         }
         print(f"  ok {circuit_id} ({file_id}) -> {len(coords)} pts")
 

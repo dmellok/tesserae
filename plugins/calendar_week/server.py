@@ -39,7 +39,10 @@ def fetch(
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
     try:
         events = core.server_module.load_events(
-            feeds_filter, start_dt, end_dt, data_dir=Path(core.data_dir),
+            feeds_filter,
+            start_dt,
+            end_dt,
+            data_dir=Path(core.data_dir),
         )
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
@@ -54,25 +57,28 @@ def fetch(
     cur = start_date
     while cur < end_date:
         all_evs = buckets.get(cur.isoformat(), [])
-        days.append({
-            "date":     cur.isoformat(),
-            "day":      cur.day,
-            "is_today": cur == today,
-            "weekday":  cur.weekday(),  # 0=Mon
-            "events":   [
-                {
-                    "summary": e["summary"],
-                    "start":   e["start"],
-                    "all_day": e.get("all_day", False),
-                    "colour":  e.get("feed_colour"),
-                } for e in all_evs
-            ],
-        })
+        days.append(
+            {
+                "date": cur.isoformat(),
+                "day": cur.day,
+                "is_today": cur == today,
+                "weekday": cur.weekday(),  # 0=Mon
+                "events": [
+                    {
+                        "summary": e["summary"],
+                        "start": e["start"],
+                        "all_day": e.get("all_day", False),
+                        "colour": e.get("feed_colour"),
+                    }
+                    for e in all_evs
+                ],
+            }
+        )
         cur += timedelta(days=1)
 
     return {
-        "start":      start_date.isoformat(),
-        "end":        (end_date - timedelta(days=1)).isoformat(),
+        "start": start_date.isoformat(),
+        "end": (end_date - timedelta(days=1)).isoformat(),
         "week_start": week_start,
-        "days":       days,
+        "days": days,
     }

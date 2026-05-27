@@ -34,6 +34,7 @@ PRUNE_AFTER_HOURS = 24
 
 # ----- storage helpers ------------------------------------------------
 
+
 def _data_dir() -> Path:
     """Path of this plugin's data_dir, looked up via the live registry.
     Safe to call from any request handler — the loader populates the
@@ -134,6 +135,7 @@ def _find_list(data: dict[str, Any], list_id: str) -> dict[str, Any] | None:
 
 # ----- widget API -----------------------------------------------------
 
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -151,11 +153,11 @@ def fetch(
         # friendly empty state, NOT an error, so the widget shell still
         # renders. The cell editor explains how to choose a list.
         return {
-            "list_id":   list_id or "",
+            "list_id": list_id or "",
             "list_name": "",
-            "items":     [],
-            "empty":     True,
-            "reason":    "no_list" if not list_id else "list_missing",
+            "items": [],
+            "empty": True,
+            "reason": "no_list" if not list_id else "list_missing",
         }
 
     items = list(lst.get("items") or [])
@@ -163,22 +165,24 @@ def fetch(
         items = [it for it in items if not it.get("completed_at")]
     # Sort: incomplete first (oldest -> newest), then completed (most
     # recently done first) so the eye reads the active list top-down.
-    items.sort(key=lambda it: (
-        bool(it.get("completed_at")),
-        it.get("completed_at") or "",
-        it.get("created_at") or "",
-    ))
+    items.sort(
+        key=lambda it: (
+            bool(it.get("completed_at")),
+            it.get("completed_at") or "",
+            it.get("created_at") or "",
+        )
+    )
     if max_items > 0:
         items = items[:max_items]
 
     return {
-        "list_id":     lst["id"],
-        "list_name":   lst.get("name") or lst["id"],
-        "items":       items,
-        "total":       len(lst.get("items") or []),
-        "completed":   sum(1 for it in (lst.get("items") or []) if it.get("completed_at")),
-        "empty":       not items,
-        "reason":      "empty_list" if not items else "",
+        "list_id": lst["id"],
+        "list_name": lst.get("name") or lst["id"],
+        "items": items,
+        "total": len(lst.get("items") or []),
+        "completed": sum(1 for it in (lst.get("items") or []) if it.get("completed_at")),
+        "empty": not items,
+        "reason": "empty_list" if not items else "",
     }
 
 
@@ -189,12 +193,12 @@ def choices(name: str) -> list[dict[str, str]]:
         return []
     data = _load()
     return [
-        {"value": lst["id"], "label": lst.get("name") or lst["id"]}
-        for lst in data.get("lists", [])
+        {"value": lst["id"], "label": lst.get("name") or lst["id"]} for lst in data.get("lists", [])
     ]
 
 
 # ----- admin blueprint ------------------------------------------------
+
 
 def blueprint() -> Blueprint:
     """Mounted by the plugin loader at /plugins/todo/."""
@@ -214,12 +218,14 @@ def blueprint() -> Blueprint:
         for lst in lists:
             items = lst.get("items") or []
             done = sum(1 for it in items if it.get("completed_at"))
-            summarised.append({
-                "id":        lst["id"],
-                "name":      lst.get("name") or lst["id"],
-                "active":    len(items) - done,
-                "completed": done,
-            })
+            summarised.append(
+                {
+                    "id": lst["id"],
+                    "name": lst.get("name") or lst["id"],
+                    "active": len(items) - done,
+                    "completed": done,
+                }
+            )
         return render_template("todo/index.html", lists=summarised)
 
     @bp.post("/lists")
@@ -230,12 +236,14 @@ def blueprint() -> Blueprint:
             return redirect(url_for("todo_admin.index"))
         data = _load()
         list_id = _unique_id(data, _slugify(name))
-        data["lists"].append({
-            "id":         list_id,
-            "name":       name,
-            "created_at": _now_iso(),
-            "items":      [],
-        })
+        data["lists"].append(
+            {
+                "id": list_id,
+                "name": name,
+                "created_at": _now_iso(),
+                "items": [],
+            }
+        )
         _save(data)
         flash(f"Created list '{name}'.", "ok")
         return redirect(url_for("todo_admin.show_list", list_id=list_id))
@@ -247,16 +255,20 @@ def blueprint() -> Blueprint:
         if lst is None:
             abort(404)
         items = list(lst.get("items") or [])
-        items.sort(key=lambda it: (
-            bool(it.get("completed_at")),
-            it.get("completed_at") or "",
-            it.get("created_at") or "",
-        ))
+        items.sort(
+            key=lambda it: (
+                bool(it.get("completed_at")),
+                it.get("completed_at") or "",
+                it.get("created_at") or "",
+            )
+        )
         active = [it for it in items if not it.get("completed_at")]
-        done   = [it for it in items if it.get("completed_at")]
+        done = [it for it in items if it.get("completed_at")]
         return render_template(
             "todo/list.html",
-            list=lst, active=active, done=done,
+            list=lst,
+            active=active,
+            done=done,
             prune_hours=PRUNE_AFTER_HOURS,
         )
 
@@ -270,12 +282,14 @@ def blueprint() -> Blueprint:
         lst = _find_list(data, list_id)
         if lst is None:
             abort(404)
-        lst.setdefault("items", []).append({
-            "id":           secrets.token_hex(6),
-            "text":         text,
-            "created_at":   _now_iso(),
-            "completed_at": None,
-        })
+        lst.setdefault("items", []).append(
+            {
+                "id": secrets.token_hex(6),
+                "text": text,
+                "created_at": _now_iso(),
+                "completed_at": None,
+            }
+        )
         _save(data)
         return redirect(url_for("todo_admin.show_list", list_id=list_id))
 

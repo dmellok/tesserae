@@ -61,8 +61,7 @@ def fetch(
     access_key = (settings.get("access_key") or "").strip()
     if not access_key:
         return {
-            "error":
-                "Set your Unsplash Access Key in Settings → Plugins → Unsplash.",
+            "error": "Set your Unsplash Access Key in Settings → Plugins → Unsplash.",
             "url": None,
         }
 
@@ -126,12 +125,12 @@ def fetch(
 
     user = photo.get("user") or {}
     result = {
-        "url":             image_url,
-        "alt":             (photo.get("alt_description") or photo.get("description") or "").strip(),
-        "credit_name":     (user.get("name") or "").strip(),
+        "url": image_url,
+        "alt": (photo.get("alt_description") or photo.get("description") or "").strip(),
+        "credit_name": (user.get("name") or "").strip(),
         "credit_username": (user.get("username") or "").strip(),
-        "html_link":       (photo.get("links") or {}).get("html", ""),
-        "fetched_at":      int(time.time()),
+        "html_link": (photo.get("links") or {}).get("html", ""),
+        "fetched_at": int(time.time()),
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))

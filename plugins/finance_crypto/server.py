@@ -22,7 +22,9 @@ def _get(url: str) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     coin = (options.get("coin") or "bitcoin").strip().lower()
     vs = (options.get("vs") or "usd").strip().lower()
@@ -44,8 +46,7 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
             f"?ids={coin}&vs_currencies={vs}&include_24hr_change=true&include_market_cap=true"
         )
         chart = _get(
-            f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart"
-            f"?vs_currency={vs}&days=1"
+            f"https://api.coingecko.com/api/v3/coins/{coin}/market_chart?vs_currency={vs}&days=1"
         )
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "price": None}
@@ -60,12 +61,12 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     series = [round(float(p[1]), 6) for p in prices]
 
     result = {
-        "coin":      coin,
-        "vs":        vs,
-        "price":     pdata.get(vs),
+        "coin": coin,
+        "vs": vs,
+        "price": pdata.get(vs),
         "change_24h": pdata.get(f"{vs}_24h_change"),
         "market_cap": pdata.get(f"{vs}_market_cap"),
-        "series":    series,
+        "series": series,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

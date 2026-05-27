@@ -32,11 +32,11 @@ query($user: String!) {
 """.strip()
 
 LEVEL_TO_INT = {
-    "NONE":              0,
-    "FIRST_QUARTILE":    1,
-    "SECOND_QUARTILE":   2,
-    "THIRD_QUARTILE":    3,
-    "FOURTH_QUARTILE":   4,
+    "NONE": 0,
+    "FIRST_QUARTILE": 1,
+    "SECOND_QUARTILE": 2,
+    "THIRD_QUARTILE": 3,
+    "FOURTH_QUARTILE": 4,
 }
 
 
@@ -44,11 +44,16 @@ def _core():
     return current_app.config["PLUGIN_REGISTRY"].get("github_core").server_module
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     core = _core()
     if not core.get_token():
-        return {"error": "Add a GitHub PAT in Plugins → GitHub Core. GraphQL requires auth.", "weeks": []}
+        return {
+            "error": "Add a GitHub PAT in Plugins → GitHub Core. GraphQL requires auth.",
+            "weeks": [],
+        }
     user = (options.get("user") or "").strip() or core.get_username()
     if not user:
         return {"error": "Set a GitHub username — here or as github_core default.", "weeks": []}
@@ -77,7 +82,9 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     if payload.get("errors"):
         return {"error": payload["errors"][0].get("message", "GraphQL error"), "weeks": []}
-    cal = (((payload.get("data") or {}).get("user") or {}).get("contributionsCollection") or {}).get("contributionCalendar")
+    cal = (
+        ((payload.get("data") or {}).get("user") or {}).get("contributionsCollection") or {}
+    ).get("contributionCalendar")
     if not cal:
         return {"error": f"No contribution data for @{user}.", "weeks": []}
 
@@ -85,11 +92,13 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     for w in cal.get("weeks") or []:
         days = []
         for d in w.get("contributionDays") or []:
-            days.append({
-                "date":  d.get("date"),
-                "count": d.get("contributionCount") or 0,
-                "level": LEVEL_TO_INT.get(d.get("contributionLevel"), 0),
-            })
+            days.append(
+                {
+                    "date": d.get("date"),
+                    "count": d.get("contributionCount") or 0,
+                    "level": LEVEL_TO_INT.get(d.get("contributionLevel"), 0),
+                }
+            )
         weeks.append(days)
 
     # Derived stats — current streak (consecutive days with count > 0,
@@ -130,15 +139,15 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     this_month = sum((d.get("count") or 0) for d in flat[-30:])
 
     result = {
-        "user":            user,
-        "total":           cal.get("totalContributions") or 0,
-        "weeks":           weeks,
-        "current_streak":  current_streak,
-        "longest_streak":  longest,
-        "busiest_date":    busiest["date"],
-        "busiest_count":   busiest["count"],
-        "this_week":       this_week,
-        "this_month":      this_month,
+        "user": user,
+        "total": cal.get("totalContributions") or 0,
+        "weeks": weeks,
+        "current_streak": current_streak,
+        "longest_streak": longest,
+        "busiest_date": busiest["date"],
+        "busiest_count": busiest["count"],
+        "this_week": this_week,
+        "this_month": this_month,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

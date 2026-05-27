@@ -58,7 +58,7 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 
-    races = (((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or [])
+    races = ((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or []
     if not races:
         return {"error": "no upcoming race in calendar"}
     race = races[0]
@@ -66,20 +66,20 @@ def fetch(
     location = circuit.get("Location") or {}
 
     result: dict[str, Any] = {
-        "season":      race.get("season"),
-        "round":       race.get("round"),
-        "raceName":    race.get("raceName"),
-        "date":        race.get("date"),
-        "time":        race.get("time") or "",
-        "circuitId":   circuit.get("circuitId"),
+        "season": race.get("season"),
+        "round": race.get("round"),
+        "raceName": race.get("raceName"),
+        "date": race.get("date"),
+        "time": race.get("time") or "",
+        "circuitId": circuit.get("circuitId"),
         "circuitName": circuit.get("circuitName"),
-        "locality":    location.get("locality"),
-        "country":     location.get("country"),
+        "locality": location.get("locality"),
+        "country": location.get("country"),
         "sessions": {
-            "fp1":        _session(race.get("FirstPractice")),
-            "fp2":        _session(race.get("SecondPractice")),
-            "fp3":        _session(race.get("ThirdPractice")),
-            "sprint":     _session(race.get("Sprint")),
+            "fp1": _session(race.get("FirstPractice")),
+            "fp2": _session(race.get("SecondPractice")),
+            "fp3": _session(race.get("ThirdPractice")),
+            "sprint": _session(race.get("Sprint")),
             "qualifying": _session(race.get("Qualifying")),
         },
     }

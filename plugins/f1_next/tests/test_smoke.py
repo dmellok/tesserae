@@ -25,10 +25,10 @@ _FAKE_PAYLOAD = json.dumps(
                             "circuitName": "Circuit de Monaco",
                             "Location": {"locality": "Monte Carlo", "country": "Monaco"},
                         },
-                        "FirstPractice":  {"date": "2026-06-05", "time": "11:30:00Z"},
+                        "FirstPractice": {"date": "2026-06-05", "time": "11:30:00Z"},
                         "SecondPractice": {"date": "2026-06-05", "time": "15:00:00Z"},
-                        "ThirdPractice":  {"date": "2026-06-06", "time": "10:30:00Z"},
-                        "Qualifying":     {"date": "2026-06-06", "time": "14:00:00Z"},
+                        "ThirdPractice": {"date": "2026-06-06", "time": "10:30:00Z"},
+                        "Qualifying": {"date": "2026-06-06", "time": "14:00:00Z"},
                     }
                 ]
             }

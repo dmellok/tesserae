@@ -58,7 +58,7 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 
-    races = (((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or [])
+    races = ((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or []
     if not races:
         return {"error": "no upcoming race in calendar"}
     race = races[0]
@@ -69,28 +69,32 @@ def fetch(
     # FP3 on sprint weekends and Sprint on non-sprint weekends, so we
     # can't assume a fixed schedule.
     raw_sessions = [
-        ("FP1",  _session(race.get("FirstPractice"))),
-        ("FP2",  _session(race.get("SecondPractice"))),
-        ("FP3",  _session(race.get("ThirdPractice"))),
+        ("FP1", _session(race.get("FirstPractice"))),
+        ("FP2", _session(race.get("SecondPractice"))),
+        ("FP3", _session(race.get("ThirdPractice"))),
         ("SPRINT_Q", _session(race.get("SprintQualifying"))),
-        ("SPRINT",   _session(race.get("Sprint"))),
+        ("SPRINT", _session(race.get("Sprint"))),
         ("QUAL", _session(race.get("Qualifying"))),
-        ("RACE", {"date": race.get("date"), "time": race.get("time") or ""} if race.get("date") else None),
+        (
+            "RACE",
+            {"date": race.get("date"), "time": race.get("time") or ""}
+            if race.get("date")
+            else None,
+        ),
     ]
     sessions = [
-        {"label": label, "date": s["date"], "time": s["time"]}
-        for label, s in raw_sessions if s
+        {"label": label, "date": s["date"], "time": s["time"]} for label, s in raw_sessions if s
     ]
 
     result: dict[str, Any] = {
-        "season":      race.get("season"),
-        "round":       race.get("round"),
-        "raceName":    race.get("raceName"),
-        "circuitId":   circuit.get("circuitId"),
+        "season": race.get("season"),
+        "round": race.get("round"),
+        "raceName": race.get("raceName"),
+        "circuitId": circuit.get("circuitId"),
         "circuitName": circuit.get("circuitName"),
-        "locality":    location.get("locality"),
-        "country":     location.get("country"),
-        "sessions":    sessions,
+        "locality": location.get("locality"),
+        "country": location.get("country"),
+        "sessions": sessions,
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))

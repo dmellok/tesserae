@@ -21,15 +21,17 @@ HTTP_TIMEOUT_S = 12
 USER_AGENT = "Mozilla/5.0 (compatible; tesserae/0.1)"
 SAFE = re.compile(r"^[A-Z0-9.^=-]{1,10}$")
 RANGE_INTERVAL = {
-    "1d":  "5m",
-    "5d":  "15m",
+    "1d": "5m",
+    "5d": "15m",
     "1mo": "30m",
     "3mo": "1d",
-    "1y":  "1d",
+    "1y": "1d",
 }
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     symbol = (options.get("symbol") or "AAPL").strip().upper()
     if not SAFE.match(symbol):
@@ -41,7 +43,9 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)
-    cache = data_dir / f"yf_{symbol.replace('.', '_').replace('^', '_').replace('=', '_')}_{rng}.json"
+    cache = (
+        data_dir / f"yf_{symbol.replace('.', '_').replace('^', '_').replace('=', '_')}_{rng}.json"
+    )
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
             return json.loads(cache.read_text())
@@ -62,7 +66,9 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     results = ((payload.get("chart") or {}).get("result") or [None])[0]
     if not results:
-        err = (((payload.get("chart") or {}).get("error") or {}).get("description")) or "Unknown ticker"
+        err = (
+            ((payload.get("chart") or {}).get("error") or {}).get("description")
+        ) or "Unknown ticker"
         return {"error": str(err), "price": None}
 
     meta = results.get("meta") or {}
@@ -75,15 +81,15 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     change_pct = ((price - prev_close) / prev_close * 100.0) if (price and prev_close) else None
 
     result = {
-        "symbol":     symbol,
-        "name":       meta.get("shortName") or meta.get("longName") or symbol,
-        "currency":   meta.get("currency") or "USD",
-        "exchange":   meta.get("exchangeName") or "",
-        "price":      price,
+        "symbol": symbol,
+        "name": meta.get("shortName") or meta.get("longName") or symbol,
+        "currency": meta.get("currency") or "USD",
+        "exchange": meta.get("exchangeName") or "",
+        "price": price,
         "prev_close": prev_close,
         "change_pct": change_pct,
-        "range":      rng,
-        "series":     series,
+        "range": rng,
+        "series": series,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

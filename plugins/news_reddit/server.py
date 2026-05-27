@@ -16,7 +16,9 @@ USER_AGENT = "tesserae/0.1 (+news_reddit)"
 SUB_RE = re.compile(r"^[A-Za-z0-9_]{1,21}$")
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     raw_sub = (options.get("subreddit") or "").strip()
     # Tolerate "r/foo", "/r/foo", "/r/foo/" — strip leading paths and
@@ -55,16 +57,18 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     posts = []
     for c in children[:max_items]:
         d = c.get("data") or {}
-        posts.append({
-            "title":     d.get("title") or "",
-            "url":       d.get("url") or f"https://reddit.com{d.get('permalink', '')}",
-            "permalink": f"https://reddit.com{d.get('permalink', '')}",
-            "author":    d.get("author") or "",
-            "score":     d.get("score") or 0,
-            "comments":  d.get("num_comments") or 0,
-            "time":      d.get("created_utc"),
-            "is_self":   bool(d.get("is_self")),
-        })
+        posts.append(
+            {
+                "title": d.get("title") or "",
+                "url": d.get("url") or f"https://reddit.com{d.get('permalink', '')}",
+                "permalink": f"https://reddit.com{d.get('permalink', '')}",
+                "author": d.get("author") or "",
+                "score": d.get("score") or 0,
+                "comments": d.get("num_comments") or 0,
+                "time": d.get("created_utc"),
+                "is_self": bool(d.get("is_self")),
+            }
+        )
     result = {"subreddit": sub, "sort": sort, "window": window, "posts": posts}
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

@@ -1,0 +1,74 @@
+# Tesserae CI — runs ruff + pytest on every push and PR.
+#
+# We don't install Playwright's browsers here. Tests that need the
+# headless renderer should mock it (the renderer module imports fine
+# without `playwright install`; failures only happen on actual
+# browser launches).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same branch when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ruff:
+    name: ruff
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: ruff check
+        run: ruff check .
+      - name: ruff format --check
+        # Formatting drift breaks the build before it gets to review.
+        # If this fails locally, run `ruff format` and commit.
+        run: ruff format --check .
+
+  pytest:
+    name: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: pytest
+        run: pytest -q
+
+  mypy:
+    name: mypy (strict modules)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dev deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: mypy
+        # Only the contract modules are checked under --strict per the
+        # pyproject overrides; plugin code passes default mypy.
+        run: mypy app

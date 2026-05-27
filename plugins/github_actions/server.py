@@ -19,7 +19,9 @@ def _core():
     return current_app.config["PLUGIN_REGISTRY"].get("github_core").server_module
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     raw = options.get("repos") or ""
     repos = [r.strip() for r in raw.replace(",", "\n").splitlines() if REPO_RE.match(r.strip())]
@@ -47,16 +49,18 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         except Exception:
             continue
         for r in (payload.get("workflow_runs") or [])[:max_per]:
-            runs.append({
-                "repo":        repo,
-                "name":        r.get("name") or "",
-                "branch":      r.get("head_branch") or "",
-                "event":       r.get("event") or "",
-                "status":      r.get("status") or "",
-                "conclusion":  r.get("conclusion") or "",
-                "run_number":  r.get("run_number"),
-                "updated_at":  r.get("updated_at"),
-            })
+            runs.append(
+                {
+                    "repo": repo,
+                    "name": r.get("name") or "",
+                    "branch": r.get("head_branch") or "",
+                    "event": r.get("event") or "",
+                    "status": r.get("status") or "",
+                    "conclusion": r.get("conclusion") or "",
+                    "run_number": r.get("run_number"),
+                    "updated_at": r.get("updated_at"),
+                }
+            )
     runs.sort(key=lambda r: r.get("updated_at") or "", reverse=True)
     result = {"runs": runs}
     with contextlib.suppress(OSError):

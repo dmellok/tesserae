@@ -54,8 +54,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # composition maps to the left edge of the landscape buffer the
         # firmware reads. The previous heuristic conditioned on input
         # aspect (img w < img h) and silently skipped squares, so a
-        # square image (e.g. a gallery photo at 1000×1000 fitted into
-        # 1600×1200) landed in the buffer un-rotated and the
+        # square image (e.g. a gallery photo at 1000x1000 fitted into
+        # 1600x1200) landed in the buffer un-rotated and the
         # mount-rotation made it appear sideways on the panel.
         img = img.rotate(90, expand=True)
     if img.size != (native_w, native_h):

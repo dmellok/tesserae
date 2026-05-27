@@ -62,11 +62,13 @@ def _slim_atom(feed: ET.Element, max_items: int) -> tuple[str, list[dict[str, An
         if link_el is not None:
             href = link_el.attrib.get("href") or ""
         when = _parse_when(published_el.text if published_el is not None else "")
-        items.append({
-            "title":     (t.text or "").strip() if t is not None else "",
-            "url":       href,
-            "published": when.isoformat() if when else "",
-        })
+        items.append(
+            {
+                "title": (t.text or "").strip() if t is not None else "",
+                "url": href,
+                "published": when.isoformat() if when else "",
+            }
+        )
     return feed_title, items
 
 
@@ -82,15 +84,19 @@ def _slim_rss(rss: ET.Element, max_items: int) -> tuple[str, list[dict[str, Any]
         link_el = item.find("link")
         date_el = item.find("pubDate")
         when = _parse_when(date_el.text if date_el is not None else "")
-        items.append({
-            "title":     (title_el.text or "").strip() if title_el is not None else "",
-            "url":       (link_el.text or "").strip() if link_el is not None else "",
-            "published": when.isoformat() if when else "",
-        })
+        items.append(
+            {
+                "title": (title_el.text or "").strip() if title_el is not None else "",
+                "url": (link_el.text or "").strip() if link_el is not None else "",
+                "published": when.isoformat() if when else "",
+            }
+        )
     return feed_title, items
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     url = (options.get("url") or "").strip()
     if not url:

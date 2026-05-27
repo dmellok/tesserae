@@ -16,11 +16,11 @@ from flask.testing import FlaskClient
 _FAKE_PAYLOAD = json.dumps(
     {
         "current": {
-            "alder_pollen":   0.5,
-            "birch_pollen":   3.2,
-            "grass_pollen":   42.0,
+            "alder_pollen": 0.5,
+            "birch_pollen": 3.2,
+            "grass_pollen": 42.0,
             "mugwort_pollen": 1.1,
-            "olive_pollen":   0.0,
+            "olive_pollen": 0.0,
             "ragweed_pollen": 0.4,
         }
     }

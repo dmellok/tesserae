@@ -34,11 +34,16 @@ def test_signature_matches_known_hmac_sha1() -> None:
     # The path is short enough that we can predict the signature:
     import hashlib
     import hmac
-    expected = hmac.new(
-        b"supersecret",
-        b"/v3/test?devid=1234567",
-        hashlib.sha1,
-    ).hexdigest().upper()
+
+    expected = (
+        hmac.new(
+            b"supersecret",
+            b"/v3/test?devid=1234567",
+            hashlib.sha1,
+        )
+        .hexdigest()
+        .upper()
+    )
     assert url.endswith(f"&signature={expected}")
 
 
@@ -53,37 +58,39 @@ def test_missing_credentials_returns_friendly_error() -> None:
     assert "credentials" in out["error"].lower()
 
 
-_FAKE_PAYLOAD = json.dumps({
-    "departures": [
-        {
-            "stop_id": 1071,
-            "route_id": 4,
-            "direction_id": 5,
-            "scheduled_departure_utc": "2026-05-27T01:30:00Z",
-            "estimated_departure_utc": "2026-05-27T01:32:00Z",
-            "at_platform": False,
-            "platform_number": "1",
+_FAKE_PAYLOAD = json.dumps(
+    {
+        "departures": [
+            {
+                "stop_id": 1071,
+                "route_id": 4,
+                "direction_id": 5,
+                "scheduled_departure_utc": "2026-05-27T01:30:00Z",
+                "estimated_departure_utc": "2026-05-27T01:32:00Z",
+                "at_platform": False,
+                "platform_number": "1",
+            },
+            {
+                "stop_id": 1071,
+                "route_id": 4,
+                "direction_id": 5,
+                "scheduled_departure_utc": "2026-05-27T01:45:00Z",
+                "estimated_departure_utc": "2026-05-27T01:45:00Z",
+                "at_platform": False,
+                "platform_number": "1",
+            },
+        ],
+        "routes": {
+            "4": {"route_id": 4, "route_name": "Alamein", "route_number": ""},
         },
-        {
-            "stop_id": 1071,
-            "route_id": 4,
-            "direction_id": 5,
-            "scheduled_departure_utc": "2026-05-27T01:45:00Z",
-            "estimated_departure_utc": "2026-05-27T01:45:00Z",
-            "at_platform": False,
-            "platform_number": "1",
+        "directions": {
+            "5": {"direction_id": 5, "direction_name": "City (Flinders Street)"},
         },
-    ],
-    "routes": {
-        "4": {"route_id": 4, "route_name": "Alamein", "route_number": ""},
-    },
-    "directions": {
-        "5": {"direction_id": 5, "direction_name": "City (Flinders Street)"},
-    },
-    "stops": {
-        "1071": {"stop_name": "Camberwell Railway Station (Camberwell)"},
-    },
-}).encode()
+        "stops": {
+            "1071": {"stop_name": "Camberwell Railway Station (Camberwell)"},
+        },
+    }
+).encode()
 
 
 class _FakeResp:

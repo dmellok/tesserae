@@ -39,8 +39,8 @@ def get_username() -> str:
 
 def headers(*, accept: str = ACCEPT) -> dict[str, str]:
     h: dict[str, str] = {
-        "User-Agent":          USER_AGENT,
-        "Accept":              accept,
+        "User-Agent": USER_AGENT,
+        "Accept": accept,
         "X-GitHub-Api-Version": API_VERSION,
     }
     token = get_token()
@@ -66,7 +66,9 @@ def request_graphql(query: str, variables: dict[str, Any], *, timeout: int = 12)
     h["Content-Type"] = "application/json"
     req = urllib.request.Request(
         "https://api.github.com/graphql",
-        data=body, headers=h, method="POST",
+        data=body,
+        headers=h,
+        method="POST",
     )
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))

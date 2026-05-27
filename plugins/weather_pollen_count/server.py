@@ -39,11 +39,11 @@ MPC_LEVELS = ["Off Season", "Extreme", "Very High", "High", "Moderate", "Low"]
 # scraped category can map back onto the same colour-coded bands the
 # Open-Meteo branch uses. Grains/m³ rough midpoints.
 MPC_LEVEL_TO_COUNT = {
-    "Low":       15,
-    "Moderate":  50,
-    "High":      150,
+    "Low": 15,
+    "Moderate": 50,
+    "High": 150,
     "Very High": 250,
-    "Extreme":   400,
+    "Extreme": 400,
 }
 
 
@@ -72,6 +72,7 @@ def _open_meteo(lat: float, lon: float) -> dict[str, Any] | None:
     except Exception:
         return None
     current = payload.get("current") or {}
+
     # Aggregate the individual species into broad categories the widget
     # actually displays.
     def _agg(*keys: str) -> float | None:
@@ -79,17 +80,17 @@ def _open_meteo(lat: float, lon: float) -> dict[str, Any] | None:
         nums = [v for v in vals if isinstance(v, (int, float))]
         return max(nums) if nums else None
 
-    tree  = _agg("alder_pollen", "birch_pollen", "olive_pollen")
+    tree = _agg("alder_pollen", "birch_pollen", "olive_pollen")
     grass = _agg("grass_pollen")
-    weed  = _agg("mugwort_pollen", "ragweed_pollen")
+    weed = _agg("mugwort_pollen", "ragweed_pollen")
     if tree is None and grass is None and weed is None:
         return None
     return {
-        "grass":       grass,
-        "tree":        tree,
-        "weed":        weed,
+        "grass": grass,
+        "tree": tree,
+        "weed": weed,
         "grass_label": None,
-        "source":      "open-meteo.com",
+        "source": "open-meteo.com",
     }
 
 
@@ -116,11 +117,11 @@ def _scrape_melbourne_pollen() -> dict[str, Any] | None:
         if re.search(rf"\b{re.escape(level)}\b", tail, re.IGNORECASE):
             count = MPC_LEVEL_TO_COUNT.get(level)
             return {
-                "grass":       count,
-                "tree":        None,
-                "weed":        None,
+                "grass": count,
+                "tree": None,
+                "weed": None,
                 "grass_label": level,
-                "source":      "melbournepollen.com.au",
+                "source": "melbournepollen.com.au",
             }
     return None
 
@@ -150,8 +151,11 @@ def fetch(
         # No upstream returned anything — surface a friendly empty state
         # so the cell still renders the widget shell.
         primary = {
-            "grass": None, "tree": None, "weed": None,
-            "grass_label": None, "source": "",
+            "grass": None,
+            "tree": None,
+            "weed": None,
+            "grass_label": None,
+            "source": "",
         }
 
     result: dict[str, Any] = {

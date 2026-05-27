@@ -52,6 +52,7 @@ DEFAULT_COLOUR = "#0d8c7e"
 
 # ----- storage --------------------------------------------------------
 
+
 def _data_dir() -> Path:
     registry = current_app.config["PLUGIN_REGISTRY"]
     plugin = registry.get("calendar_core")
@@ -101,6 +102,7 @@ def _unique_id(data: dict[str, Any], base: str) -> str:
 
 # ----- fetch + cache --------------------------------------------------
 
+
 def _ics_cache_path(data_dir: Path, feed_id: str) -> Path:
     safe = re.sub(r"[^A-Za-z0-9_-]", "_", feed_id)[:40]
     return data_dir / f"feed_{safe}.ics"
@@ -126,9 +128,7 @@ def _fetch_ics(url: str, cache_path: Path) -> bytes | None:
     return blob
 
 
-def _expand_events(
-    blob: bytes, start: datetime, end: datetime
-) -> list[dict[str, Any]]:
+def _expand_events(blob: bytes, start: datetime, end: datetime) -> list[dict[str, Any]]:
     """Parse an .ics blob + return a JSON-safe list of events in
     [start, end), including recurring expansions handled by
     recurring_ical_events."""
@@ -164,13 +164,15 @@ def _expand_events(
                     edt = edt.replace(tzinfo=UTC)
                 s_iso = sdt.astimezone(UTC).isoformat()
                 e_iso = edt.astimezone(UTC).isoformat() if edt else s_iso
-            out.append({
-                "summary":  summary or "(untitled)",
-                "location": location,
-                "start":    s_iso,
-                "end":      e_iso,
-                "all_day":  all_day,
-            })
+            out.append(
+                {
+                    "summary": summary or "(untitled)",
+                    "location": location,
+                    "start": s_iso,
+                    "end": e_iso,
+                    "all_day": all_day,
+                }
+            )
         except Exception:
             continue
     out.sort(key=lambda e: (not e["all_day"], e["start"]))
@@ -205,8 +207,8 @@ def load_events(
         if blob is None:
             continue
         for ev in _expand_events(blob, start, end):
-            ev["feed_id"]     = fid
-            ev["feed_name"]   = feed.get("name") or fid
+            ev["feed_id"] = fid
+            ev["feed_name"] = feed.get("name") or fid
             ev["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR
             out.append(ev)
     out.sort(key=lambda e: (not e["all_day"], e["start"]))
@@ -215,6 +217,7 @@ def load_events(
 
 # ----- cell-option choices --------------------------------------------
 
+
 def choices(name: str) -> list[dict[str, str]]:
     """Powers the multi-select feed picker on each calendar widget."""
     if name != "feeds":
@@ -222,11 +225,13 @@ def choices(name: str) -> list[dict[str, str]]:
     feeds = _load_feeds().get("feeds") or []
     return [
         {"value": f["id"], "label": f.get("name") or f["id"]}
-        for f in feeds if f.get("enabled", True)
+        for f in feeds
+        if f.get("enabled", True)
     ]
 
 
 # ----- admin blueprint ------------------------------------------------
+
 
 def blueprint() -> Blueprint:
     bp = Blueprint("calendar_core_admin", __name__, template_folder="templates")
@@ -248,14 +253,16 @@ def blueprint() -> Blueprint:
             colour = DEFAULT_COLOUR
         data = _load_feeds()
         fid = _unique_id(data, _slugify(name))
-        data["feeds"].append({
-            "id":         fid,
-            "name":       name,
-            "url":        url,
-            "colour":     colour,
-            "enabled":    True,
-            "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
-        })
+        data["feeds"].append(
+            {
+                "id": fid,
+                "name": name,
+                "url": url,
+                "colour": colour,
+                "enabled": True,
+                "created_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+            }
+        )
         _save_feeds(data)
         flash(f"Added feed '{name}'.", "ok")
         return redirect(url_for("calendar_core_admin.index"))

@@ -9,15 +9,17 @@ from unittest.mock import patch
 import pytest
 from flask.testing import FlaskClient
 
-_FAKE_PAYLOAD = json.dumps({
-    "date": "2026-05-27",
-    "title": "Galaxy NGC 3660",
-    "explanation": "...",
-    "media_type": "image",
-    "url": "https://apod.nasa.gov/apod/image/2605/galaxy_960.jpg",
-    "hdurl": "https://apod.nasa.gov/apod/image/2605/galaxy_1176.jpg",
-    "copyright": "Adam Block",
-}).encode()
+_FAKE_PAYLOAD = json.dumps(
+    {
+        "date": "2026-05-27",
+        "title": "Galaxy NGC 3660",
+        "explanation": "...",
+        "media_type": "image",
+        "url": "https://apod.nasa.gov/apod/image/2605/galaxy_960.jpg",
+        "hdurl": "https://apod.nasa.gov/apod/image/2605/galaxy_1176.jpg",
+        "copyright": "Adam Block",
+    }
+).encode()
 
 
 class _FakeResp:

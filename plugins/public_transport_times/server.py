@@ -28,11 +28,15 @@ BASE = "https://timetableapi.ptv.vic.gov.au"
 def _sign_url(path_with_query: str, devid: str, key: str) -> str:
     sep = "&" if "?" in path_with_query else "?"
     path_with_devid = f"{path_with_query}{sep}devid={devid}"
-    sig = hmac.new(
-        key.encode("utf-8"),
-        path_with_devid.encode("utf-8"),
-        hashlib.sha1,
-    ).hexdigest().upper()
+    sig = (
+        hmac.new(
+            key.encode("utf-8"),
+            path_with_devid.encode("utf-8"),
+            hashlib.sha1,
+        )
+        .hexdigest()
+        .upper()
+    )
     return f"{BASE}{path_with_devid}&signature={sig}"
 
 
@@ -55,12 +59,12 @@ def _slim_departure(
     route = routes.get(str(d.get("route_id"))) or {}
     direction = directions.get(str(d.get("direction_id"))) or {}
     return {
-        "scheduled":      d.get("scheduled_departure_utc"),
-        "estimated":      d.get("estimated_departure_utc"),
-        "platform":       d.get("platform_number") or "",
-        "at_platform":    bool(d.get("at_platform")),
-        "route_number":   route.get("route_number") or "",
-        "route_name":     route.get("route_name") or "",
+        "scheduled": d.get("scheduled_departure_utc"),
+        "estimated": d.get("estimated_departure_utc"),
+        "platform": d.get("platform_number") or "",
+        "at_platform": bool(d.get("at_platform")),
+        "route_number": route.get("route_number") or "",
+        "route_name": route.get("route_name") or "",
         "direction_name": direction.get("direction_name") or "",
     }
 
@@ -72,10 +76,9 @@ def fetch(
     key = (settings.get("key") or "").strip()
     if not devid or not key:
         return {
-            "error":
-                "PTV credentials not set. Visit Settings → Plugins → Public Transport "
-                "and paste your developer ID and signing key from the PTV registration "
-                "email."
+            "error": "PTV credentials not set. Visit Settings → Plugins → Public Transport "
+            "and paste your developer ID and signing key from the PTV registration "
+            "email."
         }
 
     try:
@@ -98,11 +101,7 @@ def fetch(
     if cached is not None:
         return cached
 
-    qs = (
-        f"max_results={max_results}"
-        "&include_cancelled=true"
-        "&expand=Route&expand=Direction"
-    )
+    qs = f"max_results={max_results}&include_cancelled=true&expand=Route&expand=Direction"
     if direction_id:
         with contextlib.suppress(TypeError, ValueError):
             qs += f"&direction_id={int(direction_id)}"
@@ -123,8 +122,8 @@ def fetch(
     stop_info = stops.get(str(stop_id)) or {}
 
     result: dict[str, Any] = {
-        "stop_id":    stop_id,
-        "stop_name":  stop_label or stop_info.get("stop_name") or f"Stop {stop_id}",
+        "stop_id": stop_id,
+        "stop_name": stop_label or stop_info.get("stop_name") or f"Stop {stop_id}",
         "route_type": route_type,
         "departures": [_slim_departure(d, routes, directions) for d in departures[:max_results]],
     }

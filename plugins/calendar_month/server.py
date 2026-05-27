@@ -72,29 +72,32 @@ def fetch(
         all_day = [e for e in all_evs if e.get("all_day")]
         timed = [e for e in all_evs if not e.get("all_day")]
         visible = (all_day + timed)[:max_per_day]
-        days.append({
-            "date":     cur.isoformat(),
-            "day":      cur.day,
-            "month":    cur.month,
-            "in_month": cur.month == first_of_month.month,
-            "is_today": cur == today,
-            "events":   [
-                {
-                    "summary": e["summary"],
-                    "start":   e["start"],
-                    "all_day": e.get("all_day", False),
-                    "colour":  e.get("feed_colour"),
-                } for e in visible
-            ],
-            "total":    len(all_evs),
-            "extra":    max(0, len(all_evs) - max_per_day),
-        })
+        days.append(
+            {
+                "date": cur.isoformat(),
+                "day": cur.day,
+                "month": cur.month,
+                "in_month": cur.month == first_of_month.month,
+                "is_today": cur == today,
+                "events": [
+                    {
+                        "summary": e["summary"],
+                        "start": e["start"],
+                        "all_day": e.get("all_day", False),
+                        "colour": e.get("feed_colour"),
+                    }
+                    for e in visible
+                ],
+                "total": len(all_evs),
+                "extra": max(0, len(all_evs) - max_per_day),
+            }
+        )
         cur += timedelta(days=1)
 
     return {
-        "month":      first_of_month.month,
-        "year":       first_of_month.year,
+        "month": first_of_month.month,
+        "year": first_of_month.year,
         "month_name": cal_mod.month_name[first_of_month.month],
         "week_start": week_start,
-        "days":       days,
+        "days": days,
     }

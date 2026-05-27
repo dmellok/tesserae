@@ -14,7 +14,9 @@ HTTP_TIMEOUT_S = 12
 USER_AGENT = "tesserae/0.1 (+clock_sunrise_sunset)"
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     lat = float(options.get("latitude", 0.0))
     lon = float(options.get("longitude", 0.0))
@@ -44,14 +46,14 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     daily = payload.get("daily") or {}
     sunrise = (daily.get("sunrise") or [None])[0]
-    sunset  = (daily.get("sunset") or [None])[0]
+    sunset = (daily.get("sunset") or [None])[0]
     daylight_s = (daily.get("daylight_duration") or [None])[0]
 
     result = {
-        "label":           options.get("label") or "",
-        "tz":              payload.get("timezone") or "UTC",
-        "sunrise":         sunrise,
-        "sunset":          sunset,
+        "label": options.get("label") or "",
+        "tz": payload.get("timezone") or "UTC",
+        "sunrise": sunrise,
+        "sunset": sunset,
         "daylight_seconds": daylight_s,
     }
     with contextlib.suppress(OSError):

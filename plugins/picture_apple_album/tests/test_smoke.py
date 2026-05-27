@@ -58,49 +58,53 @@ def test_orientation_classifier_handles_edge_cases() -> None:
     assert server._orientation_of({"width": 100, "height": 100}) == "square"
     assert server._orientation_of({"width": 200, "height": 100}) == "landscape"
     assert server._orientation_of({"width": 100, "height": 200}) == "portrait"
-    assert server._orientation_of({"width": 0,   "height": 100}) == "any"
+    assert server._orientation_of({"width": 0, "height": 100}) == "any"
 
 
-_FAKE_WEBSTREAM = json.dumps({
-    "streamName": "Family",
-    "userFirstName": "Jane",
-    "userLastName": "Doe",
-    "photos": [
-        {
-            "photoGuid": "abc-123",
-            "width": "1200",
-            "height": "1600",
-            "dateCreated": "2026-05-01T00:00:00Z",
-            "derivatives": {
-                "1500": {
-                    "checksum": "CHKSM_BIG",
-                    "fileSize": "200000",
-                    "width": "1200",
-                    "height": "1600",
-                },
-                "640": {
-                    "checksum": "CHKSM_SMALL",
-                    "fileSize": "30000",
-                    "width": "480",
-                    "height": "640",
+_FAKE_WEBSTREAM = json.dumps(
+    {
+        "streamName": "Family",
+        "userFirstName": "Jane",
+        "userLastName": "Doe",
+        "photos": [
+            {
+                "photoGuid": "abc-123",
+                "width": "1200",
+                "height": "1600",
+                "dateCreated": "2026-05-01T00:00:00Z",
+                "derivatives": {
+                    "1500": {
+                        "checksum": "CHKSM_BIG",
+                        "fileSize": "200000",
+                        "width": "1200",
+                        "height": "1600",
+                    },
+                    "640": {
+                        "checksum": "CHKSM_SMALL",
+                        "fileSize": "30000",
+                        "width": "480",
+                        "height": "640",
+                    },
                 },
             },
-        },
-    ],
-}).encode()
+        ],
+    }
+).encode()
 
-_FAKE_ASSETURLS = json.dumps({
-    "items": {
-        "CHKSM_BIG": {
-            "url_location": "cvws.icloud-content.com",
-            "url_path": "/B/abc/biglurl?signature=xyz",
+_FAKE_ASSETURLS = json.dumps(
+    {
+        "items": {
+            "CHKSM_BIG": {
+                "url_location": "cvws.icloud-content.com",
+                "url_path": "/B/abc/biglurl?signature=xyz",
+            },
+            "CHKSM_SMALL": {
+                "url_location": "cvws.icloud-content.com",
+                "url_path": "/B/abc/smalllurl?signature=xyz",
+            },
         },
-        "CHKSM_SMALL": {
-            "url_location": "cvws.icloud-content.com",
-            "url_path": "/B/abc/smalllurl?signature=xyz",
-        },
-    },
-}).encode()
+    }
+).encode()
 
 
 class _FakeResp:
@@ -125,15 +129,18 @@ def _urlopen_router(body_by_path: dict[str, bytes]):
             if key in url:
                 return _FakeResp(body)
         raise RuntimeError(f"unmocked URL: {url}")
+
     return _fake
 
 
 def test_fetch_returns_largest_derivative_url(tmp_path) -> None:
     server = _load_server()
-    fake = _urlopen_router({
-        "/webstream":     _FAKE_WEBSTREAM,
-        "/webasseturls":  _FAKE_ASSETURLS,
-    })
+    fake = _urlopen_router(
+        {
+            "/webstream": _FAKE_WEBSTREAM,
+            "/webasseturls": _FAKE_ASSETURLS,
+        }
+    )
     with patch("urllib.request.urlopen", side_effect=fake):
         out = server.fetch(
             {"album": "B00AAAAAAAAAA", "mode": "random"},

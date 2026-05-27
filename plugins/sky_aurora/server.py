@@ -15,7 +15,7 @@ USER_AGENT = "tesserae/0.1 (+sky_aurora)"
 
 # https://services.swpc.noaa.gov/json/planetary_k_index_1m.json
 # Array of {"time_tag", "kp_index", "estimated_kp", ...} — most recent last.
-KP_NOWCAST_URL  = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
+KP_NOWCAST_URL = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
 
 # https://services.swpc.noaa.gov/text/3-day-forecast.txt — text-format,
 # we'll grab the structured forecast JSON instead:
@@ -23,7 +23,9 @@ KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-inde
 
 
 def _get(url: str) -> Any:
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    req = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"}
+    )
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -33,22 +35,24 @@ def _visibility_band(kp: float) -> tuple[str, float]:
     magnetic latitude for a given Kp. Returns (label, lat_threshold).
     Tables are commonly published by NOAA; using rounded midpoints."""
     table = [
-        (0, "Polar only",         67.5),
-        (1, "Polar only",         66.5),
-        (2, "Polar only",         65.0),
-        (3, "Sub-polar",          63.0),
-        (4, "High-latitude",      60.0),
-        (5, "Mid-latitude",       57.5),
-        (6, "Mid-latitude (G2)",  54.5),
-        (7, "Lower mid (G3)",     51.5),
+        (0, "Polar only", 67.5),
+        (1, "Polar only", 66.5),
+        (2, "Polar only", 65.0),
+        (3, "Sub-polar", 63.0),
+        (4, "High-latitude", 60.0),
+        (5, "Mid-latitude", 57.5),
+        (6, "Mid-latitude (G2)", 54.5),
+        (7, "Lower mid (G3)", 51.5),
         (8, "Far south/north (G4)", 47.5),
-        (9, "Extreme (G5)",       42.0),
+        (9, "Extreme (G5)", 42.0),
     ]
     n = max(0, min(9, int(kp)))
     return table[n][1], table[n][2]
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     lat = float(options.get("latitude") or 0.0)
     abs_lat = abs(lat)
@@ -82,11 +86,13 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         for row in fc[1:]:
             if len(row) >= 3:
                 with contextlib.suppress(ValueError, TypeError):
-                    forecast_rows.append({
-                        "time":   row[0],
-                        "kp":     float(row[1]),
-                        "kind":   row[2],
-                    })
+                    forecast_rows.append(
+                        {
+                            "time": row[0],
+                            "kp": float(row[1]),
+                            "kind": row[2],
+                        }
+                    )
     forecast_rows.sort(key=lambda r: r.get("time") or "")
     # Future-only window: drop rows in the past.
     now_ts = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
@@ -99,17 +105,17 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     visible_soon = abs_lat >= forecast_oval
 
     result = {
-        "lat":             lat,
-        "current_kp":      round(current_kp, 1),
-        "max_kp_3d":       round(max_kp_3d, 1),
-        "band_label":      band_label,
-        "forecast_band":   forecast_label,
-        "visible_now":     visible_now,
-        "visible_soon":    visible_soon,
-        "oval_lat":        oval_lat,
-        "forecast_oval":   forecast_oval,
-        "forecast":        future[:24],  # 24 3-hour blocks = 3 days
-        "fetched_at":      int(time.time()),
+        "lat": lat,
+        "current_kp": round(current_kp, 1),
+        "max_kp_3d": round(max_kp_3d, 1),
+        "band_label": band_label,
+        "forecast_band": forecast_label,
+        "visible_now": visible_now,
+        "visible_soon": visible_soon,
+        "oval_lat": oval_lat,
+        "forecast_oval": forecast_oval,
+        "forecast": future[:24],  # 24 3-hour blocks = 3 days
+        "fetched_at": int(time.time()),
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result))

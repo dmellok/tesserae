@@ -31,20 +31,22 @@ def test_missing_access_key_returns_friendly_error() -> None:
     assert "access key" in out["error"].lower()
 
 
-_FAKE_PHOTO = json.dumps({
-    "urls": {
-        "raw":     "https://images.unsplash.com/raw",
-        "full":    "https://images.unsplash.com/full",
-        "regular": "https://images.unsplash.com/regular",
-    },
-    "alt_description": "Tree in fog",
-    "links": {
-        "html":              "https://unsplash.com/photos/abc",
-        "download_location": "https://api.unsplash.com/photos/abc/download",
-    },
-    "user": {"name": "Ansel Adams", "username": "ansel"},
-    "color": "#888888",
-}).encode()
+_FAKE_PHOTO = json.dumps(
+    {
+        "urls": {
+            "raw": "https://images.unsplash.com/raw",
+            "full": "https://images.unsplash.com/full",
+            "regular": "https://images.unsplash.com/regular",
+        },
+        "alt_description": "Tree in fog",
+        "links": {
+            "html": "https://unsplash.com/photos/abc",
+            "download_location": "https://api.unsplash.com/photos/abc/download",
+        },
+        "user": {"name": "Ansel Adams", "username": "ansel"},
+        "color": "#888888",
+    }
+).encode()
 
 
 class _FakeResp:

@@ -21,7 +21,9 @@ def _get_json(url: str) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     feed = options.get("feed", "top")
     if feed not in ("top", "new", "best", "show", "ask"):
@@ -50,15 +52,17 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
             continue
         if not item:
             continue
-        stories.append({
-            "id":     item.get("id"),
-            "title":  item.get("title") or "",
-            "url":    item.get("url") or f"https://news.ycombinator.com/item?id={item.get('id')}",
-            "by":     item.get("by") or "",
-            "score":  item.get("score") or 0,
-            "comments": item.get("descendants") or 0,
-            "time":   item.get("time"),
-        })
+        stories.append(
+            {
+                "id": item.get("id"),
+                "title": item.get("title") or "",
+                "url": item.get("url") or f"https://news.ycombinator.com/item?id={item.get('id')}",
+                "by": item.get("by") or "",
+                "score": item.get("score") or 0,
+                "comments": item.get("descendants") or 0,
+                "time": item.get("time"),
+            }
+        )
 
     result = {"feed": feed, "stories": stories}
     with contextlib.suppress(OSError):

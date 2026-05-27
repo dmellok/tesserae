@@ -29,18 +29,18 @@ def _cached(path: Path) -> Any | None:
 
 # GitHub event types → (icon, human label).
 EVENT_KINDS = {
-    "PushEvent":            ("git-commit",       "pushed"),
-    "PullRequestEvent":     ("git-pull-request", "PR"),
-    "IssuesEvent":          ("warning-circle",   "issue"),
-    "IssueCommentEvent":    ("chat-circle",      "commented"),
-    "PullRequestReviewEvent": ("eye",            "reviewed"),
+    "PushEvent": ("git-commit", "pushed"),
+    "PullRequestEvent": ("git-pull-request", "PR"),
+    "IssuesEvent": ("warning-circle", "issue"),
+    "IssueCommentEvent": ("chat-circle", "commented"),
+    "PullRequestReviewEvent": ("eye", "reviewed"),
     "PullRequestReviewCommentEvent": ("chats", "review"),
-    "CreateEvent":          ("plus-circle",      "created"),
-    "DeleteEvent":          ("minus-circle",     "deleted"),
-    "ForkEvent":            ("git-fork",         "forked"),
-    "WatchEvent":           ("star",             "starred"),
-    "ReleaseEvent":         ("tag",              "released"),
-    "PublicEvent":          ("globe",            "made public"),
+    "CreateEvent": ("plus-circle", "created"),
+    "DeleteEvent": ("minus-circle", "deleted"),
+    "ForkEvent": ("git-fork", "forked"),
+    "WatchEvent": ("star", "starred"),
+    "ReleaseEvent": ("tag", "released"),
+    "PublicEvent": ("globe", "made public"),
 }
 
 
@@ -67,20 +67,25 @@ def _slim_event(ev: dict[str, Any]) -> dict[str, Any]:
     elif ev["type"] == "CreateEvent":
         detail = payload.get("ref_type") or ""
     return {
-        "icon":    kind,
-        "label":   label,
-        "repo":    repo,
-        "detail":  detail,
-        "at":      ev.get("created_at"),
+        "icon": kind,
+        "label": label,
+        "repo": repo,
+        "detail": detail,
+        "at": ev.get("created_at"),
     }
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     core = _core()
     user = (options.get("user") or "").strip() or core.get_username()
     if not user:
-        return {"error": "Set a GitHub username — either here or as the default in Plugins → GitHub Core.", "events": []}
+        return {
+            "error": "Set a GitHub username — either here or as the default in Plugins → GitHub Core.",
+            "events": [],
+        }
 
     max_events = int(options.get("max_events") or 10)
     data_dir = Path(ctx["data_dir"])
@@ -106,9 +111,16 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     #  * per-type counts (commits / PRs / issues / other)
     #  * unique repos touched
     from datetime import datetime
+
     now = datetime.now(UTC)
     seven_days = [0] * 7
-    type_counts = {"PushEvent": 0, "PullRequestEvent": 0, "IssuesEvent": 0, "ReleaseEvent": 0, "other": 0}
+    type_counts = {
+        "PushEvent": 0,
+        "PullRequestEvent": 0,
+        "IssuesEvent": 0,
+        "ReleaseEvent": 0,
+        "other": 0,
+    }
     repos_set: set[str] = set()
     for ev_raw, ev in zip((raw or []), all_events, strict=False):
         repos_set.add(ev.get("repo") or "")
@@ -131,16 +143,16 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
 
     events = all_events[:max_events]
     result = {
-        "user":         user,
-        "events":       events,
-        "count":        len(events),
-        "total_30":     len(all_events),
-        "daily":        seven_days,
-        "repos_count":  len([r for r in repos_set if r]),
+        "user": user,
+        "events": events,
+        "count": len(events),
+        "total_30": len(all_events),
+        "daily": seven_days,
+        "repos_count": len([r for r in repos_set if r]),
         "type_commits": type_counts.get("PushEvent", 0),
-        "type_prs":     type_counts.get("PullRequestEvent", 0),
-        "type_issues":  type_counts.get("IssuesEvent", 0),
-        "type_releases":type_counts.get("ReleaseEvent", 0),
+        "type_prs": type_counts.get("PullRequestEvent", 0),
+        "type_issues": type_counts.get("IssuesEvent", 0),
+        "type_releases": type_counts.get("ReleaseEvent", 0),
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))

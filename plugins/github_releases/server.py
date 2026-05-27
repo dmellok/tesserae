@@ -19,7 +19,9 @@ def _core():
     return current_app.config["PLUGIN_REGISTRY"].get("github_core").server_module
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     raw = options.get("repos") or ""
     repos = [r.strip() for r in raw.replace(",", "\n").splitlines() if REPO_RE.match(r.strip())]
@@ -41,18 +43,22 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     out = []
     for repo in repos:
         try:
-            rels = core.request_json(f"https://api.github.com/repos/{repo}/releases?per_page={max_per}")
+            rels = core.request_json(
+                f"https://api.github.com/repos/{repo}/releases?per_page={max_per}"
+            )
         except Exception:
             rels = []
         for r in (rels or [])[:max_per]:
-            out.append({
-                "repo":         repo,
-                "tag":          r.get("tag_name") or "",
-                "name":         r.get("name") or r.get("tag_name") or "",
-                "published_at": r.get("published_at"),
-                "prerelease":   bool(r.get("prerelease")),
-                "draft":        bool(r.get("draft")),
-            })
+            out.append(
+                {
+                    "repo": repo,
+                    "tag": r.get("tag_name") or "",
+                    "name": r.get("name") or r.get("tag_name") or "",
+                    "published_at": r.get("published_at"),
+                    "prerelease": bool(r.get("prerelease")),
+                    "draft": bool(r.get("draft")),
+                }
+            )
     out.sort(key=lambda r: r.get("published_at") or "", reverse=True)
     result = {"releases": out}
     with contextlib.suppress(OSError):

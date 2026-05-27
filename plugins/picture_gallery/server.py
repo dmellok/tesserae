@@ -61,6 +61,7 @@ SQUARE_TOLERANCE = 0.05
 
 # ----- data_dir + metadata --------------------------------------------
 
+
 def _data_dir() -> Path:
     registry = current_app.config["PLUGIN_REGISTRY"]
     plugin = registry.get("picture_gallery")
@@ -94,6 +95,7 @@ def _save_meta(data_dir: Path, meta: dict[str, dict[str, Any]]) -> None:
 
 # ----- folder resolution ----------------------------------------------
 
+
 def _folder_path(folder_name: str, data_dir: Path) -> Path | None:
     if not folder_name or folder_name == ROOT_FOLDER_VALUE:
         return data_dir
@@ -119,8 +121,7 @@ def _list_images(folder: Path | None) -> list[Path]:
         return []
     try:
         return sorted(
-            p for p in folder.iterdir()
-            if p.is_file() and p.suffix.lower() in ALLOWED_SUFFIXES
+            p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in ALLOWED_SUFFIXES
         )
     except (PermissionError, OSError):
         return []
@@ -130,7 +131,8 @@ def _list_internal_folders(data_dir: Path) -> list[str]:
     if not data_dir.exists():
         return []
     return sorted(
-        p.name for p in data_dir.iterdir()
+        p.name
+        for p in data_dir.iterdir()
         if p.is_dir() and _FOLDER_NAME_RE.match(p.name) and not p.name.startswith(".")
     )
 
@@ -143,6 +145,7 @@ def _all_folder_names(data_dir: Path) -> list[str]:
 
 
 # ----- thumbnails -----------------------------------------------------
+
 
 def _thumb_path(data_dir: Path, folder_name: str, filename: str, source: Path) -> Path:
     try:
@@ -172,6 +175,7 @@ def _ensure_thumbnail(source: Path, dest: Path) -> Path | None:
 
 
 # ----- orientation cache ---------------------------------------------
+
 
 def _orient_cache_path(data_dir: Path) -> Path:
     return data_dir / ORIENT_CACHE_FILE
@@ -248,6 +252,7 @@ def _filter_by_orientation(
 
 # ----- widget contract: fetch + choices ------------------------------
 
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -258,9 +263,8 @@ def fetch(
     images = _list_images(folder)
     if not images:
         return {
-            "error":
-                f"No images in '{folder_name or ROOT_FOLDER_VALUE}'. "
-                "Add some at Plugins → Gallery.",
+            "error": f"No images in '{folder_name or ROOT_FOLDER_VALUE}'. "
+            "Add some at Plugins → Gallery.",
             "url": None,
         }
 
@@ -270,8 +274,7 @@ def fetch(
         images = _filter_by_orientation(images, folder_segment, orientation, data_dir)
         if not images:
             return {
-                "error":
-                    f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
+                "error": f"No {orientation} images in '{folder_name or ROOT_FOLDER_VALUE}'.",
                 "url": None,
             }
 
@@ -291,10 +294,10 @@ def fetch(
         chosen = random.choice(images)
 
     return {
-        "url":      f"/plugins/picture_gallery/folders/{folder_segment}/{chosen.name}",
+        "url": f"/plugins/picture_gallery/folders/{folder_segment}/{chosen.name}",
         "filename": chosen.name,
-        "folder":   folder_segment,
-        "count":    len(images),
+        "folder": folder_segment,
+        "count": len(images),
     }
 
 
@@ -322,6 +325,7 @@ def choices(name: str) -> list[dict[str, Any]]:
 
 
 # ----- admin blueprint ------------------------------------------------
+
 
 def blueprint() -> Blueprint:
     bp = Blueprint("picture_gallery_admin", __name__, template_folder="templates")
@@ -367,24 +371,29 @@ def blueprint() -> Blueprint:
         meta = _load_meta(data_dir)
         # Surface a root pseudo-folder when there are loose images.
         root_imgs = [
-            p for p in (data_dir.iterdir() if data_dir.exists() else [])
+            p
+            for p in (data_dir.iterdir() if data_dir.exists() else [])
             if p.is_file() and p.suffix.lower() in ALLOWED_SUFFIXES
         ]
         if root_imgs:
-            folders.append({
-                "id":             ROOT_FOLDER_VALUE,
-                "name":           "(root)",
-                "image_count":    len(root_imgs),
-                "external_path":  None,
-            })
+            folders.append(
+                {
+                    "id": ROOT_FOLDER_VALUE,
+                    "name": "(root)",
+                    "image_count": len(root_imgs),
+                    "external_path": None,
+                }
+            )
         for fname in _all_folder_names(data_dir):
             entry = meta.get(fname, {})
-            folders.append({
-                "id":             fname,
-                "name":           fname,
-                "image_count":    len(_list_images(_folder_path(fname, data_dir))),
-                "external_path":  entry.get("external_path"),
-            })
+            folders.append(
+                {
+                    "id": fname,
+                    "name": fname,
+                    "image_count": len(_list_images(_folder_path(fname, data_dir))),
+                    "external_path": entry.get("external_path"),
+                }
+            )
         return render_template("picture_gallery/index.html", folders=folders)
 
     @bp.post("/folders")

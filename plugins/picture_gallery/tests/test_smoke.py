@@ -33,7 +33,9 @@ def test_fetch_empty_folder_returns_friendly_error(app: Flask) -> None:
     server = _load_server()
     plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
     out = server.fetch(
-        {"folder": ""}, {}, ctx={"data_dir": str(plugin.data_dir)},
+        {"folder": ""},
+        {},
+        ctx={"data_dir": str(plugin.data_dir)},
     )
     assert out["url"] is None
     assert "No images" in out["error"]
@@ -44,7 +46,9 @@ def test_fetch_picks_a_seeded_image(app: Flask) -> None:
     plugin = app.config["PLUGIN_REGISTRY"].get("picture_gallery")
     _seed_image(plugin.data_dir, "cat.jpg")
     out = server.fetch(
-        {"folder": ""}, {}, ctx={"data_dir": str(plugin.data_dir)},
+        {"folder": ""},
+        {},
+        ctx={"data_dir": str(plugin.data_dir)},
     )
     assert out["url"].endswith("/cat.jpg")
     assert out["count"] == 1

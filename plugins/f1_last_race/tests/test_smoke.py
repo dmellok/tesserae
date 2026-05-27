@@ -28,7 +28,11 @@ _FAKE_PAYLOAD = json.dumps(
                             {
                                 "position": "1",
                                 "points": "25",
-                                "Driver": {"code": "ANT", "givenName": "Andrea Kimi", "familyName": "Antonelli"},
+                                "Driver": {
+                                    "code": "ANT",
+                                    "givenName": "Andrea Kimi",
+                                    "familyName": "Antonelli",
+                                },
                                 "Constructor": {"constructorId": "mercedes", "name": "Mercedes"},
                                 "Time": {"millis": "5295758", "time": "1:28:15.758"},
                                 "FastestLap": {"rank": "1"},
@@ -37,7 +41,11 @@ _FAKE_PAYLOAD = json.dumps(
                             {
                                 "position": "2",
                                 "points": "18",
-                                "Driver": {"code": "HAM", "givenName": "Lewis", "familyName": "Hamilton"},
+                                "Driver": {
+                                    "code": "HAM",
+                                    "givenName": "Lewis",
+                                    "familyName": "Hamilton",
+                                },
                                 "Constructor": {"constructorId": "ferrari", "name": "Ferrari"},
                                 "Time": {"millis": "5306526", "time": "+10.768"},
                                 "status": "Finished",
@@ -45,7 +53,11 @@ _FAKE_PAYLOAD = json.dumps(
                             {
                                 "position": "3",
                                 "points": "15",
-                                "Driver": {"code": "VER", "givenName": "Max", "familyName": "Verstappen"},
+                                "Driver": {
+                                    "code": "VER",
+                                    "givenName": "Max",
+                                    "familyName": "Verstappen",
+                                },
                                 "Constructor": {"constructorId": "red_bull", "name": "Red Bull"},
                                 "Time": {"millis": "5307034", "time": "+11.276"},
                                 "status": "Finished",

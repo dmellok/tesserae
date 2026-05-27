@@ -35,19 +35,32 @@ def test_todo_renders_empty_when_no_list_selected(client: FlaskClient, size: str
 
 
 def test_todo_cell_data_includes_seeded_items(app: Flask, client: FlaskClient) -> None:
-    _seed_lists(app, {
-        "lists": [
-            {
-                "id": "groceries",
-                "name": "Groceries",
-                "created_at": "2026-05-27T10:00:00+00:00",
-                "items": [
-                    {"id": "a", "text": "Milk",  "created_at": "2026-05-27T10:01:00+00:00", "completed_at": None},
-                    {"id": "b", "text": "Bread", "created_at": "2026-05-27T10:02:00+00:00", "completed_at": None},
-                ],
-            }
-        ]
-    })
+    _seed_lists(
+        app,
+        {
+            "lists": [
+                {
+                    "id": "groceries",
+                    "name": "Groceries",
+                    "created_at": "2026-05-27T10:00:00+00:00",
+                    "items": [
+                        {
+                            "id": "a",
+                            "text": "Milk",
+                            "created_at": "2026-05-27T10:01:00+00:00",
+                            "completed_at": None,
+                        },
+                        {
+                            "id": "b",
+                            "text": "Bread",
+                            "created_at": "2026-05-27T10:02:00+00:00",
+                            "completed_at": None,
+                        },
+                    ],
+                }
+            ]
+        },
+    )
     # Call fetch() directly with the cell's data_dir; this exercises
     # the same code path the composer uses.
     plugin = app.config["PLUGIN_REGISTRY"].get("todo")
@@ -62,19 +75,36 @@ def test_todo_cell_data_includes_seeded_items(app: Flask, client: FlaskClient) -
 
 
 def test_todo_prunes_items_completed_more_than_24h_ago(app: Flask) -> None:
-    _seed_lists(app, {
-        "lists": [{
-            "id": "x", "name": "X", "items": [
-                {"id": "old", "text": "old done", "created_at": "2026-05-20T00:00:00+00:00",
-                 "completed_at": "2026-05-20T00:00:00+00:00"},
-                {"id": "new", "text": "fresh", "created_at": "2026-05-26T00:00:00+00:00",
-                 "completed_at": None},
-            ],
-        }]
-    })
+    _seed_lists(
+        app,
+        {
+            "lists": [
+                {
+                    "id": "x",
+                    "name": "X",
+                    "items": [
+                        {
+                            "id": "old",
+                            "text": "old done",
+                            "created_at": "2026-05-20T00:00:00+00:00",
+                            "completed_at": "2026-05-20T00:00:00+00:00",
+                        },
+                        {
+                            "id": "new",
+                            "text": "fresh",
+                            "created_at": "2026-05-26T00:00:00+00:00",
+                            "completed_at": None,
+                        },
+                    ],
+                }
+            ]
+        },
+    )
     plugin = app.config["PLUGIN_REGISTRY"].get("todo")
     out = plugin.server_module.fetch(
-        {"list_id": "x"}, {}, ctx={"data_dir": str(plugin.data_dir)},
+        {"list_id": "x"},
+        {},
+        ctx={"data_dir": str(plugin.data_dir)},
     )
     ids = [i["id"] for i in out["items"]]
     assert "old" not in ids
@@ -95,12 +125,15 @@ def test_todo_admin_blueprint_responds(app: Flask, client: FlaskClient) -> None:
 
 
 def test_todo_choices_returns_lists(app: Flask, client: FlaskClient) -> None:
-    _seed_lists(app, {
-        "lists": [
-            {"id": "a", "name": "Alpha", "items": []},
-            {"id": "b", "name": "Beta",  "items": []},
-        ]
-    })
+    _seed_lists(
+        app,
+        {
+            "lists": [
+                {"id": "a", "name": "Alpha", "items": []},
+                {"id": "b", "name": "Beta", "items": []},
+            ]
+        },
+    )
     plugin = app.config["PLUGIN_REGISTRY"].get("todo")
     # choices() reads from current_app — drive it inside a request ctx.
     with app.test_request_context("/"):

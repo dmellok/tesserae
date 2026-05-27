@@ -37,16 +37,16 @@ def _slim_result(r: dict[str, Any]) -> dict[str, Any]:
     time_obj = r.get("Time") or {}
     fastest = r.get("FastestLap") or {}
     return {
-        "position":   r.get("position"),
-        "code":       driver.get("code") or "",
-        "given":      driver.get("givenName") or "",
-        "family":     driver.get("familyName") or "",
-        "constructor":     constructor.get("name") or "",
-        "constructorId":   constructor.get("constructorId") or "",
-        "time":       time_obj.get("time") or "",  # "1:28:15.758" for P1, "+10.768" for others
-        "points":     r.get("points"),
-        "status":     r.get("status") or "",
-        "fastest":    fastest.get("rank") == "1",
+        "position": r.get("position"),
+        "code": driver.get("code") or "",
+        "given": driver.get("givenName") or "",
+        "family": driver.get("familyName") or "",
+        "constructor": constructor.get("name") or "",
+        "constructorId": constructor.get("constructorId") or "",
+        "time": time_obj.get("time") or "",  # "1:28:15.758" for P1, "+10.768" for others
+        "points": r.get("points"),
+        "status": r.get("status") or "",
+        "fastest": fastest.get("rank") == "1",
     }
 
 
@@ -68,7 +68,7 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 
-    races = (((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or [])
+    races = ((payload.get("MRData") or {}).get("RaceTable") or {}).get("Races") or []
     if not races:
         return {"error": "no completed race in calendar"}
     race = races[0]
@@ -77,15 +77,15 @@ def fetch(
     results = race.get("Results") or []
 
     result: dict[str, Any] = {
-        "season":      race.get("season"),
-        "round":       race.get("round"),
-        "raceName":    race.get("raceName"),
-        "date":        race.get("date"),
-        "circuitId":   circuit.get("circuitId"),
+        "season": race.get("season"),
+        "round": race.get("round"),
+        "raceName": race.get("raceName"),
+        "date": race.get("date"),
+        "circuitId": circuit.get("circuitId"),
         "circuitName": circuit.get("circuitName"),
-        "locality":    location.get("locality"),
-        "country":     location.get("country"),
-        "podium":      [_slim_result(r) for r in results[:3]],
+        "locality": location.get("locality"),
+        "country": location.get("country"),
+        "podium": [_slim_result(r) for r in results[:3]],
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result))

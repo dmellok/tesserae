@@ -19,7 +19,9 @@ def _core():
     return current_app.config["PLUGIN_REGISTRY"].get("github_core").server_module
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     repo = (options.get("repo") or "").strip()
     if not SAFE_RE.match(repo):
@@ -73,19 +75,19 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
         commit_weeks = [int(w.get("total") or 0) for w in activity if isinstance(w, dict)]
 
     result = {
-        "repo":         info.get("full_name") or repo,
-        "description":  info.get("description") or "",
-        "stars":        info.get("stargazers_count") or 0,
-        "forks":        info.get("forks_count") or 0,
-        "issues":       info.get("open_issues_count") or 0,
-        "watchers":     info.get("subscribers_count") or 0,
-        "language":     info.get("language") or "",
-        "pushed_at":    info.get("pushed_at"),
+        "repo": info.get("full_name") or repo,
+        "description": info.get("description") or "",
+        "stars": info.get("stargazers_count") or 0,
+        "forks": info.get("forks_count") or 0,
+        "issues": info.get("open_issues_count") or 0,
+        "watchers": info.get("subscribers_count") or 0,
+        "language": info.get("language") or "",
+        "pushed_at": info.get("pushed_at"),
         "default_branch": info.get("default_branch") or "main",
-        "is_archived":  bool(info.get("archived")),
+        "is_archived": bool(info.get("archived")),
         "latest_release": (releases or {}).get("tag_name") or "",
-        "license":      ((info.get("license") or {}).get("spdx_id")) or "",
-        "languages":    lang_items,
+        "license": ((info.get("license") or {}).get("spdx_id")) or "",
+        "languages": lang_items,
         "commit_weeks": commit_weeks,
         "commits_year": sum(commit_weeks),
         "busiest_week": max(commit_weeks) if commit_weeks else 0,

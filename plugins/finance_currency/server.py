@@ -23,7 +23,9 @@ def _get(url: str) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del settings
     base = (options.get("base") or "AUD").strip().upper()
     quote = (options.get("quote") or "USD").strip().upper()
@@ -60,11 +62,11 @@ def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, A
     change_pct = ((rate - first) / first * 100.0) if first else None
 
     result = {
-        "base":   base,
-        "quote":  quote,
-        "rate":   rate,
+        "base": base,
+        "quote": quote,
+        "rate": rate,
         "series": points,
-        "as_of":  latest.get("date"),
+        "as_of": latest.get("date"),
         "change_30d": change_pct,
     }
     with contextlib.suppress(OSError):

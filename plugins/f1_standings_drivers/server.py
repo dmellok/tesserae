@@ -36,14 +36,14 @@ def _slim_standing(s: dict[str, Any]) -> dict[str, Any]:
     constructors = s.get("Constructors") or []
     constructor = constructors[0] if constructors else {}
     return {
-        "position":      s.get("position"),
-        "points":        s.get("points"),
-        "wins":          s.get("wins"),
-        "code":          driver.get("code") or "",
-        "given":         driver.get("givenName") or "",
-        "family":        driver.get("familyName") or "",
-        "constructor":     constructor.get("name") or "",
-        "constructorId":   constructor.get("constructorId") or "",
+        "position": s.get("position"),
+        "points": s.get("points"),
+        "wins": s.get("wins"),
+        "code": driver.get("code") or "",
+        "given": driver.get("givenName") or "",
+        "family": driver.get("familyName") or "",
+        "constructor": constructor.get("name") or "",
+        "constructorId": constructor.get("constructorId") or "",
     }
 
 
@@ -68,15 +68,15 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 
-    lists = (((payload.get("MRData") or {}).get("StandingsTable") or {}).get("StandingsLists") or [])
+    lists = ((payload.get("MRData") or {}).get("StandingsTable") or {}).get("StandingsLists") or []
     if not lists:
         return {"error": "no standings yet"}
     table = lists[0]
     standings = table.get("DriverStandings") or []
 
     result: dict[str, Any] = {
-        "season":    table.get("season"),
-        "round":     table.get("round"),
+        "season": table.get("season"),
+        "round": table.get("round"),
         "standings": [_slim_standing(s) for s in standings],
     }
     with contextlib.suppress(OSError):
