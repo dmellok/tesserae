@@ -1,0 +1,75 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state %}
+{% block title %}Todo Lists — Tesserae{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph-bold ph-list-checks" aria-hidden="true"></i> Todo</h1>
+  <p class="page-blurb">Persistent lists for the dashboard. Completed items auto-prune after 24 hours.</p>
+</div>
+
+<section class="card">
+  {{ card_head('New list', icon_name='plus-circle', level=2,
+               blurb='Give it a short name — you’ll pick it from the cell editor when adding the widget to a dashboard.') }}
+  <form method="post" action="{{ url_for('todo_admin.create_list') }}" class="form">
+    <div class="field-row">
+      <div class="field" style="flex:1;">
+        <label for="new-list-name">List name</label>
+        <input type="text" id="new-list-name" name="name" placeholder="Groceries" required autofocus>
+      </div>
+      <div class="actions" style="align-self:end;">
+        {{ button('Create', icon='plus') }}
+      </div>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  {{ card_head('Your lists', icon_name='list-bullets', level=2) }}
+  {% if lists %}
+  <ul class="td-lists">
+    {% for lst in lists %}
+    <li class="td-list-row">
+      <a class="td-list-link" href="{{ url_for('todo_admin.show_list', list_id=lst.id) }}">
+        <i class="ph-bold ph-list-checks td-list-icon" aria-hidden="true"></i>
+        <span class="td-list-name">{{ lst.name }}</span>
+        <span class="td-list-counts">
+          <span class="td-count td-count--active"><i class="ph ph-circle" aria-hidden="true"></i>{{ lst.active }} active</span>
+          <span class="td-count td-count--done"><i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>{{ lst.completed }} done</span>
+        </span>
+        <i class="ph ph-caret-right td-list-caret" aria-hidden="true"></i>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {{ empty_state('list-checks', 'No lists yet',
+                 blurb='Create your first list above. Then add the Todo widget to a dashboard cell and choose this list from the cell editor.') }}
+  {% endif %}
+</section>
+
+<style>
+  .td-lists { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+  .td-list-row { margin: 0; }
+  .td-list-link {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--t-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--t-fg);
+    background: var(--t-surface);
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .td-list-link:hover { background: var(--t-surface-hover); border-color: var(--t-border-strong); }
+  .td-list-icon { font-size: 20px; color: var(--t-accent); }
+  .td-list-name { font-weight: 700; font-size: 15px; }
+  .td-list-counts { display: flex; gap: 12px; font-size: 12px; color: var(--t-fg-soft); }
+  .td-count { display: inline-flex; gap: 4px; align-items: center; }
+  .td-count--done { opacity: 0.7; }
+  .td-list-caret { color: var(--t-fg-soft); }
+</style>
+{% endblock %}

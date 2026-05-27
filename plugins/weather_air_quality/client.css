@@ -1,0 +1,195 @@
+/* weather_air_quality — Bauhaus AQI card. Same shape vocabulary as
+   weather_now: inverted header bar, hero with big number + icon panel,
+   four-up stat strip. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- header --- */
+
+.aq-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.aq-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.aq-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.aq-time { white-space: nowrap; }
+
+/* --- hero ---
+   Background recolours per AQI band; this is the at-a-glance signal —
+   green-ish accent for clean air, yellow for moderate, red for bad. */
+
+.aq-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  background: var(--theme-surface);
+  color: var(--theme-fg);
+  min-height: 0;
+  overflow: hidden;
+}
+.aq-hero-text {
+  padding: clamp(10px, 2cqw, 22px) clamp(12px, 2.4cqw, 26px);
+  display: grid;
+  align-content: center;
+  gap: clamp(2px, 0.6cqw, 6px);
+  min-width: 0;
+}
+.aq-aqi {
+  font-size: clamp(48px, 14cqw, 132px);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.045em;
+}
+.aq-band-label {
+  font-size: clamp(13px, 2.4cqw, 22px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aq-scale {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+.aq-hero-icon {
+  background: var(--theme-surface2);
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 2cqw, 22px);
+  min-width: 0;
+  overflow: hidden;
+}
+.aq-hero-icon .ph-bold {
+  font-size: clamp(80px, 28cqw, 280px);
+  color: var(--theme-fg);
+  line-height: 1;
+}
+
+/* AQI band overlays — fade the text-panel background colour to match
+   the air-quality severity. All decorative tokens. */
+.aq-band--good     .aq-hero-text { background: var(--theme-accent);   color: var(--theme-bg); }
+.aq-band--fair     .aq-hero-text { background: var(--theme-surface2); color: var(--theme-fg); }
+.aq-band--moderate .aq-hero-text { background: var(--theme-accent2);  color: var(--theme-fg); }
+.aq-band--poor     .aq-hero-text { background: var(--theme-accent3);  color: var(--theme-bg); }
+.aq-band--vpoor    .aq-hero-text { background: var(--theme-fg);       color: var(--theme-bg); }
+.aq-band--good     .aq-scale,
+.aq-band--poor     .aq-scale,
+.aq-band--vpoor    .aq-scale     { opacity: 0.85; }
+
+/* --- four-up pollutant chips --- */
+
+.aq-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.aq-stat {
+  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
+  display: grid;
+  gap: clamp(2px, 0.4cqw, 6px);
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.aq-stat-icon {
+  position: absolute;
+  top: clamp(4px, 0.8cqw, 8px);
+  right: clamp(6px, 1.2cqw, 12px);
+  font-size: clamp(14px, 2.4cqw, 22px);
+  opacity: 0.5;
+}
+.aq-stat-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+.aq-stat-value {
+  font-size: clamp(16px, 3cqw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.aq-stat-value small {
+  font-size: 0.5em;
+  font-weight: 700;
+  margin-left: 0.2em;
+  opacity: 0.75;
+}
+
+.aq-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
+.aq-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
+.aq-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.aq-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+
+/* --- size adaptations --- */
+
+.root.size-xs .aq-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .aq-aqi { font-size: clamp(34px, 18cqw, 60px); }
+.root.size-xs .aq-band-label { font-size: 10px; }
+.root.size-xs .aq-scale { display: none; }
+.root.size-xs .aq-hero-icon { padding: 6px; }
+.root.size-xs .aq-hero-icon .ph-bold { font-size: clamp(36px, 22cqw, 64px); }
+.root.size-xs .aq-stat { padding: 4px 6px; }
+.root.size-xs .aq-stat-icon { display: none; }
+.root.size-xs .aq-stat-label { font-size: 8px; }
+.root.size-xs .aq-stat-value { font-size: 14px; }
+.root.size-xs .aq-stat-value small { display: none; }
+
+.root.size-sm .aq-aqi { font-size: clamp(40px, 14cqw, 64px); }
+.root.size-sm .aq-hero-icon .ph-bold { font-size: clamp(64px, 24cqw, 120px); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

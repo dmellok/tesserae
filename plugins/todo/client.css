@@ -1,0 +1,142 @@
+/* todo — Bauhaus checklist card. Same shape vocabulary as the weather
+   and f1 widgets: inverted header bar with accent2 mark, content on
+   surface. Display-only; admin handles edits. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- header --- */
+
+.td-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.td-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.td-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.td-bar-count {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- items list --- */
+
+.td-list {
+  list-style: none;
+  margin: 0;
+  padding: clamp(6px, 1.2cqw, 14px) 0;
+  background: var(--theme-surface);
+  display: grid;
+  grid-auto-rows: min-content;
+  align-content: start;
+  min-height: 0;
+  overflow: hidden;
+}
+.td-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.4cqw, 14px);
+  padding: clamp(3px, 0.7cqh, 8px) clamp(10px, 2cqw, 18px);
+  min-width: 0;
+}
+.td-tick {
+  font-size: clamp(16px, 2.6cqw, 22px);
+  color: var(--theme-fg);
+  line-height: 1;
+}
+.td-item--done .td-tick { color: var(--theme-accent); }
+
+.td-text {
+  font-size: clamp(11px, 2cqw, 16px);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--theme-fg);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.td-item--done .td-text {
+  text-decoration: line-through;
+  color: var(--theme-fgSoft);
+  opacity: 0.75;
+}
+.td-when {
+  font-size: clamp(9px, 1.4cqw, 11px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--theme-fgSoft);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- empty state --- */
+
+.td-empty {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(4px, 1cqw, 10px);
+  padding: clamp(12px, 2.4cqw, 28px);
+  background: var(--theme-surface);
+}
+.td-empty .ph-duotone {
+  font-size: clamp(28px, 8cqw, 64px);
+  color: var(--theme-fg);
+  opacity: 0.6;
+}
+.td-empty-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.td-empty-secondary {
+  font-size: clamp(10px, 1.7cqw, 13px);
+  color: var(--theme-fgSoft);
+  max-width: 24em;
+  margin: 0 auto;
+}
+
+/* --- size adaptations --- */
+
+.root.size-xs .td-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .td-list { padding: 2px 0; }
+.root.size-xs .td-item { padding: 1px 6px; gap: 6px; }
+.root.size-xs .td-tick { font-size: 12px; }
+.root.size-xs .td-text { font-size: 10px; }
+.root.size-xs .td-when { display: none; }

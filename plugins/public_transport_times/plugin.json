@@ -1,0 +1,33 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Public Transport (PTV)",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.",
+  "icon": "ph-train",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "settings": [
+    { "name": "devid", "type": "string", "label": "PTV developer ID" },
+    { "name": "key",   "type": "string", "label": "PTV signing key", "secret": true }
+  ],
+  "cell_options": [
+    { "name": "stop_id", "type": "number", "label": "Stop ID (numeric, from the PTV API)" },
+    {
+      "name": "route_type",
+      "type": "select",
+      "label": "Mode",
+      "default": 0,
+      "choices": [
+        { "value": 0, "label": "Train" },
+        { "value": 1, "label": "Tram" },
+        { "value": 2, "label": "Bus" },
+        { "value": 3, "label": "V/Line" },
+        { "value": 4, "label": "Night Bus" }
+      ]
+    },
+    { "name": "stop_label",   "type": "string", "label": "Stop label (display override)", "default": "" },
+    { "name": "max_results",  "type": "number", "label": "Departures to show", "default": 5 },
+    { "name": "direction_id", "type": "number", "label": "Direction filter (blank = both)", "default": 0 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

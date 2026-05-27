@@ -1,0 +1,182 @@
+/* public_transport_times — Bauhaus PTV departures card. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- header --- */
+
+.pt-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.pt-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.pt-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pt-bar-mode {
+  font-size: clamp(14px, 2.4cqw, 22px);
+  line-height: 1;
+}
+
+/* --- departures rows ---
+   First row gets the accent block — it's the "next one to catch." Rest
+   sit on surface with thin dividers, like a printed timetable. */
+
+.pt-rows {
+  display: grid;
+  grid-auto-rows: 1fr;
+  background: var(--theme-surface);
+  min-height: 0;
+  overflow: hidden;
+}
+.pt-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: clamp(8px, 1.6cqw, 16px);
+  padding: clamp(4px, 1cqw, 12px) clamp(10px, 2cqw, 20px);
+  min-width: 0;
+  border-top: 1px solid var(--theme-divider);
+}
+.pt-row:first-child {
+  background: var(--theme-accent);
+  color: var(--theme-bg);
+  border-top: 0;
+}
+.pt-row-icon {
+  font-size: clamp(16px, 2.8cqw, 26px);
+  line-height: 1;
+  opacity: 0.6;
+}
+.pt-row:first-child .pt-row-icon { opacity: 1; }
+.pt-row-route {
+  font-size: clamp(11px, 2cqw, 16px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  min-width: clamp(28px, 5cqw, 44px);
+  padding: clamp(2px, 0.4cqw, 5px) clamp(5px, 1cqw, 9px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  text-align: center;
+  border-radius: 2px;
+}
+.pt-row:first-child .pt-row-route {
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+}
+.pt-row-dest {
+  font-size: clamp(11px, 2cqw, 15px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pt-row-mins {
+  font-size: clamp(15px, 2.8cqw, 24px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.pt-tag {
+  font-size: clamp(9px, 1.4cqw, 11px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: clamp(2px, 0.4cqw, 4px) clamp(4px, 0.8cqw, 8px);
+  border-radius: 1px;
+  white-space: nowrap;
+}
+.pt-tag--ontime { background: var(--theme-surface2); color: var(--theme-fg); }
+.pt-tag--late   { background: var(--theme-accent3);  color: var(--theme-bg); }
+.pt-tag--early  { background: var(--theme-accent2);  color: var(--theme-fg); }
+.pt-tag--now    { background: var(--theme-fg);       color: var(--theme-bg); }
+.pt-row:first-child .pt-tag--ontime { background: var(--theme-bg); color: var(--theme-fg); }
+
+/* --- empty state --- */
+
+.pt-empty {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(4px, 1cqw, 10px);
+  padding: clamp(12px, 2.4cqw, 28px);
+  background: var(--theme-surface);
+}
+.pt-empty .ph-duotone {
+  font-size: clamp(32px, 8cqw, 64px);
+  color: var(--theme-fg);
+  opacity: 0.6;
+}
+.pt-empty-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.pt-empty-secondary {
+  font-size: clamp(10px, 1.7cqw, 13px);
+  color: var(--theme-fgSoft);
+}
+
+/* --- size adaptations --- */
+
+.root.size-xs .pt-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .pt-row { padding: 3px 6px; gap: 6px; grid-template-columns: auto 1fr auto; }
+.root.size-xs .pt-row-icon { display: none; }
+.root.size-xs .pt-row-route { font-size: 9px; min-width: 22px; padding: 1px 3px; }
+.root.size-xs .pt-row-dest { font-size: 9px; }
+.root.size-xs .pt-row-mins { font-size: 12px; }
+.root.size-xs .pt-tag { display: none; }
+
+.root.size-sm .pt-row { padding: 4px 8px; gap: 8px; }
+.root.size-sm .pt-row-dest { font-size: clamp(10px, 1.7cqw, 12px); }
+.root.size-sm .pt-row-mins { font-size: clamp(13px, 2.2cqw, 16px); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }
