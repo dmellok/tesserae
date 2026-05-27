@@ -19,6 +19,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/finance_currency/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -29,11 +30,12 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/finance_currency/client.css">
     <div class="root size-${size}">
-      <header class="fx-bar">
-        <span class="fx-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="fx-pair">${escapeHtml(data.base)}<span class="fx-slash">/</span>${escapeHtml(data.quote)}</span>
         <span class="fx-asof">${escapeHtml(data.as_of || "—")}</span>
       </header>

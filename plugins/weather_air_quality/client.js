@@ -48,6 +48,7 @@ function escapeHtml(s) {
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/weather_air_quality/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -71,11 +72,12 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_air_quality/client.css">
     <div class="root size-${size}">
-      <header class="aq-bar">
-        <span class="aq-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="aq-place">${escapeHtml(data.label || "—")}</span>
         <span class="aq-time">${nowTime()}</span>
       </header>

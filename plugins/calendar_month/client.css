@@ -25,22 +25,7 @@
 
 /* --- title bar --- */
 
-.cm-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(8px, 1.4cqw, 12px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(6px, 1.2cqw, 12px) clamp(10px, 2cqw, 18px);
-  font-size: clamp(14px, 2.6cqw, 22px);
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-.cm-mark { display: inline-block; width: clamp(14px, 2.2cqw, 20px); height: clamp(14px, 2.2cqw, 20px); background: var(--theme-accent2); }
 .cm-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-bar-icon { font-size: clamp(18px, 3cqw, 28px); line-height: 1; }
 
 /* --- weekday header — high-contrast strip so labels don't disappear
    into the panel after dither. --- */

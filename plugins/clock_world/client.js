@@ -70,13 +70,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/clock_world/client.css">
     <div class="root size-${size}">
-      <header class="cw-bar">
-        <span class="cw-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="cw-title">World</span>
-        <i class="ph-bold ph-globe cw-bar-icon"></i>
+        <i class="ph-bold ph-globe wb-bar-icon"></i>
       </header>
       <section class="cw-list" data-cw-list>${rows(new Date())}</section>
     </div>

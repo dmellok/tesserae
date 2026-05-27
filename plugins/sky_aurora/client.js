@@ -17,7 +17,7 @@ function sparkBars(forecast) {
   if (!forecast || !forecast.length) return "";
   return forecast.slice(0, 24).map((f) => {
     const h = Math.max(8, Math.min(100, (f.kp / 9) * 100));
-    return `<span class="ar-bar ${kpClass(f.kp)}" style="height:${h}%" title="${escapeHtml(f.time)}: Kp ${f.kp}"></span>`;
+    return `<span class="wb-bar ${kpClass(f.kp)}" style="height:${h}%" title="${escapeHtml(f.time)}: Kp ${f.kp}"></span>`;
   }).join("");
 }
 
@@ -26,6 +26,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/sky_aurora/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -39,14 +40,15 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
     <link rel="stylesheet" href="/plugins/sky_aurora/client.css">
     <div class="root size-${size}">
-      <header class="ar-bar">
-        <span class="ar-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="ar-title">Aurora · Kp index</span>
-        <i class="ph-bold ph-mountains ar-bar-icon"></i>
+        <i class="ph-bold ph-mountains wb-bar-icon"></i>
       </header>
       <section class="ar-hero ${kpClass(kpNow)}">
         <div class="ar-now">

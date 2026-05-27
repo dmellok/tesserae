@@ -38,13 +38,14 @@ function renderEmpty(reason, listName) {
   }
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
     <link rel="stylesheet" href="/plugins/todo/client.css">
     <div class="root size-md is-empty">
-      <header class="td-bar">
-        <span class="td-mark" aria-hidden="true"></span>
-        <span class="td-bar-label">${escapeHtml(listName || "Todo")}</span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">${escapeHtml(listName || "Todo")}</span>
       </header>
       <div class="td-empty">
         <i class="ph-duotone ph-${icon}" aria-hidden="true"></i>
@@ -81,14 +82,15 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
     <link rel="stylesheet" href="/plugins/todo/client.css">
     <div class="root size-${size}">
-      <header class="td-bar">
-        <span class="td-mark" aria-hidden="true"></span>
-        <span class="td-bar-label">${escapeHtml(data.list_name || "Todo")}</span>
-        <span class="td-bar-count">${done}/${total}</span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">${escapeHtml(data.list_name || "Todo")}</span>
+        <span class="wb-bar-count">${done}/${total}</span>
       </header>
       <ul class="td-list">
         ${items.map(itemHtml).join("")}

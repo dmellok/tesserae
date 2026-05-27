@@ -30,6 +30,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/github_actions/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -87,13 +88,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/github_actions/client.css">
     <div class="root size-${size}">
-      <header class="ga-bar">
-        <span class="ga-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="ga-title">CI Runs</span>
-        <i class="ph-bold ph-play-circle ga-bar-icon"></i>
+        <i class="ph-bold ph-play-circle wb-bar-icon"></i>
       </header>
       ${statBlock}
       <section class="ga-list">${rows || `<div class="ga-empty">No recent runs.</div>`}</section>

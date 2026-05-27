@@ -35,6 +35,7 @@ function escapeHtml(s) {
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/f1_standings_drivers/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -88,13 +89,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/f1_standings_drivers/client.css">
     <div class="root size-${size}">
-      <header class="fs-bar">
-        <span class="fs-mark" aria-hidden="true"></span>
-        <span class="fs-bar-label">Drivers · ${escapeHtml(data.season || "")}</span>
-        <span class="fs-bar-round">${data.round ? `After R${escapeHtml(data.round)}` : ""}</span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">Drivers · ${escapeHtml(data.season || "")}</span>
+        <span class="wb-bar-meta">${data.round ? `After R${escapeHtml(data.round)}` : ""}</span>
       </header>
       <section class="fs-rows">${rowsHtml}</section>
     </div>

@@ -20,6 +20,7 @@ function escapeHtml(s) {
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/f1_weekend/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -84,13 +85,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/f1_weekend/client.css">
     <div class="root size-${size}">
-      <header class="fw-bar">
-        <span class="fw-mark" aria-hidden="true"></span>
-        <span class="fw-bar-label">${escapeHtml(data.raceName || "Race Weekend")}</span>
-        <span class="fw-bar-round">${data.round ? `R${escapeHtml(data.round)} · ${escapeHtml(data.season || "")}` : ""}</span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">${escapeHtml(data.raceName || "Race Weekend")}</span>
+        <span class="wb-bar-meta">${data.round ? `R${escapeHtml(data.round)} · ${escapeHtml(data.season || "")}` : ""}</span>
       </header>
       <section class="fw-rows">${rowsHtml}</section>
       ${showCircuit ? `

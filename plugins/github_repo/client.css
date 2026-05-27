@@ -58,19 +58,8 @@
   border-radius: 2px 2px 0 0;
 }
 
-.gr-bar {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg); color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(11px, 1.8cqw, 15px); font-weight: 800;
-  text-transform: none; letter-spacing: 0;
-  font-family: var(--theme-font-mono, ui-monospace);
-}
-.gr-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
 .gr-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gr-slash { color: var(--theme-accent2); padding: 0 1px; }
-.gr-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); }
 
 .gr-body { padding: clamp(10px, 2cqw, 22px); background: var(--theme-surface); min-height: 0; overflow: hidden; display: grid; align-content: center; gap: clamp(6px, 1cqh, 12px); }
 .gr-desc { margin: 0; font-size: clamp(12px, 2cqw, 16px); line-height: 1.4; color: var(--theme-fg); }
@@ -111,7 +100,6 @@
 .root.size-xs .gr-stat .ph-bold { display: none; }
 .root.size-xs .gr-v { font-size: 14px; }
 .root.size-xs .gr-l { font-size: 8px; }
-.root.size-xs .gr-bar { font-size: 10px; padding: 3px 6px; }
 .root.size-xs .gr-foot { display: none; }
 .root.size-xs .gr-desc { display: none; }
 .root.size-xs .gr-meta { display: none; }

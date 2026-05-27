@@ -53,6 +53,7 @@ function delayMins(scheduled, estimated) {
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/public_transport_times/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -106,14 +107,15 @@ export default async function render(shadow, ctx) {
   if (!departures.length) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
       <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
       <link rel="stylesheet" href="/plugins/public_transport_times/client.css">
       <div class="root size-${size}">
-        <header class="pt-bar">
-          <span class="pt-mark" aria-hidden="true"></span>
-          <span class="pt-bar-label">${escapeHtml(data.stop_name || "Stop")}</span>
-          <i class="ph-bold ph-${modeIcon} pt-bar-mode" aria-hidden="true"></i>
+        <header class="wb-bar">
+          <span class="wb-mark" aria-hidden="true"></span>
+          <span class="wb-title">${escapeHtml(data.stop_name || "Stop")}</span>
+          <i class="ph-bold ph-${modeIcon} wb-bar-mode" aria-hidden="true"></i>
         </header>
         <div class="pt-empty">
           <i class="ph-duotone ph-moon-stars" aria-hidden="true"></i>
@@ -127,13 +129,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/public_transport_times/client.css">
     <div class="root size-${size}">
-      <header class="pt-bar">
-        <span class="pt-mark" aria-hidden="true"></span>
-        <span class="pt-bar-label">${escapeHtml(data.stop_name || "Stop")}</span>
-        <i class="ph-bold ph-${modeIcon} pt-bar-mode" aria-hidden="true"></i>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">${escapeHtml(data.stop_name || "Stop")}</span>
+        <i class="ph-bold ph-${modeIcon} wb-bar-mode" aria-hidden="true"></i>
       </header>
       <section class="pt-rows">
         ${departures.map((d) => renderRow(d, modeIcon)).join("")}

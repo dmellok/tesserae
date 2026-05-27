@@ -22,32 +22,6 @@
 
 /* --- header --- */
 
-.fn-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.fn-mark {
-  display: inline-block;
-  width: clamp(10px, 1.6cqw, 14px);
-  height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
-}
-.fn-bar-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fn-bar-round { white-space: nowrap; }
 
 /* --- hero: circuit silhouette | race info ---
    Same 50/50 split as weather_now's hero, with the circuit silhouette
@@ -188,8 +162,6 @@
 
 /* --- size adaptations --- */
 
-.root.size-xs .fn-bar { font-size: 8px; padding: 3px 6px; }
-.root.size-xs .fn-bar-round { display: none; }
 .root.size-xs .fn-hero { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
 .root.size-xs .fn-circuit { padding: 4px; min-height: 32px; }
 .root.size-xs .fn-text { padding: 6px 8px; gap: 2px; }

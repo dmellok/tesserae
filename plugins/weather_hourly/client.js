@@ -85,6 +85,7 @@ function escapeHtml(s) {
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/weather_hourly/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -177,11 +178,12 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/weather_hourly/client.css">
     <div class="root size-${size}">
-      <header class="wh-bar">
-        <span class="wh-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="wh-title">${data.label ? escapeHtml(data.label) + " · " : ""}Next ${data.hours || 24} hr</span>
         <span class="wh-time">${nowTime()}</span>
       </header>

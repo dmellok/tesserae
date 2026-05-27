@@ -11,20 +11,8 @@
   box-sizing: border-box; overflow: hidden;
 }
 
-.cd-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg); color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
-}
-.cd-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
 .cd-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cd-count { font-variant-numeric: tabular-nums; }
-.cd-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
 
 .cd-list {
   display: grid;
@@ -101,7 +89,6 @@
 }
 
 /* xs: collapse to next event only */
-.root.size-xs .cd-bar { font-size: 8px; padding: 3px 6px; }
 .root.size-xs .cd-ev { padding: 3px 6px; gap: 6px; grid-template-columns: auto 1fr; }
 .root.size-xs .cd-when { font-size: 9px; }
 .root.size-xs .cd-summary { font-size: 11px; }

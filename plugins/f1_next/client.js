@@ -58,6 +58,7 @@ function pad(n) { return String(n).padStart(2, "0"); }
 function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/f1_next/client.css">
     <div class="root error">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
@@ -101,13 +102,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/f1_next/client.css">
     <div class="root size-${size}">
-      <header class="fn-bar">
-        <span class="fn-mark" aria-hidden="true"></span>
-        <span class="fn-bar-label">Next Race</span>
-        <span class="fn-bar-round">${data.round ? `R${escapeHtml(data.round)} · ${escapeHtml(data.season || "")}` : ""}</span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">Next Race</span>
+        <span class="wb-bar-meta">${data.round ? `R${escapeHtml(data.round)} · ${escapeHtml(data.season || "")}` : ""}</span>
       </header>
       <section class="fn-hero">
         <div class="fn-circuit" aria-hidden="true">

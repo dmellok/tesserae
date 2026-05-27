@@ -72,17 +72,7 @@
   font: 700 clamp(8px, 1.2cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--theme-fgSoft);
 }
-.ga-bar {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg); color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.1em;
-}
-.ga-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
 .ga-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--theme-font-mono, ui-monospace); text-transform: none; letter-spacing: 0; }
-.ga-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); }
 .ga-list {
   display: grid; grid-auto-rows: min-content; align-content: start;
   background: var(--theme-surface); padding: clamp(4px, 0.8cqh, 10px) 0;

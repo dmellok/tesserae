@@ -22,25 +22,6 @@
 
 /* --- header bar: inverted strip + warn-coloured mark + place + time --- */
 
-.wn-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.wn-mark {
-  display: inline-block;
-  width: clamp(10px, 1.6cqw, 14px);
-  height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
-}
 .wn-place {
   min-width: 0;
   overflow: hidden;
@@ -210,8 +191,6 @@
 .root.size-xs .wn-stat-label { font-size: 8px; }
 .root.size-xs .wn-stat-value { font-size: 14px; }
 .root.size-xs .wn-stat-value small { display: none; }
-.root.size-xs .wn-bar { font-size: 8px; padding: 3px 6px; }
-
 /* sm: keep range + rain tag, no sun row. Stats stay 4-up. */
 .root.size-sm .wn-temp { font-size: clamp(40px, 14cqw, 64px); }
 .root.size-sm .wn-hero-icon .ph-bold { font-size: clamp(64px, 24cqw, 120px); }

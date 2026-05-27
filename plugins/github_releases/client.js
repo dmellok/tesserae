@@ -20,6 +20,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/github_releases/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -65,13 +66,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/github_releases/client.css">
     <div class="root size-${size}">
-      <header class="rl-bar">
-        <span class="rl-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="rl-title">Releases · ${releases.length}</span>
-        <i class="ph-bold ph-github-logo rl-bar-icon"></i>
+        <i class="ph-bold ph-github-logo wb-bar-icon"></i>
       </header>
       ${releases.length ? `
         <section class="rl-summary rl-summary--${newestTier}">

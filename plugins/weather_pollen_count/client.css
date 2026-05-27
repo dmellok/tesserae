@@ -21,25 +21,6 @@
 
 /* --- header --- */
 
-.pl-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.pl-mark {
-  display: inline-block;
-  width: clamp(10px, 1.6cqw, 14px);
-  height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
-}
 .pl-place {
   min-width: 0;
   overflow: hidden;
@@ -163,7 +144,6 @@
 
 /* --- size adaptations --- */
 
-.root.size-xs .pl-bar { font-size: 8px; padding: 3px 6px; }
 .root.size-xs .pl-level { font-size: clamp(20px, 12cqw, 36px); }
 .root.size-xs .pl-headline { font-size: 9px; }
 .root.size-xs .pl-count { font-size: 12px; }

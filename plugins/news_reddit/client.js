@@ -18,6 +18,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/news_reddit/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -42,14 +43,15 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
     <link rel="stylesheet" href="/plugins/news_reddit/client.css">
     <div class="root size-${size}">
-      <header class="rd-bar">
-        <span class="rd-mark" aria-hidden="true"></span>
-        <span class="rd-title-bar">r/${escapeHtml(data.subreddit)} · ${escapeHtml(data.sort)}${data.sort === "top" ? " · " + escapeHtml(data.window) : ""}</span>
-        <i class="ph-bold ph-reddit-logo rd-bar-icon"></i>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">r/${escapeHtml(data.subreddit)} · ${escapeHtml(data.sort)}${data.sort === "top" ? " · " + escapeHtml(data.window) : ""}</span>
+        <i class="ph-bold ph-reddit-logo wb-bar-icon"></i>
       </header>
       <section class="rd-list">${rows || `<div class="rd-empty">No posts.</div>`}</section>
     </div>

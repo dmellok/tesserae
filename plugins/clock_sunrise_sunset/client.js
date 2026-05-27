@@ -42,6 +42,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/clock_sunrise_sunset/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -66,13 +67,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/clock_sunrise_sunset/client.css">
     <div class="root size-${size}">
-      <header class="ss-bar">
-        <span class="ss-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="ss-title">${escapeHtml(data.label || "Sun")}</span>
-        <i class="ph-bold ph-sun-horizon ss-bar-icon"></i>
+        <i class="ph-bold ph-sun-horizon wb-bar-icon"></i>
       </header>
       <section class="ss-hero">
         <svg viewBox="0 0 ${W} ${H}" class="ss-svg" preserveAspectRatio="xMidYMid meet">

@@ -1,17 +1,5 @@
 :host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
 .root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
-.rd-bar {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
-  gap: clamp(8px, 1.4cqw, 12px);
-  background: var(--theme-fg); color: var(--theme-bg);
-  padding: clamp(6px, 1.2cqw, 12px) clamp(10px, 2cqw, 18px);
-  font-size: clamp(12px, 2.2cqw, 18px); font-weight: 900;
-  text-transform: lowercase; letter-spacing: 0.02em;
-  font-family: var(--theme-font-mono, ui-monospace);
-}
-.rd-mark { display: inline-block; width: clamp(12px, 2cqw, 18px); height: clamp(12px, 2cqw, 18px); background: var(--theme-accent2); }
-.rd-title-bar { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rd-bar-icon { font-size: clamp(18px, 3cqw, 28px); color: var(--theme-accent3); }
 
 .rd-list { display: grid; grid-auto-rows: min-content; align-content: start; background: var(--theme-surface); min-height: 0; overflow: hidden; }
 .rd-row {

@@ -20,31 +20,6 @@
 
 /* --- header --- */
 
-.pt-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.pt-mark {
-  display: inline-block;
-  width: clamp(10px, 1.6cqw, 14px);
-  height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
-}
-.pt-bar-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .pt-bar-mode {
   font-size: clamp(14px, 2.4cqw, 22px);
   line-height: 1;
@@ -156,7 +131,6 @@
 
 /* --- size adaptations --- */
 
-.root.size-xs .pt-bar { font-size: 8px; padding: 3px 6px; }
 .root.size-xs .pt-row { padding: 3px 6px; gap: 6px; grid-template-columns: auto 1fr auto; }
 .root.size-xs .pt-row-icon { display: none; }
 .root.size-xs .pt-row-route { font-size: 9px; min-width: 22px; padding: 1px 3px; }

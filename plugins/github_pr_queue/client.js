@@ -60,6 +60,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/github_pr_queue/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -115,14 +116,15 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
     <link rel="stylesheet" href="/plugins/github_pr_queue/client.css">
     <div class="root size-${size}">
-      <header class="pq-bar">
-        <span class="pq-mark" aria-hidden="true"></span>
-        <span class="pq-title-bar">PR Queue · @${escapeHtml(data.user)}</span>
-        <i class="ph-bold ph-git-pull-request pq-bar-icon"></i>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">PR Queue · @${escapeHtml(data.user)}</span>
+        <i class="ph-bold ph-git-pull-request wb-bar-icon"></i>
       </header>
       ${statStrip}
       <section class="pq-body">${body}</section>

@@ -24,6 +24,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/calendar_day/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -35,14 +36,15 @@ export default async function render(shadow, ctx) {
   if (!events.length) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
       <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
       <link rel="stylesheet" href="/plugins/calendar_day/client.css">
       <div class="root size-${size}">
-        <header class="cd-bar">
-          <span class="cd-mark" aria-hidden="true"></span>
+        <header class="wb-bar">
+          <span class="wb-mark" aria-hidden="true"></span>
           <span class="cd-title">${escapeHtml(fmtDate(data.now))}</span>
-          <i class="ph-bold ph-calendar-check cd-bar-icon" aria-hidden="true"></i>
+          <i class="ph-bold ph-calendar-check wb-bar-icon" aria-hidden="true"></i>
         </header>
         <div class="cd-empty">
           <i class="ph-duotone ph-coffee" aria-hidden="true"></i>
@@ -71,11 +73,12 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/calendar_day/client.css">
     <div class="root size-${size}">
-      <header class="cd-bar">
-        <span class="cd-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="cd-title">${escapeHtml(fmtDate(data.now))}</span>
         <span class="cd-count">${data.count}</span>
       </header>

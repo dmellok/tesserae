@@ -23,32 +23,6 @@
 
 /* --- header --- */
 
-.fw-bar {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-.fw-mark {
-  display: inline-block;
-  width: clamp(10px, 1.6cqw, 14px);
-  height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
-}
-.fw-bar-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.fw-bar-round { white-space: nowrap; }
 
 /* --- session rows ---
    Each row: short session label (FP1/QUAL/RACE), day, time. Race row

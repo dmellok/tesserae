@@ -20,6 +20,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/news_rss/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -40,13 +41,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/news_rss/client.css">
     <div class="root size-${size}">
-      <header class="nr-bar">
-        <span class="nr-mark" aria-hidden="true"></span>
-        <span class="nr-title-bar">${escapeHtml(title)}</span>
-        <i class="ph-bold ph-rss nr-bar-icon"></i>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">${escapeHtml(title)}</span>
+        <i class="ph-bold ph-rss wb-bar-icon"></i>
       </header>
       <section class="nr-list">${rows || `<div class="nr-empty">No headlines.</div>`}</section>
     </div>

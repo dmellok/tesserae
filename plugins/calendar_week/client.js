@@ -13,6 +13,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/calendar_week/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -46,13 +47,14 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/plugins/calendar_week/client.css">
     <div class="root size-${size}">
-      <header class="cw-bar">
-        <span class="cw-mark" aria-hidden="true"></span>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
         <span class="cw-title">This week · ${escapeHtml(data.start)} → ${escapeHtml(data.end)}</span>
-        <i class="ph-bold ph-calendar cw-bar-icon" aria-hidden="true"></i>
+        <i class="ph-bold ph-calendar wb-bar-icon" aria-hidden="true"></i>
       </header>
       <div class="cw-grid">${cols}</div>
     </div>

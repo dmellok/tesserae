@@ -1,0 +1,146 @@
+/* widget-bauhaus.css — shared shell for every Bauhaus-style widget.
+ *
+ * Most widgets in plugins/ render the same shape:
+ *   inverted-fg header bar (accent2 mark + title + right icon)
+ *   body with a list / hero / grid
+ *   maybe a footer
+ *   error state shared across all
+ *
+ * Before this file every widget redeclared every selector with its own
+ * prefix (.wn-bar, .fn-bar, .cm-bar, …). Net effect: ~50 lines of
+ * duplicated CSS in every widget's client.css, and a header-bar
+ * tweak meant editing 30 files.
+ *
+ * Now widgets:
+ *   1. <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
+ *      before their own client.css
+ *   2. Use .wb-* classes for the shared shape
+ *   3. Override per-widget proportions via the --wb-* custom
+ *      properties on :host (set in their own client.css)
+ *
+ * The widget's own client.css holds only the widget-specific bits:
+ * body layout, custom chips, sparklines, etc.
+ *
+ * All sizes use container queries (cqw / cqh) so widgets read well
+ * across xs/sm/md/lg cells. Per-widget overrides via CSS custom
+ * properties let a widget bump font/padding without redeclaring
+ * the whole bar.
+ *
+ *   :host {
+ *     --wb-bar-fs:  clamp(14px, 2.6cqw, 22px);
+ *     --wb-bar-fw:  900;
+ *   }
+ */
+
+/* ----- root / host defaults ----- */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-family: var(--theme-font, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.wb-root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* ----- header bar ----- */
+
+.wb-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--wb-bar-gap, clamp(6px, 1.2cqw, 10px));
+  background: var(--wb-bar-bg, var(--theme-fg));
+  color: var(--wb-bar-fg, var(--theme-bg));
+  padding: var(--wb-bar-pad-y, clamp(4px, 0.9cqw, 8px))
+           var(--wb-bar-pad-x, clamp(8px, 1.6cqw, 14px));
+  font-size: var(--wb-bar-fs, clamp(10px, 1.7cqw, 14px));
+  font-weight: var(--wb-bar-fw, 800);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.wb-mark {
+  display: inline-block;
+  width: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
+  height: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
+  background: var(--wb-mark-bg, var(--theme-accent2));
+}
+
+.wb-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wb-bar-icon {
+  font-size: var(--wb-bar-icon-size, clamp(14px, 2.4cqw, 22px));
+  line-height: 1;
+}
+
+/* Optional right-aligned label slot inside the header bar (used for
+   round badges, counts, "after R5", etc). */
+.wb-bar-meta {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ----- empty + error states ----- */
+
+.wb-empty {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(16px, 3cqw, 36px);
+  background: var(--theme-surface);
+}
+.wb-empty .ph-duotone {
+  font-size: clamp(36px, 10cqw, 88px);
+  color: var(--theme-fg);
+  opacity: 0.55;
+}
+.wb-empty-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--theme-fg);
+}
+.wb-empty-secondary {
+  font-size: clamp(11px, 1.8cqw, 14px);
+  color: var(--theme-fgSoft);
+  max-width: 28em;
+  margin: 0 auto;
+}
+
+.wb-root.is-error,
+.wb-error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+  background: var(--theme-surface);
+}
+.wb-root.is-error .ph,
+.wb-error .ph {
+  font-size: 28px;
+}
+.wb-root.is-error span,
+.wb-error span {
+  font: 12px/1.4 var(--theme-font-mono, monospace);
+  word-break: break-word;
+  max-width: 90%;
+}

@@ -20,6 +20,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/news_hacker_news/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -46,14 +47,15 @@ export default async function render(shadow, ctx) {
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
     <link rel="stylesheet" href="/plugins/news_hacker_news/client.css">
     <div class="root size-${size}">
-      <header class="hn-bar">
-        <span class="hn-mark" aria-hidden="true"></span>
-        <span class="hn-title-bar">Hacker News · ${escapeHtml(label)}</span>
-        <i class="ph-bold ph-flame hn-bar-icon"></i>
+      <header class="wb-bar">
+        <span class="wb-mark" aria-hidden="true"></span>
+        <span class="wb-title">Hacker News · ${escapeHtml(label)}</span>
+        <i class="ph-bold ph-flame wb-bar-icon"></i>
       </header>
       <section class="hn-list">${rows || `<div class="hn-empty">No stories.</div>`}</section>
     </div>
