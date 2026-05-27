@@ -96,6 +96,7 @@ def fetch(
                 "altitude": s[S_BARO_ALT] if len(s) > S_BARO_ALT else None,
                 "velocity": s[S_VELOCITY] if len(s) > S_VELOCITY else None,
                 "track": s[S_TRACK] if len(s) > S_TRACK else None,
+                "vertical_rate": s[S_VERTICAL] if len(s) > S_VERTICAL else None,
                 "on_ground": bool(s[S_ON_GROUND]) if len(s) > S_ON_GROUND else False,
                 "lat": f_lat,
                 "lon": f_lon,
