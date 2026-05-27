@@ -38,10 +38,19 @@ In active development. Tracked by milestone:
 
 Server, renderers, devices, scheduler, HA discovery, settings, theme builder,
 page editor, and the modern UI are all in. Tests + ruff + mypy --strict (on
-contract modules) clean.
+contract modules) clean. CI runs ruff / pytest / mypy on every push (see
+[.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
-The first-cut bedrock widget set (M10) has been dropped to rebuild fresh —
-the plugins/ directory now ships only `themes_core`. Widgets are next.
+The widget catalogue now spans weather, F1, calendar, news, finance, GitHub,
+clocks, sky, pictures, todo, and Melbourne public transport — ~40 widgets in
+the `plugins/` directory across `widget` / `theme` / `font` / `data` /
+`admin` plugin kinds. See [Widget stability tiers](#widget-stability-tiers)
+below for an upfront read on which ones depend on undocumented upstreams.
+
+> **For tinkerers, not your mum.** Tesserae is a `git clone → tinker`
+> dashboard. The admin chrome is polished but the deployment story still
+> assumes you can read tracebacks and edit settings.json. Aimed at
+> hobbyists who run a Pi appliance at home.
 
 ## Architecture in one diagram
 
@@ -122,8 +131,15 @@ refresh cadence is set by `sleep_interval_s` on `tesserae/esp32/config`.
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m app.main
+.venv/bin/python -m app.main         # production: waitress, port 8000
+.venv/bin/python -m app.main --dev   # Flask dev server with auto-reload + debugger
 ```
+
+`python -m app.main` runs under [waitress](https://docs.pylonsproject.org/projects/waitress/),
+a pure-Python production WSGI server — same command on a Raspberry Pi
+appliance, no need for nginx in front for a single-user install. `--dev`
+opts into Flask's dev server when you're hacking on the admin and want
+auto-reload.
 
 Open <http://127.0.0.1:8000/> — on first boot you'll be sent to `/setup`
 to pick an admin password. After that, sign in at `/login` and configure
@@ -145,6 +161,68 @@ Run the test suite:
 
 The renderer + transport + push pipeline + auth + settings flow are all
 covered with no broker or Chromium dependency.
+
+## Widget stability tiers
+
+Every widget that hits the network depends on an upstream — and not every
+upstream is equally reliable. Tesserae's tiers say what to expect when
+your widget suddenly shows an error after a year of working fine.
+
+### Stable
+
+Backed by an official, documented API. Won't break unless the upstream
+ships a deliberate breaking change (which usually comes with notice).
+
+| Widget | Upstream |
+|---|---|
+| `weather_now`, `weather_hourly`, `weather_forecast`, `weather_air_quality`, `weather_pollen_count` (Open-Meteo path) | open-meteo.com |
+| `f1_next`, `f1_last_race`, `f1_weekend`, `f1_standings_drivers` | jolpi.ca/ergast (maintained Ergast successor) |
+| `news_rss` | any RSS 2.0 / Atom 1.0 feed |
+| `news_hacker_news` | hacker-news.firebaseio.com (Firebase-hosted, documented) |
+| `news_wikipedia_otd` | Wikimedia REST API |
+| `finance_crypto` | CoinGecko v3 (documented) |
+| `finance_currency` | frankfurter.app (ECB-sourced, documented) |
+| `github_repo`, `github_releases`, `github_activity`, `github_pr_queue`, `github_actions`, `github_contributions` | api.github.com (REST v3 + GraphQL v4) |
+| `calendar_month`, `calendar_week`, `calendar_day` | iCal feeds from Google / iCloud / Outlook |
+| `clock_sunrise_sunset` | open-meteo.com |
+| `sky_aurora` | services.swpc.noaa.gov (NOAA Space Weather, documented) |
+| `sky_air_traffic` | opensky-network.org (rate-limited but documented) |
+| `public_transport_times` | timetableapi.ptv.vic.gov.au (official PTV API v3) |
+| `picture_apod` | api.nasa.gov |
+| `picture_unsplash` | api.unsplash.com |
+
+### Best-effort
+
+Undocumented endpoint, but used by enough open-source projects for long
+enough that breakage would be a notable event. Failure mode is usually
+"widget returns an error payload until somebody updates the parser."
+
+| Widget | Why best-effort |
+|---|---|
+| `finance_stock` | Yahoo Finance's `/v8/finance/chart/` endpoint isn't officially documented. Has been stable for 7+ years and is what most "free stock API" libraries reach for. |
+| `picture_apple_album` | Reverse-engineered iCloud Shared Album endpoints. The shape has held up for ~10 years; Apple has shifted partitioning twice without breaking the protocol. |
+
+### Fragile
+
+Scraping or relying on a soft policy. Most likely to break with no
+notice. The widget will surface an error payload rather than silently
+serve stale data.
+
+| Widget | Why fragile |
+|---|---|
+| `weather_pollen_count` (Melbourne fallback) | Scrapes melbournepollen.com.au's home page when Open-Meteo's pollen data is null (it's Europe-only). Any DOM redesign on their end breaks this path. The Open-Meteo path is stable. |
+| `news_reddit` | Uses Reddit's public `/r/<sub>.json` endpoint. Reddit has tightened API access over time; this still works for low-volume reads but could be locked down. |
+
+### Tier policy
+
+* **Stable widgets** can be relied on for long-running dashboards. PR
+  welcome if you spot an upstream that's tightened terms.
+* **Best-effort widgets** should not be the only display in a
+  twelve-month deployment. If they break, the widget's error payload
+  tells you exactly which endpoint failed.
+* **Fragile widgets** should be considered convenience. If your dashboard
+  cares about pollen counts every day, treat the widget as a starting
+  point and contribute a more durable backend.
 
 ## Tech stack
 
