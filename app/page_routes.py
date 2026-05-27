@@ -268,6 +268,11 @@ def _editor_context(page: Page) -> dict[str, Any]:
     for c in page.cells:
         cell_palettes[c.id] = _palette_for(c.theme) if c.theme else page_palette
 
+    # Cells in a JSON-safe shape for the interactive layout editor JS.
+    layout_editor_cells = [
+        {"id": c.id, "x": c.x, "y": c.y, "w": c.w, "h": c.h, "plugin": c.plugin} for c in page.cells
+    ]
+
     return {
         "page": page,
         "panel": panel,
@@ -280,6 +285,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "preview_scale": _preview_scale(panel.w, panel.h),
         "palette_tokens": list(PALETTE_TOKENS),
         "cell_palettes": cell_palettes,
+        "layout_editor_cells": layout_editor_cells,
     }
 
 
@@ -564,6 +570,75 @@ def delete_cell(page_id: str, cell_id: str) -> Response:
     new_cells = [c for c in page.cells if c.id != cell_id]
     _store().save(page.model_copy(update={"cells": new_cells}))
     return _flash_save(True, "Cell deleted.")
+
+
+@bp.post("/<page_id>/cells/batch")
+def batch_cells(page_id: str) -> Response:
+    """Apply a set of resize / create / delete cell mutations atomically.
+
+    The layout editor uses this to push multi-cell rearrangements (e.g.
+    dragging a shared boundary updates two cells at once; inserting a
+    new cell shrinks the source and adds a new one) in a single save.
+
+    Body: JSON
+      {
+        "updates": [{"id": "abc", "x": 0, "y": 0, "w": 100, "h": 100}, ...],
+        "creates": [{"x": 0, "y": 0, "w": 100, "h": 100}, ...],
+        "deletes": ["cell_id_1", "cell_id_2"]
+      }
+
+    Only x/y/w/h are mutable here — plugin assignment / options stay on
+    the per-cell form path. Returns JSON {ok, cells: [...]} so the
+    client can refresh without a full page reload.
+    """
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    updates = body.get("updates") or []
+    creates = body.get("creates") or []
+    deletes = set(body.get("deletes") or [])
+
+    panel = resolve_page_panel(page.panel, _settings_store())
+
+    def _clamp_geom(g: dict[str, Any], existing: Cell | None) -> dict[str, int]:
+        return {
+            "x": _coerce_int(g.get("x"), existing.x if existing else 0, lo=0, hi=panel.w - 1),
+            "y": _coerce_int(g.get("y"), existing.y if existing else 0, lo=0, hi=panel.h - 1),
+            "w": _coerce_int(g.get("w"), existing.w if existing else 1, lo=1, hi=panel.w),
+            "h": _coerce_int(g.get("h"), existing.h if existing else 1, lo=1, hi=panel.h),
+        }
+
+    by_id = {c.id: c for c in page.cells}
+    for upd in updates:
+        cid = str(upd.get("id") or "")
+        if cid not in by_id:
+            continue
+        cell = by_id[cid]
+        geom = _clamp_geom(upd, cell)
+        by_id[cid] = cell.model_copy(update=geom)
+
+    for cid in deletes:
+        by_id.pop(cid, None)
+
+    # Preserve original cell order; new cells append.
+    remaining = [by_id[c.id] for c in page.cells if c.id in by_id]
+    for spec in creates:
+        geom = _clamp_geom(spec, None)
+        remaining.append(_new_cell(**geom))
+
+    _store().save(page.model_copy(update={"cells": remaining}))
+    # Drop any stale draft preview — the layout is now persisted.
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+    return jsonify(
+        {
+            "ok": True,
+            "cells": [
+                {"id": c.id, "x": c.x, "y": c.y, "w": c.w, "h": c.h, "plugin": c.plugin}
+                for c in remaining
+            ],
+        }
+    )
 
 
 def register(app: Flask) -> None:
