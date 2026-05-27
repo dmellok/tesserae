@@ -185,14 +185,17 @@ def _project_fires(schedule: Schedule, start: datetime, end: datetime) -> list[d
 
 def _build_timeline(schedules: Iterable[Schedule], hours: int = 24) -> dict[str, Any]:
     """Bucket projected fires per schedule across the next ``hours``
-    hours, plus hour markers. Returned shape feeds straight into the
-    Jinja template."""
+    hours, plus hour markers and a "now" position. The window snaps
+    its start to the top of the current hour so the now-marker falls
+    visibly inside the timeline rather than flush against the left
+    edge (which is what you'd get if start == now)."""
     now = datetime.now()
-    end = now + timedelta(hours=hours)
-    total_seconds = (end - now).total_seconds()
+    start = now.replace(minute=0, second=0, microsecond=0)
+    end = start + timedelta(hours=hours)
+    total_seconds = (end - start).total_seconds()
 
     def _pct(dt: datetime) -> float:
-        return max(0.0, min(100.0, (dt - now).total_seconds() / total_seconds * 100.0))
+        return max(0.0, min(100.0, (dt - start).total_seconds() / total_seconds * 100.0))
 
     rows: list[dict[str, Any]] = []
     for s in schedules:
@@ -208,13 +211,15 @@ def _build_timeline(schedules: Iterable[Schedule], hours: int = 24) -> dict[str,
             }
         )
     hour_marks = [
-        {"hour": (now + timedelta(hours=h)).hour, "pct": (h / hours) * 100.0}
+        {"hour": (start + timedelta(hours=h)).hour, "pct": (h / hours) * 100.0}
         for h in range(hours + 1)
         if h % 3 == 0
     ]
     return {
-        "start": now,
+        "start": start,
         "end": end,
+        "now": now,
+        "now_pct": _pct(now),
         "rows": rows,
         "hour_marks": hour_marks,
         "any_fires": any(r["fires"] for r in rows),

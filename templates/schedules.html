@@ -99,11 +99,18 @@
   {% elif not timeline.any_fires %}
   <p class="lede">Nothing scheduled to fire in the next 24 hours.</p>
   {% else %}
-  <div class="timeline">
+  <div class="timeline" style="--now-pct: {{ '%.2f'|format(timeline.now_pct) }}%;">
     <div class="timeline-axis" aria-hidden="true">
       {% for mark in timeline.hour_marks %}
       <span class="timeline-tick" style="left: {{ '%.2f'|format(mark.pct) }}%;">{{ '%02d'|format(mark.hour) }}:00</span>
       {% endfor %}
+    </div>
+    {# Vertical "now" line — spans the whole stack of timeline rows
+       so the eye can sight straight down from a row's upcoming fires
+       to wall-clock now. The line uses absolute positioning relative
+       to the timeline; its left coord comes from --now-pct. #}
+    <div class="timeline-now" aria-hidden="true" title="Now {{ timeline.now.strftime('%H:%M') }}">
+      <span class="timeline-now-label">Now</span>
     </div>
     {% for row in timeline.rows %}
     <div class="timeline-row {% if not row.enabled %}is-disabled{% endif %}">
@@ -146,15 +153,15 @@
   {% if not schedules %}
   <p class="lede">No schedules yet — create one above.</p>
   {% else %}
-  <table class="data-table">
+  <table class="data-table schedules-table">
     <thead>
       <tr>
         <th>Name</th>
-        <th>Page</th>
+        <th class="col-page">Page</th>
         <th>Cadence</th>
-        <th>Days</th>
-        <th>Last fired</th>
-        <th>State</th>
+        <th class="col-days">Days</th>
+        <th class="col-last">Last fired</th>
+        <th class="col-state">State</th>
         <th class="actions-col">Actions</th>
       </tr>
     </thead>
@@ -165,7 +172,7 @@
           <strong>{{ s.name }}</strong>
           <div class="muted-row"><code>{{ s.id }}</code></div>
         </td>
-        <td><code>{{ s.page_id }}</code></td>
+        <td class="col-page"><code>{{ s.page_id }}</code></td>
         <td>
           {% if s.type == 'interval' %}
             every {{ s.interval_minutes }} min
@@ -178,15 +185,15 @@
             daily {{ s.fires_at.strftime('%H:%M') if s.fires_at else '??:??' }}
           {% endif %}
         </td>
-        <td>
+        <td class="col-days">
           {% set days = s.days_of_week %}
           {% if days|length == 7 %}every day{% else %}{% for d in days %}{{ DAY_NAMES[d] }}{% if not loop.last %} {% endif %}{% endfor %}{% endif %}
         </td>
-        <td>
+        <td class="col-last">
           {% set last = status.get(s.id, {}).get('last_fired') %}
           {% if last %}<time datetime="{{ last }}">{{ last|int }}</time>{% else %}<span class="muted">—</span>{% endif %}
         </td>
-        <td>
+        <td class="col-state">
           {% if s.enabled %}<span class="pill is-ok">enabled</span>{% else %}<span class="pill">disabled</span>{% endif %}
         </td>
         <td class="actions-col">

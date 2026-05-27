@@ -90,6 +90,33 @@
 button.ghost.danger { color: var(--t-danger); }
 button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; }
 
+/* Schedules table — progressively drop columns as the viewport
+   narrows so the table fits without horizontal scroll. The Name +
+   Cadence + Actions columns are the essentials; everything else
+   gets hidden first. */
+@media (max-width: 900px) {
+  .schedules-table .col-last,
+  .schedules-table .col-state { display: none; }
+}
+@media (max-width: 700px) {
+  .schedules-table .col-page,
+  .schedules-table .col-days { display: none; }
+  /* Collapse the action button labels to icons only. */
+  .schedules-table .actions-col button > span,
+  .schedules-table .actions-col a > span { display: none; }
+  .schedules-table .actions-col button,
+  .schedules-table .actions-col .ghost-link {
+    padding: 6px 8px;
+    min-width: 32px;
+  }
+}
+@media (max-width: 500px) {
+  /* Tighten further on phones: smaller font, tighter cells. */
+  .data-table { font-size: 12px; }
+  .data-table th,
+  .data-table td { padding: 6px 6px; }
+}
+
 .ghost-link {
   display: inline-flex;
   align-items: center;
@@ -115,6 +142,47 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   display: grid;
   gap: 6px;
   padding-top: 24px;
+  position: relative;
+}
+
+/* "Now" line — vertical accent stripe spanning every row's track.
+   Positioned via --now-pct (set inline on .timeline). The line lives
+   in a strip that mirrors the track lane: the 180px label column is
+   skipped by offsetting `left` past the gutter + gap, and width then
+   spans the remaining row area. */
+.timeline-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(180px + var(--t-space-3));
+  width: calc(100% - 180px - var(--t-space-3));
+  pointer-events: none;
+  z-index: 1;
+}
+.timeline-now::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--now-pct, 0%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--t-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--t-accent) 25%, transparent);
+}
+.timeline-now-label {
+  position: absolute;
+  top: 0;
+  left: var(--now-pct, 0%);
+  transform: translateX(-50%);
+  padding: 1px 6px;
+  background: var(--t-accent);
+  color: var(--t-bg, #fff);
+  font: 700 10px/1.2 var(--t-font-mono, ui-monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 2px;
+  white-space: nowrap;
 }
 .timeline-axis {
   position: relative;
@@ -184,5 +252,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 @media (max-width: 720px) {
   .timeline-row { grid-template-columns: 120px 1fr; }
   .timeline-axis { margin-left: 132px; }
+  .timeline-now {
+    left: calc(120px + var(--t-space-3));
+    width: calc(100% - 120px - var(--t-space-3));
+  }
 }
 
