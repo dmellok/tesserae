@@ -44,6 +44,16 @@ from app.state.user_themes import (
 _log = logging.getLogger(__name__)
 _MAX_EXTRACT_BYTES = 8 * 1024 * 1024  # 8 MiB — generous for a UI upload
 
+
+def _json_error(message: str, status: int) -> Response:
+    """JSON error response with a status code set on the Response
+    object (avoids the (Response, int) tuple form, which mypy can't
+    reconcile with a `-> Response` annotation)."""
+    resp = jsonify({"error": message})
+    resp.status_code = status
+    return resp
+
+
 bp = Blueprint("themes", __name__, url_prefix="/themes")
 
 
@@ -237,12 +247,10 @@ def extract_palette() -> Response:
     eyedropper canvas. JSON only — no flash redirects."""
     upload = request.files.get("image")
     if upload is None or not upload.filename:
-        return jsonify({"error": "No image provided."}), 400
+        return _json_error("No image provided.", 400)
     data = upload.read(_MAX_EXTRACT_BYTES + 1)
     if len(data) > _MAX_EXTRACT_BYTES:
-        return jsonify(
-            {"error": f"Image too large (>{_MAX_EXTRACT_BYTES // (1024 * 1024)} MiB)."}
-        ), 413
+        return _json_error(f"Image too large (>{_MAX_EXTRACT_BYTES // (1024 * 1024)} MiB).", 413)
     mode = (request.form.get("mode") or "light").strip()
     if mode not in VALID_MODES:
         mode = "light"
@@ -250,7 +258,7 @@ def extract_palette() -> Response:
         colors = extract_dominant(data)
     except Exception as exc:
         _log.exception("palette extraction failed")
-        return jsonify({"error": f"Could not parse image: {exc}"}), 400
+        return _json_error(f"Could not parse image: {exc}", 400)
     palette = assign_to_tokens(colors, mode=mode)
     mime = upload.mimetype or "image/png"
     data_url = f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"

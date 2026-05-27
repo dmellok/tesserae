@@ -88,8 +88,9 @@ def _kmeans_np(pixels: np.ndarray, k: int, max_iter: int = 12) -> tuple[np.ndarr
 
 def extract_dominant(image_bytes: bytes, k: int = _K_DEFAULT) -> list[RGB]:
     """Return up to ``k`` dominant colours, sorted by cluster size desc."""
-    img = Image.open(io.BytesIO(image_bytes))
-    img = img.convert("RGB")
+    # Annotate explicitly: Image.open() returns ImageFile, .convert()
+    # returns plain Image — same variable needs a wider type for mypy.
+    img: Image.Image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     img.thumbnail((_RESIZE_MAX, _RESIZE_MAX))
     pixels = np.asarray(img, dtype=np.uint8).reshape(-1, 3)
     centres, counts = _kmeans_np(pixels, k=k)
