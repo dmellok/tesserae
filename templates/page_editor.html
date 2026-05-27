@@ -2,7 +2,9 @@
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
 {% block title %}{{ page.name }} — Dashboard editor — Tesserae{% endblock %}
 
-{% set PALETTE_TOKENS = ['bg','surface','surface2','fg','fgSoft','muted','accent','accentSoft','divider','danger','warn','ok'] %}
+{# PALETTE_TOKENS comes from app/state/user_themes.py via the editor
+   context so the editor can't drift from the theme schema. #}
+{% set PALETTE_TOKENS = palette_tokens %}
 
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
@@ -25,7 +27,7 @@
     {% endfor %}
     <div class="field">
       <label for="cell-{{ cell.id }}-plugin">Plugin</label>
-      <select id="cell-{{ cell.id }}-plugin" name="plugin" data-reload-on-change>
+      <select id="cell-{{ cell.id }}-plugin" name="plugin" data-reload-on-change="1">
         <option value="" {% if not cell.plugin %}selected{% endif %}>(pick a widget)</option>
         {% for p in plugins %}
         <option value="{{ p.id }}" {% if cell.plugin == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
@@ -65,16 +67,21 @@
     {% endif %}
 
     <details class="form-group">
-      <summary>Per-cell colour overrides ({{ (cell.palette_overrides or {})|length }} of 12 overridden)</summary>
+      <summary>Per-cell colour overrides ({{ (cell.palette_overrides or {})|length }} of {{ PALETTE_TOKENS|length }} overridden)</summary>
       <div class="palette-grid">
         {% set overrides = cell.palette_overrides or {} %}
+        {% set palette = cell_palettes.get(cell.id, {}) %}
         {% for token in PALETTE_TOKENS %}
+        {# Pre-fill from the effective theme so each swatch shows what
+           it actually controls — without this every picker would show
+           black and you'd have to guess which token is which. #}
+        {% set current = overrides.get(token, palette.get(token, '#000000')) %}
         <div class="palette-field">
           <label>
             <input type="checkbox" name="override_{{ token }}_enabled" {% if token in overrides %}checked{% endif %}>
             {{ token }}
           </label>
-          <input type="color" name="override_{{ token }}" value="{{ overrides.get(token, '#000000') }}">
+          <input type="color" name="override_{{ token }}" value="{{ current }}">
         </div>
         {% endfor %}
       </div>

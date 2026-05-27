@@ -241,21 +241,45 @@ def _ensure_cells_fit_panel(page: Page, panel: Any) -> Page:
 
 def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
+    from app.state.user_themes import PALETTE_TOKENS
+
     panel = resolve_page_panel(page.panel, _settings_store())
     page = _ensure_cells_fit_panel(page, panel)
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
     active_layout = detect_layout(panel_cells, panel.w, panel.h)
     widgets = sorted(_plugins().widgets(), key=lambda p: p.name.lower())
+    plugins = _plugins()
+
+    # Effective palette per cell — same resolution chain the composer uses
+    # (cell.theme || page.theme || "default") so the per-cell colour
+    # pickers can pre-fill with the actual swatch the widget will paint
+    # with. Without this the pickers all default to #000000 and there's
+    # no way to tell which token controls which colour.
+    def _palette_for(theme_id: str | None) -> dict[str, str]:
+        if theme_id:
+            theme = plugins.get_theme(theme_id)
+            if theme is not None:
+                return dict(theme.palette)
+        default = plugins.get_theme("default")
+        return dict(default.palette) if default is not None else {}
+
+    page_palette = _palette_for(page.theme)
+    cell_palettes: dict[str, dict[str, str]] = {}
+    for c in page.cells:
+        cell_palettes[c.id] = _palette_for(c.theme) if c.theme else page_palette
+
     return {
         "page": page,
         "panel": panel,
         "plugins": widgets,
         "plugin_cell_options": _materialize_cell_options(widgets),
-        "themes": sorted(_plugins().themes.values(), key=lambda t: t.name.lower()),
-        "fonts": sorted(_plugins().fonts.values(), key=lambda f: f.name.lower()),
+        "themes": sorted(plugins.themes.values(), key=lambda t: t.name.lower()),
+        "fonts": sorted(plugins.fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
         "preview_scale": _preview_scale(panel.w, panel.h),
+        "palette_tokens": list(PALETTE_TOKENS),
+        "cell_palettes": cell_palettes,
     }
 
 
