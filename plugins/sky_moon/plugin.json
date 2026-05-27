@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Sky — Moon Phase",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Current moon phase + illumination, age (days since new moon), upcoming new / first-quarter / full / last-quarter dates, and (optionally) tonight's moonrise + moonset. Phase + age are computed locally from the synodic month; moonrise/moonset comes from Open-Meteo when latitude/longitude are set.",
+  "icon": "ph-moon-stars",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude",
+      "default": -37.8136,
+      "help": "Used for moonrise / moonset. Leave at default if you don't care."
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude",
+      "default": 144.9631
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Place label",
+      "default": "Melbourne"
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
