@@ -48,6 +48,13 @@ async function mountCell(cell) {
   const panelW = Number(cell.dataset.panelW);
   const panelH = Number(cell.dataset.panelH);
   const pluginId = cell.dataset.plugin;
+  // Unassigned cells (layout slot without a widget yet) carry an empty
+  // data-plugin attribute. The template renders its own "pick a widget"
+  // placeholder; don't try to import /plugins//client.js.
+  if (!pluginId) {
+    cell.dataset.rendered = "true";
+    return;
+  }
 
   let options = {};
   try {
