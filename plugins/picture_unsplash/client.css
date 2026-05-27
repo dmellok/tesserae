@@ -1,0 +1,100 @@
+/* picture_unsplash — full-bleed random photo with optional Bauhaus
+   credit strip at the bottom. Same shape vocabulary as picture_apod. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+}
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pu-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.scale-fit     .pu-img { object-fit: contain; }
+.scale-fill    .pu-img { object-fit: cover; }
+.scale-stretch .pu-img { object-fit: fill; }
+
+.pu-bg, .pu-fg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+.pu-bg {
+  object-fit: cover;
+  transform: scale(1.1);
+  filter: blur(24px);
+  z-index: 0;
+}
+.pu-fg {
+  object-fit: contain;
+  z-index: 1;
+}
+
+/* Credit strip — same inverted-bar treatment as the APOD caption but
+   with a camera icon. */
+.pu-credit {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  z-index: 2;
+}
+.pu-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.pu-credit-icon {
+  font-size: clamp(14px, 2.4cqw, 18px);
+  line-height: 1;
+}
+.pu-credit-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty / error state */
+.pu-empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: var(--theme-surface2);
+  color: var(--theme-fgSoft);
+  padding: clamp(12px, 3cqw, 32px);
+  gap: clamp(6px, 1.2cqw, 12px);
+}
+.pu-empty .ph-duotone {
+  font-size: clamp(48px, 18cqw, 200px);
+  color: var(--theme-fg);
+  opacity: 0.45;
+}
+.pu-empty-msg {
+  font-size: clamp(11px, 1.9cqw, 14px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  max-width: 80%;
+}

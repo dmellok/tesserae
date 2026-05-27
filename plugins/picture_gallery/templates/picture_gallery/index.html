@@ -1,0 +1,95 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state %}
+{% block title %}Gallery — Tesserae{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph-bold ph-images" aria-hidden="true"></i> Gallery</h1>
+  <p class="page-blurb">Folders of images for the picture_gallery widget to rotate through. Internal folders live in this appliance's data dir; external folders point at any directory on the host.</p>
+</div>
+
+<section class="card">
+  {{ card_head('New folder', icon_name='folder-plus', level=2,
+               blurb='Leave the external path blank for an internal folder (images uploaded here). Fill it in to link an existing host directory in read-only.') }}
+  <form method="post" action="{{ url_for('picture_gallery_admin.create_folder') }}" class="form">
+    <div class="field-grid">
+      <div class="field">
+        <label for="new-folder-name">Folder name</label>
+        <input type="text" id="new-folder-name" name="name" placeholder="vacation" pattern="[a-z0-9][a-z0-9_-]{0,63}" required autofocus>
+        <p class="field-help">Lowercase letters, digits, hyphens, underscores. Max 64 chars.</p>
+      </div>
+      <div class="field">
+        <label for="new-folder-external">External path (optional)</label>
+        <input type="text" id="new-folder-external" name="external_path" placeholder="/Users/me/Pictures/Vacation">
+        <p class="field-help">Read-only link to a host directory. Uploads + deletes are rejected for external folders.</p>
+      </div>
+    </div>
+    <div class="actions">{{ button('Create folder', icon='plus') }}</div>
+  </form>
+</section>
+
+<section class="card">
+  {{ card_head('Your folders', icon_name='folders', level=2) }}
+  {% if folders %}
+  <ul class="pg-folders">
+    {% for f in folders %}
+    <li class="pg-folder-row">
+      <a class="pg-folder-link" href="{{ url_for('picture_gallery_admin.show_folder', folder=f.id) }}">
+        <i class="ph-bold ph-{{ 'folder-open' if f.external_path else 'folder' }} pg-folder-icon" aria-hidden="true"></i>
+        <span class="pg-folder-name">{{ f.name }}{% if f.external_path %} <span class="pg-external-tag">↗ external</span>{% endif %}</span>
+        <span class="pg-folder-count"><i class="ph ph-images" aria-hidden="true"></i>{{ f.image_count }}</span>
+        <i class="ph ph-caret-right pg-folder-caret" aria-hidden="true"></i>
+      </a>
+      {% if f.external_path %}
+      <div class="pg-folder-path">{{ f.external_path }}</div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {{ empty_state('images', 'No folders yet',
+                 blurb='Create one above. Then add the Picture — Gallery widget to a dashboard cell and pick it from the cell editor.') }}
+  {% endif %}
+</section>
+
+<style>
+  .pg-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pg-folder-row { margin: 0; }
+  .pg-folder-link {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--t-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: var(--t-fg);
+    background: var(--t-surface);
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .pg-folder-link:hover { background: var(--t-surface-hover); border-color: var(--t-border-strong); }
+  .pg-folder-icon { font-size: 20px; color: var(--t-accent); }
+  .pg-folder-name { font-weight: 700; font-size: 15px; }
+  .pg-external-tag {
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0.7;
+    padding: 1px 6px;
+    background: var(--t-surface-hover);
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .pg-folder-count {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    font-size: 13px;
+    color: var(--t-fg-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .pg-folder-caret { color: var(--t-fg-soft); }
+  .pg-folder-path { font: 11px ui-monospace, monospace; color: var(--t-fg-soft); padding: 0 14px 4px 46px; }
+</style>
+{% endblock %}

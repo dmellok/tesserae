@@ -1,0 +1,28 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Picture — NASA APOD",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.",
+  "icon": "ph-planet",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "show_caption", "type": "boolean", "label": "Show title + copyright overlay", "default": true },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "fit",
+      "choices": [
+        { "value": "fit",     "label": "Fit (letterbox)" },
+        { "value": "fill",    "label": "Fill (crop to cover)" },
+        { "value": "stretch", "label": "Stretch (distort to fill)" },
+        { "value": "blurred", "label": "Fit with blurred background" }
+      ]
+    }
+  ],
+  "settings": [
+    { "name": "api_key", "type": "string", "label": "NASA API key", "secret": true, "default": "DEMO_KEY" }
+  ],
+  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true }
+}

@@ -1,0 +1,43 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Picture — Unsplash",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.",
+  "icon": "ph-camera",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "query",       "type": "string", "label": "Search terms",                          "default": "" },
+    { "name": "collections", "type": "string", "label": "Collection IDs (comma-separated)",      "default": "" },
+    { "name": "username",    "type": "string", "label": "Photographer username",                 "default": "" },
+    {
+      "name": "orientation",
+      "type": "select",
+      "label": "Orientation",
+      "default": "any",
+      "choices": [
+        { "value": "any",       "label": "Any" },
+        { "value": "landscape", "label": "Landscape" },
+        { "value": "portrait",  "label": "Portrait" },
+        { "value": "squarish",  "label": "Square" }
+      ]
+    },
+    { "name": "show_credit", "type": "boolean", "label": "Show photographer credit overlay", "default": true },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "fill",
+      "choices": [
+        { "value": "fit",     "label": "Fit (letterbox)" },
+        { "value": "fill",    "label": "Fill (crop to cover)" },
+        { "value": "stretch", "label": "Stretch (distort to fill)" },
+        { "value": "blurred", "label": "Fit with blurred background" }
+      ]
+    }
+  ],
+  "settings": [
+    { "name": "access_key", "type": "string", "label": "Unsplash Access Key", "secret": true, "default": "" }
+  ],
+  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true }
+}

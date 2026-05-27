@@ -1,0 +1,143 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button %}
+{% block title %}{{ folder_name }} — Gallery — Tesserae{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <p class="page-blurb">
+    <a href="{{ url_for('picture_gallery_admin.index') }}"><i class="ph ph-caret-left" aria-hidden="true"></i> All folders</a>
+  </p>
+  <h1><i class="ph-bold ph-{{ 'folder-open' if external else 'folder' }}" aria-hidden="true"></i> {{ folder_name }}</h1>
+  <p class="page-blurb">
+    {{ images|length }} image{{ '' if images|length == 1 else 's' }}
+    {% if external %}
+    · <span class="pg-external-inline">external</span> · <code>{{ external_path }}</code>
+    {% endif %}
+  </p>
+</div>
+
+{% if not external %}
+<section class="card">
+  {{ card_head('Upload', icon_name='upload-simple', level=2,
+               blurb='Allowed: %s. Max %dMB per file.'|format(allowed_exts|join(', '), max_upload_mb)) }}
+  <form method="post" action="{{ url_for('picture_gallery_admin.upload', folder=folder_id) }}" class="form" enctype="multipart/form-data">
+    <div class="field">
+      <label for="upload-file">Pick one or more images</label>
+      <input type="file" id="upload-file" name="file" accept="{{ allowed_exts|join(',') }}" multiple required>
+    </div>
+    <div class="actions">{{ button('Upload', icon='upload-simple') }}</div>
+  </form>
+</section>
+{% endif %}
+
+<section class="card">
+  {{ card_head('Images', icon_name='images', level=2) }}
+  {% if images %}
+  <div class="pg-grid">
+    {% for img in images %}
+    <div class="pg-tile">
+      <a href="{{ url_for('picture_gallery_admin.serve_image', folder=folder_id, filename=img.name) }}" target="_blank">
+        <img src="{{ url_for('picture_gallery_admin.serve_thumbnail', folder=folder_id, filename=img.name) }}" alt="{{ img.name }}" loading="lazy">
+      </a>
+      <div class="pg-tile-row">
+        <span class="pg-tile-name" title="{{ img.name }}">{{ img.name }}</span>
+        {% if not external %}
+        <form method="post" action="{{ url_for('picture_gallery_admin.delete_image', folder=folder_id, filename=img.name) }}" class="pg-tile-delete" onsubmit="return confirm('Delete {{ img.name }}?');">
+          <button type="submit" class="pg-tile-delbtn" aria-label="Delete" title="Delete">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="card-empty">
+    <i class="ph-duotone ph-image-square" aria-hidden="true"></i>
+    {% if external %}This external directory has no images Tesserae can read.{% else %}Upload some images above.{% endif %}
+  </p>
+  {% endif %}
+</section>
+
+{% if folder_id != '_root' %}
+<section class="card">
+  {{ card_head('Danger zone', icon_name='trash', level=2,
+               blurb='External folders unlink only — the host files are never touched.' if external else 'Permanently removes the folder and all its images.') }}
+  <form method="post" action="{{ url_for('picture_gallery_admin.delete_folder', folder=folder_id) }}"
+        onsubmit="return confirm('Delete folder {{ folder_name }}{% if not external %} and all its images{% endif %}?');">
+    {{ button('Delete folder' if not external else 'Unlink folder', icon='trash', variant='ghost danger') }}
+  </form>
+</section>
+{% endif %}
+
+<style>
+  .pg-external-inline {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 6px;
+    background: var(--t-surface-hover);
+    border-radius: 2px;
+  }
+  .pg-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .pg-tile {
+    border: 1px solid var(--t-border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--t-surface);
+    display: grid;
+    grid-template-rows: auto auto;
+  }
+  .pg-tile a { display: block; }
+  .pg-tile img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: var(--t-surface-hover);
+  }
+  .pg-tile-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    color: var(--t-fg-soft);
+    border-top: 1px solid var(--t-border);
+  }
+  .pg-tile-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: ui-monospace, monospace;
+  }
+  .pg-tile-delete { margin: 0; }
+  .pg-tile-delbtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    color: var(--t-fg-soft);
+    font-size: 14px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .pg-tile-delbtn:hover { color: var(--t-danger); background: var(--t-surface-hover); }
+  .card-empty {
+    color: var(--t-fg-soft);
+    padding: 12px 16px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 14px;
+  }
+  .card-empty .ph-duotone { font-size: 20px; }
+</style>
+{% endblock %}

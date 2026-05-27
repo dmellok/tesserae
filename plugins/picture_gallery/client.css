@@ -1,0 +1,106 @@
+/* picture_gallery — full-bleed image with the same scale modes as
+   picture_apod / picture_unsplash and an optional filename overlay. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+}
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.pg-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.scale-fit     .pg-img { object-fit: contain; }
+.scale-fill    .pg-img { object-fit: cover; }
+.scale-stretch .pg-img { object-fit: fill; }
+.scale-center  .pg-img { object-fit: none; object-position: center; }
+
+.pg-bg, .pg-fg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+.pg-bg {
+  object-fit: cover;
+  transform: scale(1.1);
+  filter: blur(24px);
+  z-index: 0;
+}
+.pg-fg {
+  object-fit: contain;
+  z-index: 1;
+}
+
+/* Filename overlay — same inverted-bar treatment as picture_apod's
+   caption strip so the three picture widgets read as a family. */
+.pg-caption {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  z-index: 2;
+}
+.pg-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.pg-caption-icon {
+  font-size: clamp(14px, 2.4cqw, 18px);
+  line-height: 1;
+}
+.pg-caption-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Empty / error */
+.pg-empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: var(--theme-surface2);
+  color: var(--theme-fgSoft);
+  padding: clamp(12px, 3cqw, 32px);
+  gap: clamp(6px, 1.2cqw, 12px);
+}
+.pg-empty .ph-duotone {
+  font-size: clamp(48px, 18cqw, 200px);
+  color: var(--theme-fg);
+  opacity: 0.45;
+}
+.pg-empty-msg {
+  font-size: clamp(11px, 1.9cqw, 14px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  max-width: 80%;
+}
