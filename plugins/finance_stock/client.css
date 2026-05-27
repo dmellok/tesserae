@@ -1,33 +1,197 @@
-:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
-.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr auto; box-sizing: border-box; overflow: hidden; }
-.fs-symbol { font-size: 1.1em; }
-.fs-exchange { font-size: 0.75em; opacity: 0.7; text-align: right; }
+/* finance_stock — Bauhaus single-ticker card. Same shape as the other
+   finance widgets: header / hero / area chart / 4-up stats. */
 
-.fs-hero { background: var(--theme-surface); display: grid; align-content: center; gap: clamp(2px, 0.5cqh, 6px); padding: clamp(12px, 2cqw, 24px) clamp(14px, 2.4cqw, 26px); }
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fs-symbol {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fs-exchange {
+  font: 700 0.8em/1 var(--theme-font-mono, ui-monospace);
+  white-space: nowrap;
+}
+
+/* --- hero --- */
+
+.fs-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: stretch;
+  background: var(--theme-surface);
+  color: var(--theme-fg);
+  min-height: 0;
+  overflow: hidden;
+}
+.fs-hero-text {
+  padding: clamp(10px, 2cqw, 22px) clamp(12px, 2.4cqw, 26px);
+  display: grid;
+  align-content: center;
+  gap: clamp(2px, 0.6cqw, 6px);
+  min-width: 0;
+}
 .fs-name {
   font: 700 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font, system-ui);
-  text-transform: uppercase; letter-spacing: 0.06em;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--theme-fgSoft);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.fs-price { display: flex; align-items: baseline; gap: clamp(6px, 1cqw, 10px); }
-.fs-curr { font: 700 clamp(11px, 1.8cqw, 14px)/1 var(--theme-font-mono, ui-monospace); color: var(--theme-fgSoft); }
-.fs-val { font-size: clamp(28px, 8cqw, 64px); font-weight: 900; letter-spacing: -0.03em; line-height: 1; }
-.fs-change { display: inline-flex; align-items: center; gap: 4px; font: 800 clamp(11px, 1.8cqw, 16px)/1 var(--theme-font-mono, ui-monospace); }
-.fs-range-lbl { font-size: 0.7em; font-weight: 700; color: var(--theme-fgSoft); margin-left: 2px; }
-.fs-hero--up   .fs-change { color: var(--theme-accent); }
-.fs-hero--down .fs-change { color: var(--theme-accent3); }
+.fs-price {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(6px, 1cqw, 10px);
+  min-width: 0;
+}
+.fs-curr {
+  font: 700 clamp(11px, 1.8cqw, 14px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fgSoft);
+}
+.fs-val {
+  font-size: clamp(28px, 8cqw, 72px);
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 0.9;
+}
+.fs-change {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(4px, 0.6cqw, 8px);
+  font: 800 clamp(12px, 2cqw, 18px)/1 var(--theme-font-mono, ui-monospace);
+}
+.fs-range-lbl {
+  font-size: 0.65em;
+  font-weight: 700;
+  color: var(--theme-fgSoft);
+  margin-left: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.root.is-up   .fs-change { color: var(--theme-accent); }
+.root.is-down .fs-change { color: var(--theme-accent3); }
 
-.fs-spark { background: var(--theme-surface2); padding: clamp(8px, 1.4cqw, 16px); min-height: 0; overflow: hidden; border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg); }
-.fs-svg { width: 100%; height: 100%; display: block; }
-.fs-svg.is-up   { color: var(--theme-accent); }
-.fs-svg.is-down { color: var(--theme-accent3); }
+.fs-hero-icon {
+  background: var(--theme-surface2);
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 2cqw, 22px);
+  min-width: 0;
+  overflow: hidden;
+}
+.fs-hero-icon .ph-bold {
+  font-size: clamp(48px, 18cqw, 180px);
+  color: var(--theme-fg);
+  line-height: 1;
+}
+
+/* --- chart --- */
+
+.fs-chart {
+  background: var(--theme-surface);
+  padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 16px);
+  min-height: 0;
+  overflow: hidden;
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fs-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.root.is-up   .fs-svg { color: var(--theme-accent); }
+.root.is-down .fs-svg { color: var(--theme-accent3); }
+
+/* --- 4-up stat strip --- */
+
+.fs-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fs-stat {
+  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
+  display: grid;
+  gap: clamp(2px, 0.4cqw, 6px);
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+.fs-stat-icon {
+  position: absolute;
+  top: clamp(4px, 0.8cqw, 8px);
+  right: clamp(6px, 1.2cqw, 12px);
+  font-size: clamp(14px, 2.4cqw, 22px);
+  opacity: 0.5;
+}
+.fs-stat-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+}
+.fs-stat-value {
+  font-size: clamp(14px, 2.6cqw, 26px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fs-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
+.fs-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
+.fs-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.fs-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+
+/* --- size adaptations --- */
 
 .root.size-xs .fs-val { font-size: clamp(22px, 14cqw, 36px); }
 .root.size-xs .fs-name { display: none; }
-.root.size-xs .fs-spark { display: none; }
+.root.size-xs .fs-change { font-size: 10px; }
+.root.size-xs .fs-hero-icon { padding: 6px; }
+.root.size-xs .fs-hero-icon .ph-bold { font-size: clamp(36px, 20cqw, 56px); }
+.root.size-xs .fs-chart { display: none; }
+.root.size-xs .fs-stat { padding: 4px 6px; }
+.root.size-xs .fs-stat-icon { display: none; }
+.root.size-xs .fs-stat-label { font-size: 8px; }
+.root.size-xs .fs-stat-value { font-size: 11px; }
 .root.size-xs .fs-exchange { display: none; }
 
-.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.root.size-sm .fs-val { font-size: clamp(26px, 9cqw, 42px); }
+.root.size-sm .fs-hero-icon .ph-bold { font-size: clamp(48px, 18cqw, 96px); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }
