@@ -1,4 +1,9 @@
-/* calendar_month — Bauhaus month grid. */
+/* calendar_month — Bauhaus month grid.
+ *
+ * Sized for e-ink survival: every line uses --theme-fg (true black on
+ * a light theme, so it dithers cleanly), grid borders are 2-3px, text
+ * is bumped up across the board, and the today highlight is a SOLID
+ * accent block (no faded color-mix that would smear in Floyd-Steinberg). */
 
 :host {
   display: block;
@@ -18,110 +23,139 @@
   overflow: hidden;
 }
 
+/* --- title bar --- */
+
 .cm-bar {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
+  gap: clamp(8px, 1.4cqw, 12px);
   background: var(--theme-fg);
   color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(11px, 1.8cqw, 16px);
-  font-weight: 800;
+  padding: clamp(6px, 1.2cqw, 12px) clamp(10px, 2cqw, 18px);
+  font-size: clamp(14px, 2.6cqw, 22px);
+  font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
 }
-.cm-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.cm-mark { display: inline-block; width: clamp(14px, 2.2cqw, 20px); height: clamp(14px, 2.2cqw, 20px); background: var(--theme-accent2); }
 .cm-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
+.cm-bar-icon { font-size: clamp(18px, 3cqw, 28px); line-height: 1; }
+
+/* --- weekday header — high-contrast strip so labels don't disappear
+   into the panel after dither. --- */
 
 .cm-weekhead {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--theme-surface);
-  border-bottom: 1px solid var(--theme-divider);
+  background: var(--theme-surface2);
+  border-bottom: clamp(2px, 0.4cqw, 3px) solid var(--theme-fg);
 }
 .cm-weekhead span {
-  padding: clamp(3px, 0.6cqh, 8px) clamp(4px, 0.8cqw, 10px);
-  font-size: clamp(9px, 1.3cqw, 12px);
-  font-weight: 800;
+  padding: clamp(5px, 0.9cqh, 10px) clamp(6px, 1cqw, 12px);
+  font-size: clamp(11px, 1.8cqw, 15px);
+  font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--theme-fgSoft);
+  color: var(--theme-fg);
   text-align: left;
+  border-right: 1px solid var(--theme-fg);
 }
+.cm-weekhead span:last-child { border-right: 0; }
+
+/* --- day grid ---
+   2px borders in --theme-fg (true black) so the cell walls survive
+   dithering. Out-of-month days get the surface2 fill so they recede
+   without using a thin gray border. */
 
 .cm-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: 1fr;
-  background: var(--theme-surface);
+  background: var(--theme-fg);  /* shows through the gaps as black gridlines */
+  gap: clamp(1.5px, 0.3cqw, 2px);
+  padding: clamp(1.5px, 0.3cqw, 2px);
   min-height: 0;
 }
 .cm-day {
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: clamp(2px, 0.4cqh, 6px);
-  padding: clamp(3px, 0.6cqh, 8px) clamp(4px, 0.6cqw, 8px);
-  border-right: 1px solid var(--theme-divider);
-  border-bottom: 1px solid var(--theme-divider);
+  gap: clamp(2px, 0.5cqh, 6px);
+  padding: clamp(4px, 0.8cqh, 10px) clamp(5px, 0.9cqw, 10px);
+  background: var(--theme-surface);
   min-width: 0;
   overflow: hidden;
 }
-.cm-day:nth-child(7n) { border-right: 0; }
 .cm-day.is-out { background: var(--theme-surface2); }
-.cm-day.is-out .cm-num { opacity: 0.4; }
-.cm-day.is-today {
-  background: color-mix(in oklab, var(--theme-accent) 14%, var(--theme-surface));
-}
+.cm-day.is-out .cm-num { color: var(--theme-fgSoft); }
+
+/* Today — solid accent fill, no transparency. Survives dither as a
+   block. The day number becomes inverted on the accent block. */
+.cm-day.is-today { background: var(--theme-accent); }
 .cm-day.is-today .cm-num {
-  background: var(--theme-accent);
   color: var(--theme-bg);
-  border-radius: 999px;
-  padding: 1px 7px;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
 }
+.cm-day.is-today .cm-chip {
+  background: var(--theme-bg);
+  color: var(--theme-fg);
+  border-left-color: var(--theme-fg);
+}
+.cm-day.is-today .cm-chip-t,
+.cm-day.is-today .cm-chip-s { color: var(--theme-fg); }
+.cm-day.is-today .cm-more { color: var(--theme-bg); }
 
 .cm-num {
-  font-size: clamp(10px, 1.6cqw, 14px);
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: clamp(14px, 2.4cqw, 22px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
   justify-self: start;
-  line-height: 1.2;
+  line-height: 1;
 }
+
 .cm-events {
   display: grid;
-  gap: 2px;
+  gap: clamp(2px, 0.4cqh, 4px);
   align-content: start;
   min-width: 0;
   overflow: hidden;
 }
+
+/* Event chips — every chip carries a thick coloured left bar so the
+   feed colour is still visible after dither, and the fill is a solid
+   surface2 (no transparency) for the same reason. */
 .cm-chip {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 4px;
-  background: color-mix(in oklab, var(--chip) 20%, var(--theme-surface));
-  border-left: 3px solid var(--chip);
-  padding: 1px 4px;
-  border-radius: 2px;
+  gap: clamp(3px, 0.6cqw, 6px);
+  background: var(--theme-surface2);
+  border-left: clamp(3px, 0.6cqw, 5px) solid var(--chip);
+  padding: clamp(2px, 0.4cqh, 4px) clamp(4px, 0.7cqw, 7px);
+  border-radius: 0;
   min-width: 0;
   overflow: hidden;
 }
 .cm-chip-t {
-  font: 600 clamp(8px, 1.2cqw, 10px)/1.1 var(--theme-font-mono, ui-monospace);
+  font: 700 clamp(10px, 1.6cqw, 13px)/1.1 var(--theme-font-mono, ui-monospace);
   font-variant-numeric: tabular-nums;
-  color: var(--theme-fgSoft);
+  color: var(--theme-fg);
 }
 .cm-chip-s {
-  font-size: clamp(9px, 1.3cqw, 11px);
-  font-weight: 600;
+  font-size: clamp(11px, 1.8cqw, 15px);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  color: var(--theme-fg);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .cm-more {
-  font: 700 clamp(8px, 1.2cqw, 10px)/1.2 var(--theme-font, system-ui);
-  color: var(--theme-fgSoft);
+  font: 900 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font, system-ui);
+  color: var(--theme-fg);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }

@@ -1,4 +1,6 @@
-/* calendar_week — Bauhaus 7-column week strip. */
+/* calendar_week — Bauhaus 7-column week strip.
+ * Same e-ink-survival treatment as calendar_month: black gridlines
+ * via gap-fill, solid blocks instead of color-mix, fonts bumped. */
 
 :host {
   display: block; width: 100%; height: 100%;
@@ -15,98 +17,106 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: clamp(6px, 1.2cqw, 10px);
+  gap: clamp(8px, 1.4cqw, 12px);
   background: var(--theme-fg);
   color: var(--theme-bg);
-  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
-  font-size: clamp(10px, 1.7cqw, 14px);
-  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+  padding: clamp(6px, 1.2cqw, 12px) clamp(10px, 2cqw, 18px);
+  font-size: clamp(13px, 2.3cqw, 18px);
+  font-weight: 900; text-transform: uppercase; letter-spacing: 0.08em;
 }
-.cw-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.cw-mark { display: inline-block; width: clamp(12px, 2cqw, 18px); height: clamp(12px, 2cqw, 18px); background: var(--theme-accent2); }
 .cw-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cw-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
+.cw-bar-icon { font-size: clamp(18px, 3cqw, 26px); line-height: 1; }
 
 .cw-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--theme-surface);
+  background: var(--theme-fg);  /* black bleeds through the gaps as gridlines */
+  gap: clamp(1.5px, 0.3cqw, 2px);
+  padding: 0;
   min-height: 0;
 }
 .cw-col {
   display: grid;
   grid-template-rows: auto 1fr;
-  border-right: 1px solid var(--theme-divider);
+  background: var(--theme-surface);
   min-width: 0;
   min-height: 0;
 }
-.cw-col:last-child { border-right: 0; }
-.cw-col.is-today { background: color-mix(in oklab, var(--theme-accent) 10%, var(--theme-surface)); }
+.cw-col.is-today { background: var(--theme-accent); }
 
 .cw-colhead {
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: baseline;
-  gap: 4px;
-  padding: clamp(4px, 0.8cqh, 10px) clamp(4px, 0.8cqw, 10px);
-  border-bottom: 1px solid var(--theme-divider);
+  gap: clamp(4px, 0.8cqw, 8px);
+  padding: clamp(6px, 1.2cqh, 12px) clamp(6px, 1cqw, 12px);
+  border-bottom: clamp(2px, 0.4cqw, 3px) solid var(--theme-fg);
   background: var(--theme-surface2);
 }
 .cw-col.is-today .cw-colhead {
-  background: var(--theme-accent);
+  background: var(--theme-fg);
   color: var(--theme-bg);
 }
 .cw-dow {
-  font-size: clamp(9px, 1.4cqw, 12px);
-  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--theme-fgSoft);
+  font-size: clamp(11px, 1.7cqw, 14px);
+  font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--theme-fg);
 }
-.cw-col.is-today .cw-dow { color: var(--theme-bg); opacity: 0.85; }
+.cw-col.is-today .cw-dow { color: var(--theme-bg); }
 .cw-dnum {
-  font-size: clamp(12px, 2cqw, 18px);
-  font-weight: 800;
-  letter-spacing: -0.01em;
+  font-size: clamp(15px, 2.4cqw, 22px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
   text-align: right;
 }
+.cw-col.is-today .cw-dnum { color: var(--theme-bg); }
 
 .cw-evs {
   display: grid;
-  gap: 2px;
+  gap: clamp(2px, 0.4cqh, 4px);
   align-content: start;
-  padding: 4px;
+  padding: clamp(4px, 0.8cqw, 8px);
   min-width: 0;
   overflow: hidden;
 }
 .cw-ev {
   display: grid;
-  gap: 1px;
-  background: color-mix(in oklab, var(--chip) 18%, var(--theme-surface));
-  border-left: 3px solid var(--chip);
-  padding: 3px 5px;
-  border-radius: 2px;
+  gap: 2px;
+  background: var(--theme-surface2);
+  border-left: clamp(3px, 0.6cqw, 5px) solid var(--chip);
+  padding: clamp(3px, 0.6cqh, 6px) clamp(4px, 0.7cqw, 8px);
+  border-radius: 0;
   min-width: 0;
   overflow: hidden;
+  color: var(--theme-fg);
+}
+.cw-col.is-today .cw-ev {
+  background: var(--theme-bg);
+  border-left-color: var(--theme-fg);
 }
 .cw-ev-t {
-  font: 700 clamp(8px, 1.2cqw, 10px)/1.1 var(--theme-font-mono, ui-monospace);
+  font: 800 clamp(10px, 1.5cqw, 12px)/1.1 var(--theme-font-mono, ui-monospace);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--theme-fgSoft);
+  color: var(--theme-fg);
 }
 .cw-ev-s {
-  font-size: clamp(9px, 1.4cqw, 12px);
-  font-weight: 600;
+  font-size: clamp(11px, 1.8cqw, 15px);
+  font-weight: 700;
   line-height: 1.2;
+  letter-spacing: -0.005em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .cw-empty {
-  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  font: 700 clamp(11px, 1.7cqw, 14px)/1 var(--theme-font, system-ui);
   text-align: center;
   color: var(--theme-fgSoft);
-  opacity: 0.4;
-  padding-top: 8px;
+  padding-top: 12px;
 }
+.cw-col.is-today .cw-empty { color: var(--theme-bg); opacity: 0.7; }
 
 .root.error {
   display: grid; place-items: center; text-align: center;
