@@ -37,9 +37,13 @@ export default async function render(shadow, ctx) {
   }).join("");
 
   const cells = weeks.map((week) => {
-    const days = week.map((d) => `
-      <span class="gc-cell" data-lvl="${d.level}" title="${escapeHtml(d.date)}: ${d.count}"></span>
-    `).join("");
+    // Anchor each cell to its real day-of-week (Sun=1 .. Sat=7 grid
+    // row) so partial weeks at the start/end of the range don't pack
+    // their cells against the top of the column.
+    const days = week.map((d) => {
+      const row = d.date ? new Date(d.date).getDay() + 1 : 1;
+      return `<span class="gc-cell" data-lvl="${d.level}" style="grid-row:${row}" title="${escapeHtml(d.date)}: ${d.count}"></span>`;
+    }).join("");
     return `<div class="gc-week">${days}</div>`;
   }).join("");
 

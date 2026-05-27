@@ -162,10 +162,13 @@
 
 /* --- size adaptations --- */
 
-.root.size-xs .fn-hero { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-.root.size-xs .fn-circuit { padding: 4px; min-height: 32px; }
+/* xs: no room for both circuit + text + chips. Drop the circuit
+   silhouette so the race name has room to breathe above the chip
+   strip — the name is what matters at thumbnail size. */
+.root.size-xs .fn-hero { grid-template-columns: 1fr; }
+.root.size-xs .fn-circuit { display: none; }
 .root.size-xs .fn-text { padding: 6px 8px; gap: 2px; }
-.root.size-xs .fn-race-lead { font-size: 14px; }
+.root.size-xs .fn-race-lead { font-size: 16px; line-height: 1; }
 .root.size-xs .fn-race-suffix { display: none; }
 .root.size-xs .fn-place { display: none; }
 .root.size-xs .fn-when { font-size: 9px; }

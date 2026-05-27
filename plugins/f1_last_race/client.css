@@ -13,15 +13,27 @@
   width: 100%;
   height: 100%;
   display: grid;
-  /* header / podium / circuit. Circuit is 1fr so it absorbs whatever
-     vertical room is left; podium rows are auto-sized. */
-  grid-template-rows: auto auto 1fr;
+  /* md/lg: circuit silhouette on the LEFT as a side panel, podium on
+     the right. Header spans both columns. */
+  grid-template-columns: 1fr 1.6fr;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "header header"
+    "circuit podium";
   box-sizing: border-box;
   overflow: hidden;
 }
-/* When the circuit row isn't rendered (sm/xs), drop the third track. */
+.wb-bar { grid-area: header; }
+.fl-podium { grid-area: podium; min-width: 0; }
+.fl-circuit { grid-area: circuit; }
+/* xs/sm don't render the circuit — collapse to a single column. */
 .root.size-xs,
-.root.size-sm { grid-template-rows: auto 1fr; }
+.root.size-sm {
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "header"
+    "podium";
+}
 
 /* --- header --- */
 
@@ -114,19 +126,23 @@
 .fl-row--p1 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
 .fl-row--p3 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
 
-/* --- circuit silhouette band ---
-   Sits below the podium, accent2 backdrop so it pops without competing
-   with the podium colours. */
+/* --- circuit silhouette panel ---
+   Sits on the LEFT as a side panel. Neutral surface background so the
+   silhouette doesn't fight the podium colour blocks for attention. */
 
 .fl-circuit {
-  background: var(--theme-accent2);
+  background: var(--theme-surface);
   color: var(--theme-fg);
   display: grid;
   place-items: center;
   padding: clamp(8px, 1.8cqw, 20px) clamp(12px, 2.4cqw, 28px);
   min-height: 0;
+  min-width: 0;
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  /* Border on the RIGHT now — separates the silhouette from the
+     podium column. Same thick-fg bauhaus rule the layout uses
+     elsewhere. */
+  border-right: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
 }
 .fl-circuit-svg {
   width: 100%;

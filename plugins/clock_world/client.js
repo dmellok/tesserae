@@ -1,4 +1,7 @@
-// clock_world — multiple cities, one cell, no server fetch.
+// clock_world — Bauhaus world clock. Each city is a colour-blocked
+// row with a hero time, the city name, timezone abbreviation, local
+// day-of-week, and a sun/moon icon indicating whether it's daytime
+// at that location. Pure client-side, no fetch.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -22,7 +25,7 @@ function fmtTime(d, tz, hour12) {
   try {
     return new Intl.DateTimeFormat([], {
       timeZone: tz,
-      hour:   "2-digit",
+      hour: "2-digit",
       minute: "2-digit",
       hour12: hour12,
     }).format(d);
@@ -34,8 +37,18 @@ function fmtTime(d, tz, hour12) {
 function fmtDay(d, tz) {
   try {
     return new Intl.DateTimeFormat([], {
-      timeZone: tz, weekday: "short", day: "numeric", month: "short",
-    }).format(d);
+      timeZone: tz, weekday: "short",
+    }).format(d).toUpperCase();
+  } catch {
+    return "";
+  }
+}
+
+function fmtDate(d, tz) {
+  try {
+    return new Intl.DateTimeFormat([], {
+      timeZone: tz, day: "numeric", month: "short",
+    }).format(d).toUpperCase();
   } catch {
     return "";
   }
@@ -43,8 +56,9 @@ function fmtDay(d, tz) {
 
 function offset(d, tz) {
   try {
-    const opts = { timeZone: tz, timeZoneName: "short" };
-    const parts = new Intl.DateTimeFormat([], opts).formatToParts(d);
+    const parts = new Intl.DateTimeFormat([], {
+      timeZone: tz, timeZoneName: "short",
+    }).formatToParts(d);
     const tzName = parts.find((p) => p.type === "timeZoneName");
     return tzName ? tzName.value : "";
   } catch {
@@ -52,32 +66,61 @@ function offset(d, tz) {
   }
 }
 
+// Local hour in the given timezone — used to pick day vs night icon.
+function localHour(d, tz) {
+  try {
+    const h = new Intl.DateTimeFormat([], {
+      timeZone: tz, hour: "numeric", hour12: false,
+    }).formatToParts(d).find((p) => p.type === "hour");
+    return h ? Number(h.value) : 12;
+  } catch {
+    return 12;
+  }
+}
+
+// Bauhaus city tints — cycle through the decorative triad. First city
+// always lands on accent so the "home" entry feels primary.
+const ROW_TINTS = ["row-accent", "row-accent2", "row-accent3", "row-surface"];
+
 export default async function render(shadow, ctx) {
   const cities = parseCities(ctx.cell.options.cities);
   const hour12 = ctx.cell.options.format === "12h";
   const size = ctx.cell.size;
 
   function rows(d) {
-    return cities.map((c) => `
-      <div class="cw-row">
-        <span class="cw-city" title="${escapeHtml(c.tz)}">${escapeHtml(c.label)}</span>
-        <span class="cw-time">${escapeHtml(fmtTime(d, c.tz, hour12))}</span>
-        <span class="cw-off">${escapeHtml(offset(d, c.tz))}</span>
-        <span class="cw-day">${escapeHtml(fmtDay(d, c.tz))}</span>
-      </div>
-    `).join("");
+    return cities.map((c, i) => {
+      const h = localHour(d, c.tz);
+      const isDay = h >= 6 && h < 18;
+      const phaseIcon = isDay ? "ph-sun" : "ph-moon-stars";
+      const tint = ROW_TINTS[i % ROW_TINTS.length];
+      return `
+        <div class="cw-row ${tint}" data-day="${isDay ? '1' : '0'}">
+          <div class="cw-row-text">
+            <div class="cw-city">${escapeHtml(c.label)}</div>
+            <div class="cw-time">${escapeHtml(fmtTime(d, c.tz, hour12))}</div>
+            <div class="cw-meta">
+              <span class="cw-day">${escapeHtml(fmtDay(d, c.tz))} ${escapeHtml(fmtDate(d, c.tz))}</span>
+              <span class="cw-off">${escapeHtml(offset(d, c.tz))}</span>
+            </div>
+          </div>
+          <div class="cw-row-icon" aria-hidden="true">
+            <i class="ph-bold ${phaseIcon}"></i>
+          </div>
+        </div>
+      `;
+    }).join("");
   }
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/clock_world/client.css">
     <div class="root size-${size}">
       <header class="wb-bar">
         <span class="wb-mark" aria-hidden="true"></span>
         <span class="cw-title">World</span>
-        <i class="ph-bold ph-globe wb-bar-icon"></i>
+        <i class="ph-bold ph-globe-hemisphere-west wb-bar-icon"></i>
       </header>
       <section class="cw-list" data-cw-list>${rows(new Date())}</section>
     </div>
