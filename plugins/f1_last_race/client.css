@@ -1,0 +1,198 @@
+/* f1_last_race — Bauhaus podium card. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  /* header / podium / circuit. Circuit is 1fr so it absorbs whatever
+     vertical room is left; podium rows are auto-sized. */
+  grid-template-rows: auto auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+/* When the circuit row isn't rendered (sm/xs), drop the third track. */
+.root.size-xs,
+.root.size-sm { grid-template-rows: auto 1fr; }
+
+/* --- header --- */
+
+.fl-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.fl-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.fl-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fl-bar-round { white-space: nowrap; }
+
+/* --- podium ---
+   One stripe per finisher. Big position number on the left, driver
+   family name + team in the middle, time/gap on the right, optional
+   FL badge tucked at the end. */
+
+.fl-podium {
+  display: grid;
+  grid-auto-rows: 1fr;
+  align-content: stretch;
+  min-height: 0;
+}
+.fl-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: clamp(8px, 1.6cqw, 18px);
+  padding: clamp(6px, 1.4cqw, 14px) clamp(10px, 2cqw, 20px);
+  min-width: 0;
+  overflow: hidden;
+}
+.fl-pos {
+  font-size: clamp(28px, 7cqw, 64px);
+  font-weight: 900;
+  line-height: 0.85;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.fl-name {
+  display: grid;
+  gap: clamp(1px, 0.3cqw, 4px);
+  min-width: 0;
+  overflow: hidden;
+}
+.fl-family {
+  font-size: clamp(13px, 2.6cqw, 24px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fl-team {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fl-time {
+  font-size: clamp(11px, 2cqw, 16px);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fl-fl {
+  font-size: clamp(9px, 1.4cqw, 11px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: clamp(2px, 0.4cqw, 4px) clamp(4px, 0.8cqw, 8px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  border-radius: 1px;
+}
+
+/* Position colour blocks — same accent vocabulary as the weather
+   widgets' stat row. Border-top rules read as bauhaus separators. */
+.fl-row--p1 {
+  background: var(--theme-accent);
+  color: var(--theme-bg);
+}
+.fl-row--p1 .fl-pos { color: var(--theme-bg); }
+.fl-row--p2 {
+  background: var(--theme-surface2);
+  color: var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fl-row--p3 {
+  background: var(--theme-accent3);
+  color: var(--theme-bg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fl-row--p1 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
+.fl-row--p3 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
+
+/* --- circuit silhouette band ---
+   Sits below the podium, accent2 backdrop so it pops without competing
+   with the podium colours. */
+
+.fl-circuit {
+  background: var(--theme-accent2);
+  color: var(--theme-fg);
+  display: grid;
+  place-items: center;
+  padding: clamp(8px, 1.8cqw, 20px) clamp(12px, 2.4cqw, 28px);
+  min-height: 0;
+  overflow: hidden;
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fl-circuit-svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+.fl-circuit-fallback {
+  font-size: clamp(11px, 2cqw, 16px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.6;
+}
+
+/* --- size adaptations --- */
+
+.root.size-xs .fl-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .fl-bar-round { display: none; }
+.root.size-xs .fl-row { padding: 4px 6px; gap: 6px; grid-template-columns: auto 1fr auto; }
+.root.size-xs .fl-pos { font-size: 20px; }
+.root.size-xs .fl-family { font-size: 11px; }
+.root.size-xs .fl-team { display: none; }
+.root.size-xs .fl-time { font-size: 9px; }
+.root.size-xs .fl-fl { display: none; }
+
+.root.size-sm .fl-pos { font-size: clamp(22px, 5cqw, 32px); }
+.root.size-sm .fl-family { font-size: clamp(12px, 2.2cqw, 16px); }
+.root.size-sm .fl-time { font-size: clamp(10px, 1.7cqw, 13px); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

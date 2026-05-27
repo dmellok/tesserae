@@ -1,0 +1,10 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "F1 Core",
+  "version": "0.1.0",
+  "kind": "data",
+  "description": "Shared assets for the F1 widget family. Bundles racing-line silhouettes for every current F1 circuit (preprocessed from bacinger/f1-circuits, MIT) keyed by Jolpica circuitId. Loaded once and cached by the shared client helper. Re-run plugins/f1_core/tools/build_circuits.py when the calendar gains a new circuit.",
+  "icon": "ph-flag-checkered",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "render": { "needs_network": false }
+}

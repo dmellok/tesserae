@@ -1,0 +1,223 @@
+/* f1_next — Bauhaus next-race card. Same visual vocabulary as the
+   weather widgets: inverted header bar, colour-blocked panels, thick
+   black rules between sections, big bold display type. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- header --- */
+
+.fn-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.fn-mark {
+  display: inline-block;
+  width: clamp(10px, 1.6cqw, 14px);
+  height: clamp(10px, 1.6cqw, 14px);
+  background: var(--theme-accent2);
+}
+.fn-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fn-bar-round { white-space: nowrap; }
+
+/* --- hero: circuit silhouette | race info ---
+   Same 50/50 split as weather_now's hero, with the circuit silhouette
+   taking the left panel and the race text taking the right. */
+
+.fn-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.fn-circuit {
+  background: var(--theme-surface2);
+  color: var(--theme-fg);
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 2.4cqw, 28px);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.fn-circuit-svg {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+.fn-circuit-fallback {
+  font-size: clamp(48px, 14cqw, 140px);
+  color: var(--theme-fg);
+  opacity: 0.6;
+}
+
+.fn-text {
+  background: var(--theme-surface);
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: clamp(8px, 1.6cqw, 18px);
+  padding: clamp(12px, 2.4cqw, 28px) clamp(14px, 2.8cqw, 32px);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.fn-race { min-width: 0; align-self: center; }
+.fn-race-lead {
+  font-size: clamp(22px, 6cqw, 64px);
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  color: var(--theme-fg);
+  word-break: break-word;
+}
+.fn-race-suffix {
+  font-size: clamp(11px, 2.2cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--theme-fgSoft);
+  margin-top: clamp(2px, 0.4cqw, 6px);
+}
+.fn-meta {
+  display: grid;
+  gap: clamp(2px, 0.5cqw, 6px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  min-width: 0;
+}
+.fn-place {
+  font-size: clamp(10px, 1.7cqw, 13px);
+  color: var(--theme-fgSoft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fn-when {
+  font-size: clamp(12px, 2.2cqw, 18px);
+  color: var(--theme-fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- countdown chips --- */
+
+.fn-chips {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  /* Thick black rule echoes the weather widgets' chip-strip anchor. */
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.fn-chip {
+  padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
+  display: grid;
+  gap: clamp(2px, 0.4cqw, 6px);
+  min-width: 0;
+  overflow: hidden;
+  align-content: center;
+}
+.fn-chip-label {
+  font-size: clamp(9px, 1.5cqw, 12px);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+.fn-chip-value {
+  font-size: clamp(20px, 4cqw, 40px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.fn-chip--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
+.fn-chip--surface { background: var(--theme-surface2); color: var(--theme-fg); }
+.fn-chip--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.fn-chip--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+
+/* --- tall-cell layout switch ---
+   Stack the hero so the circuit becomes a wide horizontal band under
+   the text. Same trick as weather_forecast / weather_hourly use. */
+
+@container (max-aspect-ratio: 1) {
+  .fn-hero {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .fn-text {
+    padding: clamp(10px, 2.4cqw, 24px) clamp(12px, 2.8cqw, 28px);
+  }
+  .fn-circuit {
+    border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  }
+}
+
+/* --- size adaptations --- */
+
+.root.size-xs .fn-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .fn-bar-round { display: none; }
+.root.size-xs .fn-hero { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+.root.size-xs .fn-circuit { padding: 4px; min-height: 32px; }
+.root.size-xs .fn-text { padding: 6px 8px; gap: 2px; }
+.root.size-xs .fn-race-lead { font-size: 14px; }
+.root.size-xs .fn-race-suffix { display: none; }
+.root.size-xs .fn-place { display: none; }
+.root.size-xs .fn-when { font-size: 9px; }
+.root.size-xs .fn-chip { padding: 3px 4px; }
+.root.size-xs .fn-chip-label { font-size: 7px; }
+.root.size-xs .fn-chip-value { font-size: 14px; }
+
+.root.size-sm .fn-race-lead { font-size: clamp(18px, 5cqw, 28px); }
+.root.size-sm .fn-when { font-size: clamp(10px, 1.8cqw, 13px); }
+
+/* --- live state: when the race has already started, swap the days
+   chip to a "LIVE" indicator. The countdown will read zeros and a
+   thin Bauhaus accent shift signals the race is on right now. */
+.root.is-live .fn-chip--accent { background: var(--theme-accent3); color: var(--theme-bg); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

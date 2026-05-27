@@ -1,0 +1,18 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "F1 — Next Race",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Countdown to the next F1 race with circuit silhouette, race name, round number, and local session time. Data from Jolpica-F1 (Ergast successor, no API key). Circuits from the bundled f1_core plugin.",
+  "icon": "ph-flag-checkered",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "show_seconds",
+      "type": "boolean",
+      "label": "Show seconds in countdown",
+      "default": true
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

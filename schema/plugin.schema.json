@@ -20,7 +20,7 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
     },
     "kind": {
-      "enum": ["widget", "theme", "font", "admin"]
+      "enum": ["widget", "theme", "font", "admin", "data"]
     },
     "description": {
       "type": "string"
