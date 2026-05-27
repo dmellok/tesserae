@@ -24,7 +24,17 @@ dependencies = [
     # RFC 5545.
     "icalendar>=5.0,<7",
     "recurring-ical-events>=2.1,<4",
+    # Production WSGI server — Flask's built-in run() is dev-only and
+    # prints a "DO NOT USE IN PRODUCTION" banner on every startup.
+    # Waitress is pure-Python, cross-platform, and tuned-by-default for
+    # the single-user appliance Tesserae targets.
+    "waitress>=3.0,<4",
 ]
+
+[project.scripts]
+# `tesserae` runs the production waitress server. `tesserae --dev`
+# opts into Flask's reload + debugger dev server.
+tesserae = "app.main:_serve"
 
 [project.optional-dependencies]
 dev = [

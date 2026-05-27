@@ -512,8 +512,50 @@ def _noop_client_factory(client_id: str) -> _NoopMqttClient:
     return _NoopMqttClient(client_id)
 
 
-if __name__ == "__main__":
+def _serve(argv: list[str] | None = None) -> None:
+    """Entry point for ``python -m app.main`` and the ``tesserae``
+    console script. Defaults to a production WSGI server (waitress);
+    pass ``--dev`` to opt into Flask's reload + debugger dev server.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="tesserae", description="Tesserae dashboard server.")
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="Use Flask's dev server (auto-reload, debugger). "
+        "Default is waitress, a production WSGI server.",
+    )
+    parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    args = parser.parse_args(argv)
+
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
     )
-    create_app().run(host="0.0.0.0", port=8000, debug=True)
+    app = create_app()
+
+    if args.dev:
+        logging.getLogger(__name__).info(
+            "Starting Flask DEV server on http://%s:%d/ (reload + debugger ON)",
+            args.host,
+            args.port,
+        )
+        app.run(host=args.host, port=args.port, debug=True)
+        return
+
+    # Production: waitress. Single-process, multi-threaded — fine for
+    # the single-user appliance. Avoids the "DO NOT USE IN PRODUCTION"
+    # warning Flask's dev server prints on startup.
+    from waitress import serve
+
+    logging.getLogger(__name__).info(
+        "Starting waitress on http://%s:%d/  (--dev for Flask dev server)",
+        args.host,
+        args.port,
+    )
+    serve(app, host=args.host, port=args.port, threads=8, ident="tesserae")
+
+
+if __name__ == "__main__":
+    _serve()
