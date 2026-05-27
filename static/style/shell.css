@@ -315,6 +315,33 @@
 
 .page.page-wide { max-width: 1440px; }
 
+/* Phone-portrait tightening — the admin shell otherwise wastes a lot
+   of the screen on edge padding + card chrome that's appropriate at
+   desktop widths but not at 390px. */
+@media (max-width: 600px) {
+  .page {
+    padding: var(--t-space-4) var(--t-space-3) var(--t-space-6);
+  }
+  .card {
+    padding: var(--t-space-4) var(--t-space-4) var(--t-space-4);
+    margin-bottom: var(--t-space-3);
+    border-radius: var(--t-radius-sm);
+  }
+  .page-head { margin-bottom: var(--t-space-4); }
+  .page-head h1 { font-size: var(--t-size-2xl); }
+  /* Touch targets — make buttons + selects at least 40px tall so
+     they're tappable without zooming. */
+  .form button,
+  .form select,
+  .form input[type="text"],
+  .form input[type="number"],
+  .form input[type="url"],
+  .form input[type="email"],
+  .form input[type="password"] {
+    min-height: 40px;
+  }
+}
+
 .page-head {
   margin-bottom: var(--t-space-6);
 }
@@ -486,7 +513,14 @@
   gap: 4px;
   margin: 0 0 var(--t-space-4);
   border-bottom: 1px solid var(--t-border);
+  /* Horizontal scroll fallback when the tab strip is wider than the
+     container (e.g. settings on a phone) — the underline acts as a
+     visible-area cue and the user can swipe to reach hidden tabs. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
 }
+.tabs::-webkit-scrollbar { display: none; }
 
 .tab {
   display: inline-flex;
@@ -502,6 +536,12 @@
               background var(--t-trans-fast);
   border-top-left-radius: var(--t-radius-sm);
   border-top-right-radius: var(--t-radius-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .tab { padding: 8px 10px; font-size: 13px; gap: 4px; }
+  .tab .ph { font-size: 14px; }
 }
 .tab .ph { font-size: 15px; opacity: 0.75; transition: opacity var(--t-trans-fast); }
 .tab .muted {

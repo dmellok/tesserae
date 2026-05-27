@@ -170,7 +170,7 @@
         handle.style.top = pxToPct(edge.a0, panelH) + "%";
         handle.style.height = pxToPct(edge.a1 - edge.a0, panelH) + "%";
       }
-      handle.addEventListener("mousedown", (e) => beginEdgeDrag(e, edge));
+      handle.addEventListener("pointerdown", (e) => beginEdgeDrag(e, edge));
       board.appendChild(handle);
     });
   }
@@ -217,6 +217,13 @@
   // ---------------------------------------------------------------
   function beginEdgeDrag(evDown, edge) {
     evDown.preventDefault();
+    // Pointer capture keeps the move/up events flowing even if the
+    // finger / cursor slides off the handle. The capturing element
+    // is the handle itself (the pointerdown target).
+    const handleEl = evDown.currentTarget;
+    if (handleEl && handleEl.setPointerCapture) {
+      try { handleEl.setPointerCapture(evDown.pointerId); } catch {}
+    }
     const rect = board.getBoundingClientRect();
     const [lo, hi] = edgeLimits(edge);
 
@@ -239,8 +246,9 @@
     }
 
     function onUp() {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
       document.body.style.cursor = "";
       board.classList.remove("is-dragging");
       const updates = collectChanges(edge);
@@ -249,8 +257,9 @@
       }
     }
 
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   }
 
   // Mutate the in-memory cells: move the edge to newCoord, growing /
@@ -428,6 +437,54 @@
       if (cell) deleteCell(cell);
     }
   });
+
+  // Long-press to delete — the 22px X icon is hard to hit on touch.
+  // Pressing anywhere on a cell (not on its insert zones or resize
+  // handles) for 600ms triggers the same delete confirm.
+  const LONG_PRESS_MS = 600;
+  const MOVE_TOLERANCE_PX = 10;
+  let lpTimer = null;
+  let lpStart = null;
+  let lpCellEl = null;
+  function cancelLongPress() {
+    if (lpTimer) clearTimeout(lpTimer);
+    lpTimer = null;
+    lpStart = null;
+    if (lpCellEl) {
+      lpCellEl.classList.remove("is-pressing");
+      lpCellEl = null;
+    }
+  }
+  board.addEventListener("pointerdown", (e) => {
+    // Skip if the press starts on an interactive child — resize
+    // handles, insert zones, the explicit delete X.
+    if (e.target.closest("[data-insert], [data-delete-cell], .le-edge")) return;
+    const cellEl = e.target.closest(".le-cell");
+    if (!cellEl) return;
+    const cell = cells.find((c) => c.id === cellEl.dataset.cellId);
+    if (!cell) return;
+    lpStart = { x: e.clientX, y: e.clientY };
+    lpCellEl = cellEl;
+    cellEl.classList.add("is-pressing");
+    lpTimer = setTimeout(() => {
+      // Visual feedback at fire moment — the css animation already
+      // showed the pulse; clean it up + run the same delete path.
+      cellEl.classList.remove("is-pressing");
+      lpTimer = null;
+      lpStart = null;
+      lpCellEl = null;
+      deleteCell(cell);
+    }, LONG_PRESS_MS);
+  });
+  board.addEventListener("pointermove", (e) => {
+    if (!lpStart) return;
+    const dx = e.clientX - lpStart.x;
+    const dy = e.clientY - lpStart.y;
+    if (dx * dx + dy * dy > MOVE_TOLERANCE_PX * MOVE_TOLERANCE_PX) cancelLongPress();
+  });
+  board.addEventListener("pointerup", cancelLongPress);
+  board.addEventListener("pointercancel", cancelLongPress);
+  board.addEventListener("pointerleave", cancelLongPress);
 
   render();
 })();

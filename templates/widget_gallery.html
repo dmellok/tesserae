@@ -51,7 +51,40 @@ Not linked from the main nav — visit /_test/widgets directly. #}
     }
     @media (max-width: 800px) {
       .shell { grid-template-columns: 1fr; }
-      .toc { position: static; }
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        max-height: 56px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 12px;
+      }
+      .toc h1 { display: none; }
+      .toc-list {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+      }
+      .toc-list a {
+        white-space: nowrap;
+        flex: 0 0 auto;
+        font-size: 12px;
+      }
+      .toc-list .toc-id { display: none; }
+      .main { padding: 16px 14px 64px; }
+      .widget { padding: 14px; }
+    }
+    /* Phone-portrait: smaller frame target so two tiles fit per row. */
+    @media (max-width: 600px) {
+      .widget-sizes { --target-w: 160px; }
+      .size-key { padding: 8px 10px; gap: 6px; }
+      .size-key dd { margin-right: 8px; font-size: 11px; }
+      .widget-head h2 { font-size: 16px; }
+      .widget-desc { font-size: 12px; }
+      .orient-toggle button { padding: 5px 10px; font-size: 11px; }
     }
 
     /* --- left rail with jump-to nav --- */

@@ -356,6 +356,60 @@
 
 @media (max-width: 1099px) {
   .editor-grid { gap: 14px; }
+  /* Centred, aspect-preserved preview frame. --panel-ar is set
+     inline (w/h) so width = min(100%, max-height × --panel-ar);
+     height comes from the existing aspect-ratio rule. Result: a
+     portrait panel takes 460px of vertical room and 460*0.75 =
+     345px of horizontal room, leaving the rest of the card empty
+     instead of being wastefully wide. */
+  .preview-card { text-align: center; }
+  .preview-frame {
+    display: inline-block;
+    width: min(100%, calc(460px * var(--panel-ar, 1)));
+    max-height: 460px;
+    /* aspect-ratio inline keeps height in lockstep with width. */
+  }
+}
+
+/* Phone-portrait: tighten everything. Header collapses to two rows;
+   action buttons go icon-only to fit. */
+@media (max-width: 600px) {
+  .preview-frame {
+    max-height: 320px;
+    width: min(100%, calc(320px * var(--panel-ar, 1)));
+  }
+  .editor-grid { gap: 10px; }
+  .preview-dims { font-size: 11px; margin-top: 6px; text-align: center; }
+
+  /* Two-row header. Row 1: back · icon · name input (takes the rest).
+     Row 2: save-status (left) · actions (right). page-id-tag and the
+     flex spacer drop out — the row layout supplies the spacing. */
+  .editor-header {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
+    gap: 6px 8px;
+    padding: var(--t-space-2) var(--t-space-1);
+  }
+  .editor-header .header-back { grid-row: 1; grid-column: 1; }
+  .editor-name-icon            { grid-row: 1; grid-column: 2; }
+  .inline-name-form            { grid-row: 1; grid-column: 3 / span 2; max-width: none; }
+  .save-status                 { grid-row: 2; grid-column: 1 / span 2; justify-self: start; }
+  .editor-spacer               { display: none; }
+  .page-id-tag                 { display: none; }
+  .editor-actions {
+    grid-row: 2;
+    grid-column: 3 / span 2;
+    justify-self: end;
+    flex-wrap: nowrap;
+  }
+  /* Action button labels collapse — icons only at this width. */
+  .editor-actions button > span:not(.icon) { display: none; }
+  .editor-actions button {
+    padding: 8px 10px;
+    min-width: 40px;
+    justify-content: center;
+  }
 }
 
 .preview-card .preview-frame { margin: 0 auto; }
@@ -444,6 +498,21 @@
 .le-cell:hover {
   background: color-mix(in oklab, var(--t-accent) 14%, var(--t-surface));
 }
+
+/* Long-press to delete — the cell fills with the danger colour over
+   the long-press window (~600ms). When it completes, the press
+   handler fires the delete confirm. Cancels (move / lift) drop the
+   class and remove the fill. */
+.le-cell.is-pressing {
+  background: var(--t-danger);
+  border-color: var(--t-danger);
+  color: var(--t-bg, #fff);
+  transition: background 600ms linear, border-color 600ms linear, color 200ms ease;
+}
+.le-cell.is-pressing .le-cell-label,
+.le-cell.is-pressing .le-cell-delete {
+  color: inherit;
+}
 .le-cell-label {
   font: 600 12px/1.2 var(--t-font-mono);
   color: var(--t-fg);
@@ -520,12 +589,15 @@
 .le-insert--left   { left: 0;   top: 0; bottom: 0; width: 14px; }
 .le-insert--right  { right: 0;  top: 0; bottom: 0; width: 14px; }
 
-/* Resize handles for shared edges. Sit ON TOP of the cells, slightly
-   thicker than the cell border so they're easy to grab. */
+/* Resize handles for shared edges. Sit ON TOP of the cells with a
+   generous hit-target (24px) for touch; the visible bar inside is
+   only 2px wide. touch-action: none stops the browser from scrolling
+   when the user starts a drag on a phone / tablet. */
 .le-edge {
   position: absolute;
   background: transparent;
   z-index: 2;
+  touch-action: none;
 }
 .le-edge::after {
   content: "";
@@ -539,23 +611,23 @@
 .layout-editor-board.is-dragging .le-edge::after { opacity: 0.7; }
 
 .le-edge--h {
-  height: 10px;
-  margin-top: -5px;
+  height: 24px;
+  margin-top: -12px;
   cursor: ns-resize;
 }
 .le-edge--h::after {
   left: 0; right: 0;
-  top: 4px;
+  top: 11px;
   height: 2px;
 }
 .le-edge--v {
-  width: 10px;
-  margin-left: -5px;
+  width: 24px;
+  margin-left: -12px;
   cursor: ew-resize;
 }
 .le-edge--v::after {
   top: 0; bottom: 0;
-  left: 4px;
+  left: 11px;
   width: 2px;
 }
 

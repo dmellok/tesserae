@@ -17,8 +17,7 @@
 
 (function () {
   const status = document.querySelector("[data-save-status]");
-  // `iframe` is reassigned by reloadPreview's double-buffer swap, so let.
-  let iframe = document.getElementById("preview-iframe");
+  const iframe = document.getElementById("preview-iframe");
   const saveBtn = document.querySelector("[data-save-all]");
   const grid = document.querySelector(".editor-grid");
   const pageId = grid ? grid.dataset.pageId : null;
@@ -46,46 +45,23 @@
     if (saveBtn) saveBtn.disabled = !dirty;
   }
 
-  // Double-buffered preview reload — clone the iframe off-screen,
-  // wait for it to render, then swap it in. Without this, every
-  // option change flashes the iframe blank for ~300-500ms while the
-  // composer re-runs each widget; that flash reads as "everything
-  // reset to page defaults" because the new iframe is empty until it
-  // finishes loading.
-  let pendingFrame = null;
+  // Reload the preview iframe in place. A short opacity fade hides
+  // the blank-during-load state without doubling the live iframe.
+  //
+  // (We used to double-buffer with a cloned iframe + swap, but that
+  // briefly held two full widget compositions in memory at once and
+  // froze the page on iPad Pro.)
   function reloadPreview() {
     if (!iframe) return;
-    // Cancel any in-flight buffer build before starting a new one.
-    if (pendingFrame) {
-      pendingFrame.remove();
-      pendingFrame = null;
-    }
     const url = new URL(iframe.src, location.origin);
     url.searchParams.set("_t", String(Date.now()));
-
-    const next = iframe.cloneNode(false);
-    next.style.position = "absolute";
-    next.style.visibility = "hidden";
-    next.style.pointerEvents = "none";
-    next.src = url.pathname + url.search;
-    next.addEventListener(
-      "load",
-      () => {
-        if (pendingFrame !== next) return; // superseded
-        // Swap: copy the live iframe's id over so editor.js's own
-        // selectors keep finding the new one, then drop the old.
-        next.style.position = "";
-        next.style.visibility = "";
-        next.style.pointerEvents = "";
-        next.id = iframe.id;
-        iframe.replaceWith(next);
-        iframe = next;
-        pendingFrame = null;
-      },
-      { once: true },
-    );
-    pendingFrame = next;
-    iframe.parentNode.appendChild(next);
+    iframe.style.transition = "opacity 140ms ease";
+    iframe.style.opacity = "0.35";
+    const onLoad = () => {
+      iframe.style.opacity = "1";
+    };
+    iframe.addEventListener("load", onLoad, { once: true });
+    iframe.src = url.pathname + url.search;
   }
 
   // Build a single FormData containing every editor-form's fields,

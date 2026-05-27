@@ -470,7 +470,10 @@
       return '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
     }
 
-    canvasWrap?.addEventListener('mousemove', (e) => {
+    // Pointer events so touch works — Safari on iPad otherwise only
+    // dispatches synthetic clicks (no hover for the loupe to follow).
+    // pointermove drives the loupe; pointerup commits the pick.
+    canvasWrap?.addEventListener('pointermove', (e) => {
       if (!imageLoaded || !armed) return;
       const px = pixelAt(e.clientX, e.clientY);
       if (!px) return;
@@ -482,16 +485,23 @@
       loupeColor.style.background = hex;
       loupeHex.textContent = hex;
     });
-    canvasWrap?.addEventListener('mouseleave', () => {
+    canvasWrap?.addEventListener('pointerleave', () => {
       if (loupe) loupe.hidden = true;
     });
-
-    canvasWrap?.addEventListener('click', (e) => {
+    canvasWrap?.addEventListener('pointerup', (e) => {
       if (!imageLoaded || !armed) return;
       const px = pixelAt(e.clientX, e.clientY);
       if (!px) return;
       setTokenValue(armed, rgbToHex(px));
       armToken(null);  // disarm after pick
+    });
+    // Mouse-only fallback: clicks (no preceding move) still pick.
+    canvasWrap?.addEventListener('click', (e) => {
+      if (!imageLoaded || !armed) return;
+      const px = pixelAt(e.clientX, e.clientY);
+      if (!px) return;
+      setTokenValue(armed, rgbToHex(px));
+      armToken(null);
     });
 
     document.addEventListener('keydown', (e) => {

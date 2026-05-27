@@ -20,16 +20,45 @@
   <form method="post"
         action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}"
         class="form" data-editor-form data-cell-id="{{ cell.id }}">
-    {% set plugin_options = [] %}
+    {# Group widgets by category for the picker. Names follow the
+       "Category — Item" convention; everything without a "—" lands
+       in an "Other" bucket. Within a group, show just the trailing
+       item name so the dropdown stays scannable. #}
+    {% set plugin_groups = namespace(items={}) %}
     {% for p in plugins %}
-      {% set _ = plugin_options.append({'value': p.id, 'label': p.name ~ ' (' ~ p.id ~ ')'}) %}
+      {% if ' — ' in p.name %}
+        {% set _parts = p.name.split(' — ', 1) %}
+        {% set _grp = _parts[0] %}
+        {% set _label = _parts[1] %}
+      {% else %}
+        {% set _grp = 'Other' %}
+        {% set _label = p.name %}
+      {% endif %}
+      {% set _ = plugin_groups.items.setdefault(_grp, []).append((p, _label)) %}
     {% endfor %}
     <div class="field">
-      <label for="cell-{{ cell.id }}-plugin">Plugin</label>
+      <label for="cell-{{ cell.id }}-plugin">Widget</label>
       <select id="cell-{{ cell.id }}-plugin" name="plugin" data-reload-on-change="1">
         <option value="" {% if not cell.plugin %}selected{% endif %}>(pick a widget)</option>
-        {% for p in plugins %}
-        <option value="{{ p.id }}" {% if cell.plugin == p.id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+        {# Curated category order; "Other" lands last. #}
+        {% for grp in ['Weather', 'Clock', 'Calendar', 'News', 'Finance', 'Sky', 'F1', 'GitHub', 'Picture', 'Other'] %}
+          {% if plugin_groups.items.get(grp) %}
+          <optgroup label="{{ grp }}">
+            {% for p, label in plugin_groups.items[grp] %}
+            <option value="{{ p.id }}" {% if cell.plugin == p.id %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
+        {% endfor %}
+        {# Any unexpected categories that fell outside the curated order. #}
+        {% for grp, entries in plugin_groups.items.items() %}
+          {% if grp not in ['Weather', 'Clock', 'Calendar', 'News', 'Finance', 'Sky', 'F1', 'GitHub', 'Picture', 'Other'] %}
+          <optgroup label="{{ grp }}">
+            {% for p, label in entries %}
+            <option value="{{ p.id }}" {% if cell.plugin == p.id %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </optgroup>
+          {% endif %}
         {% endfor %}
       </select>
     </div>
@@ -136,7 +165,7 @@
          data-fit-preview
          data-panel-w="{{ panel.w }}"
          data-panel-h="{{ panel.h }}"
-         style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
+         style="aspect-ratio: {{ panel.w }} / {{ panel.h }}; --panel-ar: calc({{ panel.w }} / {{ panel.h }});">
       <iframe id="preview-iframe"
               src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1"
               style="width: {{ panel.w }}px; height: {{ panel.h }}px;"

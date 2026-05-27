@@ -230,7 +230,13 @@
   user-select: none;
   -webkit-user-drag: none;
 }
-.tk-imgview-canvas.is-armed { cursor: crosshair; }
+.tk-imgview-canvas.is-armed {
+  cursor: crosshair;
+  /* When the eyedropper is armed, suppress browser pan/zoom on
+     touchscreens so dragging across the image picks colours
+     instead of scrolling the page. */
+  touch-action: none;
+}
 .tk-imgview-canvas-buf {
   /* Pixel-data source for the eyedropper. Drawn off-screen. */
   position: absolute;

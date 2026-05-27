@@ -17,26 +17,13 @@
 
 {{ settings_tabs(active_area) }}
 
-{% if active_area == 'server' %}
-<section class="card">
-  {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Verify the saved broker config without touching the running transport.') }}
-  <form method="post" action="{{ url_for('auth.diagnostics_test_broker') }}" class="form">
-    <div class="actions">{{ button('Test broker connection', variant='ghost', icon='plugs-connected') }}</div>
-  </form>
-</section>
-{% if session.authed %}
-<section class="card">
-  {{ card_head('Session', icon_name='sign-out', blurb='End the current admin session on this browser.') }}
-  <form method="post" action="{{ url_for('auth.logout_view') }}" class="form">
-    <div class="actions">{{ button('Sign out', variant='ghost', icon='sign-out') }}</div>
-  </form>
-</section>
-{% endif %}
-{% elif active_area == 'renderers' %}
+{% if active_area == 'renderers' %}
+{# Renderers' diagnostic stays at top — it's the only thing on the
+   page besides the renderer settings cards themselves. #}
 <section class="card">
   {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Push a small synthetic image through every loaded renderer. Lands in the Send-page history and the /events timeline.') }}
   <form method="post" action="{{ url_for('auth.diagnostics_test_push') }}" class="form">
-    <div class="actions">{{ button('Test push (synthetic image)', variant='ghost', icon='paper-plane-tilt') }}</div>
+    <div class="actions">{{ button('Test push (synthetic image)', icon='paper-plane-tilt') }}</div>
   </form>
 </section>
 {% endif %}
@@ -114,6 +101,29 @@
   {% endif %}
 </section>
 {% endfor %}
+
+{# Server-tab footer: compact diagnostics + session actions. These
+   live at the bottom so the configuration cards (App / Broker /
+   HA discovery) take the lead; these are one-shot actions you only
+   hit occasionally. #}
+{% if active_area == 'server' %}
+<div class="settings-actions">
+  <section class="card card--compact">
+    {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Verify the saved broker config without touching the running transport.') }}
+    <form method="post" action="{{ url_for('auth.diagnostics_test_broker') }}" class="form">
+      <div class="actions">{{ button('Test broker connection', icon='plugs-connected') }}</div>
+    </form>
+  </section>
+  {% if session.authed %}
+  <section class="card card--compact">
+    {{ card_head('Session', icon_name='sign-out', blurb='End the current admin session on this browser.') }}
+    <form method="post" action="{{ url_for('auth.logout_view') }}" class="form">
+      <div class="actions">{{ button('Sign out', icon='sign-out') }}</div>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
 
 <script>
   // Embedded broker: hide the bind/port/auth fields unless the

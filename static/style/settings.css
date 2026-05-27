@@ -1,3 +1,41 @@
+/* ----- Settings footer (diagnostics + session, compact) -----------
+   Two compact cards laid out side by side at desktop, stacking under
+   each other on phone. The cards have less padding and a smaller
+   header than the configuration cards above so they read as secondary
+   one-shot actions. */
+
+.settings-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--t-space-3);
+  margin-top: var(--t-space-4);
+}
+.settings-actions .card--compact {
+  margin: 0;
+  padding: var(--t-space-4);
+  display: grid;
+  gap: var(--t-space-3);
+}
+.settings-actions .card--compact .card-head {
+  margin-bottom: 0;
+}
+.settings-actions .card--compact .card-head h2 {
+  font-size: var(--t-size-md);
+}
+.settings-actions .card--compact .card-head .icon-box {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+.settings-actions .card--compact .card-head .lede {
+  font-size: var(--t-size-sm);
+  margin-top: 2px;
+}
+.settings-actions .card--compact .actions {
+  margin: 0;
+}
+
+
 /* ----- Device status block ------------------------------------------ */
 
 .device-status {
