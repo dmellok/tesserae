@@ -132,7 +132,11 @@
 }
 .actions .ghost-link { margin-right: auto; }
 
-/* ----- Buttons ------------------------------------------------------- */
+/* ----- Buttons -------------------------------------------------------
+   Three tiers: default (paper card), primary (accent, with inset
+   highlight + soft shadow so it sits proud of the surface), ghost
+   (transparent, hover-tinted). All share the same press-down
+   transform + focus-ring shape. */
 
 button,
 .btn {
@@ -150,29 +154,78 @@ button,
   justify-content: center;
   gap: var(--t-space-2);
   line-height: 1.2;
-  transition: background var(--t-trans-fast), border-color var(--t-trans-fast),
-              color var(--t-trans-fast), box-shadow var(--t-trans-fast),
-              transform var(--t-trans-fast);
+  box-shadow: var(--t-shadow-xs);
+  transition:
+    background var(--t-trans-fast),
+    border-color var(--t-trans-fast),
+    color var(--t-trans-fast),
+    box-shadow var(--t-trans),
+    transform 120ms var(--t-ease-spring);
   user-select: none;
   white-space: nowrap;
 }
-button:hover { border-color: var(--t-border-strong); background: var(--t-surface-sunk); }
-button:active { transform: translateY(1px); }
-button:focus-visible { outline: none; box-shadow: var(--t-ring); }
+button:hover {
+  border-color: var(--t-border-strong);
+  background: var(--t-surface-soft);
+  box-shadow: var(--t-shadow-sm);
+  transform: translateY(-0.5px);
+}
+button:active {
+  transform: translateY(0.5px);
+  box-shadow: var(--t-shadow-xs);
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--t-shadow-sm), var(--t-ring);
+}
 
 button .ph { font-size: 16px; }
 
 button.primary,
 .btn-primary {
-  background: var(--t-accent);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--t-accent) 92%, white),
+    var(--t-accent));
   color: var(--t-accent-fg);
-  border-color: var(--t-accent);
+  border-color: color-mix(in oklab, var(--t-accent) 70%, black);
   font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    var(--t-shadow-sm);
+}
+button.primary:hover,
+.btn-primary:hover {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--t-accent-hover) 92%, white),
+    var(--t-accent-hover));
+  border-color: color-mix(in oklab, var(--t-accent-hover) 70%, black);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    var(--t-shadow),
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 18%, transparent);
+  transform: translateY(-0.5px);
+}
+button.primary:focus-visible,
+.btn-primary:focus-visible {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    var(--t-ring-soft);
 }
 
-button.primary:hover { background: var(--t-accent-hover); border-color: var(--t-accent-hover); }
-button.ghost { background: transparent; border-color: transparent; color: var(--t-fg-soft); }
-button.ghost:hover { color: var(--t-accent); }
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--t-fg-soft);
+  box-shadow: none;
+}
+button.ghost:hover {
+  background: color-mix(in oklab, var(--t-fg) 5%, transparent);
+  color: var(--t-accent);
+  box-shadow: none;
+  transform: translateY(-0.5px);
+}
+button.ghost.danger { color: var(--t-fg-soft); }
+button.ghost.danger:hover { color: var(--t-danger); background: var(--t-danger-bg); }
 
 code {
   background: var(--t-surface-sunk);
@@ -329,33 +382,88 @@ code {
   color: var(--t-muted);
 }
 
-/* ----- File dropzone ----------------------------------------------- */
+/* ----- File dropzone -------------------------------------------------
+   The hero interaction on the Send → File tab. Layered visuals:
+   1) a soft accent radial-glow under the icon
+   2) a faint dot grid behind the body so the surface feels "alive"
+   3) an animated dashed border that subtly rotates
+   4) on drag-over: thicker accent border, brighter glow, slight
+      scale + lift, and the icon-circle pulses (drop-hint feedback)
+   5) ambient floating particles (small accent dots) behind the body
+      while idle, paused on drag so the eye locks onto the dropzone */
 
 .dropzone {
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
-  min-height: 280px;
+  min-height: 320px;
   border: 2px dashed var(--t-border-strong);
-  border-radius: var(--t-radius-lg);
-  padding: var(--t-space-7) var(--t-space-5);
+  border-radius: var(--t-radius-xl);
+  padding: var(--t-space-8) var(--t-space-5);
+  /* Three layers: accent glow up top, dot grid for texture, paper bg. */
   background:
-    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 8%, transparent), transparent 70%),
+    radial-gradient(ellipse 320px 180px at 50% 32%,
+      color-mix(in oklab, var(--t-accent) 12%, transparent), transparent 75%),
+    radial-gradient(circle at 1px 1px,
+      color-mix(in oklab, var(--t-fg) 6%, transparent) 1px, transparent 0),
     var(--t-surface-soft);
+  background-size: auto, 16px 16px, auto;
   cursor: pointer;
-  transition: border-color var(--t-trans-fast), background var(--t-trans-fast), transform var(--t-trans-fast);
+  overflow: hidden;
+  box-shadow: var(--t-shadow-inset);
+  transition:
+    border-color var(--t-trans),
+    border-style var(--t-trans-fast),
+    background var(--t-trans-slow),
+    box-shadow var(--t-trans),
+    transform var(--t-trans);
+}
+.dropzone::before {
+  /* Floating accent particles — three small dots that drift slowly
+     up-and-back. Cheap, pure CSS, no JS needed. Hidden when dragging
+     so they don't distract from the drop-target affordance. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 3px at 18% 78%, color-mix(in oklab, var(--t-accent) 60%, transparent) 100%, transparent 0),
+    radial-gradient(circle 4px at 78% 22%, color-mix(in oklab, var(--t-accent) 45%, transparent) 100%, transparent 0),
+    radial-gradient(circle 2px at 30% 30%, color-mix(in oklab, var(--t-accent) 55%, transparent) 100%, transparent 0);
+  background-repeat: no-repeat;
+  opacity: 0.7;
+  animation: dz-drift 14s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes dz-drift {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
 }
 .dropzone:hover {
   border-color: var(--t-accent);
+  box-shadow:
+    var(--t-shadow-inset),
+    0 0 0 4px color-mix(in oklab, var(--t-accent) 10%, transparent);
 }
 .dropzone.is-dragging {
   border-color: var(--t-accent);
   border-style: solid;
   background:
-    radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--t-accent) 18%, transparent), transparent 65%),
+    radial-gradient(ellipse 320px 180px at 50% 32%,
+      color-mix(in oklab, var(--t-accent) 28%, transparent), transparent 70%),
+    radial-gradient(circle at 1px 1px,
+      color-mix(in oklab, var(--t-accent) 14%, transparent) 1px, transparent 0),
     var(--t-accent-soft);
-  transform: scale(1.005);
+  background-size: auto, 16px 16px, auto;
+  transform: scale(1.01);
+  box-shadow:
+    var(--t-shadow-inset),
+    0 0 0 6px color-mix(in oklab, var(--t-accent) 22%, transparent),
+    0 16px 48px color-mix(in oklab, var(--t-accent) 18%, transparent);
+}
+.dropzone.is-dragging::before { animation-play-state: paused; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .dropzone::before { animation: none; }
 }
 .dropzone-input {
   /* Visually-hidden but still focusable + form-submittable. The
@@ -377,27 +485,50 @@ code {
   display: grid;
   justify-items: center;
   gap: var(--t-space-3);
+  position: relative;
+  z-index: 1;
 }
 .dropzone-body .dropzone-icon {
   display: grid;
   place-items: center;
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   border-radius: 50%;
-  background: var(--t-accent-soft);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,.5), transparent 60%),
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--t-accent) 22%, var(--t-surface)),
+      var(--t-accent-soft));
   color: var(--t-accent);
-  font-size: 48px;
-  transition: transform var(--t-trans-fast);
+  font-size: 52px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.6),
+    0 4px 16px color-mix(in oklab, var(--t-accent) 22%, transparent);
+  transition: transform 260ms var(--t-ease-spring),
+              box-shadow var(--t-trans);
 }
+.dropzone:hover .dropzone-icon { transform: translateY(-2px) scale(1.03); }
 .dropzone.is-dragging .dropzone-icon {
-  transform: scale(1.08);
+  transform: scale(1.10);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.7),
+    0 8px 28px color-mix(in oklab, var(--t-accent) 35%, transparent);
+  animation: dz-pulse 1.2s var(--t-ease-snappy) infinite;
+}
+@keyframes dz-pulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.7),
+                         0 8px 28px color-mix(in oklab, var(--t-accent) 35%, transparent),
+                         0 0 0 0  color-mix(in oklab, var(--t-accent) 25%, transparent); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,.7),
+                         0 12px 36px color-mix(in oklab, var(--t-accent) 45%, transparent),
+                         0 0 0 14px color-mix(in oklab, var(--t-accent) 0%, transparent); }
 }
 .dropzone-title {
   font-size: var(--t-size-xl);
   font-weight: 600;
   margin: 0;
   color: var(--t-fg);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
 }
 .dropzone-hint {
   margin: 0;
@@ -408,7 +539,7 @@ code {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 14px;
+  padding: 7px 16px;
   margin-top: var(--t-space-2);
   border-radius: var(--t-radius-pill);
   background: var(--t-surface);
@@ -416,6 +547,12 @@ code {
   font-size: var(--t-size-sm);
   font-weight: 600;
   color: var(--t-fg-soft);
+  box-shadow: var(--t-shadow-xs);
+  transition: color var(--t-trans-fast), border-color var(--t-trans-fast);
+}
+.dropzone:hover .dropzone-browse {
+  color: var(--t-accent);
+  border-color: color-mix(in oklab, var(--t-accent) 50%, var(--t-border));
 }
 .dropzone-preview {
   display: grid;

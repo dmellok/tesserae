@@ -10,16 +10,30 @@
    a sensible cap, height tracks via aspect-ratio (set inline from the
    panel dims). The inner iframe/img is sized to the panel's native
    pixels so the composer renders unscaled; static/components.js
-   (fitPreview) sets a `transform: scale(...)` to fit. */
+   (fitPreview) sets a `transform: scale(...)` to fit.
+
+   The frame reads as a piece of glass over a subtle checkerboard
+   workspace: rounded inset shadow inside, soft drop shadow outside,
+   thin border. When the panel renders content the bg disappears
+   under the composition. */
 .preview-frame {
   position: relative;
   width: 100%;
   max-width: 720px;
   border: 1px solid var(--t-border-strong);
-  border-radius: var(--t-radius-sm);
-  background: var(--t-surface-soft);
+  border-radius: var(--t-radius-md);
+  background:
+    conic-gradient(from 90deg at 1px 1px,
+      transparent 0 25%, color-mix(in oklab, var(--t-fg) 3.5%, transparent) 0 50%,
+      transparent 0 75%, color-mix(in oklab, var(--t-fg) 3.5%, transparent) 0 100%),
+    var(--t-surface-soft);
+  background-size: 14px 14px, auto;
   overflow: hidden;
   aspect-ratio: 4 / 3; /* fallback; inline style overrides */
+  box-shadow:
+    inset 0 0 0 1px rgba(16,12,8,.04),
+    inset 0 1px 2px rgba(16,12,8,.06),
+    var(--t-shadow-sm);
 }
 
 .preview-frame > iframe {
@@ -64,13 +78,24 @@
 .page-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: var(--t-space-3);
   align-items: center;
-  padding: 12px 14px;
+  padding: var(--t-space-3) var(--t-space-4);
   background: var(--t-surface);
   border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-sm);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-xs);
+  transition:
+    border-color var(--t-trans),
+    box-shadow var(--t-trans),
+    transform var(--t-trans);
 }
+.page-row:hover {
+  border-color: var(--t-border-strong);
+  box-shadow: var(--t-shadow-sm);
+  transform: translateY(-1px);
+}
+.page-row:hover .page-name { color: var(--t-accent); }
 
 .page-card-link {
   text-decoration: none;
@@ -99,7 +124,13 @@
   align-items: center;
   padding: 8px 10px;
   background: var(--t-surface-soft);
+  border: 1px solid transparent;
   border-radius: var(--t-radius-sm);
+  transition: background var(--t-trans-fast), border-color var(--t-trans-fast);
+}
+.cell-row:hover {
+  background: var(--t-surface);
+  border-color: var(--t-border);
 }
 
 .cell-row-link {
@@ -205,10 +236,23 @@
 .editor-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 0 16px;
-  margin: -20px 0 12px;
+  gap: var(--t-space-3);
+  padding: var(--t-space-3) 0 var(--t-space-4);
+  margin: calc(-1 * var(--t-space-5)) 0 var(--t-space-3);
   border-bottom: 1px solid var(--t-border);
+  position: sticky;
+  top: 64px; /* below the topbar */
+  background: color-mix(in oklab, var(--t-bg) 80%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 40;
+  padding-left: var(--t-space-1);
+  padding-right: var(--t-space-1);
+  margin-left: calc(-1 * var(--t-space-1));
+  margin-right: calc(-1 * var(--t-space-1));
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .editor-header { background: var(--t-bg); }
 }
 
 .editor-header .header-back {
@@ -252,19 +296,33 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 999px;
   background: var(--t-ok-bg);
   color: var(--t-ok);
+  border: 1px solid color-mix(in oklab, var(--t-ok) 25%, transparent);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em;
+  transition: background var(--t-trans), color var(--t-trans),
+              border-color var(--t-trans);
 }
 .save-status .ph, .save-status [class^="ph-"] { font-size: 13px; }
-.save-status[data-state="saving"] { background: var(--t-surface-soft); color: var(--t-fg-soft); }
+.save-status[data-state="saving"] {
+  background: var(--t-surface-sunk);
+  color: var(--t-fg-soft);
+  border-color: var(--t-border);
+}
 .save-status[data-state="saving"] .ph { animation: ts-spin 0.9s linear infinite; }
 .save-status[data-state="dirty"] {
-  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
+  background: color-mix(in oklab, var(--t-warn) 14%, transparent);
   color: var(--t-warn);
+  border-color: color-mix(in oklab, var(--t-warn) 30%, transparent);
 }
-.save-status[data-state="error"] { background: var(--t-danger-bg); color: var(--t-danger); }
+.save-status[data-state="error"] {
+  background: var(--t-danger-bg);
+  color: var(--t-danger);
+  border-color: color-mix(in oklab, var(--t-danger) 30%, transparent);
+}
 
 @keyframes ts-spin {
   to { transform: rotate(360deg); }
@@ -316,10 +374,21 @@
   margin: 8px 4px 0;
 }
 
-.cell-card { scroll-margin-top: 16px; transition: outline 200ms ease; }
+.cell-card {
+  scroll-margin-top: 16px;
+  transition:
+    outline 200ms ease,
+    box-shadow var(--t-trans),
+    border-color var(--t-trans);
+}
 .cell-card.is-focused {
   outline: 3px solid var(--t-accent);
   outline-offset: 2px;
+  border-color: var(--t-accent);
+  box-shadow:
+    var(--t-shadow-md),
+    var(--t-shadow-inset),
+    0 0 0 8px color-mix(in oklab, var(--t-accent) 8%, transparent);
 }
 .cell-card .card-head {
   display: flex;
@@ -336,12 +405,16 @@
 .cell-num {
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  background: var(--t-fg);
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--t-700), var(--t-900));
   color: var(--t-bg);
-  font: 700 12px/1 system-ui, sans-serif;
+  font: 700 12px/1 var(--t-font-mono);
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    var(--t-shadow-xs);
 }
 .cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
 
@@ -380,11 +453,15 @@
 }
 .layout-card:hover {
   border-color: var(--t-accent);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--t-shadow-sm);
 }
 .layout-card.is-active {
   border-color: var(--t-accent);
   background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+  box-shadow:
+    0 0 0 2px var(--t-accent),
+    var(--t-shadow-sm);
 }
 
 .layout-card input[type="radio"] {

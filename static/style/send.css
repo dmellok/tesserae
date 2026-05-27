@@ -43,14 +43,36 @@
   height: 100%;
   padding: var(--t-space-5);
   color: var(--t-muted);
+  /* Subtle checkerboard so the preview canvas reads as a designer's
+     transparent surface rather than a flat fill. The squares are
+     tinted with the soft surface tokens so they barely register —
+     they're texture, not pattern. */
+  background:
+    conic-gradient(from 90deg at 1px 1px,
+      transparent 0 25%, color-mix(in oklab, var(--t-fg) 3%, transparent) 0 50%,
+      transparent 0 75%, color-mix(in oklab, var(--t-fg) 3%, transparent) 0 100%);
+  background-size: 16px 16px;
 }
 .preview-placeholder [class^="ph-duotone"] {
-  font-size: 56px;
+  font-size: 64px;
   color: var(--t-fg-soft);
   margin-bottom: var(--t-space-2);
-  opacity: 0.6;
+  opacity: 0.55;
+  animation: preview-breathe 4.5s var(--t-ease-snappy) infinite;
 }
-.preview-placeholder p { margin: 0; font-size: var(--t-size-sm); }
+@keyframes preview-breathe {
+  0%, 100% { transform: scale(1);    opacity: 0.5; }
+  50%      { transform: scale(1.04); opacity: 0.7; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .preview-placeholder [class^="ph-duotone"] { animation: none; }
+}
+.preview-placeholder p {
+  margin: 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  letter-spacing: -0.005em;
+}
 
 /* ----- History ------------------------------------------------------ */
 
@@ -65,30 +87,47 @@
 .history-row {
   display: grid;
   grid-template-columns: 96px 1fr auto;
-  gap: 14px;
+  gap: var(--t-space-4);
   align-items: center;
-  padding: 12px;
+  padding: var(--t-space-3);
   border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-sm);
+  border-radius: var(--t-radius-md);
   background: var(--t-surface);
+  box-shadow: var(--t-shadow-xs);
+  transition:
+    border-color var(--t-trans),
+    box-shadow var(--t-trans),
+    transform var(--t-trans);
+}
+.history-row:hover {
+  border-color: var(--t-border-strong);
+  box-shadow: var(--t-shadow-sm);
+  transform: translateY(-1px);
 }
 
 .history-thumb {
-  display: block;
-  width: 96px;
-  height: 72px;
-  background: var(--t-surface-soft);
-  border-radius: var(--t-radius-sm);
-  overflow: hidden;
   display: grid;
   place-items: center;
+  width: 96px;
+  height: 72px;
+  background: var(--t-surface-sunk);
+  border-radius: var(--t-radius-sm);
+  border: 1px solid var(--t-border);
+  overflow: hidden;
   text-decoration: none;
+  transition: transform var(--t-trans), box-shadow var(--t-trans-fast);
+}
+.history-row:hover .history-thumb {
+  transform: scale(1.02);
+  box-shadow: var(--t-shadow-sm);
 }
 .history-thumb img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  transition: transform 280ms var(--t-ease-spring);
 }
+.history-thumb:hover img { transform: scale(1.04); }
 .history-thumb-empty {
   font-size: 11px;
   color: var(--t-muted);

@@ -5,14 +5,22 @@
   align-items: center;
   gap: var(--t-space-5);
   padding: var(--t-space-3) var(--t-space-6);
-  background: var(--t-surface);
-  border-bottom: 1px solid var(--t-border);
+  /* Translucent + blurred — the page bg has a subtle grid + radial
+     gradient that you see faintly through the topbar. Mobile drawer
+     is opened over the topbar (position:fixed) so the backdrop-filter
+     on topbar wouldn't affect the drawer either way. */
+  background: color-mix(in oklab, var(--t-surface) 80%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
   position: sticky;
   top: 0;
-  /* Sit above the mobile-drawer scrim so the drawer (a child of topbar)
-     renders unblurred. No backdrop-filter — it would create a containing
-     block that traps `position: fixed` descendants inside the header. */
   z-index: 60;
+}
+/* Solid fallback when the browser can't blur so the topbar never reads
+   as washed-out. */
+@supports not (backdrop-filter: blur(1px)) {
+  .topbar { background: var(--t-surface); }
 }
 
 .brand {
@@ -22,23 +30,31 @@
   text-decoration: none;
   color: var(--t-fg);
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   font-size: var(--t-size-lg);
+  transition: color var(--t-trans-fast);
 }
 .brand:hover { color: var(--t-accent); }
+.brand:hover .brand-mark { transform: rotate(8deg) scale(1.06); }
 
 .brand-mark {
   display: inline-grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   background: linear-gradient(135deg, var(--t-accent), var(--t-accent-hover));
   color: var(--t-accent-fg);
   font-size: 16px;
   position: relative;
+  /* Soft glow + inset highlight so the mark feels lit, not pasted on. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.35),
+    0 1px 3px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    0 6px 16px color-mix(in oklab, var(--t-accent) 18%, transparent);
+  transition: transform 220ms var(--t-ease-spring);
 }
-/* Tessellated dot pattern in the brand mark. Pure CSS, no image. */
+/* Tessellated dot pattern — pure CSS, no image. */
 .brand-mark::before {
   content: "";
   position: absolute;
@@ -81,14 +97,30 @@
 .topnav a:hover,
 .topnav .nav-dropdown summary:hover {
   color: var(--t-fg);
-  background: var(--t-surface-sunk);
+  background: color-mix(in oklab, var(--t-fg) 5%, transparent);
 }
 
+/* Active state — accent soft fill + thin underline anchor so the
+   active page reads at a glance without overpowering the rest of
+   the nav. */
 .topnav a.is-active,
 .topnav .nav-dropdown.is-active summary,
 .topnav .nav-dropdown[open] summary {
   color: var(--t-accent);
   background: var(--t-accent-soft);
+  position: relative;
+}
+.topnav a.is-active::after,
+.topnav .nav-dropdown.is-active summary::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--t-accent);
+  opacity: 0.85;
 }
 
 /* Plugin dropdown — anchored panel, not inline block. */
@@ -300,13 +332,27 @@
   padding: var(--t-space-5) var(--t-space-6) var(--t-space-6);
   margin: 0 0 var(--t-space-4);
   scroll-margin-top: 80px;
-  transition: border-color var(--t-trans-fast);
+  /* Soft elevation — small ambient shadow + an inset highlight on the
+     top edge so the card reads as paper lifted off the page bg rather
+     than a flat rectangle drawn on top of it. */
+  box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
+  transition:
+    border-color var(--t-trans-fast),
+    box-shadow var(--t-trans),
+    transform var(--t-trans);
+}
+.card:hover {
+  /* Whisper-soft lift on hover so the cursor feels acknowledged
+     without anything actually moving in a distracting way. */
+  box-shadow: var(--t-shadow), var(--t-shadow-inset);
+  border-color: color-mix(in oklab, var(--t-border-strong) 80%, var(--t-border));
 }
 
 .card.narrow {
   max-width: 440px;
   margin: var(--t-space-8) auto;
   padding: var(--t-space-6);
+  box-shadow: var(--t-shadow-md), var(--t-shadow-inset);
 }
 
 .card-head {
@@ -320,7 +366,7 @@
   font-size: var(--t-size-2xl);
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
   display: flex;
   align-items: center;
   gap: var(--t-space-2);
@@ -330,7 +376,7 @@
   font-size: var(--t-size-lg);
   font-weight: 600;
   margin: 0;
-  letter-spacing: -0.005em;
+  letter-spacing: -0.008em;
   display: flex;
   align-items: center;
   gap: var(--t-space-2);
@@ -350,44 +396,80 @@
   flex-shrink: 0;
 }
 
-/* ----- Empty states -------------------------------------------------- */
+/* ----- Empty states --------------------------------------------------
+   Empty states are first-class — every list / panel that can be empty
+   should render one. The icon halo is a layered radial gradient + a
+   slowly-pulsing accent ring so the eye is drawn to the illustration
+   before the helper copy. */
 
 .empty-state {
   display: grid;
   justify-items: center;
   text-align: center;
   gap: var(--t-space-2);
-  padding: var(--t-space-7) var(--t-space-4);
+  padding: var(--t-space-8) var(--t-space-4);
   color: var(--t-fg-soft);
 }
 
 .empty-state-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: var(--t-radius-lg);
-  background: var(--t-accent-soft);
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--t-radius-xl);
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255,255,255,.45), transparent 60%),
+    linear-gradient(135deg,
+      color-mix(in oklab, var(--t-accent) 18%, var(--t-surface)),
+      var(--t-accent-soft));
   color: var(--t-accent);
   display: grid;
   place-items: center;
   font-size: 32px;
-  margin-bottom: var(--t-space-2);
+  margin-bottom: var(--t-space-3);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.45),
+    0 4px 14px color-mix(in oklab, var(--t-accent) 18%, transparent);
+}
+.empty-state-icon::before,
+.empty-state-icon::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 1.5px solid color-mix(in oklab, var(--t-accent) 30%, transparent);
+  opacity: 0;
+  animation: empty-pulse 3.6s var(--t-ease-snappy) infinite;
+  pointer-events: none;
+}
+.empty-state-icon::after { animation-delay: 1.8s; }
+@keyframes empty-pulse {
+  0%   { transform: scale(0.92); opacity: 0; }
+  40%  { opacity: 0.55; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .empty-state-icon::before,
+  .empty-state-icon::after { animation: none; }
 }
 
 .empty-state h3 {
   margin: 0;
-  font-size: var(--t-size-lg);
+  font-size: var(--t-size-xl);
   font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--t-fg);
 }
 
 .empty-state .lede {
-  max-width: 360px;
+  max-width: 380px;
   margin: 0;
+  font-size: var(--t-size-md);
+  line-height: 1.55;
 }
 
 .empty-state .btn,
 .empty-state button {
-  margin-top: var(--t-space-3);
+  margin-top: var(--t-space-4);
 }
 
 .meta {
@@ -418,7 +500,7 @@
 .tabs {
   display: flex;
   gap: 4px;
-  margin: 0 0 12px;
+  margin: 0 0 var(--t-space-4);
   border-bottom: 1px solid var(--t-border);
 }
 
@@ -426,27 +508,37 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 10px 14px;
   color: var(--t-fg-soft);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 500;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  transition: color var(--t-trans-fast), border-color var(--t-trans),
+              background var(--t-trans-fast);
+  border-top-left-radius: var(--t-radius-sm);
+  border-top-right-radius: var(--t-radius-sm);
 }
-.tab .ph { font-size: 15px; opacity: 0.75; }
+.tab .ph { font-size: 15px; opacity: 0.75; transition: opacity var(--t-trans-fast); }
 .tab .muted {
   font-size: 11px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--t-surface-soft);
+  background: var(--t-surface-sunk);
   margin-left: 4px;
+  font-variant-numeric: tabular-nums;
 }
 .tab.is-active {
   color: var(--t-accent);
   border-bottom-color: var(--t-accent);
+  font-weight: 600;
 }
 .tab.is-active .ph { opacity: 1; }
-.tab:hover { color: var(--t-fg); }
+.tab:hover {
+  color: var(--t-fg);
+  background: color-mix(in oklab, var(--t-fg) 4%, transparent);
+}
+.tab:hover .ph { opacity: 1; }
 
 .page-name {
   display: inline-flex;

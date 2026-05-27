@@ -125,14 +125,22 @@
   background: var(--t-surface);
   display: grid;
   grid-template-rows: auto auto;
-  transition: border-color var(--t-trans), box-shadow var(--t-trans);
+  box-shadow: var(--t-shadow-xs);
+  transition:
+    border-color var(--t-trans),
+    box-shadow var(--t-trans),
+    transform var(--t-trans);
 }
 .theme-card:hover {
   border-color: var(--t-border-strong);
-  box-shadow: var(--t-shadow-sm);
+  box-shadow: var(--t-shadow);
+  transform: translateY(-2px);
 }
 .theme-card.is-user {
   border-color: var(--t-accent);
+  box-shadow:
+    var(--t-shadow-xs),
+    0 0 0 1px var(--t-accent);
 }
 
 .theme-card-link,
