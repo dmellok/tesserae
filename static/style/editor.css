@@ -393,21 +393,185 @@
   gap: 8px;
   font-size: 16px;
 }
-.cell-num {
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: linear-gradient(180deg, var(--t-700), var(--t-900));
-  color: var(--t-bg);
-  font: 700 12px/1 var(--t-font-mono);
-  font-variant-numeric: tabular-nums;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.12),
-    var(--t-shadow-xs);
-}
 .cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
+
+/* ----- Layout editor (interactive grid) --------------------------- */
+
+.layout-editor {
+  position: relative;
+  margin-bottom: var(--t-space-4);
+  --panel-aspect: 4 / 3;
+}
+
+.layout-editor-board {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--panel-aspect);
+  background: var(--t-surface-soft);
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--t-radius-sm);
+  user-select: none;
+  /* Containing block for absolutely-positioned cells + handles. */
+}
+.layout-editor-board.is-dragging .le-insert,
+.layout-editor-board.is-dragging .le-cell-delete {
+  /* Avoid stray hovers triggering during a resize drag. */
+  pointer-events: none;
+  opacity: 0;
+}
+
+.layout-editor-hint {
+  margin: var(--t-space-2) 0 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.layout-editor-hint .ph { font-size: 14px; color: var(--t-accent); }
+
+.le-cell {
+  position: absolute;
+  box-sizing: border-box;
+  background: color-mix(in oklab, var(--t-accent) 8%, var(--t-surface));
+  border: 1px solid var(--t-accent);
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition: background 80ms ease;
+}
+.le-cell:hover {
+  background: color-mix(in oklab, var(--t-accent) 14%, var(--t-surface));
+}
+.le-cell-label {
+  font: 600 12px/1.2 var(--t-font-mono);
+  color: var(--t-fg);
+  padding: 2px 6px;
+  background: color-mix(in oklab, var(--t-surface) 80%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+  max-width: 90%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Delete X — top-right corner, only visible on hover. */
+.le-cell-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 4px;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.le-cell:hover .le-cell-delete { opacity: 1; }
+.le-cell-delete:hover {
+  color: var(--t-danger);
+  border-color: var(--t-danger);
+}
+.le-cell-delete .ph { font-size: 13px; }
+
+/* Insert affordances — thin invisible strips on each side that show a
+   "+ insert here" hint on hover. Click splits the cell along the
+   perpendicular axis. */
+.le-insert {
+  position: absolute;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: background 120ms ease;
+  display: grid;
+  place-items: center;
+}
+.le-insert::before {
+  content: "+";
+  font: 700 18px/1 var(--t-font-mono);
+  color: var(--t-accent-fg, #fff);
+  background: var(--t-accent);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.le-insert:hover {
+  background: color-mix(in oklab, var(--t-accent) 18%, transparent);
+}
+.le-insert:hover::before {
+  opacity: 1;
+  transform: scale(1.05);
+}
+.le-insert--top    { top: 0;    left: 0; right: 0; height: 14px; }
+.le-insert--bottom { bottom: 0; left: 0; right: 0; height: 14px; }
+.le-insert--left   { left: 0;   top: 0; bottom: 0; width: 14px; }
+.le-insert--right  { right: 0;  top: 0; bottom: 0; width: 14px; }
+
+/* Resize handles for shared edges. Sit ON TOP of the cells, slightly
+   thicker than the cell border so they're easy to grab. */
+.le-edge {
+  position: absolute;
+  background: transparent;
+  z-index: 2;
+}
+.le-edge::after {
+  content: "";
+  position: absolute;
+  background: var(--t-accent);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.le-edge:hover::after,
+.layout-editor-board.is-dragging .le-edge::after { opacity: 0.7; }
+
+.le-edge--h {
+  height: 10px;
+  margin-top: -5px;
+  cursor: ns-resize;
+}
+.le-edge--h::after {
+  left: 0; right: 0;
+  top: 4px;
+  height: 2px;
+}
+.le-edge--v {
+  width: 10px;
+  margin-left: -5px;
+  cursor: ew-resize;
+}
+.le-edge--v::after {
+  top: 0; bottom: 0;
+  left: 4px;
+  width: 2px;
+}
+
+/* Custom layout editor — collapsed under the preset grid by default. */
+.custom-layout {
+  margin-top: var(--t-space-4);
+  border-top: 1px solid var(--t-border);
+  padding-top: var(--t-space-3);
+}
+.custom-layout summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  padding: var(--t-space-2) 0;
+}
+.custom-layout[open] summary { color: var(--t-fg); margin-bottom: var(--t-space-2); }
 
 /* ----- Layout picker (thumbnails) --------------------------------- */
 

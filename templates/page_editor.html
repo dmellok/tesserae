@@ -11,7 +11,6 @@
 <section class="card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
   <header class="card-head cell-card-head">
     <h2>
-      <span class="cell-num">{{ idx }}</span>
       <span>Cell {{ idx }}</span>
       <span class="muted">·</span>
       <span class="cell-card-plugin">{{ cell.plugin or 'unassigned' }}</span>
@@ -47,12 +46,10 @@
                       blank_label='Inherit page') }}
     </div>
 
-    {# Position + size come from the Layout picker — keep the values in
-       the form so the preview/save endpoints don't lose them on submit. #}
-    <input type="hidden" name="x" value="{{ cell.x }}">
-    <input type="hidden" name="y" value="{{ cell.y }}">
-    <input type="hidden" name="w" value="{{ cell.w }}">
-    <input type="hidden" name="h" value="{{ cell.h }}">
+    {# Geometry is owned by the layout editor (drag handles + presets)
+       and persisted via /cells/batch. Don't send x/y/w/h from here —
+       update_cell defaults to the cell's current geometry when these
+       fields are absent, so the layout survives a cell-option save. #}
 
     {% set cell_opts = plugin_cell_options.get(plugin.id, []) %}
     {% if cell_opts %}
@@ -194,7 +191,8 @@
     </section>
 
     <section class="card">
-      {{ card_head('Layout', icon_name='grid-four', blurb='Pick a layout to (re)split the panel into cells. Existing cell assignments are reused in order.') }}
+      {{ card_head('Layout', icon_name='grid-four', blurb='Pick a preset to (re)split the panel. Open “Custom layout” to drag edges or insert cells freely.') }}
+
       <div class="layout-grid" style="--panel-aspect: {{ panel.w }} / {{ panel.h }};">
         {% for layout in layouts %}
         <form method="post" action="{{ url_for('pages.apply_layout', page_id=page.id) }}" class="layout-form" data-confirm-if-cells>
@@ -212,6 +210,27 @@
         </form>
         {% endfor %}
       </div>
+
+      {# Interactive custom layout: drag shared edges to resize, click
+         outer-perimeter insert zones to split a cell, click the X to
+         delete (neighbours absorb the gap). Collapsed by default. #}
+      <details class="custom-layout">
+        <summary>Custom layout</summary>
+        <div class="layout-editor"
+             data-layout-editor
+             data-page-id="{{ page.id }}"
+             data-panel-w="{{ panel.w }}"
+             data-panel-h="{{ panel.h }}"
+             data-cells='{{ layout_editor_cells | tojson }}'
+             data-batch-url="{{ url_for('pages.batch_cells', page_id=page.id) }}"
+             style="--panel-aspect: {{ panel.w }} / {{ panel.h }};">
+          <div class="layout-editor-board" data-layout-board></div>
+          <p class="layout-editor-hint" data-layout-hint>
+            <i class="ph ph-info" aria-hidden="true"></i>
+            Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.
+          </p>
+        </div>
+      </details>
     </section>
 
     {% for cell in page.cells %}
@@ -221,4 +240,5 @@
 </div>
 
 <script src="{{ url_for('static', filename='pages/editor.js') }}"></script>
+<script src="{{ url_for('static', filename='pages/layout_editor.js') }}"></script>
 {% endblock %}
