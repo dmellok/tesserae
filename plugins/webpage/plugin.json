@@ -1,0 +1,50 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Webpage",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders — handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
+  "icon": "ph-globe",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "url",
+      "type": "string",
+      "label": "URL",
+      "help": "https://… — page to render inside the cell. Must support iframe embedding.",
+      "default": ""
+    },
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "fit",
+      "choices": [
+        { "value": "fit",  "label": "Fit to cell (no scroll)" },
+        { "value": "100",  "label": "100% (native, may scroll)" },
+        { "value": "75",   "label": "75%" },
+        { "value": "50",   "label": "50%" },
+        { "value": "25",   "label": "25%" }
+      ]
+    },
+    {
+      "name": "viewport_w",
+      "type": "number",
+      "label": "Render width (px)",
+      "help": "Logical viewport width the page sees. Use a desktop width for responsive sites that hide content on narrow viewports.",
+      "default": 1280,
+      "min": 200,
+      "max": 4096
+    },
+    {
+      "name": "refresh_seconds",
+      "type": "number",
+      "label": "Auto-refresh interval (seconds)",
+      "help": "0 disables auto-refresh. Useful for status pages that change without a hard reload.",
+      "default": 0,
+      "min": 0,
+      "max": 86400
+    }
+  ],
+  "render": { "dither": "ordered", "needs_network": true }
+}

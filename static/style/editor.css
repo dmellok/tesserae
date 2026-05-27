@@ -12,28 +12,17 @@
    pixels so the composer renders unscaled; static/components.js
    (fitPreview) sets a `transform: scale(...)` to fit.
 
-   The frame reads as a piece of glass over a subtle checkerboard
-   workspace: rounded inset shadow inside, soft drop shadow outside,
-   thin border. When the panel renders content the bg disappears
-   under the composition. */
+   Flat surface — no checkerboard, no inset glass. The placeholder
+   carries the empty state on its own. */
 .preview-frame {
   position: relative;
   width: 100%;
   max-width: 720px;
-  border: 1px solid var(--t-border-strong);
+  border: 1px solid var(--t-border);
   border-radius: var(--t-radius-md);
-  background:
-    conic-gradient(from 90deg at 1px 1px,
-      transparent 0 25%, color-mix(in oklab, var(--t-fg) 3.5%, transparent) 0 50%,
-      transparent 0 75%, color-mix(in oklab, var(--t-fg) 3.5%, transparent) 0 100%),
-    var(--t-surface-soft);
-  background-size: 14px 14px, auto;
+  background: var(--t-surface-soft);
   overflow: hidden;
   aspect-ratio: 4 / 3; /* fallback; inline style overrides */
-  box-shadow:
-    inset 0 0 0 1px rgba(16,12,8,.04),
-    inset 0 1px 2px rgba(16,12,8,.06),
-    var(--t-shadow-sm);
 }
 
 .preview-frame > iframe {
