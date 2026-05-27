@@ -13,6 +13,8 @@ theme came from.
 
 from __future__ import annotations
 
+import base64
+import logging
 from typing import Any
 
 from flask import (
@@ -20,6 +22,7 @@ from flask import (
     Flask,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -27,6 +30,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app.palette_extract import assign_to_tokens, extract_dominant
 from app.plugin_loader import PluginRegistry, Theme
 from app.state.user_themes import (
     PALETTE_TOKENS,
@@ -36,6 +40,9 @@ from app.state.user_themes import (
     slug_id,
     validate_palette,
 )
+
+_log = logging.getLogger(__name__)
+_MAX_EXTRACT_BYTES = 8 * 1024 * 1024  # 8 MiB — generous for a UI upload
 
 bp = Blueprint("themes", __name__, url_prefix="/themes")
 
@@ -221,6 +228,39 @@ def duplicate(theme_id: str) -> Response:
     )
     _rebuild_registry_themes()
     return redirect(url_for("themes.index", edit=new_id))
+
+
+@bp.post("/extract-palette")
+def extract_palette() -> Response:
+    """Take an uploaded image, run k-means + token-assignment, return the
+    suggested palette plus a base64 data URL the client can use for the
+    eyedropper canvas. JSON only — no flash redirects."""
+    upload = request.files.get("image")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "No image provided."}), 400
+    data = upload.read(_MAX_EXTRACT_BYTES + 1)
+    if len(data) > _MAX_EXTRACT_BYTES:
+        return jsonify(
+            {"error": f"Image too large (>{_MAX_EXTRACT_BYTES // (1024 * 1024)} MiB)."}
+        ), 413
+    mode = (request.form.get("mode") or "light").strip()
+    if mode not in VALID_MODES:
+        mode = "light"
+    try:
+        colors = extract_dominant(data)
+    except Exception as exc:
+        _log.exception("palette extraction failed")
+        return jsonify({"error": f"Could not parse image: {exc}"}), 400
+    palette = assign_to_tokens(colors, mode=mode)
+    mime = upload.mimetype or "image/png"
+    data_url = f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+    return jsonify(
+        {
+            "palette": palette,
+            "swatches": [c.hex() for c in colors],
+            "image_data_url": data_url,
+        }
+    )
 
 
 def register(app: Flask) -> None:
