@@ -126,7 +126,38 @@ to the retained `tesserae/esp32/frame/bin` topic, and skips the download when
 the URL hash hasn't changed. Months of battery life from a single Li-Po;
 refresh cadence is set by `sleep_interval_s` on `tesserae/esp32/config`.
 
-## Running locally
+## Install
+
+One-liner for **macOS, Linux, and Raspberry Pi**:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash
+```
+
+**Windows** (PowerShell):
+
+```powershell
+iwr https://raw.githubusercontent.com/dmellok/tesserae/main/install.ps1 -UseBasicParsing | iex
+```
+
+The installer:
+
+- Sanity-checks `git` + Python 3.11+
+- Clones the repo (default: `~/tesserae`, override with `TESSERAE_DIR`)
+- Creates a venv and installs the project
+- Asks for a port (default 8000)
+- Installs Chromium via Playwright for the webpage-rendering features;
+  if Playwright doesn't ship a binary for your platform (e.g. 32-bit
+  Pi OS), it looks for system `chromium-browser` / Chrome / Edge and
+  points Playwright at that. If neither exists it warns and continues
+  — everything except webpage rendering still works.
+- Writes a `run.sh` (or `run.ps1`) shortcut in the install dir.
+
+After it finishes, start the server with `./run.sh` from the install
+dir, then visit `http://localhost:8000/` (or whatever port you chose).
+First run sends you to `/setup` to pick an admin password.
+
+Manual install (or if you already cloned the repo):
 
 ```sh
 python3 -m venv .venv
@@ -140,6 +171,21 @@ a pure-Python production WSGI server — same command on a Raspberry Pi
 appliance, no need for nginx in front for a single-user install. `--dev`
 opts into Flask's dev server when you're hacking on the admin and want
 auto-reload.
+
+### Chromium for webpage rendering
+
+The Send → Webpage tab and the `webpage` widget shoot screenshots with
+headless Chromium via Playwright. Playwright ships its own binaries for
+most platforms; on 32-bit Raspberry Pi OS it doesn't, so the installer
+falls back to the system browser. To override yourself, point at any
+Chromium-compatible binary:
+
+```sh
+export TESSERAE_CHROMIUM_PATH=/usr/bin/chromium-browser
+```
+
+Or write the path to `data/core/.chromium` (single line) — the renderer
+reads either at launch.
 
 Open <http://127.0.0.1:8000/> — on first boot you'll be sent to `/setup`
 to pick an admin password. After that, sign in at `/login` and configure
