@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "News — Wikipedia On This Day",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Wikipedia 'On this day' — featured historical events for today's date. Uses the free Wikimedia REST API (no key).",
+  "icon": "ph-book-open",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "type",
+      "type": "select",
+      "label": "Type",
+      "default": "events",
+      "choices": [
+        { "value": "events", "label": "Events" },
+        { "value": "births", "label": "Births" },
+        { "value": "deaths", "label": "Deaths" },
+        { "value": "holidays", "label": "Holidays" }
+      ]
+    },
+    { "name": "max_items", "type": "number", "label": "Max entries", "default": 6 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

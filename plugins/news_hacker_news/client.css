@@ -1,0 +1,47 @@
+:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
+.root { width: 100%; height: 100%; display: grid; grid-template-rows: auto 1fr; box-sizing: border-box; overflow: hidden; }
+.hn-bar {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg); color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.hn-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.hn-title-bar { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hn-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); color: var(--theme-accent2); }
+
+.hn-list { display: grid; grid-auto-rows: min-content; align-content: start; background: var(--theme-surface); min-height: 0; overflow: hidden; }
+.hn-row {
+  display: grid; grid-template-columns: auto 1fr;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(4px, 0.8cqh, 8px) clamp(10px, 1.6cqw, 18px);
+  border-top: 1px solid var(--theme-divider);
+  min-width: 0;
+}
+.hn-row:first-child { border-top: 0; }
+.hn-num {
+  font: 800 clamp(11px, 1.8cqw, 16px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-accent); min-width: 1.5em; text-align: right;
+  align-self: start; padding-top: 1px;
+}
+.hn-body { display: grid; gap: 2px; min-width: 0; }
+.hn-title {
+  font-size: clamp(11px, 1.7cqw, 14px); font-weight: 600;
+  line-height: 1.3; word-break: break-word;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.hn-meta {
+  display: flex; gap: clamp(6px, 1cqw, 12px); flex-wrap: wrap;
+  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--theme-fgSoft);
+}
+.hn-meta .ph, .hn-meta [class^="ph-"] { font-size: 1.1em; margin-right: 2px; }
+.hn-score { color: var(--theme-accent3); }
+.hn-by, .hn-when { font-variant-numeric: tabular-nums; }
+
+.hn-empty { padding: 20px; text-align: center; color: var(--theme-fgSoft); font-size: 12px; }
+.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }

@@ -1,0 +1,15 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "News — RSS / Atom",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).",
+  "icon": "ph-rss",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "url",         "type": "string", "label": "Feed URL",           "default": "https://news.ycombinator.com/rss" },
+    { "name": "max_items",   "type": "number", "label": "Max headlines",      "default": 8 },
+    { "name": "show_source", "type": "boolean","label": "Show feed title in header", "default": true }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
