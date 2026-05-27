@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core fonts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "font",
-  "description": "Curated open-source font set vendored locally. Five families covering modern sans (Inter), geometric display (Space Grotesk), heavy display (Archivo Black, fits the Bauhaus aesthetic), mono (JetBrains Mono), and elegant serif display (DM Serif Display). All Latin subset, woff2.",
+  "description": "Curated open-source font set vendored locally. 15 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible — designed for low-vision and works great on e-ink), geometric (Space Grotesk), heavy display (Archivo Black, Anton, Bebas Neue), monospace (JetBrains Mono, IBM Plex Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora). All Latin subset, woff2.",
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },
@@ -20,6 +20,37 @@
       }
     },
     {
+      "id": "ibm_plex_sans",
+      "name": "IBM Plex Sans",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/ibm_plex_sans/400.woff2",
+        "700": "static/ibm_plex_sans/700.woff2"
+      }
+    },
+    {
+      "id": "manrope",
+      "name": "Manrope",
+      "category": "sans",
+      "weights": [400, 700, 800],
+      "files": {
+        "400": "static/manrope/400.woff2",
+        "700": "static/manrope/700.woff2",
+        "800": "static/manrope/800.woff2"
+      }
+    },
+    {
+      "id": "outfit",
+      "name": "Outfit",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/outfit/400.woff2",
+        "700": "static/outfit/700.woff2"
+      }
+    },
+    {
       "id": "space_grotesk",
       "name": "Space Grotesk",
       "category": "sans",
@@ -30,12 +61,40 @@
       }
     },
     {
+      "id": "atkinson_hyperlegible",
+      "name": "Atkinson Hyperlegible",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/atkinson_hyperlegible/400.woff2",
+        "700": "static/atkinson_hyperlegible/700.woff2"
+      }
+    },
+    {
       "id": "archivo_black",
       "name": "Archivo Black",
       "category": "display",
       "weights": [400],
       "files": {
         "400": "static/archivo-black/400.woff2"
+      }
+    },
+    {
+      "id": "anton",
+      "name": "Anton",
+      "category": "display",
+      "weights": [400],
+      "files": {
+        "400": "static/anton/400.woff2"
+      }
+    },
+    {
+      "id": "bebas_neue",
+      "name": "Bebas Neue",
+      "category": "display",
+      "weights": [400],
+      "files": {
+        "400": "static/bebas_neue/400.woff2"
       }
     },
     {
@@ -49,12 +108,52 @@
       }
     },
     {
+      "id": "ibm_plex_mono",
+      "name": "IBM Plex Mono",
+      "category": "mono",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/ibm_plex_mono/400.woff2",
+        "700": "static/ibm_plex_mono/700.woff2"
+      }
+    },
+    {
       "id": "dm_serif_display",
       "name": "DM Serif Display",
       "category": "serif",
       "weights": [400],
       "files": {
         "400": "static/dm-serif-display/400.woff2"
+      }
+    },
+    {
+      "id": "ibm_plex_serif",
+      "name": "IBM Plex Serif",
+      "category": "serif",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/ibm_plex_serif/400.woff2",
+        "700": "static/ibm_plex_serif/700.woff2"
+      }
+    },
+    {
+      "id": "crimson_pro",
+      "name": "Crimson Pro",
+      "category": "serif",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/crimson_pro/400.woff2",
+        "700": "static/crimson_pro/700.woff2"
+      }
+    },
+    {
+      "id": "lora",
+      "name": "Lora",
+      "category": "serif",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/lora/400.woff2",
+        "700": "static/lora/700.woff2"
       }
     }
   ]
