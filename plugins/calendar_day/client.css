@@ -1,0 +1,115 @@
+/* calendar_day — today's agenda list. */
+
+:host {
+  display: block; width: 100%; height: 100%;
+  color: var(--theme-fg); background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+.root {
+  width: 100%; height: 100%;
+  display: grid; grid-template-rows: auto 1fr;
+  box-sizing: border-box; overflow: hidden;
+}
+
+.cd-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg); color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+}
+.cd-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.cd-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-count { font-variant-numeric: tabular-nums; }
+.cd-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
+
+.cd-list {
+  display: grid;
+  grid-auto-rows: min-content;
+  align-content: start;
+  gap: clamp(2px, 0.4cqh, 6px);
+  padding: clamp(4px, 0.8cqh, 10px) 0;
+  background: var(--theme-surface);
+  min-height: 0;
+  overflow: hidden;
+}
+.cd-ev {
+  display: grid;
+  grid-template-columns: clamp(60px, 12cqw, 110px) 1fr;
+  align-items: start;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(4px, 0.8cqh, 8px) clamp(8px, 1.6cqw, 16px);
+  border-left: 4px solid var(--chip);
+  min-width: 0;
+}
+.cd-when {
+  font: 700 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--theme-fgSoft);
+}
+.cd-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.cd-summary {
+  font-size: clamp(11px, 1.9cqw, 16px);
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-loc {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: clamp(9px, 1.4cqw, 11px);
+  color: var(--theme-fgSoft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cd-loc .ph { font-size: 1.05em; }
+
+.cd-empty {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(4px, 1cqw, 10px);
+  padding: clamp(12px, 2.4cqw, 28px);
+  background: var(--theme-surface);
+}
+.cd-empty .ph-duotone {
+  font-size: clamp(28px, 8cqw, 64px);
+  color: var(--theme-fg);
+  opacity: 0.55;
+}
+.cd-empty-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.cd-empty-secondary {
+  font-size: clamp(10px, 1.7cqw, 13px);
+  color: var(--theme-fgSoft);
+}
+
+/* xs: collapse to next event only */
+.root.size-xs .cd-bar { font-size: 8px; padding: 3px 6px; }
+.root.size-xs .cd-ev { padding: 3px 6px; gap: 6px; grid-template-columns: auto 1fr; }
+.root.size-xs .cd-when { font-size: 9px; }
+.root.size-xs .cd-summary { font-size: 11px; }
+.root.size-xs .cd-loc { display: none; }
+
+.root.error {
+  display: grid; place-items: center; text-align: center;
+  color: var(--theme-danger); padding: 16px; gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

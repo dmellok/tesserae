@@ -1,0 +1,134 @@
+/* calendar_month — Bauhaus month grid. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.cm-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(11px, 1.8cqw, 16px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.cm-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.cm-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
+
+.cm-weekhead {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--theme-surface);
+  border-bottom: 1px solid var(--theme-divider);
+}
+.cm-weekhead span {
+  padding: clamp(3px, 0.6cqh, 8px) clamp(4px, 0.8cqw, 10px);
+  font-size: clamp(9px, 1.3cqw, 12px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--theme-fgSoft);
+  text-align: left;
+}
+
+.cm-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  background: var(--theme-surface);
+  min-height: 0;
+}
+.cm-day {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: clamp(2px, 0.4cqh, 6px);
+  padding: clamp(3px, 0.6cqh, 8px) clamp(4px, 0.6cqw, 8px);
+  border-right: 1px solid var(--theme-divider);
+  border-bottom: 1px solid var(--theme-divider);
+  min-width: 0;
+  overflow: hidden;
+}
+.cm-day:nth-child(7n) { border-right: 0; }
+.cm-day.is-out { background: var(--theme-surface2); }
+.cm-day.is-out .cm-num { opacity: 0.4; }
+.cm-day.is-today {
+  background: color-mix(in oklab, var(--theme-accent) 14%, var(--theme-surface));
+}
+.cm-day.is-today .cm-num {
+  background: var(--theme-accent);
+  color: var(--theme-bg);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
+.cm-num {
+  font-size: clamp(10px, 1.6cqw, 14px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  justify-self: start;
+  line-height: 1.2;
+}
+.cm-events {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+  overflow: hidden;
+}
+.cm-chip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 4px;
+  background: color-mix(in oklab, var(--chip) 20%, var(--theme-surface));
+  border-left: 3px solid var(--chip);
+  padding: 1px 4px;
+  border-radius: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.cm-chip-t {
+  font: 600 clamp(8px, 1.2cqw, 10px)/1.1 var(--theme-font-mono, ui-monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--theme-fgSoft);
+}
+.cm-chip-s {
+  font-size: clamp(9px, 1.3cqw, 11px);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cm-more {
+  font: 700 clamp(8px, 1.2cqw, 10px)/1.2 var(--theme-font, system-ui);
+  color: var(--theme-fgSoft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.root.error {
+  display: grid; place-items: center; text-align: center;
+  color: var(--theme-danger); padding: 16px; gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

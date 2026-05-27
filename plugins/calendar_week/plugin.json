@@ -1,0 +1,23 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Calendar — Week",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Seven-day strip of upcoming events. Each day is a column with that day's agenda underneath. Reads from feeds configured in Plugins → Calendar Feeds.",
+  "icon": "ph-calendar",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "week_start",
+      "type": "select",
+      "label": "Week starts on",
+      "default": "monday",
+      "choices": [
+        { "value": "sunday", "label": "Sunday" },
+        { "value": "monday", "label": "Monday" }
+      ]
+    },
+    { "name": "feeds_filter", "type": "string", "label": "Feed IDs (comma-separated; blank = all enabled)", "default": "" }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

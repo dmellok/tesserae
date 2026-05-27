@@ -1,0 +1,85 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state %}
+{% block title %}Calendar Feeds — Tesserae{% endblock %}
+
+{% block main %}
+<div class="page-head">
+  <h1><i class="ph-bold ph-calendar-dots" aria-hidden="true"></i> Calendar Feeds</h1>
+  <p class="page-blurb">iCal URLs that the calendar widgets read from. Google Calendar → Settings → Integrate calendar → Secret address in iCal format. iCloud → Calendar → Share Calendar → Public. Most calendar apps expose one.</p>
+</div>
+
+<section class="card">
+  {{ card_head('Add feed', icon_name='plus-circle', level=2) }}
+  <form method="post" action="{{ url_for('calendar_core_admin.create_feed') }}" class="form">
+    <div class="field-grid">
+      <div class="field" style="flex:1;">
+        <label for="feed-name">Name</label>
+        <input type="text" id="feed-name" name="name" placeholder="Personal" required autofocus>
+      </div>
+      <div class="field">
+        <label for="feed-colour">Colour</label>
+        <input type="color" id="feed-colour" name="colour" value="#0d8c7e">
+      </div>
+    </div>
+    <div class="field">
+      <label for="feed-url">iCal URL</label>
+      <input type="url" id="feed-url" name="url" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics" required>
+      <p class="field-help">webcal:// URLs are auto-rewritten to https://.</p>
+    </div>
+    <div class="actions">{{ button('Add feed', icon='plus') }}</div>
+  </form>
+</section>
+
+<section class="card">
+  {{ card_head('Your feeds', icon_name='list-bullets', level=2) }}
+  {% if feeds %}
+  <ul class="cf-list">
+    {% for f in feeds %}
+    <li class="cf-row {% if not f.enabled %}is-disabled{% endif %}">
+      <span class="cf-swatch" style="background: {{ f.colour }};" aria-hidden="true"></span>
+      <span class="cf-name">{{ f.name }}<span class="cf-id">{{ f.id }}</span></span>
+      <span class="cf-url" title="{{ f.url }}">{{ f.url }}</span>
+      <div class="cf-actions">
+        <form method="post" action="{{ url_for('calendar_core_admin.refresh_feed', feed_id=f.id) }}" class="inline">
+          <button type="submit" class="ghost" title="Refresh now"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button>
+        </form>
+        <form method="post" action="{{ url_for('calendar_core_admin.toggle_feed', feed_id=f.id) }}" class="inline">
+          <button type="submit" class="ghost" title="{{ 'Disable' if f.enabled else 'Enable' }}">
+            <i class="ph ph-{{ 'eye' if f.enabled else 'eye-slash' }}" aria-hidden="true"></i>
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('calendar_core_admin.delete_feed', feed_id=f.id) }}" class="inline" onsubmit="return confirm('Delete feed {{ f.name }}?');">
+          <button type="submit" class="ghost danger" title="Delete"><i class="ph ph-trash" aria-hidden="true"></i></button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  {{ empty_state('calendar-blank', 'No feeds yet',
+                 blurb='Add one above. Then drop a Calendar — Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
+  {% endif %}
+</section>
+
+<style>
+  .cf-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .cf-row {
+    display: grid;
+    grid-template-columns: auto 1fr 1.4fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-md);
+    background: var(--t-surface);
+    box-shadow: var(--t-shadow-xs);
+  }
+  .cf-row.is-disabled { opacity: 0.55; }
+  .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
+  .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); }
+  .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; }
+  .cf-url { font: var(--t-size-xs)/1.4 var(--t-font-mono); color: var(--t-fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cf-actions { display: flex; gap: 2px; }
+  .cf-actions form { margin: 0; }
+</style>
+{% endblock %}

@@ -18,6 +18,12 @@ dependencies = [
     "paho-mqtt>=2.0,<3",
     "playwright>=1.42,<2",
     "amqtt>=0.11,<1",
+    # icalendar + recurring_ical_events power the calendar_* widgets.
+    # Both pure-Python, depend transitively on python-dateutil, and
+    # give us correct RRULE / EXDATE expansion without us reinventing
+    # RFC 5545.
+    "icalendar>=5.0,<7",
+    "recurring-ical-events>=2.1,<4",
 ]
 
 [project.optional-dependencies]

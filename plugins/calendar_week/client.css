@@ -1,0 +1,116 @@
+/* calendar_week — Bauhaus 7-column week strip. */
+
+:host {
+  display: block; width: 100%; height: 100%;
+  color: var(--theme-fg); background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+.root {
+  width: 100%; height: 100%;
+  display: grid; grid-template-rows: auto 1fr;
+  box-sizing: border-box; overflow: hidden;
+}
+
+.cw-bar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(6px, 1.2cqw, 10px);
+  background: var(--theme-fg);
+  color: var(--theme-bg);
+  padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
+  font-size: clamp(10px, 1.7cqw, 14px);
+  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+}
+.cw-mark { display: inline-block; width: clamp(10px, 1.6cqw, 14px); height: clamp(10px, 1.6cqw, 14px); background: var(--theme-accent2); }
+.cw-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-bar-icon { font-size: clamp(14px, 2.4cqw, 22px); line-height: 1; }
+
+.cw-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--theme-surface);
+  min-height: 0;
+}
+.cw-col {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-right: 1px solid var(--theme-divider);
+  min-width: 0;
+  min-height: 0;
+}
+.cw-col:last-child { border-right: 0; }
+.cw-col.is-today { background: color-mix(in oklab, var(--theme-accent) 10%, var(--theme-surface)); }
+
+.cw-colhead {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 4px;
+  padding: clamp(4px, 0.8cqh, 10px) clamp(4px, 0.8cqw, 10px);
+  border-bottom: 1px solid var(--theme-divider);
+  background: var(--theme-surface2);
+}
+.cw-col.is-today .cw-colhead {
+  background: var(--theme-accent);
+  color: var(--theme-bg);
+}
+.cw-dow {
+  font-size: clamp(9px, 1.4cqw, 12px);
+  font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--theme-fgSoft);
+}
+.cw-col.is-today .cw-dow { color: var(--theme-bg); opacity: 0.85; }
+.cw-dnum {
+  font-size: clamp(12px, 2cqw, 18px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-align: right;
+}
+
+.cw-evs {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  padding: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+.cw-ev {
+  display: grid;
+  gap: 1px;
+  background: color-mix(in oklab, var(--chip) 18%, var(--theme-surface));
+  border-left: 3px solid var(--chip);
+  padding: 3px 5px;
+  border-radius: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.cw-ev-t {
+  font: 700 clamp(8px, 1.2cqw, 10px)/1.1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--theme-fgSoft);
+}
+.cw-ev-s {
+  font-size: clamp(9px, 1.4cqw, 12px);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cw-empty {
+  font: 600 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  text-align: center;
+  color: var(--theme-fgSoft);
+  opacity: 0.4;
+  padding-top: 8px;
+}
+
+.root.error {
+  display: grid; place-items: center; text-align: center;
+  color: var(--theme-danger); padding: 16px; gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

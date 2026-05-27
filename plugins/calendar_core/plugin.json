@@ -1,0 +1,10 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Calendar Core",
+  "version": "0.1.0",
+  "kind": "data",
+  "description": "Shared iCal feed manager for the calendar_* widget family. Add iCal URLs (Google Calendar / iCloud / Outlook all expose them) on the admin page with a name + colour. The calendar_month / calendar_week / calendar_day widgets each pick which feeds to show from a multi-select cell option. One fetch per feed, cached 15 minutes.",
+  "icon": "ph-calendar-dots",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "render": { "needs_network": true }
+}
