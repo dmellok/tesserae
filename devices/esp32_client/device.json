@@ -6,6 +6,7 @@
   "renderers": ["esp32_bin"],
   "status_topic": "tesserae/esp32/status",
   "config_topic": "tesserae/esp32/config",
+  "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "ESP32 e-paper" },
   "config_schema": {
     "sleep_interval_s": {
       "type": "int",

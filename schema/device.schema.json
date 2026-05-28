@@ -62,6 +62,21 @@
           "help": { "type": "string" }
         }
       }
+    },
+    "panel": {
+      "type": "object",
+      "description": "Physical panel attached to this device. Multi-head installs use this to size each device's compositions independently; pages can be assigned to a specific device and inherit its panel.",
+      "required": ["w", "h"],
+      "properties": {
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "orientation": {
+          "type": "string",
+          "enum": ["landscape", "portrait"],
+          "description": "Informational. The renderer is what actually rotates."
+        },
+        "name": { "type": "string", "description": "Friendly name shown in the UI." }
+      }
     }
   }
 }

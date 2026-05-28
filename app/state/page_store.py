@@ -63,14 +63,25 @@ class Page(BaseModel):
     """A saved dashboard.
 
     ``panel`` is optional: when None, the page renders at the panel
-    dims from the app settings (see ``app.panel.resolve_page_panel``).
-    The editor never sets it — the field is here only so a per-page
-    override remains possible if anyone wants it later.
+    dims from the app settings (see ``app.panel.resolve_page_panel``),
+    OR at the panel dims declared by the device named in ``device_id``
+    when that's set (multi-head installs).
+
+    ``device_id`` ties the page to a specific device. When set:
+
+    * the editor sizes the layout against that device's declared panel
+    * the push pipeline only fires renderers that target that device
+      (so a "kitchen Inky" page never lands on the "hallway ESP32")
+
+    Unset means "no specific home" — the page uses the global settings
+    panel and fans out to every loaded renderer, matching the legacy
+    single-head behaviour.
     """
 
     id: str
     name: str
     panel: Panel | None = None
+    device_id: str | None = None
     cells: list[Cell] = Field(default_factory=list)
     theme: str | None = None
     font: str | None = None

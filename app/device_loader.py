@@ -46,13 +46,26 @@ class LoaderError:
 
 @dataclass(frozen=True)
 class Device:
-    """A loaded device with its manifest and parse/validate hooks."""
+    """A loaded device with its manifest and parse/validate hooks.
+
+    Two flavours coexist in one registry:
+
+    * **Kinds** (loaded from ``devices/<id>/device.json``) — the
+      built-in device manifests that ship with the app. ``kind_of`` is
+      None: a kind IS its own kind.
+    * **Instances** (loaded from ``data/devices/<id>.json``) — user-
+      created devices that pick a kind for the parse/validate hooks
+      and config schema, then override id / name / topics / panel /
+      config. Multi-head installs use instances so each physical
+      display gets its own MQTT topic + panel.
+    """
 
     id: str
     path: Path
     manifest: dict[str, Any]
     module: ModuleType
     data_dir: Path
+    kind_of: str | None = None  # None = built-in kind; else the kind id this instance inherits from
 
     @property
     def name(self) -> str:
@@ -77,6 +90,26 @@ class Device:
         if not isinstance(schema, dict):
             return {}
         return {str(k): dict(v) for k, v in schema.items() if isinstance(v, dict)}
+
+    @property
+    def panel(self) -> dict[str, Any] | None:
+        """Declared panel dims for this device, or None if the device is
+        renderer-only / panel-agnostic. Multi-head installs use this so
+        each device sizes its pages independently of the global default."""
+        block = self.manifest.get("panel")
+        if not isinstance(block, dict):
+            return None
+        try:
+            w = int(block["w"])
+            h = int(block["h"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        out: dict[str, Any] = {"w": w, "h": h}
+        if isinstance(block.get("orientation"), str):
+            out["orientation"] = block["orientation"]
+        if isinstance(block.get("name"), str):
+            out["name"] = block["name"]
+        return out
 
     def parse_status(self, payload: bytes) -> dict[str, Any]:
         """Normalise a heartbeat payload. Falls back to ``{"raw": ...}`` if
@@ -266,4 +299,92 @@ def discover(
             manifest["status_topic"],
         )
 
+    # ----- user-defined instances ------------------------------------
+    # data_root is already data/devices/ (see main.py), so scan it directly.
+    if data_root.exists():
+        for inst_file in sorted(data_root.iterdir()):
+            if not inst_file.is_file() or not inst_file.name.endswith(".json"):
+                continue
+            load_instance_file(registry, inst_file=inst_file, data_root=data_root)
+
     return registry
+
+
+def load_instance_file(
+    registry: DeviceRegistry,
+    *,
+    inst_file: Path,
+    data_root: Path,
+) -> Device | None:
+    """Load one user-defined instance file into ``registry`` in place.
+
+    An instance file under ``data/devices/<id>.json`` is a JSON object:
+      ``{ id, kind, name, status_topic?, config_topic?, panel? }``
+    Instances inherit the kind's parse_status / validate_config, but
+    override everything else (their own id, MQTT topics, panel dims).
+    Returns the new Device on success, ``None`` if validation failed
+    (the error is appended to ``registry.errors``).
+
+    Shared by the startup discover() loop and the Settings UI's
+    add-device flow so both go through identical validation."""
+    instance_id = inst_file.stem
+    try:
+        raw_inst = json.loads(inst_file.read_text())
+    except json.JSONDecodeError as err:
+        registry.errors.append(LoaderError(instance_id, inst_file, f"invalid JSON: {err}"))
+        return None
+    if not isinstance(raw_inst, dict):
+        registry.errors.append(
+            LoaderError(instance_id, inst_file, "instance file must be a JSON object")
+        )
+        return None
+    kind_id = str(raw_inst.get("kind") or "")
+    kind = registry.devices.get(kind_id)
+    if kind is None or kind.kind_of is not None:
+        registry.errors.append(
+            LoaderError(
+                instance_id,
+                inst_file,
+                f"unknown or non-kind device {kind_id!r} (instances must reference a built-in kind)",
+            )
+        )
+        return None
+    if instance_id in registry.devices:
+        registry.errors.append(
+            LoaderError(instance_id, inst_file, f"id {instance_id!r} already in use")
+        )
+        return None
+    inst_manifest: dict[str, Any] = dict(kind.manifest)
+    inst_manifest["name"] = str(raw_inst.get("name") or kind.name)
+    if raw_inst.get("status_topic"):
+        inst_manifest["status_topic"] = str(raw_inst["status_topic"])
+    if "config_topic" in raw_inst:
+        topic = raw_inst["config_topic"]
+        if topic is None:
+            inst_manifest.pop("config_topic", None)
+        else:
+            inst_manifest["config_topic"] = str(topic)
+    if isinstance(raw_inst.get("panel"), dict):
+        inst_manifest["panel"] = dict(raw_inst["panel"])
+    # Point the instance at its cloned renderers so the settings UI
+    # and any code that reads device.renderer_ids sees the per-
+    # instance ids that clone_for_instances() will create.
+    inst_manifest["renderers"] = [f"{r}__{instance_id}" for r in kind.renderer_ids]
+    inst_data_dir = data_root / instance_id
+    inst_data_dir.mkdir(parents=True, exist_ok=True)
+    device = Device(
+        id=instance_id,
+        path=inst_file,
+        manifest=inst_manifest,
+        module=kind.module,
+        data_dir=inst_data_dir,
+        kind_of=kind_id,
+    )
+    registry.devices[instance_id] = device
+    logger.info(
+        "Loaded device instance %s (kind=%s, status=%s)",
+        instance_id,
+        kind_id,
+        inst_manifest.get("status_topic"),
+    )
+    return device

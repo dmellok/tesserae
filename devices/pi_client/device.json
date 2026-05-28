@@ -4,5 +4,6 @@
   "version": "0.1.0",
   "description": "Raspberry-Pi-side client running the inky-dash listener. Subscribes to tesserae/pi/frame/png and tesserae/pi/frame/bin; publishes a heartbeat with idle/rendering state and the last paint timestamp.",
   "renderers": ["pi_png", "pi_bin"],
-  "status_topic": "tesserae/pi/status"
+  "status_topic": "tesserae/pi/status",
+  "panel": { "w": 1424, "h": 1200, "orientation": "landscape", "name": "Inky Impression 13.3″" }
 }

@@ -22,19 +22,21 @@ from __future__ import annotations
 
 import contextlib
 import json
+import re
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from flask import Blueprint, Flask, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from app import auth
-from app.device_loader import Device, DeviceRegistry
+from app.device_loader import Device, DeviceRegistry, load_instance_file
 from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
-from app.renderer_loader import RendererRegistry
+from app.renderer_loader import RendererRegistry, clone_for_instances
 from app.state.event_log import EventLog
 from app.state.settings_store import SECRET_MASK, SettingsStore
 from app.transport import BrokerConfig, MqttTransport
@@ -397,11 +399,19 @@ def settings_area(area: str) -> str | Response:
     if area not in _AREA_KINDS:
         return Response(f"unknown settings area {area!r}", status=404)
     sections = [s for s in _build_sections() if s["kind"] in _AREA_KINDS[area]]
+    # Devices area needs the kinds list (for the Add-device form) so the
+    # template doesn't have to dig into the registry directly.
+    device_kinds = (
+        [{"id": d.id, "name": d.name, "panel": d.panel} for d in _device_kinds()]
+        if area == "devices"
+        else []
+    )
     return render_template(
         "settings.html",
         sections=sections,
         active_area=area,
         areas=_AREAS,
+        device_kinds=device_kinds,
     )
 
 
@@ -510,6 +520,143 @@ def settings_update(section_kind: str) -> Response:
         return _redirect_to_section(section_kind)
 
     return Response(f"unknown section {section_kind!r}", status=404)
+
+
+# -- device instances (multi-head) --------------------------------------
+
+_DEVICE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+
+
+def _device_data_root() -> Path:
+    return current_app.config["DEVICE_DATA_ROOT"]  # type: ignore[no-any-return]
+
+
+def _rebuild_transport_fn() -> Callable[[], None]:
+    return current_app.config["REBUILD_TRANSPORT"]  # type: ignore[no-any-return]
+
+
+def _device_kinds() -> list[Device]:
+    """Built-in device kinds (the manifests under ``devices/``)."""
+    return [d for d in _devices().all() if d.kind_of is None]
+
+
+@bp.post("/settings/devices/add")
+def devices_add() -> Response:
+    """Create a new device instance from the Devices-tab form.
+
+    Writes ``data/devices/<id>.json`` then loads it into the live
+    registry and clones the kind's renderers for the new instance.
+    No restart needed — the new device shows up immediately in the
+    page editor's Target-device dropdown."""
+    form = request.form
+    instance_id = (form.get("id") or "").strip().lower()
+    kind_id = (form.get("kind") or "").strip()
+    display_name = (form.get("name") or "").strip()
+
+    if not _DEVICE_ID_RE.match(instance_id):
+        flash(
+            "Device id must be 2-32 chars, start with a letter, and use only "
+            "lowercase letters / digits / underscore / hyphen.",
+            "error",
+        )
+        return redirect(url_for("auth.settings_area", area="devices"))
+    devices = _devices()
+    if instance_id in devices.devices:
+        flash(f"Device id {instance_id!r} is already in use.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    kind = devices.get(kind_id)
+    if kind is None or kind.kind_of is not None:
+        flash(f"Unknown device kind {kind_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    # Topic prefix = instance id. The kind's status/config topics are
+    # ``tesserae/<prefix>/...``; we just swap the prefix segment so the
+    # instance gets its own MQTT namespace.
+    def _swap_prefix(topic: str, old: str, new: str) -> str:
+        parts = topic.split("/")
+        if len(parts) >= 2 and parts[0] == "tesserae" and parts[1] == old:
+            parts[1] = new
+            return "/".join(parts)
+        # Unrecognised pattern — fall back to a sensible default rather
+        # than copying the kind's topic verbatim (which would collide).
+        return f"tesserae/{new}/{topic.rsplit('/', 1)[-1]}"
+
+    # Best-effort: read the kind's status_topic to figure out its prefix.
+    kind_status = kind.status_topic
+    kind_prefix = kind_status.split("/")[1] if kind_status.startswith("tesserae/") else kind.id
+    instance: dict[str, Any] = {
+        "id": instance_id,
+        "kind": kind_id,
+        "name": display_name or f"{kind.name} ({instance_id})",
+        "status_topic": _swap_prefix(kind_status, kind_prefix, instance_id),
+    }
+    if kind.config_topic:
+        instance["config_topic"] = _swap_prefix(kind.config_topic, kind_prefix, instance_id)
+
+    panel = dict(kind.panel or {})
+    for field_name in ("panel_w", "panel_h"):
+        raw = form.get(field_name)
+        if raw:
+            try:
+                panel["w" if field_name == "panel_w" else "h"] = int(raw)
+            except ValueError:
+                pass
+    if form.get("panel_orientation"):
+        panel["orientation"] = "portrait" if form.get("panel_orientation") == "on" else "landscape"
+    if panel:
+        instance["panel"] = panel
+
+    data_root = _device_data_root()
+    data_root.mkdir(parents=True, exist_ok=True)
+    inst_file = data_root / f"{instance_id}.json"
+    if inst_file.exists():
+        flash(f"An instance file at {inst_file.name} already exists.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    inst_file.write_text(json.dumps(instance, indent=2) + "\n")
+
+    new_device = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if new_device is None:
+        # Loader rejected it — surface the most recent error.
+        last_err = devices.errors[-1] if devices.errors else None
+        msg = last_err.message if last_err else "unknown error"
+        inst_file.unlink(missing_ok=True)
+        flash(f"Failed to load new device: {msg}", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    clone_for_instances(_renderers(), devices)
+    # Resubscribe so the broker knows about the new device's status topic.
+    _rebuild_transport_fn()()
+    flash(f"Added device {new_device.name!r}.", "ok")
+    return redirect(
+        url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}")
+    )
+
+
+@bp.post("/settings/devices/<instance_id>/delete")
+def devices_delete(instance_id: str) -> Response:
+    """Remove a user-created device instance. Built-in kinds are
+    refused — they ship with the app."""
+    devices = _devices()
+    device = devices.get(instance_id)
+    if device is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    if device.kind_of is None:
+        flash(f"Cannot delete built-in device kind {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    inst_file = device.path
+    if inst_file.exists():
+        inst_file.unlink()
+    devices.devices.pop(instance_id, None)
+    # Drop any renderer clones this instance owned.
+    renderers = _renderers()
+    for rid in list(renderers.renderers):
+        if renderers.renderers[rid].device == instance_id:
+            renderers.renderers.pop(rid, None)
+    _rebuild_transport_fn()()
+    flash(f"Deleted device {device.name!r}.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices"))
 
 
 # -- diagnostics ----------------------------------------------------
@@ -680,6 +827,7 @@ def _build_sections() -> list[dict[str, Any]]:
     for device in _devices().all():
         sid = f"device-{device.id}"
         fields = _config_fields_from_schema(device.config_schema)
+        is_instance = device.kind_of is not None
         sections.append(
             {
                 "id": sid,
@@ -695,8 +843,12 @@ def _build_sections() -> list[dict[str, Any]]:
                     "Renderers": ", ".join(device.renderer_ids),
                     "Status topic": device.status_topic,
                     "Config topic": device.config_topic or "—",
+                    **({"Instance of": str(device.kind_of)} if is_instance else {}),
                 },
                 "status": _status_view(device),
+                "delete_endpoint": (
+                    url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
+                ),
             }
         )
 

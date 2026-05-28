@@ -21,8 +21,14 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from app.state.page_store import Panel
 from app.state.settings_store import SettingsStore
+
+if TYPE_CHECKING:
+    from app.device_loader import DeviceRegistry
+    from app.state.page_store import Page
 
 # (native_landscape_w, native_landscape_h) per panel. Orientation is
 # applied separately so users can mount any panel landscape or portrait
@@ -65,14 +71,37 @@ def resolve_settings_panel(settings: SettingsStore) -> Panel:
 
 
 def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Panel:
-    """Resolve the panel for a page.
+    """Resolve the panel from raw page-panel dims + settings.
 
-    The settings panel always wins: pages are panel-agnostic so a
-    single Settings → Panel change re-fits every saved dashboard.
-    ``page_panel`` is accepted for backwards-compat with v1 pages that
-    persisted their own panel dims; it's ignored on render."""
-    del page_panel  # intentional — see docstring
+    Multi-head dispatch lives in ``resolve_panel_for_page`` — use that
+    when you have the full Page (it can look up the device's declared
+    panel). This entry point is kept for callers that only have the
+    optional Panel field handy."""
+    if page_panel is not None:
+        return page_panel
     return resolve_settings_panel(settings)
+
+
+def resolve_panel_for_page(
+    page: Page,
+    devices: DeviceRegistry | None,
+    settings: SettingsStore,
+) -> Panel:
+    """Pick the panel for a page using the multi-head resolution chain:
+
+    1. If ``page.device_id`` names a loaded device that declares a panel
+       block, use those dims (multi-head install — each page lives on
+       its assigned device).
+    2. Else fall back to ``page.panel`` if explicitly set.
+    3. Else fall back to the global settings panel (legacy / single-head
+       behaviour, unchanged from v0.1)."""
+    if page.device_id and devices is not None:
+        device = devices.devices.get(page.device_id)
+        if device is not None:
+            block = device.panel
+            if block is not None:
+                return Panel(w=int(block["w"]), h=int(block["h"]))
+    return resolve_page_panel(page.panel, settings)
 
 
 def fit_cells_to_panel(

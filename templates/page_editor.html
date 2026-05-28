@@ -208,6 +208,30 @@
           </div>
         </div>
 
+        {# Device picker — only shown if at least one loaded device
+           declares a panel block. Selecting a device sizes the editor
+           against that device's panel and the push pipeline only fires
+           that device's renderers. Empty = "no specific device", uses
+           the global settings panel and fans out to every renderer
+           (legacy single-head behaviour). #}
+        {% if device_options %}
+        <div class="field-grid">
+          <div class="field">
+            <label for="page-device">Target device</label>
+            {# Reload on change — picking a different device swaps the
+               panel dims, which the layout editor + preview iframe
+               both need to recompute against. #}
+            <select id="page-device" name="device_id" data-reload-on-change="1">
+              <option value="" {% if not page.device_id %}selected{% endif %}>(any — uses global panel)</option>
+              {% for d in device_options %}
+              <option value="{{ d.id }}" {% if page.device_id == d.id %}selected{% endif %}>{{ d.label }}</option>
+              {% endfor %}
+            </select>
+            <p class="field-help">Assigns this page to one display. The layout sizes to that device's panel, and pushes only fire that device's renderers.</p>
+          </div>
+        </div>
+        {% endif %}
+
         <div class="field-grid">
           {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or '', options=theme_options, blank_label='(default)') }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}

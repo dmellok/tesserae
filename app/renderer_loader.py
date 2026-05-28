@@ -134,6 +134,47 @@ class RendererRegistry:
         return [r for r in self.renderers.values() if r.device == device_id]
 
 
+def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
+    """For each device instance (a user-created copy of a built-in kind),
+    add a cloned Renderer record per renderer the kind consumes. The
+    clone overrides ``device`` so its ``topic_pattern`` resolves against
+    the instance's id — each physical device gets its own MQTT topics
+    without changes to the rendering core.
+
+    The link between an instance and its renderers is the **kind's**
+    ``renderer_ids`` list (e.g. ``esp32_client`` → ``["esp32_bin"]``).
+    We can't match on ``renderer.device`` because that's a topic prefix
+    (``"esp32"``), not a device id (``"esp32_client"``)."""
+    get_all = getattr(devices, "all", None)
+    get_one = getattr(devices, "get", None)
+    if not callable(get_all) or not callable(get_one):
+        return
+    for dev in get_all():
+        kind_id = getattr(dev, "kind_of", None)
+        if kind_id is None:
+            continue  # built-in kind — already has its own renderers
+        kind = get_one(kind_id)
+        if kind is None:
+            continue
+        for renderer_id in getattr(kind, "renderer_ids", []):
+            base = renderers.get(renderer_id)
+            if base is None:
+                continue
+            clone_id = f"{base.id}__{dev.id}"
+            if clone_id in renderers.renderers:
+                continue
+            cloned_manifest = dict(base.manifest)
+            cloned_manifest["device"] = dev.id
+            cloned_manifest["name"] = f"{base.name} ({dev.id})"
+            renderers.renderers[clone_id] = Renderer(
+                id=clone_id,
+                path=base.path,
+                manifest=cloned_manifest,
+                module=base.module,
+                data_dir=base.data_dir,
+            )
+
+
 def _load_schema(schema_path: Path) -> dict[str, Any]:
     raw = json.loads(schema_path.read_text())
     if not isinstance(raw, dict):

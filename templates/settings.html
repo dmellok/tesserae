@@ -1,11 +1,11 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, settings_tabs %}
+{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, text_input %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
   'server':'Server-wide configuration: base URL, panel, MQTT broker, Home Assistant discovery.',
   'renderers':'Per-renderer transform + payload settings.',
-  'devices':'Latest heartbeat + outbound config for each loaded device.',
+  'devices':'Latest heartbeat + outbound config for each loaded device. Add a second display below — each one gets its own MQTT topic and panel size.',
   'plugins':'Settings declared by each widget plugin. Secrets stay masked between saves.',
 } %}
 {% block title %}Settings: {{ AREA_TITLES[active_area] }} — Tesserae{% endblock %}
@@ -25,6 +25,28 @@
   <form method="post" action="{{ url_for('auth.diagnostics_test_push') }}" class="form">
     <div class="actions">{{ button('Test push (synthetic image)', icon='paper-plane-tilt') }}</div>
   </form>
+</section>
+{% endif %}
+
+{% if active_area == 'devices' and device_kinds %}
+{# Multi-head: register a second physical display of the same kind.
+   The kind contributes parse/validate + renderer modules; this form
+   collects the instance-specific id, name, and panel dims. #}
+<section class="card" id="add-device">
+  {{ card_head('Add device', icon_name='plus-circle', blurb='Register another physical display. Picks a kind for its protocol + renderers; the id becomes its MQTT topic prefix.') }}
+  <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+    {{ text_input('add-device-id', 'id', 'Device id', value='', placeholder='esp32_kitchen', required=True,
+                  help='Lowercase letters, digits, underscore, hyphen (2–32 chars). Used as the MQTT topic prefix: tesserae/<id>/...') }}
+    {% set kind_options = [] %}
+    {% for k in device_kinds %}{% set _ = kind_options.append({'value': k.id, 'label': k.name}) %}{% endfor %}
+    {{ select_field('add-device-kind', 'kind', 'Kind', value=device_kinds[0].id, options=kind_options) }}
+    {{ text_input('add-device-name', 'name', 'Display name', value='', placeholder='Kitchen panel') }}
+    {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1,
+                    help='Defaults to the kind’s panel size.') }}
+    {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+    <div class="actions">{{ button('Add device', icon='plus') }}</div>
+  </form>
+  <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
 </section>
 {% endif %}
 
@@ -99,6 +121,13 @@
     <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
   </form>
   {% endif %}
+
+  {% if section.delete_endpoint %}
+  <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline-delete"
+        onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the default panel.');">
+    <div class="actions">{{ button('Delete device', icon='trash', variant='danger') }}</div>
+  </form>
+  {% endif %}
 </section>
 {% endfor %}
 
@@ -153,6 +182,27 @@
       card.classList.toggle('is-custom', preset.value === 'custom');
     }
     preset.addEventListener('change', apply);
+    apply();
+  })();
+
+  // Add-device: prefill panel width/height from the picked kind. The
+  // kinds list with their panel defaults is JSON-embedded next to the
+  // form so we don't have to refetch it.
+  (function () {
+    const select = document.querySelector('#add-device-kind');
+    const data = document.querySelector('#add-device-kinds');
+    if (!select || !data) return;
+    const w = document.querySelector('#add-device-w');
+    const h = document.querySelector('#add-device-h');
+    let kinds;
+    try { kinds = JSON.parse(data.textContent || '[]'); } catch { return; }
+    function apply() {
+      const kind = kinds.find(k => k.id === select.value);
+      if (!kind || !kind.panel) return;
+      if (w && !w.value) w.value = kind.panel.w;
+      if (h && !h.value) h.value = kind.panel.h;
+    }
+    select.addEventListener('change', () => { if (w) w.value = ''; if (h) h.value = ''; apply(); });
     apply();
   })();
 </script>

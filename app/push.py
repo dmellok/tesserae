@@ -41,7 +41,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from app.panel import resolve_page_panel, resolve_settings_panel
+from app.device_loader import DeviceRegistry
+from app.panel import resolve_panel_for_page, resolve_settings_panel
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -121,6 +122,7 @@ class PushManager:
         event_log: EventLog,
         renders_dir: Path,
         base_url_fn: Callable[[], str],
+        devices: DeviceRegistry | None = None,
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -130,6 +132,10 @@ class PushManager:
         self._renders_dir = renders_dir
         self._renders_dir.mkdir(parents=True, exist_ok=True)
         self._base_url_fn = base_url_fn
+        # Optional — enables multi-head routing. When a page sets a
+        # device_id, the panel comes from that device's manifest and
+        # only its renderers fire in _fan_out.
+        self._devices = devices
         self._lock = threading.Lock()
         # Listeners fire synchronously after every push attempt (success
         # or failure). HA discovery uses this to follow pushes. Slow
@@ -295,10 +301,13 @@ class PushManager:
             return self._log_failure(
                 source="page", target=page_id, status="not_found", error="page not found"
             )
-        # Panel comes from settings unless the page has its own override.
-        # Same resolution path the composer uses, so the screenshot and
-        # the dashboard layout always agree on dims.
-        panel = resolve_page_panel(page.panel, self._settings)
+        # Panel + renderer routing: when the page is assigned to a
+        # specific device (multi-head install), panel dims come from
+        # that device's manifest and only the renderers targeting that
+        # device fire in _fan_out. Unassigned pages fall back to the
+        # global settings panel and fan out to every loaded renderer
+        # (legacy single-head behaviour).
+        panel = resolve_panel_for_page(page, self._devices, self._settings)
 
         base_url = self._base_url_fn().rstrip("/")
         compose_url = to_loopback_url(f"{base_url}/compose/{page_id}?for_push=1")
@@ -320,6 +329,7 @@ class PushManager:
             source="page",
             target=page_id,
             started=started,
+            device_filter=page.device_id,
         )
 
     def _push_bytes_locked(
@@ -349,8 +359,14 @@ class PushManager:
         source: str,
         target: str,
         started: float,
+        device_filter: str | None = None,
     ) -> PushResult:
-        """Common fanout: thumbnail + per-renderer transform / publish / log."""
+        """Common fanout: thumbnail + per-renderer transform / publish / log.
+
+        ``device_filter`` (multi-head): when set, only renderers
+        whose ``.device`` matches are fired. Pages targeting a specific
+        device pass the page's device_id so the image lands only on
+        that device's renderers."""
         comp_digest = hashlib.sha256(composition_png).hexdigest()[:16]
         thumb_path = self._renders_dir / f"{comp_digest}.png"
         if not thumb_path.exists():
@@ -363,6 +379,8 @@ class PushManager:
         disabled = _disabled_renderer_ids(self._settings)
         for renderer in self._registry.all():
             if renderer.id in disabled:
+                continue
+            if device_filter and renderer.device != device_filter:
                 continue
             renderer_start = time.monotonic()
             try:

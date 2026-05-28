@@ -17,7 +17,7 @@ from typing import Any
 
 from flask import Blueprint, abort, current_app, render_template, request
 
-from app.panel import resolve_page_panel
+from app.panel import resolve_panel_for_page
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
 
@@ -239,7 +239,8 @@ def compose(page_id: str) -> str:
     # (legacy override) wins; otherwise we pull dims from settings.
     page_dict = page.model_dump(mode="json", exclude_none=True)
     settings_store = current_app.config["SETTINGS_STORE"]
-    panel = resolve_page_panel(page.panel, settings_store)
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    panel = resolve_panel_for_page(page, devices, settings_store)
     page_dict["panel"] = {"w": panel.w, "h": panel.h}
     return render_template(
         "compose.html",

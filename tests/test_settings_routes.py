@@ -293,6 +293,92 @@ def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
     assert saved["transform_rotate_quarters"] == 0
 
 
+def test_add_device_instance_creates_clone(app_with_gate: Flask, tmp_path: Path) -> None:
+    """Multi-head: POSTing the Add-device form materialises a new device
+    instance + cloned renderer with the instance's id substituted into
+    the topic prefix, without restarting the app."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "id": "esp32_kitchen",
+            "kind": "esp32_client",
+            "name": "Kitchen panel",
+            "panel_w": "640",
+            "panel_h": "384",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert resp.location.endswith("#device-esp32_kitchen")
+
+    devices = app_with_gate.config["DEVICE_REGISTRY"]
+    new_dev = devices.get("esp32_kitchen")
+    assert new_dev is not None
+    assert new_dev.kind_of == "esp32_client"
+    assert new_dev.status_topic == "tesserae/esp32_kitchen/status"
+    assert new_dev.panel == {"w": 640, "h": 384, "orientation": "landscape", "name": "ESP32 e-paper"}
+
+    renderers = app_with_gate.config["RENDERER_REGISTRY"]
+    clone = renderers.get("esp32_bin__esp32_kitchen")
+    assert clone is not None
+    assert clone.topic == "tesserae/esp32_kitchen/frame/bin"
+
+    inst_file = tmp_path / "devices" / "esp32_kitchen.json"
+    assert inst_file.exists()
+
+
+def test_add_device_rejects_invalid_id(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/devices/add",
+        data={"id": "Has-Caps", "kind": "esp32_client"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert app_with_gate.config["DEVICE_REGISTRY"].get("Has-Caps") is None
+
+
+def test_add_device_rejects_built_in_kind_as_target(app_with_gate: Flask) -> None:
+    """Instance must reference a built-in kind, not another instance."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/devices/add",
+        data={"id": "ghost", "kind": "definitely_not_a_kind"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert app_with_gate.config["DEVICE_REGISTRY"].get("ghost") is None
+
+
+def test_delete_device_instance_removes_clones(app_with_gate: Flask, tmp_path: Path) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_kitchen", "kind": "esp32_client"},
+    )
+    resp = client.post("/settings/devices/esp32_kitchen/delete", follow_redirects=False)
+    assert resp.status_code == 302
+    devices = app_with_gate.config["DEVICE_REGISTRY"]
+    renderers = app_with_gate.config["RENDERER_REGISTRY"]
+    assert devices.get("esp32_kitchen") is None
+    assert renderers.get("esp32_bin__esp32_kitchen") is None
+    assert not (tmp_path / "devices" / "esp32_kitchen.json").exists()
+
+
+def test_delete_refuses_built_in_kind(app_with_gate: Flask) -> None:
+    """Built-in kinds ship with the app and must not be deletable."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post("/settings/devices/esp32_client/delete", follow_redirects=False)
+    assert resp.status_code == 302
+    assert app_with_gate.config["DEVICE_REGISTRY"].get("esp32_client") is not None
+
+
 def test_healthz_is_open(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     resp = client.get("/healthz")

@@ -117,6 +117,12 @@ def create_app(
     for derr in devices.errors:
         logger.warning("device loader: %s — %s", derr.device_id, derr.message)
 
+    # Multi-head: for each user-created device instance, clone the
+    # renderers of its kind with the instance's id substituted into
+    # the topic pattern. After this, each physical device has its own
+    # MQTT topics even when it inherits from a shared kind.
+    renderer_loader.clone_for_instances(renderers, devices)
+
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
     # cap bumped from EventLog's default 500 to 2000 so per-renderer rows
@@ -132,6 +138,8 @@ def create_app(
     app.config["PLUGIN_REGISTRY"] = plugins
     app.config["RENDERER_REGISTRY"] = renderers
     app.config["DEVICE_REGISTRY"] = devices
+    app.config["DEVICE_DATA_ROOT"] = device_data_root
+    app.config["DEVICE_SCHEMA_PATH"] = device_schema
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["EVENT_LOG"] = event_log
@@ -382,6 +390,7 @@ def _rebuild_transport(
         event_log=event_log,
         renders_dir=renders_dir,
         base_url_fn=_base_url,
+        devices=devices,
     )
 
     # HA discovery is opt-in. If previously running, stop it first so the

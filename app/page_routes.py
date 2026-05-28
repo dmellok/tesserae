@@ -47,7 +47,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
-from app.panel import fit_cells_to_panel, resolve_page_panel, resolve_settings_panel
+from app.panel import fit_cells_to_panel, resolve_panel_for_page, resolve_settings_panel
 from app.plugin_loader import Plugin, PluginRegistry
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
@@ -68,6 +68,12 @@ def _plugins() -> PluginRegistry:
 
 def _settings_store() -> SettingsStore:
     return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
+
+
+def _devices() -> Any:
+    """Device registry (or None if no devices/ dir was loaded). Used by
+    resolve_panel_for_page so a page can inherit its device's panel."""
+    return current_app.config.get("DEVICE_REGISTRY")
 
 
 def _slug_from(text: str) -> str:
@@ -180,7 +186,7 @@ def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     layout = LAYOUTS_BY_SLUG.get(layout_slug)
     if layout is None:
         raise ValueError(f"unknown layout {layout_slug!r}")
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
     positions = to_panel_pixels(layout, panel.w, panel.h)
     out: list[Cell] = []
     for i, (x, y, w, h) in enumerate(positions):
@@ -243,7 +249,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
     from app.state.user_themes import PALETTE_TOKENS
 
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
     page = _ensure_cells_fit_panel(page, panel)
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
     active_layout = detect_layout(panel_cells, panel.w, panel.h)
@@ -273,6 +279,26 @@ def _editor_context(page: Page) -> dict[str, Any]:
         {"id": c.id, "x": c.x, "y": c.y, "w": c.w, "h": c.h, "plugin": c.plugin} for c in page.cells
     ]
 
+    # Device picker options. Only devices that declare a panel block
+    # qualify — anything without panel dims can't host a page (the
+    # editor wouldn't know what size to render at).
+    device_registry = _devices()
+    device_options: list[dict[str, Any]] = []
+    if device_registry is not None:
+        for dev in sorted(device_registry.devices.values(), key=lambda d: d.name.lower()):
+            if dev.panel is None:
+                continue
+            label = dev.panel.get("name") or dev.name
+            device_options.append(
+                {
+                    "id": dev.id,
+                    "name": dev.name,
+                    "label": f"{label} — {dev.panel['w']}x{dev.panel['h']}",
+                    "w": int(dev.panel["w"]),
+                    "h": int(dev.panel["h"]),
+                }
+            )
+
     return {
         "page": page,
         "panel": panel,
@@ -286,6 +312,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "palette_tokens": list(PALETTE_TOKENS),
         "cell_palettes": cell_palettes,
         "layout_editor_cells": layout_editor_cells,
+        "device_options": device_options,
     }
 
 
@@ -387,6 +414,11 @@ def update(page_id: str) -> Response:
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
                 "bleed_color": (form.get("bleed_color") or page.bleed_color),
                 "icon": (form.get("icon") or None) or None,
+                # Device picker — empty string means "no specific
+                # device" (legacy behaviour). When set, resolves the
+                # panel from that device's manifest and the push
+                # pipeline fires only its renderers.
+                "device_id": (form.get("device_id") or None) or None,
             }
         )
     except ValidationError as exc:
@@ -430,7 +462,7 @@ def create_cell(page_id: str) -> Response:
     page = _store().get(page_id)
     if page is None:
         abort(404)
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
     default_w = min(panel.w, 400)
     default_h = min(panel.h, 240)
     cell = _new_cell(x=0, y=0, w=default_w, h=default_h)
@@ -482,7 +514,7 @@ def preview(page_id: str) -> Response:
     page = _store().get(page_id)
     if page is None:
         abort(404)
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
     form = request.form
 
     cell_buckets: dict[str, dict[str, Any]] = {}
@@ -523,6 +555,7 @@ def preview(page_id: str) -> Response:
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
                 "bleed_color": (form.get("bleed_color") or page.bleed_color),
                 "icon": (form.get("icon") or None) or None,
+                "device_id": (form.get("device_id") or None) or None,
                 "cells": new_cells,
             }
         )
@@ -546,7 +579,7 @@ def update_cell(page_id: str, cell_id: str) -> Response:
     new_plugin_id = (form.get("plugin") or "").strip() or None
     plugin_changed = new_plugin_id != cell.plugin
     plugin = _plugins().get(new_plugin_id) if new_plugin_id else None
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
     try:
         updated_cell = _apply_cell_form(cell, form, panel)
     except ValidationError as exc:
@@ -599,7 +632,7 @@ def batch_cells(page_id: str) -> Response:
     creates = body.get("creates") or []
     deletes = set(body.get("deletes") or [])
 
-    panel = resolve_page_panel(page.panel, _settings_store())
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
 
     def _clamp_geom(g: dict[str, Any], existing: Cell | None) -> dict[str, int]:
         return {
