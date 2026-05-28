@@ -18,12 +18,19 @@ Both contain:
 
 ## Topic-prefix convention
 
-Tesserae devices are identified by a topic prefix — `pi` for the
-default Pi device, `esp32` for the default ESP32. Custom devices
-(added via Settings → Devices → Add device) can pick their own
-prefix (e.g. `pi-kitchen`, `esp32-hallway`). Make sure your firmware
-subscribes to the right one — it's the single string you'll change
-when you wire up a second display of the same kind.
+Tesserae devices are identified by a topic prefix that defaults to the
+device kind id:
+
+| Built-in kind | Default prefix | Topics |
+|---|---|---|
+| `pi_bin_client` | `pi_bin` | `tesserae/pi_bin/frame/bin`, `tesserae/pi_bin/status` |
+| `pi_png_client` | `pi_png` | `tesserae/pi_png/frame/png`, `tesserae/pi_png/status` |
+| `esp32_client`  | `esp32`  | `tesserae/esp32/frame/bin`, `tesserae/esp32/status`, `tesserae/esp32/config` |
+
+Custom instances (added via Settings → Devices → Add device) pick
+their own prefix (e.g. `pi-kitchen`, `esp32-hallway`). Make sure your
+firmware subscribes to the right one — it's the single string you'll
+change when you wire up a second display of the same kind.
 
 ## Update briefs
 

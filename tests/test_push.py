@@ -55,7 +55,9 @@ def _make_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer
             "mime": "application/octet-stream",
             "extension": ext,
             "topic_pattern": f"tesserae/{{device}}/frame/{ext}",
-            "device": "pi" if rid.startswith("pi_") else "esp32",
+            # pi_bin / pi_png each have their own device id (post-split);
+            # esp32_* renderers all live under the shared 'esp32' kind.
+            "device": "esp32" if rid.startswith("esp32") else rid,
             "retain": retain,
         },
         module=mod,
@@ -146,10 +148,10 @@ def test_push_fans_out_to_every_renderer(tmp_path: Path, composition_png: bytes)
 
     # Two publishes — one per renderer, retention follows the manifest.
     topics = [t for t, *_ in mqtt_client.published]
-    assert "tesserae/pi/frame/png" in topics
+    assert "tesserae/pi_png/frame/png" in topics
     assert "tesserae/esp32/frame/bin" in topics
     retains = {t: retain for t, _p, _q, retain in mqtt_client.published}
-    assert retains["tesserae/pi/frame/png"] is False
+    assert retains["tesserae/pi_png/frame/png"] is False
     assert retains["tesserae/esp32/frame/bin"] is True
 
     # Payload bytes are JSON with the URL key the renderer built.
@@ -222,4 +224,4 @@ def test_failing_renderer_marks_push_failed_but_others_still_publish(
 
     # The good renderer's publish still happened.
     topics = [t for t, *_ in mqtt_client.published]
-    assert topics == ["tesserae/pi/frame/png"]
+    assert topics == ["tesserae/pi_png/frame/png"]

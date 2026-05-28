@@ -1,13 +1,13 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Pi client (PNG)",
+  "name": "Pi PNG client",
   "version": "0.1.0",
-  "description": "Composition PNG, rotated to the Pi client's landscape-native pixel grid. Published non-retained to tesserae/pi/frame/png with the v3-frozen options payload (rotate / scale / bg / saturation) so an existing inky-dash listener works without firmware changes.",
+  "description": "Composition PNG, rotated to the Pi client's landscape-native pixel grid. Published non-retained to tesserae/pi_png/frame/png with the v3-frozen options payload (rotate / scale / bg / saturation) so an existing inky-dash listener works without firmware changes.",
   "orientation": "landscape",
   "mime": "image/png",
   "extension": "png",
   "topic_pattern": "tesserae/{device}/frame/png",
-  "device": "pi",
+  "device": "pi_png",
   "retain": false,
   "settings": [
     {

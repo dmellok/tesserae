@@ -173,8 +173,8 @@ def test_settings_page_lists_loaded_renderers(app_with_gate: Flask) -> None:
     resp = client.get("/settings/renderers")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "Renderer: Pi client (PNG)" in body
-    assert "tesserae/pi/frame/png" in body  # topic shown in meta
+    assert "Renderer: Pi PNG client" in body
+    assert "tesserae/pi_png/frame/png" in body  # topic shown in meta
 
 
 def test_settings_redirects_to_server_subpage(app_with_gate: Flask) -> None:
@@ -338,7 +338,7 @@ def test_add_device_with_panel_preset(app_with_gate: Flask) -> None:
         "/settings/devices/add",
         data={
             "id": "pi_office",
-            "kind": "pi_client",
+            "kind": "pi_png_client",
             "panel_preset": "inky_7_3",
             # Bogus manual values should be ignored when a preset is picked.
             "panel_w": "9999",

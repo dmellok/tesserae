@@ -36,12 +36,12 @@ def composition_png() -> bytes:
 
 
 def test_pi_png_manifest_fields(pi_png) -> None:
-    assert pi_png.device == "pi"
+    assert pi_png.device == "pi_png"
     assert pi_png.orientation == "landscape"
     assert pi_png.extension == "png"
     assert pi_png.mime == "image/png"
     assert pi_png.retain is False
-    assert pi_png.topic == "tesserae/pi/frame/png"
+    assert pi_png.topic == "tesserae/pi_png/frame/png"
 
 
 def test_pi_png_transform_rotates(pi_png, composition_png) -> None:

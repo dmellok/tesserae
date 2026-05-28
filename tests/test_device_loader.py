@@ -49,7 +49,8 @@ def test_discovers_bundled_devices(tmp_path: Path, schema_path: Path) -> None:
         REPO_ROOT / "devices", schema_path=schema_path, data_root=tmp_path
     )
     assert registry.errors == []
-    assert "pi_client" in registry.devices
+    assert "pi_bin_client" in registry.devices
+    assert "pi_png_client" in registry.devices
     assert "esp32_client" in registry.devices
 
 

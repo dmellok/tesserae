@@ -41,15 +41,16 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     resp = client.get("/settings/devices")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # Both shipped devices appear, with the "no heartbeat" status state.
-    assert "Device: Pi client" in body
+    # All three shipped devices appear, with the "no heartbeat" status state.
+    assert "Device: Pi BIN client" in body
+    assert "Device: Pi PNG client" in body
     assert "Device: ESP32 client" in body
     assert "no heartbeat received yet" in body
     # ESP32 client config form (sleep_interval_s) shows up.
     assert "Sleep interval" in body
     assert 'name="sleep_interval_s"' in body
-    # pi_client has no config_topic — no Save button rendered for its form.
-    pi_idx = body.index("Device: Pi client")
+    # Pi kinds have no config_topic — no Save button rendered for their form.
+    pi_idx = body.index("Device: Pi BIN client")
     esp_idx = body.index("Device: ESP32 client")
     pi_section = body[pi_idx:esp_idx]
     assert 'name="sleep_interval_s"' not in pi_section
@@ -173,5 +174,6 @@ def test_device_status_subscriptions_replayed_on_broker_rebuild(app: Flask) -> N
     # new transport instance.
     app.config["REBUILD_TRANSPORT"]()
     new_transport = app.config["MQTT_TRANSPORT"]
-    assert "tesserae/pi/status" in new_transport.topic_subscriptions
+    assert "tesserae/pi_bin/status" in new_transport.topic_subscriptions
+    assert "tesserae/pi_png/status" in new_transport.topic_subscriptions
     assert "tesserae/esp32/status" in new_transport.topic_subscriptions

@@ -42,7 +42,7 @@ from app.state.settings_store import SECRET_MASK, SettingsStore
 from app.transport import BrokerConfig, MqttTransport
 
 # How fresh a heartbeat has to be to read as "ok" in the UI. Past this it
-# decays through "warn" (2x) into "stale". Tuned for the typical pi_client
+# decays through "warn" (2x) into "stale". Tuned for the typical Pi client
 # 60s heartbeat — esp32_client wakes far less often but the broker-retained
 # last value is still informative.
 STATUS_FRESH_S: int = 90

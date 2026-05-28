@@ -1,0 +1,9 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Pi PNG client",
+  "version": "0.1.0",
+  "description": "Raspberry-Pi-side client that consumes the PNG frame. Subscribes to tesserae/pi_png/frame/png; publishes a heartbeat with idle/rendering state and the last paint timestamp.",
+  "renderers": ["pi_png"],
+  "status_topic": "tesserae/pi_png/status",
+  "panel": { "w": 1424, "h": 1200, "orientation": "landscape", "name": "Inky Impression 13.3″" }
+}

@@ -35,12 +35,12 @@ def panel_png() -> bytes:
 
 
 def test_pi_bin_manifest_fields(pi_bin) -> None:
-    assert pi_bin.device == "pi"
+    assert pi_bin.device == "pi_bin"
     assert pi_bin.orientation == "composition"
     assert pi_bin.extension == "bin"
     assert pi_bin.mime == "application/octet-stream"
     assert pi_bin.retain is False
-    assert pi_bin.topic == "tesserae/pi/frame/bin"
+    assert pi_bin.topic == "tesserae/pi_bin/frame/bin"
 
 
 def test_pi_bin_transform_produces_4bpp_buffer(pi_bin, panel_png) -> None:

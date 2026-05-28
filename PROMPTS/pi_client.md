@@ -30,8 +30,17 @@ expects a heartbeat at `tesserae/<device>/status`. The `<device>` slot
 is whatever you set as the device's `topic_prefix` in Tesserae's
 Settings → Devices.
 
-For the default Pi device (`pi_client`), prefix is `pi`. For a custom
-instance you might use `pi-kitchen`, `pi-hallway`, etc.
+Two Pi kinds ship with Tesserae — pick the one matching what you're
+building:
+
+- **`pi_bin_client`** → default prefix `pi_bin` → subscribes to
+  `tesserae/pi_bin/frame/bin` (or your instance prefix).
+- **`pi_png_client`** → default prefix `pi_png` → subscribes to
+  `tesserae/pi_png/frame/png` (or your instance prefix).
+
+For a custom instance (one Pi running pi_bin client in the kitchen, a
+second running pi_png in the hallway) you might use prefixes like
+`pi-kitchen`, `pi-hallway`, etc.
 
 | Direction | Topic | QoS / Retained | Payload |
 |---|---|---|---|
