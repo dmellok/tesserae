@@ -44,13 +44,23 @@
           <span class="switch-track"><span class="switch-thumb"></span></span>
           <span class="switch-label">Use the built-in broker (recommended)</span>
         </label>
-        <p class="field-help">Runs an MQTT broker inside Tesserae on port 1883. Your clients connect to this machine's IP.</p>
       </div>
+
+      <div class="wizard-broker-builtin">
+        <div class="field">
+          <label>Point your clients at</label>
+          <p class="wizard-broker-url"><code>{{ builtin_url }}</code></p>
+          <p class="field-help">The built-in broker binds all interfaces on port {{ builtin_port }}, so your Pi / ESP32 clients connect to this address. Set a username + password below to lock it down on your network.</p>
+        </div>
+        {{ text_input('builtin-user', 'builtin_username', 'Username (optional)', value=broker.get('embedded_username', '')) }}
+        {{ text_input('builtin-pass', 'builtin_password', 'Password (optional)', value='', type='password') }}
+      </div>
+
       <div class="wizard-broker-external">
         {{ text_input('broker-host', 'host', 'Broker host', value=broker.get('host', ''), placeholder='192.168.1.50') }}
         {{ number_input('broker-port', 'port', 'Port', value=broker.get('port', 1883), min=1, step=1) }}
         {{ text_input('broker-user', 'username', 'Username (optional)', value=broker.get('username', '')) }}
-        {{ text_input('broker-pass', 'password', 'Password (optional)', value='') }}
+        {{ text_input('broker-pass', 'password', 'Password (optional)', value='', type='password') }}
       </div>
       <div class="wizard-nav">
         <a class="ghost" href="{{ url_for('onboarding.step', step='welcome') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
@@ -64,7 +74,7 @@
     <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration — or add one by hand.</p>
     {# Live discovery: refresh when a client announces itself so the user
        doesn't have to reload while waiting for the first heartbeat. #}
-    <span data-discovered-poll hidden></span>
+    <span data-discovered-poll="{{ discovered_sig }}" hidden></span>
     <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
 
     {% if instances %}
@@ -152,12 +162,17 @@
 </section>
 
 <script>
-  // Broker step: hide the external fields when the built-in broker is on.
+  // Broker step: show the built-in (URL + creds) or external fields
+  // depending on the toggle.
   (function () {
     const toggle = document.querySelector('#use-builtin');
     const ext = document.querySelector('.wizard-broker-external');
-    if (!toggle || !ext) return;
-    function apply() { ext.hidden = toggle.checked; }
+    const builtin = document.querySelector('.wizard-broker-builtin');
+    if (!toggle) return;
+    function apply() {
+      if (ext) ext.hidden = toggle.checked;
+      if (builtin) builtin.hidden = !toggle.checked;
+    }
     toggle.addEventListener('change', apply);
     apply();
   })();

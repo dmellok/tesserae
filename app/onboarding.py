@@ -34,6 +34,7 @@ from app import device_service
 from app.device_loader import DeviceRegistry
 from app.discovery import DiscoveryCache
 from app.layouts import LAYOUTS_BY_SLUG, to_panel_pixels
+from app.network import detect_local_ip
 from app.panel import resolve_panel_for_page, resolve_settings_panel
 from app.push import PushManager
 from app.state.page_store import Cell, Page, PageStore
@@ -166,7 +167,14 @@ def step(step: str) -> Response | str:
         "step_count": len(STEPS),
     }
     if step == "broker":
-        ctx["broker"] = _settings().get_section("broker")
+        broker = _settings().get_section("broker")
+        ctx["broker"] = broker
+        port = int(broker.get("embedded_port") or 1883)
+        ctx["builtin_port"] = port
+        # Address clients point at when using the built-in broker. detect_
+        # local_ip routes a UDP socket to find this host's LAN IP (no
+        # packets sent); honours TESSERAE_HOST_IP.
+        ctx["builtin_url"] = f"mqtt://{detect_local_ip()}:{port}"
     elif step == "device":
         ctx["device_kinds"] = [
             {"id": d.id, "name": d.name} for d in _devices().all() if d.kind_of is None
@@ -179,6 +187,10 @@ def step(step: str) -> Response | str:
             for e in _discovery().all()
             if e.id not in _devices().devices
         ]
+        # Baseline signature for the client-side poller (auto-refresh).
+        ctx["discovered_sig"] = ",".join(
+            sorted(f"{d['id']}:{d['kind'] or ''}" for d in ctx["discovered"])
+        )
     elif step == "dashboard":
         ctx["pages"] = [{"id": p.id, "name": p.name} for p in _pages().list()]
     return render_template("onboarding.html", **ctx)
@@ -190,15 +202,25 @@ def save_broker() -> Response:
     one, then rebuild so the connection takes effect immediately."""
     form = request.form
     if form.get("use_builtin"):
-        _settings().patch_section(
-            "broker", {"embedded_enabled": True, "host": "", "embedded_port": 1883}
-        )
+        # Bind all interfaces so LAN clients (Pi / ESP32) can reach it;
+        # the transport self-connects over loopback (see _rebuild_transport).
+        patch: dict[str, Any] = {
+            "embedded_enabled": True,
+            "host": "",
+            "embedded_port": 1883,
+            "embedded_bind": "0.0.0.0",
+            "embedded_username": (form.get("builtin_username") or "").strip(),
+        }
+        bpw = form.get("builtin_password") or ""
+        if bpw:
+            patch["embedded_password_secret"] = bpw
+        _settings().patch_section("broker", patch)
     else:
         host = (form.get("host") or "").strip()
         if not host:
             flash("Enter a broker host, or choose the built-in broker.", "error")
             return redirect(url_for("onboarding.step", step="broker"))
-        patch: dict[str, Any] = {
+        patch = {
             "embedded_enabled": False,
             "host": host,
             "port": _int(form.get("port"), 1883),

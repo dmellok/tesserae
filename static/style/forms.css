@@ -824,3 +824,8 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .wizard-hint { margin-top: 1rem; }
 .wizard-skip { text-align: center; margin-top: 1rem; }
 .wizard-broker-external[hidden] { display: none; }
+
+/* Wizard broker step: toggle between built-in (URL + creds) and external. */
+.wizard-broker-builtin[hidden], .wizard-broker-external[hidden] { display: none; }
+.wizard-broker-url { margin: 0.2rem 0 0.4rem; }
+.wizard-broker-url code { font-size: 1.05em; padding: 0.3rem 0.5rem; }

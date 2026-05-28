@@ -62,6 +62,29 @@ def test_broker_builtin_enables_embedded(app: Flask) -> None:
     assert app.config["SETTINGS_STORE"].get_section("broker")["embedded_enabled"] is True
 
 
+def test_broker_builtin_binds_all_and_saves_creds(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/onboarding/broker",
+        data={"use_builtin": "on", "builtin_username": "tess", "builtin_password": "s3cret"},
+    )
+    broker = app.config["SETTINGS_STORE"].get_section("broker")
+    assert broker["embedded_enabled"] is True
+    assert broker["embedded_bind"] == "0.0.0.0"  # LAN-reachable
+    assert broker["embedded_username"] == "tess"
+    assert broker["embedded_password_secret"] == "s3cret"
+
+
+def test_broker_step_shows_builtin_url(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/onboarding/broker").get_data(as_text=True)
+    assert "mqtt://" in body and ":1883" in body
+    # Password fields are masked.
+    assert 'name="builtin_password"' in body and 'type="password"' in body
+
+
 def test_broker_external_saves_host(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

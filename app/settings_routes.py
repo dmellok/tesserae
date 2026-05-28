@@ -410,7 +410,15 @@ def settings_area(area: str) -> str | Response:
         else []
     )
     discovered = (
-        _format_discovered(_discovery_cache().all()) if area == "devices" else []
+        [d for d in _format_discovered(_discovery_cache().all())
+         if d["id"] not in _devices().devices]
+        if area == "devices"
+        else []
+    )
+    # Signature of what we're rendering, so the client-side poller knows
+    # the baseline and can auto-refresh when the discovered set changes.
+    discovered_sig = ",".join(
+        sorted(f"{d['id']}:{d.get('kind') or ''}" for d in discovered)
     )
     return render_template(
         "settings.html",
@@ -421,6 +429,7 @@ def settings_area(area: str) -> str | Response:
         panel_preset_choices=PANEL_PRESET_CHOICES if area == "devices" else [],
         panel_presets=PANEL_PRESETS if area == "devices" else {},
         discovered_devices=discovered,
+        discovered_sig=discovered_sig,
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.
         calibrating=request.args.get("calibrating") or "",

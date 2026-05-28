@@ -11,9 +11,13 @@
 // strip is present. Skips reloading while the user is typing in a form
 // (e.g. the manual Add-device fields) so we never clobber input.
 (function () {
-  if (!document.querySelector("[data-discovered-poll]")) return;
+  const marker = document.querySelector("[data-discovered-poll]");
+  if (!marker) return;
   const ENDPOINT = "/settings/devices/discovered.json";
-  let seen = null;
+  // Baseline = what the server actually rendered (carried in the marker),
+  // NOT the first poll. Otherwise a device that announces itself between
+  // page render and the first poll gets adopted silently and never shows.
+  let seen = marker.getAttribute("data-discovered-poll") || "";
 
   function signature(list) {
     return (list || [])
@@ -38,10 +42,6 @@
       const resp = await fetch(ENDPOINT, { headers: { Accept: "application/json" } });
       if (!resp.ok) return;
       const sig = signature((await resp.json()).devices);
-      if (seen === null) {
-        seen = sig; // first sample: establish the baseline, don't reload
-        return;
-      }
       if (sig !== seen && !userIsTyping()) {
         location.reload();
       }

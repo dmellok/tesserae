@@ -339,9 +339,15 @@ def _rebuild_transport(
             embedded.start()
             app.config["EMBEDDED_BROKER"] = embedded
             if not host:
-                # Localhost loopback when broker binds there; otherwise
-                # use the same bind for consistency.
-                host = "127.0.0.1" if embedded_bind in ("127.0.0.1", "localhost") else embedded_bind
+                # The broker runs on this machine, so the transport always
+                # connects over localhost. 0.0.0.0 means "bind all
+                # interfaces" (so LAN clients can reach it) — it isn't a
+                # connectable address, so map it to loopback here too.
+                host = (
+                    embedded_bind
+                    if embedded_bind not in ("127.0.0.1", "localhost", "0.0.0.0")
+                    else "127.0.0.1"
+                )
                 embedded_self_connect = True
         except Exception:
             logger.exception(

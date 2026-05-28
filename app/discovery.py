@@ -114,12 +114,22 @@ class DiscoveryCache:
             decoded = {"raw": payload.decode("utf-8", errors="replace")}
         if not isinstance(decoded, dict):
             decoded = {"raw": decoded}
-        entry = DiscoveredDevice(
-            id=device_id,
-            received_at=time.time(),
-            parsed=decoded,
-        )
         with self._lock:
+            prev = self._items.get(device_id)
+            if prev is not None:
+                # Merge over the previous heartbeat so a kind / panel /
+                # fw_version seen once persists even if a later, partial
+                # heartbeat omits them (e.g. a device that sends a lean
+                # heartbeat after a full one). Mirrors the registered-
+                # device status cache's merge behaviour.
+                merged = dict(prev.parsed)
+                merged.update({k: v for k, v in decoded.items() if v is not None})
+                decoded = merged
+            entry = DiscoveredDevice(
+                id=device_id,
+                received_at=time.time(),
+                parsed=decoded,
+            )
             self._items[device_id] = entry
         return entry
 

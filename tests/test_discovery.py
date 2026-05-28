@@ -79,6 +79,20 @@ def test_wildcard_clear_does_not_resurrect(app: Flask) -> None:
     assert cache.get("esp32") is None
 
 
+def test_cache_merges_so_kind_persists_across_heartbeats() -> None:
+    # A full heartbeat establishes kind/panel; a later lean one (e.g. a
+    # device that drops to {"state":"idle"}) must NOT erase them, or the
+    # Register button would vanish. Mirrors the retained-LWT problem.
+    cache = DiscoveryCache()
+    cache.record("esp32_office", b'{"kind":"esp32_client","panel_w":1200,"panel_h":1600}')
+    cache.record("esp32_office", b'{"state":"idle"}')
+    e = cache.get("esp32_office")
+    assert e is not None
+    assert e.kind == "esp32_client"  # preserved
+    assert (e.panel_w, e.panel_h) == (1200, 1600)  # preserved
+    assert e.parsed["state"] == "idle"  # newest value applied
+
+
 def test_cache_tolerates_non_json_payload() -> None:
     cache = DiscoveryCache()
     entry = cache.record("pi_kitchen", b"plain text")

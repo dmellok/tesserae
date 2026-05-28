@@ -32,7 +32,7 @@
 {# Live discovery: poll for newly-announced clients and refresh so they
    appear without a manual reload. Marker present even when nothing's
    discovered yet, so polling catches the first one. #}
-<span data-discovered-poll hidden></span>
+<span data-discovered-poll="{{ discovered_sig }}" hidden></span>
 <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
 {% endif %}
 
