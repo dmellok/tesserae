@@ -13,6 +13,7 @@ fanout work the same way.
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Iterable
 from datetime import datetime, timedelta
 from typing import Any
@@ -226,6 +227,28 @@ def _build_timeline(schedules: Iterable[Schedule], hours: int = 24) -> dict[str,
     }
 
 
+def _relative(epoch: float | None) -> str:
+    """Short 'time since' label for the last-fired column."""
+    if not epoch:
+        return ""
+    seconds = max(0.0, time.time() - epoch)
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds / 60)} min ago"
+    if seconds < 86400:
+        return f"{int(seconds / 3600)} h ago"
+    return f"{int(seconds / 86400)} d ago"
+
+
+def _last_fired_view(epoch: float | None) -> dict[str, str] | None:
+    """Humanised last-fired: a relative label + an absolute tooltip.
+    ``None`` when the schedule has never fired."""
+    if not epoch:
+        return None
+    return {"rel": _relative(epoch), "abs": datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M")}
+
+
 @bp.get("")
 def index() -> str:
     schedules = _store().all()
@@ -236,6 +259,10 @@ def index() -> str:
         schedules=schedules,
         status=status,
         pages=pages,
+        # id -> display name so the table shows the dashboard's name, not
+        # its opaque id. Missing ids (deleted page) fall back in-template.
+        page_names={p.id: p.name for p in pages},
+        last_fired={sid: _last_fired_view(st.get("last_fired")) for sid, st in status.items()},
         timeline=_build_timeline(schedules),
         edit_id=request.args.get("edit"),
     )

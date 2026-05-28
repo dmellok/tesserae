@@ -68,6 +68,15 @@ def _store(tmp_path: Path) -> PageStore:
     return PageStore(tmp_path / "data" / "core" / "pages.json")
 
 
+def _new(client, **data: Any) -> str:
+    """Create a dashboard, return its (random, opaque) id. Page ids are no
+    longer derived from the name, so tests capture the id from the
+    create redirect instead of guessing a slug."""
+    resp = client.post("/pages/new", data=data or None, follow_redirects=False)
+    assert resp.status_code in (302, 303), resp.status_code
+    return resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+
+
 # -- /pages list + new -----------------------------------------------
 
 
@@ -93,13 +102,8 @@ def test_create_page_with_default_layout(app: Flask, tmp_path: Path) -> None:
     _set_panel(app, 800, 600)
     client = app.test_client()
     _sign_in(client)
-    resp = client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "1_cell"},
-        follow_redirects=False,
-    )
-    assert resp.status_code == 302
-    page = _store(tmp_path).get("home")
+    pid = _new(client, name="Home", layout="1_cell")
+    page = _store(tmp_path).get(pid)
     assert page is not None
     assert page.panel is None  # derived from settings
     assert len(page.cells) == 1
@@ -111,8 +115,8 @@ def test_create_page_with_2x2_grid_layout(app: Flask, tmp_path: Path) -> None:
     _set_panel(app, 800, 600)
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Grid", "layout": "2x2_grid"})
-    page = _store(tmp_path).get("grid")
+    pid = _new(client, name="Grid", layout="2x2_grid")
+    page = _store(tmp_path).get(pid)
     assert page is not None
     assert len(page.cells) == 4
     assert (page.cells[0].x, page.cells[0].y, page.cells[0].w, page.cells[0].h) == (0, 0, 400, 300)
@@ -124,16 +128,18 @@ def test_create_page_with_2x2_grid_layout(app: Flask, tmp_path: Path) -> None:
     )
 
 
-def test_duplicate_name_auto_uniquifies_id(app: Flask, tmp_path: Path) -> None:
-    """The user never sees the id. Submitting the same name twice
-    creates 'home' and 'home_2', not an error."""
+def test_duplicate_names_get_distinct_random_ids(app: Flask, tmp_path: Path) -> None:
+    """Ids are random + opaque (not name-derived, hidden from the UI), so
+    two dashboards with the same name coexist with distinct ids — no slug
+    collision handling needed."""
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
-    client.post("/pages/new", data={"name": "Home"})
+    a = _new(client, name="Home")
+    b = _new(client, name="Home")
+    assert a != b
     store = _store(tmp_path)
-    assert store.get("home") is not None
-    assert store.get("home_2") is not None
+    assert {p.id for p in store.list()} == {a, b}
+    assert all(p.name == "Home" for p in store.list())
 
 
 # -- page edit -------------------------------------------------------
@@ -145,9 +151,9 @@ def test_update_page_metadata_autosave_json(app: Flask, tmp_path: Path) -> None:
     from settings."""
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
+    pid = _new(client, name="Home")
     resp = client.post(
-        "/pages/home",
+        f"/pages/{pid}",
         data={
             "name": "Living room",
             "theme": "embers",
@@ -159,11 +165,62 @@ def test_update_page_metadata_autosave_json(app: Flask, tmp_path: Path) -> None:
     )
     assert resp.status_code == 200
     assert resp.json == {"ok": True, "message": "Page saved."}
-    page = _store(tmp_path).get("home")
+    page = _store(tmp_path).get(pid)
     assert page is not None
     assert page.name == "Living room"
     assert page.theme == "embers"
     assert page.gap == 16
+
+
+def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
+    """The editor posts TWO forms to this endpoint: the header rename form
+    (just ``name``) and the dashboard form (theme/font/device_ids/…). Each
+    must touch only the fields it carries, or the rename wipes the theme
+    (which every cell inherits) and the dashboard's stale state reverts the
+    rename. Regression for both reported editor bugs."""
+    client = app.test_client()
+    _sign_in(client)
+    # Bind a device so we can prove device_ids survives a name-only save.
+    client.post("/onboarding/device", data={"id": "esp32_lab", "kind": "esp32_client"})
+    pid = _new(client, name="Home")
+
+    # Dashboard-shaped save (no name; sentinel marks it owns device_ids).
+    client.post(
+        f"/pages/{pid}",
+        data={
+            "theme": "embers",
+            "icon": "music-notes",
+            "device_ids": ["esp32_lab"],
+            "device_ids_present": "1",
+        },
+        headers={"X-Requested-With": "fetch"},
+    )
+    page = _store(tmp_path).get(pid)
+    assert page.theme == "embers" and page.device_ids == ["esp32_lab"] and page.icon == "music-notes"
+
+    # Name-only save (the header rename form) must NOT wipe theme/icon/device.
+    client.post(f"/pages/{pid}", data={"name": "Living room"}, headers={"X-Requested-With": "fetch"})
+    page = _store(tmp_path).get(pid)
+    assert page.name == "Living room"  # rename applied
+    assert page.theme == "embers"  # bug 1: theme survives a name-only save
+    assert page.icon == "music-notes"  # icon survives too
+    assert page.device_ids == ["esp32_lab"]  # device binding survives too
+
+    # Dashboard save (no name) must NOT revert the rename.
+    client.post(
+        f"/pages/{pid}",
+        data={"theme": "embers", "device_ids": ["esp32_lab"], "device_ids_present": "1"},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert _store(tmp_path).get(pid).name == "Living room"  # bug 2: rename sticks
+
+    # Dashboard form with the sentinel + no checkboxes clears the binding.
+    client.post(
+        f"/pages/{pid}",
+        data={"theme": "embers", "device_ids_present": "1"},
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert _store(tmp_path).get(pid).device_ids == []
 
 
 def test_panel_change_in_settings_propagates_to_compose(app: Flask) -> None:
@@ -172,21 +229,21 @@ def test_panel_change_in_settings_propagates_to_compose(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     _set_panel(app, 600, 400)
-    client.post("/pages/new", data={"name": "Home"})
-    resp = client.get("/compose/home", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    pid = _new(client, name="Home")
+    resp = client.get(f"/compose/{pid}", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert b"width: 600px;" in resp.data
     # Now resize the panel via settings.
     _set_panel(app, 1000, 700)
-    resp = client.get("/compose/home", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    resp = client.get(f"/compose/{pid}", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert b"width: 1000px;" in resp.data
 
 
 def test_delete_page_removes_it(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Doomed"})
-    client.post("/pages/doomed/delete")
-    assert _store(tmp_path).get("doomed") is None
+    pid = _new(client, name="Doomed")
+    client.post(f"/pages/{pid}/delete")
+    assert _store(tmp_path).get(pid) is None
 
 
 # -- layout apply ---------------------------------------------------
@@ -196,15 +253,15 @@ def test_apply_layout_reuses_existing_cells(app: Flask, tmp_path: Path) -> None:
     _set_panel(app, 800, 600)
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home", "layout": "1_cell"})
-    page = _store(tmp_path).get("home")
+    pid = _new(client, name="Home", layout="1_cell")
+    page = _store(tmp_path).get(pid)
     cell_id = page.cells[0].id
     client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={"plugin": "widget_a", "x": "0", "y": "0", "w": "800", "h": "600"},
     )
-    client.post("/pages/home/layout", data={"layout": "2x2_grid"})
-    page = _store(tmp_path).get("home")
+    client.post(f"/pages/{pid}/layout", data={"layout": "2x2_grid"})
+    page = _store(tmp_path).get(pid)
     assert len(page.cells) == 4
     assert page.cells[0].plugin == "widget_a"
     assert (page.cells[0].x, page.cells[0].y, page.cells[0].w, page.cells[0].h) == (0, 0, 400, 300)
@@ -214,21 +271,18 @@ def test_apply_layout_reuses_existing_cells(app: Flask, tmp_path: Path) -> None:
 def test_apply_layout_drops_surplus_cells(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "2x2_grid"},
-    )
-    client.post("/pages/home/layout", data={"layout": "1_cell"})
-    page = _store(tmp_path).get("home")
+    pid = _new(client, name="Home", layout="2x2_grid")
+    client.post(f"/pages/{pid}/layout", data={"layout": "1_cell"})
+    page = _store(tmp_path).get(pid)
     assert len(page.cells) == 1
 
 
 def test_apply_unknown_layout_via_fetch_returns_json(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
+    pid = _new(client, name="Home")
     resp = client.post(
-        "/pages/home/layout",
+        f"/pages/{pid}/layout",
         data={"layout": "nope"},
         headers={"X-Requested-With": "fetch"},
     )
@@ -242,13 +296,10 @@ def test_apply_unknown_layout_via_fetch_returns_json(app: Flask) -> None:
 def test_add_empty_cell(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "1_cell"},
-    )
+    pid = _new(client, name="Home", layout="1_cell")
     # 1_cell default seeded one cell; add another empty.
-    client.post("/pages/home/cells")
-    page = _store(tmp_path).get("home")
+    client.post(f"/pages/{pid}/cells")
+    page = _store(tmp_path).get(pid)
     assert len(page.cells) == 2
     assert page.cells[-1].plugin is None
 
@@ -256,16 +307,13 @@ def test_add_empty_cell(app: Flask, tmp_path: Path) -> None:
 def test_assign_plugin_seeds_options(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
     client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "1_cell"},
-    )
-    cell_id = _store(tmp_path).get("home").cells[0].id
-    client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={"plugin": "widget_a", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.plugin == "widget_a"
     assert cell.options.get("format") == "24h"
     assert cell.options.get("show_date") is True
@@ -279,23 +327,20 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
     be stale against the new schema."""
     client = app.test_client()
     _sign_in(client)
-    client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "1_cell"},
-    )
-    cell_id = _store(tmp_path).get("home").cells[0].id
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
     # Step 1: assign widget_a. Options are seeded from widget_a's defaults.
     client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={"plugin": "widget_a", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.plugin == "widget_a"
     assert cell.options["format"] == "24h"
     assert cell.options["show_seconds"] is False
     # Step 2: edit an option. plugin unchanged -> options come from the form.
     client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={
             "plugin": "widget_a",
             "x": "0",
@@ -306,15 +351,15 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
             "opt_format": "12h",
         },
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.options["show_seconds"] is True
     assert cell.options["format"] == "12h"
     # Step 3: swap to widget_b -> widget_a's options shouldn't carry over.
     client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={"plugin": "widget_b", "x": "0", "y": "0", "w": "400", "h": "300"},
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.plugin == "widget_b"
     assert "show_seconds" not in cell.options
     assert "format" not in cell.options
@@ -324,13 +369,13 @@ def test_update_cell_clamps_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     _set_panel(app, 400, 300)
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home", "layout": "1_cell"})
-    cell_id = _store(tmp_path).get("home").cells[0].id
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
     client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={"plugin": "widget_a", "x": "999", "y": "-50", "w": "5000", "h": "5000"},
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.x == 399
     assert cell.y == 0
     assert cell.w == 400
@@ -340,13 +385,10 @@ def test_update_cell_clamps_out_of_bounds(app: Flask, tmp_path: Path) -> None:
 def test_delete_cell(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "2_columns"},
-    )
-    cell_id = _store(tmp_path).get("home").cells[0].id
-    client.post(f"/pages/home/cells/{cell_id}/delete")
-    assert len(_store(tmp_path).get("home").cells) == 1
+    pid = _new(client, name="Home", layout="2_columns")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(f"/pages/{pid}/cells/{cell_id}/delete")
+    assert len(_store(tmp_path).get(pid).cells) == 1
 
 
 def test_cell_palette_overrides_round_trip(app: Flask, tmp_path: Path) -> None:
@@ -354,13 +396,10 @@ def test_cell_palette_overrides_round_trip(app: Flask, tmp_path: Path) -> None:
     color input alone (every picker has SOME value) isn't enough."""
     client = app.test_client()
     _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
     client.post(
-        "/pages/new",
-        data={"name": "Home", "layout": "1_cell"},
-    )
-    cell_id = _store(tmp_path).get("home").cells[0].id
-    client.post(
-        f"/pages/home/cells/{cell_id}",
+        f"/pages/{pid}/cells/{cell_id}",
         data={
             "plugin": "widget_a",
             "x": "0",
@@ -373,7 +412,7 @@ def test_cell_palette_overrides_round_trip(app: Flask, tmp_path: Path) -> None:
             "override_bg": "#ffffff",
         },
     )
-    cell = _store(tmp_path).get("home").cells[0]
+    cell = _store(tmp_path).get(pid).cells[0]
     assert cell.palette_overrides == {"accent": "#112233"}
 
 
@@ -385,8 +424,8 @@ def test_compose_preview_overlay_present(app: Flask) -> None:
     used by the editor iframe."""
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
-    resp = client.get("/compose/home?preview=1", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
+    pid = _new(client, name="Home")
+    resp = client.get(f"/compose/{pid}?preview=1", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
     assert resp.status_code == 200
     assert b"cell-tag" in resp.data
     assert b"cell-click-shim" in resp.data
@@ -395,8 +434,8 @@ def test_compose_preview_overlay_present(app: Flask) -> None:
 def test_compose_without_preview_has_no_overlay(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
-    resp = client.get("/compose/home", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
+    pid = _new(client, name="Home")
+    resp = client.get(f"/compose/{pid}", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
     assert resp.status_code == 200
     assert b"cell-tag" not in resp.data
     assert b"cell-click-shim" not in resp.data
@@ -405,10 +444,10 @@ def test_compose_without_preview_has_no_overlay(app: Flask) -> None:
 def test_compose_still_403s_from_lan_without_session(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post("/pages/new", data={"name": "Home"})
+    pid = _new(client, name="Home")
     with client.session_transaction() as sess:
         sess.clear()
-    resp = client.get("/compose/home", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
+    resp = client.get(f"/compose/{pid}", environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
     assert resp.status_code == 403
 
 
@@ -457,9 +496,9 @@ def test_update_page_binds_multiple_devices_and_drops_unknown(app: Flask, tmp_pa
     _sign_in(client)
     client.post("/onboarding/device", data={"id": "esp32_lab", "kind": "esp32_client"})
     client.post("/onboarding/device", data={"id": "esp32_den", "kind": "esp32_client"})
-    client.post("/pages/new", data={"name": "Home"})
+    pid = _new(client, name="Home")
     resp = client.post(
-        "/pages/home",
+        f"/pages/{pid}",
         data={
             "name": "Home",
             # unknown 'ghost' + built-in kind 'esp32_client' both dropped.
@@ -468,7 +507,7 @@ def test_update_page_binds_multiple_devices_and_drops_unknown(app: Flask, tmp_pa
         headers={"X-Requested-With": "fetch"},
     )
     assert resp.status_code == 200
-    page = _store(tmp_path).get("home")
+    page = _store(tmp_path).get(pid)
     assert page is not None
     assert page.device_ids == ["esp32_lab", "esp32_den"]
 
@@ -483,13 +522,13 @@ def test_editor_shows_one_preview_per_aspect_and_checked_devices(app: Flask) -> 
         "/onboarding/device",
         data={"id": "esp32_tall", "kind": "esp32_client", "panel_orientation": "portrait"},
     )
-    client.post("/pages/new", data={"name": "Home"})
+    pid = _new(client, name="Home")
     client.post(
-        "/pages/home",
+        f"/pages/{pid}",
         data={"name": "Home", "device_ids": ["esp32_wide", "esp32_tall"]},
         headers={"X-Requested-With": "fetch"},
     )
-    body = client.get("/pages/home").get_data(as_text=True)
+    body = client.get(f"/pages/{pid}").get_data(as_text=True)
     # One landscape (800x480) + one portrait (480x800) preview = two cards.
     assert body.count('class="preview-frame"') == 2
     assert "w=800&amp;h=480" in body

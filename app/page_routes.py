@@ -27,7 +27,6 @@ URLs:
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from typing import Any
 
@@ -99,22 +98,16 @@ def _clean_device_ids(raw: list[str]) -> list[str]:
     return out
 
 
-def _slug_from(text: str) -> str:
-    s = re.sub(r"[^a-z0-9]+", "_", text.strip().lower())
-    s = re.sub(r"_+", "_", s).strip("_")
-    return s or "page"
-
-
-def _unique_id(base: str, taken: set[str]) -> str:
-    """Append _2, _3, … to base until it's not in ``taken``. Used wherever
-    we auto-generate ids from a free-text name — the user shouldn't have
-    to think about ids being globally unique."""
-    if base not in taken:
-        return base
-    n = 2
-    while f"{base}_{n}" in taken:
-        n += 1
-    return f"{base}_{n}"
+def _random_page_id(taken: set[str]) -> str:
+    """An opaque random id for a new page. Decoupled from the name on
+    purpose — the id is a stable storage key + URL + schedule target, so
+    it must never change when the user renames. It's hidden from the UI,
+    so there's nothing to gain from a readable slug (and a name-derived
+    slug just goes stale, e.g. 'untitled_dashboard_2')."""
+    while True:
+        pid = uuid.uuid4().hex[:12]
+        if pid not in taken:
+            return pid
 
 
 def _coerce_int(
@@ -399,7 +392,7 @@ def create() -> Response:
     name = (form.get("name") or "").strip() or "Untitled dashboard"
 
     taken = {p.id for p in _store().list()}
-    page_id = _unique_id(_slug_from(name), taken)
+    page_id = _random_page_id(taken)
 
     # Panel dims come from app settings; the new page inherits them.
     panel = resolve_settings_panel(_settings_store())
@@ -441,27 +434,42 @@ def edit(page_id: str) -> str:
 @bp.post("/<page_id>")
 def update(page_id: str) -> Response:
     """Update page metadata. Panel dims come from settings, not from
-    the form — the editor no longer exposes them."""
+    the form — the editor no longer exposes them.
+
+    Merge, don't replace: only fields actually present in the POST are
+    updated; absent fields keep their stored value. The editor posts two
+    *separate* forms to this endpoint — the header rename form (just
+    ``name``) and the dashboard form (theme / font / icon / device_ids /
+    …). If absent fields were reset to defaults, the rename form would
+    wipe the theme + device bindings (and vice-versa), so each must touch
+    only what it carries."""
     page = _store().get(page_id)
     if page is None:
         abort(404)
     form = request.form
+    updates: dict[str, Any] = {}
+    if "name" in form:
+        updates["name"] = (form.get("name") or page.name).strip() or page.name
+    if "theme" in form:
+        updates["theme"] = form.get("theme") or None
+    if "font" in form:
+        updates["font"] = form.get("font") or None
+    if "gap" in form:
+        updates["gap"] = _coerce_int(form.get("gap"), page.gap, lo=0)
+    if "corner_radius" in form:
+        updates["corner_radius"] = _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0)
+    if "bleed_color" in form:
+        updates["bleed_color"] = form.get("bleed_color") or page.bleed_color
+    if "icon" in form:
+        updates["icon"] = (form.get("icon") or None) or None
+    # Device checkboxes vanish from the POST when all are unticked, so a
+    # hidden ``device_ids_present`` sentinel marks the form that owns the
+    # device list. That lets the dashboard form clear it to [] while the
+    # name-only rename form leaves the bindings untouched.
+    if "device_ids_present" in form or "device_ids" in form:
+        updates["device_ids"] = _clean_device_ids(form.getlist("device_ids"))
     try:
-        updated = page.model_copy(
-            update={
-                "name": (form.get("name") or page.name).strip() or page.name,
-                "theme": (form.get("theme") or None),
-                "font": (form.get("font") or None),
-                "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
-                "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
-                "bleed_color": (form.get("bleed_color") or page.bleed_color),
-                "icon": (form.get("icon") or None) or None,
-                # Device picker — checkboxes, so multiple. Empty = "no
-                # specific device" (virtual panel, fan out to all). Each
-                # selected device's panel drives a preview + a render.
-                "device_ids": _clean_device_ids(form.getlist("device_ids")),
-            }
-        )
+        updated = page.model_copy(update=updates)
     except ValidationError as exc:
         return _flash_save(False, f"Invalid page: {exc.errors()[0]['msg']}")
     _store().save(updated)

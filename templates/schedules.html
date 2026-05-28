@@ -168,11 +168,14 @@
     <tbody>
       {% for s in schedules %}
       <tr {% if not s.enabled %}class="is-disabled"{% endif %}>
-        <td>
-          <strong>{{ s.name }}</strong>
-          <div class="muted-row"><code>{{ s.id }}</code></div>
+        <td><strong>{{ s.name }}</strong></td>
+        <td class="col-page">
+          {% if page_names.get(s.page_id) %}
+            {{ page_names[s.page_id] }}
+          {% else %}
+            <span class="muted">deleted page</span>
+          {% endif %}
         </td>
-        <td class="col-page"><code>{{ s.page_id }}</code></td>
         <td>
           {% if s.type == 'interval' %}
             every {{ s.interval_minutes }} min
@@ -190,8 +193,8 @@
           {% if days|length == 7 %}every day{% else %}{% for d in days %}{{ DAY_NAMES[d] }}{% if not loop.last %} {% endif %}{% endfor %}{% endif %}
         </td>
         <td class="col-last">
-          {% set last = status.get(s.id, {}).get('last_fired') %}
-          {% if last %}<time datetime="{{ last }}">{{ last|int }}</time>{% else %}<span class="muted">—</span>{% endif %}
+          {% set lf = last_fired.get(s.id) %}
+          {% if lf %}<time title="{{ lf.abs }}">{{ lf.rel }}</time>{% else %}<span class="muted">never</span>{% endif %}
         </td>
         <td class="col-state">
           {% if s.enabled %}<span class="pill is-ok">enabled</span>{% else %}<span class="pill">disabled</span>{% endif %}

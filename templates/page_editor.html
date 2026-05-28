@@ -196,8 +196,12 @@
     <section class="card">
       {{ card_head('Dashboard', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-editor-form>
-        <input type="hidden" name="name" value="{{ page.name }}">
+        {# No `name` here — the header rename form owns it. A stale hidden
+           name would clobber a rename on save (both forms POST here). #}
         <input type="hidden" name="icon" value="{{ page.icon or '' }}" data-icon-value>
+        {# Sentinel so update() knows this form owns device_ids even when
+           every checkbox is unticked (unchecked boxes send nothing). #}
+        <input type="hidden" name="device_ids_present" value="1">
         {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
         {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
 

@@ -56,10 +56,18 @@
 .data-table th,
 .data-table td {
   text-align: left;
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--t-border);
-  vertical-align: top;
+  /* Middle-align so every cell in a row lines up on one baseline —
+     rows mix single-line (page, state) and two-line (cadence window)
+     content, and top-align made them look ragged. */
+  vertical-align: middle;
 }
+
+/* Keep the secondary line tight under its primary in two-line cells. */
+.data-table .col-page,
+.data-table .col-last,
+.data-table .col-state { white-space: nowrap; }
 
 .data-table th {
   font-size: 11px;

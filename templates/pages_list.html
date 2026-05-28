@@ -38,8 +38,7 @@
         <span>{{ page.name }}</span>
       </div>
       <div class="page-meta">
-        <code>{{ page.id }}</code>
-        <span class="muted">·</span>
+        {# Page id is an opaque internal key — not shown. #}
         <span><i class="ph ph-grid-four"></i> {{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}</span>
         {% if page.theme %}<span class="muted">·</span><span><i class="ph ph-palette"></i> {{ page.theme }}</span>{% endif %}
       </div>

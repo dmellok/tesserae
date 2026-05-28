@@ -153,14 +153,22 @@
       });
       form.addEventListener("change", (ev) => {
         const field = ev.target;
-        // The plugin picker reshapes the cell's option fields, so we
-        // POST it immediately (persist) and reload so the new schema
-        // appears in the editor.
+        // A reload-on-change field (cell plugin picker, device checkboxes)
+        // reshapes the page server-side, so we persist then reload. Save
+        // EVERY form first — not just this one — or unsaved edits
+        // elsewhere (e.g. a theme override on another cell) get discarded
+        // when the page re-renders from disk.
         if (field && field.dataset && field.dataset.reloadOnChange) {
-          submit(form).then(() => location.reload()).catch((err) => {
-            setStatus("error");
-            console.error("[editor] plugin swap failed:", err);
-          });
+          setStatus("saving");
+          (async () => {
+            try {
+              for (const f of forms()) await submit(f);
+              location.reload();
+            } catch (err) {
+              setStatus("error");
+              console.error("[editor] save-before-reload failed:", err);
+            }
+          })();
           return;
         }
         setDirty(true);
@@ -207,8 +215,10 @@
     const empty = picker.querySelector("[data-icon-empty]");
     const labelEl = picker.querySelector("[data-icon-label]");
     const current = picker.querySelector(".icon-picker-current");
-    const input = picker.parentElement.querySelector("[data-icon-value]");
     const form = picker.closest("form[data-editor-form]");
+    // The hidden value input is a direct child of the form, not inside the
+    // picker's .field — so search the form, not picker.parentElement.
+    const input = form ? form.querySelector("[data-icon-value]") : null;
     let icons = null;
 
     function pick(name) {
