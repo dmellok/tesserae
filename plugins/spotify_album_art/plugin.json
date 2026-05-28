@@ -1,0 +1,23 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Spotify — Album Art",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Full-bleed album art of your currently-playing Spotify track. Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",
+  "icon": "ph-vinyl-record",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "scale",
+      "type": "select",
+      "label": "Scale",
+      "default": "cover",
+      "choices": [
+        { "value": "cover", "label": "Fill (crop to cover)" },
+        { "value": "contain", "label": "Fit (letterbox)" }
+      ]
+    },
+    { "name": "dim_when_paused", "type": "boolean", "label": "Dim when paused", "default": true }
+  ],
+  "render": { "dither": "floyd-steinberg", "full_bleed": true, "needs_network": true }
+}

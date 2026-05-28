@@ -1,0 +1,27 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Spotify Core",
+  "version": "0.1.0",
+  "kind": "data",
+  "description": "Shared Spotify connection for the spotify_* widgets. Paste your Spotify app's Client ID + Secret here, then connect your account once at Plugins → Spotify. Holds the OAuth tokens so every Spotify widget shows your now-playing track. No widget cell of its own.",
+  "icon": "ph-spotify-logo",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "settings": [
+    {
+      "name": "client_id",
+      "type": "string",
+      "label": "Client ID",
+      "default": "",
+      "help": "From your app at developer.spotify.com/dashboard."
+    },
+    {
+      "name": "client_secret",
+      "type": "string",
+      "label": "Client Secret",
+      "secret": true,
+      "default": "",
+      "help": "Stored as client_secret_secret on disk. Add the redirect URI shown at Plugins → Spotify to your app's settings before connecting."
+    }
+  ],
+  "render": { "needs_network": true }
+}

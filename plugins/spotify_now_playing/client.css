@@ -1,0 +1,102 @@
+/* spotify_now_playing — widget-specific bits only; the shell (root, bar,
+   empty, error) comes from widget-bauhaus.css. All type scales with the
+   cell via container-query units (cqw/cqh), floored/capped with clamp. */
+
+.wb-root { grid-template-rows: auto 1fr; }
+
+.snp-body {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2.6cqw, 30px);
+  padding: clamp(10px, 2.6cqw, 32px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Square album art sized off the body height. */
+.snp-art {
+  flex: 0 0 auto;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: max(4px, 1.4cqmin);
+  overflow: hidden;
+  background: var(--theme-surface);
+}
+.snp-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.snp-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(2px, 0.9cqh, 10px);
+}
+
+.snp-trackrow {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+}
+.snp-state {
+  flex: 0 0 auto;
+  color: var(--theme-accent);
+  font-size: clamp(16px, 4cqw, 46px);
+  line-height: 1;
+}
+.snp-track {
+  font-weight: 800;
+  font-size: clamp(18px, 5.4cqw, 64px);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snp-artist {
+  font-size: clamp(14px, 3.8cqw, 42px);
+  color: var(--theme-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snp-album {
+  font-size: clamp(12px, 2.9cqw, 32px);
+  color: var(--theme-fgSoft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snp-progress {
+  margin-top: clamp(4px, 1.2cqh, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4em;
+}
+.snp-bar {
+  height: clamp(4px, 1cqh, 10px);
+  border-radius: 999px;
+  background: var(--theme-surface2, var(--theme-surface));
+  overflow: hidden;
+}
+.snp-bar span {
+  display: block;
+  height: 100%;
+  background: var(--theme-accent);
+}
+.snp-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(10px, 2.3cqw, 22px);
+  color: var(--theme-fgSoft);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small cells: drop the album line so the title/artist keep room. */
+.size-sm .snp-album { display: none; }
