@@ -190,6 +190,34 @@
   </form>
   {% endif %}
 
+  {% if section.calibrate_endpoint %}
+  {# Orientation calibration: send a numbered test card to the panel,
+     then map the reported top-left number to the right orientation. #}
+  <div class="calibrate-block">
+    {% if calibrating == section.device_id %}
+    <p class="field-help calibrate-prompt">
+      A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
+      <strong>which number is in the top-left corner?</strong>
+    </p>
+    <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+      <div class="calibrate-choices">
+        {% for n in [1, 2, 3, 4] %}
+        <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+        {% endfor %}
+      </div>
+      <p class="field-help">Blank or not showing? Re-send below.</p>
+    </form>
+    <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+      <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
+    </form>
+    {% else %}
+    <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+      <div class="actions">{{ button('Calibrate orientation', icon='compass', variant='ghost') }}</div>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if section.delete_endpoint %}
   <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline-delete"
         onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the virtual panel.');">

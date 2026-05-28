@@ -435,6 +435,48 @@ def test_update_panel_refuses_built_in_kind(app_with_gate: Flask) -> None:
     assert (dev.panel["w"], dev.panel["h"]) != (100, 100)
 
 
+def test_calibrate_pushes_card_and_shows_answer_form(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client"})
+    resp = client.post("/settings/devices/esp32_lab/calibrate", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "calibrating=esp32_lab" in resp.location
+    # The follow-up page renders the "which number is top-left?" choices.
+    body = client.get("/settings/devices?calibrating=esp32_lab").get_data(as_text=True)
+    assert "which number is in the top-left" in body.lower()
+    assert 'name="top_left" value="1"' in body
+
+
+def test_calibrate_apply_sets_orientation_from_answer(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    # esp32_client default panel is landscape (800x480).
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client"})
+    # Pushed landscape; user reports ④ in the top-left → 180° off → landscape_flipped.
+    resp = client.post(
+        "/settings/devices/esp32_lab/calibrate/apply",
+        data={"top_left": "4"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None and dev.panel is not None
+    assert dev.panel["orientation"] == "landscape_flipped"
+
+    # ③ in the top-left → 90° → portrait_flipped, and the canvas flips to tall.
+    client.post("/settings/devices/add", data={"id": "esp32_two", "kind": "esp32_client"})
+    client.post(
+        "/settings/devices/esp32_two/calibrate/apply",
+        data={"top_left": "3"},
+        follow_redirects=False,
+    )
+    dev2 = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_two")
+    assert dev2 is not None and dev2.panel is not None
+    assert dev2.panel["orientation"] == "portrait_flipped"
+    assert dev2.panel["w"] < dev2.panel["h"]  # swapped to tall
+
+
 def test_delete_refuses_built_in_kind(app_with_gate: Flask) -> None:
     """Built-in kinds ship with the app and must not be deletable."""
     client = app_with_gate.test_client()

@@ -745,3 +745,19 @@ input[type="range"].slider:focus::-moz-range-thumb {
 @media (max-width: 540px) {
   .discovery-row { flex-direction: column; align-items: stretch; }
 }
+
+/* ----- Orientation calibration (Settings → Devices) ---------------- */
+.calibrate-block { margin-top: 0.6rem; }
+.calibrate-prompt { margin-bottom: 0.5rem; }
+.calibrate-choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  max-width: 320px;
+}
+.calibrate-num {
+  font-size: 1.4rem;
+  font-weight: 700;
+  padding: 0.6rem 0;
+  justify-content: center;
+}

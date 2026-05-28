@@ -30,7 +30,8 @@ from typing import Any
 from flask import Blueprint, Flask, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
-from app import auth, device_service
+from app import auth, calibration, device_service
+from app.calibration import build_calibration_card, target_orientation
 from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
 from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
@@ -418,6 +419,9 @@ def settings_area(area: str) -> str | Response:
         panel_preset_choices=PANEL_PRESET_CHOICES if area == "devices" else [],
         panel_presets=PANEL_PRESETS if area == "devices" else {},
         discovered_devices=discovered,
+        # When set (via ?calibrating=<id>), the matching device card shows
+        # the "which number is in the top-left?" answer form.
+        calibrating=request.args.get("calibrating") or "",
     )
 
 
@@ -731,6 +735,84 @@ def devices_delete(instance_id: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices"))
 
 
+@bp.post("/settings/devices/<instance_id>/calibrate")
+def devices_calibrate(instance_id: str) -> Response:
+    """Push the orientation test card to a device through its real
+    renderer (so the on-panel result reflects the current settings),
+    then prompt the user for what they see."""
+    device = _devices().get(instance_id)
+    if device is None or device.kind_of is None or device.panel is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    panel = device.panel
+    card = build_calibration_card(int(panel["w"]), int(panel["h"]))
+    result = _push_manager().push_image(
+        card, source_label=f"calibration:{instance_id}", device_id=instance_id
+    )
+    if result.status == "sent":
+        flash("Calibration card sent — look at your panel, then answer below.", "ok")
+    else:
+        flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
+    # ?calibrating=<id> makes the device card render the answer form.
+    return redirect(
+        url_for("auth.settings_area", area="devices", calibrating=instance_id,
+                _anchor=f"device-{instance_id}")
+    )
+
+
+@bp.post("/settings/devices/<instance_id>/calibrate/apply")
+def devices_calibrate_apply(instance_id: str) -> Response:
+    """Set the orientation derived from the calibration answer, then
+    re-push the card so the user can confirm it's now upright."""
+    anchor = f"device-{instance_id}"
+    device = _devices().get(instance_id)
+    if device is None or device.kind_of is None or device.panel is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    try:
+        top_left = int(request.form.get("top_left") or 0)
+    except ValueError:
+        top_left = 0
+    if top_left not in (1, 2, 3, 4):
+        flash("Pick which number is in the panel's top-left corner.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+    panel = device.panel
+    pushed = str(panel.get("orientation") or "landscape")
+    target = target_orientation(pushed, top_left)
+    # Aspect drives the canvas dims; swap when the target aspect differs
+    # from how the card was just pushed.
+    w, h = int(panel["w"]), int(panel["h"])
+    if calibration.is_portrait(target) != calibration.is_portrait(pushed):
+        w, h = h, w
+
+    result = device_service.update_instance_panel(
+        devices=_devices(),
+        renderers=_renderers(),
+        data_root=_device_data_root(),
+        instance_id=instance_id,
+        w=w,
+        h=h,
+        orientation=target,
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Calibration failed.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    _rebuild_transport_fn()()
+    # Confirm re-push at the new orientation.
+    if result.device.panel is not None:
+        card = build_calibration_card(int(result.device.panel["w"]), int(result.device.panel["h"]))
+        _push_manager().push_image(
+            card, source_label=f"calibration:{instance_id}", device_id=instance_id
+        )
+    flash(
+        f"Set {result.device.name!r} to {target}. Re-sent the card — it should read "
+        "upright now. If not, adjust Display orientation below.",
+        "ok",
+    )
+    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+
 # -- diagnostics ----------------------------------------------------
 
 
@@ -944,6 +1026,17 @@ def _build_sections() -> list[dict[str, Any]]:
                 "panel": device.panel if is_instance else None,
                 "panel_endpoint": (
                     url_for("auth.devices_update_panel", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "device_id": device.id,
+                "calibrate_endpoint": (
+                    url_for("auth.devices_calibrate", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "calibrate_apply_endpoint": (
+                    url_for("auth.devices_calibrate_apply", instance_id=device.id)
                     if is_instance
                     else None
                 ),
