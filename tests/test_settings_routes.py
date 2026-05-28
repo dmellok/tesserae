@@ -329,6 +329,29 @@ def test_add_device_instance_creates_clone(app_with_gate: Flask, tmp_path: Path)
     assert inst_file.exists()
 
 
+def test_add_device_with_panel_preset(app_with_gate: Flask) -> None:
+    """Preset dropdown wins over manual width/height inputs so the
+    common case (pick a known panel) is a single click."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/devices/add",
+        data={
+            "id": "pi_office",
+            "kind": "pi_client",
+            "panel_preset": "inky_7_3",
+            # Bogus manual values should be ignored when a preset is picked.
+            "panel_w": "9999",
+            "panel_h": "9999",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("pi_office")
+    assert dev is not None and dev.panel is not None
+    assert (dev.panel["w"], dev.panel["h"]) == (800, 480)
+
+
 def test_add_device_rejects_invalid_id(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

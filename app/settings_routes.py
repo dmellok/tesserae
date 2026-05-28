@@ -33,7 +33,7 @@ from werkzeug.wrappers import Response
 
 from app import auth
 from app.device_loader import Device, DeviceRegistry, load_instance_file
-from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES
+from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
 from app.renderer_loader import RendererRegistry, clone_for_instances
@@ -412,6 +412,8 @@ def settings_area(area: str) -> str | Response:
         active_area=area,
         areas=_AREAS,
         device_kinds=device_kinds,
+        panel_preset_choices=PANEL_PRESET_CHOICES if area == "devices" else [],
+        panel_presets=PANEL_PRESETS if area == "devices" else {},
     )
 
 
@@ -594,13 +596,18 @@ def devices_add() -> Response:
         instance["config_topic"] = _swap_prefix(kind.config_topic, kind_prefix, instance_id)
 
     panel = dict(kind.panel or {})
-    for field_name in ("panel_w", "panel_h"):
-        raw = form.get(field_name)
-        if raw:
-            try:
-                panel["w" if field_name == "panel_w" else "h"] = int(raw)
-            except ValueError:
-                pass
+    preset = (form.get("panel_preset") or "").strip()
+    if preset in PANEL_PRESETS:
+        panel["w"], panel["h"] = PANEL_PRESETS[preset]
+    else:
+        # 'custom' (or empty) → take the width / height inputs as-is.
+        for field_name in ("panel_w", "panel_h"):
+            raw = form.get(field_name)
+            if raw:
+                try:
+                    panel["w" if field_name == "panel_w" else "h"] = int(raw)
+                except ValueError:
+                    pass
     if form.get("panel_orientation"):
         panel["orientation"] = "portrait" if form.get("panel_orientation") == "on" else "landscape"
     if panel:

@@ -34,19 +34,23 @@
    collects the instance-specific id, name, and panel dims. #}
 <section class="card" id="add-device">
   {{ card_head('Add device', icon_name='plus-circle', blurb='Register another physical display. Picks a kind for its protocol + renderers; the id becomes its MQTT topic prefix.') }}
-  <form method="post" action="{{ url_for('auth.devices_add') }}" class="form">
+  <form method="post" action="{{ url_for('auth.devices_add') }}" class="form add-device-form">
     {{ text_input('add-device-id', 'id', 'Device id', value='', placeholder='esp32_kitchen', required=True,
                   help='Lowercase letters, digits, underscore, hyphen (2–32 chars). Used as the MQTT topic prefix: tesserae/<id>/...') }}
     {% set kind_options = [] %}
     {% for k in device_kinds %}{% set _ = kind_options.append({'value': k.id, 'label': k.name}) %}{% endfor %}
     {{ select_field('add-device-kind', 'kind', 'Kind', value=device_kinds[0].id, options=kind_options) }}
     {{ text_input('add-device-name', 'name', 'Display name', value='', placeholder='Kitchen panel') }}
-    {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1,
-                    help='Defaults to the kind’s panel size.') }}
-    {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+    {{ select_field('add-device-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
+                    help='Pick a common panel, or Custom to set width / height by hand.') }}
+    <div class="add-device-custom-fields">
+      {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
+      {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+    </div>
     <div class="actions">{{ button('Add device', icon='plus') }}</div>
   </form>
   <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
+  <script type="application/json" id="add-device-presets">{{ panel_presets|tojson }}</script>
 </section>
 {% endif %}
 
@@ -185,25 +189,47 @@
     apply();
   })();
 
-  // Add-device: prefill panel width/height from the picked kind. The
-  // kinds list with their panel defaults is JSON-embedded next to the
-  // form so we don't have to refetch it.
+  // Add-device: pick a panel preset that matches the chosen kind's
+  // dimensions, fall back to Custom + prefilled w/h if none match.
+  // Hide the manual width/height inputs unless Custom is selected.
   (function () {
-    const select = document.querySelector('#add-device-kind');
-    const data = document.querySelector('#add-device-kinds');
-    if (!select || !data) return;
-    const w = document.querySelector('#add-device-w');
-    const h = document.querySelector('#add-device-h');
-    let kinds;
-    try { kinds = JSON.parse(data.textContent || '[]'); } catch { return; }
-    function apply() {
-      const kind = kinds.find(k => k.id === select.value);
-      if (!kind || !kind.panel) return;
-      if (w && !w.value) w.value = kind.panel.w;
-      if (h && !h.value) h.value = kind.panel.h;
+    const form = document.querySelector('.add-device-form');
+    if (!form) return;
+    const kindSelect = form.querySelector('#add-device-kind');
+    const presetSelect = form.querySelector('#add-device-preset');
+    const wInput = form.querySelector('#add-device-w');
+    const hInput = form.querySelector('#add-device-h');
+    const customWrap = form.querySelector('.add-device-custom-fields');
+    const kindsNode = document.querySelector('#add-device-kinds');
+    const presetsNode = document.querySelector('#add-device-presets');
+    if (!kindSelect || !presetSelect || !wInput || !hInput || !customWrap) return;
+    let kinds, presets;
+    try {
+      kinds = JSON.parse(kindsNode.textContent || '[]');
+      presets = JSON.parse(presetsNode.textContent || '{}');
+    } catch { return; }
+
+    function findPresetFor(w, h) {
+      for (const [key, dims] of Object.entries(presets)) {
+        if (dims[0] === w && dims[1] === h) return key;
+      }
+      return 'custom';
     }
-    select.addEventListener('change', () => { if (w) w.value = ''; if (h) h.value = ''; apply(); });
-    apply();
+    function syncCustom() {
+      customWrap.hidden = presetSelect.value !== 'custom';
+    }
+    function applyKind() {
+      const kind = kinds.find(k => k.id === kindSelect.value);
+      if (!kind || !kind.panel) return;
+      const match = findPresetFor(kind.panel.w, kind.panel.h);
+      presetSelect.value = match;
+      wInput.value = kind.panel.w;
+      hInput.value = kind.panel.h;
+      syncCustom();
+    }
+    presetSelect.addEventListener('change', syncCustom);
+    kindSelect.addEventListener('change', applyKind);
+    applyKind();
   })();
 </script>
 {% endblock %}
