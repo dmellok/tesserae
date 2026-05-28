@@ -17,7 +17,8 @@
 
 (function () {
   const status = document.querySelector("[data-save-status]");
-  const iframe = document.getElementById("preview-iframe");
+  // One preview iframe per distinct aspect ratio (multi-device pages).
+  const previewFrames = () => document.querySelectorAll(".preview-frame iframe");
   const saveBtn = document.querySelector("[data-save-all]");
   const grid = document.querySelector(".editor-grid");
   const pageId = grid ? grid.dataset.pageId : null;
@@ -52,16 +53,20 @@
   // briefly held two full widget compositions in memory at once and
   // froze the page on iPad Pro.)
   function reloadPreview() {
-    if (!iframe) return;
-    const url = new URL(iframe.src, location.origin);
-    url.searchParams.set("_t", String(Date.now()));
-    iframe.style.transition = "opacity 140ms ease";
-    iframe.style.opacity = "0.35";
-    const onLoad = () => {
-      iframe.style.opacity = "1";
-    };
-    iframe.addEventListener("load", onLoad, { once: true });
-    iframe.src = url.pathname + url.search;
+    previewFrames().forEach((iframe) => {
+      const url = new URL(iframe.src, location.origin);
+      url.searchParams.set("_t", String(Date.now()));
+      iframe.style.transition = "opacity 140ms ease";
+      iframe.style.opacity = "0.35";
+      iframe.addEventListener(
+        "load",
+        () => {
+          iframe.style.opacity = "1";
+        },
+        { once: true },
+      );
+      iframe.src = url.pathname + url.search;
+    });
   }
 
   // Build a single FormData containing every editor-form's fields,
@@ -83,7 +88,7 @@
   let previewTimer;
   let previewInFlight = null;
   function schedulePreview() {
-    if (!pageId || !iframe) return;
+    if (!pageId || !previewFrames().length) return;
     clearTimeout(previewTimer);
     previewTimer = setTimeout(async () => {
       // Coalesce: if one is already running, wait for it before issuing

@@ -225,3 +225,84 @@ def test_failing_renderer_marks_push_failed_but_others_still_publish(
     # The good renderer's publish still happened.
     topics = [t for t, *_ in mqtt_client.published]
     assert topics == ["tesserae/pi_png/frame/png"]
+
+
+def test_multi_device_page_renders_once_per_panel_and_routes(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """A page bound to two instances of differing aspect renders once per
+    distinct panel, and each frame fans out only to that instance's
+    renderer clone (no cross-talk between the two displays)."""
+    from app import device_loader, device_service, renderer_loader
+    from app.main import REPO_ROOT
+
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    # Landscape (800x480) + portrait (480x800) — two distinct panels.
+    device_service.create_instance(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_land", kind_id="esp32_client",
+    )
+    device_service.create_instance(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_port", kind_id="esp32_client", orientation="portrait",
+    )
+
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(
+        Page(id="multi", name="Multi", device_ids=["esp32_land", "esp32_port"], cells=[])
+    )
+
+    fakes: dict[str, _FakeMqttClient] = {}
+
+    def factory(client_id: str) -> _FakeMqttClient:
+        fakes["client"] = _FakeMqttClient(client_id)
+        return fakes["client"]
+
+    transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
+    transport.connect()
+
+    manager = PushManager(
+        registry=renderers,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=devices,
+    )
+
+    with patch("app.push.render_to_png", return_value=composition_png) as rtp:
+        result = manager.push("multi")
+
+    assert result.status == "sent"
+    # Rendered once per distinct panel — not once per device.
+    assert rtp.call_count == 2
+    sizes = {(c.args[0].viewport_w, c.args[0].viewport_h) for c in rtp.call_args_list}
+    assert sizes == {(800, 480), (480, 800)}
+    # Each render fetched the composer at its own panel override.
+    urls = [c.args[0].url for c in rtp.call_args_list]
+    assert any("w=800&h=480" in u for u in urls)
+    assert any("w=480&h=800" in u for u in urls)
+
+    # One publish per instance clone — each frame lands only on its device.
+    mqtt_client = fakes["client"]
+    topics = [t for t, *_ in mqtt_client.published]
+    assert sorted(topics) == [
+        "tesserae/esp32_land/frame/bin",
+        "tesserae/esp32_port/frame/bin",
+    ]
+    assert {r.renderer_id for r in result.renderers} == {
+        "esp32_bin__esp32_land",
+        "esp32_bin__esp32_port",
+    }

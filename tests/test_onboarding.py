@@ -128,7 +128,7 @@ def test_starter_dashboard_created_and_bound(app: Flask) -> None:
     pages = app.config["PAGE_STORE"].list()
     assert len(pages) == 1
     page = pages[0]
-    assert page.device_id == "esp32_hallway"  # bound to the registered device
+    assert page.device_ids == ["esp32_hallway"]  # bound to the registered device
     assert page.cells and page.cells[0].plugin == "clock_analog"
 
 
@@ -138,7 +138,7 @@ def test_starter_dashboard_without_device_uses_virtual_panel(app: Flask) -> None
     client.post("/onboarding/dashboard", follow_redirects=False)
     pages = app.config["PAGE_STORE"].list()
     assert len(pages) == 1
-    assert pages[0].device_id is None  # no device registered → unbound
+    assert pages[0].device_ids == []  # no device registered → unbound
 
 
 def test_skip_marks_onboarded(app: Flask) -> None:

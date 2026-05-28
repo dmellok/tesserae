@@ -21,13 +21,14 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from math import gcd
+from typing import TYPE_CHECKING, Any
 
 from app.state.page_store import Panel
 from app.state.settings_store import SettingsStore
 
 if TYPE_CHECKING:
-    from app.device_loader import DeviceRegistry
+    from app.device_loader import Device, DeviceRegistry
     from app.state.page_store import Page
 
 # (native_landscape_w, native_landscape_h) per panel. Orientation is
@@ -82,30 +83,97 @@ def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Pan
     return resolve_settings_panel(settings)
 
 
+def _device_panel(device: Device) -> Panel | None:
+    """Panel for a single device, or None if it declares no panel block."""
+    block = device.panel
+    if block is None:
+        return None
+    return Panel(
+        w=int(block["w"]),
+        h=int(block["h"]),
+        flip=is_flipped_orientation(block.get("orientation")),
+    )
+
+
+def _selected_device_panels(
+    page: Page, devices: DeviceRegistry | None
+) -> list[tuple[Device, Panel]]:
+    """The page's targeted devices that declare a panel, paired with it.
+    Devices that are unknown or panel-less are skipped."""
+    if not page.device_ids or devices is None:
+        return []
+    out: list[tuple[Device, Panel]] = []
+    for did in page.device_ids:
+        device = devices.devices.get(did)
+        if device is None:
+            continue
+        panel = _device_panel(device)
+        if panel is not None:
+            out.append((device, panel))
+    return out
+
+
 def resolve_panel_for_page(
     page: Page,
     devices: DeviceRegistry | None,
     settings: SettingsStore,
 ) -> Panel:
-    """Pick the panel for a page using the multi-head resolution chain:
-
-    1. If ``page.device_id`` names a loaded device that declares a panel
-       block, use those dims (multi-head install — each page lives on
-       its assigned device).
-    2. Else fall back to ``page.panel`` if explicitly set.
-    3. Else fall back to the global settings panel (legacy / single-head
-       behaviour, unchanged from v0.1)."""
-    if page.device_id and devices is not None:
-        device = devices.devices.get(page.device_id)
-        if device is not None:
-            block = device.panel
-            if block is not None:
-                return Panel(
-                    w=int(block["w"]),
-                    h=int(block["h"]),
-                    flip=is_flipped_orientation(block.get("orientation")),
-                )
+    """The page's primary panel — for single-panel contexts (the editor's
+    layout grid, the default compose render). Uses the first targeted
+    device's panel, else ``page.panel``, else the global settings panel."""
+    panels = _selected_device_panels(page, devices)
+    if panels:
+        return panels[0][1]
     return resolve_page_panel(page.panel, settings)
+
+
+def panel_groups_for_push(
+    page: Page,
+    devices: DeviceRegistry | None,
+    settings: SettingsStore,
+) -> list[tuple[Panel, list[str]]]:
+    """Distinct panels the page must be rendered at, each paired with the
+    device ids that share it. Devices are grouped by exact dims + flip, so
+    a 4:3 and a portrait panel render separately while two identical
+    panels render once. An empty device-id list means "no targeted device"
+    — render at the virtual panel and fan out to every renderer."""
+    panels = _selected_device_panels(page, devices)
+    if not panels:
+        return [(resolve_page_panel(page.panel, settings), [])]
+    groups: dict[tuple[int, int, bool], tuple[Panel, list[str]]] = {}
+    for device, panel in panels:
+        key = (panel.w, panel.h, panel.flip)
+        if key not in groups:
+            groups[key] = (panel, [])
+        groups[key][1].append(device.id)
+    return list(groups.values())
+
+
+def preview_groups_for_page(
+    page: Page,
+    devices: DeviceRegistry | None,
+    settings: SettingsStore,
+) -> list[dict[str, Any]]:
+    """One entry per distinct aspect ratio among the page's targeted
+    devices — the editor renders a preview card for each. Same aspect =
+    same layout, so devices that differ only in resolution share a card.
+    No targeted device → a single virtual-panel card."""
+    panels = _selected_device_panels(page, devices)
+    if not panels:
+        p = resolve_page_panel(page.panel, settings)
+        return [{"w": p.w, "h": p.h, "label": "Virtual panel", "devices": []}]
+    groups: dict[tuple[int, int], dict[str, Any]] = {}
+    for device, panel in panels:
+        g = gcd(panel.w, panel.h) or 1
+        key = (panel.w // g, panel.h // g)
+        grp = groups.setdefault(key, {"w": panel.w, "h": panel.h, "devices": []})
+        grp["devices"].append(device.display_name)
+    out: list[dict[str, Any]] = []
+    for (aw, ah), grp in groups.items():
+        shape = "Portrait" if grp["h"] > grp["w"] else ("Square" if grp["h"] == grp["w"] else "Landscape")
+        grp["label"] = f"{shape} {aw}:{ah}"
+        out.append(grp)
+    return out
 
 
 def is_flipped_orientation(orientation: object) -> bool:

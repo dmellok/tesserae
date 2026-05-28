@@ -428,3 +428,72 @@ def test_page_icon_normalises_ph_prefix() -> None:
     assert Page(id="b", name="B", icon="house").icon == "house"
     assert Page(id="c", name="C", icon="ph-").icon is None
     assert Page(id="d", name="D", icon=None).icon is None
+
+
+# -- device binding (multi-head) ------------------------------------
+
+
+def test_page_device_id_migrates_to_device_ids() -> None:
+    """Legacy pages stored a single ``device_id``; the model now keeps a
+    ``device_ids`` list. A before-validator migrates old records on load
+    so saved dashboards survive the schema change."""
+    from app.state.page_store import Page
+
+    legacy = Page.model_validate({"id": "a", "name": "A", "device_id": "pi_bin_lounge"})
+    assert legacy.device_ids == ["pi_bin_lounge"]
+    null_legacy = Page.model_validate({"id": "b", "name": "B", "device_id": None})
+    assert null_legacy.device_ids == []
+    fresh = Page.model_validate({"id": "c", "name": "C"})
+    assert fresh.device_ids == []
+    new_shape = Page.model_validate({"id": "d", "name": "D", "device_ids": ["x", "y"]})
+    assert new_shape.device_ids == ["x", "y"]
+
+
+def test_update_page_binds_multiple_devices_and_drops_unknown(app: Flask, tmp_path: Path) -> None:
+    """The editor's device picker is now checkboxes (``device_ids``).
+    Multiple ids are kept; unknown ids and built-in kinds are dropped so
+    a page can't bind to something unbindable."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/onboarding/device", data={"id": "esp32_lab", "kind": "esp32_client"})
+    client.post("/onboarding/device", data={"id": "esp32_den", "kind": "esp32_client"})
+    client.post("/pages/new", data={"name": "Home"})
+    resp = client.post(
+        "/pages/home",
+        data={
+            "name": "Home",
+            # unknown 'ghost' + built-in kind 'esp32_client' both dropped.
+            "device_ids": ["esp32_lab", "esp32_den", "ghost", "esp32_client"],
+        },
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert resp.status_code == 200
+    page = _store(tmp_path).get("home")
+    assert page is not None
+    assert page.device_ids == ["esp32_lab", "esp32_den"]
+
+
+def test_editor_shows_one_preview_per_aspect_and_checked_devices(app: Flask) -> None:
+    """Binding two devices of differing aspect ratios renders a preview
+    card per aspect, and the picker pre-checks the bound devices."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/onboarding/device", data={"id": "esp32_wide", "kind": "esp32_client"})
+    client.post(
+        "/onboarding/device",
+        data={"id": "esp32_tall", "kind": "esp32_client", "panel_orientation": "portrait"},
+    )
+    client.post("/pages/new", data={"name": "Home"})
+    client.post(
+        "/pages/home",
+        data={"name": "Home", "device_ids": ["esp32_wide", "esp32_tall"]},
+        headers={"X-Requested-With": "fetch"},
+    )
+    body = client.get("/pages/home").get_data(as_text=True)
+    # One landscape (800x480) + one portrait (480x800) preview = two cards.
+    assert body.count('class="preview-frame"') == 2
+    assert "w=800&amp;h=480" in body
+    assert "w=480&amp;h=800" in body
+    # Both devices are pre-checked checkboxes named device_ids.
+    assert body.count('name="device_ids"') == 2
+    assert body.count("checked") >= 2

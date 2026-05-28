@@ -419,6 +419,36 @@
   margin: 8px 4px 0;
 }
 
+/* Multi-device: stacked preview groups (one per distinct aspect). The
+   first sits flush under the card head; subsequent ones get a divider
+   so the shapes read as separate displays. */
+.preview-group + .preview-group {
+  margin-top: var(--t-space-4);
+  padding-top: var(--t-space-4);
+  border-top: 1px solid var(--t-border);
+}
+.preview-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+/* Device checklist — multi-select of bindable instances. */
+.device-checklist {
+  display: grid;
+  gap: 6px;
+}
+.device-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.device-check input { margin: 0; }
+
 .cell-card {
   scroll-margin-top: 16px;
   transition:

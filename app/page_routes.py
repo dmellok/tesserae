@@ -47,7 +47,12 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
-from app.panel import fit_cells_to_panel, resolve_panel_for_page, resolve_settings_panel
+from app.panel import (
+    fit_cells_to_panel,
+    preview_groups_for_page,
+    resolve_panel_for_page,
+    resolve_settings_panel,
+)
 from app.plugin_loader import Plugin, PluginRegistry
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
@@ -74,6 +79,24 @@ def _devices() -> Any:
     """Device registry (or None if no devices/ dir was loaded). Used by
     resolve_panel_for_page so a page can inherit its device's panel."""
     return current_app.config.get("DEVICE_REGISTRY")
+
+
+def _clean_device_ids(raw: list[str]) -> list[str]:
+    """Keep only known registered-instance ids from the form, deduped in
+    order. Drops unknown ids and built-in kinds so a page can't bind to
+    something unbindable."""
+    registry = _devices()
+    if registry is None:
+        return []
+    seen: set[str] = set()
+    out: list[str] = []
+    for did in raw:
+        device = registry.devices.get(did)
+        if device is None or device.kind_of is None or did in seen:
+            continue
+        seen.add(did)
+        out.append(did)
+    return out
 
 
 def _slug_from(text: str) -> str:
@@ -286,6 +309,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
     # Anything without a panel block is skipped (the editor wouldn't
     # know what size to render at).
     device_registry = _devices()
+    selected = set(page.device_ids)
     device_options: list[dict[str, Any]] = []
     if device_registry is not None:
         for dev in sorted(device_registry.devices.values(), key=lambda d: d.name.lower()):
@@ -303,8 +327,18 @@ def _editor_context(page: Page) -> dict[str, Any]:
                     "label": f"{dev.display_name} ({dev.panel['w']}×{dev.panel['h']})",
                     "w": int(dev.panel["w"]),
                     "h": int(dev.panel["h"]),
+                    "checked": dev.id in selected,
                 }
             )
+
+    # One preview per distinct aspect ratio among the selected devices
+    # (or a single virtual-panel preview when none are selected). Each
+    # carries its own dims so the preview iframe renders at that aspect
+    # and the layout grid scales correctly.
+    preview_groups = [
+        {**g, "scale": _preview_scale(g["w"], g["h"])}
+        for g in preview_groups_for_page(page, device_registry, _settings_store())
+    ]
 
     return {
         "page": page,
@@ -316,6 +350,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
         "preview_scale": _preview_scale(panel.w, panel.h),
+        "preview_groups": preview_groups,
         "palette_tokens": list(PALETTE_TOKENS),
         "cell_palettes": cell_palettes,
         "layout_editor_cells": layout_editor_cells,
@@ -421,11 +456,10 @@ def update(page_id: str) -> Response:
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
                 "bleed_color": (form.get("bleed_color") or page.bleed_color),
                 "icon": (form.get("icon") or None) or None,
-                # Device picker — empty string means "no specific
-                # device" (legacy behaviour). When set, resolves the
-                # panel from that device's manifest and the push
-                # pipeline fires only its renderers.
-                "device_id": (form.get("device_id") or None) or None,
+                # Device picker — checkboxes, so multiple. Empty = "no
+                # specific device" (virtual panel, fan out to all). Each
+                # selected device's panel drives a preview + a render.
+                "device_ids": _clean_device_ids(form.getlist("device_ids")),
             }
         )
     except ValidationError as exc:
@@ -562,7 +596,7 @@ def preview(page_id: str) -> Response:
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
                 "bleed_color": (form.get("bleed_color") or page.bleed_color),
                 "icon": (form.get("icon") or None) or None,
-                "device_id": (form.get("device_id") or None) or None,
+                "device_ids": _clean_device_ids(form.getlist("device_ids")),
                 "cells": new_cells,
             }
         )

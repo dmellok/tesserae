@@ -346,7 +346,12 @@ def _build_starter_page(
         page_id = f"welcome-{n}"
         n += 1
 
-    page = Page(id=page_id, name="Welcome", device_id=device_id, cells=[])
+    page = Page(
+        id=page_id,
+        name="Welcome",
+        device_ids=[device_id] if device_id else [],
+        cells=[],
+    )
     panel = resolve_panel_for_page(page, devices, settings) if device_id else resolve_settings_panel(settings)
     layout = LAYOUTS_BY_SLUG["1_cell"]
     cells = [

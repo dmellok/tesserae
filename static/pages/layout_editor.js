@@ -201,15 +201,17 @@
     }
   }
 
-  // Kick the preview iframe to pick up new geometry.
+  // Kick every preview iframe to pick up new geometry. Multi-device
+  // pages render one frame per distinct aspect ratio, so refresh them all.
   function refreshPreview() {
-    const iframe = document.querySelector("#preview-iframe");
-    if (!iframe) return;
-    const src = iframe.getAttribute("src");
-    // Bump a cache-buster so the browser definitely re-fetches.
-    const sep = src.includes("?") ? "&" : "?";
-    const base = src.split("&_=")[0];
-    iframe.setAttribute("src", base + sep + "_=" + Date.now());
+    document.querySelectorAll(".preview-frame iframe").forEach((iframe) => {
+      const src = iframe.getAttribute("src");
+      if (!src) return;
+      // Bump a cache-buster so the browser definitely re-fetches.
+      const base = src.split("&_=")[0];
+      const sep = base.includes("?") ? "&" : "?";
+      iframe.setAttribute("src", base + sep + "_=" + Date.now());
+    });
   }
 
   // ---------------------------------------------------------------

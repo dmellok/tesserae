@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 logger = logging.getLogger(__name__)
 
@@ -71,24 +71,23 @@ class Page(BaseModel):
 
     ``panel`` is optional: when None, the page renders at the panel
     dims from the app settings (see ``app.panel.resolve_page_panel``),
-    OR at the panel dims declared by the device named in ``device_id``
-    when that's set (multi-head installs).
+    OR at the panel dims of the device(s) it targets (multi-head).
 
-    ``device_id`` ties the page to a specific device. When set:
+    ``device_ids`` ties the page to one or more devices. When non-empty:
 
-    * the editor sizes the layout against that device's declared panel
-    * the push pipeline only fires renderers that target that device
-      (so a "kitchen Inky" page never lands on the "hallway ESP32")
+    * the editor sizes the layout against those devices' panels — one
+      preview per distinct aspect ratio
+    * the push pipeline renders once per distinct panel and fans out
+      each frame only to that panel's devices' renderers
 
-    Unset means "no specific home" — the page uses the global settings
-    panel and fans out to every loaded renderer, matching the legacy
-    single-head behaviour.
+    Empty means "no specific home" — the page uses the global settings
+    panel and fans out to every loaded renderer (legacy single-head).
     """
 
     id: str
     name: str
     panel: Panel | None = None
-    device_id: str | None = None
+    device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)
     theme: str | None = None
     font: str | None = None
@@ -96,6 +95,17 @@ class Page(BaseModel):
     corner_radius: int = 0
     bleed_color: str = "#ffffff"
     icon: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_device_id(cls, data: Any) -> Any:
+        """Back-compat: a pre-multi-head page stored a single ``device_id``.
+        Fold it into ``device_ids`` on load so old pages.json keeps working."""
+        if isinstance(data, dict) and "device_ids" not in data:
+            legacy = data.get("device_id")
+            data = {**data, "device_ids": [legacy] if legacy else []}
+            data.pop("device_id", None)
+        return data
 
     @field_validator("icon", mode="before")
     @classmethod

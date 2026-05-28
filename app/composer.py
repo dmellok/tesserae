@@ -223,6 +223,19 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
     }
 
 
+def _panel_override(w: str | None, h: str | None) -> tuple[int, int] | None:
+    """Parse ?w=&h= into clamped panel dims, or None if absent/invalid."""
+    if not w or not h:
+        return None
+    try:
+        pw, ph = int(w), int(h)
+    except ValueError:
+        return None
+    if pw < 1 or ph < 1:
+        return None
+    return min(pw, 10000), min(ph, 10000)
+
+
 @bp.get("/compose/<page_id>")
 def compose(page_id: str) -> str:
     preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {})
@@ -235,13 +248,19 @@ def compose(page_id: str) -> str:
     for_push = request.args.get("for_push") == "1"
     preview_mode = request.args.get("preview") == "1" and not for_push
     # Inject the resolved panel before hydrate — _hydrate_page expects
-    # page_dict["panel"] to always be present. A page-level panel
-    # (legacy override) wins; otherwise we pull dims from settings.
+    # page_dict["panel"] to always be present. An explicit ?w=&h= override
+    # wins (the editor's per-aspect previews and the per-panel push render
+    # at a specific size); otherwise fall back to the page's primary panel.
     page_dict = page.model_dump(mode="json", exclude_none=True)
     settings_store = current_app.config["SETTINGS_STORE"]
     devices = current_app.config.get("DEVICE_REGISTRY")
-    panel = resolve_panel_for_page(page, devices, settings_store)
-    page_dict["panel"] = {"w": panel.w, "h": panel.h}
+    override = _panel_override(request.args.get("w"), request.args.get("h"))
+    if override is not None:
+        panel_w, panel_h = override
+    else:
+        panel = resolve_panel_for_page(page, devices, settings_store)
+        panel_w, panel_h = panel.w, panel.h
+    page_dict["panel"] = {"w": panel_w, "h": panel_h}
     return render_template(
         "compose.html",
         page=_hydrate_page(page_dict, preview=not for_push),

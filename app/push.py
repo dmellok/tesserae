@@ -42,7 +42,11 @@ from pathlib import Path
 from typing import Any, Literal
 
 from app.device_loader import DeviceRegistry
-from app.panel import is_flipped_orientation, resolve_panel_for_page, resolve_settings_panel
+from app.panel import (
+    is_flipped_orientation,
+    panel_groups_for_push,
+    resolve_settings_panel,
+)
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -316,35 +320,60 @@ class PushManager:
             return self._log_failure(
                 source="page", target=page_id, status="not_found", error="page not found"
             )
-        # Panel + renderer routing: when the page is assigned to a
-        # specific device (multi-head install), panel dims come from
-        # that device's manifest and only the renderers targeting that
-        # device fire in _fan_out. Unassigned pages fall back to the
-        # global settings panel and fan out to every loaded renderer
-        # (legacy single-head behaviour).
-        panel = resolve_panel_for_page(page, self._devices, self._settings)
-
+        # Multi-head: the page may target several devices with different
+        # panels. Render once per distinct panel (a 4:3 and a portrait
+        # panel need different compositions) and fan each frame out only
+        # to the devices that share that panel. An empty device list means
+        # "no specific device" — render at the virtual panel and fan out
+        # to every renderer (legacy single-head).
+        groups = panel_groups_for_push(page, self._devices, self._settings)
         base_url = self._base_url_fn().rstrip("/")
-        compose_url = to_loopback_url(f"{base_url}/compose/{page_id}?for_push=1")
-        try:
-            composition_png = render_to_png(
-                RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h)
+
+        all_renderers: list[RendererResult] = []
+        group_results: list[PushResult] = []
+        for panel, device_ids in groups:
+            compose_url = to_loopback_url(
+                f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
             )
-        except Exception as err:
-            return self._log_failure(
+            try:
+                composition_png = render_to_png(
+                    RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h)
+                )
+            except Exception as err:
+                group_results.append(
+                    self._log_failure(
+                        source="page",
+                        target=page_id,
+                        error=f"render: {err}",
+                        duration_s=time.monotonic() - started,
+                    )
+                )
+                continue
+            result = self._fan_out(
+                composition_png,
+                panel.model_dump(),
                 source="page",
                 target=page_id,
-                error=f"render: {err}",
-                duration_s=time.monotonic() - started,
+                started=started,
+                device_filters=set(device_ids) if device_ids else None,
             )
+            all_renderers.extend(result.renderers)
+            group_results.append(result)
 
-        return self._fan_out(
-            composition_png,
-            panel.model_dump(),
-            source="page",
-            target=page_id,
-            started=started,
-            device_filter=page.device_id,
+        # Aggregate the per-panel pushes into one result for the caller.
+        # Each group already logged its own push + renderer events.
+        failed = [r for r in group_results if r.status not in ("sent",)]
+        status: PushStatus = "sent" if group_results and not failed else "failed"
+        if not group_results:
+            status = "failed"
+        digest = next((r.composition_digest for r in group_results if r.composition_digest), "")
+        return PushResult(
+            status=status,
+            page_id=page_id,
+            composition_digest=digest,
+            duration_s=time.monotonic() - started,
+            renderers=all_renderers,
+            error=None if status == "sent" else "one or more panels failed to render/publish",
         )
 
     def _push_bytes_locked(
@@ -365,7 +394,7 @@ class PushManager:
             source=source,
             target=source_label,
             started=started,
-            device_filter=device_id,
+            device_filters={device_id} if device_id else None,
         )
 
     def _fan_out(
@@ -376,14 +405,14 @@ class PushManager:
         source: str,
         target: str,
         started: float,
-        device_filter: str | None = None,
+        device_filters: set[str] | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
-        ``device_filter`` (multi-head): when set, only renderers
-        whose ``.device`` matches are fired. Pages targeting a specific
-        device pass the page's device_id so the image lands only on
-        that device's renderers."""
+        ``device_filters`` (multi-head): when set, only renderers whose
+        ``.device`` is in the set fire — so a frame rendered for one
+        panel lands only on the devices that share that panel. ``None``
+        fans out to every renderer (legacy / virtual-panel)."""
         comp_digest = hashlib.sha256(composition_png).hexdigest()[:16]
         thumb_path = self._renders_dir / f"{comp_digest}.png"
         if not thumb_path.exists():
@@ -397,7 +426,7 @@ class PushManager:
         for renderer in self._registry.all():
             if renderer.id in disabled:
                 continue
-            if device_filter and renderer.device != device_filter:
+            if device_filters is not None and renderer.device not in device_filters:
                 continue
             renderer_start = time.monotonic()
             try:

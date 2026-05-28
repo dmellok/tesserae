@@ -161,21 +161,35 @@
 
   <section class="card preview-card">
     {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
-    <div class="preview-frame"
-         data-fit-preview
-         data-panel-w="{{ panel.w }}"
-         data-panel-h="{{ panel.h }}"
-         style="aspect-ratio: {{ panel.w }} / {{ panel.h }}; --panel-ar: calc({{ panel.w }} / {{ panel.h }});">
-      <iframe id="preview-iframe"
-              src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1"
-              style="width: {{ panel.w }}px; height: {{ panel.h }}px;"
-              loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+    {# One preview per distinct aspect ratio among the selected devices.
+       preview_groups is a single virtual-panel group when nothing is
+       picked, or one group per shape when devices of differing aspect
+       ratios are bound. #}
+    {% for g in preview_groups %}
+    <div class="preview-group">
+      {% if preview_groups|length > 1 %}
+      <p class="preview-group-label">{{ g.label }}</p>
+      {% endif %}
+      <div class="preview-frame"
+           data-fit-preview
+           data-panel-w="{{ g.w }}"
+           data-panel-h="{{ g.h }}"
+           style="aspect-ratio: {{ g.w }} / {{ g.h }}; --panel-ar: calc({{ g.w }} / {{ g.h }});">
+        <iframe src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1&amp;w={{ g.w }}&amp;h={{ g.h }}"
+                style="width: {{ g.w }}px; height: {{ g.h }}px;"
+                loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+      </div>
+      <p class="muted preview-dims">
+        {{ g.w }} × {{ g.h }}
+        {% if g.devices %}
+        <span class="muted">· {{ g.devices|join(', ') }}</span>
+        {% else %}
+        <span class="muted">·</span>
+        <a href="{{ url_for('auth.settings_area', area='server') }}#app">change panel</a>
+        {% endif %}
+      </p>
     </div>
-    <p class="muted preview-dims">
-      {{ panel.w }} × {{ panel.h }}
-      <span class="muted">·</span>
-      <a href="{{ url_for('auth.settings_area', area='server') }}#app">change panel</a>
-    </p>
+    {% endfor %}
   </section>
 
   <div class="editor-column">
@@ -209,31 +223,36 @@
         </div>
 
         {# Device picker — lists user-registered instances (built-in
-           kinds aren't bindable; they're templates). Selecting an
-           instance sizes the editor against its panel and the push
-           pipeline only fires that instance's renderers. Empty = no
-           specific device, uses the global settings panel and fans
-           out to every renderer (legacy single-head behaviour). #}
-        <div class="field-grid">
-          <div class="field">
-            <label for="page-device">Target device</label>
-            {# Reload on change — picking a different device swaps the
-               panel dims, which the layout editor + preview iframe
-               both need to recompute against. #}
-            <select id="page-device" name="device_id" data-reload-on-change="1">
-              <option value="" {% if not page.device_id %}selected{% endif %}>(any — uses virtual panel)</option>
-              {% for d in device_options %}
-              <option value="{{ d.id }}" {% if page.device_id == d.id %}selected{% endif %}>{{ d.label }}</option>
-              {% endfor %}
-            </select>
-            <p class="field-help">
-              {% if device_options %}
-              Assigns this page to one display. The layout sizes to that device's panel, and pushes only fire that device's renderers.
-              {% else %}
-              No devices registered yet. Add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a>; until then pages fan out to every renderer using the virtual panel size.
-              {% endif %}
-            </p>
+           kinds aren't bindable; they're templates). Tick one or more
+           instances to bind the page to those displays: the editor
+           previews each distinct aspect ratio, and pushes render once
+           per distinct panel and fan out only to the bound devices.
+           None ticked = virtual panel + fan out to every renderer
+           (legacy single-head behaviour). #}
+        <div class="field">
+          <label>Target devices</label>
+          {% if device_options %}
+          {# Reload on change — (un)ticking a device changes the bound
+             panels, which the layout editor + preview iframes both need
+             to recompute against. data-reload-on-change saves first so
+             the new selection survives the reload. #}
+          <div class="device-checklist">
+            {% for d in device_options %}
+            <label class="device-check">
+              <input type="checkbox" name="device_ids" value="{{ d.id }}"
+                     {% if d.checked %}checked{% endif %} data-reload-on-change="1">
+              <span>{{ d.label }}</span>
+            </label>
+            {% endfor %}
           </div>
+          <p class="field-help">
+            Bind this page to one or more displays. The layout sizes to each device's panel, and pushes only fire those devices' renderers. Differing aspect ratios get their own preview.
+          </p>
+          {% else %}
+          <p class="field-help">
+            No devices registered yet. Add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a>; until then pages fan out to every renderer using the virtual panel size.
+          </p>
+          {% endif %}
         </div>
 
         <div class="field-grid">
