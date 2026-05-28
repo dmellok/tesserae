@@ -25,7 +25,9 @@ def _core(app: Flask):
 
 
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])
-def test_now_playing_renders_metadata(app: Flask, client: FlaskClient, monkeypatch, size: str) -> None:
+def test_now_playing_renders_metadata(
+    app: Flask, client: FlaskClient, monkeypatch, size: str
+) -> None:
     monkeypatch.setattr(_core(app), "now_playing", lambda: _PLAYING)
     resp = client.get(f"/_test/render?plugin=spotify_now_playing&size={size}")
     assert resp.status_code == 200

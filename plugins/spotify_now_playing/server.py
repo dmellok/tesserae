@@ -16,7 +16,9 @@ def _core() -> Any:
     return plugin.server_module if plugin is not None else None
 
 
-def fetch(options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]) -> dict[str, Any]:
+def fetch(
+    options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
+) -> dict[str, Any]:
     del options, settings, ctx
     core = _core()
     if core is None:

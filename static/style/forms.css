@@ -258,8 +258,11 @@ code {
   padding: var(--t-space-3) var(--t-space-3) var(--t-space-3) var(--t-space-4);
   border-radius: var(--t-radius-md);
   font-size: var(--t-size-md);
-  border: 1px solid var(--t-border);
-  background: var(--t-surface);
+  border: 1px solid color-mix(in oklab, var(--t-border) 70%, transparent);
+  /* Frosted glass, matching the topbar (translucent surface + blur). */
+  background: color-mix(in oklab, var(--t-surface) 80%, transparent);
+  backdrop-filter: saturate(180%) blur(14px);
+  -webkit-backdrop-filter: saturate(180%) blur(14px);
   color: var(--t-fg);
   display: flex;
   align-items: center;
@@ -286,11 +289,18 @@ code {
 }
 
 .flash-msg { flex: 1; min-width: 0; }
-.flash .ph { font-size: 18px; flex-shrink: 0; }
-.flash--ok    { border-color: color-mix(in oklab, var(--t-ok) 35%, var(--t-border)); }
-.flash--ok    .ph-fill-check-circle { color: var(--t-ok); }
-.flash--error { border-color: color-mix(in oklab, var(--t-danger) 35%, var(--t-border)); }
-.flash--error .ph-fill-warning-circle { color: var(--t-danger); }
+.flash-icon { font-size: 18px; flex-shrink: 0; color: var(--t-accent); }
+.flash--ok    { border-color: color-mix(in oklab, var(--t-ok) 45%, transparent); }
+.flash--ok    .flash-icon { color: var(--t-ok); }
+.flash--error { border-color: color-mix(in oklab, var(--t-danger) 45%, transparent); }
+.flash--error .flash-icon { color: var(--t-danger); }
+.flash--warn  { border-color: color-mix(in oklab, var(--t-warn) 45%, transparent); }
+.flash--warn  .flash-icon { color: var(--t-warn); }
+
+/* Solid fallback when the browser can't blur, so flashes never wash out. */
+@supports not (backdrop-filter: blur(1px)) {
+  .flash { background: var(--t-surface); }
+}
 
 .flash-close {
   display: inline-grid;

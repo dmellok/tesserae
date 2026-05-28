@@ -34,12 +34,17 @@ class Panel(BaseModel):
     ``gamut`` is the physical panel's colour gamut; the .bin packer keys
     its palette + nibble LUT off it (``waveshare_e6`` default, or
     ``inky_7colour`` for the 7-colour ACeP Inky Impression). Irrelevant to
-    the PNG path (the on-device inky library projects its own gamut)."""
+    the PNG path (the on-device inky library projects its own gamut).
+
+    ``underscan`` insets the rendered frame by N pixels on every edge so
+    content clears a physical mat / bezel covering the screen edge. The
+    border sits under the mat. Applied per-device in the renderers."""
 
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
     flip: bool = False
     gamut: str = "waveshare_e6"
+    underscan: int = Field(default=0, ge=0)
 
 
 class Cell(BaseModel):

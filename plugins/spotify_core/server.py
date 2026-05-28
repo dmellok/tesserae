@@ -42,7 +42,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
-TOKEN_URL = "https://accounts.spotify.com/api/token"  # noqa: S105 — public endpoint, not a secret
+TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SCOPE = "user-read-currently-playing user-read-playback-state"
 USER_AGENT = "tesserae/0.1 (+spotify_core)"
@@ -246,7 +246,10 @@ def now_playing() -> dict[str, Any]:
     if not has_credentials():
         return {"connected": False, "error": "Add your Spotify Client ID + Secret in Settings."}
     if not connected():
-        return {"connected": False, "error": "Spotify not connected — connect at Plugins → Spotify."}
+        return {
+            "connected": False,
+            "error": "Spotify not connected — connect at Plugins → Spotify.",
+        }
     try:
         token = _valid_access_token()
     except Exception as err:

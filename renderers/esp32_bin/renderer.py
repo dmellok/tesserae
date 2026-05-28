@@ -36,7 +36,7 @@ from typing import Any
 
 from PIL import Image
 
-from app.quantizer import fit_to_panel, pack_to_panel_bin
+from app.quantizer import fit_to_panel, pack_to_panel_bin, underscan_image
 from app.state.page_store import Panel
 
 DEFAULTS: dict[str, Any] = {
@@ -67,6 +67,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")
+    # Per-device underscan: inset content so it clears a physical mat/bezel.
+    if panel.underscan:
+        img = underscan_image(img, underscan=panel.underscan)
     return pack_to_panel_bin(
         img,
         width=native_w,

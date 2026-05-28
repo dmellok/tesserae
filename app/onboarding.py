@@ -142,9 +142,7 @@ def _progress(current: str) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for key in STEPS:
         done = _DONE[key]() if key in _DONE else False
-        out.append(
-            {"key": key, "label": STEP_LABELS[key], "done": done, "current": key == current}
-        )
+        out.append({"key": key, "label": STEP_LABELS[key], "done": done, "current": key == current})
     return out
 
 
@@ -330,9 +328,7 @@ def _int(raw: str | None, default: int) -> int:
         return default
 
 
-def _build_starter_page(
-    pages: PageStore, settings: SettingsStore, devices: DeviceRegistry
-) -> Page:
+def _build_starter_page(pages: PageStore, settings: SettingsStore, devices: DeviceRegistry) -> Page:
     """A one-cell clock dashboard bound to the first registered instance
     (so it inherits that device's panel size + routing). Falls back to the
     virtual panel when no device is registered yet."""
@@ -352,7 +348,11 @@ def _build_starter_page(
         device_ids=[device_id] if device_id else [],
         cells=[],
     )
-    panel = resolve_panel_for_page(page, devices, settings) if device_id else resolve_settings_panel(settings)
+    panel = (
+        resolve_panel_for_page(page, devices, settings)
+        if device_id
+        else resolve_settings_panel(settings)
+    )
     layout = LAYOUTS_BY_SLUG["1_cell"]
     cells = [
         Cell(id=uuid.uuid4().hex[:8], plugin=STARTER_PLUGIN, x=x, y=y, w=w, h=h)

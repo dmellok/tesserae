@@ -246,7 +246,10 @@ def _last_fired_view(epoch: float | None) -> dict[str, str] | None:
     ``None`` when the schedule has never fired."""
     if not epoch:
         return None
-    return {"rel": _relative(epoch), "abs": datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M")}
+    return {
+        "rel": _relative(epoch),
+        "abs": datetime.fromtimestamp(epoch).strftime("%Y-%m-%d %H:%M"),
+    }
 
 
 @bp.get("")

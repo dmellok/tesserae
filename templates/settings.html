@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, text_input %}
+{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, slider, text_input %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
@@ -196,6 +196,9 @@
         {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
         {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
       </div>
+      {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
+      {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
+          help='Inset content by this many pixels on every edge so it clears a mat or bezel covering the screen edge. 0 = full bleed.') }}
       {% if section.gamut_capable %}
       {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
           value=section.panel.get('gamut', 'waveshare_e6'),

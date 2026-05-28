@@ -28,6 +28,7 @@
 <p class="dashboard-count">{{ pages|length }} dashboard{{ '' if pages|length == 1 else 's' }}</p>
 <ul class="pages-list">
   {% for page in pages %}
+  {% set d = page_dims.get(page.id) %}
   <li class="page-row">
     <span class="page-icon-tile" aria-hidden="true">
       <i class="ph ph-{{ page.icon or 'cube' }}"></i>
@@ -37,7 +38,6 @@
       <span class="page-meta">
         {% set devs = page_devices.get(page.id) %}
         {% if devs %}<i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs|join(', ') }}{% else %}<i class="ph ph-monitor" aria-hidden="true"></i> Virtual panel{% endif %}
-        {% set d = page_dims.get(page.id) %}
         {% if d %}<span class="muted"> · </span>{{ d.w }}×{{ d.h }}{% endif %}
         <span class="muted"> · </span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}
         {% if page.theme %}<span class="muted"> · </span>theme: {{ page.theme }}{% endif %}

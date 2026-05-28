@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.quantizer import rotate_png
+from app.quantizer import apply_underscan, rotate_png
 from app.state.page_store import Panel
 
 DEFAULTS: dict[str, Any] = {
@@ -42,7 +42,11 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     quarters = 3 if panel.w < panel.h else 0
     if panel.flip:
         quarters = (quarters + 2) % 4
-    return rotate_png(png_bytes, quarters=quarters)
+    out = rotate_png(png_bytes, quarters=quarters)
+    # Per-device underscan: inset content so it clears a physical mat/bezel.
+    if panel.underscan:
+        out = apply_underscan(out, underscan=panel.underscan)
+    return out
 
 
 def payload(digest: str, base_url: str, *, settings: dict[str, Any]) -> dict[str, Any]:

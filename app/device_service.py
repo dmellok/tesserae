@@ -142,6 +142,7 @@ def update_instance_panel(
     h: int,
     orientation: str,
     gamut: str | None = None,
+    underscan: int | None = None,
 ) -> InstanceResult:
     """Patch an instance's panel block on disk + reload in place.
 
@@ -150,7 +151,8 @@ def update_instance_panel(
     4-way display orientations; the ``_flipped`` part is a renderer-side
     180° turn, the landscape/portrait part is the canvas aspect.
     ``gamut`` is the panel's colour gamut (see ``PANEL_GAMUTS``); the .bin
-    packer keys its palette off it. ``None`` leaves the existing value."""
+    packer keys its palette off it. ``underscan`` insets the frame by N
+    pixels per edge to clear a mat/bezel. ``None`` leaves either value."""
     device = devices.get(instance_id)
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
@@ -169,6 +171,9 @@ def update_instance_panel(
     panel_block["w"], panel_block["h"], panel_block["orientation"] = w, h, o
     if gamut is not None:
         panel_block["gamut"] = gamut if gamut in PANEL_GAMUTS else "waveshare_e6"
+    if underscan is not None:
+        # Clamp so the inset can't swallow the panel (keep at least half).
+        panel_block["underscan"] = max(0, min(underscan, min(w, h) // 2 - 1))
     raw["panel"] = panel_block
     inst_file.write_text(json.dumps(raw, indent=2) + "\n")
 
@@ -212,10 +217,7 @@ def _apply_orientation(panel: dict[str, Any], orientation: str | None) -> None:
     panel["orientation"] = o
     is_portrait = o.startswith("portrait")
     w, h = panel.get("w"), panel.get("h")
-    if w and h:
-        # Normalise so portrait → tall, landscape → wide, regardless of
-        # the dims the override came in as.
-        if is_portrait and w > h:
-            panel["w"], panel["h"] = h, w
-        elif not is_portrait and h > w:
-            panel["w"], panel["h"] = h, w
+    # Normalise so portrait → tall, landscape → wide, regardless of the
+    # dims the override came in as.
+    if w and h and ((is_portrait and w > h) or (not is_portrait and h > w)):
+        panel["w"], panel["h"] = h, w

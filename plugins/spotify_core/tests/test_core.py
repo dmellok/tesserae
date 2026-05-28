@@ -84,12 +84,16 @@ def test_now_playing_idle_on_204(app: Flask, core: ModuleType, monkeypatch) -> N
     assert out["idle"] is True
 
 
-def test_now_playing_idle_when_item_is_not_a_track(app: Flask, core: ModuleType, monkeypatch) -> None:
+def test_now_playing_idle_when_item_is_not_a_track(
+    app: Flask, core: ModuleType, monkeypatch
+) -> None:
     # Ads / podcast gaps return 200 with item == None.
     monkeypatch.setattr(core, "has_credentials", lambda: True)
     monkeypatch.setattr(core, "connected", lambda: True)
     monkeypatch.setattr(core, "_valid_access_token", lambda: "tok")
-    monkeypatch.setattr(core, "_api_get", lambda url, token: (200, {"is_playing": True, "item": None}))
+    monkeypatch.setattr(
+        core, "_api_get", lambda url, token: (200, {"is_playing": True, "item": None})
+    )
     with app.app_context():
         out = core.now_playing()
     assert out["idle"] is True

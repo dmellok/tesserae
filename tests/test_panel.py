@@ -27,7 +27,7 @@ from app.state.settings_store import SettingsStore
 
 
 @pytest.fixture
-def env(tmp_path: Path):  # noqa: ANN201 — test fixture
+def env(tmp_path: Path):
     """Bundled kinds + renderers in fresh registries, plus a settings
     store whose virtual panel is a known size for the unbound fallback."""
     data_root = tmp_path / "devices"
@@ -44,7 +44,12 @@ def env(tmp_path: Path):  # noqa: ANN201 — test fixture
     settings = SettingsStore(tmp_path / "settings.json")
     settings.update_section("app", {"panel_preset": "custom", "panel_w": 1024, "panel_h": 768})
 
-    def make(instance_id: str, orientation: str | None = None, gamut: str | None = None) -> None:
+    def make(
+        instance_id: str,
+        orientation: str | None = None,
+        gamut: str | None = None,
+        underscan: int | None = None,
+    ) -> None:
         device_service.create_instance(
             devices=devices,
             renderers=renderers,
@@ -53,7 +58,7 @@ def env(tmp_path: Path):  # noqa: ANN201 — test fixture
             kind_id="esp32_client",
             orientation=orientation,
         )
-        if gamut is not None:
+        if gamut is not None or underscan is not None:
             dev = devices.get(instance_id)
             assert dev is not None and dev.panel is not None
             device_service.update_instance_panel(
@@ -65,6 +70,7 @@ def env(tmp_path: Path):  # noqa: ANN201 — test fixture
                 h=int(dev.panel["h"]),
                 orientation=str(dev.panel.get("orientation", "landscape")),
                 gamut=gamut,
+                underscan=underscan,
             )
 
     return devices, settings, make
@@ -122,9 +128,7 @@ def test_preview_groups_by_aspect_merges_flip_and_resolution(env) -> None:
     make("esp32_flip", orientation="landscape_flipped")  # 800x480 -> same aspect
     make("esp32_tall", orientation="portrait")  # 480x800 -> 3:5 portrait
 
-    page = Page(
-        id="p", name="P", device_ids=["esp32_a", "esp32_flip", "esp32_tall"], cells=[]
-    )
+    page = Page(id="p", name="P", device_ids=["esp32_a", "esp32_flip", "esp32_tall"], cells=[])
     previews = preview_groups_for_page(page, devices, settings)
 
     by_label = {g["label"]: g for g in previews}
@@ -177,6 +181,29 @@ def test_panel_gamut_defaults_and_surfaces(env) -> None:
     assert inky.gamut == "inky_7colour"
 
 
+def test_push_groups_split_by_underscan(env) -> None:
+    """Same-size panels with different mat insets render separately so each
+    group's Panel carries the right underscan for its renderers."""
+    devices, settings, make = env
+    make("esp32_flush")  # underscan 0
+    make("esp32_matted", underscan=20)
+    page = Page(id="p", name="P", device_ids=["esp32_flush", "esp32_matted"], cells=[])
+    groups = panel_groups_for_push(page, devices, settings)
+    by_us = {p.underscan: ids for p, ids in groups}
+    assert by_us[0] == ["esp32_flush"]
+    assert by_us[20] == ["esp32_matted"]
+    assert len(groups) == 2
+
+
+def test_panel_underscan_surfaces(env) -> None:
+    devices, settings, make = env
+    make("esp32_mat", underscan=15)
+    panel = resolve_panel_for_page(
+        Page(id="a", name="A", device_ids=["esp32_mat"], cells=[]), devices, settings
+    )
+    assert panel.underscan == 15
+
+
 def test_unknown_device_ids_are_skipped(env) -> None:
     """A page bound to an id that no longer exists falls back to the
     virtual panel rather than erroring."""
@@ -186,7 +213,7 @@ def test_unknown_device_ids_are_skipped(env) -> None:
     assert len(groups) == 1 and groups[0][1] == []
 
 
-def _virtual(w: int, h: int):  # noqa: ANN202
+def _virtual(w: int, h: int):
     from app.state.page_store import Panel
 
     return Panel(w=w, h=h)

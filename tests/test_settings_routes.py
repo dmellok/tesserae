@@ -317,7 +317,12 @@ def test_add_device_instance_creates_clone(app_with_gate: Flask, tmp_path: Path)
     assert new_dev is not None
     assert new_dev.kind_of == "esp32_client"
     assert new_dev.status_topic == "tesserae/esp32_kitchen/status"
-    assert new_dev.panel == {"w": 640, "h": 384, "orientation": "landscape", "name": "ESP32 e-paper"}
+    assert new_dev.panel == {
+        "w": 640,
+        "h": 384,
+        "orientation": "landscape",
+        "name": "ESP32 e-paper",
+    }
 
     renderers = app_with_gate.config["RENDERER_REGISTRY"]
     clone = renderers.get("esp32_bin__esp32_kitchen")
@@ -481,17 +486,13 @@ def test_dismiss_clears_retained_message(app_with_gate: Flask) -> None:
     status topic so the broker stops replaying the ghost on reconnect."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
-    app_with_gate.config["DISCOVERY_CACHE"].record(
-        "esp32", b'{"kind":"esp32_client"}'
-    )
+    app_with_gate.config["DISCOVERY_CACHE"].record("esp32", b'{"kind":"esp32_client"}')
     transport = MagicMock()
     app_with_gate.config["MQTT_TRANSPORT"] = transport
     resp = client.post("/settings/devices/discovery/esp32/dismiss", follow_redirects=False)
     assert resp.status_code == 302
     assert app_with_gate.config["DISCOVERY_CACHE"].get("esp32") is None
-    transport.publish.assert_called_once_with(
-        "tesserae/esp32/status", b"", qos=1, retain=True
-    )
+    transport.publish.assert_called_once_with("tesserae/esp32/status", b"", qos=1, retain=True)
 
 
 def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:

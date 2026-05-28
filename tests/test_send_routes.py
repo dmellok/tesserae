@@ -121,7 +121,9 @@ def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
 def test_send_picker_lists_registered_instances_only(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client", "name": "Lab"})
+    client.post(
+        "/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client", "name": "Lab"}
+    )
     body = client.get("/send").get_data(as_text=True)
     # Instance shows up in the picker with its custom display name.
     assert ">Lab</option>" in body
@@ -141,9 +143,7 @@ def test_send_with_device_id_routes_to_that_device(app: Flask) -> None:
         data={"url": "https://example.com/img.png", "device_id": "esp32_lab"},
         follow_redirects=False,
     )
-    pm.push_url_image.assert_called_once_with(
-        "https://example.com/img.png", device_id="esp32_lab"
-    )
+    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id="esp32_lab")
 
 
 def test_send_with_unknown_device_id_falls_back_to_none(app: Flask) -> None:

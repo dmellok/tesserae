@@ -41,7 +41,10 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=4.1",
     "mypy>=1.9",
-    "ruff>=0.4",
+    # Pinned to a minor range: ruff ships new lint rules in minor bumps,
+    # which would otherwise break CI on an unrelated upgrade. Bump
+    # deliberately + run `ruff check` / `ruff format` when you do.
+    "ruff>=0.15,<0.16",
     "types-jsonschema",
 ]
 
@@ -67,6 +70,11 @@ select = [
 ]
 ignore = [
     "E501",     # line length handled by formatter
+    # We deliberately use × (dimensions, e.g. 1600×1200) and – (en-dash
+    # ranges) in UI copy + docstrings; these flag intentional typography.
+    "RUF001",   # ambiguous unicode in strings
+    "RUF002",   # ambiguous unicode in docstrings
+    "RUF003",   # ambiguous unicode in comments
 ]
 
 [tool.ruff.format]

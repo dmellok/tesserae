@@ -214,6 +214,15 @@ class EventLog:
             ).fetchone()
         return row is not None
 
+    def referenced_digests(self) -> set[str]:
+        """Every digest still referenced by some event. The render GC keeps
+        only artifacts whose filename digest is in this set."""
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(
+                "SELECT DISTINCT digest FROM events WHERE digest IS NOT NULL AND digest != ''"
+            ).fetchall()
+        return {str(r[0]) for r in rows}
+
     # -- reads ------------------------------------------------------------
 
     def get(self, event_id: int) -> EventRow | None:

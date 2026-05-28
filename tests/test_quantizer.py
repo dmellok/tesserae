@@ -90,9 +90,7 @@ def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:
 
 def test_pack_unknown_gamut_falls_back_to_e6(red_panel: Image.Image) -> None:
     default = pack_to_panel_bin(red_panel, width=100, height=80, dither="none")
-    unknown = pack_to_panel_bin(
-        red_panel, width=100, height=80, dither="none", gamut="not-a-gamut"
-    )
+    unknown = pack_to_panel_bin(red_panel, width=100, height=80, dither="none", gamut="not-a-gamut")
     assert unknown == default
 
 
@@ -110,6 +108,25 @@ def test_rotate_round_trip() -> None:
     # Four quarter turns returns to the original size (and is a fast
     # no-op via quarters % 4).
     assert rotate_png(png, quarters=4) == png
+
+
+def test_underscan_image_insets_and_preserves_size() -> None:
+    from app.quantizer import underscan_image
+
+    img = Image.new("RGB", (100, 80), (255, 0, 0))
+    out = underscan_image(img, underscan=10, fill="#ffffff")
+    assert out.size == (100, 80)
+    assert out.getpixel((2, 2)) == (255, 255, 255)  # border = fill (sits under the mat)
+    assert out.getpixel((50, 40)) == (255, 0, 0)  # content survives inset
+
+
+def test_underscan_image_noop_for_nonpositive_or_oversize() -> None:
+    from app.quantizer import underscan_image
+
+    img = Image.new("RGB", (40, 40), (0, 0, 0))
+    assert underscan_image(img, underscan=0) is img  # untouched, same object
+    too_big = underscan_image(img, underscan=50)  # inset would consume the image
+    assert too_big.size == (40, 40)
 
 
 def test_underscan_preserves_outer_dims() -> None:

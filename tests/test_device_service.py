@@ -18,7 +18,7 @@ from app.main import REPO_ROOT
 
 
 @pytest.fixture
-def registries(tmp_path: Path):  # noqa: ANN201 — test fixture
+def registries(tmp_path: Path):
     """Bundled kinds + renderers loaded into fresh registries, with a
     tmp instance data root."""
     data_root = tmp_path / "devices"
@@ -100,9 +100,13 @@ def test_create_instance_portrait_swaps_dims(registries) -> None:
 def test_create_instance_portrait_swaps_and_stores_orientation(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
-        panel_overrides={"w": 800, "h": 480}, orientation="portrait_flipped",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
+        panel_overrides={"w": 800, "h": 480},
+        orientation="portrait_flipped",
     )
     assert result.ok and result.device is not None
     panel = result.device.panel
@@ -121,12 +125,20 @@ def test_create_instance_portrait_swaps_and_stores_orientation(registries) -> No
 def test_update_panel_sets_flipped_orientation(registries) -> None:
     devices, renderers, data_root = registries
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
     )
     r1 = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", w=800, h=480, orientation="landscape_flipped",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        w=800,
+        h=480,
+        orientation="landscape_flipped",
     )
     assert r1.ok and r1.device is not None
     assert r1.device.panel["orientation"] == "landscape_flipped"
@@ -138,25 +150,37 @@ def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
     # / too-short are genuinely rejected.
     for bad in ("1leading_digit", "a", "has space"):
         res = device_service.create_instance(
-            devices=devices, renderers=renderers, data_root=data_root,
-            instance_id=bad, kind_id="esp32_client",
+            devices=devices,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id=bad,
+            kind_id="esp32_client",
         )
         assert not res.ok and res.device is None, bad
 
     bad_kind = device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="ok_id", kind_id="nope",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="ok_id",
+        kind_id="nope",
     )
     assert not bad_kind.ok
 
     # Registering against another instance (not a kind) is refused.
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
     )
     dup = device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
     )
     assert not dup.ok  # id already in use
 
@@ -164,12 +188,20 @@ def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
 def test_update_panel_stores_dims_verbatim(registries) -> None:
     devices, renderers, data_root = registries
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
     )
     result = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", w=600, h=448, orientation="portrait",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        w=600,
+        h=448,
+        orientation="portrait",
     )
     assert result.ok and result.device is not None
     # update stores exactly what's given — no swap (the form's JS already
@@ -183,12 +215,21 @@ def test_update_panel_stores_dims_verbatim(registries) -> None:
 def test_update_panel_persists_gamut_and_clamps_unknown(registries) -> None:
     devices, renderers, data_root = registries
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="bin_57", kind_id="pi_bin_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_57",
+        kind_id="pi_bin_client",
     )
     ok = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="inky_7colour",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_57",
+        w=600,
+        h=448,
+        orientation="landscape",
+        gamut="inky_7colour",
     )
     assert ok.ok and ok.device is not None
     assert ok.device.panel["gamut"] == "inky_7colour"
@@ -197,26 +238,93 @@ def test_update_panel_persists_gamut_and_clamps_unknown(registries) -> None:
     assert saved["panel"]["gamut"] == "inky_7colour"
     # An unknown gamut clamps back to the safe E6 default.
     clamped = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="bogus",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_57",
+        w=600,
+        h=448,
+        orientation="landscape",
+        gamut="bogus",
     )
     assert clamped.ok and clamped.device is not None
     assert clamped.device.panel["gamut"] == "waveshare_e6"
     # Omitting gamut leaves the stored value untouched.
     device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="inky_7colour",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_57",
+        w=600,
+        h=448,
+        orientation="landscape",
+        gamut="inky_7colour",
     )
     kept = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="bin_57", w=640, h=400, orientation="landscape",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_57",
+        w=640,
+        h=400,
+        orientation="landscape",
     )
     assert kept.ok and kept.device is not None
     assert kept.device.panel["gamut"] == "inky_7colour"
 
 
-def test_delete_instance_refuses_kind(registries) -> None:
+def test_update_panel_persists_and_clamps_underscan(registries) -> None:
     devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_u",
+        kind_id="pi_bin_client",
+    )
+    ok = device_service.update_instance_panel(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_u",
+        w=600,
+        h=448,
+        orientation="landscape",
+        underscan=24,
+    )
+    assert ok.ok and ok.device is not None
+    assert ok.device.panel["underscan"] == 24
+    # Oversize is clamped so the inset can't swallow the panel.
+    big = device_service.update_instance_panel(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_u",
+        w=600,
+        h=448,
+        orientation="landscape",
+        underscan=99999,
+    )
+    assert big.ok and big.device is not None
+    assert big.device.panel["underscan"] == 448 // 2 - 1  # min(w,h)//2 - 1
+    # Negative clamps to 0; omitting it leaves the stored value.
+    neg = device_service.update_instance_panel(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="bin_u",
+        w=600,
+        h=448,
+        orientation="landscape",
+        underscan=-5,
+    )
+    assert neg.ok and neg.device is not None
+    # 0 is the default, so the surfaced panel dict omits it.
+    assert neg.device.panel.get("underscan", 0) == 0
+
+
+def test_delete_instance_refuses_kind(registries) -> None:
+    devices, renderers, _data_root = registries
     result = device_service.delete_instance(
         devices=devices, renderers=renderers, instance_id="esp32_client"
     )
@@ -227,8 +335,11 @@ def test_delete_instance_refuses_kind(registries) -> None:
 def test_delete_instance_removes_record_file_and_clones(registries) -> None:
     devices, renderers, data_root = registries
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
     )
     assert renderers.get("esp32_bin__esp32_lab") is not None
     result = device_service.delete_instance(

@@ -72,6 +72,9 @@ PushStatus = Literal["sent", "busy", "failed", "not_found"]
 # Larger downloads are rejected before going through Pillow.
 _MAX_REMOTE_IMAGE_BYTES: int = 16 * 1024 * 1024
 _HTTP_TIMEOUT_S: float = 10.0
+# Sweep orphaned render artifacts every N renders (in addition to a sweep
+# at startup) so the dir stays bounded on long-running instances.
+_PRUNE_EVERY_RENDERS: int = 50
 
 
 @dataclass(frozen=True)
@@ -141,6 +144,10 @@ class PushManager:
         # only its renderers fire in _fan_out.
         self._devices = devices
         self._lock = threading.Lock()
+        # Renders accumulate in renders_dir as events age out (the event-log
+        # cap evicts rows but not their artifacts). Sweep orphans on a
+        # rolling basis so the dir stays bounded without a restart.
+        self._renders_since_prune = 0
         # Listeners fire synchronously after every push attempt (success
         # or failure). HA discovery uses this to follow pushes. Slow
         # listeners block the request — keep them fast. Exceptions are
@@ -310,6 +317,29 @@ class PushManager:
                 except OSError as err:
                     logger.warning("Could not delete artifact %s: %s", path, err)
         return deleted
+
+    def prune_orphan_renders(self) -> int:
+        """Delete render artifacts no longer referenced by any event (and
+        any leftover thumbnails). Renders are content-addressed: a file
+        whose digest isn't on an event row is dead weight left behind when
+        the event-log cap evicted the row that owned it. Safe to call any
+        time; returns the number of files removed."""
+        keep = self._event_log.referenced_digests()
+        try:
+            entries = [p for p in self._renders_dir.iterdir() if p.is_file()]
+        except OSError:
+            return 0
+        removed = 0
+        for path in entries:
+            if path.name.startswith("thumb_") or path.stem not in keep:
+                try:
+                    path.unlink(missing_ok=True)
+                    removed += 1
+                except OSError as err:
+                    logger.warning("could not prune render %s: %s", path, err)
+        if removed:
+            logger.info("pruned %d orphaned render artifact(s)", removed)
+        return removed
 
     # -- internals -------------------------------------------------------
 
@@ -483,6 +513,15 @@ class PushManager:
             extra={"renderers": [asdict(r) for r in results]},
         )
 
+        # Roll the orphan-render sweep on a cadence (the just-written
+        # artifacts are already referenced by the events above, so they're
+        # safe). Keeps the renders dir bounded on long-running instances
+        # without waiting for a restart.
+        self._renders_since_prune += 1
+        if self._renders_since_prune >= _PRUNE_EVERY_RENDERS:
+            self._renders_since_prune = 0
+            self.prune_orphan_renders()
+
         return PushResult(
             status=status,
             page_id=target,
@@ -543,6 +582,7 @@ class PushManager:
                     "h": int(block["h"]),
                     "flip": is_flipped_orientation(block.get("orientation")),
                     "gamut": str(block.get("gamut") or "waveshare_e6"),
+                    "underscan": max(0, int(block.get("underscan") or 0)),
                 }
         panel = resolve_settings_panel(self._settings)
         return {"w": panel.w, "h": panel.h}

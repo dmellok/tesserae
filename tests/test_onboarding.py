@@ -17,14 +17,15 @@ def app(tmp_path: Path) -> Flask:
     return a
 
 
-def _sign_in(client) -> None:  # noqa: ANN001
+def _sign_in(client) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 
 def test_setup_redirects_into_wizard(app: Flask) -> None:
     client = app.test_client()
     resp = client.post(
-        "/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"},
+        "/setup",
+        data={"password": "abcdefgh", "password_confirm": "abcdefgh"},
         follow_redirects=False,
     )
     assert resp.status_code == 302

@@ -196,10 +196,14 @@ def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
         headers={"X-Requested-With": "fetch"},
     )
     page = _store(tmp_path).get(pid)
-    assert page.theme == "embers" and page.device_ids == ["esp32_lab"] and page.icon == "music-notes"
+    assert (
+        page.theme == "embers" and page.device_ids == ["esp32_lab"] and page.icon == "music-notes"
+    )
 
     # Name-only save (the header rename form) must NOT wipe theme/icon/device.
-    client.post(f"/pages/{pid}", data={"name": "Living room"}, headers={"X-Requested-With": "fetch"})
+    client.post(
+        f"/pages/{pid}", data={"name": "Living room"}, headers={"X-Requested-With": "fetch"}
+    )
     page = _store(tmp_path).get(pid)
     assert page.name == "Living room"  # rename applied
     assert page.theme == "embers"  # bug 1: theme survives a name-only save

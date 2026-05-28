@@ -124,24 +124,36 @@ def rotate_png(png_bytes: bytes, *, quarters: int) -> bytes:
     return out.getvalue()
 
 
-def apply_underscan(png_bytes: bytes, *, underscan: int, fill: str = "#ffffff") -> bytes:
-    """Inset the image by ``underscan`` pixels on every edge, padding the
-    border with ``fill``. The original WxH is preserved; the content is
-    downscaled to (W-2u, H-2u) and pasted at (u, u) so the published frame
-    still matches the panel grid. Compensates for a physical mat / bezel."""
+def underscan_image(img: Image.Image, *, underscan: int, fill: str = "#ffffff") -> Image.Image:
+    """Inset ``img`` by ``underscan`` pixels on every edge, padding the
+    border with ``fill``. Size is preserved: content is downscaled to
+    (W-2u, H-2u) and pasted at (u, u). Compensates for a physical mat /
+    bezel covering the screen edge — the border sits under the mat, so its
+    colour is invisible in practice. No-op for ``underscan <= 0`` or when
+    the inset would consume the whole image."""
     if underscan <= 0:
-        return png_bytes
-    img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
-    w, h = img.size
+        return img
+    rgb = img.convert("RGB")
+    w, h = rgb.size
     inner_w = w - 2 * underscan
     inner_h = h - 2 * underscan
     if inner_w <= 0 or inner_h <= 0:
-        return png_bytes
-    inner = img.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
+        return rgb
+    inner = rgb.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
     canvas = Image.new("RGB", (w, h), fill)
     canvas.paste(inner, (underscan, underscan))
+    return canvas
+
+
+def apply_underscan(png_bytes: bytes, *, underscan: int, fill: str = "#ffffff") -> bytes:
+    """``underscan_image`` for the PNG-bytes renderers (pi_png). Re-encodes
+    only when an inset is actually applied."""
+    if underscan <= 0:
+        return png_bytes
+    img = Image.open(io.BytesIO(png_bytes))
+    out_img = underscan_image(img, underscan=underscan, fill=fill)
     out = io.BytesIO()
-    canvas.save(out, format="PNG", optimize=True)
+    out_img.save(out, format="PNG", optimize=True)
     return out.getvalue()
 
 

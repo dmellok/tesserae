@@ -12,7 +12,6 @@ Covers the three slices independently:
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 
@@ -20,7 +19,7 @@ import pytest
 from flask import Flask
 
 from app.discovery import DiscoveryCache, device_id_from_status_topic
-from app.main import REPO_ROOT, create_app
+from app.main import create_app
 
 
 @pytest.fixture
@@ -72,7 +71,9 @@ def test_wildcard_clear_does_not_resurrect(app: Flask) -> None:
     # good, not bounce it back.
     transport = app.config["MQTT_TRANSPORT"]
     cache = app.config["DISCOVERY_CACHE"]
-    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}'))
+    transport._on_message(
+        None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}')
+    )
     assert cache.get("esp32") is not None
     cache.forget("esp32")
     transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b""))  # tombstone
@@ -125,7 +126,7 @@ def test_topic_helper_extracts_id() -> None:
 # -- Wildcard dispatcher in main ------------------------------------------
 
 
-def _fake_msg(topic: str, payload: bytes):  # noqa: ANN202 — test helper
+def _fake_msg(topic: str, payload: bytes):
     return type("Msg", (), {"topic": topic, "payload": payload})()
 
 
@@ -151,8 +152,12 @@ def test_wildcard_caches_kind_default_topics(app: Flask) -> None:
     there is a not-yet-registered physical device."""
     transport = app.config["MQTT_TRANSPORT"]
     cache = app.config["DISCOVERY_CACHE"]
-    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}'))
-    transport._on_message(None, None, _fake_msg("tesserae/pi_bin/status", b'{"kind":"pi_bin_client"}'))
+    transport._on_message(
+        None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}')
+    )
+    transport._on_message(
+        None, None, _fake_msg("tesserae/pi_bin/status", b'{"kind":"pi_bin_client"}')
+    )
     assert {d.id for d in cache.all()} == {"esp32", "pi_bin"}
 
 
@@ -171,7 +176,7 @@ def test_wildcard_skips_registered_instances(app: Flask) -> None:
 # -- Settings routes ------------------------------------------------------
 
 
-def _sign_in(client) -> None:  # noqa: ANN001 — Flask test client
+def _sign_in(client) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 

@@ -123,6 +123,12 @@ class Device:
             out["name"] = block["name"]
         if isinstance(block.get("gamut"), str):
             out["gamut"] = block["gamut"]
+        try:
+            underscan = int(block.get("underscan", 0))
+        except (TypeError, ValueError):
+            underscan = 0
+        if underscan > 0:
+            out["underscan"] = underscan
         return out
 
     def parse_status(self, payload: bytes) -> dict[str, Any]:

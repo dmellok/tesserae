@@ -410,16 +410,17 @@ def settings_area(area: str) -> str | Response:
         else []
     )
     discovered = (
-        [d for d in _format_discovered(_discovery_cache().all())
-         if d["id"] not in _devices().devices]
+        [
+            d
+            for d in _format_discovered(_discovery_cache().all())
+            if d["id"] not in _devices().devices
+        ]
         if area == "devices"
         else []
     )
     # Signature of what we're rendering, so the client-side poller knows
     # the baseline and can auto-refresh when the discovered set changes.
-    discovered_sig = ",".join(
-        sorted(f"{d['id']}:{d.get('kind') or ''}" for d in discovered)
-    )
+    discovered_sig = ",".join(sorted(f"{d['id']}:{d.get('kind') or ''}" for d in discovered))
     return render_template(
         "settings.html",
         sections=sections,
@@ -617,10 +618,8 @@ def _panel_overrides_from_form(form: Any) -> dict[str, Any]:
     for field_name, key in (("panel_w", "w"), ("panel_h", "h")):
         raw = form.get(field_name)
         if raw:
-            try:
+            with contextlib.suppress(ValueError):
                 overrides[key] = int(raw)
-            except ValueError:
-                pass
     return overrides
 
 
@@ -660,9 +659,7 @@ def devices_discovered_json() -> Response:
         for d in _format_discovered(_discovery_cache().all())
         if d["id"] not in _devices().devices
     ]
-    return current_app.response_class(
-        json.dumps({"devices": items}), mimetype="application/json"
-    )
+    return current_app.response_class(json.dumps({"devices": items}), mimetype="application/json")
 
 
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
@@ -726,9 +723,7 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
     device simply re-announces on its next heartbeat."""
     cache_had = _discovery_cache().forget(discovered_id)
     try:
-        _transport().publish(
-            f"tesserae/{discovered_id}/status", b"", qos=1, retain=True
-        )
+        _transport().publish(f"tesserae/{discovered_id}/status", b"", qos=1, retain=True)
         flash(f"Dismissed {discovered_id!r} and cleared its retained heartbeat.", "ok")
     except Exception as exc:  # transport offline — cache is still cleared
         if cache_had:
@@ -756,6 +751,14 @@ def devices_update_panel(instance_id: str) -> Response:
         flash("Panel width and height must be whole numbers.", "error")
         return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
+    underscan_raw = form.get("panel_underscan")
+    underscan: int | None = None
+    if underscan_raw:
+        try:
+            underscan = max(0, int(underscan_raw))
+        except ValueError:
+            underscan = 0
+
     result = device_service.update_instance_panel(
         devices=_devices(),
         renderers=_renderers(),
@@ -765,6 +768,7 @@ def devices_update_panel(instance_id: str) -> Response:
         h=new_h,
         orientation=form.get("panel_orientation") or "landscape",
         gamut=form.get("panel_gamut"),
+        underscan=underscan,
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
@@ -816,8 +820,12 @@ def devices_calibrate(instance_id: str) -> Response:
         flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
     # ?calibrating=<id> makes the device card render the answer form.
     return redirect(
-        url_for("auth.settings_area", area="devices", calibrating=instance_id,
-                _anchor=f"device-{instance_id}")
+        url_for(
+            "auth.settings_area",
+            area="devices",
+            calibrating=instance_id,
+            _anchor=f"device-{instance_id}",
+        )
     )
 
 

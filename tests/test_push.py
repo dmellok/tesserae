@@ -227,6 +227,30 @@ def test_failing_renderer_marks_push_failed_but_others_still_publish(
     assert topics == ["tesserae/pi_png/frame/png"]
 
 
+def test_prune_orphan_renders_keeps_referenced_drops_the_rest(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    renders = manager._renders_dir
+
+    # One digest still referenced by an event; everything else is dead.
+    manager._event_log.record(
+        type="push", source="page", target="home", status="sent", digest="keepme123456"
+    )
+    (renders / "keepme123456.png").write_bytes(b"x")  # referenced -> keep
+    (renders / "orphan99999999.png").write_bytes(b"x")  # no event -> drop
+    (renders / "orphan99999999.bin").write_bytes(b"x")  # no event -> drop
+    (renders / "thumb_home_deadbeef.png").write_bytes(b"x")  # dead thumbnail -> drop
+
+    removed = manager.prune_orphan_renders()
+    assert removed == 3
+    assert (renders / "keepme123456.png").exists()
+    assert not (renders / "orphan99999999.png").exists()
+    assert not (renders / "orphan99999999.bin").exists()
+    assert not (renders / "thumb_home_deadbeef.png").exists()
+
+
 def test_multi_device_page_renders_once_per_panel_and_routes(
     tmp_path: Path, composition_png: bytes
 ) -> None:
@@ -249,12 +273,19 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
     )
     # Landscape (800x480) + portrait (480x800) — two distinct panels.
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_land", kind_id="esp32_client",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_land",
+        kind_id="esp32_client",
     )
     device_service.create_instance(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_port", kind_id="esp32_client", orientation="portrait",
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_port",
+        kind_id="esp32_client",
+        orientation="portrait",
     )
 
     page_store = PageStore(tmp_path / "pages.json")

@@ -69,8 +69,12 @@ _SEGMENTS: dict[int, frozenset[str]] = {
 }
 
 
-def _draw_digit(draw: ImageDraw.ImageDraw, digit: int, box: tuple[int, int, int, int],
-                color: tuple[int, int, int]) -> None:
+def _draw_digit(
+    draw: ImageDraw.ImageDraw,
+    digit: int,
+    box: tuple[int, int, int, int],
+    color: tuple[int, int, int],
+) -> None:
     """Draw a seven-segment ``digit`` filling ``box`` = (x, y, w, h)."""
     x, y, w, h = box
     t = max(4, min(w, h) // 8)  # segment thickness

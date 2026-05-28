@@ -417,6 +417,12 @@ def _rebuild_transport(
         base_url_fn=_base_url,
         devices=devices,
     )
+    # Sweep render artifacts orphaned by event-log eviction (or a manual
+    # history clear) at boot. Idempotent + never fatal.
+    try:
+        app.config["PUSH_MANAGER"].prune_orphan_renders()
+    except Exception:
+        logger.exception("startup render prune failed")
 
     # HA discovery is opt-in. If previously running, stop it first so the
     # old listeners detach from the previous PushManager (which has been

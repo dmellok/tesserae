@@ -99,10 +99,11 @@
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
+    {% set FLASH_ICONS = {'ok': 'ph-check-circle', 'error': 'ph-x-circle', 'warn': 'ph-warning'} %}
     <div class="flashes" role="status" aria-live="polite" data-flashes>
       {% for category, message in messages %}
       <div class="flash flash--{{ category }}" data-flash>
-        <i class="ph-fill {% if category == 'ok' %}ph-fill-check-circle{% else %}ph-fill-warning-circle{% endif %}" aria-hidden="true"></i>
+        <i class="ph-fill {{ FLASH_ICONS.get(category, 'ph-info') }} flash-icon" aria-hidden="true"></i>
         <span class="flash-msg">{{ message }}</span>
         <button type="button" class="flash-close" aria-label="Dismiss" data-flash-close>
           <i class="ph ph-x" aria-hidden="true"></i>
