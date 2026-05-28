@@ -910,17 +910,6 @@ def _build_sections() -> list[dict[str, Any]]:
             "endpoint": url_for("auth.settings_update", section_kind="app"),
         }
     )
-    sections.append(
-        {
-            "id": "panel",
-            "kind": "panel",
-            "title": "Panel",
-            "blurb": "Pick a preset for your e-ink, or set a custom size. Portrait flips width and height.",
-            "fields": PANEL_FIELDS,
-            "state": _values_for_core("app", PANEL_FIELDS, app_raw),
-            "endpoint": url_for("auth.settings_update", section_kind="panel"),
-        }
-    )
 
     broker_raw = settings_store.get_section("broker")
     sections.append(
@@ -932,6 +921,23 @@ def _build_sections() -> list[dict[str, Any]]:
             "fields": BROKER_FIELDS,
             "state": _values_for_core("broker", BROKER_FIELDS, broker_raw),
             "endpoint": url_for("auth.settings_update", section_kind="broker"),
+        }
+    )
+
+    # Virtual panel: the fallback canvas size for pages with no target
+    # device (the "(any)" option in the page editor). Registered devices
+    # bring their own panel, so this only matters before you've added a
+    # device or for deliberately device-agnostic pages — hence it sits
+    # below the broker rather than up top.
+    sections.append(
+        {
+            "id": "panel",
+            "kind": "panel",
+            "title": "Virtual panel",
+            "blurb": "Fallback canvas size for pages with no target device. Pick a preset or set a custom size; Portrait flips width and height. Devices you register override this with their own panel.",
+            "fields": PANEL_FIELDS,
+            "state": _values_for_core("app", PANEL_FIELDS, app_raw),
+            "endpoint": url_for("auth.settings_update", section_kind="panel"),
         }
     )
 
