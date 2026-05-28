@@ -35,31 +35,53 @@ def _sign_in(client) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 
+def _add_instance(client, *, id: str, kind: str, name: str = "") -> None:
+    """Register a device instance via the Add-device endpoint so tests
+    can exercise the instance-only UI without poking the registry by
+    hand."""
+    client.post(
+        "/settings/devices/add",
+        data={"id": id, "kind": kind, "name": name},
+        follow_redirects=False,
+    )
+
+
 def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client", name="Lab ESP32")
+    _add_instance(client, id="pi_bin_kitchen", kind="pi_bin_client", name="Kitchen Pi")
     resp = client.get("/settings/devices")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # All three shipped devices appear, with the "no heartbeat" status state.
-    assert "Device: Pi BIN client" in body
-    assert "Device: Pi PNG client" in body
-    assert "Device: ESP32 client" in body
+    # Built-in kind cards are hidden — only instances appear.
+    assert "Device: Pi BIN client</span>" not in body
+    assert "Device: Pi PNG client</span>" not in body
+    assert "Device: ESP32 client</span>" not in body
+    # Registered instances do show up, with the "no heartbeat" status state.
+    assert "Device: Lab ESP32" in body
+    assert "Device: Kitchen Pi" in body
     assert "no heartbeat received yet" in body
-    # ESP32 client config form (sleep_interval_s) shows up.
+    # ESP32 instance inherits its kind's config_topic, so the sleep
+    # interval form lives on the instance card.
     assert "Sleep interval" in body
     assert 'name="sleep_interval_s"' in body
-    # Pi kinds have no config_topic — no Save button rendered for their form.
-    pi_idx = body.index("Device: Pi BIN client")
-    esp_idx = body.index("Device: ESP32 client")
-    pi_section = body[pi_idx:esp_idx]
+    # Pi instances inherit no config_topic — no config form on theirs.
+    # Slice the Pi card by its deterministic anchor id (card order isn't
+    # guaranteed alphabetical).
+    pi_start = body.index('id="device-pi_bin_kitchen"')
+    pi_end = body.find('id="device-', pi_start + 1)
+    pi_section = body[pi_start : pi_end if pi_end != -1 else len(body)]
     assert 'name="sleep_interval_s"' not in pi_section
 
 
 def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
     # Push a status payload through the status cache the way the MQTT
     # dispatcher would, then re-render and check the parsed fields show up.
-    app.config["DEVICE_STATUS"]["esp32_client"] = {
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client", name="Lab ESP32")
+    app.config["DEVICE_STATUS"]["esp32_lab"] = {
         "received_at": time.time(),
         "parsed": {
             "battery_mv": 3820,
@@ -68,8 +90,6 @@ def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
             "ip": "10.0.0.42",
         },
     }
-    client = app.test_client()
-    _sign_in(client)
     body = client.get("/settings/devices").get_data(as_text=True)
     # Fresh heartbeat -> "ok" status dot + parsed fields visible.
     assert "is-ok" in body
@@ -104,12 +124,13 @@ def test_merge_takes_new_values_when_present() -> None:
 
 
 def test_stale_heartbeat_renders_warn(app: Flask) -> None:
-    app.config["DEVICE_STATUS"]["esp32_client"] = {
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client")
+    app.config["DEVICE_STATUS"]["esp32_lab"] = {
         "received_at": time.time() - 200,  # past 90s fresh threshold
         "parsed": {"battery_mv": 3700},
     }
-    client = app.test_client()
-    _sign_in(client)
     body = client.get("/settings/devices").get_data(as_text=True)
     assert "is-warn" in body
 
@@ -117,45 +138,48 @@ def test_stale_heartbeat_renders_warn(app: Flask) -> None:
 def test_config_form_rejects_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client", name="Lab ESP32")
     # 5 seconds is below the 30-second min the device declares.
     resp = client.post(
-        "/settings/device-esp32_client",
+        "/settings/device-esp32_lab",
         data={"sleep_interval_s": "5"},
         follow_redirects=True,
     )
     body = resp.get_data(as_text=True)
-    assert "Invalid ESP32 client config" in body
+    assert "Invalid Lab ESP32 config" in body
     # Nothing persisted, nothing published.
     store = SettingsStore(tmp_path / "core" / "settings.json")
-    assert store.get_section("devices") == {}
+    assert "esp32_lab" not in store.get_section("devices")
 
 
 def test_config_form_saves_and_publishes_on_valid_input(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client")
     client.post(
-        "/settings/device-esp32_client",
+        "/settings/device-esp32_lab",
         data={"sleep_interval_s": "1800"},
         follow_redirects=False,
     )
     store = SettingsStore(tmp_path / "core" / "settings.json")
     saved = store.get_section("devices")
     # Persisted under devices.<id>.
-    assert saved["esp32_client"]["sleep_interval_s"] == 1800
-    # Published through the transport — exercising the publish path is
-    # covered by the unit test for MqttTransport; here we just confirm the
-    # endpoint completed without raising.
+    assert saved["esp32_lab"]["sleep_interval_s"] == 1800
 
 
 def test_device_status_subscription_dispatches_to_cache(app: Flask) -> None:
-    # Simulate an incoming MQTT message by invoking the transport's
-    # on_message dispatcher directly. Subscriptions were registered at
-    # boot in _rebuild_transport — verify a heartbeat arrives in the cache.
+    # Register an instance, then simulate a heartbeat on its status
+    # topic. The per-device handler updates the status cache; the
+    # wildcard listener does NOT cache it (it's an instance, not a
+    # discovered device).
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client")
     transport = app.config["MQTT_TRANSPORT"]
     payload = json.dumps({"battery_mv": 4000, "rssi": -55, "ip": "1.2.3.4"}).encode()
 
     class _Msg:
-        topic = "tesserae/esp32/status"
+        topic = "tesserae/esp32_lab/status"
         payload_attr = payload
 
     msg = _Msg()
@@ -163,17 +187,22 @@ def test_device_status_subscription_dispatches_to_cache(app: Flask) -> None:
     transport._on_message(None, None, msg)
 
     cache = app.config["DEVICE_STATUS"]
-    assert "esp32_client" in cache
-    assert cache["esp32_client"]["parsed"]["battery_mv"] == 4000
-    assert cache["esp32_client"]["parsed"]["ip"] == "1.2.3.4"
+    assert "esp32_lab" in cache
+    assert cache["esp32_lab"]["parsed"]["battery_mv"] == 4000
+    assert cache["esp32_lab"]["parsed"]["ip"] == "1.2.3.4"
 
 
-def test_device_status_subscriptions_replayed_on_broker_rebuild(app: Flask) -> None:
+def test_instance_status_subscriptions_replayed_on_broker_rebuild(app: Flask) -> None:
     # Trigger a broker rebuild (via the same callable settings_routes uses
-    # on save) and verify the device subscriptions are re-installed on the
-    # new transport instance.
+    # on save) and verify the instance subscription is re-installed on
+    # the new transport instance. Kinds are not subscribed — their
+    # heartbeats flow to discovery instead.
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="esp32_lab", kind="esp32_client")
     app.config["REBUILD_TRANSPORT"]()
     new_transport = app.config["MQTT_TRANSPORT"]
-    assert "tesserae/pi_bin/status" in new_transport.topic_subscriptions
-    assert "tesserae/pi_png/status" in new_transport.topic_subscriptions
-    assert "tesserae/esp32/status" in new_transport.topic_subscriptions
+    assert "tesserae/esp32_lab/status" in new_transport.topic_subscriptions
+    assert "tesserae/+/status" in new_transport.topic_subscriptions  # discovery wildcard
+    # Kind default topics are NOT directly subscribed any more.
+    assert "tesserae/esp32/status" not in new_transport.topic_subscriptions

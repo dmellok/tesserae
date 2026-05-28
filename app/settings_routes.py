@@ -639,8 +639,14 @@ def devices_add() -> Response:
                     panel["w" if field_name == "panel_w" else "h"] = int(raw)
                 except ValueError:
                     pass
-    if form.get("panel_orientation"):
-        panel["orientation"] = "portrait" if form.get("panel_orientation") == "on" else "landscape"
+    orientation = (form.get("panel_orientation") or "").strip().lower()
+    if orientation in ("portrait", "landscape"):
+        panel["orientation"] = orientation
+        # Apply portrait by swapping w/h once, so the resolved Panel matches
+        # what the user sees in the form rather than relying on every reader
+        # to re-interpret the orientation flag.
+        if orientation == "portrait" and panel.get("w") and panel.get("h"):
+            panel["w"], panel["h"] = panel["h"], panel["w"]
     if panel:
         instance["panel"] = panel
 
@@ -931,6 +937,12 @@ def _build_sections() -> list[dict[str, Any]]:
 
     enabled_map = settings_store.get_section("renderers_enabled")
     for renderer in _renderers().all():
+        # Per-instance clones inherit the base renderer's settings; the
+        # cards add no UI value and just create N rows of the same
+        # form. Filter them out — clone ids always contain '__'
+        # (see renderer_loader.clone_for_instances).
+        if "__" in renderer.id:
+            continue
         fields = list(renderer.manifest.get("settings", []))
         sid = f"renderer-{renderer.id}"
         rid = renderer.id
@@ -957,6 +969,12 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     for device in _devices().all():
+        # Built-in kinds are templates, not bindable devices — they
+        # never appear on the Devices tab. Every physical display is
+        # represented by an instance (added manually or auto-registered
+        # from the Discovered strip).
+        if device.kind_of is None:
+            continue
         sid = f"device-{device.id}"
         fields = _config_fields_from_schema(device.config_schema)
         is_instance = device.kind_of is not None

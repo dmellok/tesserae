@@ -85,6 +85,10 @@
       {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
       {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
     </div>
+    {{ select_field('add-device-orientation', 'panel_orientation', 'Orientation', value='landscape',
+                    options=[{'value':'landscape','label':'Landscape (default)'},
+                             {'value':'portrait','label':'Portrait (swap width and height)'}],
+                    help='Portrait swaps width and height after applying the panel size above.') }}
     <div class="actions">{{ button('Add device', icon='plus') }}</div>
   </form>
   <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>

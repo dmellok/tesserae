@@ -208,13 +208,12 @@
           </div>
         </div>
 
-        {# Device picker — only shown if at least one loaded device
-           declares a panel block. Selecting a device sizes the editor
-           against that device's panel and the push pipeline only fires
-           that device's renderers. Empty = "no specific device", uses
-           the global settings panel and fans out to every renderer
-           (legacy single-head behaviour). #}
-        {% if device_options %}
+        {# Device picker — lists user-registered instances (built-in
+           kinds aren't bindable; they're templates). Selecting an
+           instance sizes the editor against its panel and the push
+           pipeline only fires that instance's renderers. Empty = no
+           specific device, uses the global settings panel and fans
+           out to every renderer (legacy single-head behaviour). #}
         <div class="field-grid">
           <div class="field">
             <label for="page-device">Target device</label>
@@ -227,10 +226,15 @@
               <option value="{{ d.id }}" {% if page.device_id == d.id %}selected{% endif %}>{{ d.label }}</option>
               {% endfor %}
             </select>
-            <p class="field-help">Assigns this page to one display. The layout sizes to that device's panel, and pushes only fire that device's renderers.</p>
+            <p class="field-help">
+              {% if device_options %}
+              Assigns this page to one display. The layout sizes to that device's panel, and pushes only fire that device's renderers.
+              {% else %}
+              No devices registered yet. Add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a>; until then pages fan out to every renderer using the global panel size.
+              {% endif %}
+            </p>
           </div>
         </div>
-        {% endif %}
 
         <div class="field-grid">
           {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or '', options=theme_options, blank_label='(default)') }}

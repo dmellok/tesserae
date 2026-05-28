@@ -279,21 +279,28 @@ def _editor_context(page: Page) -> dict[str, Any]:
         {"id": c.id, "x": c.x, "y": c.y, "w": c.w, "h": c.h, "plugin": c.plugin} for c in page.cells
     ]
 
-    # Device picker options. Only devices that declare a panel block
-    # qualify — anything without panel dims can't host a page (the
-    # editor wouldn't know what size to render at).
+    # Device picker options. Only user-registered instances qualify —
+    # binding a page to a built-in kind is ambiguous (the kind is a
+    # template, not a physical display) and instances are also the
+    # only thing the user explicitly created in Settings → Devices.
+    # Anything without a panel block is skipped (the editor wouldn't
+    # know what size to render at).
     device_registry = _devices()
     device_options: list[dict[str, Any]] = []
     if device_registry is not None:
         for dev in sorted(device_registry.devices.values(), key=lambda d: d.name.lower()):
+            if dev.kind_of is None:
+                continue  # built-in kind — not a bindable target
             if dev.panel is None:
                 continue
-            label = dev.panel.get("name") or dev.name
             device_options.append(
                 {
                     "id": dev.id,
                     "name": dev.name,
-                    "label": f"{label} — {dev.panel['w']}x{dev.panel['h']}",
+                    # Show id alongside name so instances built from the
+                    # same kind (and therefore sharing panel.name) stay
+                    # tellable apart in the dropdown.
+                    "label": f"{dev.name} — {dev.id} ({dev.panel['w']}×{dev.panel['h']})",
                     "w": int(dev.panel["w"]),
                     "h": int(dev.panel["h"]),
                 }

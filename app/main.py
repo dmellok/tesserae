@@ -370,12 +370,15 @@ def _rebuild_transport(
         except Exception:
             logger.exception("MQTT connect failed (host=%s); leaving transport offline", host)
 
-    # Wire device status subscriptions. We always register them even when
-    # the transport isn't connected — paho replays subscriptions on
-    # connect, and tests want the dispatch path live even with a noop
-    # client. Each callback closes over its device so parse_status routes
-    # to the right module.
+    # Wire status subscriptions for every user-registered instance only;
+    # built-in kinds are templates with no physical device behind them.
+    # A client publishing on a kind's default topic (e.g. fresh pi_bin
+    # install on tesserae/pi_bin/status) is caught by the wildcard
+    # listener instead and surfaces in the Discovered strip — the user
+    # registers it as an instance from there.
     for device in devices.all():
+        if device.kind_of is None:
+            continue
         _subscribe_device_status(transport, device, status_cache, event_log)
 
     # Wildcard listener for discovery: any heartbeat on tesserae/+/status
@@ -498,12 +501,12 @@ def _subscribe_discovery(
     one-click registration."""
 
     def on_wildcard(topic: str, payload: bytes) -> None:
-        # Skip topics already owned by a registered device. Match on
-        # status_topic, not on the parsed id segment — built-in kinds
-        # have a kind id like 'esp32_client' but a topic prefix of
-        # 'esp32', so a naive id-segment lookup would mis-classify
-        # every kind heartbeat as "discovered".
-        if any(d.status_topic == topic for d in devices.all()):
+        # Skip topics already owned by a registered INSTANCE. Built-in
+        # kinds aren't physical devices — heartbeats arriving on a
+        # kind's default topic (e.g. fresh pi_bin install publishing
+        # to tesserae/pi_bin/status) belong in discovery so the user
+        # can promote them to instances.
+        if any(d.status_topic == topic for d in devices.all() if d.kind_of is not None):
             return
         device_id = device_id_from_status_topic(topic)
         if device_id is None:

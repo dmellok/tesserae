@@ -107,15 +107,28 @@ def test_wildcard_caches_unknown_device(app: Flask) -> None:
     assert cache.get("esp32_hallway").kind == "esp32_client"
 
 
-def test_wildcard_skips_known_kinds(app: Flask) -> None:
-    """Heartbeats on the built-in kinds' status topics must NOT show
-    up as discovered — those are handled by the per-device subscriber."""
+def test_wildcard_caches_kind_default_topics(app: Flask) -> None:
+    """Heartbeats on a kind's default topic (e.g. fresh pi_bin install
+    publishing to tesserae/pi_bin/status) DO show up as discovered —
+    kinds are templates, not bindable devices, so anything publishing
+    there is a not-yet-registered physical device."""
     transport = app.config["MQTT_TRANSPORT"]
     cache = app.config["DISCOVERY_CACHE"]
-    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b'{"battery_pct":90}'))
-    transport._on_message(None, None, _fake_msg("tesserae/pi_bin/status", b'{"state":"idle"}'))
-    transport._on_message(None, None, _fake_msg("tesserae/pi_png/status", b'{"state":"idle"}'))
-    assert cache.all() == []
+    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}'))
+    transport._on_message(None, None, _fake_msg("tesserae/pi_bin/status", b'{"kind":"pi_bin_client"}'))
+    assert {d.id for d in cache.all()} == {"esp32", "pi_bin"}
+
+
+def test_wildcard_skips_registered_instances(app: Flask) -> None:
+    """Once an instance is registered, its status topic is owned by
+    the per-device handler and shouldn't pollute discovery."""
+    client = app.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client"})
+    transport = app.config["MQTT_TRANSPORT"]
+    cache = app.config["DISCOVERY_CACHE"]
+    transport._on_message(None, None, _fake_msg("tesserae/esp32_lab/status", b'{"battery_pct":80}'))
+    assert cache.get("esp32_lab") is None
 
 
 # -- Settings routes ------------------------------------------------------

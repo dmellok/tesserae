@@ -90,12 +90,17 @@ def test_logout_emits_auth_event(app: Flask) -> None:
 
 
 def test_device_heartbeat_emits_device_event(app: Flask) -> None:
+    """Heartbeats from registered INSTANCES record a device-event row.
+    Kind-default heartbeats flow to discovery and don't write events."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client"})
     log = app.config["EVENT_LOG"]
     transport = app.config["MQTT_TRANSPORT"]
     payload = json.dumps({"battery_mv": 3950, "rssi": -42, "ip": "10.0.0.7"}).encode()
 
     class _Msg:
-        topic = "tesserae/esp32/status"
+        topic = "tesserae/esp32_lab/status"
 
     msg = _Msg()
     msg.payload = payload  # type: ignore[attr-defined]
@@ -103,7 +108,7 @@ def test_device_heartbeat_emits_device_event(app: Flask) -> None:
 
     device_rows = log.list(type="device")
     assert len(device_rows) == 1
-    assert device_rows[0].source == "esp32_client"
+    assert device_rows[0].source == "esp32_lab"
     assert device_rows[0].status == "ok"
     assert device_rows[0].extra["parsed"]["battery_mv"] == 3950
 
