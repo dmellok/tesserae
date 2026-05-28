@@ -31,12 +31,11 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-logger = logging.getLogger(__name__)
+# Shared with the device-instance lifecycle so a discovered id always
+# passes the same validation as a hand-entered one.
+from app.device_service import DEVICE_ID_RE as _DEVICE_ID_RE
 
-# Mirrors the regex enforced by settings_routes.devices_add — keep them
-# in sync so a discovered id always passes the same validation as a
-# hand-entered one.
-_DEVICE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

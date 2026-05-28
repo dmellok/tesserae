@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import contextlib
 import json
-import re
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -31,13 +30,13 @@ from typing import Any
 from flask import Blueprint, Flask, current_app, flash, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
-from app import auth
-from app.device_loader import Device, DeviceRegistry, load_instance_file
+from app import auth, device_service
+from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
 from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
-from app.renderer_loader import RendererRegistry, clone_for_instances
+from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog
 from app.state.settings_store import SECRET_MASK, SettingsStore
 from app.transport import BrokerConfig, MqttTransport
@@ -530,8 +529,10 @@ def settings_update(section_kind: str) -> Response:
 
 
 # -- device instances (multi-head) --------------------------------------
-
-_DEVICE_ID_RE = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")
+# The lifecycle (validate → write JSON → load → clone renderers) lives in
+# app.device_service so the Add-device form and the Discovered one-click
+# register share one implementation. These routes just parse the form,
+# call the service, and flash + redirect.
 
 
 def _device_data_root() -> Path:
@@ -573,125 +574,63 @@ def _format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
     return out
 
 
-@bp.post("/settings/devices/add")
-def devices_add() -> Response:
-    """Create a new device instance from the Devices-tab form.
-
-    Writes ``data/devices/<id>.json`` then loads it into the live
-    registry and clones the kind's renderers for the new instance.
-    No restart needed — the new device shows up immediately in the
-    page editor's Target-device dropdown."""
-    form = request.form
-    instance_id = (form.get("id") or "").strip().lower()
-    kind_id = (form.get("kind") or "").strip()
-    display_name = (form.get("name") or "").strip()
-
-    if not _DEVICE_ID_RE.match(instance_id):
-        flash(
-            "Device id must be 2-32 chars, start with a letter, and use only "
-            "lowercase letters / digits / underscore / hyphen.",
-            "error",
-        )
-        return redirect(url_for("auth.settings_area", area="devices"))
-    devices = _devices()
-    if instance_id in devices.devices:
-        flash(f"Device id {instance_id!r} is already in use.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-    kind = devices.get(kind_id)
-    if kind is None or kind.kind_of is not None:
-        flash(f"Unknown device kind {kind_id!r}.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
-    # Topic prefix = instance id. The kind's status/config topics are
-    # ``tesserae/<prefix>/...``; we just swap the prefix segment so the
-    # instance gets its own MQTT namespace.
-    def _swap_prefix(topic: str, old: str, new: str) -> str:
-        parts = topic.split("/")
-        if len(parts) >= 2 and parts[0] == "tesserae" and parts[1] == old:
-            parts[1] = new
-            return "/".join(parts)
-        # Unrecognised pattern — fall back to a sensible default rather
-        # than copying the kind's topic verbatim (which would collide).
-        return f"tesserae/{new}/{topic.rsplit('/', 1)[-1]}"
-
-    # Best-effort: read the kind's status_topic to figure out its prefix.
-    kind_status = kind.status_topic
-    kind_prefix = kind_status.split("/")[1] if kind_status.startswith("tesserae/") else kind.id
-    instance: dict[str, Any] = {
-        "id": instance_id,
-        "kind": kind_id,
-        "name": display_name or f"{kind.name} ({instance_id})",
-        "status_topic": _swap_prefix(kind_status, kind_prefix, instance_id),
-    }
-    if kind.config_topic:
-        instance["config_topic"] = _swap_prefix(kind.config_topic, kind_prefix, instance_id)
-
-    panel = dict(kind.panel or {})
+def _panel_overrides_from_form(form: Any) -> dict[str, Any]:
+    """Resolve the Add-device form's panel size into a ``{"w","h"}``
+    override dict. A preset wins; otherwise the custom width/height
+    inputs are used (ignored if non-numeric)."""
     preset = (form.get("panel_preset") or "").strip()
     if preset in PANEL_PRESETS:
-        panel["w"], panel["h"] = PANEL_PRESETS[preset]
-    else:
-        # 'custom' (or empty) → take the width / height inputs as-is.
-        for field_name in ("panel_w", "panel_h"):
-            raw = form.get(field_name)
-            if raw:
-                try:
-                    panel["w" if field_name == "panel_w" else "h"] = int(raw)
-                except ValueError:
-                    pass
-    orientation = (form.get("panel_orientation") or "").strip().lower()
-    if orientation in ("portrait", "landscape"):
-        panel["orientation"] = orientation
-        # Apply portrait by swapping w/h once, so the resolved Panel matches
-        # what the user sees in the form rather than relying on every reader
-        # to re-interpret the orientation flag.
-        if orientation == "portrait" and panel.get("w") and panel.get("h"):
-            panel["w"], panel["h"] = panel["h"], panel["w"]
-    if panel:
-        instance["panel"] = panel
+        w, h = PANEL_PRESETS[preset]
+        return {"w": w, "h": h}
+    overrides: dict[str, Any] = {}
+    for field_name, key in (("panel_w", "w"), ("panel_h", "h")):
+        raw = form.get(field_name)
+        if raw:
+            try:
+                overrides[key] = int(raw)
+            except ValueError:
+                pass
+    return overrides
 
-    data_root = _device_data_root()
-    data_root.mkdir(parents=True, exist_ok=True)
-    inst_file = data_root / f"{instance_id}.json"
-    if inst_file.exists():
-        flash(f"An instance file at {inst_file.name} already exists.", "error")
+
+@bp.post("/settings/devices/add")
+def devices_add() -> Response:
+    """Create a new device instance from the Devices-tab form. No restart
+    needed — the new device shows up immediately in the page editor's
+    Target-device dropdown."""
+    form = request.form
+    result = device_service.create_instance(
+        devices=_devices(),
+        renderers=_renderers(),
+        data_root=_device_data_root(),
+        instance_id=form.get("id") or "",
+        kind_id=(form.get("kind") or "").strip(),
+        name=form.get("name") or "",
+        panel_overrides=_panel_overrides_from_form(form),
+        orientation=form.get("panel_orientation"),
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Failed to add device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
-    inst_file.write_text(json.dumps(instance, indent=2) + "\n")
-
-    new_device = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
-    if new_device is None:
-        # Loader rejected it — surface the most recent error.
-        last_err = devices.errors[-1] if devices.errors else None
-        msg = last_err.message if last_err else "unknown error"
-        inst_file.unlink(missing_ok=True)
-        flash(f"Failed to load new device: {msg}", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
-    clone_for_instances(_renderers(), devices)
-    # Resubscribe so the broker knows about the new device's status topic.
     _rebuild_transport_fn()()
-    flash(f"Added device {new_device.name!r}.", "ok")
+    flash(f"Added device {result.device.name!r}.", "ok")
     return redirect(
-        url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}")
+        url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")
     )
 
 
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
 def devices_register_discovered(discovered_id: str) -> Response:
-    """One-click register a discovered device. Builds the same payload
-    as the Add-device form but sources kind / panel / id from the
-    cached heartbeat — the user only confirms (or overrides)."""
+    """One-click register a discovered device — same lifecycle as the
+    Add-device form, but kind / panel / id default from the cached
+    heartbeat (the form may override any of them)."""
     cache = _discovery_cache()
     entry = cache.get(discovered_id)
     if entry is None:
         flash(f"Discovered device {discovered_id!r} is no longer in the cache.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
 
-    # Form may override the cached values (e.g. the user picked a
-    # different kind because the client mis-reported, or chose a
-    # custom panel size). Missing form fields fall back to the cache.
     form = request.form
-    instance_id = (form.get("id") or discovered_id).strip().lower()
     kind_id = (form.get("kind") or entry.kind or "").strip()
     if not kind_id:
         flash(
@@ -701,60 +640,29 @@ def devices_register_discovered(discovered_id: str) -> Response:
         )
         return redirect(url_for("auth.settings_area", area="devices"))
 
-    # Reuse the add-device form's machinery by stuffing the values into
-    # request.form via a temporary mutable copy is awkward in Flask —
-    # easier to inline a slim version of the same logic here.
-    if not _DEVICE_ID_RE.match(instance_id):
-        flash(f"Discovered id {instance_id!r} is malformed; can't register.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-    devices = _devices()
-    if instance_id in devices.devices:
-        flash(f"Device id {instance_id!r} is already in use.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-    kind = devices.get(kind_id)
-    if kind is None or kind.kind_of is not None:
-        flash(f"Unknown device kind {kind_id!r}.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
-    instance: dict[str, Any] = {
-        "id": instance_id,
-        "kind": kind_id,
-        "name": (form.get("name") or "").strip() or f"{kind.name} ({instance_id})",
-        "status_topic": f"tesserae/{instance_id}/status",
-    }
-    if kind.config_topic:
-        instance["config_topic"] = f"tesserae/{instance_id}/config"
-
-    panel = dict(kind.panel or {})
+    panel_overrides: dict[str, Any] = {}
     if entry.panel_w is not None:
-        panel["w"] = entry.panel_w
+        panel_overrides["w"] = entry.panel_w
     if entry.panel_h is not None:
-        panel["h"] = entry.panel_h
-    if panel:
-        instance["panel"] = panel
+        panel_overrides["h"] = entry.panel_h
 
-    data_root = _device_data_root()
-    data_root.mkdir(parents=True, exist_ok=True)
-    inst_file = data_root / f"{instance_id}.json"
-    if inst_file.exists():
-        flash(f"An instance file at {inst_file.name} already exists.", "error")
+    result = device_service.create_instance(
+        devices=_devices(),
+        renderers=_renderers(),
+        data_root=_device_data_root(),
+        instance_id=form.get("id") or discovered_id,
+        kind_id=kind_id,
+        name=form.get("name") or "",
+        panel_overrides=panel_overrides,
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Failed to register device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
-    inst_file.write_text(json.dumps(instance, indent=2) + "\n")
-
-    new_device = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
-    if new_device is None:
-        last_err = devices.errors[-1] if devices.errors else None
-        msg = last_err.message if last_err else "unknown error"
-        inst_file.unlink(missing_ok=True)
-        flash(f"Failed to load discovered device: {msg}", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
-    clone_for_instances(_renderers(), devices)
     cache.forget(discovered_id)
     _rebuild_transport_fn()()
-    flash(f"Registered discovered device {new_device.name!r}.", "ok")
+    flash(f"Registered discovered device {result.device.name!r}.", "ok")
     return redirect(
-        url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}")
+        url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")
     )
 
 
@@ -772,86 +680,54 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
 
 @bp.post("/settings/devices/<instance_id>/panel")
 def devices_update_panel(instance_id: str) -> Response:
-    """Update a registered instance's panel dims + orientation. Rewrites
-    the instance JSON in place and reloads it so the new panel takes
-    effect for pages bound to this device without a restart."""
-    devices = _devices()
-    device = devices.get(instance_id)
-    if device is None or device.kind_of is None:
-        flash(f"Unknown device {instance_id!r}.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
+    """Update a registered instance's panel dims + orientation, then
+    hot-reload it so pages bound to this device pick up the new size
+    without a restart."""
+    anchor = f"device-{instance_id}"
     form = request.form
     try:
         new_w = int(form.get("panel_w") or 0)
         new_h = int(form.get("panel_h") or 0)
     except ValueError:
         flash("Panel width and height must be whole numbers.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
-    if new_w < 1 or new_h < 1:
-        flash("Panel width and height must be at least 1px.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
-    orientation = (form.get("panel_orientation") or "landscape").strip().lower()
-    if orientation not in ("landscape", "portrait"):
-        orientation = "landscape"
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
-    # Read the on-disk instance file, patch its panel block, write back.
-    inst_file = device.path
-    try:
-        raw = json.loads(inst_file.read_text())
-    except (OSError, json.JSONDecodeError) as err:
-        flash(f"Couldn't read {inst_file.name}: {err}", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
-    panel_block = dict(raw.get("panel") or {})
-    panel_block["w"] = new_w
-    panel_block["h"] = new_h
-    panel_block["orientation"] = orientation
-    raw["panel"] = panel_block
-    inst_file.write_text(json.dumps(raw, indent=2) + "\n")
-
-    # Reload in place: drop the old record + its renderer clones, then
-    # re-run the loader so the new panel + cloned renderers are live.
-    devices.devices.pop(instance_id, None)
-    renderers = _renderers()
-    for rid in list(renderers.renderers):
-        if renderers.renderers[rid].device == instance_id:
-            renderers.renderers.pop(rid, None)
-    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=_device_data_root())
-    if reloaded is None:
-        last_err = devices.errors[-1] if devices.errors else None
-        msg = last_err.message if last_err else "unknown error"
-        flash(f"Panel update failed to reload: {msg}", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-    clone_for_instances(renderers, devices)
+    result = device_service.update_instance_panel(
+        devices=_devices(),
+        renderers=_renderers(),
+        data_root=_device_data_root(),
+        instance_id=instance_id,
+        w=new_w,
+        h=new_h,
+        orientation=form.get("panel_orientation") or "landscape",
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Panel update failed.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
     _rebuild_transport_fn()()
-    flash(f"Updated {reloaded.name!r} panel to {new_w}×{new_h} ({orientation}).", "ok")
-    return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
+    panel = result.device.panel or {}
+    flash(
+        f"Updated {result.device.name!r} panel to "
+        f"{panel.get('w')}×{panel.get('h')} ({panel.get('orientation', 'landscape')}).",
+        "ok",
+    )
+    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
 
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
     refused — they ship with the app."""
-    devices = _devices()
-    device = devices.get(instance_id)
-    if device is None:
-        flash(f"Unknown device {instance_id!r}.", "error")
+    result = device_service.delete_instance(
+        devices=_devices(),
+        renderers=_renderers(),
+        instance_id=instance_id,
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Delete failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
-    if device.kind_of is None:
-        flash(f"Cannot delete built-in device kind {instance_id!r}.", "error")
-        return redirect(url_for("auth.settings_area", area="devices"))
-
-    inst_file = device.path
-    if inst_file.exists():
-        inst_file.unlink()
-    devices.devices.pop(instance_id, None)
-    # Drop any renderer clones this instance owned.
-    renderers = _renderers()
-    for rid in list(renderers.renderers):
-        if renderers.renderers[rid].device == instance_id:
-            renderers.renderers.pop(rid, None)
     _rebuild_transport_fn()()
-    flash(f"Deleted device {device.name!r}.", "ok")
+    flash(f"Deleted device {result.device.name!r}.", "ok")
     return redirect(url_for("auth.settings_area", area="devices"))
 
 
