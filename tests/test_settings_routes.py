@@ -393,6 +393,48 @@ def test_delete_device_instance_removes_clones(app_with_gate: Flask, tmp_path: P
     assert not (tmp_path / "devices" / "esp32_kitchen.json").exists()
 
 
+def test_update_panel_changes_instance_dims(app_with_gate: Flask, tmp_path: Path) -> None:
+    """The per-instance panel form rewrites the instance JSON and reloads
+    it so the new dims are live without a restart."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    resp = client.post(
+        "/settings/devices/esp32_lab/panel",
+        data={"panel_w": "600", "panel_h": "448", "panel_orientation": "portrait"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None and dev.panel is not None
+    assert (dev.panel["w"], dev.panel["h"]) == (600, 448)
+    assert dev.panel["orientation"] == "portrait"
+    # Persisted to disk.
+    import json as _json
+
+    saved = _json.loads((tmp_path / "devices" / "esp32_lab.json").read_text())
+    assert saved["panel"]["w"] == 600
+    assert saved["panel"]["orientation"] == "portrait"
+
+
+def test_update_panel_refuses_built_in_kind(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/devices/esp32_client/panel",
+        data={"panel_w": "100", "panel_h": "100"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    # Kind's panel is untouched (still its manifest default).
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_client")
+    assert dev is not None and dev.panel is not None
+    assert (dev.panel["w"], dev.panel["h"]) != (100, 100)
+
+
 def test_delete_refuses_built_in_kind(app_with_gate: Flask) -> None:
     """Built-in kinds ship with the app and must not be deletable."""
     client = app_with_gate.test_client()

@@ -26,6 +26,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
+from app.device_loader import DeviceRegistry
 from app.panel import resolve_settings_panel
 from app.push import PushManager
 from app.state.event_log import EventLog
@@ -51,6 +52,37 @@ def _settings() -> SettingsStore:
     return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
 
 
+def _devices() -> DeviceRegistry | None:
+    return current_app.config.get("DEVICE_REGISTRY")
+
+
+def _device_options() -> list[dict[str, str]]:
+    """Registered instances that can be targeted by a manual send. Mirrors
+    the page-editor picker: instances only (kinds aren't bindable)."""
+    registry = _devices()
+    if registry is None:
+        return []
+    opts: list[dict[str, str]] = []
+    for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
+        if dev.kind_of is None or dev.panel is None:
+            continue
+        opts.append({"id": dev.id, "label": f"{dev.name} — {dev.id}"})
+    return opts
+
+
+def _form_device_id() -> str | None:
+    """Read + validate the optional target-device field. Empty / unknown
+    falls back to None (fan out to every renderer using the virtual
+    panel)."""
+    raw = (request.form.get("device_id") or "").strip()
+    if not raw:
+        return None
+    registry = _devices()
+    if registry is None or raw not in registry.devices:
+        return None
+    return raw
+
+
 def _flash_result(label: str, status: str, error: str | None) -> None:
     if status == "sent":
         flash(f"{label}: sent.", "ok")
@@ -69,6 +101,7 @@ def index() -> str:
         pages=pages,
         history=history,
         panel=resolve_settings_panel(_settings()),
+        device_options=_device_options(),
         tab=request.args.get("tab", "file"),
     )
 
@@ -83,7 +116,9 @@ def send_file() -> Response:
     if not image_bytes:
         flash("Uploaded file was empty.", "error")
         return redirect(url_for("send.index", tab="file"))
-    result = _push().push_image(image_bytes, source_label=upload.filename)
+    result = _push().push_image(
+        image_bytes, source_label=upload.filename, device_id=_form_device_id()
+    )
     _flash_result(f"File {upload.filename!r}", result.status, result.error)
     return redirect(url_for("send.index", tab="history"))
 
@@ -105,7 +140,7 @@ def send_url() -> Response:
     if not url:
         flash("Paste an image URL first.", "error")
         return redirect(url_for("send.index", tab="url"))
-    result = _push().push_url_image(url)
+    result = _push().push_url_image(url, device_id=_form_device_id())
     _flash_result(f"URL {url}", result.status, result.error)
     return redirect(url_for("send.index", tab="history"))
 
@@ -122,7 +157,9 @@ def send_webpage() -> Response:
     except ValueError:
         flash("Viewport dimensions must be integers.", "error")
         return redirect(url_for("send.index", tab="webpage"))
-    result = _push().push_webpage(url, viewport_w=viewport_w, viewport_h=viewport_h)
+    result = _push().push_webpage(
+        url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=_form_device_id()
+    )
     _flash_result(f"Webpage {url}", result.status, result.error)
     return redirect(url_for("send.index", tab="history"))
 

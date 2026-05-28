@@ -32,6 +32,24 @@
 </section>
 {% endmacro %}
 
+{# Target-device picker shared by the File / URL / Webpage tabs. Empty
+   value = fan out to every renderer using the virtual panel. Selecting
+   an instance routes only to its renderers + sizes to its panel. #}
+{% macro device_picker(field_id) %}
+{% if device_options %}
+<div class="field">
+  <label for="{{ field_id }}">Target device</label>
+  <select id="{{ field_id }}" name="device_id">
+    <option value="">(any — all renderers, virtual panel)</option>
+    {% for d in device_options %}
+    <option value="{{ d.id }}">{{ d.label }}</option>
+    {% endfor %}
+  </select>
+  <p class="field-help">Limits the push to one display's renderers and panel size. Leave on "any" to fan out everywhere.</p>
+</div>
+{% endif %}
+{% endmacro %}
+
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-paper-plane-tilt"></i> Send</h1>
@@ -76,6 +94,7 @@
         </div>
       </label>
       <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
+      {{ device_picker('file-device') }}
       <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
     </form>
   </section>
@@ -131,6 +150,7 @@
         <input type="url" id="url-input" name="url" placeholder="https://..." required data-url-preview-target>
         <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
       </div>
+      {{ device_picker('url-device') }}
       <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
     </form>
   </section>
@@ -164,6 +184,7 @@
         </div>
       </div>
       <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
+      {{ device_picker('webpage-device') }}
       <div class="actions">{{ button('Render & push', icon='browser') }}</div>
     </form>
   </section>

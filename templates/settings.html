@@ -168,9 +168,26 @@
   </form>
   {% endif %}
 
+  {% if section.panel_endpoint and section.panel %}
+  {# Panel edit — orientation toggle + dims for a registered instance.
+     The JS below swaps w/h live when orientation flips so the form is
+     WYSIWYG; the backend persists exactly what's submitted. #}
+  <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
+    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Orientation',
+        value=section.panel.get('orientation', 'landscape'),
+        options=[{'value':'landscape','label':'Landscape'},
+                 {'value':'portrait','label':'Portrait'}]) }}
+    <div class="field-grid">
+      {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
+      {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
+    </div>
+    <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
+  </form>
+  {% endif %}
+
   {% if section.delete_endpoint %}
   <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline-delete"
-        onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the default panel.');">
+        onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the virtual panel.');">
     <div class="actions">{{ button('Delete device', icon='trash', variant='danger') }}</div>
   </form>
   {% endif %}
@@ -272,6 +289,25 @@
     presetSelect.addEventListener('change', syncCustom);
     kindSelect.addEventListener('change', applyKind);
     applyKind();
+  })();
+
+  // Per-instance panel edit: flipping orientation swaps the width and
+  // height inputs live, so the form stays WYSIWYG. Each device card has
+  // its own form — wire them all.
+  (function () {
+    document.querySelectorAll('.device-panel-form').forEach(function (form) {
+      const orient = form.querySelector('select[name="panel_orientation"]');
+      const w = form.querySelector('input[name="panel_w"]');
+      const h = form.querySelector('input[name="panel_h"]');
+      if (!orient || !w || !h) return;
+      let last = orient.value;
+      orient.addEventListener('change', function () {
+        if (orient.value !== last) {
+          const tmp = w.value; w.value = h.value; h.value = tmp;
+          last = orient.value;
+        }
+      });
+    });
   })();
 </script>
 {% endblock %}

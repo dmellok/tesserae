@@ -770,6 +770,64 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices"))
 
 
+@bp.post("/settings/devices/<instance_id>/panel")
+def devices_update_panel(instance_id: str) -> Response:
+    """Update a registered instance's panel dims + orientation. Rewrites
+    the instance JSON in place and reloads it so the new panel takes
+    effect for pages bound to this device without a restart."""
+    devices = _devices()
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    form = request.form
+    try:
+        new_w = int(form.get("panel_w") or 0)
+        new_h = int(form.get("panel_h") or 0)
+    except ValueError:
+        flash("Panel width and height must be whole numbers.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
+    if new_w < 1 or new_h < 1:
+        flash("Panel width and height must be at least 1px.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
+    orientation = (form.get("panel_orientation") or "landscape").strip().lower()
+    if orientation not in ("landscape", "portrait"):
+        orientation = "landscape"
+
+    # Read the on-disk instance file, patch its panel block, write back.
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text())
+    except (OSError, json.JSONDecodeError) as err:
+        flash(f"Couldn't read {inst_file.name}: {err}", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
+    panel_block = dict(raw.get("panel") or {})
+    panel_block["w"] = new_w
+    panel_block["h"] = new_h
+    panel_block["orientation"] = orientation
+    raw["panel"] = panel_block
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n")
+
+    # Reload in place: drop the old record + its renderer clones, then
+    # re-run the loader so the new panel + cloned renderers are live.
+    devices.devices.pop(instance_id, None)
+    renderers = _renderers()
+    for rid in list(renderers.renderers):
+        if renderers.renderers[rid].device == instance_id:
+            renderers.renderers.pop(rid, None)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=_device_data_root())
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        msg = last_err.message if last_err else "unknown error"
+        flash(f"Panel update failed to reload: {msg}", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    clone_for_instances(renderers, devices)
+    _rebuild_transport_fn()()
+    flash(f"Updated {reloaded.name!r} panel to {new_w}×{new_h} ({orientation}).", "ok")
+    return redirect(url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}"))
+
+
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
@@ -1004,6 +1062,14 @@ def _build_sections() -> list[dict[str, Any]]:
                 "status": _status_view(device),
                 "delete_endpoint": (
                     url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
+                ),
+                # Panel edit (orientation + dims) is only offered on
+                # instances — kinds aren't shown here at all.
+                "panel": device.panel if is_instance else None,
+                "panel_endpoint": (
+                    url_for("auth.devices_update_panel", instance_id=device.id)
+                    if is_instance
+                    else None
                 ),
             }
         )

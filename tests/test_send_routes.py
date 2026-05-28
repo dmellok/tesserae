@@ -98,7 +98,7 @@ def test_url_invokes_push_url_image(app: Flask) -> None:
         data={"url": "https://example.com/img.png"},
         follow_redirects=False,
     )
-    pm.push_url_image.assert_called_once_with("https://example.com/img.png")
+    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id=None)
 
 
 def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
@@ -113,7 +113,53 @@ def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
         data={"url": "https://example.com", "viewport_w": "800", "viewport_h": "600"},
         follow_redirects=False,
     )
-    pm.push_webpage.assert_called_once_with("https://example.com", viewport_w=800, viewport_h=600)
+    pm.push_webpage.assert_called_once_with(
+        "https://example.com", viewport_w=800, viewport_h=600, device_id=None
+    )
+
+
+def test_send_picker_lists_registered_instances_only(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client", "name": "Lab"})
+    body = client.get("/send").get_data(as_text=True)
+    # Instance shows up in the picker; built-in kinds don't.
+    assert "Lab — esp32_lab" in body
+    assert 'name="device_id"' in body
+    assert "ESP32 client" not in body  # kind name, not offered
+
+
+def test_send_with_device_id_routes_to_that_device(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client"})
+    pm = MagicMock()
+    pm.push_url_image.return_value = PushResult(status="sent", page_id="https://x")
+    app.config["PUSH_MANAGER"] = pm
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/img.png", "device_id": "esp32_lab"},
+        follow_redirects=False,
+    )
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/img.png", device_id="esp32_lab"
+    )
+
+
+def test_send_with_unknown_device_id_falls_back_to_none(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    pm = MagicMock()
+    pm.push_url_image.return_value = PushResult(status="sent", page_id="https://x")
+    app.config["PUSH_MANAGER"] = pm
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/img.png", "device_id": "ghost_device"},
+        follow_redirects=False,
+    )
+    # Unknown id is dropped rather than passed through — avoids routing
+    # a push to a device that doesn't exist.
+    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id=None)
 
 
 def test_history_lists_event_log_rows(app: Flask, tmp_path: Path) -> None:

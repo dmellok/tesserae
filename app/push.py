@@ -178,23 +178,31 @@ class PushManager:
         self._notify(result)
         return result
 
-    def push_image(self, image_bytes: bytes, *, source_label: str) -> PushResult:
+    def push_image(
+        self, image_bytes: bytes, *, source_label: str, device_id: str | None = None
+    ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
         Used by the Send-page File and Image-URL tabs. Each renderer's
         ``transform()`` is responsible for fitting the input to its panel
-        dims (the bundled renderers do this via ``fit_to_panel``)."""
+        dims (the bundled renderers do this via ``fit_to_panel``).
+
+        ``device_id`` (optional): when set, only that device's renderers
+        fire and its panel dims are used — same routing as a page bound
+        to the device."""
         if not self._lock.acquire(blocking=False):
             result = self._log_busy(source="file", target=source_label)
         else:
             try:
-                result = self._push_bytes_locked(image_bytes, source_label, source="file")
+                result = self._push_bytes_locked(
+                    image_bytes, source_label, source="file", device_id=device_id
+                )
             finally:
                 self._lock.release()
         self._notify(result)
         return result
 
-    def push_url_image(self, url: str) -> PushResult:
+    def push_url_image(self, url: str, *, device_id: str | None = None) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
         surface as failed events with the URL as the target."""
         if not self._lock.acquire(blocking=False):
@@ -206,14 +214,21 @@ class PushManager:
                 except Exception as err:
                     result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
                 else:
-                    result = self._push_bytes_locked(image_bytes, url, source="url")
+                    result = self._push_bytes_locked(
+                        image_bytes, url, source="url", device_id=device_id
+                    )
             finally:
                 self._lock.release()
         self._notify(result)
         return result
 
     def push_webpage(
-        self, url: str, *, viewport_w: int = 1600, viewport_h: int = 1200
+        self,
+        url: str,
+        *,
+        viewport_w: int = 1600,
+        viewport_h: int = 1200,
+        device_id: str | None = None,
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish."""
         if not self._lock.acquire(blocking=False):
@@ -234,7 +249,7 @@ class PushManager:
                     )
                 else:
                     result = self._push_bytes_locked(
-                        composition, url, source="webpage", started=started
+                        composition, url, source="webpage", started=started, device_id=device_id
                     )
             finally:
                 self._lock.release()
@@ -339,16 +354,18 @@ class PushManager:
         *,
         source: str,
         started: float | None = None,
+        device_id: str | None = None,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
-        panel_dims = self._panel_dims_for_send(image_bytes)
+        panel_dims = self._panel_dims_for_send(device_id)
         return self._fan_out(
             image_bytes,
             panel_dims,
             source=source,
             target=source_label,
             started=started,
+            device_filter=device_id,
         )
 
     def _fan_out(
@@ -479,14 +496,20 @@ class PushManager:
             bytes_written=len(artifact),
         )
 
-    def _panel_dims_for_send(self, image_bytes: bytes) -> dict[str, int]:
+    def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, int]:
         """Pick panel dims for a Send-page push.
 
-        Always uses ``resolve_settings_panel`` so the preset, custom
-        dims, and portrait orientation are honoured identically to
-        every other code path. ``image_bytes`` is unused — kept for
-        backwards-compat with the older signature."""
-        del image_bytes
+        With a ``device_id`` that names a loaded device declaring a panel,
+        use that device's dims (so a manual send to a specific display
+        matches its panel). Otherwise fall back to the virtual panel
+        (``resolve_settings_panel``) so the preset / custom dims /
+        portrait orientation are honoured identically to every other
+        code path."""
+        if device_id and self._devices is not None:
+            device = self._devices.devices.get(device_id)
+            if device is not None and device.panel is not None:
+                block = device.panel
+                return {"w": int(block["w"]), "h": int(block["h"])}
         panel = resolve_settings_panel(self._settings)
         return {"w": panel.w, "h": panel.h}
 
