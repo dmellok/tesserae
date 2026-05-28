@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from app.device_loader import DeviceRegistry
-from app.panel import resolve_panel_for_page, resolve_settings_panel
+from app.panel import is_flipped_orientation, resolve_panel_for_page, resolve_settings_panel
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -509,7 +509,11 @@ class PushManager:
             device = self._devices.devices.get(device_id)
             if device is not None and device.panel is not None:
                 block = device.panel
-                return {"w": int(block["w"]), "h": int(block["h"]), "rotation": block.get("rotation")}
+                return {
+                    "w": int(block["w"]),
+                    "h": int(block["h"]),
+                    "flip": is_flipped_orientation(block.get("orientation")),
+                }
         panel = resolve_settings_panel(self._settings)
         return {"w": panel.w, "h": panel.h}
 

@@ -48,19 +48,15 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # panel oriented in settings.
     native_w = max(panel.w, panel.h)
     native_h = min(panel.w, panel.h)
-    quarters = panel.rotation_quarters
-    if quarters is not None:
-        # Explicit per-device rotation (multi-head). rotation_quarters is
-        # clockwise; PIL rotate() is counter-clockwise, so negate. q=3
-        # (270° CW) reproduces the legacy portrait turn below.
-        if quarters % 4:
-            img = img.rotate(-90 * quarters, expand=True)
-    elif panel.w < panel.h:
-        # Auto (no explicit rotation): panel mounted portrait — every
-        # composition (portrait OR square) needs a 90° CCW pre-rotation
-        # so the top of the composition maps to the left edge of the
-        # landscape buffer the firmware reads.
+    if panel.w < panel.h:
+        # Panel mounted portrait — the composition (portrait or square)
+        # needs a 90° CCW pre-rotation so its top maps to the left edge
+        # of the landscape buffer the firmware reads.
         img = img.rotate(90, expand=True)
+    if panel.flip:
+        # Upside-down physical mount — turn the whole thing 180° so it
+        # reads upright on the wall.
+        img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
         # Send-page uploads aren't panel-sized; fit before packing.
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")

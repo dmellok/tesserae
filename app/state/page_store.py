@@ -25,21 +25,15 @@ logger = logging.getLogger(__name__)
 class Panel(BaseModel):
     """Panel dimensions in composition orientation (the panel's mounted form).
 
-    ``rotation`` is the clockwise degrees (0/90/180/270) a renderer +
-    preview turn the composition by to match the physically-mounted
-    panel. ``None`` means "auto" — the renderer falls back to its own
-    built-in default (the legacy single-head behaviour)."""
+    ``w``/``h`` are the canvas the composer renders at, already in the
+    chosen aspect (portrait = tall). Each renderer maps that canvas onto
+    its client's fixed native buffer. ``flip`` adds a 180° turn for an
+    upside-down physical mount — the only mount detail the renderer can't
+    infer from aspect alone."""
 
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
-    rotation: int | None = None
-
-    @property
-    def rotation_quarters(self) -> int | None:
-        """``rotation`` as clockwise quarter-turns (0-3), or None for auto."""
-        if self.rotation is None:
-            return None
-        return (self.rotation // 90) % 4
+    flip: bool = False
 
 
 class Cell(BaseModel):

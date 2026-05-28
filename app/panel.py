@@ -103,9 +103,15 @@ def resolve_panel_for_page(
                 return Panel(
                     w=int(block["w"]),
                     h=int(block["h"]),
-                    rotation=block.get("rotation"),
+                    flip=is_flipped_orientation(block.get("orientation")),
                 )
     return resolve_page_panel(page.panel, settings)
+
+
+def is_flipped_orientation(orientation: object) -> bool:
+    """True for the upside-down orientation variants. The renderer adds a
+    180° turn so the dashboard reads upright on a flipped physical mount."""
+    return orientation in ("landscape_flipped", "portrait_flipped")
 
 
 def fit_cells_to_panel(

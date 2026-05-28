@@ -72,13 +72,8 @@
         "h": { "type": "integer", "minimum": 1 },
         "orientation": {
           "type": "string",
-          "enum": ["landscape", "portrait"],
-          "description": "Informational aspect hint. Physical-mount turn is set by 'rotation'."
-        },
-        "rotation": {
-          "type": "integer",
-          "enum": [0, 90, 180, 270],
-          "description": "Clockwise degrees the renderer + preview rotate the composition to match the physically-mounted panel. Omit for the renderer's built-in default (auto)."
+          "enum": ["landscape", "landscape_flipped", "portrait", "portrait_flipped"],
+          "description": "How the user wants to read the dashboard. Landscape/portrait sets the canvas aspect; the '_flipped' variants add a 180° turn the renderer applies for an upside-down physical mount. The renderer already maps the composition onto its client's fixed buffer direction."
         },
         "name": { "type": "string", "description": "Friendly name shown in the UI." }
       }

@@ -33,16 +33,16 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
-    """Rotate the composition PNG to the panel's mounted orientation.
+    """Rotate the composition PNG to the Pi PNG client's fixed buffer
+    direction (``transform_rotate_quarters``, default 3 = one CCW turn,
+    the contract the inky-dash listener expects).
 
-    When the target device declares an explicit ``rotation`` it wins
-    (per-device, multi-head). Otherwise fall back to the renderer-level
-    ``transform_rotate_quarters`` (default 3 = one CCW turn), the legacy
-    single-head default for a ribbon-cable-up portrait mount.
+    ``panel.flip`` adds two more quarter-turns (180°) for an upside-down
+    physical mount — the one thing the fixed client contract can't cover.
     """
-    quarters = panel.rotation_quarters
-    if quarters is None:
-        quarters = int(_setting(settings, "transform_rotate_quarters"))
+    quarters = int(_setting(settings, "transform_rotate_quarters"))
+    if panel.flip:
+        quarters += 2
     return rotate_png(png_bytes, quarters=quarters)
 
 

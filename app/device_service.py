@@ -77,16 +77,16 @@ def create_instance(
     name: str = "",
     panel_overrides: dict[str, Any] | None = None,
     orientation: str | None = None,
-    rotation: int | None = None,
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
     ``panel_overrides`` (``{"w":…, "h":…}``) layer on top of the kind's
-    panel; ``orientation`` (``"portrait"`` / ``"landscape"``) is stamped
-    on and, for portrait, swaps w/h once so the stored dims match what
-    the user picked. ``rotation`` (0/90/180/270 CW degrees, or None for
-    the renderer default) is stamped on as the physical-mount turn.
-    Caller rebuilds the transport on success."""
+    panel; ``orientation`` is one of the 4-way display orientations
+    (``landscape`` / ``landscape_flipped`` / ``portrait`` /
+    ``portrait_flipped``). Portrait variants swap w/h once so the stored
+    canvas matches the chosen aspect; the ``_flipped`` part is a
+    renderer-side 180° turn, not a dims change. Caller rebuilds the
+    transport on success."""
     instance_id = instance_id.strip().lower()
     if not DEVICE_ID_RE.match(instance_id):
         return InstanceResult(
@@ -113,8 +113,6 @@ def create_instance(
     if panel_overrides:
         panel.update(panel_overrides)
     _apply_orientation(panel, orientation)
-    if rotation in (0, 90, 180, 270):
-        panel["rotation"] = rotation
     if panel:
         manifest["panel"] = panel
 
@@ -142,21 +140,20 @@ def update_instance_panel(
     w: int,
     h: int,
     orientation: str,
-    rotation: int | None = None,
 ) -> InstanceResult:
     """Patch an instance's panel block on disk + reload in place.
 
-    Unlike create, w/h are stored exactly as given (the edit form's JS
-    already swaps them live when orientation flips), so no swap here.
-    ``rotation`` (0/90/180/270 or None for auto) is the physical-mount
-    turn the renderer + preview apply."""
+    w/h are stored exactly as given (the edit form's JS already swaps
+    them live when the aspect flips). ``orientation`` is one of the
+    4-way display orientations; the ``_flipped`` part is a renderer-side
+    180° turn, the landscape/portrait part is the canvas aspect."""
     device = devices.get(instance_id)
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
     if w < 1 or h < 1:
         return InstanceResult(None, "Panel width and height must be at least 1px.")
     o = orientation.strip().lower()
-    if o not in ("landscape", "portrait"):
+    if o not in ("landscape", "landscape_flipped", "portrait", "portrait_flipped"):
         o = "landscape"
 
     inst_file = device.path
@@ -166,10 +163,6 @@ def update_instance_panel(
         return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
     panel_block = dict(raw.get("panel") or {})
     panel_block["w"], panel_block["h"], panel_block["orientation"] = w, h, o
-    if rotation in (0, 90, 180, 270):
-        panel_block["rotation"] = rotation
-    else:
-        panel_block.pop("rotation", None)  # None = auto: drop the key
     raw["panel"] = panel_block
     inst_file.write_text(json.dumps(raw, indent=2) + "\n")
 
@@ -204,11 +197,19 @@ def delete_instance(
 
 
 def _apply_orientation(panel: dict[str, Any], orientation: str | None) -> None:
-    """Stamp orientation onto a panel dict, swapping w/h once for
-    portrait so the stored dims match what the user selected."""
+    """Stamp a 4-way display orientation onto a panel dict. Portrait
+    variants swap w/h once so the stored canvas is tall; the ``_flipped``
+    part is a renderer-side 180° turn and doesn't touch dims."""
     o = (orientation or "").strip().lower()
-    if o not in ("portrait", "landscape"):
+    if o not in ("landscape", "landscape_flipped", "portrait", "portrait_flipped"):
         return
     panel["orientation"] = o
-    if o == "portrait" and panel.get("w") and panel.get("h"):
-        panel["w"], panel["h"] = panel["h"], panel["w"]
+    is_portrait = o.startswith("portrait")
+    w, h = panel.get("w"), panel.get("h")
+    if w and h:
+        # Normalise so portrait → tall, landscape → wide, regardless of
+        # the dims the override came in as.
+        if is_portrait and w > h:
+            panel["w"], panel["h"] = h, w
+        elif not is_portrait and h > w:
+            panel["w"], panel["h"] = h, w

@@ -116,10 +116,9 @@ class Device:
         except (KeyError, TypeError, ValueError):
             return None
         out: dict[str, Any] = {"w": w, "h": h}
-        if isinstance(block.get("orientation"), str):
-            out["orientation"] = block["orientation"]
-        if isinstance(block.get("rotation"), int) and block["rotation"] in (0, 90, 180, 270):
-            out["rotation"] = block["rotation"]
+        orientation = block.get("orientation")
+        if orientation in ("landscape", "landscape_flipped", "portrait", "portrait_flipped"):
+            out["orientation"] = orientation
         if isinstance(block.get("name"), str):
             out["name"] = block["name"]
         return out

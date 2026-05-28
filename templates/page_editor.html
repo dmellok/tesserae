@@ -161,18 +161,11 @@
 
   <section class="card preview-card">
     {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
-    {# When the target device is mounted at 90/270 the visible frame is
-       h×w, not w×h — flip the container aspect so the rotated preview
-       fits without clipping. #}
-    {% set sideways = preview_rotate in (90, 270) %}
-    {% set frame_w = panel.h if sideways else panel.w %}
-    {% set frame_h = panel.w if sideways else panel.h %}
     <div class="preview-frame"
          data-fit-preview
          data-panel-w="{{ panel.w }}"
          data-panel-h="{{ panel.h }}"
-         data-rotate="{{ preview_rotate }}"
-         style="aspect-ratio: {{ frame_w }} / {{ frame_h }}; --panel-ar: calc({{ frame_w }} / {{ frame_h }});">
+         style="aspect-ratio: {{ panel.w }} / {{ panel.h }}; --panel-ar: calc({{ panel.w }} / {{ panel.h }});">
       <iframe id="preview-iframe"
               src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1"
               style="width: {{ panel.w }}px; height: {{ panel.h }}px;"

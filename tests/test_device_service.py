@@ -97,41 +97,39 @@ def test_create_instance_portrait_swaps_dims(registries) -> None:
     }
 
 
-def test_create_instance_stores_rotation(registries) -> None:
+def test_create_instance_portrait_swaps_and_stores_orientation(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.create_instance(
         devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client", rotation=270,
+        instance_id="esp32_lab", kind_id="esp32_client",
+        panel_overrides={"w": 800, "h": 480}, orientation="portrait_flipped",
     )
     assert result.ok and result.device is not None
-    assert result.device.panel["rotation"] == 270
-    # Panel model exposes it as CW quarter-turns for the renderers.
+    panel = result.device.panel
+    assert panel["orientation"] == "portrait_flipped"
+    # Portrait variant → canvas is tall (w/h swapped from the landscape override).
+    assert (panel["w"], panel["h"]) == (480, 800)
+    # The Panel model derives flip from the orientation for the renderers.
+    from app.panel import is_flipped_orientation
     from app.state.page_store import Panel
 
-    assert Panel(w=800, h=480, rotation=270).rotation_quarters == 3
-    assert Panel(w=800, h=480).rotation_quarters is None  # auto
+    assert is_flipped_orientation("portrait_flipped") is True
+    assert is_flipped_orientation("portrait") is False
+    assert Panel(w=480, h=800, flip=True).flip is True
 
 
-def test_update_panel_can_set_and_clear_rotation(registries) -> None:
+def test_update_panel_sets_flipped_orientation(registries) -> None:
     devices, renderers, data_root = registries
     device_service.create_instance(
         devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", kind_id="esp32_client", rotation=90,
+        instance_id="esp32_lab", kind_id="esp32_client",
     )
-    # Set an explicit rotation.
     r1 = device_service.update_instance_panel(
         devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", w=800, h=480, orientation="landscape", rotation=180,
+        instance_id="esp32_lab", w=800, h=480, orientation="landscape_flipped",
     )
     assert r1.ok and r1.device is not None
-    assert r1.device.panel["rotation"] == 180
-    # None clears it back to auto (key dropped).
-    r2 = device_service.update_instance_panel(
-        devices=devices, renderers=renderers, data_root=data_root,
-        instance_id="esp32_lab", w=800, h=480, orientation="landscape", rotation=None,
-    )
-    assert r2.ok and r2.device is not None
-    assert "rotation" not in r2.device.panel
+    assert r1.device.panel["orientation"] == "landscape_flipped"
 
 
 def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:

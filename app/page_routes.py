@@ -309,10 +309,6 @@ def _editor_context(page: Page) -> dict[str, Any]:
     return {
         "page": page,
         "panel": panel,
-        # Physical-mount rotation (degrees) of the page's target device,
-        # so the preview can match what the panel actually shows. 0 when
-        # the device is on "auto" or no device is bound.
-        "preview_rotate": panel.rotation or 0,
         "plugins": widgets,
         "plugin_cell_options": _materialize_cell_options(widgets),
         "themes": sorted(plugins.themes.values(), key=lambda t: t.name.lower()),

@@ -63,18 +63,23 @@ def test_pi_png_transform_quarters_zero_is_identity(pi_png, composition_png) -> 
     assert img.size == (200, 100)
 
 
-def test_pi_png_device_rotation_overrides_setting(pi_png, composition_png) -> None:
-    # An explicit per-device rotation wins over the renderer setting.
-    # 200x100 with rotation=90 (1 CW quarter) -> 100x200, regardless of
-    # the renderer's transform_rotate_quarters default.
-    panel = Panel(w=200, h=100, rotation=90)
-    artifact = pi_png.transform(composition_png, panel=panel, settings=pi_png.settings_defaults())
-    assert Image.open(io.BytesIO(artifact)).size == (100, 200)
-
-    # rotation=0 is an explicit no-op even though the renderer default is 3.
-    panel0 = Panel(w=200, h=100, rotation=0)
-    artifact0 = pi_png.transform(composition_png, panel=panel0, settings=pi_png.settings_defaults())
-    assert Image.open(io.BytesIO(artifact0)).size == (200, 100)
+def test_pi_png_flip_adds_180(pi_png) -> None:
+    # flip adds 2 quarter-turns (180°) on top of the renderer's base, so
+    # output dims match the un-flipped frame but the content is turned
+    # the opposite way. Use a non-uniform image (top half red, bottom
+    # half blue) so the 180° turn is detectable byte-wise.
+    src = Image.new("RGB", (200, 100), (220, 119, 87))
+    for y in range(50):
+        for x in range(200):
+            src.putpixel((x, y), (0, 0, 255))
+    buf = io.BytesIO()
+    src.save(buf, format="PNG")
+    comp = buf.getvalue()
+    settings = pi_png.settings_defaults()
+    normal = pi_png.transform(comp, panel=Panel(w=200, h=100, flip=False), settings=settings)
+    flipped = pi_png.transform(comp, panel=Panel(w=200, h=100, flip=True), settings=settings)
+    assert Image.open(io.BytesIO(normal)).size == Image.open(io.BytesIO(flipped)).size
+    assert normal != flipped  # 180° apart
 
 
 def test_pi_png_payload_matches_v3_contract(pi_png) -> None:

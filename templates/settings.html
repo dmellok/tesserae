@@ -85,15 +85,12 @@
       {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
       {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
     </div>
-    {{ select_field('add-device-orientation', 'panel_orientation', 'Orientation', value='landscape',
-                    options=[{'value':'landscape','label':'Landscape (default)'},
-                             {'value':'portrait','label':'Portrait (swap width and height)'}],
-                    help='Portrait swaps width and height after applying the panel size above.') }}
-    {{ select_field('add-device-rotation', 'panel_rotation', 'Rotation', value='',
-                    options=[{'value':'','label':'Auto (renderer default)'},
-                             {'value':'0','label':'0°'}, {'value':'90','label':'90° CW'},
-                             {'value':'180','label':'180°'}, {'value':'270','label':'270° CW'}],
-                    help='Clockwise turn the renderer + preview apply to match how the panel is physically mounted.') }}
+    {{ select_field('add-device-orientation', 'panel_orientation', 'Display orientation', value='landscape',
+                    options=[{'value':'landscape','label':'Landscape'},
+                             {'value':'landscape_flipped','label':'Landscape (upside-down)'},
+                             {'value':'portrait','label':'Portrait'},
+                             {'value':'portrait_flipped','label':'Portrait (upside-down)'}],
+                    help='How you want to read the dashboard. Portrait swaps width/height; the upside-down variants tell the renderer to turn the frame 180° for a flipped physical mount.') }}
     <div class="actions">{{ button('Add device', icon='plus') }}</div>
   </form>
   <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
@@ -174,24 +171,21 @@
   {% endif %}
 
   {% if section.panel_endpoint and section.panel %}
-  {# Panel edit — orientation toggle + dims for a registered instance.
-     The JS below swaps w/h live when orientation flips so the form is
-     WYSIWYG; the backend persists exactly what's submitted. #}
+  {# Panel edit — display orientation + dims for a registered instance.
+     The JS below swaps w/h live when the aspect (landscape↔portrait)
+     changes so the form is WYSIWYG; the backend persists what's shown. #}
   <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
-    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Orientation',
+    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Display orientation',
         value=section.panel.get('orientation', 'landscape'),
         options=[{'value':'landscape','label':'Landscape'},
-                 {'value':'portrait','label':'Portrait'}]) }}
+                 {'value':'landscape_flipped','label':'Landscape (upside-down)'},
+                 {'value':'portrait','label':'Portrait'},
+                 {'value':'portrait_flipped','label':'Portrait (upside-down)'}],
+        help='Upside-down turns the frame 180° for a flipped physical mount; the preview stays upright.') }}
     <div class="field-grid">
       {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
       {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
     </div>
-    {{ select_field(section.id ~ '-rotation', 'panel_rotation', 'Rotation',
-        value=(section.panel.get('rotation') if section.panel.get('rotation') is not none else '')|string,
-        options=[{'value':'','label':'Auto (renderer default)'},
-                 {'value':'0','label':'0°'}, {'value':'90','label':'90° CW'},
-                 {'value':'180','label':'180°'}, {'value':'270','label':'270° CW'}],
-        help='Clockwise turn the renderer + preview apply to match the physical mount.') }}
     <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
   </form>
   {% endif %}
@@ -302,10 +296,12 @@
     applyKind();
   })();
 
-  // Per-instance panel edit: flipping orientation swaps the width and
-  // height inputs live, so the form stays WYSIWYG. Each device card has
-  // its own form — wire them all.
+  // Per-instance panel edit: changing the ASPECT (landscape↔portrait)
+  // swaps the width/height inputs live so the form stays WYSIWYG. The
+  // upside-down variants share an aspect, so toggling normal↔flipped
+  // within the same aspect must NOT swap dims.
   (function () {
+    const isPortrait = (v) => v.indexOf('portrait') === 0;
     document.querySelectorAll('.device-panel-form').forEach(function (form) {
       const orient = form.querySelector('select[name="panel_orientation"]');
       const w = form.querySelector('input[name="panel_w"]');
@@ -313,10 +309,10 @@
       if (!orient || !w || !h) return;
       let last = orient.value;
       orient.addEventListener('change', function () {
-        if (orient.value !== last) {
+        if (isPortrait(orient.value) !== isPortrait(last)) {
           const tmp = w.value; w.value = h.value; h.value = tmp;
-          last = orient.value;
         }
+        last = orient.value;
       });
     });
   })();

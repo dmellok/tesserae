@@ -62,6 +62,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # panel (original left edge → new top edge). PIL ``rotate(angle)``
         # is counter-clockwise; ``-90`` gives CW.
         img = img.rotate(-90, expand=True)
+    if panel.flip:
+        # Upside-down physical mount — turn 180° so it reads upright.
+        img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")
     return pack_to_panel_bin(
