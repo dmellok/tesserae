@@ -98,8 +98,15 @@ class DiscoveryCache:
     def record(self, device_id: str, payload: bytes) -> DiscoveredDevice | None:
         """Add or refresh a discovered device. Returns the cached entry,
         or None if ``device_id`` is malformed (we refuse to cache ids
-        we'd reject during registration anyway)."""
+        we'd reject during registration anyway) or the payload is empty.
+
+        An empty payload is a retained-message *tombstone* — what a broker
+        delivers after the retained heartbeat is cleared (e.g. on Dismiss).
+        It's not a live device, so skip it; otherwise clearing a ghost
+        would immediately re-add a kind-less one."""
         if not _DEVICE_ID_RE.match(device_id):
+            return None
+        if not payload or not payload.strip():
             return None
         try:
             decoded = json.loads(payload.decode("utf-8")) if payload else {}

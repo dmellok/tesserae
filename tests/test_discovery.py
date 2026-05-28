@@ -56,6 +56,29 @@ def test_cache_rejects_malformed_id() -> None:
     assert cache.record("1starts_with_digit", b"{}") is None
 
 
+def test_cache_ignores_empty_tombstone_payload() -> None:
+    # An empty payload is what the broker delivers after a retained
+    # heartbeat is cleared (Dismiss). It must NOT create a ghost entry,
+    # otherwise clearing one would immediately re-add a kind-less device.
+    cache = DiscoveryCache()
+    assert cache.record("esp32", b"") is None
+    assert cache.record("esp32", b"   ") is None
+    assert cache.all() == []
+
+
+def test_wildcard_clear_does_not_resurrect(app: Flask) -> None:
+    # Simulate the dismiss flow at the broker level: a real heartbeat
+    # caches the device; the empty retained tombstone must clear it for
+    # good, not bounce it back.
+    transport = app.config["MQTT_TRANSPORT"]
+    cache = app.config["DISCOVERY_CACHE"]
+    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b'{"kind":"esp32_client"}'))
+    assert cache.get("esp32") is not None
+    cache.forget("esp32")
+    transport._on_message(None, None, _fake_msg("tesserae/esp32/status", b""))  # tombstone
+    assert cache.get("esp32") is None
+
+
 def test_cache_tolerates_non_json_payload() -> None:
     cache = DiscoveryCache()
     entry = cache.record("pi_kitchen", b"plain text")

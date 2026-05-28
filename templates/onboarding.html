@@ -62,6 +62,10 @@
     {% elif step == 'device' %}
     <h1>Register a device</h1>
     <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration — or add one by hand.</p>
+    {# Live discovery: refresh when a client announces itself so the user
+       doesn't have to reload while waiting for the first heartbeat. #}
+    <span data-discovered-poll hidden></span>
+    <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
 
     {% if instances %}
     <div class="wizard-registered">

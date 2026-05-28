@@ -641,6 +641,21 @@ def devices_add() -> Response:
     )
 
 
+@bp.get("/settings/devices/discovered.json")
+def devices_discovered_json() -> Response:
+    """Current discovered devices as JSON. The Devices page + setup wizard
+    poll this so a newly-announced client appears without a manual refresh
+    (the heartbeat may arrive seconds after the page loads)."""
+    items = [
+        {"id": d["id"], "kind": d["kind"]}
+        for d in _format_discovered(_discovery_cache().all())
+        if d["id"] not in _devices().devices
+    ]
+    return current_app.response_class(
+        json.dumps({"devices": items}), mimetype="application/json"
+    )
+
+
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
 def devices_register_discovered(discovered_id: str) -> Response:
     """One-click register a discovered device — same lifecycle as the
@@ -690,13 +705,31 @@ def devices_register_discovered(discovered_id: str) -> Response:
 
 @bp.post("/settings/devices/discovery/<discovered_id>/dismiss")
 def devices_dismiss_discovered(discovered_id: str) -> Response:
-    """Drop a discovered device from the cache. Restart of the server
-    (or the next heartbeat) will re-discover it — this is a 'not now'
-    button, not a permanent block-list."""
-    if _discovery_cache().forget(discovered_id):
-        flash(f"Dismissed {discovered_id!r}.", "ok")
-    else:
-        flash(f"{discovered_id!r} wasn't in the discovery cache.", "error")
+    """Drop a discovered device, and clear its retained status message on
+    the broker so it stays gone.
+
+    A client publishes its heartbeat retained, so the broker replays it to
+    the discovery wildcard on every connect — dismissing only the
+    in-memory cache lets a stale/renamed device (e.g. one reflashed to a
+    new id) pop straight back. Publishing an empty retained payload to its
+    status topic clears the retention; ``DiscoveryCache.record`` ignores
+    that empty tombstone so it doesn't re-add a kind-less ghost. A live
+    device simply re-announces on its next heartbeat."""
+    cache_had = _discovery_cache().forget(discovered_id)
+    try:
+        _transport().publish(
+            f"tesserae/{discovered_id}/status", b"", qos=1, retain=True
+        )
+        flash(f"Dismissed {discovered_id!r} and cleared its retained heartbeat.", "ok")
+    except Exception as exc:  # transport offline — cache is still cleared
+        if cache_had:
+            flash(
+                f"Dismissed {discovered_id!r}, but couldn't clear the retained "
+                f"message (broker offline: {exc}); it may reappear on reconnect.",
+                "error",
+            )
+        else:
+            flash(f"{discovered_id!r} wasn't in the discovery cache.", "error")
     return redirect(url_for("auth.settings_area", area="devices"))
 
 

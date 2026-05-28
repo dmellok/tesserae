@@ -1,5 +1,6 @@
 # Runtime state
 data/
+data.bak*/
 *.db
 *.db-journal
 *.db-wal

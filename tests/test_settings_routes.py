@@ -7,6 +7,7 @@ renderer manifests, and the form-driven update path."""
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from flask import Flask
@@ -475,6 +476,41 @@ def test_calibrate_apply_sets_orientation_from_answer(app_with_gate: Flask) -> N
     assert dev2 is not None and dev2.panel is not None
     assert dev2.panel["orientation"] == "portrait_flipped"
     assert dev2.panel["w"] < dev2.panel["h"]  # swapped to tall
+
+
+def test_dismiss_clears_retained_message(app_with_gate: Flask) -> None:
+    """Dismiss must publish an empty retained payload to the device's
+    status topic so the broker stops replaying the ghost on reconnect."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    app_with_gate.config["DISCOVERY_CACHE"].record(
+        "esp32", b'{"kind":"esp32_client"}'
+    )
+    transport = MagicMock()
+    app_with_gate.config["MQTT_TRANSPORT"] = transport
+    resp = client.post("/settings/devices/discovery/esp32/dismiss", follow_redirects=False)
+    assert resp.status_code == 302
+    assert app_with_gate.config["DISCOVERY_CACHE"].get("esp32") is None
+    transport.publish.assert_called_once_with(
+        "tesserae/esp32/status", b"", qos=1, retain=True
+    )
+
+
+def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record("esp32_attic", b'{"kind":"esp32_client"}')
+    body = client.get("/settings/devices/discovered.json")
+    assert body.status_code == 200
+    data = body.get_json()
+    ids = {d["id"] for d in data["devices"]}
+    assert ids == {"esp32_attic"}
+    # Once registered it drops out of the discovered feed.
+    client.post("/settings/devices/add", data={"id": "esp32_attic", "kind": "esp32_client"})
+    cache.record("esp32_attic", b'{"kind":"esp32_client"}')  # a late heartbeat
+    data = client.get("/settings/devices/discovered.json").get_json()
+    assert "esp32_attic" not in {d["id"] for d in data["devices"]}
 
 
 def test_delete_refuses_built_in_kind(app_with_gate: Flask) -> None:

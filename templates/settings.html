@@ -28,6 +28,14 @@
 </section>
 {% endif %}
 
+{% if active_area == 'devices' %}
+{# Live discovery: poll for newly-announced clients and refresh so they
+   appear without a manual reload. Marker present even when nothing's
+   discovered yet, so polling catches the first one. #}
+<span data-discovered-poll hidden></span>
+<script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
+{% endif %}
+
 {% if active_area == 'devices' and discovered_devices %}
 {# Discovery: devices that are publishing heartbeats but haven't been
    registered yet. The wildcard listener on tesserae/+/status fills this
