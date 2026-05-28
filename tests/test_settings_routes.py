@@ -276,7 +276,6 @@ def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
             "scale": "fill",
             "bg": "black",
             "saturation": "0.8",
-            "transform_rotate_quarters": "0",
         },
         follow_redirects=False,
     )
@@ -291,7 +290,6 @@ def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
     assert saved["scale"] == "fill"
     assert saved["bg"] == "black"
     assert saved["saturation"] == 0.8
-    assert saved["transform_rotate_quarters"] == 0
 
 
 def test_add_device_instance_creates_clone(app_with_gate: Flask, tmp_path: Path) -> None:

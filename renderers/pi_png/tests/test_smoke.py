@@ -44,23 +44,22 @@ def test_pi_png_manifest_fields(pi_png) -> None:
     assert pi_png.topic == "tesserae/pi_png/frame/png"
 
 
-def test_pi_png_transform_rotates(pi_png, composition_png) -> None:
+def test_pi_png_landscape_panel_is_identity(pi_png, composition_png) -> None:
+    # Landscape panel (w > h): no rotation — matches pi_bin, which only
+    # turns when the panel is portrait. (Was a fixed 270° before; that
+    # left landscape pages sideways.)
     panel = Panel(w=200, h=100)
     artifact = pi_png.transform(composition_png, panel=panel, settings=pi_png.settings_defaults())
-    img = Image.open(io.BytesIO(artifact))
-    # Default transform_rotate_quarters=1 (90 CW): 200x100 -> 100x200.
-    assert img.size == (100, 200)
+    assert Image.open(io.BytesIO(artifact)).size == (200, 100)
 
 
-def test_pi_png_transform_quarters_zero_is_identity(pi_png, composition_png) -> None:
-    panel = Panel(w=200, h=100)
-    artifact = pi_png.transform(
-        composition_png,
-        panel=panel,
-        settings={**pi_png.settings_defaults(), "transform_rotate_quarters": 0},
-    )
-    img = Image.open(io.BytesIO(artifact))
-    assert img.size == (200, 100)
+def test_pi_png_portrait_panel_rotates_to_landscape(pi_png, composition_png) -> None:
+    # Portrait panel (w < h): 90° CCW turn (3 CW quarters), same as
+    # pi_bin, mapping the tall composition onto the client's landscape buffer.
+    panel = Panel(w=100, h=200)
+    artifact = pi_png.transform(composition_png, panel=panel, settings=pi_png.settings_defaults())
+    # composition_png is 200x100; a 90° turn makes it 100x200.
+    assert Image.open(io.BytesIO(artifact)).size == (100, 200)
 
 
 def test_pi_png_flip_adds_180(pi_png) -> None:

@@ -21,10 +21,6 @@ DEFAULTS: dict[str, Any] = {
     "scale": "fit",
     "bg": "white",
     "saturation": 0.5,
-    # 3 CW quarter-turns = 1 CCW turn. Matches pi_bin (M47): composition
-    # is portrait-native, panel is landscape-native, and the ribbon-cable-up
-    # mount needs CCW to land right-side-up. Flip to 1 for ribbon-cable-down.
-    "transform_rotate_quarters": 3,
 }
 
 
@@ -33,16 +29,19 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
-    """Rotate the composition PNG to the Pi PNG client's fixed buffer
-    direction (``transform_rotate_quarters``, default 3 = one CCW turn,
-    the contract the inky-dash listener expects).
+    """Rotate the composition PNG to match the panel's orientation.
 
-    ``panel.flip`` adds two more quarter-turns (180°) for an upside-down
-    physical mount — the one thing the fixed client contract can't cover.
+    Derives the turn from the panel the same way ``pi_bin`` does, so the
+    per-device Rotation control drives both renderers identically: a
+    portrait panel (taller than wide) gets a 90° CCW turn — ``3``
+    clockwise quarter-turns — to map its top edge onto the client's
+    landscape buffer; landscape gets none. ``panel.flip`` adds 180° for
+    an upside-down mount.
     """
-    quarters = int(_setting(settings, "transform_rotate_quarters"))
+    del settings  # rotation comes from the panel now, not a fixed setting
+    quarters = 3 if panel.w < panel.h else 0
     if panel.flip:
-        quarters += 2
+        quarters = (quarters + 2) % 4
     return rotate_png(png_bytes, quarters=quarters)
 
 
