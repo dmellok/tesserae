@@ -38,6 +38,7 @@
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">Tesserae</span>
     </a>
+    {% block topnav %}
     <button type="button" class="nav-toggle" aria-label="Open menu" aria-controls="primary-nav" aria-expanded="false">
       <i class="ph ph-list" aria-hidden="true"></i>
     </button>
@@ -89,6 +90,7 @@
         <span class="theme-toggle-label">Toggle theme</span>
       </button>
     </nav>
+    {% endblock %}
     <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Toggle dark mode">
       <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
       <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>

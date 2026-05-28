@@ -47,8 +47,8 @@ def test_setup_sets_password_and_signs_in(app_with_gate: Flask, tmp_path: Path) 
         follow_redirects=False,
     )
     assert resp.status_code == 302
-    # /setup -> /settings -> /settings/server (the default sub-page)
-    assert resp.location.endswith("/settings")
+    # First run drops into the setup wizard, not straight to /settings.
+    assert "/onboarding" in resp.location
     # Auth state visible to the next request; /settings redirects to the
     # Server sub-page, which renders for an authed user.
     resp = client.get("/settings", follow_redirects=True)

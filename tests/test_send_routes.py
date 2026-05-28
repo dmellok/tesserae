@@ -203,10 +203,12 @@ def test_nav_links_to_send(app: Flask) -> None:
 
 
 def test_root_redirects_to_send(app: Flask) -> None:
-    """The brand logo + a bare URL hit / — both should land on Send,
-    the most common post-login destination."""
+    """Once onboarded, the brand logo + a bare URL hit / and land on
+    Send, the most common post-login destination. (Before onboarding,
+    / lands in the setup wizard — covered in test_onboarding.)"""
     client = app.test_client()
     _sign_in(client)
+    client.post("/onboarding/finish")  # mark setup complete
     resp = client.get("/", follow_redirects=False)
     assert resp.status_code == 302
     assert resp.location.endswith("/send")

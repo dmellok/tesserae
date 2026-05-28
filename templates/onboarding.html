@@ -1,0 +1,161 @@
+{% extends "_base.html" %}
+{% from "_components.html" import button, text_input, number_input, select_field %}
+{% block title %}Setup — Tesserae{% endblock %}
+{% block page_class %}page-narrow{% endblock %}
+
+{# Focused flow: hide the main nav so the wizard is the only thing to do. #}
+{% block topnav %}{% endblock %}
+
+{% block main %}
+<section class="wizard">
+  <ol class="wizard-steps" aria-label="Setup progress">
+    {% for s in steps %}
+    <li class="wizard-step {% if s.current %}is-current{% elif s.done %}is-done{% endif %}">
+      <span class="wizard-step-dot">{% if s.done and not s.current %}<i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>{% else %}{{ loop.index }}{% endif %}</span>
+      <span class="wizard-step-label">{{ s.label }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+
+  <div class="card wizard-card">
+
+    {# ---------- Welcome ---------- #}
+    {% if step == 'welcome' %}
+    <h1>Welcome to Tesserae</h1>
+    <p class="lede">Four quick steps to get a dashboard onto your first panel. You can skip any time and configure things later under Settings.</p>
+    <ol class="wizard-overview">
+      <li><strong>Broker</strong> — where frames are published.</li>
+      <li><strong>Device</strong> — register the panel that paints them.</li>
+      <li><strong>Dashboard</strong> — a starter layout, pushed to the panel.</li>
+    </ol>
+    <div class="wizard-nav">
+      <span></span>
+      <a class="primary" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Get started</span></a>
+    </div>
+
+    {# ---------- Broker ---------- #}
+    {% elif step == 'broker' %}
+    <h1>Connect a broker</h1>
+    <p class="lede">Tesserae publishes frames over MQTT. Use the built-in broker if you don't already run one, or point at an existing broker.</p>
+    <form method="post" action="{{ url_for('onboarding.save_broker') }}" class="form wizard-broker-form">
+      <div class="field field--switch">
+        <label class="switch" for="use-builtin">
+          <input type="checkbox" id="use-builtin" name="use_builtin" {% if broker.embedded_enabled or not broker.host %}checked{% endif %}>
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+          <span class="switch-label">Use the built-in broker (recommended)</span>
+        </label>
+        <p class="field-help">Runs an MQTT broker inside Tesserae on port 1883. Your clients connect to this machine's IP.</p>
+      </div>
+      <div class="wizard-broker-external">
+        {{ text_input('broker-host', 'host', 'Broker host', value=broker.get('host', ''), placeholder='192.168.1.50') }}
+        {{ number_input('broker-port', 'port', 'Port', value=broker.get('port', 1883), min=1, step=1) }}
+        {{ text_input('broker-user', 'username', 'Username (optional)', value=broker.get('username', '')) }}
+        {{ text_input('broker-pass', 'password', 'Password (optional)', value='') }}
+      </div>
+      <div class="wizard-nav">
+        <a class="ghost" href="{{ url_for('onboarding.step', step='welcome') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+        {{ button('Save & continue', icon='arrow-right') }}
+      </div>
+    </form>
+
+    {# ---------- Device ---------- #}
+    {% elif step == 'device' %}
+    <h1>Register a device</h1>
+    <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration — or add one by hand.</p>
+
+    {% if instances %}
+    <div class="wizard-registered">
+      <p class="field-help">Registered:</p>
+      <ul>{% for d in instances %}<li><i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i> {{ d.name }} <code>{{ d.id }}</code></li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    {% if discovered %}
+    <h2 class="wizard-subhead">Discovered</h2>
+    <ul class="wizard-discovered">
+      {% for d in discovered %}
+      <li>
+        <span><code>{{ d.id }}</code>{% if d.kind %} · {{ d.kind }}{% endif %}{% if d.panel_w and d.panel_h %} · {{ d.panel_w }}×{{ d.panel_h }}{% endif %}</span>
+        {% if d.kind %}
+        <form method="post" action="{{ url_for('onboarding.register_discovered', discovered_id=d.id) }}" class="form form--inline">
+          <div class="actions">{{ button('Register', icon='plus', variant='ghost') }}</div>
+        </form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if device_kinds %}
+    <details class="wizard-manual" {% if not discovered %}open{% endif %}>
+      <summary>Add a device by hand</summary>
+      <form method="post" action="{{ url_for('onboarding.add_device') }}" class="form">
+        {{ text_input('dev-id', 'id', 'Device id', value='', placeholder='esp32_hallway', required=True, help='Lowercase letters, digits, underscore, hyphen. Becomes the MQTT topic prefix.') }}
+        {% set kind_opts = [] %}{% for k in device_kinds %}{% set _ = kind_opts.append({'value': k.id, 'label': k.name}) %}{% endfor %}
+        {{ select_field('dev-kind', 'kind', 'Kind', value=device_kinds[0].id, options=kind_opts) }}
+        <div class="actions">{{ button('Add device', icon='plus') }}</div>
+      </form>
+    </details>
+    {% endif %}
+
+    <p class="field-help wizard-hint"><i class="ph ph-compass" aria-hidden="true"></i> Mounted sideways or upside-down? Calibrate it from the device card (Settings → Devices) after setup.</p>
+
+    <div class="wizard-nav">
+      <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
+    </div>
+
+    {# ---------- Dashboard ---------- #}
+    {% elif step == 'dashboard' %}
+    <h1>Your first dashboard</h1>
+    {% if pages %}
+    <p class="lede">A starter dashboard is ready. Push it to your panel to confirm everything's wired up, then finish — or open the editor to make it yours.</p>
+    <ul class="wizard-pages">
+      {% for p in pages %}
+      <li>
+        <span><i class="ph ph-squares-four" aria-hidden="true"></i> {{ p.name }}</span>
+        <span class="wizard-page-actions">
+          <a class="ghost" href="/pages/{{ p.id }}"><i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span></a>
+          <form method="post" action="{{ url_for('onboarding.push_starter', page_id=p.id) }}" class="form form--inline">
+            <div class="actions">{{ button('Push to panel', icon='paper-plane-tilt', variant='ghost') }}</div>
+          </form>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    <div class="wizard-nav">
+      <a class="ghost" href="{{ url_for('onboarding.step', step='device') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      <form method="post" action="{{ url_for('onboarding.finish') }}" class="form form--inline">
+        <div class="actions">{{ button('Finish', icon='check') }}</div>
+      </form>
+    </div>
+    {% else %}
+    <p class="lede">Create a ready-made dashboard — a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
+    <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
+      <div class="wizard-nav">
+        <a class="ghost" href="{{ url_for('onboarding.step', step='device') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+        {{ button('Create a starter dashboard', icon='sparkle') }}
+      </div>
+    </form>
+    {% endif %}
+    {% endif %}
+
+  </div>
+
+  <form method="post" action="{{ url_for('onboarding.skip') }}" class="form wizard-skip">
+    <button type="submit" class="ghost">Skip setup</button>
+  </form>
+</section>
+
+<script>
+  // Broker step: hide the external fields when the built-in broker is on.
+  (function () {
+    const toggle = document.querySelector('#use-builtin');
+    const ext = document.querySelector('.wizard-broker-external');
+    if (!toggle || !ext) return;
+    function apply() { ext.hidden = toggle.checked; }
+    toggle.addEventListener('change', apply);
+    apply();
+  })();
+</script>
+{% endblock %}

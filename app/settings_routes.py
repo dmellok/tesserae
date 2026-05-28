@@ -339,7 +339,9 @@ def setup() -> Response | str:
             auth.set_password(settings, pw)
             auth.login()
             _log_auth("setup", "ok")
-            return redirect(url_for("auth.settings"))
+            # First run drops into the setup wizard, not straight to
+            # Settings — the wizard sequences broker → device → dashboard.
+            return redirect(url_for("onboarding.index"))
     return render_template("setup.html")
 
 

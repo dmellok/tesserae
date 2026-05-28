@@ -31,6 +31,7 @@ from app import (
     composer,
     device_loader,
     events_routes,
+    onboarding,
     page_routes,
     plugin_loader,
     renderer_loader,
@@ -209,6 +210,7 @@ def create_app(
     events_routes.register(app)
     themes_routes.register(app)
     page_routes.register(app)
+    onboarding.register(app)
 
     if not testing:
         auth.install_gate(app, settings)
@@ -253,9 +255,11 @@ def create_app(
 
     @app.get("/")
     def index() -> Response:
-        # Send is the most common landing destination — first-run after
-        # /setup, link clicks from HA, etc. all want to push something.
-        # /pages is one nav hop away.
+        # First run (password set, but setup not finished) lands in the
+        # wizard. Once onboarded, Send is the default destination — link
+        # clicks from HA etc. all want to push something.
+        if not onboarding.is_onboarded(settings):
+            return redirect(url_for("onboarding.index"))
         return redirect(url_for("send.index"))
 
     @app.get("/renders/<path:filename>")
