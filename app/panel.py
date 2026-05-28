@@ -100,7 +100,11 @@ def resolve_panel_for_page(
         if device is not None:
             block = device.panel
             if block is not None:
-                return Panel(w=int(block["w"]), h=int(block["h"]))
+                return Panel(
+                    w=int(block["w"]),
+                    h=int(block["h"]),
+                    rotation=block.get("rotation"),
+                )
     return resolve_page_panel(page.panel, settings)
 
 

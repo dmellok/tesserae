@@ -33,16 +33,24 @@
   // transform so the preview always fits without overflowing.
   function fitPreview(frame) {
     const panelW = parseInt(frame.dataset.panelW || "0", 10);
+    const panelH = parseInt(frame.dataset.panelH || "0", 10);
     if (!panelW) return;
     const rect = frame.getBoundingClientRect();
     if (!rect.width) return;
-    const scale = rect.width / panelW;
+    // Physical-mount rotation (0/90/180/270). For 90/270 the iframe's
+    // native width becomes the vertical extent after rotation, so the
+    // container width must be matched against panelH instead.
+    const rotate = ((parseInt(frame.dataset.rotate || "0", 10) % 360) + 360) % 360;
+    const sideways = rotate === 90 || rotate === 270;
+    const visualW = sideways && panelH ? panelH : panelW;
+    const scale = rect.width / visualW;
     // Iframes are sized at the panel's native CSS pixels so the
     // composer renders unscaled — they need a transform to fit. Raster
     // images use object-fit (no transform) so they letterbox cleanly
     // regardless of the source's aspect ratio.
     frame.querySelectorAll("iframe").forEach((el) => {
-      el.style.transform = `scale(${scale})`;
+      el.style.transform =
+        `translate(-50%, -50%) rotate(${rotate}deg) scale(${scale})`;
     });
   }
 

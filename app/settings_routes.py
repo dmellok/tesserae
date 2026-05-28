@@ -593,6 +593,17 @@ def _panel_overrides_from_form(form: Any) -> dict[str, Any]:
     return overrides
 
 
+def _rotation_from_form(form: Any) -> int | None:
+    """Read the panel rotation field. Empty / "auto" / invalid → None
+    (renderer default); otherwise one of 0 / 90 / 180 / 270."""
+    raw = (form.get("panel_rotation") or "").strip()
+    try:
+        deg = int(raw)
+    except ValueError:
+        return None
+    return deg if deg in (0, 90, 180, 270) else None
+
+
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form. No restart
@@ -608,6 +619,7 @@ def devices_add() -> Response:
         name=form.get("name") or "",
         panel_overrides=_panel_overrides_from_form(form),
         orientation=form.get("panel_orientation"),
+        rotation=_rotation_from_form(form),
     )
     if not result.ok or result.device is None:
         flash(result.error or "Failed to add device.", "error")
@@ -700,15 +712,18 @@ def devices_update_panel(instance_id: str) -> Response:
         w=new_w,
         h=new_h,
         orientation=form.get("panel_orientation") or "landscape",
+        rotation=_rotation_from_form(form),
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
     _rebuild_transport_fn()()
     panel = result.device.panel or {}
+    rot = panel.get("rotation")
+    rot_label = f", {rot}°" if rot is not None else ""
     flash(
         f"Updated {result.device.name!r} panel to "
-        f"{panel.get('w')}×{panel.get('h')} ({panel.get('orientation', 'landscape')}).",
+        f"{panel.get('w')}×{panel.get('h')} ({panel.get('orientation', 'landscape')}{rot_label}).",
         "ok",
     )
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))

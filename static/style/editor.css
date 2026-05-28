@@ -27,15 +27,17 @@
 
 .preview-frame > iframe {
   position: absolute;
-  top: 0;
-  left: 0;
+  /* Centred so fitPreview can rotate + scale around the middle. The JS
+     emits translate(-50%,-50%) rotate() scale() in one transform. */
+  top: 50%;
+  left: 50%;
   border: 0;
   display: block;
   /* The composed panel content sets its own bleed colour and paints
      over this; we only see this background while the iframe loads.
      Use the themed surface so dark mode doesn't flash bright white. */
   background: var(--t-surface-soft);
-  transform-origin: 0 0;
+  transform-origin: 50% 50%;
 }
 .preview-frame > img.preview-image {
   /* Raster previews fit the frame with letterboxing; the source is

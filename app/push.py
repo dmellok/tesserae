@@ -39,7 +39,7 @@ import urllib.request
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from app.device_loader import DeviceRegistry
 from app.panel import resolve_panel_for_page, resolve_settings_panel
@@ -371,7 +371,7 @@ class PushManager:
     def _fan_out(
         self,
         composition_png: bytes,
-        panel_dims: dict[str, int],
+        panel_dims: dict[str, Any],
         *,
         source: str,
         target: str,
@@ -496,20 +496,20 @@ class PushManager:
             bytes_written=len(artifact),
         )
 
-    def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, int]:
+    def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, Any]:
         """Pick panel dims for a Send-page push.
 
         With a ``device_id`` that names a loaded device declaring a panel,
-        use that device's dims (so a manual send to a specific display
-        matches its panel). Otherwise fall back to the virtual panel
-        (``resolve_settings_panel``) so the preset / custom dims /
+        use that device's dims + rotation (so a manual send to a specific
+        display matches its panel). Otherwise fall back to the virtual
+        panel (``resolve_settings_panel``) so the preset / custom dims /
         portrait orientation are honoured identically to every other
         code path."""
         if device_id and self._devices is not None:
             device = self._devices.devices.get(device_id)
             if device is not None and device.panel is not None:
                 block = device.panel
-                return {"w": int(block["w"]), "h": int(block["h"])}
+                return {"w": int(block["w"]), "h": int(block["h"]), "rotation": block.get("rotation")}
         panel = resolve_settings_panel(self._settings)
         return {"w": panel.w, "h": panel.h}
 

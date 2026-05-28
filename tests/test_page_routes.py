@@ -417,3 +417,14 @@ def test_nav_link_present(app: Flask) -> None:
     _sign_in(client)
     body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     assert "/pages" in body
+
+
+def test_page_icon_normalises_ph_prefix() -> None:
+    """Phosphor names are stored bare; a stray 'ph-' prefix (legacy data
+    or pasted value) is stripped so templates don't render 'ph-ph-x'."""
+    from app.state.page_store import Page
+
+    assert Page(id="a", name="A", icon="ph-house").icon == "house"
+    assert Page(id="b", name="B", icon="house").icon == "house"
+    assert Page(id="c", name="C", icon="ph-").icon is None
+    assert Page(id="d", name="D", icon=None).icon is None

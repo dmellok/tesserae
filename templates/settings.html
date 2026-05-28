@@ -89,6 +89,11 @@
                     options=[{'value':'landscape','label':'Landscape (default)'},
                              {'value':'portrait','label':'Portrait (swap width and height)'}],
                     help='Portrait swaps width and height after applying the panel size above.') }}
+    {{ select_field('add-device-rotation', 'panel_rotation', 'Rotation', value='',
+                    options=[{'value':'','label':'Auto (renderer default)'},
+                             {'value':'0','label':'0°'}, {'value':'90','label':'90° CW'},
+                             {'value':'180','label':'180°'}, {'value':'270','label':'270° CW'}],
+                    help='Clockwise turn the renderer + preview apply to match how the panel is physically mounted.') }}
     <div class="actions">{{ button('Add device', icon='plus') }}</div>
   </form>
   <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
@@ -181,6 +186,12 @@
       {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
       {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
     </div>
+    {{ select_field(section.id ~ '-rotation', 'panel_rotation', 'Rotation',
+        value=(section.panel.get('rotation') if section.panel.get('rotation') is not none else '')|string,
+        options=[{'value':'','label':'Auto (renderer default)'},
+                 {'value':'0','label':'0°'}, {'value':'90','label':'90° CW'},
+                 {'value':'180','label':'180°'}, {'value':'270','label':'270° CW'}],
+        help='Clockwise turn the renderer + preview apply to match the physical mount.') }}
     <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
   </form>
   {% endif %}

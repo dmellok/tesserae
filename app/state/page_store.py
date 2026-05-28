@@ -23,10 +23,23 @@ logger = logging.getLogger(__name__)
 
 
 class Panel(BaseModel):
-    """Panel dimensions in composition orientation (the panel's mounted form)."""
+    """Panel dimensions in composition orientation (the panel's mounted form).
+
+    ``rotation`` is the clockwise degrees (0/90/180/270) a renderer +
+    preview turn the composition by to match the physically-mounted
+    panel. ``None`` means "auto" — the renderer falls back to its own
+    built-in default (the legacy single-head behaviour)."""
 
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
+    rotation: int | None = None
+
+    @property
+    def rotation_quarters(self) -> int | None:
+        """``rotation`` as clockwise quarter-turns (0-3), or None for auto."""
+        if self.rotation is None:
+            return None
+        return (self.rotation // 90) % 4
 
 
 class Cell(BaseModel):
@@ -89,6 +102,18 @@ class Page(BaseModel):
     corner_radius: int = 0
     bleed_color: str = "#ffffff"
     icon: str | None = None
+
+    @field_validator("icon", mode="before")
+    @classmethod
+    def _strip_icon_prefix(cls, value: Any) -> Any:
+        """Store Phosphor icon names bare (e.g. ``house``). Templates add
+        the ``ph ph-`` class prefix themselves, so a stored ``ph-house``
+        would render as ``ph-ph-house`` (no icon). Normalise on the way
+        in — fixes legacy data on load and any future prefixed input."""
+        if isinstance(value, str):
+            cleaned = value.strip().removeprefix("ph-")
+            return cleaned or None
+        return value
 
 
 class PageStore:

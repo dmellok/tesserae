@@ -97,6 +97,43 @@ def test_create_instance_portrait_swaps_dims(registries) -> None:
     }
 
 
+def test_create_instance_stores_rotation(registries) -> None:
+    devices, renderers, data_root = registries
+    result = device_service.create_instance(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_lab", kind_id="esp32_client", rotation=270,
+    )
+    assert result.ok and result.device is not None
+    assert result.device.panel["rotation"] == 270
+    # Panel model exposes it as CW quarter-turns for the renderers.
+    from app.state.page_store import Panel
+
+    assert Panel(w=800, h=480, rotation=270).rotation_quarters == 3
+    assert Panel(w=800, h=480).rotation_quarters is None  # auto
+
+
+def test_update_panel_can_set_and_clear_rotation(registries) -> None:
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_lab", kind_id="esp32_client", rotation=90,
+    )
+    # Set an explicit rotation.
+    r1 = device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_lab", w=800, h=480, orientation="landscape", rotation=180,
+    )
+    assert r1.ok and r1.device is not None
+    assert r1.device.panel["rotation"] == 180
+    # None clears it back to auto (key dropped).
+    r2 = device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="esp32_lab", w=800, h=480, orientation="landscape", rotation=None,
+    )
+    assert r2.ok and r2.device is not None
+    assert "rotation" not in r2.device.panel
+
+
 def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
     devices, renderers, data_root = registries
     # Mixed case is forgivingly lowercased, but a leading digit / spaces

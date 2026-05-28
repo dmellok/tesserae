@@ -63,6 +63,20 @@ def test_pi_png_transform_quarters_zero_is_identity(pi_png, composition_png) -> 
     assert img.size == (200, 100)
 
 
+def test_pi_png_device_rotation_overrides_setting(pi_png, composition_png) -> None:
+    # An explicit per-device rotation wins over the renderer setting.
+    # 200x100 with rotation=90 (1 CW quarter) -> 100x200, regardless of
+    # the renderer's transform_rotate_quarters default.
+    panel = Panel(w=200, h=100, rotation=90)
+    artifact = pi_png.transform(composition_png, panel=panel, settings=pi_png.settings_defaults())
+    assert Image.open(io.BytesIO(artifact)).size == (100, 200)
+
+    # rotation=0 is an explicit no-op even though the renderer default is 3.
+    panel0 = Panel(w=200, h=100, rotation=0)
+    artifact0 = pi_png.transform(composition_png, panel=panel0, settings=pi_png.settings_defaults())
+    assert Image.open(io.BytesIO(artifact0)).size == (200, 100)
+
+
 def test_pi_png_payload_matches_v3_contract(pi_png) -> None:
     payload = pi_png.payload(
         "abc123", "http://192.168.1.10:8000", settings=pi_png.settings_defaults()

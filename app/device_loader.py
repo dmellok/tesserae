@@ -118,6 +118,8 @@ class Device:
         out: dict[str, Any] = {"w": w, "h": h}
         if isinstance(block.get("orientation"), str):
             out["orientation"] = block["orientation"]
+        if isinstance(block.get("rotation"), int) and block["rotation"] in (0, 90, 180, 270):
+            out["rotation"] = block["rotation"]
         if isinstance(block.get("name"), str):
             out["name"] = block["name"]
         return out

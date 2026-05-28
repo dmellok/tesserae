@@ -33,14 +33,16 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
-    """Rotate the composition PNG to landscape orientation.
+    """Rotate the composition PNG to the panel's mounted orientation.
 
-    ``transform_rotate_quarters`` defaults to 1 (a single 90deg CW turn) —
-    the Pi panel's mounted orientation is portrait but the client expects
-    landscape. Override per install if the panel is mounted landscape.
+    When the target device declares an explicit ``rotation`` it wins
+    (per-device, multi-head). Otherwise fall back to the renderer-level
+    ``transform_rotate_quarters`` (default 3 = one CCW turn), the legacy
+    single-head default for a ribbon-cable-up portrait mount.
     """
-    del panel  # rotation count is fixed at the renderer level; panel dims unused
-    quarters = int(_setting(settings, "transform_rotate_quarters"))
+    quarters = panel.rotation_quarters
+    if quarters is None:
+        quarters = int(_setting(settings, "transform_rotate_quarters"))
     return rotate_png(png_bytes, quarters=quarters)
 
 

@@ -73,7 +73,12 @@
         "orientation": {
           "type": "string",
           "enum": ["landscape", "portrait"],
-          "description": "Informational. The renderer is what actually rotates."
+          "description": "Informational aspect hint. Physical-mount turn is set by 'rotation'."
+        },
+        "rotation": {
+          "type": "integer",
+          "enum": [0, 90, 180, 270],
+          "description": "Clockwise degrees the renderer + preview rotate the composition to match the physically-mounted panel. Omit for the renderer's built-in default (auto)."
         },
         "name": { "type": "string", "description": "Friendly name shown in the UI." }
       }
