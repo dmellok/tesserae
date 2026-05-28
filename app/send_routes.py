@@ -66,7 +66,7 @@ def _device_options() -> list[dict[str, str]]:
     for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
         if dev.kind_of is None or dev.panel is None:
             continue
-        opts.append({"id": dev.id, "label": f"{dev.name} — {dev.id}"})
+        opts.append({"id": dev.id, "label": dev.display_name})
     return opts
 
 

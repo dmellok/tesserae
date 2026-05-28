@@ -54,6 +54,30 @@ def test_discovers_bundled_devices(tmp_path: Path, schema_path: Path) -> None:
     assert "esp32_client" in registry.devices
 
 
+def test_display_name_collapses_auto_default_to_id(tmp_path: Path) -> None:
+    """An instance whose name is the auto-generated "Kind (id)" default
+    shows just the id in pickers; a custom name is shown verbatim.
+    display_name only reads name + id, so a stub module is fine."""
+    from types import ModuleType
+
+    from app.device_loader import Device
+
+    stub = ModuleType("stub")
+
+    def _dev(name: str) -> Device:
+        return Device(
+            id="lounge_frame",
+            path=tmp_path,
+            manifest={"name": name, "status_topic": "t"},
+            module=stub,
+            data_dir=tmp_path,
+            kind_of="pi_bin_client",
+        )
+
+    assert _dev("Pi BIN client (lounge_frame)").display_name == "lounge_frame"
+    assert _dev("Lounge Display").display_name == "Lounge Display"
+
+
 def test_compat_mismatch_rejected(tmp_path: Path, schema_path: Path) -> None:
     devs = tmp_path / "devices"
     devs.mkdir()

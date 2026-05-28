@@ -297,10 +297,10 @@ def _editor_context(page: Page) -> dict[str, Any]:
                 {
                     "id": dev.id,
                     "name": dev.name,
-                    # Show id alongside name so instances built from the
-                    # same kind (and therefore sharing panel.name) stay
-                    # tellable apart in the dropdown.
-                    "label": f"{dev.name} — {dev.id} ({dev.panel['w']}×{dev.panel['h']})",
+                    # display_name collapses the auto "Kind (id)" default
+                    # to just the id; dims stay so same-panel instances
+                    # remain tellable apart.
+                    "label": f"{dev.display_name} ({dev.panel['w']}×{dev.panel['h']})",
                     "w": int(dev.panel["w"]),
                     "h": int(dev.panel["h"]),
                 }

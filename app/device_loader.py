@@ -72,6 +72,17 @@ class Device:
         return str(self.manifest["name"])
 
     @property
+    def display_name(self) -> str:
+        """Short label for device pickers. When the user didn't set a
+        custom name, ``name`` is the auto-generated ``"Kind (id)"``
+        default — which duplicates the id. Collapse that case to just
+        the id so the picker reads ``lounge_frame`` instead of
+        ``Pi BIN client (lounge_frame) — lounge_frame``."""
+        if self.name.endswith(f"({self.id})"):
+            return self.id
+        return self.name
+
+    @property
     def renderer_ids(self) -> list[str]:
         return [str(r) for r in self.manifest.get("renderers", [])]
 
