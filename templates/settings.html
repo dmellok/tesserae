@@ -85,12 +85,12 @@
       {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
       {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
     </div>
-    {{ select_field('add-device-orientation', 'panel_orientation', 'Display orientation', value='landscape',
-                    options=[{'value':'landscape','label':'Landscape'},
-                             {'value':'landscape_flipped','label':'Landscape (upside-down)'},
-                             {'value':'portrait','label':'Portrait'},
-                             {'value':'portrait_flipped','label':'Portrait (upside-down)'}],
-                    help='How you want to read the dashboard. Portrait swaps width/height; the upside-down variants tell the renderer to turn the frame 180° for a flipped physical mount.') }}
+    {{ select_field('add-device-orientation', 'panel_orientation', 'Rotation', value='landscape',
+                    options=[{'value':'landscape','label':'0°'},
+                             {'value':'portrait','label':'90°'},
+                             {'value':'landscape_flipped','label':'180°'},
+                             {'value':'portrait_flipped','label':'270°'}],
+                    help='Clockwise turn applied to match how the panel is mounted. 0° = native (wide); 90°/270° render tall; 180° is upside-down. Not sure? Use Calibrate after adding.') }}
     <div class="actions">{{ button('Add device', icon='plus') }}</div>
   </form>
   <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
@@ -175,13 +175,13 @@
      The JS below swaps w/h live when the aspect (landscape↔portrait)
      changes so the form is WYSIWYG; the backend persists what's shown. #}
   <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
-    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Display orientation',
+    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
         value=section.panel.get('orientation', 'landscape'),
-        options=[{'value':'landscape','label':'Landscape'},
-                 {'value':'landscape_flipped','label':'Landscape (upside-down)'},
-                 {'value':'portrait','label':'Portrait'},
-                 {'value':'portrait_flipped','label':'Portrait (upside-down)'}],
-        help='Upside-down turns the frame 180° for a flipped physical mount; the preview stays upright.') }}
+        options=[{'value':'landscape','label':'0°'},
+                 {'value':'portrait','label':'90°'},
+                 {'value':'landscape_flipped','label':'180°'},
+                 {'value':'portrait_flipped','label':'270°'}],
+        help='Clockwise turn to match the mount. 0° = native (wide); 90°/270° render tall; 180° is upside-down. The preview stays upright.') }}
     <div class="field-grid">
       {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
       {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}

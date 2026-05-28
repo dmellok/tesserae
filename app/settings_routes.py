@@ -578,6 +578,22 @@ def _format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
     return out
 
 
+# Display label for each stored orientation value. The control is a
+# rotation, so it reads in degrees; the stored values stay the
+# aspect+flip strings the rest of the system uses. Order matches the
+# calibration cycle (0/90/180/270).
+_ORIENTATION_DEGREES: dict[str, str] = {
+    "landscape": "0°",
+    "portrait": "90°",
+    "landscape_flipped": "180°",
+    "portrait_flipped": "270°",
+}
+
+
+def _orientation_label(orientation: str) -> str:
+    return _ORIENTATION_DEGREES.get(orientation, orientation)
+
+
 def _panel_overrides_from_form(form: Any) -> dict[str, Any]:
     """Resolve the Add-device form's panel size into a ``{"w","h"}``
     override dict. A preset wins; otherwise the custom width/height
@@ -712,7 +728,7 @@ def devices_update_panel(instance_id: str) -> Response:
     panel = result.device.panel or {}
     flash(
         f"Updated {result.device.name!r} panel to "
-        f"{panel.get('w')}×{panel.get('h')} ({panel.get('orientation', 'landscape')}).",
+        f"{panel.get('w')}×{panel.get('h')} at {_orientation_label(panel.get('orientation', 'landscape'))}.",
         "ok",
     )
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
@@ -806,8 +822,8 @@ def devices_calibrate_apply(instance_id: str) -> Response:
             card, source_label=f"calibration:{instance_id}", device_id=instance_id
         )
     flash(
-        f"Set {result.device.name!r} to {target}. Re-sent the card — it should read "
-        "upright now. If not, adjust Display orientation below.",
+        f"Set {result.device.name!r} to {_orientation_label(target)} — your dashboard now reads "
+        "upright in that orientation. Re-sent the card to confirm; adjust Rotation below if needed.",
         "ok",
     )
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
