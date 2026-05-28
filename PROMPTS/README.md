@@ -24,3 +24,16 @@ default Pi device, `esp32` for the default ESP32. Custom devices
 prefix (e.g. `pi-kitchen`, `esp32-hallway`). Make sure your firmware
 subscribes to the right one — it's the single string you'll change
 when you wire up a second display of the same kind.
+
+## Update briefs
+
+If you already have a working client from an earlier version, these
+briefs walk a coding assistant through retrofitting it for the named-
+device topic convention (no breaking change to the default prefix —
+old clients keep working with `pi` / `esp32`):
+
+| File | Hardware |
+|---|---|
+| [updates/pi_bin_multihead.md](updates/pi_bin_multihead.md) | tesserae-pi-bin-client → device_id in install script |
+| [updates/pi_png_multihead.md](updates/pi_png_multihead.md) | tesserae-pi-png-client → device_id in install script |
+| [updates/esp32_multihead.md](updates/esp32_multihead.md) | esp32-inky-dash-client → device_id via captive portal + always-on settings page |
