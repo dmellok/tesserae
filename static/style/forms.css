@@ -708,3 +708,40 @@ input[type="range"].slider:focus::-moz-range-thumb {
 /* Built-in broker fields — hidden when the master switch is off. */
 .embedded-broker-fields { display: contents; }
 .embedded-broker-fields.is-collapsed { display: none; }
+
+/* ----- Discovered devices strip (Settings → Devices) --------------- */
+.discovery-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.discovery-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  background: var(--t-surface-soft);
+}
+.discovery-id { font-weight: 600; margin-bottom: 0.4rem; }
+.discovery-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.2rem;
+  margin: 0;
+  font-size: 0.85em;
+  color: var(--t-fg-soft);
+}
+.discovery-meta div { display: flex; gap: 0.4rem; }
+.discovery-meta dt { font-weight: 500; }
+.discovery-meta dd { margin: 0; }
+.discovery-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: stretch; }
+.discovery-actions .form--inline .actions { margin: 0; padding: 0; }
+.discovery-hint { font-size: 0.8em; color: var(--t-fg-soft); padding: 0.3rem 0.4rem; }
+@media (max-width: 540px) {
+  .discovery-row { flex-direction: column; align-items: stretch; }
+}

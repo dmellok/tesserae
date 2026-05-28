@@ -28,6 +28,44 @@
 </section>
 {% endif %}
 
+{% if active_area == 'devices' and discovered_devices %}
+{# Discovery: devices that are publishing heartbeats but haven't been
+   registered yet. The wildcard listener on tesserae/+/status fills this
+   in; the form here pre-fills from whatever the client advertised
+   (kind, panel dims, fw version). #}
+<section class="card" id="discovered-devices">
+  {{ card_head('Discovered devices', icon_name='radar', blurb='Clients publishing heartbeats that aren’t registered yet. The values come from the client’s last heartbeat — confirm them and register, or dismiss if they’re not yours.') }}
+  <ul class="discovery-list">
+    {% for d in discovered_devices %}
+    <li class="discovery-row">
+      <div class="discovery-info">
+        <div class="discovery-id"><code>{{ d.id }}</code></div>
+        <dl class="discovery-meta">
+          <div><dt>Kind</dt><dd>{{ d.kind or '—' }}</dd></div>
+          {% if d.panel_w and d.panel_h %}<div><dt>Panel</dt><dd>{{ d.panel_w }}×{{ d.panel_h }}</dd></div>{% endif %}
+          {% if d.fw_version %}<div><dt>FW</dt><dd>{{ d.fw_version }}</dd></div>{% endif %}
+          {% if d.ip %}<div><dt>IP</dt><dd><code>{{ d.ip }}</code></dd></div>{% endif %}
+          <div><dt>Seen</dt><dd>{{ d.relative }}</dd></div>
+        </dl>
+      </div>
+      <div class="discovery-actions">
+        {% if d.kind %}
+        <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
+          <div class="actions">{{ button('Register', icon='plus', variant='primary') }}</div>
+        </form>
+        {% else %}
+        <span class="discovery-hint">No <code>kind</code> in heartbeat — use Add-device below.</span>
+        {% endif %}
+        <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline">
+          <div class="actions">{{ button('Dismiss', icon='x', variant='ghost') }}</div>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 {% if active_area == 'devices' and device_kinds %}
 {# Multi-head: register a second physical display of the same kind.
    The kind contributes parse/validate + renderer modules; this form

@@ -39,6 +39,7 @@ from app import (
     settings_routes,
     themes_routes,
 )
+from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
 from app.network import detect_base_url
@@ -134,12 +135,17 @@ def create_app(
     # MQTT subscription updates it; the settings page reads it. Plain dict
     # — single-writer (the broker dispatcher) so no lock needed for reads.
     status_cache: dict[str, dict[str, Any]] = {}
+    # Wildcard listener on tesserae/+/status feeds this cache for every
+    # device id we don't yet know about; the Settings → Devices page
+    # surfaces it as a "Discovered" strip with one-click register.
+    discovery_cache = DiscoveryCache()
 
     app.config["PLUGIN_REGISTRY"] = plugins
     app.config["RENDERER_REGISTRY"] = renderers
     app.config["DEVICE_REGISTRY"] = devices
     app.config["DEVICE_DATA_ROOT"] = device_data_root
     app.config["DEVICE_SCHEMA_PATH"] = device_schema
+    app.config["DISCOVERY_CACHE"] = discovery_cache
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["EVENT_LOG"] = event_log
@@ -158,6 +164,7 @@ def create_app(
             renderers,
             devices,
             status_cache,
+            discovery_cache,
             page_store,
             event_log,
             renders_dir,
@@ -273,6 +280,7 @@ def _rebuild_transport(
     renderers: renderer_loader.RendererRegistry,
     devices: device_loader.DeviceRegistry,
     status_cache: dict[str, dict[str, Any]],
+    discovery_cache: DiscoveryCache,
     page_store: PageStore,
     event_log: EventLog,
     renders_dir: Path,
@@ -369,6 +377,10 @@ def _rebuild_transport(
     # to the right module.
     for device in devices.all():
         _subscribe_device_status(transport, device, status_cache, event_log)
+
+    # Wildcard listener for discovery: any heartbeat on tesserae/+/status
+    # for an id we don't know about gets cached for the Settings UI.
+    _subscribe_discovery(transport, devices, discovery_cache)
 
     app_section = settings.get_section("app")
 
@@ -473,6 +485,39 @@ def _subscribe_device_status(
         )
 
     transport.subscribe(device.status_topic, on_status, qos=1)
+
+
+def _subscribe_discovery(
+    transport: MqttTransport,
+    devices: device_loader.DeviceRegistry,
+    discovery_cache: DiscoveryCache,
+) -> None:
+    """Wildcard listener on ``tesserae/+/status``. Heartbeats for known
+    device ids are ignored here (the per-device handler already ran);
+    anything else gets cached so the Settings UI can surface it for
+    one-click registration."""
+
+    def on_wildcard(topic: str, payload: bytes) -> None:
+        # Skip topics already owned by a registered device. Match on
+        # status_topic, not on the parsed id segment — built-in kinds
+        # have a kind id like 'esp32_client' but a topic prefix of
+        # 'esp32', so a naive id-segment lookup would mis-classify
+        # every kind heartbeat as "discovered".
+        if any(d.status_topic == topic for d in devices.all()):
+            return
+        device_id = device_id_from_status_topic(topic)
+        if device_id is None:
+            return
+        entry = discovery_cache.record(device_id, payload)
+        if entry is not None:
+            logger.info(
+                "discovery: heartbeat from %s (kind=%s, fw=%s)",
+                device_id,
+                entry.kind,
+                entry.fw_version,
+            )
+
+    transport.subscribe("tesserae/+/status", on_wildcard, qos=1)
 
 
 class _NoopMqttClient:

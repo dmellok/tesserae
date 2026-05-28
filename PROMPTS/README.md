@@ -39,8 +39,14 @@ briefs walk a coding assistant through retrofitting it for the named-
 device topic convention (no breaking change to the default prefix —
 old clients keep working with `pi` / `esp32`):
 
-| File | Hardware |
-|---|---|
-| [updates/pi_bin_multihead.md](updates/pi_bin_multihead.md) | tesserae-pi-bin-client → device_id in install script |
-| [updates/pi_png_multihead.md](updates/pi_png_multihead.md) | tesserae-pi-png-client → device_id in install script |
-| [updates/esp32_multihead.md](updates/esp32_multihead.md) | esp32-inky-dash-client → device_id via captive portal + always-on settings page |
+| File | Hardware | Scope |
+|---|---|---|
+| [updates/pi_bin_multihead.md](updates/pi_bin_multihead.md) | tesserae-pi-bin-client | device_id in install script |
+| [updates/pi_png_multihead.md](updates/pi_png_multihead.md) | tesserae-pi-png-client | device_id in install script |
+| [updates/esp32_multihead.md](updates/esp32_multihead.md) | esp32-inky-dash-client | device_id via captive portal + always-on settings page |
+| [updates/pi_bin_discovery.md](updates/pi_bin_discovery.md) | tesserae-pi-bin-client | extend heartbeat with kind / panel / fw / ip for Settings auto-register |
+| [updates/pi_png_discovery.md](updates/pi_png_discovery.md) | tesserae-pi-png-client | extend heartbeat with kind / panel / fw / ip for Settings auto-register |
+| [updates/esp32_discovery.md](updates/esp32_discovery.md) | esp32-inky-dash-client | extend heartbeat with kind / panel / fw / ip for Settings auto-register |
+
+Apply the **multihead** brief first (it changes the topic prefix),
+then the **discovery** brief in the same repo.

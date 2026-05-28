@@ -33,6 +33,7 @@ from werkzeug.wrappers import Response
 
 from app import auth
 from app.device_loader import Device, DeviceRegistry, load_instance_file
+from app.discovery import DiscoveredDevice, DiscoveryCache
 from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
@@ -406,6 +407,9 @@ def settings_area(area: str) -> str | Response:
         if area == "devices"
         else []
     )
+    discovered = (
+        _format_discovered(_discovery_cache().all()) if area == "devices" else []
+    )
     return render_template(
         "settings.html",
         sections=sections,
@@ -414,6 +418,7 @@ def settings_area(area: str) -> str | Response:
         device_kinds=device_kinds,
         panel_preset_choices=PANEL_PRESET_CHOICES if area == "devices" else [],
         panel_presets=PANEL_PRESETS if area == "devices" else {},
+        discovered_devices=discovered,
     )
 
 
@@ -542,6 +547,32 @@ def _device_kinds() -> list[Device]:
     return [d for d in _devices().all() if d.kind_of is None]
 
 
+def _discovery_cache() -> DiscoveryCache:
+    return current_app.config["DISCOVERY_CACHE"]  # type: ignore[no-any-return]
+
+
+def _format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
+    """Shape DiscoveredDevice records for the template — flatten to plain
+    dicts so Jinja doesn't trip over @property access, and pre-compute
+    the relative-time string."""
+    now = time.time()
+    out: list[dict[str, Any]] = []
+    for d in items:
+        out.append(
+            {
+                "id": d.id,
+                "kind": d.kind,
+                "panel_w": d.panel_w,
+                "panel_h": d.panel_h,
+                "fw_version": d.fw_version,
+                "ip": d.ip,
+                "relative": _format_relative(max(0.0, now - d.received_at)),
+                "parsed": d.parsed,
+            }
+        )
+    return out
+
+
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form.
@@ -637,6 +668,100 @@ def devices_add() -> Response:
     return redirect(
         url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}")
     )
+
+
+@bp.post("/settings/devices/discovery/<discovered_id>/register")
+def devices_register_discovered(discovered_id: str) -> Response:
+    """One-click register a discovered device. Builds the same payload
+    as the Add-device form but sources kind / panel / id from the
+    cached heartbeat — the user only confirms (or overrides)."""
+    cache = _discovery_cache()
+    entry = cache.get(discovered_id)
+    if entry is None:
+        flash(f"Discovered device {discovered_id!r} is no longer in the cache.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    # Form may override the cached values (e.g. the user picked a
+    # different kind because the client mis-reported, or chose a
+    # custom panel size). Missing form fields fall back to the cache.
+    form = request.form
+    instance_id = (form.get("id") or discovered_id).strip().lower()
+    kind_id = (form.get("kind") or entry.kind or "").strip()
+    if not kind_id:
+        flash(
+            f"Discovered device {discovered_id!r} didn't advertise a kind; "
+            "register it manually via the Add-device form.",
+            "error",
+        )
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    # Reuse the add-device form's machinery by stuffing the values into
+    # request.form via a temporary mutable copy is awkward in Flask —
+    # easier to inline a slim version of the same logic here.
+    if not _DEVICE_ID_RE.match(instance_id):
+        flash(f"Discovered id {instance_id!r} is malformed; can't register.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    devices = _devices()
+    if instance_id in devices.devices:
+        flash(f"Device id {instance_id!r} is already in use.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    kind = devices.get(kind_id)
+    if kind is None or kind.kind_of is not None:
+        flash(f"Unknown device kind {kind_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    instance: dict[str, Any] = {
+        "id": instance_id,
+        "kind": kind_id,
+        "name": (form.get("name") or "").strip() or f"{kind.name} ({instance_id})",
+        "status_topic": f"tesserae/{instance_id}/status",
+    }
+    if kind.config_topic:
+        instance["config_topic"] = f"tesserae/{instance_id}/config"
+
+    panel = dict(kind.panel or {})
+    if entry.panel_w is not None:
+        panel["w"] = entry.panel_w
+    if entry.panel_h is not None:
+        panel["h"] = entry.panel_h
+    if panel:
+        instance["panel"] = panel
+
+    data_root = _device_data_root()
+    data_root.mkdir(parents=True, exist_ok=True)
+    inst_file = data_root / f"{instance_id}.json"
+    if inst_file.exists():
+        flash(f"An instance file at {inst_file.name} already exists.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    inst_file.write_text(json.dumps(instance, indent=2) + "\n")
+
+    new_device = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if new_device is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        msg = last_err.message if last_err else "unknown error"
+        inst_file.unlink(missing_ok=True)
+        flash(f"Failed to load discovered device: {msg}", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    clone_for_instances(_renderers(), devices)
+    cache.forget(discovered_id)
+    _rebuild_transport_fn()()
+    flash(f"Registered discovered device {new_device.name!r}.", "ok")
+    return redirect(
+        url_for("auth.settings_area", area="devices", _anchor=f"device-{instance_id}")
+    )
+
+
+@bp.post("/settings/devices/discovery/<discovered_id>/dismiss")
+def devices_dismiss_discovered(discovered_id: str) -> Response:
+    """Drop a discovered device from the cache. Restart of the server
+    (or the next heartbeat) will re-discover it — this is a 'not now'
+    button, not a permanent block-list."""
+    if _discovery_cache().forget(discovered_id):
+        flash(f"Dismissed {discovered_id!r}.", "ok")
+    else:
+        flash(f"{discovered_id!r} wasn't in the discovery cache.", "error")
+    return redirect(url_for("auth.settings_area", area="devices"))
 
 
 @bp.post("/settings/devices/<instance_id>/delete")
