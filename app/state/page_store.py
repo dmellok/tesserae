@@ -29,11 +29,17 @@ class Panel(BaseModel):
     chosen aspect (portrait = tall). Each renderer maps that canvas onto
     its client's fixed native buffer. ``flip`` adds a 180° turn for an
     upside-down physical mount — the only mount detail the renderer can't
-    infer from aspect alone."""
+    infer from aspect alone.
+
+    ``gamut`` is the physical panel's colour gamut; the .bin packer keys
+    its palette + nibble LUT off it (``waveshare_e6`` default, or
+    ``inky_7colour`` for the 7-colour ACeP Inky Impression). Irrelevant to
+    the PNG path (the on-device inky library projects its own gamut)."""
 
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
     flip: bool = False
+    gamut: str = "waveshare_e6"
 
 
 class Cell(BaseModel):

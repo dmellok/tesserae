@@ -121,6 +121,8 @@ class Device:
             out["orientation"] = orientation
         if isinstance(block.get("name"), str):
             out["name"] = block["name"]
+        if isinstance(block.get("gamut"), str):
+            out["gamut"] = block["gamut"]
         return out
 
     def parse_status(self, payload: bytes) -> dict[str, Any]:

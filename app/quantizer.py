@@ -72,6 +72,36 @@ WAVESHARE_E6_PALETTE: tuple[tuple[int, int, int], ...] = (
 _E6_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3, 0x5, 0x6)
 
 
+# Pimoroni Inky Impression 7-colour (ACeP / UC8159) palette. Same ink
+# primaries as Spectra 6 but a 7th colour (orange) and a *different* index
+# order: the .bin nibble IS the inky library's native palette index, so a
+# Pi client can write it straight into the UC8159 buffer. Declaring the
+# palette in that index order makes the LUT an identity map (0…6).
+INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),  # 0 black
+    (255, 255, 255),  # 1 white
+    (0, 255, 0),  # 2 green
+    (0, 0, 255),  # 3 blue
+    (255, 0, 0),  # 4 red
+    (255, 255, 0),  # 5 yellow
+    (255, 140, 0),  # 6 orange
+)
+
+_INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
+
+
+# Panel colour gamuts the .bin packer can target, keyed by the value
+# stored on a device's panel block. Each maps to (palette, nibble LUT).
+# ``waveshare_e6`` is the default everywhere so existing devices and the
+# always-E6 ESP32 path are unchanged.
+PanelGamut = Literal["waveshare_e6", "inky_7colour"]
+PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour")
+_GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]] = {
+    "waveshare_e6": (WAVESHARE_E6_PALETTE, _E6_NIBBLE_BY_PALETTE_INDEX),
+    "inky_7colour": (INKY_7COLOUR_PALETTE, _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX),
+}
+
+
 _PIL_DITHER_MAP: dict[str, Image.Dither] = {
     "floyd-steinberg": Image.Dither.FLOYDSTEINBERG,
     "none": Image.Dither.NONE,
@@ -204,8 +234,6 @@ def quantize_to_png(
 
 
 # --- numpy-backed dither for the panel-bin packer ---------------------
-
-_PALETTE_E6_ARR: np.ndarray = np.array(WAVESHARE_E6_PALETTE, dtype=np.float32)
 
 
 def _nearest_palette_indices(pixels: np.ndarray, palette: np.ndarray) -> np.ndarray:
@@ -386,11 +414,18 @@ def pack_to_panel_bin(
     dither: DitherMode = "floyd-steinberg",
     saturation: float = 1.0,
     contrast: float = 1.0,
+    gamut: str = "waveshare_e6",
 ) -> bytes:
-    """Quantise against ``WAVESHARE_E6_PALETTE`` and pack to the panel's
-    native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes each,
-    scanline order, high nibble = even column (col 0, 2, …), low nibble =
-    odd column. Matches the firmware's ``epd_display`` SPI stream.
+    """Quantise against the selected ``gamut`` palette and pack to the
+    panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
+    each, scanline order, high nibble = even column (col 0, 2, …), low nibble
+    = odd column. Matches the firmware's ``epd_display`` SPI stream.
+
+    ``gamut`` selects the target palette + nibble LUT (see ``PANEL_GAMUTS``):
+    ``waveshare_e6`` (6 colours, the default — ESP32 firmware + Waveshare E6
+    Pi clients) or ``inky_7colour`` (7 colours incl. orange, indices matching
+    the Pimoroni inky library so a Pi client writes them straight to the
+    UC8159 buffer). An unknown value falls back to ``waveshare_e6``.
 
     ``width`` must be even. The image must already be at
     ``(width, height)`` — callers resize / orient first (the dashboard
@@ -418,6 +453,9 @@ def pack_to_panel_bin(
     if img.size != (width, height):
         raise ValueError(f"image must be {width}x{height}, got {img.size}")
 
+    palette, nibble_by_index = _GAMUT_TABLE.get(gamut, _GAMUT_TABLE["waveshare_e6"])
+    pal_arr = np.array(palette, dtype=np.float32)
+
     rgb = img.convert("RGB")
     # ImageEnhance is C-speed and idempotent at factor=1.0 (no-op fast path).
     if saturation != 1.0:
@@ -426,28 +464,29 @@ def pack_to_panel_bin(
         rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
 
     if dither in _PIL_DITHER_MAP:
-        pal_img = _palette_image(WAVESHARE_E6_PALETTE)
+        pal_img = _palette_image(palette)
         indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
         raw = indexed.tobytes()
     elif dither == "atkinson":
-        raw = _error_diffusion(rgb, _PALETTE_E6_ARR, _ATKINSON_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
     elif dither == "jarvis":
-        raw = _error_diffusion(rgb, _PALETTE_E6_ARR, _JJN_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
     elif dither == "stucki":
-        raw = _error_diffusion(rgb, _PALETTE_E6_ARR, _STUCKI_WEIGHTS)
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
     elif dither == "bayer-8x8":
-        raw = _dither_ordered(rgb, _PALETTE_E6_ARR, _BAYER_8X8)
+        raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
     elif dither == "halftone":
-        raw = _dither_ordered(rgb, _PALETTE_E6_ARR, _HALFTONE_16, strength=128.0)
+        raw = _dither_ordered(rgb, pal_arr, _HALFTONE_16, strength=128.0)
     elif dither == "crosshatch":
-        raw = _dither_ordered(rgb, _PALETTE_E6_ARR, _CROSSHATCH_8, strength=96.0)
+        raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
     else:
         raise ValueError(f"unknown dither mode: {dither!r}")
 
-    # palette index -> firmware nibble via bytes.translate (C-speed). 256-byte
-    # LUT; anything past our 6 entries falls through to 0x0 (safe black).
+    # palette index -> firmware/library nibble via bytes.translate (C-speed).
+    # 256-byte LUT; anything past the gamut's entries falls through to 0x0
+    # (safe black).
     lut = bytearray(256)
-    for i, nibble in enumerate(_E6_NIBBLE_BY_PALETTE_INDEX):
+    for i, nibble in enumerate(nibble_by_index):
         lut[i] = nibble
     nibbles = raw.translate(bytes(lut))
 

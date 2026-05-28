@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from app.device_loader import Device, DeviceRegistry, load_instance_file
+from app.quantizer import PANEL_GAMUTS
 from app.renderer_loader import RendererRegistry, clone_for_instances
 
 # Canonical instance-id rule, shared with the Settings routes. Lowercase,
@@ -140,13 +141,16 @@ def update_instance_panel(
     w: int,
     h: int,
     orientation: str,
+    gamut: str | None = None,
 ) -> InstanceResult:
     """Patch an instance's panel block on disk + reload in place.
 
     w/h are stored exactly as given (the edit form's JS already swaps
     them live when the aspect flips). ``orientation`` is one of the
     4-way display orientations; the ``_flipped`` part is a renderer-side
-    180° turn, the landscape/portrait part is the canvas aspect."""
+    180° turn, the landscape/portrait part is the canvas aspect.
+    ``gamut`` is the panel's colour gamut (see ``PANEL_GAMUTS``); the .bin
+    packer keys its palette off it. ``None`` leaves the existing value."""
     device = devices.get(instance_id)
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
@@ -163,6 +167,8 @@ def update_instance_panel(
         return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
     panel_block = dict(raw.get("panel") or {})
     panel_block["w"], panel_block["h"], panel_block["orientation"] = w, h, o
+    if gamut is not None:
+        panel_block["gamut"] = gamut if gamut in PANEL_GAMUTS else "waveshare_e6"
     raw["panel"] = panel_block
     inst_file.write_text(json.dumps(raw, indent=2) + "\n")
 

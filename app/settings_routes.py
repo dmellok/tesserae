@@ -764,6 +764,7 @@ def devices_update_panel(instance_id: str) -> Response:
         w=new_w,
         h=new_h,
         orientation=form.get("panel_orientation") or "landscape",
+        gamut=form.get("panel_gamut"),
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
@@ -1078,6 +1079,13 @@ def _build_sections() -> list[dict[str, Any]]:
                     **({"Instance of": str(device.kind_of)} if is_instance else {}),
                 },
                 "status": _status_view(device),
+                # The colour-gamut control only matters for the .bin Pi path
+                # (pi_bin packs server-side to a fixed palette). PNG clients
+                # project their own gamut on-device; the ESP32 firmware is
+                # always E6. Gate on the device's base renderer being pi_bin.
+                "gamut_capable": any(
+                    rid.split("__", 1)[0] == "pi_bin" for rid in device.renderer_ids
+                ),
                 "delete_endpoint": (
                     url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
                 ),

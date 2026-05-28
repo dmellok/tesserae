@@ -44,7 +44,7 @@ def env(tmp_path: Path):  # noqa: ANN201 — test fixture
     settings = SettingsStore(tmp_path / "settings.json")
     settings.update_section("app", {"panel_preset": "custom", "panel_w": 1024, "panel_h": 768})
 
-    def make(instance_id: str, orientation: str | None = None) -> None:
+    def make(instance_id: str, orientation: str | None = None, gamut: str | None = None) -> None:
         device_service.create_instance(
             devices=devices,
             renderers=renderers,
@@ -53,6 +53,19 @@ def env(tmp_path: Path):  # noqa: ANN201 — test fixture
             kind_id="esp32_client",
             orientation=orientation,
         )
+        if gamut is not None:
+            dev = devices.get(instance_id)
+            assert dev is not None and dev.panel is not None
+            device_service.update_instance_panel(
+                devices=devices,
+                renderers=renderers,
+                data_root=data_root,
+                instance_id=instance_id,
+                w=int(dev.panel["w"]),
+                h=int(dev.panel["h"]),
+                orientation=str(dev.panel.get("orientation", "landscape")),
+                gamut=gamut,
+            )
 
     return devices, settings, make
 
@@ -129,6 +142,39 @@ def test_first_bound_device_drives_single_panel_contexts(env) -> None:
     page = Page(id="p", name="P", device_ids=["esp32_tall"], cells=[])
     panel = resolve_panel_for_page(page, devices, settings)
     assert (panel.w, panel.h) == (480, 800)
+
+
+def test_push_groups_split_by_gamut(env) -> None:
+    """Two devices with identical dims but different colour gamuts must
+    render as separate push groups — each frame packs to its own palette."""
+    devices, settings, make = env
+    make("esp32_e6")  # default waveshare_e6
+    make("esp32_7c", gamut="inky_7colour")  # same 800x480, 7-colour
+
+    page = Page(id="p", name="P", device_ids=["esp32_e6", "esp32_7c"], cells=[])
+    groups = panel_groups_for_push(page, devices, settings)
+
+    by_gamut = {p.gamut: ids for p, ids in groups}
+    assert by_gamut["waveshare_e6"] == ["esp32_e6"]
+    assert by_gamut["inky_7colour"] == ["esp32_7c"]
+    assert len(groups) == 2
+
+
+def test_panel_gamut_defaults_and_surfaces(env) -> None:
+    """A device with no gamut set resolves to waveshare_e6; an explicit
+    gamut surfaces onto the resolved Panel."""
+    devices, settings, make = env
+    make("esp32_plain")
+    make("esp32_inky", gamut="inky_7colour")
+
+    plain = resolve_panel_for_page(
+        Page(id="a", name="A", device_ids=["esp32_plain"], cells=[]), devices, settings
+    )
+    inky = resolve_panel_for_page(
+        Page(id="b", name="B", device_ids=["esp32_inky"], cells=[]), devices, settings
+    )
+    assert plain.gamut == "waveshare_e6"
+    assert inky.gamut == "inky_7colour"
 
 
 def test_unknown_device_ids_are_skipped(env) -> None:

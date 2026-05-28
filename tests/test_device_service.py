@@ -180,6 +180,41 @@ def test_update_panel_stores_dims_verbatim(registries) -> None:
     assert saved["panel"]["w"] == 600
 
 
+def test_update_panel_persists_gamut_and_clamps_unknown(registries) -> None:
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="bin_57", kind_id="pi_bin_client",
+    )
+    ok = device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="inky_7colour",
+    )
+    assert ok.ok and ok.device is not None
+    assert ok.device.panel["gamut"] == "inky_7colour"
+    # Persisted to disk.
+    saved = json.loads((data_root / "bin_57.json").read_text())
+    assert saved["panel"]["gamut"] == "inky_7colour"
+    # An unknown gamut clamps back to the safe E6 default.
+    clamped = device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="bogus",
+    )
+    assert clamped.ok and clamped.device is not None
+    assert clamped.device.panel["gamut"] == "waveshare_e6"
+    # Omitting gamut leaves the stored value untouched.
+    device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="bin_57", w=600, h=448, orientation="landscape", gamut="inky_7colour",
+    )
+    kept = device_service.update_instance_panel(
+        devices=devices, renderers=renderers, data_root=data_root,
+        instance_id="bin_57", w=640, h=400, orientation="landscape",
+    )
+    assert kept.ok and kept.device is not None
+    assert kept.device.panel["gamut"] == "inky_7colour"
+
+
 def test_delete_instance_refuses_kind(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.delete_instance(

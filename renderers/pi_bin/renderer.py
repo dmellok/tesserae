@@ -67,6 +67,10 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         dither=_setting(settings, "dither"),
         saturation=float(_setting(settings, "saturation")),
         contrast=float(_setting(settings, "contrast")),
+        # Gamut is a per-device panel attribute (a 7-colour Inky vs a
+        # Waveshare E6 differ in palette + index order), threaded through
+        # the Panel so one shared renderer serves both.
+        gamut=panel.gamut,
     )
 
 

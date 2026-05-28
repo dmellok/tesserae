@@ -196,6 +196,13 @@
         {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
         {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
       </div>
+      {% if section.gamut_capable %}
+      {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
+          value=section.panel.get('gamut', 'waveshare_e6'),
+          options=[{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
+                   {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
+          help='Match the physical panel. The .bin frame quantises to this palette; pick 7-colour for the older ACeP Inky Impression (e.g. 5.7") so orange renders and colours map correctly.') }}
+      {% endif %}
       <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
     </form>
   </div>

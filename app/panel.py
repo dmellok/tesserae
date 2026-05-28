@@ -92,6 +92,7 @@ def _device_panel(device: Device) -> Panel | None:
         w=int(block["w"]),
         h=int(block["h"]),
         flip=is_flipped_orientation(block.get("orientation")),
+        gamut=str(block.get("gamut") or "waveshare_e6"),
     )
 
 
@@ -140,9 +141,12 @@ def panel_groups_for_push(
     panels = _selected_device_panels(page, devices)
     if not panels:
         return [(resolve_page_panel(page.panel, settings), [])]
-    groups: dict[tuple[int, int, bool], tuple[Panel, list[str]]] = {}
+    # Key includes gamut: two same-size panels that pack to different
+    # palettes (E6 vs 7-colour Inky) must render as separate groups so each
+    # group's Panel carries the gamut its renderers will pack against.
+    groups: dict[tuple[int, int, bool, str], tuple[Panel, list[str]]] = {}
     for device, panel in panels:
-        key = (panel.w, panel.h, panel.flip)
+        key = (panel.w, panel.h, panel.flip, panel.gamut)
         if key not in groups:
             groups[key] = (panel, [])
         groups[key][1].append(device.id)

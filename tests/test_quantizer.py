@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 
 from app.quantizer import (
+    INKY_7COLOUR_PALETTE,
     WAVESHARE_E6_PALETTE,
     apply_underscan,
     fit_to_panel,
@@ -64,6 +65,35 @@ def test_pack_red_panel_maps_to_palette_red_nibble(red_panel: Image.Image) -> No
 def test_pack_dispatches_every_dither_mode(red_panel: Image.Image, dither: str) -> None:
     packed = pack_to_panel_bin(red_panel, width=100, height=80, dither=dither)
     assert len(packed) == 100 * 80 // 2
+
+
+def test_pack_inky_7colour_orange_maps_to_nibble_six() -> None:
+    # Orange exists only in the 7-colour gamut; it's palette index 6 and the
+    # LUT is identity, so a pure-orange panel packs to 0x66 bytes. On the E6
+    # gamut the same orange would snap to a different (6-colour) entry.
+    orange = Image.new("RGB", (100, 80), (255, 140, 0))
+    packed = pack_to_panel_bin(orange, width=100, height=80, dither="none", gamut="inky_7colour")
+    assert all(b == 0x66 for b in packed)
+    assert INKY_7COLOUR_PALETTE[6] == (255, 140, 0)
+
+
+def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:
+    # Red is index 3 on E6 (nibble 0x3) but index 4 on the 7-colour gamut
+    # (identity LUT -> nibble 0x4): the index spaces genuinely differ.
+    red = Image.new("RGB", (100, 80), (255, 0, 0))
+    e6 = pack_to_panel_bin(red, width=100, height=80, dither="none")
+    inky = pack_to_panel_bin(red, width=100, height=80, dither="none", gamut="inky_7colour")
+    assert all(b == 0x33 for b in e6)
+    assert all(b == 0x44 for b in inky)
+    assert INKY_7COLOUR_PALETTE[4] == (255, 0, 0)
+
+
+def test_pack_unknown_gamut_falls_back_to_e6(red_panel: Image.Image) -> None:
+    default = pack_to_panel_bin(red_panel, width=100, height=80, dither="none")
+    unknown = pack_to_panel_bin(
+        red_panel, width=100, height=80, dither="none", gamut="not-a-gamut"
+    )
+    assert unknown == default
 
 
 def test_pack_unknown_dither_raises(red_panel: Image.Image) -> None:

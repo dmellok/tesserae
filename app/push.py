@@ -542,6 +542,7 @@ class PushManager:
                     "w": int(block["w"]),
                     "h": int(block["h"]),
                     "flip": is_flipped_orientation(block.get("orientation")),
+                    "gamut": str(block.get("gamut") or "waveshare_e6"),
                 }
         panel = resolve_settings_panel(self._settings)
         return {"w": panel.w, "h": panel.h}
