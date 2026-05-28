@@ -182,55 +182,64 @@
   {# Panel edit — display orientation + dims for a registered instance.
      The JS below swaps w/h live when the aspect (landscape↔portrait)
      changes so the form is WYSIWYG; the backend persists what's shown. #}
-  <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
-    {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
-        value=section.panel.get('orientation', 'landscape'),
-        options=[{'value':'landscape','label':'0°'},
-                 {'value':'portrait','label':'90°'},
-                 {'value':'landscape_flipped','label':'180°'},
-                 {'value':'portrait_flipped','label':'270°'}],
-        help='Clockwise turn to match the mount. 0° = native (wide); 90°/270° render tall; 180° is upside-down. The preview stays upright.') }}
-    <div class="field-grid">
-      {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
-      {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
-    </div>
-    <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
-  </form>
-  {% endif %}
-
-  {% if section.calibrate_endpoint %}
-  {# Orientation calibration: send a numbered test card to the panel,
-     then map the reported top-left number to the right orientation. #}
-  <div class="calibrate-block">
-    {% if calibrating == section.device_id %}
-    <p class="field-help calibrate-prompt">
-      A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
-      <strong>which number is in the top-left corner?</strong>
-    </p>
-    <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
-      <div class="calibrate-choices">
-        {% for n in [1, 2, 3, 4] %}
-        <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
-        {% endfor %}
+  <div class="device-subsection">
+    <p class="device-subhead">Panel &amp; orientation</p>
+    <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
+      {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
+          value=section.panel.get('orientation', 'landscape'),
+          options=[{'value':'landscape','label':'0°'},
+                   {'value':'portrait','label':'90°'},
+                   {'value':'landscape_flipped','label':'180°'},
+                   {'value':'portrait_flipped','label':'270°'}],
+          help='Clockwise turn to match the mount. 0° = native (wide); 90°/270° render tall; 180° is upside-down. The preview stays upright.') }}
+      <div class="field-grid">
+        {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
+        {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
       </div>
-      <p class="field-help">Blank or not showing? Re-send below.</p>
+      <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
     </form>
-    <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-      <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
-    </form>
-    {% else %}
-    <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-      <div class="actions">{{ button('Calibrate orientation', icon='compass', variant='ghost') }}</div>
-    </form>
-    {% endif %}
   </div>
   {% endif %}
 
-  {% if section.delete_endpoint %}
-  <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline-delete"
-        onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the virtual panel.');">
-    <div class="actions">{{ button('Delete device', icon='trash', variant='danger') }}</div>
-  </form>
+  {# Footer toolbar — secondary + destructive actions on one row,
+     separated from the editable sections above by a divider. #}
+  {% if section.calibrate_endpoint or section.delete_endpoint %}
+  <div class="device-footer">
+    {% if section.calibrate_endpoint %}
+    {# Orientation calibration: send a numbered test card to the panel,
+       then map the reported top-left number to the right orientation. #}
+    <div class="calibrate-block">
+      {% if calibrating == section.device_id %}
+      <p class="field-help calibrate-prompt">
+        A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
+        <strong>which number is in the top-left corner?</strong>
+      </p>
+      <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+        <div class="calibrate-choices">
+          {% for n in [1, 2, 3, 4] %}
+          <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+          {% endfor %}
+        </div>
+        <p class="field-help">Blank or not showing? Re-send below.</p>
+      </form>
+      <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+        <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
+      </form>
+      {% else %}
+      <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+        <div class="actions">{{ button('Calibrate orientation', icon='compass', variant='ghost') }}</div>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if section.delete_endpoint %}
+    <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline-delete"
+          onsubmit="return confirm('Delete this device? Its renderers stop publishing and pages assigned to it will fall back to the virtual panel.');">
+      <div class="actions">{{ button('Delete device', icon='trash', variant='danger') }}</div>
+    </form>
+    {% endif %}
+  </div>
   {% endif %}
 </section>
 {% endfor %}

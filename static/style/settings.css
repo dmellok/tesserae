@@ -91,3 +91,51 @@
   font-variant-numeric: tabular-nums;
 }
 
+
+/* ----- Device card: grouped sections -------------------------------
+   The device card stacks distinct blocks — heartbeat status, an
+   editable "Panel & orientation" group, and a footer toolbar of
+   secondary/destructive actions. Divider lines + a small section
+   label keep the groups legible instead of one long form. */
+
+.device-subsection {
+  margin-top: var(--t-space-4);
+  padding-top: var(--t-space-4);
+  border-top: 1px solid var(--t-border);
+}
+
+.device-subhead {
+  margin: 0 0 var(--t-space-3);
+  font-size: var(--t-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+}
+
+/* Calibrate (left) + Delete (right) on one row, divided from the
+   sections above. Wraps to a column on narrow screens. */
+.device-footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  flex-wrap: wrap;
+  margin-top: var(--t-space-4);
+  padding-top: var(--t-space-4);
+  border-top: 1px solid var(--t-border);
+}
+.device-footer .calibrate-block,
+.device-footer .form--inline-delete { margin: 0; }
+/* Calibrate grows to fill the row; its button sits left (the shared
+   .actions rule right-aligns by default). Delete stays hard right. */
+.device-footer .calibrate-block { flex: 1 1 auto; }
+.device-footer .calibrate-block .actions { justify-content: flex-start; }
+.device-footer .form--inline-delete { flex: 0 0 auto; }
+.device-footer .actions { margin: 0; }
+
+@media (max-width: 540px) {
+  .device-footer { flex-direction: column; align-items: stretch; }
+  .device-footer .form--inline-delete .actions { justify-content: flex-start; }
+}
+
