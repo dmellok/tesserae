@@ -13,32 +13,19 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 
 ## Status
 
-In active development. Tracked by milestone:
+A working hobbyist build. The pipeline (composer → renderers →
+transport → devices), the scheduler, Home Assistant discovery, the
+theme builder, the form-driven page editor, and the modern admin UI are
+all in.
 
-| # | Milestone | Status |
-|---|---|---|
-| 1 | Scaffold + plugin loader + composer + clock widget + smoke test | done |
-| 2 | Renderer loader + `pi_png` + `MqttTransport` + push pipeline | done |
-| 3 | `/settings` page generated from manifests + auth gate | done |
-| 4 | `pi_bin` + `esp32_bin` renderers | done |
-| 5 | Device layer (`pi_client` + `esp32_client`) | done |
-| 6 | Scheduler | done |
-| 7 | Send page | done |
-| 8 | Generalise event log (renderer / device / scheduler events) | done |
-| 9 | Home Assistant MQTT discovery | done |
-| 10 | ~~Port bedrock widgets (year_progress, sun_moon, weather, todo, calendar)~~ — dropped, rebuilding fresh | superseded |
-| 11 | Settings split into Server / Renderers / Devices / Plugins sub-pages | done |
-| 12 | Polish: timezone, test-broker, test-push, live SSE event stream | done |
-| 13 | Theme builder + curated v4 theme subset | done |
-| 14 | Form-driven page editor (CRUD pages + cells + live preview iframe) | done |
-| 15 | Editor redesign — pre-selectable layouts, auto-save, click-to-edit preview | done |
-| 16 | Reusable form components, sliders/switches, hidden IDs, panel-from-settings | done |
-| 17 | `/` redirects to `/send`; reorder nav; Plugins dropdown for admin pages | done |
-| 18 | Modern UI overhaul + locally vendored Phosphor icon set | done |
+**Multi-head is first-class.** Register multiple physical panels as
+device instances, each with its own MQTT topics and panel size; bind a
+dashboard to a specific display; auto-discover clients that announce
+themselves on the broker; and calibrate a panel's orientation from a
+numbered test card. See [Setting up a device](#setting-up-a-device).
 
-Server, renderers, devices, scheduler, HA discovery, settings, theme builder,
-page editor, and the modern UI are all in. Tests + ruff + mypy --strict (on
-contract modules) clean. CI runs ruff / pytest / mypy on every push (see
+Tests + ruff + mypy --strict (on contract modules) clean. CI runs
+ruff / pytest / mypy on every push (see
 [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 The widget catalogue now spans weather, F1, calendar, news, finance, GitHub,
@@ -73,11 +60,16 @@ below for an upfront read on which ones depend on undocumented upstreams.
 │                            ▼                                        │
 │                  Broker                                             │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Devices        Devices (drop-a-folder)                             │
-│                    ├─ pi_client    (subscribes tesserae/pi/status)  │
-│                    └─ esp32_client (subs status, pub/sub config)    │
+│  Devices        Device kinds (drop-a-folder) + user instances      │
+│                    ├─ pi_bin_client  (tesserae/pi_bin/status)       │
+│                    ├─ pi_png_client  (tesserae/pi_png/status)       │
+│                    └─ esp32_client   (status + pub/sub config)      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+A **kind** is a built-in device template; each physical panel you
+register is an **instance** of a kind with its own id, topics, and panel
+size (multi-head). Instances are created in Settings → Devices.
 
 Four layers, one direction of flow. Each layer only knows the boxes directly
 adjacent. **One canonical internal orientation: composition** (panel's mounted
@@ -86,25 +78,37 @@ field — no orientation muddle.
 
 ## MQTT topic scheme
 
-Grammar: `tesserae/<device-type>/<channel>[/<format>]`
+Grammar: `tesserae/<device-id>/<channel>[/<format>]`
+
+`<device-id>` is the device's topic prefix. Built-in kinds default to
+`pi_bin`, `pi_png`, and `esp32`; user-registered instances use their own
+id (e.g. `pi_kitchen`, `esp32_hallway`). The table below shows the
+default prefixes.
 
 | Topic | Payload | Retain | Direction |
 |---|---|---|---|
-| `tesserae/pi/frame/png` | `{url, rotate, scale, bg, saturation}` | no | publish |
-| `tesserae/pi/frame/bin` | `{url}` | no | publish |
-| `tesserae/pi/status` | `{...heartbeat...}` | yes | subscribe |
+| `tesserae/pi_png/frame/png` | `{url, rotate, scale, bg, saturation}` | no | publish |
+| `tesserae/pi_bin/frame/bin` | `{url}` | no | publish |
+| `tesserae/pi_bin/status`, `tesserae/pi_png/status` | `{state, kind, panel_w, panel_h, fw_version, …}` | yes | subscribe |
 | `tesserae/esp32/frame/bin` | `{url}` | yes | publish |
-| `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip}` | yes | subscribe |
+| `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip, kind, panel_w, panel_h, fw_version}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
+| `tesserae/+/status` | (wildcard) — any unregistered id is surfaced for one-click registration in Settings → Devices | — | subscribe |
+
+The `kind` / `panel_w` / `panel_h` / `fw_version` keys in a heartbeat are
+the discovery hint: a client that includes them gets pre-filled in the
+Discovered strip so registering it is one click.
 
 ## Clients
 
 The server publishes; something downstream paints the panel. Three reference
-clients live in their own repos — pick whichever matches your hardware.
+clients live in their own repos — pick whichever matches your hardware. Each
+takes a `device_id` (the topic prefix; defaults shown below) and announces
+itself on `tesserae/<device_id>/status` so the server can auto-discover it.
 
 **[tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client)**
-pairs with the `pi_png` renderer. A Pi-side Python daemon that subscribes to
-`tesserae/pi/frame/png` and hands incoming PNGs to
+pairs with the `pi_png` renderer (default id `pi_png`). A Pi-side Python daemon
+that subscribes to `tesserae/<device_id>/frame/png` and hands incoming PNGs to
 [`inky`](https://github.com/pimoroni/inky)'s high-level `set_image()`, so it
 works on every panel the inky lib supports — pHAT, wHAT, Impression 4"/5.7"/
 7.3"/13.3", 2/3/6/7 colour. Quantising on the Pi every frame makes it the
@@ -112,19 +116,22 @@ slower of the two Pi paths, but it stays wire-compatible with the inky-dash
 v3/v4 listener protocol.
 
 **[tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client)**
-pairs with the `pi_bin` renderer. Same Pi-side daemon shape, but it subscribes
-to `tesserae/pi/frame/bin` and writes the server's already-packed 4-bpp buffer
+pairs with the `pi_bin` renderer (default id `pi_bin`). Same Pi-side daemon
+shape, but it subscribes to `tesserae/<device_id>/frame/bin` and writes the
+server's already-packed 4-bpp buffer
 straight into inky's internal `_buf` — no PIL on the Pi paint path. The result
 is the fastest path on a Pimoroni Inky Impression (Spectra 6 / Waveshare E6,
 any of the four sizes — auto-detected via the HAT EEPROM). The trade is a
 private-API dependency: the `inky` version is pinned exactly.
 
 **[tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client)**
-pairs with the `esp32_bin` renderer. Battery-powered ESP32-S3-WROOM-2 firmware
-for the Waveshare 13.3" Spectra 6 panel: deep-sleeps between wakes, subscribes
-to the retained `tesserae/esp32/frame/bin` topic, and skips the download when
-the URL hash hasn't changed. Months of battery life from a single Li-Po;
-refresh cadence is set by `sleep_interval_s` on `tesserae/esp32/config`.
+pairs with the `esp32_bin` renderer (default id `esp32`). Battery-powered
+ESP32-S3-WROOM-2 firmware for the Waveshare 13.3" Spectra 6 panel: deep-sleeps
+between wakes, subscribes to the retained `tesserae/<device_id>/frame/bin`
+topic, and skips the download when the URL hash hasn't changed. Months of
+battery life from a single Li-Po; refresh cadence is set by `sleep_interval_s`
+on `tesserae/<device_id>/config`. Device id + Wi-Fi are set through a captive
+portal (also reachable on the LAN afterward via `tesserae-<id>.local`).
 
 ## Install
 
@@ -208,6 +215,29 @@ Run the test suite:
 The renderer + transport + push pipeline + auth + settings flow are all
 covered with no broker or Chromium dependency.
 
+## Setting up a device
+
+Once the server is running and pointed at your MQTT broker
+(Settings → Server → MQTT broker):
+
+1. **Flash a client** for your hardware (see [Clients](#clients)). On
+   first run it publishes a heartbeat on `tesserae/<device-id>/status`.
+2. **Settings → Devices → Discovered.** A client that announced itself
+   shows up here with its kind and panel size pre-filled — click
+   **Register** to turn it into a device instance. (No heartbeat yet?
+   Use **Add device** to create one by hand.)
+3. **Calibrate orientation.** Hit **Calibrate** to push a numbered test
+   card to the panel, then tell it which number landed in the top-left
+   corner; it sets the rotation that makes your dashboard read upright.
+   The **Rotation** dropdown (0 / 90 / 180 / 270°) is there for manual
+   tweaks.
+4. **Bind a dashboard.** In the page editor, set **Target device** so a
+   dashboard sizes to that panel and pushes only to its renderers. Leave
+   it on *(any)* to fan out to every renderer at the virtual-panel size.
+
+Running more than one panel? Repeat with a distinct `device-id` per
+client — each gets its own topics, panel size, and orientation.
+
 ## Widget stability tiers
 
 Every widget that hits the network depends on an upstream — and not every
@@ -284,8 +314,8 @@ serve stale data.
 ```
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
-  plugins/<id>/    widget + theme plugins (drop-a-folder). Currently only
-                   themes_core ships bundled; widgets are being rebuilt.
+  plugins/<id>/    widget / theme / font / data / admin plugins
+                   (drop-a-folder) — ~40 widgets ship bundled
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
