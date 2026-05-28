@@ -133,6 +133,42 @@ def _find_list(data: dict[str, Any], list_id: str) -> dict[str, Any] | None:
     return None
 
 
+def _index_context(selected_id: str | None) -> dict[str, Any]:
+    """Context for the single-page admin: every list (as a tab) plus the
+    selected list's items, split into active + recently-done. Selecting
+    nothing defaults to the first list."""
+    data = _load()
+    lists = data.get("lists", [])
+    tabs = [
+        {
+            "id": lst["id"],
+            "name": lst.get("name") or lst["id"],
+            "active": sum(1 for it in (lst.get("items") or []) if not it.get("completed_at")),
+        }
+        for lst in lists
+    ]
+    if selected_id is None and lists:
+        selected_id = lists[0]["id"]
+    lst = _find_list(data, selected_id) if selected_id else None
+    selected: dict[str, Any] | None = None
+    if lst is not None:
+        items = sorted(
+            lst.get("items") or [],
+            key=lambda it: (
+                bool(it.get("completed_at")),
+                it.get("completed_at") or "",
+                it.get("created_at") or "",
+            ),
+        )
+        selected = {
+            "id": lst["id"],
+            "name": lst.get("name") or lst["id"],
+            "active": [it for it in items if not it.get("completed_at")],
+            "done": [it for it in items if it.get("completed_at")],
+        }
+    return {"lists": tabs, "selected": selected, "prune_hours": PRUNE_AFTER_HOURS}
+
+
 # ----- widget API -----------------------------------------------------
 
 
@@ -210,23 +246,9 @@ def blueprint() -> Blueprint:
 
     @bp.get("/")
     def index() -> str:
-        data = _load()
-        lists = data.get("lists", [])
-        # Annotate each list with quick counts so the index shows
-        # "5 active · 2 done" style summaries.
-        summarised = []
-        for lst in lists:
-            items = lst.get("items") or []
-            done = sum(1 for it in items if it.get("completed_at"))
-            summarised.append(
-                {
-                    "id": lst["id"],
-                    "name": lst.get("name") or lst["id"],
-                    "active": len(items) - done,
-                    "completed": done,
-                }
-            )
-        return render_template("todo/index.html", lists=summarised)
+        # Single page: ?list=<id> picks the active tab (defaults to the
+        # first list).
+        return render_template("todo/index.html", **_index_context(request.args.get("list")))
 
     @bp.post("/lists")
     def create_list() -> Response:
@@ -250,27 +272,22 @@ def blueprint() -> Blueprint:
 
     @bp.get("/lists/<list_id>")
     def show_list(list_id: str) -> str:
+        # Same single page, with this list pre-selected. Item mutations
+        # redirect here so the user stays on the list they're editing.
+        return render_template("todo/index.html", **_index_context(list_id))
+
+    @bp.post("/lists/<list_id>/rename")
+    def rename_list(list_id: str) -> Response:
+        name = (request.form.get("name") or "").strip()
         data = _load()
         lst = _find_list(data, list_id)
         if lst is None:
             abort(404)
-        items = list(lst.get("items") or [])
-        items.sort(
-            key=lambda it: (
-                bool(it.get("completed_at")),
-                it.get("completed_at") or "",
-                it.get("created_at") or "",
-            )
-        )
-        active = [it for it in items if not it.get("completed_at")]
-        done = [it for it in items if it.get("completed_at")]
-        return render_template(
-            "todo/list.html",
-            list=lst,
-            active=active,
-            done=done,
-            prune_hours=PRUNE_AFTER_HOURS,
-        )
+        if name:
+            lst["name"] = name
+            _save(data)
+            flash(f"Renamed to '{name}'.", "ok")
+        return redirect(url_for("todo_admin.show_list", list_id=list_id))
 
     @bp.post("/lists/<list_id>/items")
     def add_item(list_id: str) -> Response:

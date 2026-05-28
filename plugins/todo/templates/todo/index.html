@@ -1,75 +1,240 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button, empty_state %}
-{% block title %}Todo Lists — Tesserae{% endblock %}
+{% block title %}Todo — Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-list-checks" aria-hidden="true"></i> Todo</h1>
-  <p class="page-blurb">Persistent lists for the dashboard. Completed items auto-prune after 24 hours.</p>
 </div>
 
-<section class="card">
-  {{ card_head('New list', icon_name='plus-circle', level=2,
-               blurb='Give it a short name — you’ll pick it from the cell editor when adding the widget to a dashboard.') }}
-  <form method="post" action="{{ url_for('todo_admin.create_list') }}" class="form">
-    <div class="field-row">
-      <div class="field" style="flex:1;">
-        <label for="new-list-name">List name</label>
-        <input type="text" id="new-list-name" name="name" placeholder="Groceries" required autofocus>
-      </div>
-      <div class="actions" style="align-self:end;">
-        {{ button('Create', icon='plus') }}
-      </div>
-    </div>
+{# List tabs — one chip per list, plus an inline "new list" field. #}
+<div class="td-tabs">
+  {% for l in lists %}
+  <a class="td-tab {% if selected and l.id == selected.id %}is-active{% endif %}"
+     href="{{ url_for('todo_admin.show_list', list_id=l.id) }}">
+    <span>{{ l.name }}</span><span class="td-tab-count">{{ l.active }}</span>
+  </a>
+  {% endfor %}
+  <form method="post" action="{{ url_for('todo_admin.create_list') }}" class="td-newlist">
+    <input type="text" name="name" placeholder="New list…" aria-label="New list name" required>
+    <button type="submit" class="td-btn"><i class="ph ph-plus" aria-hidden="true"></i> Add list</button>
   </form>
-</section>
+</div>
 
-<section class="card">
-  {{ card_head('Your lists', icon_name='list-bullets', level=2) }}
-  {% if lists %}
-  <ul class="td-lists">
-    {% for lst in lists %}
-    <li class="td-list-row">
-      <a class="td-list-link" href="{{ url_for('todo_admin.show_list', list_id=lst.id) }}">
-        <i class="ph-bold ph-list-checks td-list-icon" aria-hidden="true"></i>
-        <span class="td-list-name">{{ lst.name }}</span>
-        <span class="td-list-counts">
-          <span class="td-count td-count--active"><i class="ph ph-circle" aria-hidden="true"></i>{{ lst.active }} active</span>
-          <span class="td-count td-count--done"><i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>{{ lst.completed }} done</span>
-        </span>
-        <i class="ph ph-caret-right td-list-caret" aria-hidden="true"></i>
-      </a>
-    </li>
-    {% endfor %}
-  </ul>
-  {% else %}
-  {{ empty_state('list-checks', 'No lists yet',
-                 blurb='Create your first list above. Then add the Todo widget to a dashboard cell and choose this list from the cell editor.') }}
-  {% endif %}
-</section>
+{% if selected %}
+<div class="td-list-head">
+  <h2 class="td-list-title">{{ selected.name }}</h2>
+  <div class="td-list-actions">
+    <button type="button" class="td-btn" data-td-rename-toggle>
+      <i class="ph ph-pencil-simple" aria-hidden="true"></i> Rename
+    </button>
+    <form method="post" action="{{ url_for('todo_admin.delete_list', list_id=selected.id) }}"
+          onsubmit="return confirm('Delete “{{ selected.name }}” and all its items?');">
+      <button type="submit" class="td-btn td-btn-danger">
+        <i class="ph ph-trash" aria-hidden="true"></i> Delete list
+      </button>
+    </form>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('todo_admin.rename_list', list_id=selected.id) }}"
+      class="td-rename-form" data-td-rename-form hidden>
+  <input type="text" name="name" value="{{ selected.name }}" aria-label="List name" required>
+  <button type="submit" class="primary">Save</button>
+  <button type="button" class="td-btn" data-td-rename-cancel>Cancel</button>
+</form>
+
+<form method="post" action="{{ url_for('todo_admin.add_item', list_id=selected.id) }}" class="td-additem">
+  <input type="text" name="text" placeholder="What needs doing?" aria-label="New item" required autofocus>
+  <button type="submit" class="primary"><i class="ph ph-plus" aria-hidden="true"></i> Add</button>
+</form>
+
+{% if selected.active or selected.done %}
+<ul class="td-items">
+  {% for it in selected.active %}
+  <li class="td-item">
+    <span class="td-text">{{ it.text }}</span>
+    <form method="post" action="{{ url_for('todo_admin.delete_item', list_id=selected.id, item_id=it.id) }}" class="td-inline">
+      <button type="submit" class="td-del" aria-label="Delete item" title="Delete">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('todo_admin.toggle_item', list_id=selected.id, item_id=it.id) }}" class="td-inline">
+      <button type="submit" class="td-btn"><i class="ph ph-check" aria-hidden="true"></i> Done</button>
+    </form>
+  </li>
+  {% endfor %}
+  {% for it in selected.done %}
+  <li class="td-item td-item--done">
+    <span class="td-text">{{ it.text }}</span>
+    <form method="post" action="{{ url_for('todo_admin.delete_item', list_id=selected.id, item_id=it.id) }}" class="td-inline">
+      <button type="submit" class="td-del" aria-label="Delete item" title="Delete">
+        <i class="ph ph-x" aria-hidden="true"></i>
+      </button>
+    </form>
+    <form method="post" action="{{ url_for('todo_admin.toggle_item', list_id=selected.id, item_id=it.id) }}" class="td-inline">
+      <button type="submit" class="td-btn"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i> Undo</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="td-empty">Nothing here yet — add something above.</p>
+{% endif %}
+
+<p class="td-foot">Completed items linger for {{ prune_hours }} hours, then prune themselves.</p>
+{% else %}
+<p class="td-empty">No lists yet — name one above and hit Add list.</p>
+{% endif %}
 
 <style>
-  .td-lists { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
-  .td-list-row { margin: 0; }
-  .td-list-link {
-    display: grid;
-    grid-template-columns: auto 1fr auto auto;
+  /* ----- tabs ----- */
+  .td-tabs {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    padding: 12px 14px;
-    border: 1px solid var(--t-border);
-    border-radius: 6px;
-    text-decoration: none;
-    color: var(--t-fg);
-    background: var(--t-surface);
-    transition: background 120ms ease, border-color 120ms ease;
+    gap: 10px;
+    margin: 0 0 var(--t-space-5);
+    padding-bottom: var(--t-space-5);
+    border-bottom: 1px solid var(--t-border);
   }
-  .td-list-link:hover { background: var(--t-surface-hover); border-color: var(--t-border-strong); }
-  .td-list-icon { font-size: 20px; color: var(--t-accent); }
-  .td-list-name { font-weight: 700; font-size: 15px; }
-  .td-list-counts { display: flex; gap: 12px; font-size: 12px; color: var(--t-fg-soft); }
-  .td-count { display: inline-flex; gap: 4px; align-items: center; }
-  .td-count--done { opacity: 0.7; }
-  .td-list-caret { color: var(--t-fg-soft); }
+  .td-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--t-border);
+    background: var(--t-surface);
+    color: var(--t-fg);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .td-tab:hover { border-color: var(--t-border-strong); }
+  .td-tab.is-active {
+    border-color: var(--t-accent);
+    color: var(--t-accent);
+    background: color-mix(in oklab, var(--t-accent) 12%, transparent);
+  }
+  .td-tab-count { font-size: 12px; color: var(--t-fg-soft); font-variant-numeric: tabular-nums; }
+  .td-tab.is-active .td-tab-count { color: var(--t-accent); }
+  .td-newlist { display: flex; gap: 8px; }
+
+  /* ----- shared inputs + buttons ----- */
+  .td-tabs input[type="text"],
+  .td-additem input[type="text"],
+  .td-rename-form input[type="text"] {
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-sm);
+    background: var(--t-surface-soft);
+    padding: 10px 14px;
+    font: inherit;
+    color: var(--t-fg);
+  }
+  .td-tabs input:focus,
+  .td-additem input:focus,
+  .td-rename-form input:focus {
+    outline: none;
+    border-color: var(--t-accent);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--t-accent) 20%, transparent);
+  }
+  .td-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-sm);
+    background: var(--t-surface);
+    color: var(--t-fg-soft);
+    font: inherit;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .td-btn:hover { border-color: var(--t-accent); color: var(--t-accent); }
+  .td-btn-danger:hover {
+    border-color: var(--t-danger);
+    color: var(--t-danger);
+    background: color-mix(in oklab, var(--t-danger) 8%, transparent);
+  }
+
+  /* ----- selected list head + rename ----- */
+  .td-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: var(--t-space-3);
+  }
+  .td-list-title { margin: 0; font-size: 22px; font-weight: 700; }
+  .td-list-actions { display: flex; gap: 8px; align-items: center; }
+  .td-rename-form { display: flex; gap: 8px; margin-bottom: var(--t-space-3); }
+  .td-rename-form input { flex: 1; min-width: 0; max-width: 420px; }
+
+  /* ----- add item ----- */
+  .td-additem { display: flex; gap: 12px; margin-bottom: var(--t-space-4); }
+  .td-additem input { flex: 1; min-width: 0; }
+
+  /* ----- items ----- */
+  .td-items {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-md);
+    overflow: hidden;
+    background: var(--t-surface);
+  }
+  .td-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--t-border);
+  }
+  .td-item:last-child { border-bottom: 0; }
+  .td-text { flex: 1; min-width: 0; font-size: 15px; word-break: break-word; }
+  .td-item--done .td-text { text-decoration: line-through; color: var(--t-fg-soft); }
+  .td-inline { margin: 0; }
+  /* per-item delete: subtle, hover-revealed so the row stays clean */
+  .td-del {
+    border: 0;
+    background: none;
+    color: var(--t-fg-soft);
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    padding: 6px;
+    border-radius: var(--t-radius-sm);
+    opacity: 0;
+    transition: opacity 120ms ease, color 120ms ease;
+  }
+  .td-item:hover .td-del { opacity: 0.6; }
+  .td-del:hover { opacity: 1; color: var(--t-danger); }
+
+  .td-empty { color: var(--t-fg-soft); font-size: 14px; padding: 8px 2px; }
+  .td-foot {
+    margin: var(--t-space-4) 0 0;
+    font-size: 12px;
+    color: var(--t-muted);
+    text-align: center;
+  }
 </style>
+
+<script>
+  (function () {
+    const toggle = document.querySelector("[data-td-rename-toggle]");
+    const form = document.querySelector("[data-td-rename-form]");
+    const cancel = document.querySelector("[data-td-rename-cancel]");
+    if (!toggle || !form) return;
+    toggle.addEventListener("click", () => {
+      form.hidden = !form.hidden;
+      if (!form.hidden) form.querySelector("input").focus();
+    });
+    cancel?.addEventListener("click", () => { form.hidden = true; });
+  })();
+</script>
 {% endblock %}
