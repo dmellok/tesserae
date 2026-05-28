@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core themes",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "kind": "theme",
   "description": "Curated theme set. Each theme picks three coherent decorative tokens — accent / accent2 / accent3 — that the widgets paint with for colour-blocked layouts. warn / danger / ok stay reserved for actual semantic states (errors, warnings, success badges) and never appear in regular UI. User themes save under data/plugins/themes_core/user.json.",
   "supports": {
@@ -195,6 +195,69 @@
         "danger": "#f87171",
         "warn": "#facc15",
         "ok": "#4ade80"
+      }
+    },
+    {
+      "id": "ramen",
+      "name": "Ramen",
+      "mode": "light",
+      "palette": {
+        "bg": "#fafaed",
+        "surface": "#fafaed",
+        "surface2": "#dbd2d0",
+        "fg": "#141313",
+        "fgSoft": "#fafaed",
+        "muted": "#fafaed",
+        "accent": "#d66a76",
+        "accent2": "#557f91",
+        "accent3": "#a0876c",
+        "accentSoft": "#f1d6cf",
+        "divider": "#fafaed",
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
+      }
+    },
+    {
+      "id": "embers",
+      "name": "Embers",
+      "mode": "light",
+      "palette": {
+        "bg": "#fcfef4",
+        "surface": "#f8faf0",
+        "surface2": "#e8eae0",
+        "fg": "#303331",
+        "fgSoft": "#777a75",
+        "muted": "#a0a39c",
+        "accent": "#eb744d",
+        "accent2": "#4d4f46",
+        "accent3": "#303331",
+        "accentSoft": "#f8dcca",
+        "divider": "#c9cbc3",
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
+      }
+    },
+    {
+      "id": "tokyo",
+      "name": "Tokyo",
+      "mode": "light",
+      "palette": {
+        "bg": "#fefef6",
+        "surface": "#fafaf3",
+        "surface2": "#ecece7",
+        "fg": "#474b5c",
+        "fgSoft": "#878a92",
+        "muted": "#acadb1",
+        "accent": "#16a8ae",
+        "accent2": "#eb503d",
+        "accent3": "#1f172d",
+        "accentSoft": "#c4e8e4",
+        "divider": "#d0d1d0",
+        "danger": "#dc2626",
+        "warn": "#facc15",
+        "ok": "#16a34a"
       }
     }
   ]
