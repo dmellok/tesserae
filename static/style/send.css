@@ -156,8 +156,11 @@
 }
 
 .history-target {
-  font-size: 12px;
-  color: var(--t-fg-soft);
+  /* The dashboard / target name is the row's headline now (was a
+     monospace slug chip) — give it weight over the source tag. */
+  font-size: 14px;
+  color: var(--t-fg);
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button, empty_state %}
+{% from "_components.html" import card_head, button, empty_state, switch %}
 {% block title %}Schedules — Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
@@ -18,52 +18,63 @@
 {% macro schedule_form(s, edit_mode, pages) %}
 <form method="post" class="form schedule-form"
       action="{{ url_for('schedules.update', schedule_id=s.id) if edit_mode else url_for('schedules.create') }}">
-  <div class="field-grid">
+  {# Row 1 — what fires, which dashboard, how often. #}
+  <div class="field-grid sf-primary">
     <div class="field">
       <label for="sf-{{ s.id or 'new' }}-name">Name</label>
-      <input type="text" id="sf-{{ s.id or 'new' }}-name" name="name" value="{{ s.name }}" required>
+      <input type="text" id="sf-{{ s.id or 'new' }}-name" name="name" value="{{ s.name }}"
+             placeholder="Morning refresh" required>
     </div>
     <div class="field">
-      <label for="sf-{{ s.id or 'new' }}-page">Page</label>
+      <label for="sf-{{ s.id or 'new' }}-page">Dashboard</label>
       <select id="sf-{{ s.id or 'new' }}-page" name="page_id" required>
-        {% if not pages %}<option value="">(no saved pages yet)</option>{% endif %}
+        {% if not pages %}<option value="">(no dashboards yet)</option>{% endif %}
         {% for p in pages %}
-        <option value="{{ p.id }}" {% if p.id == s.page_id %}selected{% endif %}>{{ p.name }} ({{ p.id }})</option>
+        <option value="{{ p.id }}" {% if p.id == s.page_id %}selected{% endif %}>{{ p.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="field">
-      <label for="sf-{{ s.id or 'new' }}-type">Type</label>
+      <label for="sf-{{ s.id or 'new' }}-type">Cadence</label>
       <select id="sf-{{ s.id or 'new' }}-type" name="type" data-toggle-target>
         <option value="interval" {% if s.type == 'interval' %}selected{% endif %}>Every N minutes</option>
-        <option value="daily" {% if s.type == 'daily' %}selected{% endif %}>Daily at HH:MM</option>
+        <option value="daily" {% if s.type == 'daily' %}selected{% endif %}>Daily at a set time</option>
       </select>
     </div>
+  </div>
+
+  {# Row 2 — cadence detail. The type select toggles which set shows. #}
+  <div class="field-grid sf-cadence">
     <div class="field type-interval">
       <label for="sf-{{ s.id or 'new' }}-interval">Interval (minutes)</label>
       <input type="number" id="sf-{{ s.id or 'new' }}-interval" name="interval_minutes"
              value="{{ s.interval_minutes or 30 }}" min="1" max="10080">
     </div>
-    <div class="field type-interval">
-      <label for="sf-{{ s.id or 'new' }}-start">Window start (HH:MM)</label>
-      <input type="time" id="sf-{{ s.id or 'new' }}-start" name="time_of_day_start" value="{{ s.time_of_day_start or '' }}">
-    </div>
-    <div class="field type-interval">
-      <label for="sf-{{ s.id or 'new' }}-end">Window end (HH:MM)</label>
-      <input type="time" id="sf-{{ s.id or 'new' }}-end" name="time_of_day_end" value="{{ s.time_of_day_end or '' }}">
+    <div class="field type-interval sf-window">
+      <label>Active window <span class="field-opt">optional</span></label>
+      <div class="sf-window-pair">
+        <input type="time" aria-label="Window start" name="time_of_day_start"
+               value="{{ s.time_of_day_start or '' }}">
+        <span class="sf-window-dash" aria-hidden="true">to</span>
+        <input type="time" aria-label="Window end" name="time_of_day_end"
+               value="{{ s.time_of_day_end or '' }}">
+      </div>
+      <p class="field-help">Leave blank to fire around the clock.</p>
     </div>
     <div class="field type-daily">
-      <label for="sf-{{ s.id or 'new' }}-fires-at">Fire at (HH:MM)</label>
-      <input type="time" id="sf-{{ s.id or 'new' }}-fires-at" name="fires_at" value="{{ s.fires_at.strftime('%H:%M') if s.fires_at else '07:00' }}">
+      <label for="sf-{{ s.id or 'new' }}-fires-at">Fire at</label>
+      <input type="time" id="sf-{{ s.id or 'new' }}-fires-at" name="fires_at"
+             value="{{ s.fires_at.strftime('%H:%M') if s.fires_at else '07:00' }}">
     </div>
+  </div>
+
+  {# Row 3 — modifiers. #}
+  <div class="field-grid sf-meta">
     <div class="field">
       <label for="sf-{{ s.id or 'new' }}-priority">Priority</label>
       <input type="number" id="sf-{{ s.id or 'new' }}-priority" name="priority" value="{{ s.priority }}" step="1">
     </div>
-    <div class="field field--boolean">
-      <input type="checkbox" id="sf-{{ s.id or 'new' }}-enabled" name="enabled" {% if s.enabled %}checked{% endif %}>
-      <label for="sf-{{ s.id or 'new' }}-enabled">Enabled</label>
-    </div>
+    {{ switch('sf-' ~ (s.id or 'new') ~ '-enabled', 'enabled', 'Enabled', checked=s.enabled) }}
   </div>
 
   <div class="field">

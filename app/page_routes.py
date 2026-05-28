@@ -366,7 +366,29 @@ def _preview_scale(panel_w: int, panel_h: int = 0) -> float:
 @bp.get("")
 def index() -> str:
     pages = _store().list()
-    return render_template("pages_list.html", pages=pages)
+    devices = _devices()
+    settings = _settings_store()
+    # Resolve each page's panel so the list can show its size (a page
+    # bound to a device inherits that device's panel; otherwise the
+    # virtual panel from settings).
+    page_dims = {p.id: resolve_panel_for_page(p, devices, settings) for p in pages}
+
+    def _device_names(page: Page) -> list[str]:
+        """Friendly display names of the devices a page targets (skipping
+        any that no longer exist). Empty = unbound / virtual panel."""
+        if devices is None:
+            return []
+        names: list[str] = []
+        for did in page.device_ids:
+            device = devices.devices.get(did)
+            if device is not None:
+                names.append(device.display_name)
+        return names
+
+    page_devices = {p.id: _device_names(p) for p in pages}
+    return render_template(
+        "pages_list.html", pages=pages, page_dims=page_dims, page_devices=page_devices
+    )
 
 
 @bp.get("/new")

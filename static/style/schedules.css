@@ -6,6 +6,45 @@
   gap: 14px 16px;
 }
 
+/* New/edit schedule form — every row shares one 3-column grid so the
+   fields line up across rows (Row 1 was thirds, Rows 2/3 were halves, so
+   the edges didn't match). The active-window control spans the two right
+   columns; the enabled toggle bottom-aligns with the priority input. */
+.schedule-form .field-grid { grid-template-columns: repeat(3, 1fr); }
+.schedule-form .sf-window { grid-column: span 2; }
+.schedule-form .sf-meta { align-items: end; }
+
+@media (max-width: 720px) {
+  .schedule-form .field-grid { grid-template-columns: 1fr; }
+  .schedule-form .sf-window { grid-column: auto; }
+}
+
+/* "optional" tag beside a field label. */
+.field-opt {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+  margin-left: 6px;
+}
+
+/* Active window: two time inputs read as one "start to end" control. */
+.sf-window-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sf-window-pair input[type="time"] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sf-window-dash {
+  flex: 0 0 auto;
+  color: var(--t-muted);
+  font-size: 12px;
+}
+
 .dow-picker {
   display: flex;
   flex-wrap: wrap;

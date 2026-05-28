@@ -1,52 +1,62 @@
 {% extends "_base.html" %}
-{% from "_components.html" import empty_state %}
 {% block title %}Dashboards — Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-squares-four"></i> Dashboards
-    <form method="post" action="{{ url_for('pages.create') }}" class="inline">
-      <button type="submit" class="header-action">
-        <i class="ph ph-plus" aria-hidden="true"></i><span>New dashboard</span>
-      </button>
-    </form>
-  </h1>
+  <h1><i class="ph ph-squares-four"></i> Dashboards</h1>
   <p class="lede">
-    Each dashboard is a panel-sized canvas of widget cells.
-    Push one from <a href="{{ url_for('send.index') }}">Send</a>, schedule
-    it on <a href="{{ url_for('schedules.index') }}">Schedules</a>, or
-    wire a HA button on
-    <a href="{{ url_for('auth.settings_area', area='server') }}">Settings</a>.
+    Each dashboard is a panel-sized grid of cells you compose, render, and push to your panel.
   </p>
 </header>
+
+{# Inline create — name the dashboard up front, then land in the editor. #}
+<form method="post" action="{{ url_for('pages.create') }}" class="card dashboard-create">
+  <span class="dashboard-create-icon" aria-hidden="true"><i class="ph ph-plus-circle"></i></span>
+  <input type="text" name="name" class="dashboard-create-input"
+         placeholder="New dashboard name" autocomplete="off" aria-label="New dashboard name">
+  <button type="submit" class="primary dashboard-create-btn">
+    <i class="ph ph-plus" aria-hidden="true"></i><span>Create dashboard</span>
+  </button>
+</form>
 
 {% if not pages %}
 <div class="empty-state">
   <span class="empty-state-icon"><i class="ph-duotone ph-squares-four" aria-hidden="true"></i></span>
   <h3>No dashboards yet</h3>
-  <p class="lede">A dashboard is the canvas you assemble widgets onto. Start with a layout, then drop plugins into each cell.</p>
-  <form method="post" action="{{ url_for('pages.create') }}" class="inline">
-    <button type="submit" class="btn btn-primary">Create your first dashboard</button>
-  </form>
+  <p class="lede">A dashboard is the canvas you assemble widgets onto. Name one above to get started.</p>
 </div>
 {% else %}
+<p class="dashboard-count">{{ pages|length }} dashboard{{ '' if pages|length == 1 else 's' }}</p>
 <ul class="pages-list">
   {% for page in pages %}
   <li class="page-row">
-    <a class="page-card-link" href="{{ url_for('pages.edit', page_id=page.id) }}">
-      <div class="page-name">
-        {% if page.icon %}<span class="page-icon"><i class="ph ph-{{ page.icon }}" aria-hidden="true"></i></span>{% endif %}
-        <span>{{ page.name }}</span>
-      </div>
-      <div class="page-meta">
-        {# Page id is an opaque internal key — not shown. #}
-        <span><i class="ph ph-grid-four"></i> {{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}</span>
-        {% if page.theme %}<span class="muted">·</span><span><i class="ph ph-palette"></i> {{ page.theme }}</span>{% endif %}
-      </div>
+    <span class="page-icon-tile" aria-hidden="true">
+      <i class="ph ph-{{ page.icon or 'cube' }}"></i>
+    </span>
+    <a class="page-row-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
+      <span class="page-name">{{ page.name }}</span>
+      <span class="page-meta">
+        {% set devs = page_devices.get(page.id) %}
+        {% if devs %}<i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs|join(', ') }}{% else %}<i class="ph ph-monitor" aria-hidden="true"></i> Virtual panel{% endif %}
+        {% set d = page_dims.get(page.id) %}
+        {% if d %}<span class="muted"> · </span>{{ d.w }}×{{ d.h }}{% endif %}
+        <span class="muted"> · </span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}
+        {% if page.theme %}<span class="muted"> · </span>theme: {{ page.theme }}{% endif %}
+      </span>
     </a>
     <div class="page-actions">
+      <a class="page-action" href="{{ url_for('pages.edit', page_id=page.id) }}">
+        <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+      </a>
+      <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
+        <input type="hidden" name="page_id" value="{{ page.id }}">
+        <button type="submit" class="page-action" title="Push this dashboard to its panel">
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
+        </button>
+      </form>
       <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
             onsubmit="return confirm('Delete this dashboard?');">
-        <button type="submit" class="ghost danger" title="Delete dashboard">
+        <button type="submit" class="page-action page-action-danger" title="Delete dashboard"
+                aria-label="Delete dashboard">
           <i class="ph ph-trash" aria-hidden="true"></i>
         </button>
       </form>
@@ -55,4 +65,18 @@
   {% endfor %}
 </ul>
 {% endif %}
+
+<script>
+  // Keep "Create dashboard" disabled until a name is typed — mirrors the
+  // reference and avoids creating an accidental untitled board.
+  (function () {
+    const form = document.querySelector(".dashboard-create");
+    if (!form) return;
+    const input = form.querySelector(".dashboard-create-input");
+    const btn = form.querySelector(".dashboard-create-btn");
+    const sync = () => { btn.disabled = !input.value.trim(); };
+    input.addEventListener("input", sync);
+    sync();
+  })();
+</script>
 {% endblock %}

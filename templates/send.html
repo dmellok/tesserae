@@ -220,20 +220,21 @@
       </a>
       <div class="history-meta">
         <div class="history-top">
-          {{ pill_status(ev.status) }}
+          {# Only flag the exceptions — a green "sent" on every row is noise. #}
+          {% if ev.status != 'sent' %}{{ pill_status(ev.status) }}{% endif %}
           <span class="history-source">{{ ev.source }}</span>
-          <code class="history-target">{{ ev.target }}</code>
+          <span class="history-target">{{ ev.target }}</span>
         </div>
         <div class="history-sub">
-          <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|int }}</time>
+          <time title="{{ ev.abs }}">{{ ev.rel }}</time>
           <span class="muted">·</span>
           <span>{{ '%.2f'|format(ev.duration_s) }} s</span>
           {% if ev.error %}<span class="muted">·</span><span class="history-err">{{ ev.error }}</span>{% endif %}
         </div>
-        {% if ev.extra.renderers %}
+        {% if ev.renderers %}
         <div class="history-renderers">
-          {% for r in ev.extra.renderers %}
-          <span class="pill {% if r.error %}is-danger{% endif %}">{{ r.renderer_id }}</span>
+          {% for r in ev.renderers %}
+          <span class="pill {% if r.error %}is-danger{% endif %}">{{ r.label }}</span>
           {% endfor %}
         </div>
         {% endif %}
