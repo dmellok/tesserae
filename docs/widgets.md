@@ -24,8 +24,8 @@ widget at any (w, h) — the size token is derived from the longer side:
 | md   | 640×400   | ≤ 700 px              | half-panel widget             |
 | lg   | 1200×800  | > 700 px              | full-panel feature            |
 
-Source: [`app/composer.py`](../app/composer.py) → `SIZE_DIMENSIONS`,
-[`static/composer.js`](../static/composer.js) → `SIZE_THRESHOLDS`.
+Source: [`app/composer.py`](https://github.com/dmellok/tesserae/blob/main/app/composer.py) → `SIZE_DIMENSIONS`,
+[`static/composer.js`](https://github.com/dmellok/tesserae/blob/main/static/composer.js) → `SIZE_THRESHOLDS`.
 
 Design at all four sizes. The same widget should hide non-essential
 sections at `xs`/`sm` (use `.size-xs` / `.size-sm` class on your root
@@ -47,7 +47,7 @@ orientation setting.
 | `inky_13_3`       | 1600×1200       | Spectra 6 (Pimoroni)                  |
 | `waveshare_e6_7_5`| 800×480         | Waveshare E6                          |
 
-Source: [`app/panel.py`](../app/panel.py) → `PANEL_PRESETS`.
+Source: [`app/panel.py`](https://github.com/dmellok/tesserae/blob/main/app/panel.py) → `PANEL_PRESETS`.
 
 Most users will put 1–4 widgets on a panel. A widget filling an
 `inky_13_3` portrait alone lives in a 1200×1600 cell. Two-up on the
@@ -115,7 +115,7 @@ path. Convention: `<theme>_<role>` — e.g. `weather_now`, `weather_hourly`,
 * **`icon`** — Phosphor name used in the editor's widget picker.
 * **`render.needs_network`** — hint for the renderer (not enforced).
 
-Full schema: [`schema/plugin.schema.json`](../schema/plugin.schema.json).
+Full schema: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json).
 
 ---
 
@@ -238,7 +238,7 @@ Paper, green family on Botanical, warm spectrum on Citrus, etc.
 "low battery" pill, "broker offline" error — and stay distinct from
 the decorative trio.
 
-Source: [`schema/plugin.schema.json`](../schema/plugin.schema.json)
+Source: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json)
 → `themes.palette`.
 
 CSS custom properties are set on the **cell host** by the composer.
@@ -442,7 +442,7 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 
 ## Optional design baseline — `widget-base.css`
 
-[`static/style/widget-base.css`](../static/style/widget-base.css)
+[`static/style/widget-base.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-base.css)
 defines a tiny vocabulary you can opt into. Aligned with the
 no-borders design language: every "card" element gets its shape from
 its surface colour, not from a drawn outline.
@@ -493,12 +493,12 @@ yellow, red, blue, green.
 
 ## Reference: shipped widgets
 
-* [`plugins/weather_now`](../plugins/weather_now/) — hero icon + stats
+* [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now) — hero icon + stats
   grid + sun row. Adapts xs→lg. Open-Meteo + 10-min disk cache.
-* [`plugins/weather_hourly`](../plugins/weather_hourly/) — Chart.js
+* [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly) — Chart.js
   line of next 12/24/48 hours + rain-probability strip. Vendored
   Chart.js loaded lazily from `/static/vendor/chart.umd.min.js`.
-* [`plugins/weather_forecast`](../plugins/weather_forecast/) — 5
+* [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast) — 5
   day-columns with today-highlighted via `surface2`.
 
 Read the `client.js` of any of these for the canonical patterns:

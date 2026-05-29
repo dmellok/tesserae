@@ -1,0 +1,61 @@
+# Install a client
+
+The Tesserae server publishes frames; a **client** on the other end paints your
+panel. Three reference clients live in their own repos — pick whichever matches
+your hardware. Each takes a `device_id` (the MQTT topic prefix; defaults shown
+below) and announces itself on `tesserae/<device_id>/status` so the server can
+[auto-discover it](devices.md).
+
+See [Screens & compatibility](../compatibility.md) for which renderer feeds each
+client and what's been tested on real hardware.
+
+## tesserae-esp32-bin-client
+
+[:material-github: dmellok/tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client)
+· pairs with the `esp32_bin` renderer · default id `esp32`
+
+Battery-powered **ESP32-S3-WROOM-2** firmware for the Waveshare 13.3" Spectra 6
+panel. It deep-sleeps between wakes, subscribes to the retained
+`tesserae/<device_id>/frame/bin` topic, and skips the download when the frame
+hash hasn't changed. Months of battery life from a single Li-Po; the refresh
+cadence is set by `sleep_interval_s` on `tesserae/<device_id>/config`. Device id
+and Wi-Fi are configured through a captive portal (reachable afterward on the
+LAN at `tesserae-<id>.local`).
+
+!!! success "This is the maintainer's daily driver"
+    The ESP32 + Waveshare 13.3" path is the one combination confirmed on real
+    hardware so far.
+
+## tesserae-pi-bin-client
+
+[:material-github: dmellok/tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client)
+· pairs with the `pi_bin` renderer · default id `pi_bin`
+
+A Raspberry-Pi-side Python daemon. It subscribes to
+`tesserae/<device_id>/frame/bin` and writes the server's already-packed 4-bpp
+buffer straight into the [`inky`](https://github.com/pimoroni/inky) library's
+internal `_buf` — no PIL on the Pi paint path. This is the **fastest** path on a
+Pimoroni Inky Impression (Spectra 6 / Waveshare E6, any of the four sizes,
+auto-detected via the HAT EEPROM). The trade-off is a private-API dependency:
+the `inky` version is pinned exactly.
+
+## tesserae-pi-png-client
+
+[:material-github: dmellok/tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client)
+· pairs with the `pi_png` renderer · default id `pi_png`
+
+The same Pi-side daemon shape, but it subscribes to
+`tesserae/<device_id>/frame/png` and hands incoming PNGs to `inky`'s high-level
+`set_image()`. That makes it work on **every panel the inky library supports** —
+pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", in 2/3/6/7 colour. Quantising on the
+Pi every frame makes it the slower of the two Pi paths, but it stays
+wire-compatible with the inky-dash v3/v4 listener protocol.
+
+## After flashing
+
+On first run, a client publishes a heartbeat on `tesserae/<device-id>/status`.
+Head to [Set up a device](devices.md) to register it, calibrate the panel
+orientation, and bind a dashboard.
+
+Running more than one panel? Flash each with a distinct `device-id` — every
+client gets its own topics, panel size, and orientation.
