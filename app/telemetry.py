@@ -112,17 +112,22 @@ class TelemetryConfig:
         return f"{self.host.rstrip('/')}/api/v0/event"
 
 
-def _system_props(app_version: str) -> dict[str, str]:
+def _system_props(app_version: str) -> dict[str, object]:
     """Aptabase's required ``systemProps`` block. All values are stable
-    OS/runtime facts, no identifiers."""
+    OS/runtime facts, no identifiers.
+
+    Aptabase's validator is strict:
+      * ``isDebug`` is a real boolean — not the string ``"false"``.
+      * ``sdkVersion`` must match ``<name>@<version>`` (a ``/`` 400s).
+    Both lessons learned the hard way (HTTP 400 from /api/v0/event)."""
     return {
-        "isDebug": "false",
+        "isDebug": False,
         "osName": _platform.system() or "Unknown",
         "osVersion": _platform.release() or "",
         "locale": "en-US",
         "appVersion": app_version,
         "appBuildNumber": "0",
-        "sdkVersion": "tesserae/0.1",
+        "sdkVersion": f"aptabase-tesserae@{app_version}",
         "engineName": "cpython",
         "engineVersion": _platform.python_version(),
     }

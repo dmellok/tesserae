@@ -199,6 +199,33 @@ def test_send_posts_aptabase_shaped_payload(
     assert "timestamp" in body
 
 
+def test_system_props_match_aptabase_strict_shape(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Aptabase 400s on a string ``isDebug`` or a slash in ``sdkVersion``.
+    Lock the shape down so a future tidy-up can't regress it."""
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        captured["body"] = json.loads(req.data or b"{}")
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        t.send("app.started", {})
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    body = captured["body"]
+    assert isinstance(body, dict)
+    sys_props = body["systemProps"]
+    assert sys_props["isDebug"] is False, "Aptabase requires bool, not 'false'"
+    assert "@" in sys_props["sdkVersion"], "Aptabase requires name@version, not name/version"
+    assert "/" not in sys_props["sdkVersion"]
+
+
 def test_failure_silent_when_endpoint_unreachable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
