@@ -11,6 +11,10 @@ renderer, new format = drop a folder.
 The name: a [*tessera*](https://en.wikipedia.org/wiki/Tessera) is the
 individual tile of a mosaic; the editor composes a dashboard out of cells.
 
+**[Full documentation](https://dmellok.github.io/tesserae/)** — install
+guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
+hardware compatibility, and how to build a widget (with AI).
+
 ## Screenshots
 
 Compose in the browser — pick widgets, a theme, and which display(s) each
@@ -69,10 +73,10 @@ ruff / pytest / mypy on every push (see
 [.github/workflows/ci.yml](.github/workflows/ci.yml)).
 
 The widget catalogue now spans weather, F1, calendar, news, finance, GitHub,
-clocks, sky, pictures, todo, and Melbourne public transport — ~40 widgets in
-the `plugins/` directory across `widget` / `theme` / `font` / `data` /
-`admin` plugin kinds. See [Widget stability tiers](#widget-stability-tiers)
-below for an upfront read on which ones depend on undocumented upstreams.
+clocks, sky, pictures, todo, and Melbourne public transport — **47 widgets**
+in `plugins/`, alongside `theme` / `font` / `data` / `admin` plugins. See
+[Widget stability tiers](#widget-stability-tiers) below for an upfront read
+on which ones depend on undocumented upstreams.
 
 > **For tinkerers, not your mum.** Tesserae is a `git clone → tinker`
 > dashboard. The admin chrome is polished but the deployment story still
@@ -239,10 +243,12 @@ to pick an admin password. After that, sign in at `/login` and configure
 the broker + base URL at `/settings`. Renderers and plugins that declare
 settings show up as their own sections, generated from manifests.
 
-To preview a single widget without composing a dashboard, hit
-<http://127.0.0.1:8000/_test/render?plugin=clock&size=md> from loopback
-(the auth gate keeps `/compose` and `/_test/render` reachable from
-`127.0.0.1` only).
+To preview a single widget without composing a dashboard, run `--dev`, sign
+in, then open <http://127.0.0.1:8000/_test/render?plugin=clock_analog&size=md>
+in your browser. `/_test/render` needs the dev/test server **and** a session
+— it isn't loopback-exempt. (The loopback bypass is for `/compose/`,
+`/renders/`, and `/plugins/<id>/<asset>`, which the in-process renderer
+fetches without a session.)
 
 Run the test suite:
 
@@ -355,7 +361,7 @@ serve stale data.
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
   plugins/<id>/    widget / theme / font / data / admin plugins
-                   (drop-a-folder) — ~40 widgets ship bundled
+                   (drop-a-folder) — 47 widgets ship bundled
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests

@@ -26,9 +26,9 @@ and sun times. Data from Open-Meteo (no API key).*
 
 ## 1. Identity
 
-- **id**: `<lowercase_snake_case>` — matches `^[a-z][a-z0-9_]*$`. Becomes
-  the folder name and URL slug. Convention: `<theme>_<role>` (e.g.
-  `weather_now`, `news_headlines`).
+- **id**: `<lowercase_snake_case>` — the folder name and URL slug. The
+  loader only skips `.`/`_`-prefixed folders; lowercase `[a-z0-9_]` is
+  convention. Use `<family>_<role>` (e.g. `weather_now`, `news_headlines`).
 - **name**: short display name as it'll show in the widget picker.
 - **version**: `0.1.0` for a new widget.
 - **icon**: Phosphor icon name (regular weight) for the editor picker.

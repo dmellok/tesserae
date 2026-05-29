@@ -63,10 +63,13 @@ when you're hacking on the admin.
 2. Sign in at `/login`, then go to **Settings → Server** and point Tesserae at your **MQTT broker** and set the **base URL** the panel uses to fetch frames.
 3. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
 
-To preview a single widget without composing a dashboard, hit
-`http://127.0.0.1:8000/_test/render?plugin=clock_analog&size=md` from loopback
-(the auth gate keeps `/compose` and `/_test/render` reachable from `127.0.0.1`
-only, and only when running `--dev`).
+To preview a single widget without composing a dashboard, run `--dev`, sign
+in, then open
+`http://127.0.0.1:8000/_test/render?plugin=clock_analog&size=md` in your
+browser. `/_test/render` needs the dev (or test) server **and** a logged-in
+session — it isn't loopback-exempt. The loopback bypass is only for
+`/compose/`, `/renders/`, and `/plugins/<id>/<asset>`, which the in-process
+Playwright renderer fetches without a session.
 
 ## Chromium for webpage rendering
 

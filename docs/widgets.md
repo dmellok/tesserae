@@ -66,9 +66,10 @@ plugins/<id>/
   tests/test_smoke.py smoke test (optional but recommended)
 ```
 
-`<id>` must match `^[a-z][a-z0-9_]*$` and is the URL slug + the disk
-path. Convention: `<theme>_<role>` — e.g. `weather_now`, `weather_hourly`,
-`year_progress`.
+`<id>` is the folder name — it doubles as the URL slug and the disk path.
+The loader skips any folder starting with `.` or `_`; beyond that,
+lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
+— e.g. `weather_now`, `weather_hourly`.
 
 ---
 
