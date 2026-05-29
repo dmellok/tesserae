@@ -29,6 +29,9 @@ dependencies = [
     # Waitress is pure-Python, cross-platform, and tuned-by-default for
     # the single-user appliance Tesserae targets.
     "waitress>=3.0,<4",
+    # Bundled IANA tz database so zoneinfo (scheduler + the timezone
+    # picker) has a complete, consistent zone list on any host OS.
+    "tzdata",
 ]
 
 [project.scripts]

@@ -7,8 +7,8 @@
   "icon": "ph-calendar-dots",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
-    { "name": "latitude", "type": "number", "label": "Latitude", "default": -37.8136 },
-    { "name": "longitude", "type": "number", "label": "Longitude", "default": 144.9631 },
+    { "name": "latitude", "type": "number", "label": "Latitude", "default": "" },
+    { "name": "longitude", "type": "number", "label": "Longitude", "default": "" },
     { "name": "label", "type": "string", "label": "Place label", "default": "Melbourne" },
     {
       "name": "units",

@@ -7,8 +7,8 @@
   "icon": "ph-airplane-tilt",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
-    { "name": "latitude",  "type": "number", "label": "Latitude",                 "default": -37.8136 },
-    { "name": "longitude", "type": "number", "label": "Longitude",                "default": 144.9631 },
+    { "name": "latitude",  "type": "number", "label": "Latitude",                 "default": "" },
+    { "name": "longitude", "type": "number", "label": "Longitude",                "default": "" },
     { "name": "radius_km", "type": "number", "label": "Search radius (km)",       "default": 60 },
     { "name": "max_results","type": "number","label": "Max flights to list",      "default": 8 }
   ],

@@ -23,6 +23,7 @@ from __future__ import annotations
 import contextlib
 import json
 import time
+import zoneinfo
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -56,17 +57,45 @@ bp = Blueprint("auth", __name__)
 # shape as plugin / renderer ``settings`` so the template can render them
 # through the same path.
 
+# Every IANA zone the host knows about, plus a "system" sentinel. Built
+# once at import; ``tzdata`` is a dependency so the list is complete and
+# consistent regardless of the host OS.
+_TZ_CHOICES: list[dict[str, str]] = [
+    {"value": "system", "label": "System (host local time)"},
+    *({"value": tz, "label": tz} for tz in sorted(zoneinfo.available_timezones())),
+]
+
 APP_FIELDS: list[dict[str, Any]] = [
     {
         "name": "timezone",
-        "type": "string",
-        "label": "Timezone (IANA name or 'system')",
+        "type": "select",
+        "label": "Timezone",
         "default": "system",
+        "choices": _TZ_CHOICES,
         "help": (
             "Used by the scheduler when interpreting daily fire times and "
-            "time-of-day windows. 'system' uses the host's local time; "
-            "anything else must be an IANA zone like 'Australia/Melbourne'."
+            "time-of-day windows. 'System' uses the host's local time."
         ),
+    },
+    {
+        "name": "latitude",
+        "type": "number",
+        "label": "Latitude",
+        "default": "",
+        "step": "any",  # decimal degrees — a default step of 1 rejects e.g. -37.8136
+        "help": (
+            "Default location for weather / sky / sunrise widgets, so you don't "
+            "re-enter coordinates per widget. A widget can still override it with "
+            "its own latitude/longitude. Decimal degrees, e.g. -37.8136."
+        ),
+    },
+    {
+        "name": "longitude",
+        "type": "number",
+        "label": "Longitude",
+        "default": "",
+        "step": "any",
+        "help": "Decimal degrees, e.g. 144.9631. Paired with Latitude above.",
     },
     {
         "name": "ha_discovery_enabled",

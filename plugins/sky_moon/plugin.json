@@ -11,14 +11,14 @@
       "name": "latitude",
       "type": "number",
       "label": "Latitude",
-      "default": -37.8136,
+      "default": "",
       "help": "Used for moonrise / moonset. Leave at default if you don't care."
     },
     {
       "name": "longitude",
       "type": "number",
       "label": "Longitude",
-      "default": 144.9631
+      "default": ""
     },
     {
       "name": "label",

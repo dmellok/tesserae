@@ -7,7 +7,7 @@
   "icon": "ph-mountains",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
-    { "name": "latitude", "type": "number", "label": "Your latitude (for visibility hint)", "default": -37.8136 }
+    { "name": "latitude", "type": "number", "label": "Your latitude (for visibility hint)", "default": "" }
   ],
   "render": { "dither": "none", "needs_network": true }
 }

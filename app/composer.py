@@ -60,12 +60,44 @@ def _registry() -> PluginRegistry:
     return registry
 
 
+# Last-resort coordinates (Melbourne) so a location widget still renders
+# before any global or per-cell location is set.
+_FALLBACK_LAT = -37.8136
+_FALLBACK_LON = 144.9631
+
+
+def _global_location() -> tuple[float, float]:
+    """The global default coordinates from the app settings (Settings →
+    Server), with a built-in fallback so widgets never render blank."""
+    store = current_app.config.get("SETTINGS_STORE")
+    app_cfg = store.get_section("app") if store is not None else {}
+
+    def _f(value: Any, fallback: float) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return fallback
+
+    return _f(app_cfg.get("latitude"), _FALLBACK_LAT), _f(app_cfg.get("longitude"), _FALLBACK_LON)
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
         return dict(raw)
     merged: dict[str, Any] = plugin.cell_option_defaults()
     merged.update(raw)
+    # Fill blank latitude/longitude from the global location so the
+    # weather / sky / sunrise widgets don't each re-enter coordinates. An
+    # explicit per-cell value always wins (it's non-blank here).
+    needs_lat = "latitude" in merged and merged["latitude"] in (None, "")
+    needs_lon = "longitude" in merged and merged["longitude"] in (None, "")
+    if needs_lat or needs_lon:
+        glat, glon = _global_location()
+        if needs_lat:
+            merged["latitude"] = glat
+        if needs_lon:
+            merged["longitude"] = glon
     return merged
 
 
