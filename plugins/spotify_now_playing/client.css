@@ -19,12 +19,12 @@
   overflow: hidden;
 }
 
-/* --- hero: track text (left) + square album-art panel (right) ---
+/* --- hero: square album-art panel (left) + track text (right) ---
    Always two columns: the square art (or vinyl placeholder) fills the
-   right edge full-height like the weather widgets' icon panel. */
+   left edge full-height; the track block takes the rest. */
 .snp-hero {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr;
   align-items: stretch;
   min-height: 0;
   background: var(--theme-surface);

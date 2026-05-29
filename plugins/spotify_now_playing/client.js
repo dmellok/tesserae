@@ -83,6 +83,7 @@ export default async function render(shadow, ctx) {
         <i class="wb-bar-icon ph ph-spotify-logo" aria-hidden="true"></i>
       </header>
       <section class="snp-hero">
+        ${artPanel}
         <div class="snp-meta">
           <div class="snp-trackrow">
             <i class="ph-fill ph-${stateIcon} snp-state" aria-hidden="true"></i>
@@ -91,7 +92,6 @@ export default async function render(shadow, ctx) {
           <div class="snp-artist"><i class="ph-bold ph-user snp-artist-icon" aria-hidden="true"></i>${escapeHtml(data.artist)}</div>
           ${showAlbum ? `<div class="snp-album"><i class="ph-bold ph-disc snp-album-icon" aria-hidden="true"></i>${escapeHtml(data.album)}</div>` : ""}
         </div>
-        ${artPanel}
       </section>
       ${progress}
     </div>`;
