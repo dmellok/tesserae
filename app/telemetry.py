@@ -38,6 +38,7 @@ defaults apply.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import logging
 import os
@@ -210,6 +211,32 @@ class Telemetry:
         except queue.Full:
             logger.debug("telemetry: queue full, dropping %s", event_name)
 
+    def set_enabled(self, on: bool) -> None:
+        """Toggle the enabled state at runtime. Spins up the worker
+        thread on the first transition to on (so a fresh app where
+        startup created a disabled Telemetry doesn't have to be
+        restarted after the user flips the toggle). On→off keeps the
+        worker around but ``send`` drops everything, so a future re-
+        enable picks up immediately."""
+        can_enable = on and bool(self._cfg.host) and bool(self._cfg.app_key)
+        self._cfg = dataclasses.replace(self._cfg, enabled=can_enable)
+        if can_enable and (self._thread is None or not self._thread.is_alive()):
+            self._stop.clear()
+            self._thread = threading.Thread(
+                target=self._worker, name="tesserae-telemetry", daemon=True
+            )
+            self._thread.start()
+
+    def test_send(self) -> str | None:
+        """Synchronous send for immediate UI feedback when a user flips
+        the toggle on. Fires the canonical ``app.started`` event — the
+        same one that would otherwise fire on next process start, so
+        the maintainer's dashboard sees this install right away.
+        Returns ``None`` on a 2xx response, or a short error string."""
+        if not self.enabled:
+            return "telemetry is disabled"
+        return self._post("app.started", {})
+
     def shutdown(self, *, timeout: float = 2.0) -> None:
         self._stop.set()
         with contextlib.suppress(queue.Full):
@@ -228,9 +255,11 @@ class Telemetry:
             if item is None:
                 return
             name, props = item
-            self._post(name, props)
+            self._post(name, props)  # return value discarded
 
-    def _post(self, event_name: str, props: dict[str, str]) -> None:
+    def _post(self, event_name: str, props: dict[str, str]) -> str | None:
+        """POST one event. Returns ``None`` on a 2xx response or a short
+        error string on failure (HTTPError gets ``HTTP <code> <reason>``)."""
         body = {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
@@ -252,7 +281,16 @@ class Telemetry:
         try:
             with urllib.request.urlopen(req, timeout=SEND_TIMEOUT_S) as resp:
                 resp.read(1)  # discard body
+            return None
+        except urllib.error.HTTPError as err:
+            msg = f"HTTP {err.code} {err.reason}"
+            logger.debug("telemetry: send failed (%s): %s", event_name, msg)
+            return msg
         except urllib.error.URLError as err:
-            logger.debug("telemetry: send failed (%s): %s", event_name, err)
+            msg = str(err.reason or err)
+            logger.debug("telemetry: send failed (%s): %s", event_name, msg)
+            return msg
         except OSError as err:
-            logger.debug("telemetry: send error (%s): %s", event_name, err)
+            msg = str(err)
+            logger.debug("telemetry: send error (%s): %s", event_name, msg)
+            return msg

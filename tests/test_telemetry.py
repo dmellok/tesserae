@@ -216,6 +216,110 @@ def test_failure_silent_when_endpoint_unreachable(
     assert t._queue.qsize() == 0
 
 
+# ----- runtime enable + synchronous test_send -----------------------
+
+
+def test_set_enabled_off_to_on_starts_worker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Telemetry created disabled (because settings said off) must be
+    able to come alive when the user flips the toggle, without a
+    restart."""
+    monkeypatch.setattr(tm, "APTABASE_HOST", "https://baked.example")
+    monkeypatch.setattr(tm, "APTABASE_APP_KEY", "BAKEDKEY")
+    monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_HOST", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_APP_KEY", raising=False)
+    t = tm.Telemetry.from_settings(
+        data_root=tmp_path,
+        app_version="0.4.1",
+        settings_app={"telemetry_enabled": False},
+    )
+    assert t.enabled is False
+    assert t._thread is None
+
+    t.set_enabled(True)
+    try:
+        assert t.enabled is True
+        assert t._thread is not None and t._thread.is_alive()
+    finally:
+        t.shutdown(timeout=1.0)
+
+
+def test_set_enabled_on_to_off_stops_sending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        assert t.enabled is True
+        t.set_enabled(False)
+        assert t.enabled is False
+        # send() is gated by enabled and never queues when off.
+        t.send("app.started")
+        assert t._queue.qsize() == 0
+    finally:
+        t.shutdown(timeout=1.0)
+
+
+def test_test_send_returns_none_on_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _FakeResp())
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        assert t.test_send() is None
+    finally:
+        t.shutdown(timeout=1.0)
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+def test_test_send_returns_error_string_on_http_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # urllib.error.HTTPError's internal fp uses a _TemporaryFileCloser
+    # whose finalizer fires after the test on Python 3.14 — pytest
+    # surfaces that as PytestUnraisableExceptionWarning. The exception
+    # itself is irrelevant to what we're testing here, so we ignore it.
+    def http_error(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del req, timeout
+        raise urllib.error.HTTPError(
+            url="https://x/api/v0/event",
+            code=401,
+            msg="Unauthorized",
+            hdrs=None,  # type: ignore[arg-type]
+            fp=BytesIO(b""),
+        )
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", http_error)
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        err = t.test_send()
+    finally:
+        t.shutdown(timeout=1.0)
+    assert err is not None
+    assert "401" in err and "Unauthorized" in err
+
+
+def test_test_send_returns_error_string_on_connection_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refused(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del req, timeout
+        raise urllib.error.URLError("connection refused")
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", refused)
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        err = t.test_send()
+    finally:
+        t.shutdown(timeout=1.0)
+    assert err is not None and "connection refused" in err
+
+
+def test_test_send_when_disabled_returns_short_message(tmp_path: Path) -> None:
+    t = tm.Telemetry.disabled()
+    err = t.test_send()
+    assert err is not None and "disabled" in err.lower()
+
+
 def test_disabled_send_makes_no_http_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[object] = []
 

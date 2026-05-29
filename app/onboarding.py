@@ -319,8 +319,17 @@ def finish() -> Response:
     # checkbox only POSTs its name when ticked, so absence means the
     # user explicitly unchecked it. Persist either choice so it survives
     # restarts and the answer is recorded the moment the user makes it.
-    settings.patch_section("app", {"telemetry_enabled": "telemetry_enabled" in request.form})
+    was_telemetry_on = bool(settings.get_section("app").get("telemetry_enabled", False))
+    now_on = "telemetry_enabled" in request.form
+    settings.patch_section("app", {"telemetry_enabled": now_on})
     mark_onboarded(settings)
+    # Apply the consent live + fire app.started immediately so a fresh
+    # install reports in without waiting for the next process restart.
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is not None and now_on != was_telemetry_on:
+        telemetry.set_enabled(now_on)
+        if now_on:
+            telemetry.test_send()  # silent — onboarding shouldn't get loud
     flash("You're all set.", "ok")
     return redirect(url_for("send.index"))
 
