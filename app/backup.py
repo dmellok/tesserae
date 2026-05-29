@@ -30,10 +30,20 @@ from pathlib import Path
 
 BACKUPS_SUBDIR = "core/backups"  # relative to data_root
 META_NAME = ".tesserae-backup.json"
-META_VERSION = 1
+META_VERSION = 2  # added "excluded_subpaths" field
 
 LABEL_MANUAL = "manual"
 LABEL_PRE_UPDATE = "pre-update"
+
+# Subpaths under data_root whose **regular files are excluded** from a
+# snapshot — dotfiles (config like ``.folders.json``) inside them are still
+# included so plugin metadata survives a restore.
+#
+# picture_gallery hosts user-uploaded images that can be tens of MB each;
+# including them would blow up every backup and double-store data the user
+# already has on disk. Restoring a backup that excluded a subpath does NOT
+# wipe the user's current files there — the photos persist across restores.
+DEFAULT_EXCLUDED_SUBPATHS: tuple[str, ...] = ("plugins/picture_gallery",)
 
 
 @dataclass(frozen=True)
@@ -72,10 +82,34 @@ def _snapshot_sqlite(src: Path, dst: Path) -> bool:
         return False
 
 
-def create(data_root: Path, *, label: str = LABEL_MANUAL, note: str = "") -> Backup:
+def _is_excluded(rel: Path, excluded_subpaths: tuple[str, ...]) -> bool:
+    """Whether ``rel`` (relative to data_root) is a regular file inside any
+    excluded subpath. Dotfiles within an excluded subpath are kept so
+    plugin config / metadata still rides along."""
+    if rel.name.startswith("."):
+        return False
+    rel_posix = rel.as_posix()
+    return any(
+        rel_posix == prefix or rel_posix.startswith(prefix + "/") for prefix in excluded_subpaths
+    )
+
+
+def create(
+    data_root: Path,
+    *,
+    label: str = LABEL_MANUAL,
+    note: str = "",
+    excluded_subpaths: tuple[str, ...] = DEFAULT_EXCLUDED_SUBPATHS,
+) -> Backup:
     """Snapshot ``data/`` into a single ``.zip`` under
     ``data/core/backups/`` and return its metadata. Writes to a ``.part``
-    first and renames on success so a crash never leaves a partial."""
+    first and renames on success so a crash never leaves a partial.
+
+    Regular files under ``excluded_subpaths`` are skipped (picture gallery
+    images by default) — dotfiles inside those paths are still included
+    so plugin config survives. The exclusion list is embedded in the
+    backup's metadata so :func:`restore` knows to preserve the user's
+    current files there rather than wiping them."""
     data_root = Path(data_root)
     out_dir = _backups_dir(data_root)
     ts = time.strftime("%Y%m%d-%H%M%S", time.localtime())
@@ -101,6 +135,8 @@ def create(data_root: Path, *, label: str = LABEL_MANUAL, note: str = "") -> Bac
             else:
                 continue
             rel = src.relative_to(data_root)
+            if _is_excluded(rel, excluded_subpaths):
+                continue
             if src.suffix == ".db":
                 staged = td_path / rel
                 staged.parent.mkdir(parents=True, exist_ok=True)
@@ -116,6 +152,7 @@ def create(data_root: Path, *, label: str = LABEL_MANUAL, note: str = "") -> Bac
             "created_at": time.time(),
             "label": label,
             "note": note,
+            "excluded_subpaths": list(excluded_subpaths),
         }
         zf.writestr(META_NAME, json.dumps(meta, indent=2))
     tmp.replace(final)
@@ -172,13 +209,19 @@ def delete(data_root: Path, backup_id: str) -> bool:
 
 
 def restore(data_root: Path, backup_id: str) -> None:
-    """Replace ``data/`` contents with the snapshot's payload. Preserves
-    the backups dir itself (don't want to delete the snapshot we're
-    restoring from). The caller is expected to restart the server right
-    after — open SQLite handles on the old ``events.db`` keep writing to
-    the orphaned inode until the process restarts (Linux/macOS); on
-    Windows the live handle blocks the replace, so do this with the
-    server stopped or via the maintenance flow which restarts."""
+    """Replace ``data/`` contents with the snapshot's payload. Preserves:
+
+    * the backups dir itself (deleting the snapshot we're restoring from
+      mid-restore would be bad),
+    * any file inside an excluded subpath the backup recorded — those
+      represent on-disk data the snapshot deliberately skipped (e.g.
+      gallery photos), so the user's current files stay put.
+
+    The caller is expected to restart the server right after — open
+    SQLite handles on the old ``events.db`` keep writing to the orphaned
+    inode until the process restarts (Linux/macOS); on Windows the live
+    handle blocks the replace, so do this with the server stopped or via
+    the maintenance flow which restarts."""
     data_root = Path(data_root)
     backup = get(data_root, backup_id)
     if backup is None:
@@ -186,6 +229,11 @@ def restore(data_root: Path, backup_id: str) -> None:
     with zipfile.ZipFile(backup.path) as zf:
         if META_NAME not in zf.namelist():
             raise ValueError("not a Tesserae backup (no meta)")
+        try:
+            meta = json.loads(zf.read(META_NAME))
+        except (json.JSONDecodeError, OSError):
+            meta = {}
+        excluded = tuple(meta.get("excluded_subpaths") or ())
         # Stage to tmp, then swap.
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
@@ -196,15 +244,34 @@ def restore(data_root: Path, backup_id: str) -> None:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(zf.read(member))
             backups_dir = _backups_dir(data_root).resolve()
-            # Wipe data_root contents except the backups dir.
-            for child in list(data_root.iterdir()):
-                if child.resolve() == backups_dir:
+            # Wipe data_root contents except the backups dir and files
+            # inside excluded subpaths.
+            for src in data_root.rglob("*"):
+                if not src.exists() or src.is_dir():
                     continue
-                if child.is_dir():
-                    shutil.rmtree(child)
-                else:
-                    with contextlib.suppress(OSError):
-                        child.unlink()
+                # Inside backups dir → skip.
+                try:
+                    src.resolve().relative_to(backups_dir)
+                    continue
+                except ValueError:
+                    pass
+                rel = src.relative_to(data_root)
+                if _is_excluded(rel, excluded):
+                    continue
+                with contextlib.suppress(OSError):
+                    src.unlink()
+            # Clean up any now-empty dirs (best-effort).
+            for d in sorted(
+                (p for p in data_root.rglob("*") if p.is_dir()),
+                key=lambda p: len(p.parts),
+                reverse=True,
+            ):
+                try:
+                    if d.resolve() == backups_dir:
+                        continue
+                    d.rmdir()
+                except OSError:
+                    pass
             # Lay down the staged content.
             for src in td_path.rglob("*"):
                 if src.is_dir():

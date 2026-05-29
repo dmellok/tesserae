@@ -99,3 +99,75 @@ def test_restore_unknown_id_raises(tmp_path: Path) -> None:
     _seed(root)
     with pytest.raises(FileNotFoundError):
         bk.restore(root, "does-not-exist")
+
+
+# ----- gallery (and any excluded subpath) handling ----------------------
+
+
+def _seed_with_gallery(root: Path) -> None:
+    """Layout typical of a live system: small config + a gallery dir with
+    a dotfile (config) and a multi-MB "image" that should NOT make it
+    into the backup."""
+    _seed(root)
+    gallery = root / "plugins" / "picture_gallery"
+    gallery.mkdir(parents=True)
+    (gallery / ".folders.json").write_text('{"holidays":{"label":"Holidays"}}')
+    (gallery / "holidays").mkdir()
+    (gallery / "holidays" / "sunset.jpg").write_bytes(b"BIGIMG" * 200_000)
+    (gallery / "root_photo.png").write_bytes(b"BIGPNG" * 100_000)
+
+
+def test_gallery_images_are_excluded_but_config_is_kept(tmp_path: Path) -> None:
+    import zipfile
+
+    root = tmp_path / "data"
+    _seed_with_gallery(root)
+    backup = bk.create(root, label="manual")
+    with zipfile.ZipFile(backup.path) as zf:
+        names = set(zf.namelist())
+    # The small config rides along.
+    assert "plugins/picture_gallery/.folders.json" in names
+    # The image files are excluded — both nested and root-level.
+    assert "plugins/picture_gallery/holidays/sunset.jpg" not in names
+    assert "plugins/picture_gallery/root_photo.png" not in names
+    # And the backup is dramatically smaller than the gallery footprint.
+    gallery_bytes = sum(
+        p.stat().st_size for p in (root / "plugins" / "picture_gallery").rglob("*") if p.is_file()
+    )
+    assert backup.bytes < gallery_bytes // 4
+
+
+def test_excluded_subpaths_recorded_in_metadata(tmp_path: Path) -> None:
+    import json
+    import zipfile
+
+    root = tmp_path / "data"
+    _seed_with_gallery(root)
+    backup = bk.create(root)
+    with zipfile.ZipFile(backup.path) as zf:
+        meta = json.loads(zf.read(bk.META_NAME))
+    assert "plugins/picture_gallery" in meta["excluded_subpaths"]
+    assert meta["version"] >= 2
+
+
+def test_restore_preserves_users_gallery_photos(tmp_path: Path) -> None:
+    """Restoring a backup that excluded the gallery must NOT delete the
+    user's current photos on disk — they're not in the backup."""
+    root = tmp_path / "data"
+    _seed_with_gallery(root)
+    backup = bk.create(root)
+
+    # Drop a new photo AFTER the backup. It should survive the restore.
+    new_photo = root / "plugins" / "picture_gallery" / "holidays" / "new.jpg"
+    new_photo.write_bytes(b"AFTER-BACKUP")
+    # Also mutate a non-excluded file so we can confirm THAT one rolls back.
+    (root / "core" / "settings.json").write_text('{"mutated":true}')
+
+    bk.restore(root, backup.id)
+
+    # Excluded file: the photo dropped after the backup is still there.
+    assert new_photo.read_bytes() == b"AFTER-BACKUP"
+    # Original gallery image (excluded; never in backup, never deleted) intact.
+    assert (root / "plugins" / "picture_gallery" / "holidays" / "sunset.jpg").exists()
+    # Non-excluded file rolled back from the snapshot.
+    assert (root / "core" / "settings.json").read_text() == '{"app":{"x":1}}'

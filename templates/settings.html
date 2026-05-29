@@ -381,7 +381,7 @@
   </section>
 
   <section class="card">
-    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Backups contain real secrets (API tokens, MQTT creds, OAuth) — keep them somewhere safe.') }}
+    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos are skipped (the .folders.json metadata is kept) so backups stay small and restoring leaves your images untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth) — keep them somewhere safe.') }}
 
     <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">
       <div class="field">
