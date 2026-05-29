@@ -81,3 +81,60 @@ def test_backup_download_404_when_missing(app: Flask) -> None:
     _sign_in(client)
     resp = client.get("/settings/system/backup/does-not-exist/download")
     assert resp.status_code == 404
+
+
+def test_telemetry_test_button_flashes_when_disabled(app: Flask) -> None:
+    """When telemetry is off (the default in testing mode), the test-event
+    button should bounce back with a friendly explanation rather than
+    pretending to send."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/settings/system/telemetry/test", follow_redirects=True)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Telemetry is off" in body
+
+
+def test_telemetry_test_button_records_event_when_enabled(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With telemetry enabled and a stubbed urlopen, hitting the test
+    route should write a telemetry row to the EventLog."""
+    import dataclasses
+    from io import BytesIO
+
+    from app import telemetry as tm
+
+    class _OK:
+        def read(self, n: int = -1) -> bytes:
+            return BytesIO(b"OK").read(n)
+
+        def __enter__(self) -> _OK:
+            return self
+
+        def __exit__(self, *a: object) -> bool:
+            return False
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _OK())
+    # Spin telemetry up live without touching real settings.
+    telemetry: tm.Telemetry = app.config["TELEMETRY"]
+    telemetry._cfg = dataclasses.replace(
+        telemetry._cfg,
+        enabled=True,
+        host="https://analytics.example.com",
+        app_key="AK-test",
+    )
+    # Wire the in-process event log into the live telemetry so the test
+    # route's record() lands in the same log the assertion reads.
+    telemetry._event_log = app.config["EVENT_LOG"]
+
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/settings/system/telemetry/test", follow_redirects=True)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Test event delivered" in body
+
+    log = app.config["EVENT_LOG"]
+    rows = log.list(type="telemetry", limit=10)
+    assert any(r.source == "app.started" and r.status == "sent" for r in rows)

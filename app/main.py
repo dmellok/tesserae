@@ -188,6 +188,7 @@ def create_app(
             data_root=data_root,
             app_version=_pkg_version,
             settings_app=settings.get_section("app"),
+            event_log=event_log,
         )
         telemetry.send("app.started")
     app.config["TELEMETRY"] = telemetry

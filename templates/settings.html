@@ -419,6 +419,28 @@
     <p class="lede">No backups yet.</p>
     {% endif %}
   </section>
+
+  <section class="card">
+    {{ card_head('Telemetry', icon_name='broadcast', blurb='Two events (app.started, update.applied) go to ' ~ (system_telemetry_host or 'the project backend') ~ '. Every attempt is recorded as a "telemetry" row in the Events tab so you can see exactly what landed.') }}
+
+    <p>
+      Status: {% if system_telemetry_enabled %}
+        <span class="pill is-ok">enabled</span>
+        &middot; <code>{{ system_telemetry_host }}</code>
+      {% else %}
+        <span class="pill">disabled</span>
+        <span class="muted">— tick <em>Send anonymous usage telemetry</em> in Settings → Server → App to turn it on.</span>
+      {% endif %}
+    </p>
+
+    <form method="post" action="{{ url_for('auth.system_telemetry_test') }}" class="form">
+      <p class="field-help">Fires a synchronous <code>app.started</code> event and flashes the outcome. If the backend is reachable you'll also see a new row under Events. Useful for re-checking the endpoint without toggling the setting off and on.</p>
+      <div class="actions">
+        {{ button('Send test event', icon='paper-plane-tilt', disabled=not system_telemetry_enabled) }}
+        <a class="button ghost" href="{{ url_for('events.index') }}?type=telemetry"><i class="ph ph-pulse"></i> View in Events</a>
+      </div>
+    </form>
+  </section>
 </div>
 {% endif %}
 

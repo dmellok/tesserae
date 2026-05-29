@@ -521,6 +521,8 @@ def settings_area(area: str) -> str | Response:
     system_last_check = None
     system_history: list[Any] = []
     system_backups: list[Any] = []
+    system_telemetry_enabled = False
+    system_telemetry_host = ""
     if area == "system":
         updater = current_app.config["UPDATER"]
         try:
@@ -530,6 +532,11 @@ def settings_area(area: str) -> str | Response:
         system_last_check = updater.last_check
         system_history = list(reversed(updater.history()))
         system_backups = _backup_mod.list_all(current_app.config["DATA_ROOT"])
+        telemetry = current_app.config.get("TELEMETRY")
+        if telemetry is not None:
+            system_telemetry_enabled = telemetry.enabled
+            # endpoint is empty when disabled; surface host as a hint either way.
+            system_telemetry_host = telemetry._cfg.host  # type: ignore[attr-defined]
 
     return render_template(
         "settings.html",
@@ -549,6 +556,8 @@ def settings_area(area: str) -> str | Response:
         system_history=system_history,
         system_backups=system_backups,
         system_dev_mode=bool(current_app.debug),
+        system_telemetry_enabled=system_telemetry_enabled,
+        system_telemetry_host=system_telemetry_host,
     )
 
 
@@ -747,6 +756,26 @@ def system_backup_delete(backup_id: str) -> Response:
         flash(f"Deleted backup {backup_id}.", "ok")
     else:
         flash(f"No backup named {backup_id}.", "error")
+    return _system_redirect()
+
+
+@bp.post("/settings/system/telemetry/test")
+def system_telemetry_test() -> Response:
+    """Fire a synchronous app.started and surface the outcome in a flash
+    + the Events tab. Useful for re-checking the endpoint without
+    toggling the setting off and on."""
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is None or not telemetry.enabled:
+        flash(
+            "Telemetry is off. Tick the toggle in Settings → Server → App first.",
+            "error",
+        )
+        return _system_redirect()
+    err = telemetry.test_send()
+    if err:
+        flash(f"Test event failed: {err}. Check the endpoint config.", "error")
+    else:
+        flash("Test event delivered. Check the Events tab for the row.", "ok")
     return _system_redirect()
 
 

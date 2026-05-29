@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from app import telemetry as tm
+from app.state.event_log import EventLog
 
 # ----- instance id ----------------------------------------------------
 
@@ -318,6 +319,89 @@ def test_test_send_when_disabled_returns_short_message(tmp_path: Path) -> None:
     t = tm.Telemetry.disabled()
     err = t.test_send()
     assert err is not None and "disabled" in err.lower()
+
+
+# ----- event log wiring ---------------------------------------------
+
+
+def _make_enabled_with_event_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> tuple[tm.Telemetry, EventLog]:
+    monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_HOST", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_APP_KEY", raising=False)
+    monkeypatch.setattr(tm, "APTABASE_HOST", "https://analytics.example.com")
+    monkeypatch.setattr(tm, "APTABASE_APP_KEY", "AK-1234")
+    log = EventLog(tmp_path / "events.db")
+    t = tm.Telemetry.from_settings(
+        data_root=tmp_path,
+        app_version="0.4.2",
+        settings_app={"telemetry_enabled": True},
+        event_log=log,
+    )
+    return t, log
+
+
+def test_test_send_records_success_row_in_event_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _FakeResp())
+    t, log = _make_enabled_with_event_log(tmp_path, monkeypatch)
+    try:
+        assert t.test_send() is None
+    finally:
+        t.shutdown(timeout=1.0)
+    rows = log.list(type="telemetry", limit=10)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.source == "app.started"
+    assert row.status == "sent"
+    assert row.error is None
+    assert row.target == "https://analytics.example.com"
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
+def test_test_send_records_failure_row_in_event_log(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def http_error(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del req, timeout
+        raise urllib.error.HTTPError(
+            url="https://x/api/v0/event",
+            code=401,
+            msg="Unauthorized",
+            hdrs=None,  # type: ignore[arg-type]
+            fp=BytesIO(b""),
+        )
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", http_error)
+    t, log = _make_enabled_with_event_log(tmp_path, monkeypatch)
+    try:
+        err = t.test_send()
+    finally:
+        t.shutdown(timeout=1.0)
+    assert err is not None
+    rows = log.list(type="telemetry", limit=10)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.status == "failed"
+    assert row.error is not None and "401" in row.error
+
+
+def test_async_send_records_row_via_worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Background ``send()`` path must also log a telemetry row when it
+    runs (otherwise the Events tab would only ever see test_send rows)."""
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _FakeResp())
+    t, log = _make_enabled_with_event_log(tmp_path, monkeypatch)
+    try:
+        t.send("update.applied", {"from": "deadbee", "to": "cafef00"})
+        _drain(t)
+        # Give the worker a beat to call _post + record after dequeue.
+        time.sleep(0.1)
+    finally:
+        t.shutdown(timeout=1.0)
+    rows = log.list(type="telemetry", limit=10)
+    assert any(r.source == "update.applied" and r.status == "sent" for r in rows)
 
 
 def test_disabled_send_makes_no_http_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -51,6 +51,10 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.state.event_log import EventLog
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +135,9 @@ class Telemetry:
     event; the worker thread drains the queue and posts. :meth:`shutdown`
     drains and stops; never required (the worker is a daemon thread)."""
 
-    def __init__(self, cfg: TelemetryConfig) -> None:
+    def __init__(self, cfg: TelemetryConfig, event_log: EventLog | None = None) -> None:
         self._cfg = cfg
+        self._event_log = event_log
         self._queue: queue.Queue[tuple[str, dict[str, str]] | None] = queue.Queue(
             maxsize=QUEUE_CAPACITY
         )
@@ -151,6 +156,7 @@ class Telemetry:
         data_root: Path,
         app_version: str,
         settings_app: dict,
+        event_log: EventLog | None = None,
     ) -> Telemetry:
         """Resolve enable-flag + env-var endpoint overrides into a config.
 
@@ -158,7 +164,11 @@ class Telemetry:
         :data:`APTABASE_APP_KEY`. ``TESSERAE_TELEMETRY_HOST`` and
         ``TESSERAE_TELEMETRY_APP_KEY`` override them — these exist only
         as a dev convenience for the maintainer, not as a public
-        re-aiming knob. ``TESSERAE_TELEMETRY=0`` kills it hard."""
+        re-aiming knob. ``TESSERAE_TELEMETRY=0`` kills it hard.
+
+        ``event_log`` (optional): when provided, each send attempt is
+        recorded as a ``type="telemetry"`` row so the Events tab shows
+        whether the endpoint is actually reachable."""
         enabled_setting = bool(settings_app.get("telemetry_enabled", False))
         host = os.environ.get("TESSERAE_TELEMETRY_HOST", "").strip() or APTABASE_HOST
         key = os.environ.get("TESSERAE_TELEMETRY_APP_KEY", "").strip() or APTABASE_APP_KEY
@@ -170,7 +180,8 @@ class Telemetry:
                 app_key=key,
                 instance_id=_ensure_instance_id(data_root),
                 app_version=app_version,
-            )
+            ),
+            event_log=event_log,
         )
 
     @classmethod
@@ -259,7 +270,11 @@ class Telemetry:
 
     def _post(self, event_name: str, props: dict[str, str]) -> str | None:
         """POST one event. Returns ``None`` on a 2xx response or a short
-        error string on failure (HTTPError gets ``HTTP <code> <reason>``)."""
+        error string on failure (HTTPError gets ``HTTP <code> <reason>``).
+
+        Records a ``type="telemetry"`` row in the event log either way so
+        the Events tab can show success / failure side-by-side with push
+        history."""
         body = {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
@@ -278,19 +293,30 @@ class Telemetry:
             },
             method="POST",
         )
+        started = datetime.now(UTC).timestamp()
+        err_msg: str | None = None
         try:
             with urllib.request.urlopen(req, timeout=SEND_TIMEOUT_S) as resp:
                 resp.read(1)  # discard body
-            return None
         except urllib.error.HTTPError as err:
-            msg = f"HTTP {err.code} {err.reason}"
-            logger.debug("telemetry: send failed (%s): %s", event_name, msg)
-            return msg
+            err_msg = f"HTTP {err.code} {err.reason}"
+            logger.debug("telemetry: send failed (%s): %s", event_name, err_msg)
         except urllib.error.URLError as err:
-            msg = str(err.reason or err)
-            logger.debug("telemetry: send failed (%s): %s", event_name, msg)
-            return msg
+            err_msg = str(err.reason or err)
+            logger.debug("telemetry: send failed (%s): %s", event_name, err_msg)
         except OSError as err:
-            msg = str(err)
-            logger.debug("telemetry: send error (%s): %s", event_name, msg)
-            return msg
+            err_msg = str(err)
+            logger.debug("telemetry: send error (%s): %s", event_name, err_msg)
+        if self._event_log is not None:
+            with contextlib.suppress(Exception):
+                # Logging is best-effort — never let an event-log issue
+                # take down the worker thread or the request thread.
+                self._event_log.record(
+                    type="telemetry",
+                    source=event_name,
+                    target=self._cfg.host,
+                    status="sent" if err_msg is None else "failed",
+                    error=err_msg,
+                    duration_s=datetime.now(UTC).timestamp() - started,
+                )
+        return err_msg

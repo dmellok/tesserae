@@ -3,7 +3,8 @@
 A dedicated page that reads the same EventLog the Send-page history reads —
 but unfiltered. Chips at the top scope to one event type at a time.
 
-Types in v1: ``push``, ``renderer``, ``device``, ``scheduler``, ``auth``.
+Types in v1: ``push``, ``renderer``, ``device``, ``scheduler``, ``auth``,
+``telemetry``.
 
 The ``/events/stream`` endpoint is a Server-Sent Events feed: every new
 row written to the EventLog is pushed to subscribed clients. Dev werkzeug
@@ -34,7 +35,7 @@ from app.state.event_log import EventLog, EventRow
 bp = Blueprint("events", __name__, url_prefix="/events")
 
 
-_KNOWN_TYPES: tuple[str, ...] = ("push", "renderer", "device", "scheduler", "auth")
+_KNOWN_TYPES: tuple[str, ...] = ("push", "renderer", "device", "scheduler", "auth", "telemetry")
 _MAX_LIMIT: int = 500
 
 
