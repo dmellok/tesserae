@@ -143,6 +143,7 @@ def update_instance_panel(
     orientation: str,
     gamut: str | None = None,
     underscan: int | None = None,
+    icon: str | None = None,
 ) -> InstanceResult:
     """Patch an instance's panel block on disk + reload in place.
 
@@ -152,7 +153,8 @@ def update_instance_panel(
     180° turn, the landscape/portrait part is the canvas aspect.
     ``gamut`` is the panel's colour gamut (see ``PANEL_GAMUTS``); the .bin
     packer keys its palette off it. ``underscan`` insets the frame by N
-    pixels per edge to clear a mat/bezel. ``None`` leaves either value."""
+    pixels per edge to clear a mat/bezel. ``icon`` is a top-level Phosphor
+    slug for device pickers. ``None`` leaves any of these untouched."""
     device = devices.get(instance_id)
     if device is None or device.kind_of is None:
         return InstanceResult(None, f"Unknown device {instance_id!r}.")
@@ -175,6 +177,14 @@ def update_instance_panel(
         # Clamp so the inset can't swallow the panel (keep at least half).
         panel_block["underscan"] = max(0, min(underscan, min(w, h) // 2 - 1))
     raw["panel"] = panel_block
+    if icon is not None:
+        # Top-level (device-wide), not a panel attribute. Blank clears the
+        # override so the device falls back to its kind's default icon.
+        cleaned = icon.strip()
+        if cleaned:
+            raw["icon"] = cleaned
+        else:
+            raw.pop("icon", None)
     inst_file.write_text(json.dumps(raw, indent=2) + "\n")
 
     devices.devices.pop(instance_id, None)

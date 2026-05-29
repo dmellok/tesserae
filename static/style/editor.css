@@ -544,20 +544,6 @@
   text-align: center;
 }
 
-/* Device checklist — multi-select of bindable instances. */
-.device-checklist {
-  display: grid;
-  gap: 6px;
-}
-.device-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.device-check input { margin: 0; }
-
 .cell-card {
   scroll-margin-top: 16px;
   transition:

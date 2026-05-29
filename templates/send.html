@@ -32,20 +32,28 @@
 </section>
 {% endmacro %}
 
-{# Target-device picker shared by the File / URL / Webpage tabs. Empty
-   value = fan out to every renderer using the virtual panel. Selecting
-   an instance routes only to its renderers + sizes to its panel. #}
+{# Target-device picker shared by the File / URL / Webpage tabs. Tick any
+   number of displays; the push renders + fans out to each. Nothing ticked
+   = fan out to every renderer using the virtual panel. Mirrors the
+   dashboard editor's device checklist. #}
 {% macro device_picker(field_id) %}
 {% if device_options %}
 <div class="field">
-  <label for="{{ field_id }}">Target device</label>
-  <select id="{{ field_id }}" name="device_id">
-    <option value="">(any — all renderers, virtual panel)</option>
+  <label>Target devices</label>
+  <div class="device-checklist">
     {% for d in device_options %}
-    <option value="{{ d.id }}">{{ d.label }}</option>
+    <label class="device-check">
+      <input type="checkbox" name="device_id" value="{{ d.id }}">
+      <span class="device-check-icon"><i class="ph ph-{{ d.icon }}" aria-hidden="true"></i></span>
+      <span class="device-check-body">
+        <span class="device-check-name">{{ d.label }}</span>
+        <span class="device-check-dims">{{ d.dims }}</span>
+      </span>
+      <span class="device-check-tick"><i class="ph ph-check" aria-hidden="true"></i></span>
+    </label>
     {% endfor %}
-  </select>
-  <p class="field-help">Limits the push to one display's renderers and panel size. Leave on "any" to fan out everywhere.</p>
+  </div>
+  <p class="field-help">Each ticked display is rendered at its own panel size and gets its own push. Tick none to fan out to every renderer using the virtual panel.</p>
 </div>
 {% endif %}
 {% endmacro %}

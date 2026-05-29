@@ -83,6 +83,17 @@ class Device:
         return self.name
 
     @property
+    def icon(self) -> str:
+        """Phosphor icon slug (no ``ph-`` prefix) for device pickers and the
+        settings card. Comes from the manifest — kinds declare a sensible
+        default in ``device.json`` and instances inherit it until the user
+        picks their own. Falls back to a generic display glyph."""
+        raw = self.manifest.get("icon")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+        return "monitor"
+
+    @property
     def renderer_ids(self) -> list[str]:
         return [str(r) for r in self.manifest.get("renderers", [])]
 
@@ -376,6 +387,8 @@ def load_instance_file(
         return None
     inst_manifest: dict[str, Any] = dict(kind.manifest)
     inst_manifest["name"] = str(raw_inst.get("name") or kind.name)
+    if isinstance(raw_inst.get("icon"), str) and raw_inst["icon"].strip():
+        inst_manifest["icon"] = raw_inst["icon"].strip()
     if raw_inst.get("status_topic"):
         inst_manifest["status_topic"] = str(raw_inst["status_topic"])
     if "config_topic" in raw_inst:

@@ -15,6 +15,7 @@ Tabs:
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -32,7 +33,7 @@ from werkzeug.wrappers import Response
 
 from app.device_loader import DeviceRegistry
 from app.panel import resolve_settings_panel
-from app.push import PushManager
+from app.push import PushManager, PushResult
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog, EventRow
 from app.state.page_store import PageStore
@@ -71,21 +72,29 @@ def _device_options() -> list[dict[str, str]]:
     for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
         if dev.kind_of is None or dev.panel is None:
             continue
-        opts.append({"id": dev.id, "label": dev.display_name})
+        opts.append(
+            {
+                "id": dev.id,
+                "label": dev.display_name,
+                "icon": dev.icon,
+                "dims": f"{dev.panel['w']}×{dev.panel['h']}",
+            }
+        )
     return opts
 
 
-def _form_device_id() -> str | None:
-    """Read + validate the optional target-device field. Empty / unknown
-    falls back to None (fan out to every renderer using the virtual
-    panel)."""
-    raw = (request.form.get("device_id") or "").strip()
-    if not raw:
-        return None
+def _form_device_ids() -> list[str]:
+    """Read + validate the multi-select target-device field. Unknown ids
+    are dropped; an empty list means "any" (fan out to every renderer
+    using the virtual panel)."""
     registry = _devices()
-    if registry is None or raw not in registry.devices:
-        return None
-    return raw
+    if registry is None:
+        return []
+    return [
+        raw
+        for raw in (v.strip() for v in request.form.getlist("device_id"))
+        if raw and raw in registry.devices
+    ]
 
 
 def _flash_result(label: str, status: str, error: str | None) -> None:
@@ -95,6 +104,41 @@ def _flash_result(label: str, status: str, error: str | None) -> None:
         flash(f"{label}: another push in flight — try again.", "error")
     else:
         flash(f"{label}: {status}{(' — ' + error) if error else ''}", "error")
+
+
+def _device_label(device_id: str | None) -> str:
+    """Friendly name for a target id; ``None`` is the virtual-panel fan-out."""
+    if device_id is None:
+        return "all renderers"
+    registry = _devices()
+    dev = registry.devices.get(device_id) if registry is not None else None
+    return dev.display_name if dev is not None else device_id
+
+
+def _push_to_targets(
+    label: str, targets: list[str], push: Callable[[str | None], PushResult]
+) -> None:
+    """Run a one-off push once per selected device (or once with ``None`` —
+    the virtual-panel fan-out — when none are selected), then flash one
+    combined summary. Each call logs its own History row."""
+    ids: list[str | None] = list(targets) if targets else [None]
+    results = [(tid, push(tid)) for tid in ids]
+    sent = [tid for tid, r in results if r.status == "sent"]
+    failed = [(tid, r) for tid, r in results if r.status != "sent"]
+    if sent and not failed:
+        flash(f"{label}: sent to {', '.join(_device_label(t) for t in sent)}.", "ok")
+    elif sent and failed:
+        names = ", ".join(_device_label(t) for t, _ in failed)
+        flash(
+            f"{label}: sent to {', '.join(_device_label(t) for t in sent)}; failed for {names}.",
+            "warn",
+        )
+    else:
+        _, first = failed[0]
+        if first.status == "busy":
+            flash(f"{label}: another push in flight — try again.", "error")
+        else:
+            flash(f"{label}: {first.status}{(' — ' + first.error) if first.error else ''}", "error")
 
 
 def _relative(epoch: float) -> str:
@@ -178,10 +222,12 @@ def send_file() -> Response:
     if not image_bytes:
         flash("Uploaded file was empty.", "error")
         return redirect(url_for("send.index", tab="file"))
-    result = _push().push_image(
-        image_bytes, source_label=upload.filename, device_id=_form_device_id()
+    filename = upload.filename
+    _push_to_targets(
+        f"File {filename!r}",
+        _form_device_ids(),
+        lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid),
     )
-    _flash_result(f"File {upload.filename!r}", result.status, result.error)
     return redirect(url_for("send.index", tab="history"))
 
 
@@ -202,8 +248,11 @@ def send_url() -> Response:
     if not url:
         flash("Paste an image URL first.", "error")
         return redirect(url_for("send.index", tab="url"))
-    result = _push().push_url_image(url, device_id=_form_device_id())
-    _flash_result(f"URL {url}", result.status, result.error)
+    _push_to_targets(
+        f"URL {url}",
+        _form_device_ids(),
+        lambda tid: _push().push_url_image(url, device_id=tid),
+    )
     return redirect(url_for("send.index", tab="history"))
 
 
@@ -219,10 +268,13 @@ def send_webpage() -> Response:
     except ValueError:
         flash("Viewport dimensions must be integers.", "error")
         return redirect(url_for("send.index", tab="webpage"))
-    result = _push().push_webpage(
-        url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=_form_device_id()
+    _push_to_targets(
+        f"Webpage {url}",
+        _form_device_ids(),
+        lambda tid: _push().push_webpage(
+            url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid
+        ),
     )
-    _flash_result(f"Webpage {url}", result.status, result.error)
     return redirect(url_for("send.index", tab="history"))
 
 

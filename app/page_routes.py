@@ -314,10 +314,12 @@ def _editor_context(page: Page) -> dict[str, Any]:
                 {
                     "id": dev.id,
                     "name": dev.name,
+                    "icon": dev.icon,
                     # display_name collapses the auto "Kind (id)" default
                     # to just the id; dims stay so same-panel instances
                     # remain tellable apart.
-                    "label": f"{dev.display_name} ({dev.panel['w']}×{dev.panel['h']})",
+                    "label": dev.display_name,
+                    "dims": f"{dev.panel['w']}×{dev.panel['h']}",
                     "w": int(dev.panel["w"]),
                     "h": int(dev.panel["h"]),
                     "checked": dev.id in selected,

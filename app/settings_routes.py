@@ -35,6 +35,7 @@ from app import auth, calibration, device_service
 from app.calibration import build_calibration_card, target_orientation
 from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
+from app.network import detect_local_ip
 from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
@@ -57,12 +58,21 @@ bp = Blueprint("auth", __name__)
 # shape as plugin / renderer ``settings`` so the template can render them
 # through the same path.
 
-# Every IANA zone the host knows about, plus a "system" sentinel. Built
-# once at import; ``tzdata`` is a dependency so the list is complete and
-# consistent regardless of the host OS.
+# Canonical Area/City zones only, plus a "system" sentinel and explicit UTC.
+# ``zoneinfo.available_timezones()`` also returns legacy/compat buckets
+# (Etc/* fixed offsets, SystemV/*, country aliases like US/* and Brazil/*,
+# and single-word names like GMT or Japan) that just clutter a picker — we
+# drop those and keep the modern ``Area/City`` form most pickers show.
+# ``tzdata`` is a dependency so the list is complete regardless of host OS.
+_LEGACY_TZ_PREFIXES = ("Etc/", "SystemV/", "US/", "Canada/", "Brazil/", "Mexico/", "Chile/")
 _TZ_CHOICES: list[dict[str, str]] = [
     {"value": "system", "label": "System (host local time)"},
-    *({"value": tz, "label": tz} for tz in sorted(zoneinfo.available_timezones())),
+    {"value": "UTC", "label": "UTC"},
+    *(
+        {"value": tz, "label": tz}
+        for tz in sorted(zoneinfo.available_timezones())
+        if "/" in tz and not tz.startswith(_LEGACY_TZ_PREFIXES)
+    ),
 ]
 
 APP_FIELDS: list[dict[str, Any]] = [
@@ -149,7 +159,24 @@ PANEL_FIELDS: list[dict[str, Any]] = [
     },
 ]
 
+# Field order matters: the settings template groups the external-broker
+# fields (host/port/username/password) and the built-in-broker fields
+# (embedded_*) into two contiguous blocks it can show/hide. The
+# ``embedded_enabled`` switch leads the card; flipping it hides whichever
+# block is irrelevant. ``keepalive``/``client_id`` configure the client
+# connection either way, so they stay visible at the bottom.
 BROKER_FIELDS: list[dict[str, Any]] = [
+    {
+        "name": "embedded_enabled",
+        "type": "switch",
+        "label": "Built-in broker",
+        "default": False,
+        "help": (
+            "Run an in-process MQTT broker (amqtt). Convenient when you "
+            "don't have a Mosquitto host handy; leave off to point Tesserae "
+            "at an external broker instead."
+        ),
+    },
     {"name": "host", "type": "string", "label": "Host", "default": ""},
     {
         "name": "port",
@@ -161,33 +188,6 @@ BROKER_FIELDS: list[dict[str, Any]] = [
     },
     {"name": "username", "type": "string", "label": "Username", "default": ""},
     {"name": "password", "type": "string", "label": "Password", "default": "", "secret": True},
-    {
-        "name": "keepalive",
-        "type": "slider",
-        "label": "Keepalive (seconds)",
-        "default": 60,
-        "min": 10,
-        "max": 600,
-        "step": 5,
-        "unit": "s",
-    },
-    {
-        "name": "client_id",
-        "type": "string",
-        "label": "MQTT client id",
-        "default": "tesserae",
-    },
-    {
-        "name": "embedded_enabled",
-        "type": "switch",
-        "label": "Built-in broker",
-        "default": False,
-        "help": (
-            "Run an in-process MQTT broker (amqtt). Convenient when you "
-            "don't have a Mosquitto host handy; leave off for any "
-            "non-trivial deployment."
-        ),
-    },
     {
         "name": "embedded_port",
         "type": "number",
@@ -226,6 +226,22 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "default": "",
         "secret": True,
         "help": "Stored on disk in a hashed password file the broker reads on start.",
+    },
+    {
+        "name": "keepalive",
+        "type": "slider",
+        "label": "Keepalive (seconds)",
+        "default": 60,
+        "min": 10,
+        "max": 600,
+        "step": 5,
+        "unit": "s",
+    },
+    {
+        "name": "client_id",
+        "type": "string",
+        "label": "MQTT client id",
+        "default": "tesserae",
     },
 ]
 
@@ -798,6 +814,7 @@ def devices_update_panel(instance_id: str) -> Response:
         orientation=form.get("panel_orientation") or "landscape",
         gamut=form.get("panel_gamut"),
         underscan=underscan,
+        icon=form.get("device_icon"),
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
@@ -1022,6 +1039,7 @@ def _build_sections() -> list[dict[str, Any]]:
             "fields": APP_FIELDS,
             "state": _values_for_core("app", APP_FIELDS, app_raw),
             "endpoint": url_for("auth.settings_update", section_kind="app"),
+            "meta": {"Network IP": detect_local_ip()},
         }
     )
 
@@ -1035,6 +1053,7 @@ def _build_sections() -> list[dict[str, Any]]:
             "fields": BROKER_FIELDS,
             "state": _values_for_core("broker", BROKER_FIELDS, broker_raw),
             "endpoint": url_for("auth.settings_update", section_kind="broker"),
+            "meta": {"MQTT URL": _broker_mqtt_url(broker_raw)},
         }
     )
 
@@ -1103,6 +1122,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 "id": sid,
                 "kind": "device",
                 "title": f"Device: {device.name}",
+                "icon": device.icon,
                 "blurb": device.manifest.get("description") or "",
                 "fields": fields,
                 "state": (
@@ -1216,6 +1236,38 @@ def _values_for_core(
         else:
             out[name] = field.get("default", "")
     return out
+
+
+def _truthy_setting(value: object) -> bool:
+    """Loose truthiness for stored switch values (bool, ``"true"``/``"on"``, 1)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def _broker_mqtt_url(raw: dict[str, Any]) -> str:
+    """The ``mqtt://host:port`` clients should point at, from the saved
+    broker config. For the built-in broker a 0.0.0.0 bind resolves to the
+    host's LAN IP (what other machines actually connect to) and a loopback
+    bind stays 127.0.0.1; for an external broker it's the configured
+    host:port. Returns ``—`` when no external host is set."""
+    if _truthy_setting(raw.get("embedded_enabled")):
+        bind = str(raw.get("embedded_bind") or "127.0.0.1").strip() or "127.0.0.1"
+        port = raw.get("embedded_port") or 1883
+        if bind in ("0.0.0.0", "::"):
+            host = detect_local_ip()
+        elif bind in ("127.0.0.1", "localhost", "::1"):
+            host = "127.0.0.1"
+        else:
+            host = bind
+    else:
+        host = str(raw.get("host") or "").strip()
+        port = raw.get("port") or 1883
+        if not host:
+            return "—"
+    return f"mqtt://{host}:{port}"
 
 
 def _apply_broker_change() -> None:

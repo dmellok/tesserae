@@ -113,6 +113,37 @@
   color: var(--t-muted);
 }
 
+/* Curated device-icon picker — a row of selectable glyph tiles. */
+.device-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+}
+.device-icon-pick {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  color: var(--t-fg-soft);
+  font-size: 20px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.device-icon-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.device-icon-pick:hover { border-color: var(--t-border-strong); color: var(--t-fg); }
+.device-icon-pick:has(input:checked) {
+  border-color: var(--t-accent);
+  background: var(--t-accent-soft);
+  color: var(--t-accent-ink);
+}
+.device-icon-pick:focus-within {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+
 /* Calibrate (left) + Delete (right) on one row, divided from the
    sections above. Wraps to a column on narrow screens. */
 .device-footer {

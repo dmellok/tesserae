@@ -11,6 +11,10 @@
       "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$"
     },
     "name": { "type": "string", "minLength": 1 },
+    "icon": {
+      "type": "string",
+      "description": "Phosphor icon slug (no 'ph-' prefix) shown in device pickers and the settings card. Instances may override the kind's default."
+    },
     "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$" },
     "description": { "type": "string" },
     "renderers": {

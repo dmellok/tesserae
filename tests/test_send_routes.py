@@ -125,9 +125,11 @@ def test_send_picker_lists_registered_instances_only(app: Flask) -> None:
         "/settings/devices/add", data={"id": "esp32_lab", "kind": "esp32_client", "name": "Lab"}
     )
     body = client.get("/send").get_data(as_text=True)
-    # Instance shows up in the picker with its custom display name.
-    assert ">Lab</option>" in body
+    # Instance shows up in the multi-select checklist with its custom
+    # display name and a checkbox carrying its id.
+    assert ">Lab</span>" in body
     assert 'name="device_id"' in body
+    assert 'value="esp32_lab"' in body
     assert "ESP32 client" not in body  # kind name, not offered
 
 

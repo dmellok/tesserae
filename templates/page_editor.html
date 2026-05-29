@@ -245,7 +245,12 @@
             <label class="device-check">
               <input type="checkbox" name="device_ids" value="{{ d.id }}"
                      {% if d.checked %}checked{% endif %} data-reload-on-change="1">
-              <span>{{ d.label }}</span>
+              <span class="device-check-icon"><i class="ph ph-{{ d.icon }}" aria-hidden="true"></i></span>
+              <span class="device-check-body">
+                <span class="device-check-name">{{ d.label }}</span>
+                <span class="device-check-dims">{{ d.dims }}</span>
+              </span>
+              <span class="device-check-tick"><i class="ph ph-check" aria-hidden="true"></i></span>
             </label>
             {% endfor %}
           </div>

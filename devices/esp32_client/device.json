@@ -1,6 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "ESP32 client",
+  "icon": "device-tablet",
   "version": "0.1.0",
   "description": "Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. Publishes battery / RSSI / IP heartbeats on wake; reads its sleep-interval config from the broker.",
   "renderers": ["esp32_bin"],

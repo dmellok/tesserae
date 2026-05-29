@@ -1,6 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Pi BIN client",
+  "icon": "monitor",
   "version": "0.1.0",
   "description": "Raspberry-Pi-side client that consumes the 4-bpp .bin frame. Subscribes to tesserae/pi_bin/frame/bin; publishes a heartbeat with idle/rendering state and the last paint timestamp.",
   "renderers": ["pi_bin"],

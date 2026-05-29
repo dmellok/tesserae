@@ -115,7 +115,7 @@
 <section class="card {% if section.kind == 'panel' %}panel-section{% endif %}" id="{{ section.id }}">
   <header class="card-head">
     <h2>
-      <span class="icon-box"><i class="ph ph-{{ KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
+      <span class="icon-box"><i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
       <span>{{ section.title }}</span>
     </h2>
     {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
@@ -153,19 +153,26 @@
           'help': 'Push pipeline skips this renderer when off — settings stay saved.',
       }, section.enabled) }}
     {% endif %}
-    {% set ns = namespace(in_embedded_group=false) %}
+    {# Broker card: wrap the external-broker fields and the built-in-broker
+       fields in two groups the script below shows/hides off the
+       ``embedded_enabled`` switch. Other sections render flat. #}
+    {% set ns = namespace(group=none) %}
     {% for field in section.fields %}
       {% set value = section.state.get(field.name, field.get('default', '')) %}
       {% set field_id = section.id ~ '-' ~ field.name %}
-      {% set embedded_secondary = field.name in (
-          'embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password'
-      ) %}
-      {% if embedded_secondary and not ns.in_embedded_group %}
-        <div class="embedded-broker-fields">
-        {% set ns.in_embedded_group = true %}
-      {% elif not embedded_secondary and ns.in_embedded_group %}
-        </div>
-        {% set ns.in_embedded_group = false %}
+      {% set this_group = none %}
+      {% if section.kind == 'broker' %}
+        {% if field.name in ('host', 'port', 'username', 'password') %}
+          {% set this_group = 'external' %}
+        {% elif field.name in ('embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password') %}
+          {% set this_group = 'embedded' %}
+        {% endif %}
+      {% endif %}
+      {% if this_group != ns.group %}
+        {% if ns.group %}</div>{% endif %}
+        {% if this_group == 'external' %}<div class="external-broker-fields">
+        {% elif this_group == 'embedded' %}<div class="embedded-broker-fields">{% endif %}
+        {% set ns.group = this_group %}
       {% endif %}
       {% if section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
         <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
@@ -173,7 +180,7 @@
         {{ auto_field(field_id, field.name, field, value) }}
       {% endif %}
     {% endfor %}
-    {% if ns.in_embedded_group %}</div>{% endif %}
+    {% if ns.group %}</div>{% endif %}
     <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
   </form>
   {% endif %}
@@ -183,8 +190,26 @@
      The JS below swaps w/h live when the aspect (landscape↔portrait)
      changes so the form is WYSIWYG; the backend persists what's shown. #}
   <div class="device-subsection">
-    <p class="device-subhead">Panel &amp; orientation</p>
+    <p class="device-subhead">Appearance &amp; panel</p>
     <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
+      {# Curated device icons — a small, display-oriented set rather than the
+         editor's full icon search; covers form-factors + a few rooms. A
+         current value outside the set is appended so it stays selectable. #}
+      {% set base_device_icons = ['monitor','device-tablet','device-mobile','desktop','television-simple','frame-corners','image-square','squares-four','house','couch','coffee','briefcase'] %}
+      {% set current_icon = section.icon or 'monitor' %}
+      {% set device_icons = base_device_icons if current_icon in base_device_icons else base_device_icons + [current_icon] %}
+      <div class="field">
+        <label>Icon</label>
+        <div class="device-icon-grid" role="radiogroup" aria-label="Device icon">
+          {% for ic in device_icons %}
+          <label class="device-icon-pick" title="{{ ic }}">
+            <input type="radio" name="device_icon" value="{{ ic }}" {% if ic == current_icon %}checked{% endif %}>
+            <i class="ph ph-{{ ic }}" aria-hidden="true"></i>
+          </label>
+          {% endfor %}
+        </div>
+        <p class="field-help">Shown in device pickers, the dashboard editor, and the send page.</p>
+      </div>
       {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
           value=section.panel.get('orientation', 'landscape'),
           options=[{'value':'landscape','label':'0°'},
@@ -278,17 +303,18 @@
 {% endif %}
 
 <script>
-  // Embedded broker: hide the bind/port/auth fields unless the
-  // master switch is on. The fields stay in the DOM (still POSTed)
-  // so flipping the switch back doesn't blow away previously-typed
-  // values.
+  // Built-in broker switch: show the embedded bind/port/auth fields and
+  // hide the external host/port/auth fields when on — and vice versa.
+  // Both groups stay in the DOM (still POSTed) so flipping the switch
+  // doesn't blow away previously-typed values.
   (function () {
-    const group = document.querySelector('.embedded-broker-fields');
-    if (!group) return;
+    const embedded = document.querySelector('.embedded-broker-fields');
+    const external = document.querySelector('.external-broker-fields');
     const toggle = document.querySelector('input[name="embedded_enabled"]');
-    if (!toggle) return;
+    if (!toggle || (!embedded && !external)) return;
     function apply() {
-      group.classList.toggle('is-collapsed', !toggle.checked);
+      if (embedded) embedded.classList.toggle('is-collapsed', !toggle.checked);
+      if (external) external.classList.toggle('is-collapsed', toggle.checked);
     }
     toggle.addEventListener('change', apply);
     apply();

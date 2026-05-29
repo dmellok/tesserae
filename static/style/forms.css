@@ -715,9 +715,83 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .panel-custom-fields { display: none; }
 .panel-section.is-custom .panel-custom-fields { display: contents; }
 
-/* Built-in broker fields — hidden when the master switch is off. */
-.embedded-broker-fields { display: contents; }
-.embedded-broker-fields.is-collapsed { display: none; }
+/* Broker fields — the master switch swaps which set shows: built-in
+   fields when on, external host/auth fields when off. */
+.embedded-broker-fields,
+.external-broker-fields { display: contents; }
+.embedded-broker-fields.is-collapsed,
+.external-broker-fields.is-collapsed { display: none; }
+
+/* ----- Device checklist — selectable icon tiles -------------------- *
+ * Shared by the dashboard editor (multi-bind a page) and the Send page
+ * (multi-target a one-off push). Each row is a card; the native control
+ * (checkbox or radio) is visually hidden and the card reflects state via
+ * :has(). Works for both since :checked is control-agnostic. */
+.device-checklist {
+  display: grid;
+  gap: var(--t-space-2);
+}
+.device-check {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  padding: var(--t-space-2) var(--t-space-3);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.device-check input { position: absolute; opacity: 0; pointer-events: none; }
+.device-check:hover { border-color: var(--t-border-strong); }
+.device-check:focus-within { outline: 2px solid var(--t-accent); outline-offset: 2px; }
+.device-check:has(input:checked) {
+  border-color: var(--t-accent);
+  background: var(--t-accent-soft);
+}
+.device-check-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface-sunk);
+  color: var(--t-fg-soft);
+  font-size: 18px;
+}
+.device-check:has(input:checked) .device-check-icon {
+  background: var(--t-surface);
+  color: var(--t-accent);
+}
+.device-check-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.25;
+}
+.device-check-name {
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  color: var(--t-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.device-check-dims {
+  font-size: var(--t-size-xs);
+  color: var(--t-muted);
+}
+.device-check-tick {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--t-accent);
+  font-size: 18px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.device-check:has(input:checked) .device-check-tick { opacity: 1; }
 
 /* ----- Discovered devices strip (Settings → Devices) --------------- */
 .discovery-list {
