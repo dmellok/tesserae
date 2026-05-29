@@ -355,7 +355,15 @@ def blueprint() -> Blueprint:
         thumb = _thumb_path(data_dir, folder, filename, source)
         result = _ensure_thumbnail(source, thumb)
         if result is None:
-            return send_from_directory(target_dir, filename)
+            # Thumbnail generation failed — unreadable file (locked, or a
+            # OneDrive/cloud "online-only" placeholder), or a format Pillow
+            # won't decode. Try the original, but never 500 on a single bad
+            # image: a thumbnail that won't load is fine, the gallery just
+            # skips it.
+            try:
+                return send_from_directory(target_dir, filename)
+            except OSError:
+                abort(404)
         response = send_file(result, mimetype="image/jpeg", conditional=True)
         # The thumbnail URL embeds the source mtime, so the browser can
         # cache aggressively — a re-upload will hit a different URL.
