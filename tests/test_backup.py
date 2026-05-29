@@ -147,7 +147,28 @@ def test_excluded_subpaths_recorded_in_metadata(tmp_path: Path) -> None:
     with zipfile.ZipFile(backup.path) as zf:
         meta = json.loads(zf.read(bk.META_NAME))
     assert "plugins/picture_gallery" in meta["excluded_subpaths"]
+    assert "core/renders" in meta["excluded_subpaths"]
     assert meta["version"] >= 2
+
+
+def test_render_cache_artifacts_are_excluded(tmp_path: Path) -> None:
+    """core/renders is the content-addressed push cache — regenerable
+    and potentially large, so it shouldn't ride along in backups."""
+    import zipfile
+
+    root = tmp_path / "data"
+    _seed(root)
+    renders = root / "core" / "renders"
+    renders.mkdir(parents=True)
+    (renders / "abc1234.png").write_bytes(b"\x89PNG" + b"x" * 200_000)
+    (renders / "abc1234.bin").write_bytes(b"y" * 400_000)
+
+    backup = bk.create(root)
+    with zipfile.ZipFile(backup.path) as zf:
+        names = set(zf.namelist())
+    assert not any(n.startswith("core/renders/") for n in names), [
+        n for n in names if n.startswith("core/renders/")
+    ]
 
 
 def test_restore_preserves_users_gallery_photos(tmp_path: Path) -> None:

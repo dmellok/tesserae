@@ -39,11 +39,18 @@ LABEL_PRE_UPDATE = "pre-update"
 # snapshot — dotfiles (config like ``.folders.json``) inside them are still
 # included so plugin metadata survives a restore.
 #
-# picture_gallery hosts user-uploaded images that can be tens of MB each;
-# including them would blow up every backup and double-store data the user
-# already has on disk. Restoring a backup that excluded a subpath does NOT
-# wipe the user's current files there — the photos persist across restores.
-DEFAULT_EXCLUDED_SUBPATHS: tuple[str, ...] = ("plugins/picture_gallery",)
+# - ``plugins/picture_gallery`` hosts user-uploaded photos (tens of MB each).
+# - ``core/renders`` is the push pipeline's content-addressed cache of
+#   composition PNGs and per-renderer ``.bin`` artifacts. These regenerate
+#   the moment any dashboard is pushed again, and the push code already
+#   handles the "PNG evicted from disk" case for old history entries.
+#
+# Restoring a backup that excluded a subpath does NOT wipe the user's
+# current files there — the photos / render cache persist across restores.
+DEFAULT_EXCLUDED_SUBPATHS: tuple[str, ...] = (
+    "plugins/picture_gallery",
+    "core/renders",
+)
 
 
 @dataclass(frozen=True)
