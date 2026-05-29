@@ -32,6 +32,10 @@ dependencies = [
     # Bundled IANA tz database so zoneinfo (scheduler + the timezone
     # picker) has a complete, consistent zone list on any host OS.
     "tzdata",
+    # Optional mDNS advertiser (Settings → opt-in): publishes
+    # tesserae.local + an _http._tcp service so the appliance is
+    # reachable by name without touching the host's hostname.
+    "zeroconf>=0.130,<1",
 ]
 
 [project.scripts]

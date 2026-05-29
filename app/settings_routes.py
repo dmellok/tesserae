@@ -118,6 +118,17 @@ APP_FIELDS: list[dict[str, Any]] = [
             "appear under a 'Tesserae' device in HA. Default off."
         ),
     },
+    {
+        "name": "mdns_enabled",
+        "type": "switch",
+        "label": "Advertise tesserae.local over mDNS",
+        "default": False,
+        "help": (
+            "Announce this server as tesserae.local (and an _http._tcp service) "
+            "over mDNS / Bonjour so you can reach it by name without changing "
+            "the host machine's hostname. Default off."
+        ),
+    },
 ]
 
 PANEL_FIELDS: list[dict[str, Any]] = [

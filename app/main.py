@@ -17,6 +17,7 @@ auth gate so test clients can hit /settings without juggling sessions.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import tzinfo
 from pathlib import Path
@@ -43,6 +44,7 @@ from app import (
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
+from app.mdns import MdnsAdvertiser
 from app.network import detect_base_url
 from app.push import PushManager
 from app.scheduler import Scheduler
@@ -60,6 +62,7 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 def create_app(
     *,
     testing: bool = False,
+    dev: bool = False,
     data_root: Path | None = None,
     plugins_dir: Path | None = None,
     renderers_dir: Path | None = None,
@@ -170,6 +173,7 @@ def create_app(
             event_log,
             renders_dir,
             testing=testing,
+            dev=dev,
         )
 
     app.config["REBUILD_TRANSPORT"] = rebuild_transport
@@ -290,6 +294,7 @@ def _rebuild_transport(
     renders_dir: Path,
     *,
     testing: bool,
+    dev: bool = False,
 ) -> None:
     """Tear down any existing transport, construct a fresh one from current
     broker settings, rewire the PushManager, and re-subscribe every loaded
@@ -451,6 +456,35 @@ def _rebuild_transport(
             app.config["HA_DISCOVERY"] = None
     else:
         app.config["HA_DISCOVERY"] = None
+
+    # mDNS: opt-in advertiser for tesserae.local (+ an _http._tcp service)
+    # so the appliance is reachable by name without touching the host's
+    # hostname. Stop any previous instance before (re)starting.
+    old_mdns: MdnsAdvertiser | None = app.config.get("MDNS_ADVERTISER")
+    if old_mdns is not None:
+        try:
+            old_mdns.stop()
+        except Exception:
+            logger.exception("stopping previous mDNS advertiser")
+        app.config.pop("MDNS_ADVERTISER", None)
+    if _truthy(app_section.get("mdns_enabled")) and not testing:
+        # DETECTED_HTTP_PORT is captured on the first request; at boot fall
+        # back to the env/default. Only the SRV record cares about the port
+        # — the tesserae.local A record resolves regardless.
+        env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
+        default_port = int(env_port) if env_port.isdigit() else 8000
+        port = int(app.config.get("DETECTED_HTTP_PORT") or default_port)
+        # Dev server advertises tesserae-dev.local so it can coexist with a
+        # production instance on the same LAN without a name clash.
+        advertiser = MdnsAdvertiser(hostname="tesserae-dev" if dev else "tesserae", port=port)
+        try:
+            advertiser.start()
+            app.config["MDNS_ADVERTISER"] = advertiser
+        except Exception:
+            logger.exception("starting mDNS advertiser")
+            app.config["MDNS_ADVERTISER"] = None
+    else:
+        app.config["MDNS_ADVERTISER"] = None
 
 
 def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
@@ -617,7 +651,7 @@ def _serve(argv: list[str] | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
     )
-    app = create_app()
+    app = create_app(dev=args.dev)
 
     if args.dev:
         logging.getLogger(__name__).info(
