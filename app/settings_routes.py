@@ -141,6 +141,21 @@ APP_FIELDS: list[dict[str, Any]] = [
             "the host machine's hostname. Default off."
         ),
     },
+    {
+        "name": "telemetry_enabled",
+        "type": "switch",
+        "label": "Send anonymous usage telemetry",
+        "default": False,
+        "help": (
+            "Two events to the project's analytics backend — app.started "
+            "(version + platform) and update.applied (from/to short SHA + "
+            "channel). Identified only by a random instance UUID; no IPs, "
+            "paths, settings, secrets, or push contents. Off by default; "
+            "helps the maintainer see how many people are running Tesserae "
+            "and what versions they're on. TESSERAE_TELEMETRY=0 disables "
+            "regardless of this setting."
+        ),
+    },
 ]
 
 PANEL_FIELDS: list[dict[str, Any]] = [
@@ -639,6 +654,17 @@ def system_update_apply() -> Response:
     if result.pip_changed:
         note += " (deps reinstalled)"
     flash(note + ". Restarting…", "ok")
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is not None:
+        telemetry.send(
+            "update.applied",
+            {
+                "from": result.from_sha[:7],
+                "to": result.to_sha[:7],
+                "channel": channel,
+                "pip_changed": "yes" if result.pip_changed else "no",
+            },
+        )
     _updater().restart(delay_s=1.5)
     return _system_redirect()
 

@@ -47,12 +47,48 @@ def test_root_lands_on_wizard_until_onboarded(app: Flask) -> None:
 def test_wizard_steps_render(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    for step in ("welcome", "broker", "device", "dashboard"):
+    for step in ("welcome", "broker", "device", "dashboard", "telemetry"):
         resp = client.get(f"/onboarding/{step}")
         assert resp.status_code == 200, step
     # Unknown step falls back to welcome.
     resp = client.get("/onboarding/bogus", follow_redirects=False)
     assert "/onboarding/welcome" in resp.location
+
+
+def test_telemetry_step_shows_a_pre_checked_consent_toggle(app: Flask) -> None:
+    """Default-on at the consent screen: the checkbox is rendered pre-
+    ticked so a user who just clicks Finish opts in. They can untick
+    it — the test below covers that path."""
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/onboarding/telemetry").get_data(as_text=True)
+    assert 'name="telemetry_enabled"' in body
+    assert "checked" in body
+    # And the explanation is honest about what's sent.
+    assert "app.started" in body
+    assert "update.applied" in body
+
+
+def test_finish_persists_telemetry_opt_in(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/onboarding/finish", data={"telemetry_enabled": "1"})
+    assert resp.status_code == 302
+    app_section = app.config["SETTINGS_STORE"].get_section("app")
+    assert app_section["telemetry_enabled"] is True
+    assert app_section["onboarded"] is True
+
+
+def test_finish_persists_telemetry_opt_out(app: Flask) -> None:
+    """Unchecked checkboxes don't post their name at all. Absence must
+    record an explicit False, not be silently ignored."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/onboarding/finish", data={})  # no telemetry_enabled
+    assert resp.status_code == 302
+    app_section = app.config["SETTINGS_STORE"].get_section("app")
+    assert app_section["telemetry_enabled"] is False
+    assert app_section["onboarded"] is True
 
 
 def test_broker_builtin_enables_embedded(app: Flask) -> None:

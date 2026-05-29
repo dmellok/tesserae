@@ -170,6 +170,28 @@ def create_app(
 
     app.config["UPDATER"] = _Updater(REPO_ROOT, data_root)
 
+    # Anonymous, opt-in telemetry — disabled by default; configure in
+    # Settings → Server → App. Tests skip it entirely so no test run can
+    # accidentally hit a real endpoint.
+    from importlib import metadata as _metadata
+
+    from app.telemetry import Telemetry as _Telemetry
+
+    if testing:
+        telemetry = _Telemetry.disabled()
+    else:
+        try:
+            _pkg_version = _metadata.version("tesserae")
+        except _metadata.PackageNotFoundError:
+            _pkg_version = "0.0.0"
+        telemetry = _Telemetry.from_settings(
+            data_root=data_root,
+            app_version=_pkg_version,
+            settings_app=settings.get_section("app"),
+        )
+        telemetry.send("app.started")
+    app.config["TELEMETRY"] = telemetry
+
     # Transport + push manager are (re)built from current broker settings.
     # Holding the rebuilder in app.config lets settings_routes call it on a
     # broker change without restarting the process. Device subscriptions

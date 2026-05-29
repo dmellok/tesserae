@@ -42,12 +42,13 @@ from app.state.settings_store import SettingsStore
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "broker", "device", "dashboard")
+STEPS: tuple[str, ...] = ("welcome", "broker", "device", "dashboard", "telemetry")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
     "broker": "Broker",
     "device": "Device",
     "dashboard": "Dashboard",
+    "telemetry": "Help out",
 }
 # Widget the starter dashboard drops into its single cell — a clock needs
 # no API keys or config, so it paints on the very first push.
@@ -313,7 +314,13 @@ def skip() -> Response:
 
 @bp.post("/finish")
 def finish() -> Response:
-    mark_onboarded(_settings())
+    settings = _settings()
+    # The telemetry consent comes from the last onboarding step. A
+    # checkbox only POSTs its name when ticked, so absence means the
+    # user explicitly unchecked it. Persist either choice so it survives
+    # restarts and the answer is recorded the moment the user makes it.
+    settings.patch_section("app", {"telemetry_enabled": "telemetry_enabled" in request.form})
+    mark_onboarded(settings)
     flash("You're all set.", "ok")
     return redirect(url_for("send.index"))
 
