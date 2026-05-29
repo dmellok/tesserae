@@ -75,3 +75,32 @@ def test_cap_evicts_oldest(tmp_path: Path) -> None:
     assert len(rows) == 3
     # Oldest two (ids[0], ids[1]) evicted; newest three remain.
     assert {r.id for r in rows} == set(ids[2:])
+
+
+def test_device_cap_protects_other_events(tmp_path: Path) -> None:
+    """A flood of device heartbeats evicts old heartbeats, not push history."""
+    log = EventLog(tmp_path / "events.db", cap=1000, device_cap=10)
+    push_ids = [
+        log.record(type="push", source="page", target=f"p{i}", status="sent") for i in range(5)
+    ]
+    for i in range(50):  # way over the device sub-cap
+        log.record(type="device", source="lounge", target="t", status="ok", extra={"i": i})
+    assert log.count(type="device") == 10  # bounded by device_cap
+    # All push rows survive (well under the global cap).
+    assert all(log.get(pid) is not None for pid in push_ids)
+    # The surviving device rows are the most recent ones.
+    devs = log.list(type="device", limit=10)
+    assert {d.extra["i"] for d in devs} == set(range(40, 50))
+
+
+def test_status_changed_meaningfully() -> None:
+    from app.main import status_changed_meaningfully
+
+    # First sighting always counts.
+    assert status_changed_meaningfully({}, {"state": "idle"}) is True
+    # Volatile-only drift (battery / rssi) does not.
+    prev = {"state": "idle", "battery_pct": 80, "rssi": -60}
+    same = {"state": "idle", "battery_pct": 74, "rssi": -71}
+    assert status_changed_meaningfully(prev, same) is False
+    # A real field change does.
+    assert status_changed_meaningfully(prev, {"state": "rendering", "battery_pct": 80}) is True

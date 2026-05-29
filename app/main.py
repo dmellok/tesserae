@@ -135,10 +135,11 @@ def create_app(
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
-    # cap bumped from EventLog's default 500 to 2000 so per-renderer rows
-    # (one per push per renderer) and device heartbeats (every minute or
-    # so) don't crowd out the push history.
-    event_log = EventLog(data_root / "core" / "events.db", cap=2000)
+    # Global cap 2000; device heartbeats get a 500-row sub-cap so a busy
+    # fleet can't evict push / scheduler / auth history. We also only log a
+    # device event when the status actually changed (below), so steady
+    # idle heartbeats don't churn the log at all.
+    event_log = EventLog(data_root / "core" / "events.db", cap=2000, device_cap=500)
 
     # Cache of the most recent parsed status heartbeat per device. The
     # MQTT subscription updates it; the settings page reads it. Plain dict
@@ -509,6 +510,25 @@ def _rebuild_transport(
         app.config["MDNS_ADVERTISER"] = None
 
 
+# Heartbeat fields that drift every beat (battery, signal, uptime). They
+# update the live status cache + HA sensors, but a change in one of these
+# alone shouldn't write an event-log row — otherwise every heartbeat logs.
+_VOLATILE_STATUS_KEYS: frozenset[str] = frozenset(
+    {"battery_mv", "battery_pct", "rssi", "voltage", "uptime", "uptime_s", "last_paint"}
+)
+
+
+def status_changed_meaningfully(prev: dict[str, Any], merged: dict[str, Any]) -> bool:
+    """True if the device status changed in a way worth an event-log row —
+    ignoring volatile drift (battery / signal / uptime). First sighting
+    (empty ``prev``) always counts."""
+    if not prev:
+        return True
+    before = {k: v for k, v in prev.items() if k not in _VOLATILE_STATUS_KEYS}
+    after = {k: v for k, v in merged.items() if k not in _VOLATILE_STATUS_KEYS}
+    return before != after
+
+
 def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     """Merge a freshly-parsed heartbeat into the prior cached dict.
 
@@ -555,14 +575,18 @@ def _subscribe_device_status(
             "received_at": time.time(),
             "parsed": merged,
         }
-        event_log.record(
-            type="device",
-            source=device.id,
-            target=device.status_topic,
-            status="error" if "error" in parsed else "ok",
-            error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
-            extra={"parsed": merged},
-        )
+        # Only log when the status actually changed (or carries an error).
+        # The live cache + HA sensors still see every heartbeat; this just
+        # keeps steady heartbeats from churning the capped event log.
+        if "error" in parsed or status_changed_meaningfully(prev, merged):
+            event_log.record(
+                type="device",
+                source=device.id,
+                target=device.status_topic,
+                status="error" if "error" in parsed else "ok",
+                error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
+                extra={"parsed": merged},
+            )
         ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
         if ha is not None:
             try:

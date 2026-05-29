@@ -83,9 +83,12 @@ class EventLog:
     CREATE INDEX IF NOT EXISTS events_by_type_time ON events (type, timestamp DESC);
     """
 
-    def __init__(self, path: Path, *, cap: int = 500) -> None:
+    def __init__(self, path: Path, *, cap: int = 500, device_cap: int | None = None) -> None:
         self._path = path
         self._cap = cap
+        # High-volume device heartbeats get their own sub-cap so they can't
+        # crowd push / scheduler / auth history out of the global ``cap``.
+        self._device_cap = device_cap
         self._lock = threading.Lock()
         # Per-row listeners — used by the SSE /events/stream endpoint.
         # Fired after each successful insert, outside the DB lock.
@@ -189,6 +192,18 @@ class EventLog:
         """Cap-based eviction. We over-delete in one shot rather than
         one-per-insert so a backlog (e.g. after a long offline window)
         recovers in a single transaction."""
+        # First bound the high-volume 'device' type on its own, so a flood
+        # of heartbeats evicts old heartbeats rather than push history.
+        if self._device_cap is not None:
+            dev_count = int(
+                conn.execute("SELECT COUNT(*) FROM events WHERE type = 'device'").fetchone()[0]
+            )
+            if dev_count > self._device_cap:
+                conn.execute(
+                    "DELETE FROM events WHERE id IN "
+                    "(SELECT id FROM events WHERE type = 'device' ORDER BY id ASC LIMIT ?)",
+                    (dev_count - self._device_cap,),
+                )
         cur = conn.execute("SELECT COUNT(*) FROM events")
         count = int(cur.fetchone()[0])
         if count <= self._cap:
