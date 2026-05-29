@@ -35,12 +35,18 @@ export default async function render(shadow, ctx) {
   const posts = Array.isArray(data.posts) ? data.posts : [];
 
   function meta(p) {
-    return `
-      <span class="rd-score"><i class="ph-bold ph-arrow-fat-up"></i>${fmtScore(p.score)}</span>
-      <span class="rd-com"><i class="ph-bold ph-chat-circle-text"></i>${p.comments}</span>
-      <span class="rd-by"><i class="ph-bold ph-user"></i>u/${escapeHtml(p.author)}</span>
-      <span class="rd-when"><i class="ph-bold ph-clock"></i>${escapeHtml(ago(p.time))}</span>
-    `;
+    // Score + comments come from the JSON API; the RSS feed (current
+    // source) omits them, so only render those chips when present.
+    const bits = [];
+    if (p.score != null) {
+      bits.push(`<span class="rd-score"><i class="ph-bold ph-arrow-fat-up"></i>${fmtScore(p.score)}</span>`);
+    }
+    if (p.comments != null) {
+      bits.push(`<span class="rd-com"><i class="ph-bold ph-chat-circle-text"></i>${p.comments}</span>`);
+    }
+    bits.push(`<span class="rd-by"><i class="ph-bold ph-user"></i>u/${escapeHtml(p.author)}</span>`);
+    bits.push(`<span class="rd-when"><i class="ph-bold ph-clock"></i>${escapeHtml(ago(p.time))}</span>`);
+    return bits.join("");
   }
 
   const lede = posts[0];
