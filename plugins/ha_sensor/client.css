@@ -1,0 +1,175 @@
+/* ha_sensor — Bauhaus value blocks. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- single-entity hero: number left, icon panel right (50/50) --- */
+
+.hs-hero {
+  background: var(--theme-surface);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: 0;
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.hs-hero-text {
+  padding: clamp(10px, 2cqw, 24px);
+  min-width: 0;
+}
+.hs-hero-value {
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-size: clamp(40px, 22cqmin, 180px);
+  color: var(--theme-fg);
+}
+.hs-hero-value small {
+  font-size: 0.4em;
+  font-weight: 800;
+  margin-left: 0.12em;
+  color: var(--theme-fgSoft);
+}
+.hs-hero-sub {
+  margin-top: 0.4em;
+  font-size: clamp(10px, 2.2cqw, 16px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--theme-muted);
+}
+.hs-hero-icon {
+  background: var(--theme-surface2);
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.hs-hero-icon .ph-bold {
+  font-size: clamp(56px, 26cqmin, 220px);
+  line-height: 1;
+  color: var(--theme-fg);
+}
+.hs-hero.is-unavailable .hs-hero-value { color: var(--theme-muted); }
+
+/* --- multi-entity grid of colour-blocked tiles --- */
+
+.hs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  min-height: 0;
+}
+/* 3+ tiles use three columns on wide cells; tall cells stack to one. */
+.root[style*="--hs-count:5"] .hs-grid,
+.root[style*="--hs-count:6"] .hs-grid,
+.root[style*="--hs-count:7"] .hs-grid,
+.root[style*="--hs-count:8"] .hs-grid,
+.root[style*="--hs-count:9"] .hs-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+@container (max-aspect-ratio: 0.8) {
+  .hs-grid { grid-template-columns: 1fr !important; }
+}
+
+.hs-tile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(8px, 1.8cqw, 18px) clamp(10px, 2cqw, 20px);
+  min-width: 0;
+  overflow: hidden;
+}
+.hs-tile-icon {
+  grid-row: 1 / 3;
+  font-size: clamp(20px, 5cqw, 44px);
+  line-height: 1;
+}
+.hs-tile-name {
+  font-size: clamp(9px, 1.6cqw, 13px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.hs-tile-value {
+  font-size: clamp(20px, 5cqw, 46px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.hs-tile-value small {
+  font-size: 0.5em;
+  font-weight: 700;
+  margin-left: 0.12em;
+  opacity: 0.85;
+}
+
+.hs-tile--accent { background: var(--theme-accent); color: var(--theme-bg); }
+.hs-tile--surface2 { background: var(--theme-surface2); color: var(--theme-fg); }
+.hs-tile--accent2 { background: var(--theme-accent2); color: var(--theme-bg); }
+.hs-tile--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
+.hs-tile.is-unavailable { opacity: 0.55; }
+
+/* --- size adaptations --- */
+
+.root.size-xs .hs-hero-text { padding: 6px 10px; }
+.root.size-xs .hs-hero-value { font-size: clamp(30px, 20cqmin, 80px); }
+.root.size-xs .hs-tile { padding: 5px 8px; }
+.root.size-xs .hs-tile-value { font-size: clamp(15px, 5cqw, 26px); }
+.root.size-sm .hs-tile-value { font-size: clamp(16px, 5cqw, 30px); }
+
+/* --- empty stub --- */
+
+.hs-stub {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(16px, 3cqw, 36px);
+  background: var(--theme-surface);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.hs-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--theme-fg); opacity: 0.5; }
+.hs-stub-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.hs-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--theme-fgSoft); }
+
+/* --- error state --- */
+
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

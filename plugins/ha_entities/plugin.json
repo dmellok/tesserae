@@ -1,0 +1,14 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Entities",
+  "version": "0.2.0",
+  "kind": "widget",
+  "description": "A status grid of several Home Assistant entities — lights, switches, locks, doors, presence — each with a state dot and its current value. List the entity ids (one per line, or comma-separated). Requires the Home Assistant Core plugin.",
+  "icon": "ph-squares-four",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "title", "type": "string", "label": "Title", "default": "Entities" },
+    { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}

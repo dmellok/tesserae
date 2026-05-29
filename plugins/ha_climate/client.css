@@ -1,0 +1,154 @@
+/* ha_climate — Bauhaus thermostat tiles. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- tone tints (shared by hero + tiles) --- */
+.tone-heat { background: var(--theme-accent2); color: var(--theme-bg); }
+.tone-cool { background: var(--theme-accent); color: var(--theme-bg); }
+.tone-idle { background: var(--theme-surface2); color: var(--theme-fg); }
+.tone-neutral { background: var(--theme-surface); color: var(--theme-fg); }
+
+/* --- single-entity hero --- */
+.hc-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: 0;
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.hc-hero-text { padding: clamp(10px, 2cqw, 24px); min-width: 0; }
+.hc-hero-icon {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  background: color-mix(in oklab, currentColor 12%, transparent);
+}
+.hc-hero-icon .ph-bold { font-size: clamp(56px, 24cqmin, 200px); line-height: 1; }
+.hc-current {
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-size: clamp(40px, 20cqmin, 150px);
+  display: inline-flex;
+  align-items: flex-start;
+}
+.hc-deg { font-size: 0.4em; font-weight: 800; margin-top: 0.12em; }
+
+.hc-meta {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1.2cqw, 12px);
+  flex-wrap: wrap;
+  margin-top: clamp(4px, 1cqh, 12px);
+}
+.hc-target {
+  font-size: clamp(11px, 2.2cqw, 18px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.hc-chip {
+  font-size: clamp(9px, 1.8cqw, 14px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.2em 0.6em;
+  background: color-mix(in oklab, currentColor 18%, transparent);
+}
+
+/* --- multi-entity grid --- */
+.hc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  min-height: 0;
+}
+.root[style*="--hc-count:3"] .hc-grid,
+.root[style*="--hc-count:5"] .hc-grid,
+.root[style*="--hc-count:6"] .hc-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+@container (max-aspect-ratio: 0.8) {
+  .hc-grid { grid-template-columns: 1fr !important; }
+}
+
+.hc-tile {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(3px, 0.8cqh, 8px);
+  padding: clamp(8px, 1.8cqw, 18px);
+  min-width: 0;
+  overflow: hidden;
+}
+.hc-tile-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1cqw, 10px);
+  min-width: 0;
+}
+.hc-tile-icon { font-size: clamp(16px, 3.6cqw, 30px); line-height: 1; }
+.hc-tile-name {
+  font-size: clamp(9px, 1.6cqw, 13px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.hc-tile-current {
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-size: clamp(28px, 9cqw, 64px);
+  display: inline-flex;
+  align-items: flex-start;
+}
+.hc-tile .hc-meta { margin-top: 0; }
+.hc-tile.is-unavailable { opacity: 0.55; }
+
+/* --- size adaptations --- */
+.root.size-sm .hc-current { font-size: clamp(36px, 18cqmin, 80px); }
+.root.size-sm .hc-tile-current { font-size: clamp(24px, 9cqw, 44px); }
+
+/* --- empty stub --- */
+.hc-stub {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(16px, 3cqw, 36px);
+  background: var(--theme-surface);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.hc-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--theme-fg); opacity: 0.5; }
+.hc-stub-primary { font-size: clamp(13px, 2.4cqw, 20px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.hc-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--theme-fgSoft); }
+
+/* --- error state --- */
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

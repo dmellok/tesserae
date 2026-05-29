@@ -1,0 +1,15 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant Core",
+  "version": "0.1.0",
+  "kind": "data",
+  "description": "Shared Home Assistant connection for the ha_* widget family. Set your HA base URL + a Long-Lived Access Token (Home Assistant → your profile → Long-Lived Access Tokens) once here and every ha widget reads live entity states from it over the REST API. No cell of its own.",
+  "icon": "ph-house-line",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "settings": [
+    { "name": "base_url", "type": "string", "label": "Home Assistant URL (e.g. http://homeassistant.local:8123)", "default": "" },
+    { "name": "token", "type": "string", "label": "Long-Lived Access Token", "secret": true, "default": "" },
+    { "name": "verify_tls", "type": "boolean", "label": "Verify TLS certificate (uncheck for self-signed HTTPS)", "default": true }
+  ],
+  "render": { "needs_network": true }
+}

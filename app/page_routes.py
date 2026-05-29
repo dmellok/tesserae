@@ -148,6 +148,22 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
             if str(choice.get("value")) == raw:
                 return choice["value"]
         return raw
+    if ftype == "multiselect":
+        # Persist path: ``all_form`` is a Werkzeug MultiDict (getlist gives
+        # every checked box). Preview path: ``all_form`` is a plain dict
+        # where the demux already promoted >1 values to a list, but a
+        # single check stays a scalar and zero checks is absent. Normalise
+        # all three to a clean list of non-empty strings.
+        key = f"opt_{field['name']}"
+        if hasattr(all_form, "getlist"):
+            values: Any = all_form.getlist(key)
+        elif isinstance(raw, list):
+            values = raw
+        elif raw in (None, ""):
+            values = []
+        else:
+            values = [raw]
+        return [str(v) for v in values if str(v).strip()]
     if ftype == "color":
         if raw and raw.startswith("#"):
             return raw

@@ -793,6 +793,91 @@ input[type="range"].slider:focus::-moz-range-thumb {
 }
 .device-check:has(input:checked) .device-check-tick { opacity: 1; }
 
+/* ----- Multi-select checklist (searchable) ------------------------- *
+ * Used by cell options that pick several values from a live list (e.g.
+ * the Home Assistant entity pickers). A filter box narrows a scrollable
+ * list of checkboxes so the user browses by name, never typing ids. */
+.multiselect {
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+  background: var(--t-surface);
+  overflow: hidden;
+}
+.multiselect-search {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  border-bottom: 1px solid var(--t-border);
+  color: var(--t-muted);
+}
+.multiselect-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  font: inherit;
+  color: var(--t-fg);
+}
+.multiselect-search input:focus { outline: none; }
+.multiselect-count {
+  flex: 0 0 auto;
+  font-size: var(--t-size-xs);
+  font-weight: 600;
+  color: var(--t-accent);
+  white-space: nowrap;
+}
+.multiselect-list {
+  max-height: 220px;
+  overflow-y: auto;
+}
+.multiselect-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  cursor: pointer;
+  font-size: var(--t-size-sm);
+  border-top: 1px solid var(--t-border);
+}
+.multiselect-opt:first-of-type { border-top: 0; }
+.multiselect-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.multiselect-opt:hover { background: var(--t-surface-soft); }
+.multiselect-tick {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--t-border-strong);
+  border-radius: 4px;
+  background: var(--t-surface);
+  color: var(--t-accent-fg);
+  font-size: 13px;
+}
+.multiselect-tick .ph { opacity: 0; }
+.multiselect-opt:has(input:checked) .multiselect-tick {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+}
+.multiselect-opt:has(input:checked) .multiselect-tick .ph { opacity: 1; }
+.multiselect-opt:has(input:checked) { background: var(--t-accent-soft); }
+.multiselect-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.multiselect-empty,
+.multiselect-hint {
+  margin: 0;
+  padding: var(--t-space-3);
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
+  text-align: center;
+}
+
 /* ----- Discovered devices strip (Settings → Devices) --------------- */
 .discovery-list {
   list-style: none;

@@ -1,0 +1,106 @@
+/* ha_entities — Bauhaus status rows with bold status-coloured icon blocks. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--theme-fg);
+  background: var(--theme-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.he-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--theme-surface);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+
+.he-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.6cqw, 16px);
+  flex: 1 1 0;
+  min-height: 0;
+  padding-right: clamp(10px, 1.8cqw, 18px);
+  border-bottom: 1px solid var(--theme-divider);
+  /* zebra striping for rhythm without colouring the whole row */
+  background: var(--theme-surface);
+}
+.he-row:nth-child(even) { background: var(--theme-surface2); }
+.he-row:last-child { border-bottom: 0; }
+
+/* Bold status-coloured icon block on the left — the colour reads state. */
+.he-chip {
+  align-self: stretch;
+  display: grid;
+  place-items: center;
+  width: clamp(34px, 8cqw, 64px);
+  background: var(--theme-muted);
+  color: var(--theme-bg);
+  font-size: clamp(16px, 3.4cqw, 30px);
+}
+.he-row.is-on .he-chip { background: var(--theme-accent); }
+.he-row.is-off .he-chip { background: var(--theme-surface2); color: var(--theme-fg); box-shadow: inset 0 0 0 2px var(--theme-muted); }
+.he-row.is-other .he-chip { background: var(--theme-accent2); }
+.he-row.is-missing .he-chip { background: var(--theme-danger); }
+
+.he-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: clamp(11px, 2.1cqw, 17px);
+  color: var(--theme-fg);
+}
+
+.he-label {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-size: clamp(11px, 2.1cqw, 17px);
+  color: var(--theme-fgSoft);
+}
+.he-row.is-on .he-label { color: var(--theme-accent); }
+.he-row.is-missing .he-label { color: var(--theme-danger); }
+
+/* --- empty stub --- */
+.he-stub {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(6px, 1.2cqw, 12px);
+  padding: clamp(16px, 3cqw, 36px);
+  background: var(--theme-surface);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+}
+.he-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--theme-fg); opacity: 0.5; }
+.he-stub-primary { font-size: clamp(13px, 2.4cqw, 20px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+.he-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--theme-fgSoft); }
+
+/* --- error state --- */
+.root.error {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--theme-danger);
+  padding: 16px;
+  gap: 8px;
+}
+.root.error .ph { font-size: 28px; }
+.root.error span { font: 12px/1.4 monospace; word-break: break-word; }

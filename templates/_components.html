@@ -129,6 +129,44 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{#- Multi-select: a searchable checklist. ``value`` is the selected list
+   (tolerates a bare string / None); ``options`` is [{value,label}], as
+   produced by a plugin's choices(). An option with an empty value is
+   treated as a guidance hint (e.g. "set HA URL + token") rather than a
+   pickable row. The search box filters client-side (editor.js) and is
+   never submitted (it has no name). -#}
+{%- macro multiselect_field(field_id, name, label, value=None, options=[], help=None) -%}
+  {%- set sel = (value if (value is not string and value is iterable) else ([value] if value else [])) -%}
+  {%- set sel_str = sel | map('string') | list -%}
+  {%- set real = options | selectattr('value') | list -%}
+<div class="field">
+  <label>{{ label }}</label>
+  <div class="multiselect" data-multiselect>
+    {% if real %}
+    <div class="multiselect-search">
+      <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+      <input type="search" placeholder="Filter…" data-ms-filter autocomplete="off" spellcheck="false" aria-label="Filter {{ label }}">
+      <span class="multiselect-count" data-ms-count></span>
+    </div>
+    <div class="multiselect-list" data-ms-list>
+      {% for opt in real %}
+      <label class="multiselect-opt" data-ms-text="{{ opt.label | lower }}">
+        <input type="checkbox" name="{{ name }}" value="{{ opt.value }}"
+               {% if opt.value | string in sel_str %}checked{% endif %}>
+        <span class="multiselect-tick" aria-hidden="true"><i class="ph ph-check"></i></span>
+        <span class="multiselect-label">{{ opt.label }}</span>
+      </label>
+      {% endfor %}
+      <p class="multiselect-empty" data-ms-empty hidden>No matches.</p>
+    </div>
+    {% else %}
+    <p class="multiselect-hint">{{ (options[0].label if options else None) or 'No options available.' }}</p>
+    {% endif %}
+  </div>
+  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+</div>
+{%- endmacro -%}
+
 {%- macro button(label, variant='primary', type='submit', name=None, value=None, full_width=False, title=None, disabled=False, icon=None) -%}
 {#- ``icon``: a Phosphor name like 'plus' or 'arrow-right'. The macro
    renders it in the regular weight; for fill / bold / duotone styling
@@ -292,6 +330,8 @@ macro here instead.
     {{ switch(field_id, name, label, checked=value, help=help_text) }}
   {% elif ftype == 'select' %}
     {{ select_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
+  {% elif ftype == 'multiselect' %}
+    {{ multiselect_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
   {% elif ftype == 'textarea' %}
     {{ textarea_field(field_id, name, label, value=value, help=help_text) }}
   {% elif ftype == 'slider' %}

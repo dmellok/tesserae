@@ -540,3 +540,27 @@ def test_editor_shows_one_preview_per_aspect_and_checked_devices(app: Flask) -> 
     # Both devices are pre-checked checkboxes named device_ids.
     assert body.count('name="device_ids"') == 2
     assert body.count("checked") >= 2
+
+
+def test_multiselect_cell_option_coercion() -> None:
+    """A ``multiselect`` option normalises to a clean string list across the
+    two form shapes: a Werkzeug MultiDict (persist) and the plain dict the
+    preview demux builds (scalar for one pick, list for several)."""
+    from werkzeug.datastructures import MultiDict
+
+    from app.page_routes import _coerce_cell_option
+
+    field = {"name": "entities", "type": "multiselect", "default": []}
+
+    # Persist path — several checked boxes arrive as repeated keys.
+    md = MultiDict([("opt_entities", "light.a"), ("opt_entities", "light.b")])
+    assert _coerce_cell_option(field, md.get("opt_entities"), md) == ["light.a", "light.b"]
+
+    # Preview path — demux already promoted >1 to a list.
+    plain = {"opt_entities": ["light.a", "light.b"]}
+    assert _coerce_cell_option(field, plain["opt_entities"], plain) == ["light.a", "light.b"]
+
+    # Preview path — a single check stays scalar; absent / blank → empty.
+    assert _coerce_cell_option(field, "light.a", {"opt_entities": "light.a"}) == ["light.a"]
+    assert _coerce_cell_option(field, None, {}) == []
+    assert _coerce_cell_option(field, "", {"opt_entities": ""}) == []

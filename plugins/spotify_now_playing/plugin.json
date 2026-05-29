@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Spotify — Now Playing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
   "description": "Currently-playing Spotify track: album art, title, artist and album, with an optional progress bar. Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",
   "icon": "ph-music-notes",

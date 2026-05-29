@@ -1,0 +1,15 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — History",
+  "version": "0.2.0",
+  "kind": "widget",
+  "description": "One or more numeric Home Assistant sensors over time as Bauhaus sparklines, each with its current value, a trend arrow and min/max for the window. Great for temperature, power, or anything that trends. Requires the Home Assistant Core plugin.",
+  "icon": "ph-chart-line",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "title", "type": "string", "label": "Title (blank = entity name / \"History\")", "default": "" },
+    { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
+    { "name": "hours", "type": "number", "label": "Window (hours)", "default": 24 }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
