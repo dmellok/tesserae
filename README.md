@@ -11,6 +11,33 @@ renderer, new format = drop a folder.
 The name: a [*tessera*](https://en.wikipedia.org/wiki/Tessera) is the
 individual tile of a mosaic; the editor composes a dashboard out of cells.
 
+## Screenshots
+
+Compose in the browser — pick widgets, a theme, and which display(s) each
+dashboard binds to — then render headless and push the frame over MQTT.
+
+<p align="center">
+  <img src="docs/screenshots/ui-dashboards.png" alt="Dashboards list" width="420">
+  <img src="docs/screenshots/ui-editor.png" alt="Dashboard editor with live preview, theme picker and multi-display binding" width="420">
+</p>
+<p align="center">
+  <img src="docs/screenshots/ui-send.png" alt="Send page" width="270">
+  <img src="docs/screenshots/ui-schedules.png" alt="Schedules" width="270">
+  <img src="docs/screenshots/ui-settings.png" alt="Device settings" width="270">
+</p>
+
+**Frames pushed to the panels.** Each dashboard renders to a panel-sized
+frame and publishes only to the display(s) it's bound to. A few examples
+across themes and panel sizes (the last is a small 448×600 panel):
+
+<p align="center">
+  <img src="docs/screenshots/dash-morning.png" alt="Morning dashboard" width="150">
+  <img src="docs/screenshots/dash-lounge.png" alt="Lounge dashboard" width="150">
+  <img src="docs/screenshots/dash-office.png" alt="Office dashboard" width="150">
+  <img src="docs/screenshots/dash-dev.png" alt="Dev dashboard" width="150">
+  <img src="docs/screenshots/dash-glance.png" alt="Glance dashboard" width="150">
+</p>
+
 ## Status
 
 A working hobbyist build. The pipeline (composer → renderers →
