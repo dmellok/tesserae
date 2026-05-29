@@ -359,6 +359,41 @@
     });
   }
 
+  // Live preview -> editor: the preview iframe (compose.html) posts
+  // {type:'tesserae-cell-clicked', cellId} when a cell is clicked. Focus
+  // that cell's card here — scroll it into view, highlight it, focus its
+  // first control — and echo 'tesserae-focus-cell' back so the preview
+  // outlines the same cell.
+  function focusCellCard(cellId) {
+    let target = null;
+    document.querySelectorAll(".cell-card").forEach((card) => {
+      const match = card.dataset.cellId === cellId;
+      card.classList.toggle("is-focused", match);
+      if (match) target = card;
+    });
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    const field = target.querySelector("select, input, textarea, button");
+    if (field) {
+      try { field.focus({ preventScroll: true }); } catch (e) { field.focus(); }
+    }
+    previewFrames().forEach((iframe) => {
+      try {
+        iframe.contentWindow.postMessage(
+          { type: "tesserae-focus-cell", cellId },
+          location.origin,
+        );
+      } catch (e) { /* iframe not ready / cross-origin */ }
+    });
+  }
+
+  window.addEventListener("message", (ev) => {
+    if (ev.origin !== location.origin) return;
+    const d = ev.data;
+    if (!d || d.type !== "tesserae-cell-clicked" || !d.cellId) return;
+    focusCellCard(d.cellId);
+  });
+
   if (saveBtn) {
     saveBtn.addEventListener("click", saveAll);
     saveBtn.disabled = true;
