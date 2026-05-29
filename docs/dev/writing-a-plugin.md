@@ -18,7 +18,7 @@ should read it too.
 
 ## Why this works well
 
-- **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the 12 theme tokens, container queries, the e-ink rules. A model that reads it has everything it needs.
+- **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the `--c-*` colour layer, container queries, the e-ink rules. A model that reads it has everything it needs.
 - **There are 47 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
 - **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
 - **Every widget ships a smoke test.** The model can write it and you can run it — objective "did it work" rather than vibes.
@@ -59,10 +59,12 @@ A widget is a drop-a-folder plugin under plugins/<id>/ with:
   - server.py    (optional, server-side data fetch -> ctx.data)
 
 Before writing anything, read docs/widgets.md end to end — it is the full
-contract: the ctx shape, the 12 theme tokens (use var(--theme-*) only, no
-hard-coded hex), container queries (cqw/cqh), Phosphor icon usage (bold for big
-icons, never fill), and the e-ink constraints (no drawn borders, no animations,
-no client-side fetch — use server.py).
+contract: the ctx shape, the colour layers (paint from the --c-* semantic
+tokens, never the raw --theme-* primitives; --c-data-* for categorical
+colour, --c-ok/warn/danger for status only; no hard-coded hex), container
+queries (cqw/cqh), Phosphor icon usage (bold for big icons, never fill), and
+the e-ink constraints (no drawn borders, no animations, no client-side fetch
+— use server.py).
 
 Then read these three shipped widgets as the canonical patterns:
 plugins/weather_now, plugins/weather_hourly, plugins/weather_forecast.
@@ -129,7 +131,7 @@ payload. Then run it: .venv/bin/python -m pytest plugins/<id>/ -q
 These are the things AI most often gets wrong on e-ink. Call them out explicitly
 (they're all in [the contract](../widgets.md), but worth repeating):
 
-- [ ] **Theme tokens only** — `var(--theme-*)` / `ctx.theme.*`, never hard-coded hex (except documented data-identity colours: team/brand/flag).
+- [ ] **Semantic tokens only** — style DOM with `var(--c-*)` (`--c-data-*` for categorical colour, `--c-ok/warn/danger` for status only); `ctx.theme.*` is canvas-only. Never raw `--theme-*` or hard-coded hex (except documented data-identity colours: team/brand/flag).
 - [ ] **No drawn borders.** Card shapes come from `bg` vs `surface` contrast and spacing, not `border:` rules. They dither into invisibility on Spectra 6 anyway.
 - [ ] **Bold, not fill, for big icons.** `ph-bold` reads clean at size; `ph-fill` quantises into blobs.
 - [ ] **No animations / transitions / `requestAnimationFrame`.** The frame is screenshotted; anything mid-flight gets caught half-rendered. `animation: false` on Chart.js too.

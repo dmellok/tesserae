@@ -23,8 +23,8 @@ and Wi-Fi are configured through a captive portal (reachable afterward on the
 LAN at `tesserae-<id>.local`).
 
 !!! success "This is the maintainer's daily driver"
-    The ESP32 + Waveshare 13.3" path is the one combination confirmed on real
-    hardware so far.
+    The ESP32 + Waveshare 13.3" path runs in production daily. All three
+    clients are [confirmed on real hardware](../compatibility.md#whats-been-tested-on-real-hardware).
 
 ## tesserae-pi-bin-client
 

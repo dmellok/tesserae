@@ -147,10 +147,10 @@ export default async function render(shadow, ctx) {
     w: 1600, h: 1200,      // full panel dims
     portrait: false        // panel.h > panel.w
   },
-  theme: {                  // resolved palette (hex strings)
-    bg: "#ffffff",
+  theme: {                  // resolved primitive palette as hex strings —
+    bg: "#ffffff",          // for canvas/Chart.js only; style DOM with --c-*
     surface: "#e2d4b8",
-    // ...12 tokens total
+    // ...all 14 primitives
   },
   font: {
     family: "Inter",       // resolved page font
@@ -206,46 +206,78 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
 
 ---
 
-## Theme palette — the 12 tokens
+## Colour — primitives and the semantic layer
 
-Available as both `var(--theme-<token>)` in CSS and `ctx.theme.<token>`
-in JS (for canvas / Chart.js). User themes only define these 12 — no
-hard-coded hex in widgets, ever.
+Colour has two layers. **Themes define 14 primitive tokens.** Widgets
+**never reference those primitives directly** — they paint from the `--c-*`
+**semantic layer** the composer derives on every cell host. The split keeps
+two ideas apart that are easy to conflate: *categorical* colour ("I need N
+distinguishable blocks / chart series") and *status* colour ("this means
+good / caution / bad"). A sunny day is categorical; a very-high UV reading
+is status.
 
-| token       | typical use                                        |
-|-------------|----------------------------------------------------|
-| `bg`        | cell background                                    |
-| `surface`   | subpanel / card background                         |
-| `surface2`  | emphasised card (e.g. "today" in a 5-day grid)     |
-| `fg`        | primary text                                       |
-| `fgSoft`    | secondary text                                     |
-| `muted`     | labels, supporting metadata                        |
-| `accent`    | primary brand colour — icons, links, charts, the first colour-block |
-| `accent2`   | second decorative colour, theme-coordinated. Paints the second colour-block in bauhaus-style multi-block layouts. |
-| `accent3`   | third decorative colour, theme-coordinated. Paints the third colour-block. |
-| `accentSoft`| accent fill at low contrast (chart areas, pills)   |
-| `divider`   | chart grid lines + axes only — **not** for card borders (see no-borders note below) |
-| `danger`    | **semantic only** — errors, alarm states. Never used for normal decorative blocks; use `accent3` for visual variety instead. |
-| `warn`      | **semantic only** — caution / warning badges. Use `accent2` for normal decorative blocks. |
-| `ok`        | **semantic only** — success badges, "all good" indicators. |
+### Primitives — what a theme defines
 
-Decorative vs semantic: `accent` / `accent2` / `accent3` are the
-**three theme-coordinated colour blocks** widgets paint regular UI in
-(humidity / wind / UV / rain blocks, day cards, chip rows). Each
-theme picks them to feel coherent together — Bauhaus primaries on
-Paper, green family on Botanical, warm spectrum on Citrus, etc.
-`warn` / `danger` / `ok` exist for actual semantic states only —
-"low battery" pill, "broker offline" error — and stay distinct from
-the decorative trio.
+14 tokens, validated by
+[`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json)
+→ `themes.palette`. Theme authors pick these; **widgets don't touch them.**
 
-Source: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json)
-→ `themes.palette`.
+| primitive | role |
+|---|---|
+| `bg` | outer cell background |
+| `surface` | card / subpanel background |
+| `surface2` | raised / emphasised card |
+| `fg` | primary text |
+| `fgSoft` | secondary text |
+| `muted` | labels, supporting metadata |
+| `accent` / `accent2` / `accent3` | the theme-coordinated colour triad |
+| `accentSoft` | low-contrast accent fill |
+| `divider` | chart axes / grid lines only |
+| `ok` / `warn` / `danger` | status hues |
 
-CSS custom properties are set on the **cell host** by the composer.
-They cross the Shadow DOM boundary automatically — `var(--theme-fg)`
-inside your shadow works without any extra wiring.
+### Semantic tokens — what widgets paint with
 
-For Chart.js (canvas) you need actual hex strings — use `ctx.theme`:
+Defined on the cell host in
+[`templates/compose.html`](https://github.com/dmellok/tesserae/blob/main/templates/compose.html)
+and inherited into every widget's shadow (whether or not it links
+`widget-bauhaus.css`). **Reference these, never `--theme-*`** — the enforce
+test [`tests/test_semantic_tokens.py`](https://github.com/dmellok/tesserae/blob/main/tests/test_semantic_tokens.py)
+fails the build otherwise.
+
+| semantic token | maps to | use for |
+|---|---|---|
+| `--c-bg` | bg | cell background |
+| `--c-surface` | surface | cards |
+| `--c-raised` | surface2 | emphasised cards |
+| `--c-text` / `--c-text-soft` / `--c-text-mute` | fg / fgSoft / muted | text by emphasis |
+| `--c-line` | divider | chart axes / grid only — never card borders |
+| `--c-accent` | accent | brand highlight |
+| `--c-accent-soft` | accentSoft | soft tonal fills (dithers — large fills only) |
+| `--c-data-1` … `--c-data-4` | accent / accent2 / accent3 / surface2 | **categorical** — N distinguishable colours, no meaning |
+| `--c-ok` / `--c-warn` / `--c-danger` / `--c-info` | ok / warn / danger / accent | **status** — advisory / hazard / error ONLY |
+
+### Categorical vs status — the rule
+
+Use `--c-data-*` for anything decorative or "these are different things":
+stat blocks, chart series, language swatches, day columns. Use
+`--c-ok` / `--c-warn` / `--c-danger` **only** when the value is a genuine
+advisory, hazard, or error — a UV/AQI band, an overdue task, a failed
+fetch, a missing entity. Never reach for a status token just because you
+want a particular colour: it breaks on themes where `warn` is a loud alarm,
+and makes a sunny day read as a warning.
+
+**E-ink ceiling.** The categorical ramp tops out at **4 distinct hues** on a
+6-ink E6 panel (yellow / red / blue / green; `--c-data-4` is the neutral
+block), 5 on the 7-colour Inky (adds orange). Don't design a 6-way
+categorical split — the panel can't resolve it. For tonal emphasis within
+one hue use `--c-accent-soft`, but it dithers to a stipple on the panel, so
+reserve it for large fills, never small text.
+
+### Chart.js (canvas) needs hex
+
+Canvas can't read CSS custom properties, so charts pull primitive hex from
+`ctx.theme` (e.g. `ctx.theme.accent`) — the one place JS reads a primitive
+directly, and only to feed a value to canvas, not to style DOM:
 
 ```js
 new Chart(canvas.getContext("2d"), {
@@ -253,20 +285,6 @@ new Chart(canvas.getContext("2d"), {
   data: { datasets: [{ borderColor: ctx.theme.accent, ... }] },
 });
 ```
-
-### Tinting by semantics
-
-The weather suite establishes a convention worth copying:
-
-* condition icons by code: clear→`warn`, partly cloudy→`accent`,
-  overcast/fog→`muted`, rain→`accent`, snow→`fgSoft`, storms→`danger`
-* UV value by band: low→`ok`, mod/high→`warn`, very high→`danger`
-* range arrows: high→`warn`, low→`fgSoft`
-* rain pills: highlighted (`accent`) when probability ≥ 30%
-
-Pattern: data-driven `tone` argument that flows to inline
-`style="color: var(--theme-${tone})"`. Stays palette-only — works on
-every theme.
 
 ---
 
@@ -348,11 +366,11 @@ const TEAM_COLOURS = {
 };
 
 // Apply via inline style so it slots alongside palette-token elements.
-`<span class="team-chip" style="background: ${TEAM_COLOURS[team] || 'var(--theme-surface2)'}">...</span>`
+`<span class="team-chip" style="background: ${TEAM_COLOURS[team] || 'var(--c-raised)'}">...</span>`
 ```
 
-Fall back to a theme token (`surface2` or `accent`) for unknown values
-so the widget never produces a blank/black square.
+Fall back to a semantic token (`--c-raised` or `--c-accent`) for unknown
+values so the widget never produces a blank/black square.
 
 For dark mode: many brand colours need a fallback variant. Define
 both in a lookup and switch based on a hint (e.g. is the theme dark?
@@ -397,7 +415,7 @@ Conventions:
   Spectra 6, no woff2-weight cost.
 * **Monochrome SVGs that pick up `currentColor`** if you want them to
   theme automatically: `<svg fill="currentColor" stroke="currentColor">`
-  in your SVG file, then set `color: var(--theme-fg)` on the parent.
+  in your SVG file, then set `color: var(--c-text)` on the parent.
 * **Bake brand colours into the SVG** when the data IS the colour
   (team logo, flag).
 * **Keep files small** — under 10 KB each ideally. The renderer waits
@@ -440,33 +458,34 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 
 ---
 
-## Optional design baseline — `widget-base.css`
+## Shared baseline — `widget-bauhaus.css`
 
-[`static/style/widget-base.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-base.css)
-defines a tiny vocabulary you can opt into. Aligned with the
-no-borders design language: every "card" element gets its shape from
-its surface colour, not from a drawn outline.
+Most widgets link
+[`static/style/widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css)
+before their own `client.css`. It carries the shared shell so a header-bar
+tweak is one edit, not 40 — and it sets the `:host` defaults (sizing,
+`color: var(--c-text)`, `background: var(--c-bg)`). The `--c-*` semantic
+tokens themselves come from the cell host (the composer), so they're
+available whether or not a widget links this file.
 
-* `.widget` — outer wrapper (grid + container queries + theme bg/fg)
-* `.head` + `.head-icon` + `.head-title` + `.head-place` + `.head-time`
-* `.tile` — generic card surface (uses `--theme-surface`)
-* `.stat` + `.stat-ico` + `.stat-text` + `.stat-label` + `.stat-value`
-* `.pill` (and `.pill.is-accent` / `.is-ok` / `.is-warn` / `.is-danger`)
-* `.state-empty` / `.state-error` — centered fallback states
+* `.wb-bar` + `.wb-mark` + `.wb-title` + `.wb-bar-icon` + `.wb-bar-meta` — the inverted header strip
+* `.wb-empty` + `.wb-empty-primary` + `.wb-empty-secondary` — empty state
+* `.wb-root.is-error` / `.wb-error` — error state (paints `--c-danger`)
 
-To opt in, link it before your own `client.css`:
+Tune proportions per widget via `--wb-*` custom properties on `:host`
+(e.g. `--wb-bar-fs`, `--wb-bar-fw`) instead of redeclaring the bar.
+
+Link it before your own `client.css`:
 
 ```js
 shadow.innerHTML = `
-  <link rel="stylesheet" href="/static/style/widget-base.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
   <link rel="stylesheet" href="/plugins/<id>/client.css">
   ...`;
 ```
 
-The current shipped widgets (`weather_now`, `weather_hourly`,
-`weather_forecast`) do NOT use this baseline — they roll their own
-CSS — but the conventions there are good defaults if Claude Design
-needs a starting point.
+The weather suite (`weather_now`, `weather_hourly`, `weather_forecast`)
+and ~40 others build on this baseline — read any of them for the pattern.
 
 ---
 
@@ -475,14 +494,14 @@ needs a starting point.
 The Spectra 6 / Waveshare E6 panel has **6 colours**: black, white,
 yellow, red, blue, green.
 
-* Use the theme tokens — themes already map to palette-friendly hex
-  ranges. Don't sample colours outside the palette.
-* **No drawn borders.** Themes are tuned so `bg` vs `surface` contrast
-  defines card shapes — sections rise through colour, not lines. Thin
-  borders dither into invisibility on Spectra 6 anyway, and the
+* Use the `--c-*` semantic tokens — themes map their primitives to
+  palette-friendly hex ranges. Don't sample colours outside the palette.
+* **No drawn borders.** Themes are tuned so `--c-bg` vs `--c-surface`
+  contrast defines card shapes — sections rise through colour, not lines.
+  Thin borders dither into invisibility on Spectra 6 anyway, and the
   no-borders pattern reads cleaner in the admin too. Use spacing,
   background shifts, and type hierarchy instead of `border:` rules.
-  `divider` token survives for chart axes and grid lines only.
+  `--c-line` survives for chart axes and grid lines only.
 * Refresh time is ~25 s on the 13.3" panel. Static, dense layouts
   win; busy gradients quantise into noise.
 * Tabular numerics align cleanly: `font-variant-numeric: tabular-nums`.
@@ -565,7 +584,8 @@ changes; refresh the page to see updates.
 
 ## What NOT to do
 
-* Don't hard-code hex colours. Use `var(--theme-*)` or `ctx.theme.*`.
+* Don't hard-code hex colours. Style DOM with `var(--c-*)`; use
+  `ctx.theme.*` only to feed canvas / Chart.js.
 * Don't reach into the parent document — you're sandboxed in a
   Shadow DOM. The composer expects that.
 * Don't kick off intervals / animations / async work that finishes

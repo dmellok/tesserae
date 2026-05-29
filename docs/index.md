@@ -65,11 +65,11 @@ drop-a-folder plugins discovered at boot. See
 
 ## Project status
 
-Tesserae is young and built in the open by a solo maintainer. It runs daily on
-real hardware (a battery ESP32 + Waveshare 13.3" Spectra 6), but most
-panel/client combinations haven't been confirmed yet — see
-[what's tested](compatibility.md#whats-been-tested-on-real-hardware). Testers
-and contributors are very welcome:
+Tesserae is young and built in the open by a solo maintainer. All three
+reference clients (ESP32, Pi `.bin`, Pi PNG) are confirmed on real hardware —
+see [what's tested](compatibility.md#whats-been-tested-on-real-hardware) — but
+the panel matrix is still small, so testers on other displays are very
+welcome, as are contributors:
 [open an issue or PR](https://github.com/dmellok/tesserae).
 
 For tinkerers, not your mum.
