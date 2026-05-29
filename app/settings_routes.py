@@ -252,7 +252,13 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "name": "client_id",
         "type": "string",
         "label": "MQTT client id",
-        "default": "tesserae",
+        "default": "",
+        "help": (
+            "Must be unique per instance — a broker evicts a duplicate client "
+            "id the moment another connects with it, which causes an endless "
+            "reconnect loop. Leave blank to auto-use 'tesserae-<hostname>'; the "
+            "--dev server appends '-dev'."
+        ),
     },
 ]
 

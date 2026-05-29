@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import socket
 import time
 from datetime import tzinfo
 from pathlib import Path
@@ -285,6 +287,23 @@ def create_app(
     return app
 
 
+def _resolve_client_id(configured: Any, *, dev: bool) -> str:
+    """MQTT client id for this instance.
+
+    A configured value (Settings → Broker → MQTT client id) wins. Otherwise
+    default to ``tesserae-<hostname>`` so two machines sharing one broker
+    don't collide — MQTT brokers evict a duplicate client id the moment
+    another connects with it, which causes the endless reconnect loop
+    ("disconnected unexpectedly" every couple of seconds). The ``--dev``
+    server appends ``-dev`` so it never fights its own prod instance."""
+    base = str(configured or "").strip()
+    if not base:
+        host = socket.gethostname().split(".", 1)[0].strip().lower()
+        host = re.sub(r"[^a-z0-9_-]+", "-", host).strip("-") or "host"
+        base = f"tesserae-{host}"
+    return f"{base}-dev" if dev else base
+
+
 def _rebuild_transport(
     app: Flask,
     settings: SettingsStore,
@@ -379,7 +398,7 @@ def _rebuild_transport(
         username=transport_user,
         password=transport_pass,
         keepalive=int(broker_raw.get("keepalive") or 60),
-        client_id=str(broker_raw.get("client_id") or "tesserae"),
+        client_id=_resolve_client_id(broker_raw.get("client_id"), dev=dev),
     )
     transport = MqttTransport(config, client_factory=factory)
     if host:

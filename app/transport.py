@@ -198,7 +198,17 @@ class MqttTransport:
             self._client.subscribe(sub.topic, 1)
 
     def _on_disconnect(self, client: Any, userdata: Any, *args: Any, **kwargs: Any) -> None:
-        logger.warning("MQTT disconnected unexpectedly")
+        # paho v2 passes (disconnect_flags, reason_code, properties). The
+        # reason code says WHY — notably "Session taken over", which means
+        # another client connected with this same client_id (give each
+        # instance a unique 'MQTT client id' in Settings → Broker).
+        reason = kwargs.get("reason_code")
+        if reason is None and len(args) >= 2:
+            reason = args[1]
+        if reason is not None:
+            logger.warning("MQTT disconnected: %s", reason)
+        else:
+            logger.warning("MQTT disconnected unexpectedly")
 
     def _on_message(self, client: Any, userdata: Any, message: Any) -> None:
         topic = str(message.topic)
