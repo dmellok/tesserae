@@ -76,6 +76,9 @@ def create_app(
         static_url_path="/static",
     )
     app.testing = testing
+    # Surfaced to templates so the admin UI can flag a --dev instance
+    # (reddish-orange accent) and the mDNS advertiser picks tesserae-dev.local.
+    app.config["DEV_MODE"] = dev
 
     data_root = data_root or REPO_ROOT / "data"
     plugins_dir = plugins_dir or REPO_ROOT / "plugins"

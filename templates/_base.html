@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/editor.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
-<body class="admin">
+<body class="admin{% if config.DEV_MODE %} dev-mode{% endif %}">
   <header class="topbar">
     <a class="brand" href="/">
       <span class="brand-mark" aria-hidden="true"></span>

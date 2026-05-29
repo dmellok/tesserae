@@ -1,0 +1,20 @@
+# Normalise line endings. Most files use LF; Windows scripts need CRLF or
+# PowerShell can mis-parse them (e.g. a here-string fails to terminate when
+# install.ps1 is checked out with LF and run as a file).
+* text=auto eol=lf
+
+# Windows scripts: always check out with CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# POSIX shell scripts: always LF.
+*.sh text eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.woff2 binary
+*.bin binary
+*.db binary

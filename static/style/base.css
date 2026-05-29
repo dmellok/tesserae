@@ -223,6 +223,25 @@
   --t-ring-soft: 0 0 0 4px color-mix(in oklab, var(--t-accent) 22%, transparent);
 }
 
+/* Dev-mode tell: a `tesserae --dev` server retints the admin accent
+   reddish-orange so it's obvious you're not on your production instance.
+   Set on <body> (added by _base.html when config.DEV_MODE) so it wins
+   over the :root + dark-theme accent for everything inside. */
+body.dev-mode {
+  --t-accent:        #e0542a;
+  --t-accent-hover:  #c0431d;
+  --t-accent-soft:   #fbe7df;
+  --t-accent-fg:     #ffffff;
+  --t-accent-ink:    #7c2b12;
+}
+:root[data-theme="dark"] body.dev-mode {
+  --t-accent:        #ff7a4d;
+  --t-accent-hover:  #ff9166;
+  --t-accent-soft:   color-mix(in oklab, #ff7a4d 18%, #181b21);
+  --t-accent-fg:     #2a0f06;
+  --t-accent-ink:    #ffd9c9;
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 
