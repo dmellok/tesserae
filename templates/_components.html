@@ -354,6 +354,7 @@ macro here instead.
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
   {% else %}
     {{ text_input(field_id, name, label, value=value or '',
+                  placeholder=spec.get('placeholder', ''),
                   type='password' if spec.get('secret') else 'text',
                   autocomplete='new-password' if spec.get('secret') else None,
                   help=help_text) }}

@@ -125,6 +125,13 @@ class MqttTransport:
         return self._connected
 
     @property
+    def client_id(self) -> str:
+        """The resolved MQTT client id in use (host-based default / -dev
+        suffix already applied). Surfaced so the settings UI can show what
+        a blank 'MQTT client id' field actually connects as."""
+        return self._config.client_id
+
+    @property
     def topic_subscriptions(self) -> list[str]:
         with self._lock:
             return [s.topic for s in self._subscriptions]

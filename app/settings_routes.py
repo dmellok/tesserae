@@ -1067,7 +1067,7 @@ def _build_sections() -> list[dict[str, Any]]:
             "kind": "broker",
             "title": "MQTT broker",
             "blurb": "Tesserae publishes frames here; devices subscribe.",
-            "fields": BROKER_FIELDS,
+            "fields": _broker_fields_with_client_id_hint(),
             "state": _values_for_core("broker", BROKER_FIELDS, broker_raw),
             "endpoint": url_for("auth.settings_update", section_kind="broker"),
             "meta": {"MQTT URL": _broker_mqtt_url(broker_raw)},
@@ -1285,6 +1285,20 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
         if not host:
             return "—"
     return f"mqtt://{host}:{port}"
+
+
+def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:
+    """BROKER_FIELDS with the client_id field's placeholder set to the live
+    (auto) client id, so a blank field shows what it actually connects as
+    (e.g. ``tesserae-<hostname>`` / ``…-dev``) rather than looking unset."""
+    transport = current_app.config.get("MQTT_TRANSPORT")
+    auto = getattr(transport, "client_id", "") or ""
+    if not auto:
+        return BROKER_FIELDS
+    return [
+        {**f, "placeholder": f"{auto} (auto)"} if f.get("name") == "client_id" else f
+        for f in BROKER_FIELDS
+    ]
 
 
 def _apply_broker_change() -> None:
