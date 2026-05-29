@@ -66,7 +66,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # Upside-down physical mount — turn 180° so it reads upright.
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
-        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale="fit", bg="white")
+        # Send-page per-push fit mode (fit/fill/stretch/center/blur).
+        fit = str(settings.get("image_fit") or "fit")
+        img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)

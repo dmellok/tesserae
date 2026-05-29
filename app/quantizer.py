@@ -22,7 +22,7 @@ import io
 from typing import Literal
 
 import numpy as np
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageFilter
 
 # DitherMode covers both the Pillow-only callers and the numpy-backed ones.
 # pack_to_panel_bin dispatches on the full set; callers that don't own a
@@ -172,14 +172,30 @@ def fit_to_panel(
     * ``stretch`` — squash to exact dims.
     * ``center``  — paste original at panel centre; clip overflow, ``bg``
                     elsewhere.
+    * ``blur``    — preserve aspect (as ``fit``) over a blurred, cover-cropped
+                    copy of the image so the letterbox area is filled.
 
-    Used by the Send page (M7) when the uploaded image isn't already panel
+    Used by the Send page when the uploaded image isn't already panel
     sized. Dashboard renders skip this — the composer emits panel-exact PNGs."""
     src = img.convert("RGB")
-    if src.size == (target_w, target_h):
+    if src.size == (target_w, target_h) and scale != "blur":
         return src
     if scale == "stretch":
         return src.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    if scale == "blur":
+        # Cover-crop a copy to fill the panel, blur it for the backdrop,
+        # then paste the aspect-fit image centred on top.
+        background = fit_to_panel(src, target_w=target_w, target_h=target_h, scale="fill", bg=bg)
+        radius = max(8, min(target_w, target_h) // 16)
+        background = background.filter(ImageFilter.GaussianBlur(radius))
+        ratio = src.width / src.height
+        if ratio > target_w / target_h:
+            fg_w, fg_h = target_w, max(1, round(target_w / ratio))
+        else:
+            fg_w, fg_h = max(1, round(target_h * ratio)), target_h
+        fg = src.resize((fg_w, fg_h), Image.Resampling.LANCZOS)
+        background.paste(fg, ((target_w - fg_w) // 2, (target_h - fg_h) // 2))
+        return background
     canvas = Image.new("RGB", (target_w, target_h), bg)
     if scale == "center":
         x = (target_w - src.width) // 2

@@ -196,30 +196,38 @@ class PushManager:
         return result
 
     def push_image(
-        self, image_bytes: bytes, *, source_label: str, device_id: str | None = None
+        self,
+        image_bytes: bytes,
+        *,
+        source_label: str,
+        device_id: str | None = None,
+        fit: str | None = None,
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
-        Used by the Send-page File and Image-URL tabs. Each renderer's
-        ``transform()`` is responsible for fitting the input to its panel
-        dims (the bundled renderers do this via ``fit_to_panel``).
+        Used by the Send-page File / Image-URL / Gallery flows. Each
+        renderer's ``transform()`` fits the input to its panel dims (the
+        bundled .bin renderers via ``fit_to_panel``).
 
         ``device_id`` (optional): when set, only that device's renderers
         fire and its panel dims are used — same routing as a page bound
-        to the device."""
+        to the device. ``fit`` (optional): the fit mode for non-panel-sized
+        input (``fit``/``fill``/``stretch``/``center``/``blur``)."""
         if not self._lock.acquire(blocking=False):
             result = self._log_busy(source="file", target=source_label)
         else:
             try:
                 result = self._push_bytes_locked(
-                    image_bytes, source_label, source="file", device_id=device_id
+                    image_bytes, source_label, source="file", device_id=device_id, fit=fit
                 )
             finally:
                 self._lock.release()
         self._notify(result)
         return result
 
-    def push_url_image(self, url: str, *, device_id: str | None = None) -> PushResult:
+    def push_url_image(
+        self, url: str, *, device_id: str | None = None, fit: str | None = None
+    ) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
         surface as failed events with the URL as the target."""
         if not self._lock.acquire(blocking=False):
@@ -232,7 +240,7 @@ class PushManager:
                     result = self._log_failure(source="url", target=url, error=f"fetch: {err}")
                 else:
                     result = self._push_bytes_locked(
-                        image_bytes, url, source="url", device_id=device_id
+                        image_bytes, url, source="url", device_id=device_id, fit=fit
                     )
             finally:
                 self._lock.release()
@@ -246,6 +254,7 @@ class PushManager:
         viewport_w: int = 1600,
         viewport_h: int = 1200,
         device_id: str | None = None,
+        fit: str | None = None,
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish."""
         if not self._lock.acquire(blocking=False):
@@ -266,7 +275,12 @@ class PushManager:
                     )
                 else:
                     result = self._push_bytes_locked(
-                        composition, url, source="webpage", started=started, device_id=device_id
+                        composition,
+                        url,
+                        source="webpage",
+                        started=started,
+                        device_id=device_id,
+                        fit=fit,
                     )
             finally:
                 self._lock.release()
@@ -433,6 +447,7 @@ class PushManager:
         source: str,
         started: float | None = None,
         device_id: str | None = None,
+        fit: str | None = None,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
@@ -444,6 +459,7 @@ class PushManager:
             target=source_label,
             started=started,
             device_filters={device_id} if device_id else None,
+            image_fit=fit,
         )
 
     def _fan_out(
@@ -455,13 +471,16 @@ class PushManager:
         target: str,
         started: float,
         device_filters: set[str] | None = None,
+        image_fit: str | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
         ``device_filters`` (multi-head): when set, only renderers whose
         ``.device`` is in the set fire — so a frame rendered for one
         panel lands only on the devices that share that panel. ``None``
-        fans out to every renderer (legacy / virtual-panel)."""
+        fans out to every renderer (legacy / virtual-panel). ``image_fit``
+        (optional): fit mode for non-panel-sized input, passed through to
+        each renderer's transform; ``None`` keeps each renderer's default."""
         comp_digest = hashlib.sha256(composition_png).hexdigest()[:16]
         thumb_path = self._renders_dir / f"{comp_digest}.png"
         if not thumb_path.exists():
@@ -479,7 +498,9 @@ class PushManager:
                 continue
             renderer_start = time.monotonic()
             try:
-                result = self._publish_artifact(renderer, composition_png, panel)
+                result = self._publish_artifact(
+                    renderer, composition_png, panel, image_fit=image_fit
+                )
             except Exception as err:
                 logger.exception("renderer %s failed", renderer.id)
                 result = RendererResult(
@@ -552,12 +573,22 @@ class PushManager:
         )
 
     def _publish_artifact(
-        self, renderer: Renderer, composition_png: bytes, panel: Panel
+        self,
+        renderer: Renderer,
+        composition_png: bytes,
+        panel: Panel,
+        *,
+        image_fit: str | None = None,
     ) -> RendererResult:
         """Run one renderer end-to-end: settings -> transform -> write -> publish."""
         settings = self._settings.get_for_runtime(
             "renderers", renderer.id, renderer.manifest.get("settings", [])
         )
+        if image_fit:
+            # Per-push fit override for non-panel-sized input. .bin renderers
+            # read ``image_fit`` (server-side fit_to_panel); pi_png passes it
+            # to the client via its ``scale`` payload field.
+            settings = {**settings, "image_fit": image_fit, "scale": image_fit}
         artifact = renderer.transform(composition_png, panel=panel, settings=settings)
         digest = hashlib.sha256(artifact).hexdigest()[:16]
 
