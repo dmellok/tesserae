@@ -16,27 +16,40 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 Compose in the browser — pick widgets, a theme, and which display(s) each
 dashboard binds to — then render headless and push the frame over MQTT.
 
-<p align="center">
-  <img src="docs/screenshots/ui-dashboards.png" alt="Dashboards list" width="420">
-  <img src="docs/screenshots/ui-editor.png" alt="Dashboard editor with live preview, theme picker and multi-display binding" width="420">
-</p>
-<p align="center">
-  <img src="docs/screenshots/ui-send.png" alt="Send page" width="270">
-  <img src="docs/screenshots/ui-schedules.png" alt="Schedules" width="270">
-  <img src="docs/screenshots/ui-settings.png" alt="Device settings" width="270">
-</p>
+<details>
+<summary><b>Screenshots</b> — admin UI &amp; example device frames (click to expand; click any image for full size)</summary>
 
-**Frames pushed to the panels.** Each dashboard renders to a panel-sized
-frame and publishes only to the display(s) it's bound to. A few examples
-across themes and panel sizes (the last is a small 448×600 panel):
+<h4>Admin UI</h4>
 
-<p align="center">
-  <img src="docs/screenshots/dash-morning.png" alt="Morning dashboard" width="150">
-  <img src="docs/screenshots/dash-lounge.png" alt="Lounge dashboard" width="150">
-  <img src="docs/screenshots/dash-office.png" alt="Office dashboard" width="150">
-  <img src="docs/screenshots/dash-dev.png" alt="Dev dashboard" width="150">
-  <img src="docs/screenshots/dash-glance.png" alt="Glance dashboard" width="150">
-</p>
+<table>
+  <tr>
+    <td align="center" width="50%"><a href="docs/screenshots/ui-dashboards.png"><img src="docs/screenshots/ui-dashboards.png" width="340" alt="Dashboards list"></a><br><sub>Dashboards</sub></td>
+    <td align="center" width="50%"><a href="docs/screenshots/ui-editor.png"><img src="docs/screenshots/ui-editor.png" width="340" alt="Editor with live preview"></a><br><sub>Editor + live preview</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/ui-send.png"><img src="docs/screenshots/ui-send.png" width="340" alt="Send page"></a><br><sub>Send</sub></td>
+    <td align="center"><a href="docs/screenshots/ui-schedules.png"><img src="docs/screenshots/ui-schedules.png" width="340" alt="Schedules"></a><br><sub>Schedules</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/ui-settings.png"><img src="docs/screenshots/ui-settings.png" width="340" alt="Device settings"></a><br><sub>Device settings</sub></td>
+    <td></td>
+  </tr>
+</table>
+
+<h4>Frames pushed to the panels</h4>
+<sub>Each dashboard renders to a panel-sized frame and publishes only to the display(s) it's bound to — across themes and panel sizes (Glance is a small 448×600 panel).</sub>
+
+<table>
+  <tr>
+    <td align="center"><a href="docs/screenshots/dash-morning.png"><img src="docs/screenshots/dash-morning.png" height="200" alt="Morning"></a><br><sub>Morning</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-lounge.png"><img src="docs/screenshots/dash-lounge.png" height="200" alt="Lounge"></a><br><sub>Lounge</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-office.png"><img src="docs/screenshots/dash-office.png" height="200" alt="Office"></a><br><sub>Office</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-dev.png"><img src="docs/screenshots/dash-dev.png" height="200" alt="Dev"></a><br><sub>Dev</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-glance.png"><img src="docs/screenshots/dash-glance.png" height="200" alt="Glance"></a><br><sub>Glance</sub></td>
+  </tr>
+</table>
+
+</details>
 
 ## Status
 
