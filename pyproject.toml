@@ -54,6 +54,12 @@ dev = [
     "ruff>=0.15,<0.16",
     "types-jsonschema",
 ]
+docs = [
+    # MkDocs Material builds the public wiki at docs/ -> GitHub Pages.
+    # The gen_* scripts under scripts/ produce the auto-generated pages
+    # (widget gallery, hardware compatibility) from the live manifests.
+    "mkdocs-material>=9.5,<10",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]

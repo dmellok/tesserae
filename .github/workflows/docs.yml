@@ -1,0 +1,72 @@
+# Build the MkDocs wiki and deploy it to GitHub Pages.
+#
+# The widget gallery + compatibility pages are regenerated from the live
+# manifests on every build, so they can't drift. Widget *screenshots* are
+# committed artifacts (capture them locally with
+# scripts/capture_widget_shots.py against a --dev instance) — we don't run
+# a browser in CI.
+#
+# One-time setup: repo Settings -> Pages -> Source = "GitHub Actions".
+
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "scripts/gen_*.py"
+      - "plugins/**/plugin.json"
+      - "renderers/**/renderer.json"
+      - "devices/**/device.json"
+      - "app/panel.py"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# Allow the workflow to publish to Pages via the deployment API.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; don't cancel an in-flight publish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install docs deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[docs]"
+      - name: Regenerate auto pages from manifests
+        run: |
+          python scripts/gen_widget_gallery.py
+          python scripts/gen_compatibility.py
+      - name: Build site (strict)
+        run: mkdocs build --strict
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

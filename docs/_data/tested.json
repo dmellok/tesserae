@@ -1,0 +1,20 @@
+{
+  "_comment": "Hand-maintained test matrix. Maps each renderer/client to your real-world test status. Edit freely, then rerun: python scripts/gen_compatibility.py. Status is shown verbatim; use 'Tested', 'Partial', or 'Not yet tested'.",
+  "renderers": {
+    "esp32_bin": {
+      "status": "Tested",
+      "hardware": "Waveshare 13.3\" Spectra 6 (ESP32-S3-WROOM-2)",
+      "notes": "Primary daily driver — battery-powered, deep-sleep."
+    },
+    "pi_bin": {
+      "status": "Not yet tested",
+      "hardware": "Pimoroni Inky Impression (Spectra 6 / Waveshare E6)",
+      "notes": ""
+    },
+    "pi_png": {
+      "status": "Not yet tested",
+      "hardware": "Any panel the Pimoroni inky library supports",
+      "notes": ""
+    }
+  }
+}

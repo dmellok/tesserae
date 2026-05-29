@@ -1,0 +1,72 @@
+site_name: Tesserae
+site_description: Self-hosted e-ink dashboard companion — compose tile dashboards, render headless, push frames over MQTT.
+site_url: https://dmellok.github.io/tesserae/
+repo_url: https://github.com/dmellok/tesserae
+repo_name: dmellok/tesserae
+edit_uri: edit/main/docs/
+copyright: MIT-licensed. For tinkerers, not your mum.
+
+# docs/widget-build-prompt.md is an internal batch prompt, not a wiki page.
+exclude_docs: |
+  widget-build-prompt.md
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+nav:
+  - Home: index.md
+  - Install Tesserae: install/server.md
+  - Install a client: install/clients.md
+  - Set up a device: install/devices.md
+  - Screens & compatibility: compatibility.md
+  - Widget gallery: widgets/gallery.md
+  - Plugin development:
+      - Build a widget with AI: dev/writing-a-plugin.md
+      - Widget contract & design system: widgets.md
+      - Design brief template: widget-design-brief.md

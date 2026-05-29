@@ -34,3 +34,6 @@ static/dist/
 # Working notes / build prompts for downstream projects
 notes/
 PROMPTS/
+
+# MkDocs build output (published via GitHub Actions, never committed)
+/site/
