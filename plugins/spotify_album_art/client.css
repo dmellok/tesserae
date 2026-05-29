@@ -4,7 +4,7 @@
 .sa-wrap {
   width: 100%;
   height: 100%;
-  background: var(--theme-bg);
+  background: var(--c-bg);
   display: block;
 }
 

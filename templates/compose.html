@@ -43,6 +43,33 @@
       /* Each cell is a sizing container so plugins can use cqw/cqh CSS units
          to auto-scale to their cell dimensions. */
       container-type: size;
+
+      /* Semantic token layer. Widgets paint from these --c-* tokens, NEVER
+         the raw --theme-* primitives. Defined on the cell host so every
+         widget's shadow inherits them regardless of which stylesheets it
+         links. Two ideas kept apart that used to be conflated:
+           - categorical (--c-data-*): "N distinguishable colours, no meaning"
+           - status (--c-ok/warn/danger): "good / caution / bad"
+         The categorical ramp tops out at ~4 hues on a 6-ink E6 panel;
+         --c-accent-soft is the tonal lane (dithers — large fills only).
+         See docs/widgets.md → "Theme tokens". */
+      --c-bg:          var(--theme-bg);
+      --c-surface:     var(--theme-surface);
+      --c-raised:      var(--theme-surface2);
+      --c-text:        var(--theme-fg);
+      --c-text-soft:   var(--theme-fgSoft);
+      --c-text-mute:   var(--theme-muted);
+      --c-line:        var(--theme-divider);
+      --c-accent:      var(--theme-accent);
+      --c-accent-soft: var(--theme-accentSoft);
+      --c-data-1:      var(--theme-accent);
+      --c-data-2:      var(--theme-accent2);
+      --c-data-3:      var(--theme-accent3);
+      --c-data-4:      var(--theme-surface2);
+      --c-ok:          var(--theme-ok);
+      --c-warn:        var(--theme-warn);
+      --c-danger:      var(--theme-danger);
+      --c-info:        var(--theme-accent);
     }
     .cell.full-bleed { outline: 0; }
     .cell.error { outline: 2px solid {{ page.palette.danger }}; }

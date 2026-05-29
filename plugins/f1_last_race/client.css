@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -101,38 +101,38 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   padding: clamp(2px, 0.4cqw, 4px) clamp(4px, 0.8cqw, 8px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
+  background: var(--c-text);
+  color: var(--c-bg);
   border-radius: 1px;
 }
 
 /* Position colour blocks — same accent vocabulary as the weather
    widgets' stat row. Border-top rules read as bauhaus separators. */
 .fl-row--p1 {
-  background: var(--theme-accent);
-  color: var(--theme-bg);
+  background: var(--c-accent);
+  color: var(--c-bg);
 }
-.fl-row--p1 .fl-pos { color: var(--theme-bg); }
+.fl-row--p1 .fl-pos { color: var(--c-bg); }
 .fl-row--p2 {
-  background: var(--theme-surface2);
-  color: var(--theme-fg);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  background: var(--c-raised);
+  color: var(--c-text);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fl-row--p3 {
-  background: var(--theme-accent3);
-  color: var(--theme-bg);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  background: var(--c-data-3);
+  color: var(--c-bg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
-.fl-row--p1 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
-.fl-row--p3 .fl-fl { background: var(--theme-bg); color: var(--theme-fg); }
+.fl-row--p1 .fl-fl { background: var(--c-bg); color: var(--c-text); }
+.fl-row--p3 .fl-fl { background: var(--c-bg); color: var(--c-text); }
 
 /* --- circuit silhouette panel ---
    Sits on the LEFT as a side panel. Neutral surface background so the
    silhouette doesn't fight the podium colour blocks for attention. */
 
 .fl-circuit {
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   display: grid;
   place-items: center;
   padding: clamp(8px, 1.8cqw, 20px) clamp(12px, 2.4cqw, 28px);
@@ -142,7 +142,7 @@
   /* Border on the RIGHT now — separates the silhouette from the
      podium column. Same thick-fg bauhaus rule the layout uses
      elsewhere. */
-  border-right: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-right: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fl-circuit-svg {
   width: 100%;
@@ -178,7 +178,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

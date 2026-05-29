@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -76,9 +76,9 @@
   overflow: hidden;
   text-align: center;
 }
-.wf-day--accent  { background: var(--theme-accent);  color: var(--theme-bg); }
-.wf-day--surface { background: var(--theme-surface); color: var(--theme-fg); }
-.wf-day--surface2 { background: var(--theme-surface2); color: var(--theme-fg); }
+.wf-day--accent  { background: var(--c-accent);  color: var(--c-bg); }
+.wf-day--surface { background: var(--c-surface); color: var(--c-text); }
+.wf-day--surface2 { background: var(--c-raised); color: var(--c-text); }
 
 .wf-day-name {
   font-size: clamp(10px, 1.7cqw, 14px);
@@ -168,7 +168,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

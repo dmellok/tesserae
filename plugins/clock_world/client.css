@@ -7,8 +7,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -35,7 +35,7 @@
   overflow: hidden;
   /* Thick fg rule between the bar and the first row — same trick the
      weather widgets use to anchor the colour blocks. */
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 
 .cw-row {
@@ -115,20 +115,20 @@
    inverts foreground against the tinted background so widgets remain
    legible on every theme. */
 .row-accent {
-  background: var(--theme-accent);
-  color: var(--theme-bg);
+  background: var(--c-accent);
+  color: var(--c-bg);
 }
 .row-accent2 {
-  background: var(--theme-accent2);
-  color: var(--theme-fg);
+  background: var(--c-data-2);
+  color: var(--c-text);
 }
 .row-accent3 {
-  background: var(--theme-accent3);
-  color: var(--theme-bg);
+  background: var(--c-data-3);
+  color: var(--c-bg);
 }
 .row-surface {
-  background: var(--theme-surface2);
-  color: var(--theme-fg);
+  background: var(--c-raised);
+  color: var(--c-text);
 }
 
 /* --- size-specific tightening ----------------------------------- */

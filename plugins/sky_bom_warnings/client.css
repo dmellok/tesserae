@@ -8,8 +8,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -46,28 +46,28 @@
   padding: clamp(8px, 1.6cqh, 18px) clamp(12px, 2cqw, 22px);
   min-width: 0;
   overflow: hidden;
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 12%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
 }
 .bw-card:first-child { border-top: 0; }
 
 /* Major warning cards = accent3 (red) block. */
 .bw-card.is-major {
-  background: var(--theme-accent3);
-  color: var(--theme-bg);
+  background: var(--c-data-3);
+  color: var(--c-bg);
 }
 .bw-card.is-major .bw-phase {
-  background: var(--theme-bg);
-  color: var(--theme-accent3);
+  background: var(--c-bg);
+  color: var(--c-data-3);
 }
 
 /* Minor cards on surface2 (neutral) with a thick fg-rule for emphasis. */
 .bw-card.is-minor {
-  background: var(--theme-surface2);
-  color: var(--theme-fg);
+  background: var(--c-raised);
+  color: var(--c-text);
 }
 .bw-card.is-minor .bw-phase {
-  background: var(--theme-fg);
-  color: var(--theme-bg);
+  background: var(--c-text);
+  color: var(--c-bg);
 }
 
 /* Cancelled phase: dim the card. */
@@ -142,8 +142,8 @@
 
 .bw-foot {
   padding: clamp(4px, 0.8cqw, 8px) clamp(12px, 2cqw, 22px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
+  background: var(--c-text);
+  color: var(--c-bg);
   font: 800 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -158,11 +158,11 @@
   text-align: center;
   gap: clamp(4px, 1cqw, 10px);
   padding: clamp(12px, 2.4cqw, 28px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .bw-empty .ph-duotone {
   font-size: clamp(32px, 9cqw, 72px);
-  color: var(--theme-accent);
+  color: var(--c-accent);
   opacity: 0.85;
 }
 .bw-empty-primary {
@@ -173,14 +173,14 @@
 }
 .bw-empty-secondary {
   font-size: clamp(11px, 1.7cqw, 14px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 
 .root.error {
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

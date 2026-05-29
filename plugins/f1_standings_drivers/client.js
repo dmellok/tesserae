@@ -55,7 +55,7 @@ function sizeRows(size) {
 }
 
 function row(s) {
-  const colour = TEAM_COLOR[s.constructorId] || "var(--theme-fgSoft)";
+  const colour = TEAM_COLOR[s.constructorId] || "var(--c-text-soft)";
   const isLeader = s.position === "1";
   return `
     <div class="fs-row ${isLeader ? "fs-row--leader" : ""}">

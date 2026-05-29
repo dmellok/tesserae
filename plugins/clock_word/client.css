@@ -1,17 +1,17 @@
-:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); }
+:host { display: block; width: 100%; height: 100%; color: var(--c-text); background: var(--c-bg); }
 .root {
   width: 100%; height: 100%;
   display: grid; align-content: center; gap: clamp(2px, 0.6cqh, 6px);
   padding: clamp(12px, 3cqw, 36px);
   box-sizing: border-box;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   font-family: var(--theme-font, system-ui);
 }
 .cw-it {
   font-size: clamp(12px, 2.8cqw, 28px);
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   text-transform: uppercase;
 }
 .cw-lead {
@@ -19,21 +19,21 @@
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: -0.035em;
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
 .cw-tail {
   font-size: clamp(20px, 8cqw, 84px);
   font-weight: 900;
   line-height: 0.95;
   letter-spacing: -0.035em;
-  color: var(--theme-accent);
+  color: var(--c-accent);
 }
 .cw-dot {
   display: inline-block;
   width: 0.28em;
   height: 0.28em;
   border-radius: 50%;
-  background: var(--theme-accent2);
+  background: var(--c-data-2);
   margin-left: 0.18em;
   vertical-align: 0.05em;
   animation: cw-pulse 2s ease-in-out infinite;

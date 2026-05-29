@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -34,7 +34,7 @@
 
 .wn-hero {
   position: relative;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   display: grid;
   /* 50/50 split: text on the left, icon panel on the right takes
      equal space. Bauhaus colour-block proportions. */
@@ -55,14 +55,14 @@
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: -0.045em;
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
 .wn-cond {
   font-size: clamp(13px, 2.4cqw, 22px);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -76,12 +76,12 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.wn-range-high { color: var(--theme-accent3); }
+.wn-range-high { color: var(--c-data-3); }
 .wn-range-low,
-.wn-range-feels { color: var(--theme-fg); }
+.wn-range-feels { color: var(--c-text); }
 
 .wn-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   align-self: stretch;
   display: grid;
   place-items: center;
@@ -91,7 +91,7 @@
 }
 .wn-hero-icon .ph-bold {
   font-size: clamp(80px, 28cqw, 280px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 
@@ -99,8 +99,8 @@
   position: absolute;
   top: 0;
   right: 0;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   padding: clamp(3px, 0.6cqw, 6px) clamp(8px, 1.4cqw, 14px);
   font-size: clamp(10px, 1.6cqw, 13px);
   font-weight: 700;
@@ -115,7 +115,7 @@
   grid-template-columns: repeat(4, 1fr);
   /* Thick black rule separating the stat row from the hero — sparing
      use of bauhaus heavy lines to anchor the layout. */
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .wn-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.8cqw, 18px);
@@ -148,10 +148,10 @@
   opacity: 0.85;
 }
 
-.wn-stat--accent { background: var(--theme-accent); color: var(--theme-bg); }
-.wn-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.wn-stat--accent2 { background: var(--theme-accent2); color: var(--theme-fg); }
-.wn-stat--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
+.wn-stat--accent { background: var(--c-data-1); color: var(--c-bg); }
+.wn-stat--surface { background: var(--c-data-4); color: var(--c-text); }
+.wn-stat--accent2 { background: var(--c-data-2); color: var(--c-text); }
+.wn-stat--accent3 { background: var(--c-data-3); color: var(--c-bg); }
 
 /* --- sunrise/sunset row (md, lg only) --- */
 
@@ -173,8 +173,8 @@
 .wn-sun-cell .ph { font-size: 1.3em; }
 .wn-sun-label { opacity: 0.85; }
 .wn-sun-time { margin-left: auto; font-weight: 800; }
-.wn-sun-cell--accent { background: var(--theme-accent); color: var(--theme-bg); }
-.wn-sun-cell--inverse { background: var(--theme-fg); color: var(--theme-bg); }
+.wn-sun-cell--accent { background: var(--c-accent); color: var(--c-bg); }
+.wn-sun-cell--inverse { background: var(--c-text); color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -201,7 +201,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

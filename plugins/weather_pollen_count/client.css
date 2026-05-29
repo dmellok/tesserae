@@ -5,8 +5,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -35,8 +35,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
@@ -83,7 +83,7 @@
 }
 
 .pl-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -92,22 +92,22 @@
 }
 .pl-hero-icon .ph-bold {
   font-size: clamp(80px, 28cqw, 280px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 
 /* Band overlays, decorative tokens only. */
-.pl-band--low   .pl-hero-text { background: var(--theme-accent);   color: var(--theme-bg); }
-.pl-band--mod   .pl-hero-text { background: var(--theme-accent2);  color: var(--theme-fg); }
-.pl-band--high  .pl-hero-text { background: var(--theme-accent3);  color: var(--theme-bg); }
-.pl-band--vhigh .pl-hero-text { background: var(--theme-fg);       color: var(--theme-bg); }
+.pl-band--low   .pl-hero-text { background: var(--c-accent);   color: var(--c-bg); }
+.pl-band--mod   .pl-hero-text { background: var(--c-data-2);  color: var(--c-text); }
+.pl-band--high  .pl-hero-text { background: var(--c-data-3);  color: var(--c-bg); }
+.pl-band--vhigh .pl-hero-text { background: var(--c-text);       color: var(--c-bg); }
 
 /* --- three-up species chips --- */
 
 .pl-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .pl-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -138,9 +138,9 @@
   line-height: 1;
 }
 
-.pl-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.pl-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.pl-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.pl-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.pl-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.pl-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -164,7 +164,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

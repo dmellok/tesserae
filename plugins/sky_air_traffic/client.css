@@ -9,8 +9,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -36,8 +36,8 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
@@ -62,7 +62,7 @@
   font: 700 clamp(11px, 1.8cqw, 16px)/1 var(--theme-font, system-ui);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .at-lede-meta > span {
   display: inline-flex;
@@ -73,7 +73,7 @@
 .at-lede-meta .ph-bold { font-size: 1.1em; opacity: 0.85; }
 
 .at-lede-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -82,7 +82,7 @@
 }
 .at-lede-icon .ph-bold {
   font-size: clamp(48px, 18cqw, 180px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
   transition: transform 200ms ease;
 }
@@ -92,7 +92,7 @@
 .at-lede-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .at-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -129,10 +129,10 @@
   margin-left: 0.2em;
   opacity: 0.75;
 }
-.at-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.at-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.at-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.at-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.at-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.at-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.at-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.at-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- remaining rows --- */
 
@@ -140,10 +140,10 @@
   display: grid;
   grid-auto-rows: min-content;
   align-content: start;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-height: 0;
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .at-row {
   display: grid;
@@ -151,7 +151,7 @@
   align-items: center;
   gap: clamp(10px, 1.8cqw, 18px);
   padding: clamp(8px, 1.4cqh, 16px) clamp(12px, 2cqw, 22px);
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 12%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
   min-width: 0;
   overflow: hidden;
 }
@@ -159,7 +159,7 @@
 .at-row.is-ground { opacity: 0.5; }
 .at-row-icon {
   font-size: clamp(24px, 4.5cqw, 48px);
-  color: var(--theme-accent);
+  color: var(--c-accent);
   transition: transform 200ms ease;
   flex-shrink: 0;
 }
@@ -185,7 +185,7 @@
   font: 700 clamp(10px, 1.5cqw, 13px)/1 var(--theme-font, system-ui);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,7 +195,7 @@
   flex-wrap: wrap;
   gap: clamp(8px, 1.4cqw, 16px);
   font: 700 clamp(10px, 1.6cqw, 14px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .at-row-meta > span {
   display: inline-flex;
@@ -209,10 +209,10 @@
 
 .at-phase { display: inline-flex; align-items: center; gap: 4px; }
 .vr-up,
-.vr-up-strong   { color: var(--theme-accent); }
+.vr-up-strong   { color: var(--c-accent); }
 .vr-down,
-.vr-down-strong { color: var(--theme-accent3); }
-.vr-level       { color: var(--theme-fgSoft); }
+.vr-down-strong { color: var(--c-data-3); }
+.vr-level       { color: var(--c-text-soft); }
 
 /* --- sizing --- */
 
@@ -247,11 +247,11 @@
   text-align: center;
   gap: clamp(4px, 1cqw, 10px);
   padding: clamp(12px, 2.4cqw, 28px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .at-empty .ph-duotone {
   font-size: clamp(28px, 8cqw, 64px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.55;
 }
 .at-empty-primary {
@@ -262,14 +262,14 @@
 }
 .at-empty-secondary {
   font-size: clamp(10px, 1.7cqw, 13px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 
 .root.error {
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

@@ -5,8 +5,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
 }
 
 .root {
@@ -50,8 +50,8 @@
   grid-template-columns: auto auto 1fr;
   align-items: center;
   gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--theme-fg);
-  color: var(--theme-bg);
+  background: var(--c-text);
+  color: var(--c-bg);
   padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
   font-size: clamp(10px, 1.7cqw, 14px);
   font-weight: 800;
@@ -63,7 +63,7 @@
   display: inline-block;
   width: clamp(10px, 1.6cqw, 14px);
   height: clamp(10px, 1.6cqw, 14px);
-  background: var(--theme-accent2);
+  background: var(--c-data-2);
 }
 .pu-credit-icon {
   font-size: clamp(14px, 2.4cqw, 18px);
@@ -81,14 +81,14 @@
   display: grid;
   place-items: center;
   text-align: center;
-  background: var(--theme-surface2);
-  color: var(--theme-fgSoft);
+  background: var(--c-raised);
+  color: var(--c-text-soft);
   padding: clamp(12px, 3cqw, 32px);
   gap: clamp(6px, 1.2cqw, 12px);
 }
 .pu-empty .ph-duotone {
   font-size: clamp(48px, 18cqw, 200px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.45;
 }
 .pu-empty-msg {

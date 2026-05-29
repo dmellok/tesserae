@@ -28,7 +28,7 @@ export default async function render(shadow, ctx) {
         ? "ALL DAY"
         : new Date(e.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
       return `
-        <div class="cw-ev" style="--chip:${escapeHtml(e.colour || "var(--theme-accent)")}">
+        <div class="cw-ev" style="--chip:${escapeHtml(e.colour || "var(--c-accent)")}">
           <span class="cw-ev-t">${escapeHtml(t)}</span>
           <span class="cw-ev-s">${escapeHtml(e.summary)}</span>
         </div>

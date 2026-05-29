@@ -61,7 +61,7 @@ export default async function render(shadow, ctx) {
       ? "ALL DAY"
       : fmtTime(e.start) + (e.end && !e.all_day ? "–" + fmtTime(e.end) : "");
     return `
-      <div class="cd-ev" style="--chip:${escapeHtml(e.colour || "var(--theme-accent)")}">
+      <div class="cd-ev" style="--chip:${escapeHtml(e.colour || "var(--c-accent)")}">
         <div class="cd-when">${escapeHtml(t)}</div>
         <div class="cd-body">
           <div class="cd-summary">${escapeHtml(e.summary)}</div>

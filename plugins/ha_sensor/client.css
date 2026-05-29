@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -21,12 +21,12 @@
 /* --- single-entity hero: number left, icon panel right (50/50) --- */
 
 .hs-hero {
-  background: var(--theme-surface);
+  background: var(--c-surface);
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
   min-height: 0;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .hs-hero-text {
   padding: clamp(10px, 2cqw, 24px);
@@ -37,13 +37,13 @@
   line-height: 0.9;
   letter-spacing: -0.03em;
   font-size: clamp(40px, 22cqmin, 180px);
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
 .hs-hero-value small {
   font-size: 0.4em;
   font-weight: 800;
   margin-left: 0.12em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .hs-hero-sub {
   margin-top: 0.4em;
@@ -51,10 +51,10 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--theme-muted);
+  color: var(--c-text-mute);
 }
 .hs-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   align-self: stretch;
   display: grid;
   place-items: center;
@@ -63,16 +63,16 @@
 .hs-hero-icon .ph-bold {
   font-size: clamp(56px, 26cqmin, 220px);
   line-height: 1;
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
-.hs-hero.is-unavailable .hs-hero-value { color: var(--theme-muted); }
+.hs-hero.is-unavailable .hs-hero-value { color: var(--c-text-mute); }
 
 /* --- multi-entity grid of colour-blocked tiles --- */
 
 .hs-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
   min-height: 0;
 }
 /* 3+ tiles use three columns on wide cells; tall cells stack to one. */
@@ -127,10 +127,10 @@
   opacity: 0.85;
 }
 
-.hs-tile--accent { background: var(--theme-accent); color: var(--theme-bg); }
-.hs-tile--surface2 { background: var(--theme-surface2); color: var(--theme-fg); }
-.hs-tile--accent2 { background: var(--theme-accent2); color: var(--theme-bg); }
-.hs-tile--accent3 { background: var(--theme-accent3); color: var(--theme-bg); }
+.hs-tile--accent { background: var(--c-accent); color: var(--c-bg); }
+.hs-tile--surface2 { background: var(--c-raised); color: var(--c-text); }
+.hs-tile--accent2 { background: var(--c-data-2); color: var(--c-bg); }
+.hs-tile--accent3 { background: var(--c-data-3); color: var(--c-bg); }
 .hs-tile.is-unavailable { opacity: 0.55; }
 
 /* --- size adaptations --- */
@@ -149,17 +149,17 @@
   text-align: center;
   gap: clamp(6px, 1.2cqw, 12px);
   padding: clamp(16px, 3cqw, 36px);
-  background: var(--theme-surface);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  background: var(--c-surface);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
-.hs-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--theme-fg); opacity: 0.5; }
+.hs-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--c-text); opacity: 0.5; }
 .hs-stub-primary {
   font-size: clamp(13px, 2.4cqw, 20px);
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.hs-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--theme-fgSoft); }
+.hs-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--c-text-soft); }
 
 /* --- error state --- */
 
@@ -167,7 +167,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

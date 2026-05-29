@@ -1,4 +1,4 @@
-:host { display: block; width: 100%; height: 100%; color: var(--theme-fg); background: var(--theme-bg); font-variant-numeric: tabular-nums; }
+:host { display: block; width: 100%; height: 100%; color: var(--c-text); background: var(--c-bg); font-variant-numeric: tabular-nums; }
 .root { width: 100%; height: 100%; display: grid; grid-template-rows: auto auto 1fr; box-sizing: border-box; overflow: hidden; }
 
 /* --- header ----------------------------------------------------- */
@@ -12,12 +12,12 @@
   grid-template-areas: "lbl tag" "meta tag";
   gap: 4px clamp(10px, 1.6cqw, 18px);
   align-items: center;
-  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
-.rl-summary--fresh  { background: var(--theme-accent);   color: var(--theme-bg); }
-.rl-summary--recent { background: var(--theme-accent2);  color: var(--theme-fg); }
-.rl-summary--older  { background: var(--theme-surface2); color: var(--theme-fg); }
-.rl-summary--stale  { background: var(--theme-accent3);  color: var(--theme-bg); }
+.rl-summary--fresh  { background: var(--c-accent);   color: var(--c-bg); }
+.rl-summary--recent { background: var(--c-data-2);  color: var(--c-text); }
+.rl-summary--older  { background: var(--c-raised); color: var(--c-text); }
+.rl-summary--stale  { background: var(--c-data-3);  color: var(--c-bg); }
 .rl-summary-lbl {
   grid-area: lbl;
   font: 800 clamp(9px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
@@ -37,16 +37,16 @@
 .rl-summary-age { display: inline-flex; gap: 4px; align-items: center; opacity: 0.85; }
 
 /* --- rows -------------------------------------------------------- */
-.rl-list { display: grid; grid-auto-rows: min-content; align-content: start; background: var(--theme-surface); min-height: 0; overflow: hidden; }
+.rl-list { display: grid; grid-auto-rows: min-content; align-content: start; background: var(--c-surface); min-height: 0; overflow: hidden; }
 .rl-row {
   display: grid; grid-template-columns: auto 1fr auto auto;
   align-items: center; gap: clamp(10px, 1.6cqw, 16px);
   padding: clamp(6px, 1.2cqh, 12px) clamp(12px, 2cqw, 22px);
-  border-top: 1px solid var(--theme-divider);
+  border-top: 1px solid var(--c-line);
   min-width: 0;
 }
 .rl-row:first-child { border-top: 0; }
-.rl-icon { font-size: clamp(15px, 2.6cqw, 22px); color: var(--theme-accent); }
+.rl-icon { font-size: clamp(15px, 2.6cqw, 22px); color: var(--c-accent); }
 .rl-repo {
   font: 700 clamp(12px, 1.9cqw, 16px)/1.2 var(--theme-font-mono, ui-monospace);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -54,13 +54,13 @@
 .rl-tag {
   font: 900 clamp(13px, 2.2cqw, 18px)/1 var(--theme-font-mono, ui-monospace);
   letter-spacing: -0.02em; white-space: nowrap;
-  color: var(--theme-accent);
+  color: var(--c-accent);
 }
 .rl-pre {
   font: 800 clamp(8px, 1.2cqw, 10px)/1 var(--theme-font, system-ui);
   text-transform: uppercase; letter-spacing: 0.08em;
   padding: 2px 6px; border-radius: 2px;
-  background: var(--theme-accent2); color: var(--theme-fg);
+  background: var(--c-data-2); color: var(--c-text);
   margin-left: 4px;
 }
 .rl-age {
@@ -70,12 +70,12 @@
   white-space: nowrap;
 }
 .rl-age .ph-bold { font-size: 1.1em; }
-.rl-age--fresh  { background: var(--theme-accent);   color: var(--theme-bg); }
-.rl-age--recent { background: var(--theme-accent2);  color: var(--theme-fg); }
-.rl-age--older  { background: var(--theme-surface2); color: var(--theme-fgSoft); }
-.rl-age--stale  { background: var(--theme-accent3);  color: var(--theme-bg); }
+.rl-age--fresh  { background: var(--c-accent);   color: var(--c-bg); }
+.rl-age--recent { background: var(--c-data-2);  color: var(--c-text); }
+.rl-age--older  { background: var(--c-raised); color: var(--c-text-soft); }
+.rl-age--stale  { background: var(--c-data-3);  color: var(--c-bg); }
 
-.rl-empty { padding: 28px; text-align: center; color: var(--theme-fgSoft); font-size: 14px; font-weight: 600; }
-.root.error { display: grid; place-items: center; text-align: center; color: var(--theme-danger); padding: 16px; gap: 8px; }
+.rl-empty { padding: 28px; text-align: center; color: var(--c-text-soft); font-size: 14px; font-weight: 600; }
+.root.error { display: grid; place-items: center; text-align: center; color: var(--c-danger); padding: 16px; gap: 8px; }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }

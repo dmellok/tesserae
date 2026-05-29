@@ -7,8 +7,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -31,8 +31,8 @@
   grid-template-areas:
     "text icon"
     "bar  bar";
-  background: var(--theme-accent);
-  color: var(--theme-bg);
+  background: var(--c-accent);
+  color: var(--c-bg);
   min-width: 0;
   overflow: hidden;
 }
@@ -76,7 +76,7 @@
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
-  background: color-mix(in oklab, var(--theme-fg) 15%, var(--theme-accent));
+  background: color-mix(in oklab, var(--c-text) 15%, var(--c-accent));
 }
 .td-progress-icon .ph-bold {
   font-size: clamp(40px, 12cqw, 120px);
@@ -85,12 +85,12 @@
 .td-progress-bar {
   grid-area: bar;
   height: clamp(8px, 1.4cqw, 14px);
-  background: color-mix(in oklab, var(--theme-bg) 30%, transparent);
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 25%, transparent);
+  background: color-mix(in oklab, var(--c-bg) 30%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 25%, transparent);
 }
 .td-progress-fill {
   height: 100%;
-  background: var(--theme-bg);
+  background: var(--c-bg);
   transition: width 240ms ease;
 }
 
@@ -100,13 +100,13 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   display: grid;
   grid-auto-rows: min-content;
   align-content: start;
   min-height: 0;
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .td-item {
   display: grid;
@@ -116,7 +116,7 @@
   padding: clamp(6px, 1.2cqh, 14px) clamp(12px, 2cqw, 22px);
   min-width: 0;
   overflow: hidden;
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 10%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 10%, transparent);
 }
 .td-item:first-child { border-top: 0; }
 
@@ -124,7 +124,7 @@
 .td-item--open .td-num {
   font: 900 clamp(14px, 2.6cqw, 26px)/1 var(--theme-font-mono, ui-monospace);
   letter-spacing: -0.03em;
-  color: var(--theme-accent);
+  color: var(--c-accent);
   min-width: 1.6em;
   text-align: right;
 }
@@ -132,7 +132,7 @@
   font-size: clamp(13px, 2.2cqw, 20px);
   font-weight: 700;
   letter-spacing: -0.005em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1.25;
   min-width: 0;
   word-break: break-word;
@@ -141,7 +141,7 @@
 /* Done items — filled check + strikethrough. */
 .td-item--done .td-tick {
   font-size: clamp(16px, 2.6cqw, 26px);
-  color: var(--theme-accent);
+  color: var(--c-accent);
   line-height: 1;
   min-width: 1.6em;
   text-align: center;
@@ -151,7 +151,7 @@
   font-weight: 600;
   text-decoration: line-through;
   text-decoration-thickness: 2px;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   opacity: 0.7;
   line-height: 1.25;
   min-width: 0;
@@ -165,7 +165,7 @@
   font: 700 clamp(9px, 1.4cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   white-space: nowrap;
 }
 .td-when .ph-bold { font-size: 1.1em; opacity: 0.7; }
@@ -175,7 +175,7 @@
 .td-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .td-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -207,9 +207,9 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-.td-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.td-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.td-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
+.td-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.td-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.td-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
 
 /* --- empty state --- */
 
@@ -219,11 +219,11 @@
   text-align: center;
   gap: clamp(4px, 1cqw, 10px);
   padding: clamp(12px, 2.4cqw, 28px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .td-empty .ph-duotone {
   font-size: clamp(28px, 8cqw, 64px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.6;
 }
 .td-empty-primary {
@@ -234,7 +234,7 @@
 }
 .td-empty-secondary {
   font-size: clamp(10px, 1.7cqw, 13px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   max-width: 24em;
   margin: 0 auto;
 }

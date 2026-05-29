@@ -6,8 +6,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -38,8 +38,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
@@ -73,7 +73,7 @@
   opacity: 0.75;
 }
 .aq-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -82,17 +82,17 @@
 }
 .aq-hero-icon .ph-bold {
   font-size: clamp(80px, 28cqw, 280px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 
 /* AQI band overlays — fade the text-panel background colour to match
    the air-quality severity. All decorative tokens. */
-.aq-band--good     .aq-hero-text { background: var(--theme-accent);   color: var(--theme-bg); }
-.aq-band--fair     .aq-hero-text { background: var(--theme-surface2); color: var(--theme-fg); }
-.aq-band--moderate .aq-hero-text { background: var(--theme-accent2);  color: var(--theme-fg); }
-.aq-band--poor     .aq-hero-text { background: var(--theme-accent3);  color: var(--theme-bg); }
-.aq-band--vpoor    .aq-hero-text { background: var(--theme-fg);       color: var(--theme-bg); }
+.aq-band--good     .aq-hero-text { background: var(--c-accent);   color: var(--c-bg); }
+.aq-band--fair     .aq-hero-text { background: var(--c-raised); color: var(--c-text); }
+.aq-band--moderate .aq-hero-text { background: var(--c-data-2);  color: var(--c-text); }
+.aq-band--poor     .aq-hero-text { background: var(--c-data-3);  color: var(--c-bg); }
+.aq-band--vpoor    .aq-hero-text { background: var(--c-text);       color: var(--c-bg); }
 .aq-band--good     .aq-scale,
 .aq-band--poor     .aq-scale,
 .aq-band--vpoor    .aq-scale     { opacity: 0.85; }
@@ -102,7 +102,7 @@
 .aq-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .aq-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -140,10 +140,10 @@
   opacity: 0.75;
 }
 
-.aq-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.aq-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.aq-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.aq-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.aq-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.aq-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.aq-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.aq-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -167,7 +167,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

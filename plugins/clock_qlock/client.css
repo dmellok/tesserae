@@ -9,8 +9,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  background: var(--theme-bg);
-  color: var(--theme-fg);
+  background: var(--c-bg);
+  color: var(--c-text);
 }
 
 .root {
@@ -49,18 +49,18 @@
   letter-spacing: 0.04em;
   /* Dim default — barely-there at 8% of fg. Active cells flip to
      full fg / accent via .is-lit (see .lit-* roots below). */
-  color: color-mix(in oklab, var(--theme-fg) 18%, transparent);
+  color: color-mix(in oklab, var(--c-text) 18%, transparent);
   user-select: none;
   transition: color 200ms ease;
 }
-.qk-cell.is-lit { color: var(--theme-fg); }
+.qk-cell.is-lit { color: var(--c-text); }
 
 /* Per-theme tint for lit cells. Defaults to fg; the cell option flips
    the root class to a different token so the active letters paint in
    the accent triad if the user wants colour. */
-.lit-accent  .qk-cell.is-lit { color: var(--theme-accent); }
-.lit-accent2 .qk-cell.is-lit { color: var(--theme-accent2); }
-.lit-accent3 .qk-cell.is-lit { color: var(--theme-accent3); }
+.lit-accent  .qk-cell.is-lit { color: var(--c-accent); }
+.lit-accent2 .qk-cell.is-lit { color: var(--c-data-2); }
+.lit-accent3 .qk-cell.is-lit { color: var(--c-data-3); }
 
 /* Corner dots — minute-precision indicator.
    Each lit dot = 1 minute past the displayed 5-minute step. Ordered
@@ -76,13 +76,13 @@
   width: clamp(4px, 1.4cqw, 12px);
   height: clamp(4px, 1.4cqw, 12px);
   border-radius: 50%;
-  background: color-mix(in oklab, var(--theme-fg) 18%, transparent);
+  background: color-mix(in oklab, var(--c-text) 18%, transparent);
   transition: background 200ms ease;
 }
-.qk-corner.is-lit { background: var(--theme-fg); }
-.lit-accent  .qk-corner.is-lit { background: var(--theme-accent); }
-.lit-accent2 .qk-corner.is-lit { background: var(--theme-accent2); }
-.lit-accent3 .qk-corner.is-lit { background: var(--theme-accent3); }
+.qk-corner.is-lit { background: var(--c-text); }
+.lit-accent  .qk-corner.is-lit { background: var(--c-accent); }
+.lit-accent2 .qk-corner.is-lit { background: var(--c-data-2); }
+.lit-accent3 .qk-corner.is-lit { background: var(--c-data-3); }
 .qk-corner--tl { top:    clamp(6px, 2cqw, 16px); left:  clamp(6px, 2cqw, 16px); }
 .qk-corner--tr { top:    clamp(6px, 2cqw, 16px); right: clamp(6px, 2cqw, 16px); }
 .qk-corner--bl { bottom: clamp(6px, 2cqw, 16px); left:  clamp(6px, 2cqw, 16px); }

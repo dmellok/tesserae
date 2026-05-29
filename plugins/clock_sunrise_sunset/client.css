@@ -8,8 +8,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -32,7 +32,7 @@
 /* --- hero (arc + rail) --- */
 
 .ss-hero {
-  background: var(--theme-surface);
+  background: var(--c-surface);
   display: grid;
   grid-template-rows: 1fr auto;
   gap: clamp(6px, 1cqh, 14px);
@@ -50,33 +50,33 @@
 }
 .ss-arc-track {
   fill: none;
-  stroke: color-mix(in oklab, var(--theme-fg) 16%, transparent);
+  stroke: color-mix(in oklab, var(--c-text) 16%, transparent);
   stroke-width: 4;
   stroke-linecap: round;
 }
 .ss-arc-past {
   fill: none;
-  stroke: var(--theme-accent);
+  stroke: var(--c-accent);
   stroke-width: 5;
   stroke-linecap: round;
 }
 .ss-horizon {
-  stroke: var(--theme-fg);
+  stroke: var(--c-text);
   stroke-width: 1.5;
   stroke-dasharray: 3 4;
   opacity: 0.4;
 }
 .ss-sun {
-  fill: var(--theme-accent2);
-  stroke: var(--theme-fg);
+  fill: var(--c-data-2);
+  stroke: var(--c-text);
   stroke-width: 2;
 }
 .root.is-night .ss-sun {
-  fill: var(--theme-fg);
-  stroke: var(--theme-fg);
+  fill: var(--c-text);
+  stroke: var(--c-text);
 }
 .ss-endpoint {
-  fill: var(--theme-fg);
+  fill: var(--c-text);
 }
 
 .ss-rail {
@@ -99,14 +99,14 @@
 }
 .ss-rail-end .ph-bold {
   font-size: clamp(16px, 2.6cqw, 26px);
-  color: var(--theme-accent);
+  color: var(--c-accent);
   line-height: 1;
   grid-row: span 2;
   align-self: center;
 }
 .ss-rail-end.ss-rail-set .ph-bold {
   order: 2;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .ss-rail-time {
   font: 900 clamp(15px, 3cqw, 30px)/1 var(--theme-font-mono, ui-monospace);
@@ -116,7 +116,7 @@
   font: 700 clamp(9px, 1.4cqw, 12px)/1 var(--theme-font, system-ui);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   grid-column: 2;
 }
 .ss-rail-end.ss-rail-set .ss-rail-lbl {
@@ -132,9 +132,9 @@
 .ss-rail-value {
   font: 900 clamp(18px, 3.6cqw, 40px)/0.95 var(--theme-font-mono, ui-monospace);
   letter-spacing: -0.03em;
-  color: var(--theme-accent);
+  color: var(--c-accent);
 }
-.root.is-night .ss-rail-value { color: var(--theme-fg); }
+.root.is-night .ss-rail-value { color: var(--c-text); }
 .ss-rail-mid .ss-rail-lbl { grid-column: 1; }
 
 /* --- 4-up stat strip --- */
@@ -142,7 +142,7 @@
 .ss-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .ss-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -173,10 +173,10 @@
   line-height: 1;
   white-space: nowrap;
 }
-.ss-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.ss-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.ss-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.ss-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.ss-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.ss-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.ss-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.ss-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -196,7 +196,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

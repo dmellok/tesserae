@@ -5,8 +5,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -39,8 +39,8 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
@@ -66,14 +66,14 @@
 .fx-change-lbl {
   font-size: 0.65em;
   font-weight: 700;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   margin-left: 2px;
 }
-.root.is-up   .fx-change { color: var(--theme-accent); }
-.root.is-down .fx-change { color: var(--theme-accent3); }
+.root.is-up   .fx-change { color: var(--c-accent); }
+.root.is-down .fx-change { color: var(--c-data-3); }
 
 .fx-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -82,7 +82,7 @@
 }
 .fx-hero-icon .ph-bold {
   font-size: clamp(48px, 18cqw, 180px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 
@@ -90,11 +90,11 @@
 
 .fx-chart {
   position: relative;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 16px);
   min-height: 0;
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fx-canvas {
   display: block;
@@ -107,7 +107,7 @@
 .fx-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fx-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -140,10 +140,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.fx-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.fx-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.fx-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.fx-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.fx-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.fx-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.fx-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.fx-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -167,7 +167,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

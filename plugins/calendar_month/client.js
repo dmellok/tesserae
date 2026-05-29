@@ -34,7 +34,7 @@ export default async function render(shadow, ctx) {
         ? ""
         : new Date(e.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
       return `
-        <div class="cm-chip" style="--chip:${escapeHtml(e.colour || "var(--theme-accent)")}">
+        <div class="cm-chip" style="--chip:${escapeHtml(e.colour || "var(--c-accent)")}">
           ${t ? `<span class="cm-chip-t">${escapeHtml(t)}</span>` : ""}
           <span class="cm-chip-s">${escapeHtml(e.summary)}</span>
         </div>

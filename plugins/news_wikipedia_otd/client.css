@@ -7,8 +7,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -29,11 +29,11 @@
   align-items: center;
   gap: clamp(12px, 2.2cqw, 24px);
   padding: clamp(12px, 2.4cqw, 28px) clamp(14px, 2.6cqw, 30px);
-  background: var(--theme-accent);
-  color: var(--theme-bg);
+  background: var(--c-accent);
+  color: var(--c-bg);
   min-width: 0;
   overflow: hidden;
-  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .wo-lede-year {
   font: 900 clamp(38px, 9cqw, 104px)/0.85 var(--theme-font-mono, ui-monospace);
@@ -60,7 +60,7 @@
   display: grid;
   grid-auto-rows: min-content;
   align-content: start;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-height: 0;
   overflow: hidden;
 }
@@ -72,7 +72,7 @@
   align-items: baseline;
   min-width: 0;
   overflow: hidden;
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 12%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
 }
 .wo-row:first-child { border-top: 0; }
 .wo-year {
@@ -110,7 +110,7 @@
 .wo-empty {
   padding: 28px;
   text-align: center;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   font-size: 14px;
   font-weight: 600;
 }
@@ -119,7 +119,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

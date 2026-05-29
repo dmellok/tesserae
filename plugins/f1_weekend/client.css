@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -31,7 +31,7 @@
 .fw-rows {
   display: grid;
   grid-auto-rows: 1fr;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-height: 0;
   overflow: hidden;
 }
@@ -42,7 +42,7 @@
   gap: clamp(8px, 1.6cqw, 18px);
   padding: clamp(4px, 1cqw, 12px) clamp(10px, 2cqw, 20px);
   min-width: 0;
-  border-top: 1px solid var(--theme-divider);
+  border-top: 1px solid var(--c-line);
 }
 .fw-row:first-child { border-top: 0; }
 .fw-row-label {
@@ -50,14 +50,14 @@
   font-weight: 900;
   letter-spacing: 0.08em;
   min-width: clamp(40px, 8cqw, 70px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .fw-row-day {
   font-size: clamp(11px, 1.8cqw, 14px);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -66,30 +66,30 @@
   font-size: clamp(13px, 2.4cqw, 20px);
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   white-space: nowrap;
 }
 
 .fw-row--race {
-  background: var(--theme-accent);
-  color: var(--theme-bg);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  background: var(--c-accent);
+  color: var(--c-bg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fw-row--race .fw-row-label,
 .fw-row--race .fw-row-day,
-.fw-row--race .fw-row-time { color: var(--theme-bg); }
+.fw-row--race .fw-row-time { color: var(--c-bg); }
 
 /* --- circuit silhouette band --- */
 
 .fw-circuit {
-  background: var(--theme-accent2);
-  color: var(--theme-fg);
+  background: var(--c-data-2);
+  color: var(--c-text);
   display: grid;
   place-items: center;
   padding: clamp(8px, 1.8cqw, 20px) clamp(12px, 2.4cqw, 28px);
   min-height: clamp(60px, 12cqh, 160px);
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fw-circuit-svg {
   width: 100%;
@@ -119,7 +119,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

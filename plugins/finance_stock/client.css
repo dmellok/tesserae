@@ -5,8 +5,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -38,8 +38,8 @@
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
@@ -54,7 +54,7 @@
   font: 700 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font, system-ui);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -67,7 +67,7 @@
 }
 .fs-curr {
   font: 700 clamp(11px, 1.8cqw, 14px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .fs-val {
   font-size: clamp(28px, 8cqw, 72px);
@@ -84,16 +84,16 @@
 .fs-range-lbl {
   font-size: 0.65em;
   font-weight: 700;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   margin-left: 2px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.root.is-up   .fs-change { color: var(--theme-accent); }
-.root.is-down .fs-change { color: var(--theme-accent3); }
+.root.is-up   .fs-change { color: var(--c-accent); }
+.root.is-down .fs-change { color: var(--c-data-3); }
 
 .fs-hero-icon {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -102,33 +102,33 @@
 }
 .fs-hero-icon .ph-bold {
   font-size: clamp(48px, 18cqw, 180px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 
 /* --- chart --- */
 
 .fs-chart {
-  background: var(--theme-surface);
+  background: var(--c-surface);
   padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 16px);
   min-height: 0;
   overflow: hidden;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fs-svg {
   width: 100%;
   height: 100%;
   display: block;
 }
-.root.is-up   .fs-svg { color: var(--theme-accent); }
-.root.is-down .fs-svg { color: var(--theme-accent3); }
+.root.is-up   .fs-svg { color: var(--c-accent); }
+.root.is-down .fs-svg { color: var(--c-data-3); }
 
 /* --- 4-up stat strip --- */
 
 .fs-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fs-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -161,10 +161,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.fs-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.fs-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.fs-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.fs-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.fs-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.fs-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.fs-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.fs-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -189,7 +189,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

@@ -8,8 +8,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -35,14 +35,14 @@
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: stretch;
-  background: var(--theme-surface);
-  color: var(--theme-fg);
+  background: var(--c-surface);
+  color: var(--c-text);
   min-height: 0;
   overflow: hidden;
 }
 
 .mn-disc {
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2cqw, 22px);
@@ -58,18 +58,18 @@
   display: block;
 }
 .mn-shadow {
-  fill: color-mix(in oklab, var(--theme-fg) 80%, transparent);
+  fill: color-mix(in oklab, var(--c-text) 80%, transparent);
 }
 .mn-lit {
   /* The accent2 token is the warm yellow on most themes — reads as
      "lit moon" cleanly. */
-  fill: var(--theme-accent2);
+  fill: var(--c-data-2);
 }
 .mn-rim {
   /* Thin outline traces the disc's circumference so the full moon
      stays legible at small sizes when the lit colour matches the bg. */
   fill: none;
-  stroke: var(--theme-fg);
+  stroke: var(--c-text);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
@@ -113,7 +113,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   margin-left: 4px;
 }
 .mn-age {
@@ -123,7 +123,7 @@
   font: 700 clamp(10px, 1.6cqw, 13px)/1 var(--theme-font, system-ui);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .mn-age .ph-bold { font-size: 1.1em; }
 
@@ -132,7 +132,7 @@
 .mn-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .mn-stat {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -165,10 +165,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.mn-stat--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.mn-stat--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.mn-stat--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.mn-stat--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.mn-stat--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.mn-stat--surface { background: var(--c-raised); color: var(--c-text); }
+.mn-stat--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.mn-stat--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- size adaptations --- */
 
@@ -192,7 +192,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

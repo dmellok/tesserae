@@ -1,6 +1,6 @@
 /* calendar_month — Bauhaus month grid.
  *
- * Sized for e-ink survival: every line uses --theme-fg (true black on
+ * Sized for e-ink survival: every line uses --c-text (true black on
  * a light theme, so it dithers cleanly), grid borders are 2-3px, text
  * is bumped up across the board, and the today highlight is a SOLID
  * accent block (no faded color-mix that would smear in Floyd-Steinberg). */
@@ -9,8 +9,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -33,8 +33,8 @@
 .cm-weekhead {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--theme-surface2);
-  border-bottom: clamp(2px, 0.4cqw, 3px) solid var(--theme-fg);
+  background: var(--c-raised);
+  border-bottom: clamp(2px, 0.4cqw, 3px) solid var(--c-text);
 }
 .cm-weekhead span {
   padding: clamp(5px, 0.9cqh, 10px) clamp(6px, 1cqw, 12px);
@@ -42,14 +42,14 @@
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   text-align: left;
-  border-right: 1px solid var(--theme-fg);
+  border-right: 1px solid var(--c-text);
 }
 .cm-weekhead span:last-child { border-right: 0; }
 
 /* --- day grid ---
-   2px borders in --theme-fg (true black) so the cell walls survive
+   2px borders in --c-text (true black) so the cell walls survive
    dithering. Out-of-month days get the surface2 fill so they recede
    without using a thin gray border. */
 
@@ -57,7 +57,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: 1fr;
-  background: var(--theme-fg);  /* shows through the gaps as black gridlines */
+  background: var(--c-text);  /* shows through the gaps as black gridlines */
   gap: clamp(1.5px, 0.3cqw, 2px);
   padding: clamp(1.5px, 0.3cqw, 2px);
   min-height: 0;
@@ -67,30 +67,30 @@
   grid-template-rows: auto 1fr;
   gap: clamp(2px, 0.5cqh, 6px);
   padding: clamp(4px, 0.8cqh, 10px) clamp(5px, 0.9cqw, 10px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-width: 0;
   overflow: hidden;
 }
-.cm-day.is-out { background: var(--theme-surface2); }
-.cm-day.is-out .cm-num { color: var(--theme-fgSoft); }
+.cm-day.is-out { background: var(--c-raised); }
+.cm-day.is-out .cm-num { color: var(--c-text-soft); }
 
 /* Today — solid accent fill, no transparency. Survives dither as a
    block. The day number becomes inverted on the accent block. */
-.cm-day.is-today { background: var(--theme-accent); }
+.cm-day.is-today { background: var(--c-accent); }
 .cm-day.is-today .cm-num {
-  color: var(--theme-bg);
+  color: var(--c-bg);
   background: transparent;
   border-radius: 0;
   padding: 0;
 }
 .cm-day.is-today .cm-chip {
-  background: var(--theme-bg);
-  color: var(--theme-fg);
-  border-left-color: var(--theme-fg);
+  background: var(--c-bg);
+  color: var(--c-text);
+  border-left-color: var(--c-text);
 }
 .cm-day.is-today .cm-chip-t,
-.cm-day.is-today .cm-chip-s { color: var(--theme-fg); }
-.cm-day.is-today .cm-more { color: var(--theme-bg); }
+.cm-day.is-today .cm-chip-s { color: var(--c-text); }
+.cm-day.is-today .cm-more { color: var(--c-bg); }
 
 .cm-num {
   font-size: clamp(14px, 2.4cqw, 22px);
@@ -116,7 +116,7 @@
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: clamp(3px, 0.6cqw, 6px);
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   border-left: clamp(3px, 0.6cqw, 5px) solid var(--chip);
   padding: clamp(2px, 0.4cqh, 4px) clamp(4px, 0.7cqw, 7px);
   border-radius: 0;
@@ -126,13 +126,13 @@
 .cm-chip-t {
   font: 700 clamp(10px, 1.6cqw, 13px)/1.1 var(--theme-font-mono, ui-monospace);
   font-variant-numeric: tabular-nums;
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
 .cm-chip-s {
   font-size: clamp(11px, 1.8cqw, 15px);
   font-weight: 700;
   letter-spacing: -0.005em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -140,14 +140,14 @@
 
 .cm-more {
   font: 900 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font, system-ui);
-  color: var(--theme-fg);
+  color: var(--c-text);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .root.error {
   display: grid; place-items: center; text-align: center;
-  color: var(--theme-danger); padding: 16px; gap: 8px;
+  color: var(--c-danger); padding: 16px; gap: 8px;
 }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; }

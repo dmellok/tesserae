@@ -6,8 +6,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -28,11 +28,11 @@
   align-items: center;
   gap: clamp(10px, 2cqw, 22px);
   padding: clamp(12px, 2.4cqw, 28px) clamp(14px, 2.6cqw, 30px);
-  background: var(--theme-accent);
-  color: var(--theme-bg);
+  background: var(--c-accent);
+  color: var(--c-bg);
   min-width: 0;
   overflow: hidden;
-  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .hn-lede-num {
   font: 900 clamp(36px, 9cqw, 96px)/0.85 var(--theme-font-mono, ui-monospace);
@@ -56,7 +56,7 @@
   overflow: hidden;
 }
 .hn-meta--lede {
-  color: var(--theme-bg);
+  color: var(--c-bg);
   opacity: 0.85;
 }
 
@@ -66,7 +66,7 @@
   display: grid;
   grid-auto-rows: min-content;
   align-content: start;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-height: 0;
   overflow: hidden;
 }
@@ -77,7 +77,7 @@
   padding: clamp(8px, 1.4cqh, 16px) clamp(12px, 2cqw, 22px);
   min-width: 0;
   overflow: hidden;
-  border-top: 1px solid color-mix(in oklab, var(--theme-fg) 12%, transparent);
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
 }
 .hn-row:first-child { border-top: 0; }
 .hn-num {
@@ -121,8 +121,8 @@
   white-space: nowrap;
 }
 .hn-meta .ph-bold { font-size: 1.1em; }
-.hn-score { color: var(--theme-accent3); }
-.hn-lede .hn-score { color: var(--theme-bg); }
+.hn-score { color: var(--c-data-3); }
+.hn-lede .hn-score { color: var(--c-bg); }
 .hn-com  { opacity: 0.85; }
 .hn-by   { opacity: 0.75; }
 .hn-when { opacity: 0.75; }
@@ -140,7 +140,7 @@
 .hn-empty {
   padding: 28px;
   text-align: center;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   font-size: 14px;
   font-weight: 600;
 }
@@ -149,7 +149,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

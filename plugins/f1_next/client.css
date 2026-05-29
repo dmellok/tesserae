@@ -6,8 +6,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -35,8 +35,8 @@
   overflow: hidden;
 }
 .fn-circuit {
-  background: var(--theme-surface2);
-  color: var(--theme-fg);
+  background: var(--c-raised);
+  color: var(--c-text);
   display: grid;
   place-items: center;
   padding: clamp(10px, 2.4cqw, 28px);
@@ -53,12 +53,12 @@
 }
 .fn-circuit-fallback {
   font-size: clamp(48px, 14cqw, 140px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.6;
 }
 
 .fn-text {
-  background: var(--theme-surface);
+  background: var(--c-surface);
   display: grid;
   grid-template-rows: 1fr auto;
   gap: clamp(8px, 1.6cqw, 18px);
@@ -73,7 +73,7 @@
   font-weight: 900;
   line-height: 0.92;
   letter-spacing: -0.035em;
-  color: var(--theme-fg);
+  color: var(--c-text);
   word-break: break-word;
 }
 .fn-race-suffix {
@@ -81,7 +81,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.16em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   margin-top: clamp(2px, 0.4cqw, 6px);
 }
 .fn-meta {
@@ -94,14 +94,14 @@
 }
 .fn-place {
   font-size: clamp(10px, 1.7cqw, 13px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .fn-when {
   font-size: clamp(12px, 2.2cqw, 18px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -114,7 +114,7 @@
   grid-auto-columns: 1fr;
   grid-auto-flow: column;
   /* Thick black rule echoes the weather widgets' chip-strip anchor. */
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .fn-chip {
   padding: clamp(6px, 1.4cqw, 14px) clamp(8px, 1.6cqw, 16px);
@@ -138,10 +138,10 @@
   line-height: 1;
 }
 
-.fn-chip--accent  { background: var(--theme-accent);   color: var(--theme-bg); }
-.fn-chip--surface { background: var(--theme-surface2); color: var(--theme-fg); }
-.fn-chip--accent2 { background: var(--theme-accent2);  color: var(--theme-fg); }
-.fn-chip--accent3 { background: var(--theme-accent3);  color: var(--theme-bg); }
+.fn-chip--accent  { background: var(--c-accent);   color: var(--c-bg); }
+.fn-chip--surface { background: var(--c-raised); color: var(--c-text); }
+.fn-chip--accent2 { background: var(--c-data-2);  color: var(--c-text); }
+.fn-chip--accent3 { background: var(--c-data-3);  color: var(--c-bg); }
 
 /* --- tall-cell layout switch ---
    Stack the hero so the circuit becomes a wide horizontal band under
@@ -156,7 +156,7 @@
     padding: clamp(10px, 2.4cqw, 24px) clamp(12px, 2.8cqw, 28px);
   }
   .fn-circuit {
-    border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+    border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
   }
 }
 
@@ -182,7 +182,7 @@
 /* --- live state: when the race has already started, swap the days
    chip to a "LIVE" indicator. The countdown will read zeros and a
    thin Bauhaus accent shift signals the race is on right now. */
-.root.is-live .fn-chip--accent { background: var(--theme-accent3); color: var(--theme-bg); }
+.root.is-live .fn-chip--accent { background: var(--c-data-3); color: var(--c-bg); }
 
 /* --- error state --- */
 
@@ -190,7 +190,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }

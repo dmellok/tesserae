@@ -32,14 +32,17 @@
  *   }
  */
 
-/* ----- root / host defaults ----- */
+/* ----- root / host defaults -----
+ * The --c-* semantic token layer is defined on the cell host by the
+ * composer (templates/compose.html), so every widget inherits it whether
+ * or not it links this file. Widgets paint from --c-* only. */
 
 :host {
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-family: var(--theme-font, system-ui, sans-serif);
   font-variant-numeric: tabular-nums;
 }
@@ -59,8 +62,8 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--wb-bar-gap, clamp(6px, 1.2cqw, 10px));
-  background: var(--wb-bar-bg, var(--theme-fg));
-  color: var(--wb-bar-fg, var(--theme-bg));
+  background: var(--wb-bar-bg, var(--c-text));
+  color: var(--wb-bar-fg, var(--c-bg));
   padding: var(--wb-bar-pad-y, clamp(4px, 0.9cqw, 8px))
            var(--wb-bar-pad-x, clamp(8px, 1.6cqw, 14px));
   font-size: var(--wb-bar-fs, clamp(10px, 1.7cqw, 14px));
@@ -73,7 +76,7 @@
   display: inline-block;
   width: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
   height: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
-  background: var(--wb-mark-bg, var(--theme-accent2));
+  background: var(--wb-mark-bg, var(--c-data-2));
 }
 
 .wb-title {
@@ -103,11 +106,11 @@
   text-align: center;
   gap: clamp(6px, 1.2cqw, 12px);
   padding: clamp(16px, 3cqw, 36px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .wb-empty .ph-duotone {
   font-size: clamp(36px, 10cqw, 88px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.55;
 }
 .wb-empty-primary {
@@ -115,11 +118,11 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--theme-fg);
+  color: var(--c-text);
 }
 .wb-empty-secondary {
   font-size: clamp(11px, 1.8cqw, 14px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   max-width: 28em;
   margin: 0 auto;
 }
@@ -129,10 +132,10 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .wb-root.is-error .ph,
 .wb-error .ph {

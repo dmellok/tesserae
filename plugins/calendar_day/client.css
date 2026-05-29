@@ -2,7 +2,7 @@
 
 :host {
   display: block; width: 100%; height: 100%;
-  color: var(--theme-fg); background: var(--theme-bg);
+  color: var(--c-text); background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 .root {
@@ -20,7 +20,7 @@
   align-content: start;
   gap: clamp(2px, 0.4cqh, 6px);
   padding: clamp(4px, 0.8cqh, 10px) 0;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   min-height: 0;
   overflow: hidden;
 }
@@ -37,7 +37,7 @@
   font: 700 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font-mono, ui-monospace);
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .cd-body {
   display: grid;
@@ -57,7 +57,7 @@
   align-items: center;
   gap: 4px;
   font-size: clamp(9px, 1.4cqw, 11px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -70,11 +70,11 @@
   text-align: center;
   gap: clamp(4px, 1cqw, 10px);
   padding: clamp(12px, 2.4cqw, 28px);
-  background: var(--theme-surface);
+  background: var(--c-surface);
 }
 .cd-empty .ph-duotone {
   font-size: clamp(28px, 8cqw, 64px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   opacity: 0.55;
 }
 .cd-empty-primary {
@@ -85,7 +85,7 @@
 }
 .cd-empty-secondary {
   font-size: clamp(10px, 1.7cqw, 13px);
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 
 /* xs: collapse to next event only */
@@ -96,7 +96,7 @@
 
 .root.error {
   display: grid; place-items: center; text-align: center;
-  color: var(--theme-danger); padding: 16px; gap: 8px;
+  color: var(--c-danger); padding: 16px; gap: 8px;
 }
 .root.error .ph { font-size: 28px; }
 .root.error span { font: 12px/1.4 monospace; word-break: break-word; }

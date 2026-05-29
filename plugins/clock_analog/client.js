@@ -42,9 +42,9 @@ function numerals(face) {
 function bauhausShapes() {
   // Three coloured shapes — red triangle at 12, blue circle at 4, yellow square at 8
   return `
-    <polygon points="100,12 92,30 108,30" fill="var(--theme-accent3)" />
-    <circle cx="154" cy="155" r="10" fill="var(--theme-accent)" />
-    <rect x="36" y="145" width="20" height="20" fill="var(--theme-accent2)" transform="rotate(15 46 155)" />
+    <polygon points="100,12 92,30 108,30" fill="var(--c-data-3)" />
+    <circle cx="154" cy="155" r="10" fill="var(--c-accent)" />
+    <rect x="36" y="145" width="20" height="20" fill="var(--c-data-2)" transform="rotate(15 46 155)" />
   `;
 }
 

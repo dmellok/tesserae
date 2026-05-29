@@ -4,8 +4,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  color: var(--theme-fg);
-  background: var(--theme-bg);
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -38,7 +38,7 @@
 
 .wh-chart {
   position: relative;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 16px);
   min-height: 0;
   overflow: hidden;
@@ -58,7 +58,7 @@
   align-items: center;
   gap: clamp(2px, 0.5cqw, 6px);
   padding: clamp(4px, 0.9cqw, 10px) clamp(6px, 1.2cqw, 14px);
-  background: var(--theme-surface2);
+  background: var(--c-raised);
 }
 .wh-cond-cell {
   display: grid;
@@ -68,7 +68,7 @@
 }
 .wh-cond-cell .ph-bold {
   font-size: clamp(18px, 3.4cqw, 30px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
 }
 .wh-cond-hour {
@@ -85,8 +85,8 @@
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: stretch;
-  background: var(--theme-fg);
-  color: var(--theme-bg);
+  background: var(--c-text);
+  color: var(--c-bg);
   min-height: clamp(28px, 5cqw, 44px);
 }
 .wh-rain-label {
@@ -102,7 +102,7 @@
   align-items: stretch;
   gap: 1px;
   padding: clamp(5px, 0.9cqw, 8px) clamp(6px, 1cqw, 10px);
-  background: var(--theme-fg);
+  background: var(--c-text);
 }
 .wh-rain-bar {
   flex: 1;
@@ -110,9 +110,9 @@
   align-self: end;
   height: var(--rain, 0%);
   min-height: 2px;
-  background: var(--theme-surface2);
+  background: var(--c-raised);
 }
-.wh-rain-bar.is-wet { background: var(--theme-accent); }
+.wh-rain-bar.is-wet { background: var(--c-accent); }
 
 /* --- vertical hourly list (tall-cell layout only) ---
    Hidden by default; the container-aspect-ratio query at the bottom
@@ -121,7 +121,7 @@
 
 .wh-hours {
   display: none;
-  background: var(--theme-surface);
+  background: var(--c-surface);
   padding: clamp(6px, 1.2cqw, 14px) clamp(8px, 1.4cqw, 18px);
   grid-auto-rows: min-content;
   align-content: start;
@@ -138,7 +138,7 @@
 }
 .wh-hour-icon {
   font-size: clamp(20px, 3.6cqh, 32px);
-  color: var(--theme-fg);
+  color: var(--c-text);
   line-height: 1;
   justify-self: center;
 }
@@ -147,12 +147,12 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--theme-fgSoft);
+  color: var(--c-text-soft);
 }
 .wh-hour-temp {
   font-size: clamp(16px, 2.8cqh, 24px);
   font-weight: 800;
-  color: var(--theme-fg);
+  color: var(--c-text);
   letter-spacing: -0.01em;
   justify-self: end;
   margin-right: clamp(6px, 1cqw, 12px);
@@ -160,14 +160,14 @@
 .wh-hour-rain {
   position: relative;
   height: clamp(6px, 1.2cqh, 10px);
-  background: var(--theme-surface2);
+  background: var(--c-raised);
   width: clamp(60px, 18cqw, 140px);
   justify-self: end;
 }
 .wh-hour-rain-fill {
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  background: var(--theme-accent);
+  background: var(--c-accent);
 }
 
 /* --- chip strip at the BOTTOM --- */
@@ -178,7 +178,7 @@
   grid-auto-flow: column;
   /* Thick black bauhaus rule separating the chip strip from the rain
      row above. Reads as the closing band of the widget. */
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--theme-fg);
+  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
 }
 .wh-chip {
   padding: clamp(5px, 1cqw, 10px) clamp(8px, 1.6cqw, 16px);
@@ -200,9 +200,9 @@
   letter-spacing: -0.02em;
   line-height: 1;
 }
-.wh-chip--high { background: var(--theme-accent3); color: var(--theme-bg); }
-.wh-chip--low { background: var(--theme-surface2); color: var(--theme-fg); }
-.wh-chip--current { background: var(--theme-accent); color: var(--theme-bg); }
+.wh-chip--high { background: var(--c-data-3); color: var(--c-bg); }
+.wh-chip--low { background: var(--c-raised); color: var(--c-text); }
+.wh-chip--current { background: var(--c-accent); color: var(--c-bg); }
 
 /* --- tall-cell layout switch ---
    Cell is taller than wide -> swap to a vertical hourly list. Chart,
@@ -229,7 +229,7 @@
   display: grid;
   place-items: center;
   text-align: center;
-  color: var(--theme-danger);
+  color: var(--c-danger);
   padding: 16px;
   gap: 8px;
 }
