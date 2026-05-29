@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Tesserae pre-push hook — nudges to bump pyproject.toml + create a
+# vX.Y.Z tag when shippable code has changed since the last tag. Bypass
+# with `git push --no-verify` for docs-only / WIP pushes.
+#
+# Activated by running once:   git config core.hooksPath .githooks
+
+set -eu
+
+last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+if [ -z "$last_tag" ]; then
+    exit 0  # no tags yet — nothing to compare against
+fi
+
+version="$(awk -F'"' '/^version = / { print $2; exit }' pyproject.toml 2>/dev/null || true)"
+if [ -z "$version" ]; then
+    exit 0
+fi
+
+tag_version="${last_tag#v}"
+if [ "$version" != "$tag_version" ]; then
+    exit 0  # already bumped relative to last tag
+fi
+
+# Same version as last tag — has any shippable code changed since?
+# (docs/, tests/, scripts/, .github/, README are excluded — they don't
+# warrant a bump on their own.)
+code_paths='app plugins renderers devices static templates schema pyproject.toml install.sh install.ps1'
+# shellcheck disable=SC2086
+if ! git diff --name-only "$last_tag..HEAD" -- $code_paths 2>/dev/null | grep -q .; then
+    exit 0  # docs/tests-only changes — no bump needed
+fi
+
+cat <<EOF >&2
+
+  pre-push: pyproject.toml is still version "$version" — same as $last_tag,
+            but shippable code has changed since that tag. Consider bumping
+            and tagging before push:
+
+      # edit pyproject.toml → "0.3.1" (patch) / "0.4.0" (minor) / "1.0.0" (major)
+      git commit -am "release: vX.Y.Z"
+      git tag -a vX.Y.Z -m "..."
+      git push && git push --tags
+
+  To skip this check for a one-off push:  git push --no-verify
+
+EOF
+exit 1
