@@ -389,7 +389,7 @@ def _rebuild_transport(
     for device in devices.all():
         if device.kind_of is None:
             continue
-        _subscribe_device_status(transport, device, status_cache, event_log)
+        _subscribe_device_status(transport, device, status_cache, event_log, app)
 
     # Wildcard listener for discovery: any heartbeat on tesserae/+/status
     # for an id we don't know about gets cached for the Settings UI.
@@ -440,6 +440,8 @@ def _rebuild_transport(
             push_manager=app.config["PUSH_MANAGER"],
             page_store=page_store,
             base_url_fn=_base_url,
+            device_registry=devices,
+            device_status=app.config["DEVICE_STATUS"],
         )
         try:
             new_ha.start()
@@ -477,13 +479,16 @@ def _subscribe_device_status(
     device: device_loader.Device,
     status_cache: dict[str, dict[str, Any]],
     event_log: EventLog,
+    app: Flask,
 ) -> None:
     """Register the per-device status callback on the transport.
 
     Every heartbeat updates the in-memory status cache (read by the
     settings page) and writes one ``device`` event row (read by /events).
     The event-log write is dedup-free for now; cap-based eviction handles
-    a flood of frequent heartbeats."""
+    a flood of frequent heartbeats. When HA discovery is running, the
+    heartbeat also feeds that display's last-seen / battery / signal / IP
+    sensors."""
 
     def on_status(topic: str, payload: bytes) -> None:
         del topic
@@ -502,6 +507,12 @@ def _subscribe_device_status(
             error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
             extra={"parsed": merged},
         )
+        ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
+        if ha is not None:
+            try:
+                ha.note_device_heartbeat(device.id, merged)
+            except Exception:
+                logger.exception("HA discovery: heartbeat notify failed for %s", device.id)
 
     transport.subscribe(device.status_topic, on_status, qos=1)
 

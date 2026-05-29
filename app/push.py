@@ -177,13 +177,19 @@ class PushManager:
 
     # -- public API ------------------------------------------------------
 
-    def push(self, page_id: str) -> PushResult:
-        """Render a saved Page through the composer and publish."""
+    def push(self, page_id: str, *, device_ids: set[str] | None = None) -> PushResult:
+        """Render a saved Page through the composer and publish.
+
+        ``device_ids`` (optional): restrict the fan-out to these devices.
+        The page renders at each matching device's panel and only that
+        device's renderers fire — used to push a dashboard to one display
+        even when it's bound to several. ``None`` keeps the default
+        behaviour (every device the page is bound to)."""
         if not self._lock.acquire(blocking=False):
             result = self._log_busy(source="page", target=page_id)
         else:
             try:
-                result = self._push_page_locked(page_id)
+                result = self._push_page_locked(page_id, device_ids=device_ids)
             finally:
                 self._lock.release()
         self._notify(result)
@@ -343,7 +349,7 @@ class PushManager:
 
     # -- internals -------------------------------------------------------
 
-    def _push_page_locked(self, page_id: str) -> PushResult:
+    def _push_page_locked(self, page_id: str, device_ids: set[str] | None = None) -> PushResult:
         started = time.monotonic()
         page = self._page_store.get(page_id)
         if page is None:
@@ -357,11 +363,24 @@ class PushManager:
         # "no specific device" — render at the virtual panel and fan out
         # to every renderer (legacy single-head).
         groups = panel_groups_for_push(page, self._devices, self._settings)
+        if device_ids is not None:
+            # Restrict each panel group to the requested devices; drop the
+            # virtual-panel group (empty device list) and any group with no
+            # surviving devices. Lets HA push a dashboard to one display.
+            groups = [(panel, [d for d in dids if d in device_ids]) for panel, dids in groups]
+            groups = [(panel, dids) for panel, dids in groups if dids]
+            if not groups:
+                return self._log_failure(
+                    source="page",
+                    target=page_id,
+                    status="failed",
+                    error="dashboard targets none of the requested device(s)",
+                )
         base_url = self._base_url_fn().rstrip("/")
 
         all_renderers: list[RendererResult] = []
         group_results: list[PushResult] = []
-        for panel, device_ids in groups:
+        for panel, group_dids in groups:
             compose_url = to_loopback_url(
                 f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
             )
@@ -385,7 +404,7 @@ class PushManager:
                 source="page",
                 target=page_id,
                 started=started,
-                device_filters=set(device_ids) if device_ids else None,
+                device_filters=set(group_dids) if group_dids else None,
             )
             all_renderers.extend(result.renderers)
             group_results.append(result)

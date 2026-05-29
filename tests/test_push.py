@@ -337,3 +337,72 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         "esp32_bin__esp32_land",
         "esp32_bin__esp32_port",
     }
+
+
+def test_push_device_filter_targets_single_display(tmp_path: Path, composition_png: bytes) -> None:
+    """push(page_id, device_ids={X}) renders only X's panel and fans out
+    only to X's renderer, even when the page is bound to several displays.
+    Filtering to a device the page doesn't target fails cleanly."""
+    from app import device_loader, device_service, renderer_loader
+    from app.main import REPO_ROOT
+
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    for inst, orient in (("esp32_land", "landscape"), ("esp32_port", "portrait")):
+        device_service.create_instance(
+            devices=devices,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id=inst,
+            kind_id="esp32_client",
+            orientation=orient,
+        )
+
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(
+        Page(id="multi", name="Multi", device_ids=["esp32_land", "esp32_port"], cells=[])
+    )
+
+    fakes: dict[str, _FakeMqttClient] = {}
+
+    def factory(client_id: str) -> _FakeMqttClient:
+        fakes["client"] = _FakeMqttClient(client_id)
+        return fakes["client"]
+
+    transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
+    transport.connect()
+    manager = PushManager(
+        registry=renderers,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=devices,
+    )
+
+    with patch("app.push.render_to_png", return_value=composition_png) as rtp:
+        result = manager.push("multi", device_ids={"esp32_land"})
+
+    assert result.status == "sent"
+    # Only the landscape panel rendered — the portrait display was excluded.
+    assert rtp.call_count == 1
+    topics = [t for t, *_ in fakes["client"].published]
+    assert topics == ["tesserae/esp32_land/frame/bin"]
+    assert {r.renderer_id for r in result.renderers} == {"esp32_bin__esp32_land"}
+
+    # Filtering to a display the page doesn't target fails (renders nothing).
+    with patch("app.push.render_to_png", return_value=composition_png) as rtp2:
+        miss = manager.push("multi", device_ids={"esp32_port_not_bound"})
+    assert miss.status == "failed"
+    assert rtp2.call_count == 0

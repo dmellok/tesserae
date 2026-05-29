@@ -4,6 +4,7 @@ HA command topic triggers PushManager.push, default-off toggle works."""
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -22,7 +23,7 @@ from app.ha_discovery import (
     HomeAssistantDiscovery,
 )
 from app.main import REPO_ROOT, create_app
-from app.push import PushResult
+from app.push import PushResult, RendererResult
 from app.state.page_store import Page, PageStore, Panel
 from app.state.settings_store import SettingsStore
 from app.transport import BrokerConfig, MqttTransport
@@ -59,7 +60,26 @@ class _FakeMqttClient:
         return (0, 1)
 
 
-def _wire(tmp_path: Path):
+class _FakeDevice:
+    def __init__(self, id: str, name: str, kind_of: str | None, panel: dict | None) -> None:
+        self.id = id
+        self.display_name = name
+        self.kind_of = kind_of
+        self.panel = panel
+
+
+class _FakeRegistry:
+    def __init__(self, devices: list[_FakeDevice]) -> None:
+        self._d = {d.id: d for d in devices}
+
+    def all(self) -> list[_FakeDevice]:
+        return list(self._d.values())
+
+    def get(self, device_id: str):
+        return self._d.get(device_id)
+
+
+def _wire(tmp_path: Path, devices=None, device_status=None):
     fakes = {}
 
     def factory(client_id: str):
@@ -77,6 +97,8 @@ def _wire(tmp_path: Path):
         push_manager=pm,
         page_store=page_store,
         base_url_fn=lambda: "http://lan.test:8000",
+        device_registry=devices,
+        device_status=device_status,
     )
     return ha, fakes["client"], pm, page_store
 
@@ -240,3 +262,101 @@ def test_toggle_on_via_settings_starts_discovery(app: Flask, tmp_path: Path) -> 
     # Persisted on disk too.
     store = SettingsStore(tmp_path / "core" / "settings.json")
     assert store.get_section("app")["ha_discovery_enabled"] is True
+
+
+# -- Multi-head: per-display HA devices --------------------------------
+
+
+def _reg_with_lounge() -> _FakeRegistry:
+    return _FakeRegistry(
+        [_FakeDevice("lounge", "Lounge frame", "pi_bin_client", {"w": 1424, "h": 1200})]
+    )
+
+
+def test_per_device_configs_published(tmp_path: Path) -> None:
+    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
+    ha.start()
+    topics = _published_topics(client)
+    for leaf in ("frame", "current", "last_update", "last_seen"):
+        assert any(f"tesserae/dev_lounge_{leaf}/config" in t for t in topics), leaf
+    assert any("select/tesserae/dev_lounge_dashboard/config" in t for t in topics)
+    assert any("image/tesserae/dev_lounge_frame/config" in t for t in topics)
+
+
+def test_per_device_select_lists_bound_dashboards(tmp_path: Path) -> None:
+    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
+    store.save(Page(id="o", name="Other", panel=Panel(w=100, h=100), device_ids=[]))
+    ha.start()
+    cfg = _payload_for(client, "homeassistant/select/tesserae/dev_lounge_dashboard/config")
+    assert cfg is not None
+    payload = json.loads(cfg)
+    assert payload["options"] == ["Morning"]  # only the bound dashboard
+    assert payload["device"]["via_device"] == "tesserae"
+
+
+def test_per_device_push_command_targets_single_display(tmp_path: Path) -> None:
+    ha, _client, pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    pm.push.return_value = PushResult(status="sent", page_id="m")
+    store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
+    ha.start()
+    ha._on_device_push_cmd("tesserae/ha/dev/lounge/cmd/push", b"Morning")
+    pm.push.assert_called_once_with("m", device_ids={"lounge"})
+
+
+def test_push_result_updates_per_device_state(tmp_path: Path) -> None:
+    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
+    ha.start()
+    client.published.clear()
+    ha._on_push_result(
+        PushResult(
+            status="sent",
+            page_id="m",
+            composition_digest="abc123def4",
+            renderers=[
+                RendererResult(
+                    renderer_id="pi_bin__lounge",
+                    topic="t",
+                    digest="d",
+                    url="u",
+                    bytes_written=1,
+                )
+            ],
+        )
+    )
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/current_page") == b"Morning"
+    assert (
+        _payload_for(client, "tesserae/ha/dev/lounge/state/image_url")
+        == b"http://lan.test:8000/renders/abc123def4.png"
+    )
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/last_update") is not None
+
+
+def test_heartbeat_publishes_last_seen_and_dynamic_sensors(tmp_path: Path) -> None:
+    ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
+    ha.start()
+    client.published.clear()
+    ha.note_device_heartbeat("lounge", {"battery_pct": 88, "rssi": -61, "ip": "10.0.0.5"})
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/last_seen") is not None
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/battery") == b"88"
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/signal") == b"-61"
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/ip") == b"10.0.0.5"
+    # The lazy battery sensor config was published the first time the key appeared.
+    assert any("sensor/tesserae/dev_lounge_battery/config" in t for t in _published_topics(client))
+
+
+def test_stop_blanks_per_device_configs(tmp_path: Path) -> None:
+    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))
+    ha.start()
+    ha.note_device_heartbeat("lounge", {"battery_pct": 88})  # create the dyn sensor
+    client.published.clear()
+    ha.stop()
+    frame_cfg = "homeassistant/image/tesserae/dev_lounge_frame/config"
+    payloads = list(_payloads_for(client, frame_cfg))
+    assert payloads and payloads[-1] == b""
+    batt_cfg = "homeassistant/sensor/tesserae/dev_lounge_battery/config"
+    batt_payloads = list(_payloads_for(client, batt_cfg))
+    assert batt_payloads and batt_payloads[-1] == b""
