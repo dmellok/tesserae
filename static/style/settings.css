@@ -170,3 +170,75 @@
   .device-footer .form--inline-delete .actions { justify-content: flex-start; }
 }
 
+/* ----- System area: backup rows ------------------------------------- */
+
+.backup-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.backup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--t-space-4);
+}
+
+.backup-meta {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.backup-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.backup-top code {
+  font-size: 13px;
+  font-weight: 600;
+}
+.backup-top .pill { text-transform: lowercase; }
+.backup-size {
+  font-size: 12px;
+  color: var(--t-muted);
+}
+
+.backup-note {
+  font-size: 13px;
+  color: var(--t-fg-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.backup-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+/* Keep the three action controls (link / button / icon-only button) at
+   the same height + padding so they line up cleanly. */
+.backup-actions .button,
+.backup-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1.2;
+}
+.backup-actions form.inline { display: inline-flex; margin: 0; }
+
+@media (max-width: 720px) {
+  .backup-row { grid-template-columns: 1fr; }
+  .backup-actions { justify-content: flex-end; }
+}
+

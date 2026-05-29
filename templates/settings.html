@@ -392,22 +392,24 @@
     </form>
 
     {% if system_backups %}
-    <ul style="list-style:none;padding:0;display:grid;gap:8px;">
+    <ul class="backup-list">
       {% for b in system_backups %}
-      <li class="card card--compact" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
-        <div style="min-width:0;">
-          <strong><code>{{ b.id }}</code></strong>
-          <span class="pill">{{ b.label }}</span>
-          {% if b.note %}<span class="muted"> &middot; {{ b.note }}</span>{% endif %}
-          <div class="muted" style="font-size:12px;">{{ (b.bytes / 1024) | round | int }} KB</div>
+      <li class="card card--compact backup-row">
+        <div class="backup-meta">
+          <div class="backup-top">
+            <code>{{ b.id }}</code>
+            <span class="pill">{{ b.label }}</span>
+            <span class="backup-size">{{ (b.bytes / 1024) | round | int }} KB</span>
+          </div>
+          {% if b.note %}<div class="backup-note">{{ b.note }}</div>{% endif %}
         </div>
-        <div class="actions">
+        <div class="backup-actions">
           <a class="button ghost" href="{{ url_for('auth.system_backup_download', backup_id=b.id) }}"><i class="ph ph-download-simple"></i> Download</a>
           <form method="post" action="{{ url_for('auth.system_backup_restore', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Restore from {{ b.id }}? Current data/ will be replaced and the server will restart.');">
             <button type="submit" class="button ghost" {% if system_dev_mode %}disabled{% endif %}><i class="ph ph-arrow-counter-clockwise"></i> Restore</button>
           </form>
           <form method="post" action="{{ url_for('auth.system_backup_delete', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Delete this backup?');">
-            <button type="submit" class="button ghost danger"><i class="ph ph-trash"></i></button>
+            <button type="submit" class="button ghost danger" aria-label="Delete backup"><i class="ph ph-trash"></i></button>
           </form>
         </div>
       </li>
