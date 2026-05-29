@@ -7,14 +7,14 @@
       "notes": "Primary daily driver — battery-powered, deep-sleep."
     },
     "pi_bin": {
-      "status": "Not yet tested",
+      "status": "Tested",
       "hardware": "Pimoroni Inky Impression (Spectra 6 / Waveshare E6)",
-      "notes": ""
+      "notes": "Fastest Pi path — packed buffer written straight to inky's _buf."
     },
     "pi_png": {
-      "status": "Not yet tested",
-      "hardware": "Any panel the Pimoroni inky library supports",
-      "notes": ""
+      "status": "Tested",
+      "hardware": "Pimoroni Inky Impression (via inky set_image)",
+      "notes": "Works on every inky-supported panel; quantises on the Pi each frame."
     }
   }
 }

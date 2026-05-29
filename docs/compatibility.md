@@ -45,5 +45,5 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken — 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) | :material-check-circle: Tested | Primary daily driver — battery-powered, deep-sleep. |
-| `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-circle-outline: Not yet tested | — |
-| `pi_png` | Any panel the Pimoroni inky library supports | :material-circle-outline: Not yet tested | — |
+| `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path — packed buffer written straight to inky's _buf. |
+| `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |

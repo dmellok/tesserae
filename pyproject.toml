@@ -59,6 +59,8 @@ docs = [
     # The gen_* scripts under scripts/ produce the auto-generated pages
     # (widget gallery, hardware compatibility) from the live manifests.
     "mkdocs-material>=9.5,<10",
+    # Click-to-zoom lightbox for the widget gallery + screenshots.
+    "mkdocs-glightbox>=0.4,<1",
 ]
 
 [tool.setuptools.packages.find]

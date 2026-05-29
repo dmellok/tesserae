@@ -40,6 +40,17 @@ theme:
         icon: material/weather-sunny
         name: Switch to light mode
 
+plugins:
+  # Declaring plugins disables the implicit default, so re-add search.
+  - search
+  # Click any image to open it full-size in a lightbox overlay.
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      zoomable: true
+      draggable: true
+
 markdown_extensions:
   - admonition
   - attr_list
