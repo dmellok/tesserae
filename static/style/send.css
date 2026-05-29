@@ -35,6 +35,23 @@
   object-fit: contain;
   background: white;
 }
+/* Blurred backdrop for the "Center + blurred background" fit mode: a
+   cover-cropped copy of the source sitting behind the contained image, so
+   the live preview matches what the renderer pushes. Toggled by
+   attachSendFitPreview; hidden for every other mode. */
+.preview-frame > img.preview-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Overscale so the blur's soft edge doesn't reveal the frame border. */
+  transform: scale(1.08);
+  filter: blur(18px) saturate(1.15);
+  z-index: 0;
+}
+.preview-frame > img.preview-bg[hidden] { display: none !important; }
+.preview-frame > img.preview-image { z-index: 1; }
 .preview-placeholder {
   display: grid;
   place-items: center;

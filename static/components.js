@@ -64,6 +64,77 @@
     });
   }
 
+  // Send-page live preview: reflect the chosen "Image fit" mode on the
+  // raster preview so it matches what the renderer pushes. fit/fill/stretch/
+  // blur are ratio-based, so object-fit handles them at any preview scale;
+  // center is pixel-based, so we scale the <img> to the panel's pixel ratio
+  // and clip. blur additionally paints a blurred cover copy behind the
+  // contained image (the .preview-bg layer).
+  const _SEND_OBJECT_FIT = { fit: "contain", fill: "cover", stretch: "fill", blur: "contain" };
+
+  function attachSendFitPreview(root) {
+    root.querySelectorAll(".send-pair").forEach((pair) => {
+      if (pair.dataset.fitSync) return;
+      const select = pair.querySelector('select[name="fit"]');
+      const frame = pair.querySelector("[data-fit-preview]");
+      const fg = frame && frame.querySelector("img.preview-image");
+      if (!select || !frame || !fg) return; // webpage tab previews an iframe
+      pair.dataset.fitSync = "1";
+      const bg = frame.querySelector("img.preview-bg");
+
+      function apply() {
+        const mode = select.value;
+        const ready = !!fg.src && !fg.hidden;
+        if (mode === "center") {
+          // "No scaling": render at the source's native pixels, but scaled
+          // by the preview's panel-px ratio so it reads true to the panel.
+          const panelW = parseInt(frame.dataset.panelW || "0", 10);
+          const scale = panelW ? frame.clientWidth / panelW : 1;
+          fg.style.objectFit = "fill";
+          fg.style.inset = "auto";
+          fg.style.left = "50%";
+          fg.style.top = "50%";
+          fg.style.transform = "translate(-50%, -50%)";
+          fg.style.width = fg.naturalWidth * scale + "px";
+          fg.style.height = fg.naturalHeight * scale + "px";
+        } else {
+          fg.style.objectFit = _SEND_OBJECT_FIT[mode] || "contain";
+          fg.style.inset = "";
+          fg.style.left = "";
+          fg.style.top = "";
+          fg.style.transform = "";
+          fg.style.width = "";
+          fg.style.height = "";
+        }
+        // In blur mode the contained image must not paint over the blurred
+        // backdrop in its letterbox margins.
+        fg.style.background = mode === "blur" ? "transparent" : "";
+        if (bg) {
+          const show = mode === "blur" && ready;
+          if (show && bg.getAttribute("src") !== fg.getAttribute("src")) {
+            bg.src = fg.src;
+          }
+          bg.hidden = !show;
+        }
+      }
+
+      select.addEventListener("change", apply);
+      fg.addEventListener("load", apply); // pixels ready: center needs naturalWidth
+      // The File / URL tabs swap the preview's src + hidden as the user picks
+      // a source; resync the backdrop + sizing on those mutations.
+      if (typeof MutationObserver !== "undefined") {
+        new MutationObserver(apply).observe(fg, {
+          attributes: true,
+          attributeFilter: ["src", "hidden"],
+        });
+      }
+      if (typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(apply).observe(frame);
+      }
+      apply();
+    });
+  }
+
   // Numeric field paired with a preset dropdown + "Custom…" option that
   // reveals the underlying number input. The number input always carries
   // the field's name — submission picks up whichever value the user
@@ -146,6 +217,7 @@
   function init() {
     attachSliders(document);
     attachPreviewFit(document);
+    attachSendFitPreview(document);
     attachPresetNumbers(document);
     attachLightbox();
   }
@@ -159,5 +231,11 @@
   // Observe future additions (the page editor swaps cell forms in/out on
   // plugin change). Skipping mutation observer for now since editor.js
   // currently full-reloads on plugin change — re-init isn't needed mid-page.
-  window.tesseraeComponents = { attachSliders, attachPreviewFit, attachPresetNumbers, fitPreview };
+  window.tesseraeComponents = {
+    attachSliders,
+    attachPreviewFit,
+    attachSendFitPreview,
+    attachPresetNumbers,
+    fitPreview,
+  };
 })();

@@ -41,11 +41,9 @@
       </a>
       <div class="pg-tile-row">
         <span class="pg-tile-name" title="{{ img.name }}">{{ img.name }}</span>
-        <form method="post" action="{{ url_for('picture_gallery_admin.send_image', folder=folder_id, filename=img.name) }}" class="pg-tile-send" onsubmit="return confirm('Push {{ img.name }} to all renderers?');">
-          <button type="submit" class="pg-tile-iconbtn" aria-label="Push to renderers" title="Push to renderers">
-            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
-          </button>
-        </form>
+        <a href="{{ url_for('send.index', tab='gallery', g_folder=folder_id, g_file=img.name) }}" class="pg-tile-iconbtn pg-tile-send" aria-label="Send to a display" title="Send to a display">
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+        </a>
         {% if not external %}
         <form method="post" action="{{ url_for('picture_gallery_admin.delete_image', folder=folder_id, filename=img.name) }}" class="pg-tile-delete" onsubmit="return confirm('Delete {{ img.name }}?');">
           <button type="submit" class="pg-tile-iconbtn pg-tile-iconbtn--danger" aria-label="Delete" title="Delete">

@@ -98,7 +98,9 @@ def test_url_invokes_push_url_image(app: Flask) -> None:
         data={"url": "https://example.com/img.png"},
         follow_redirects=False,
     )
-    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id=None)
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/img.png", device_id=None, fit=None
+    )
 
 
 def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
@@ -114,7 +116,7 @@ def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
         follow_redirects=False,
     )
     pm.push_webpage.assert_called_once_with(
-        "https://example.com", viewport_w=800, viewport_h=600, device_id=None
+        "https://example.com", viewport_w=800, viewport_h=600, device_id=None, fit=None
     )
 
 
@@ -145,7 +147,9 @@ def test_send_with_device_id_routes_to_that_device(app: Flask) -> None:
         data={"url": "https://example.com/img.png", "device_id": "esp32_lab"},
         follow_redirects=False,
     )
-    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id="esp32_lab")
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/img.png", device_id="esp32_lab", fit=None
+    )
 
 
 def test_send_with_unknown_device_id_falls_back_to_none(app: Flask) -> None:
@@ -161,7 +165,9 @@ def test_send_with_unknown_device_id_falls_back_to_none(app: Flask) -> None:
     )
     # Unknown id is dropped rather than passed through — avoids routing
     # a push to a device that doesn't exist.
-    pm.push_url_image.assert_called_once_with("https://example.com/img.png", device_id=None)
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/img.png", device_id=None, fit=None
+    )
 
 
 def test_history_lists_event_log_rows(app: Flask, tmp_path: Path) -> None:
@@ -214,3 +220,56 @@ def test_root_redirects_to_send(app: Flask) -> None:
     resp = client.get("/", follow_redirects=False)
     assert resp.status_code == 302
     assert resp.location.endswith("/send")
+
+
+def test_fit_threaded_through_url(app: Flask) -> None:
+    pm = MagicMock()
+    pm.push_url_image.return_value = PushResult(status="sent", page_id="x")
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/send/url", data={"url": "https://example.com/i.png", "fit": "blur"})
+    pm.push_url_image.assert_called_once_with(
+        "https://example.com/i.png", device_id=None, fit="blur"
+    )
+
+
+def test_invalid_fit_falls_back_to_none(app: Flask) -> None:
+    pm = MagicMock()
+    pm.push_url_image.return_value = PushResult(status="sent", page_id="x")
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/send/url", data={"url": "https://example.com/i.png", "fit": "bogus"})
+    pm.push_url_image.assert_called_once_with("https://example.com/i.png", device_id=None, fit=None)
+
+
+def test_gallery_query_shows_section(app: Flask, tmp_path: Path, monkeypatch) -> None:
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"\xff\xd8\xff")
+    gal = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    monkeypatch.setattr(gal, "resolve_image_path", lambda f, n: img if n == "p.jpg" else None)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/send?g_folder=trips&g_file=p.jpg").get_data(as_text=True)
+    assert 'id="tab-gallery"' in body
+    assert 'name="g_file" value="p.jpg"' in body
+    assert 'name="fit"' in body  # fit picker present
+
+
+def test_send_gallery_pushes_resolved_image(app: Flask, tmp_path: Path, monkeypatch) -> None:
+    img = tmp_path / "pic.jpg"
+    img.write_bytes(b"\xff\xd8\xff")
+    gal = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
+    monkeypatch.setattr(gal, "resolve_image_path", lambda f, n: img if n == "pic.jpg" else None)
+    pm = MagicMock()
+    pm.push_image.return_value = PushResult(status="sent", page_id="x")
+    app.config["PUSH_MANAGER"] = pm
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/send/gallery", data={"g_folder": "trips", "g_file": "pic.jpg", "fit": "fill"})
+    pm.push_image.assert_called_once()
+    args, kwargs = pm.push_image.call_args
+    assert args[0] == b"\xff\xd8\xff"
+    assert kwargs["fit"] == "fill"
+    assert kwargs["device_id"] is None

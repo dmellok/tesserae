@@ -3,13 +3,15 @@
 {% block title %}Send — Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
-{% set TABS = [
+{% set CORE_TABS = [
   ('file','File','upload-simple'),
   ('saved','Saved','squares-four'),
   ('url','URL','link'),
   ('webpage','Webpage','globe'),
   ('history','History','clock-counter-clockwise'),
 ] %}
+{# The Gallery tab only appears when you arrive via a gallery image's Send. #}
+{% set TABS = ([('gallery','Gallery','image-square')] + CORE_TABS) if gallery else CORE_TABS %}
 
 {% macro pill_status(status) %}
   {% if status == 'sent' %}<span class="pill is-ok">sent</span>
@@ -58,6 +60,22 @@
 {% endif %}
 {% endmacro %}
 
+{# Image fit mode — how a non-panel-sized image maps onto the panel.
+   Shared by File / URL / Webpage / Gallery. #}
+{% macro fit_picker(field_id) %}
+<div class="field">
+  <label for="{{ field_id }}">Image fit</label>
+  <select id="{{ field_id }}" name="fit">
+    <option value="fit">Fit — letterbox (keep aspect)</option>
+    <option value="fill">Fill — crop to cover</option>
+    <option value="stretch">Stretch — squash to exact dims</option>
+    <option value="center">Center — no scaling</option>
+    <option value="blur">Center + blurred background</option>
+  </select>
+  <p class="field-help">How the image maps onto the panel when it isn't already panel-sized.</p>
+</div>
+{% endmacro %}
+
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-paper-plane-tilt"></i> Send</h1>
@@ -76,6 +94,27 @@
   </a>
   {% endfor %}
 </nav>
+
+{# ----- Gallery tab (only when arriving from a gallery image) ----- #}
+{% if gallery %}
+<div class="send-pair" id="tab-gallery" {% if tab != 'gallery' %}hidden{% endif %}>
+  <section class="card send-pair-options">
+    {{ card_head('Gallery image', icon_name='image-square') }}
+    <form method="post" action="{{ url_for('send.send_gallery') }}" class="form">
+      <input type="hidden" name="g_folder" value="{{ gallery.folder }}">
+      <input type="hidden" name="g_file" value="{{ gallery.file }}">
+      <p class="field-help">Sending <strong>{{ gallery.file }}</strong> from <strong>{{ gallery.folder }}</strong>. Pick the displays + fit below.</p>
+      {{ device_picker('gallery-device') }}
+      {{ fit_picker('gallery-fit') }}
+      <div class="actions">{{ button('Push image', icon='paper-plane-tilt') }}</div>
+    </form>
+  </section>
+  {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
+    <img src="{{ gallery.url }}" alt="" class="preview-bg" aria-hidden="true" hidden>
+    <img src="{{ gallery.url }}" alt="" class="preview-image">
+  {% endcall %}
+</div>
+{% endif %}
 
 {# ----- File tab ----- #}
 <div class="send-pair" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
@@ -103,10 +142,12 @@
       </label>
       <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
       {{ device_picker('file-device') }}
+      {{ fit_picker('file-fit') }}
       <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
+    <img data-file-preview-bg alt="" class="preview-bg" aria-hidden="true" hidden>
     <img data-file-preview alt="" class="preview-image" hidden>
     <div class="preview-placeholder" data-file-preview-placeholder>
       <i class="ph-duotone ph-image" aria-hidden="true"></i>
@@ -159,10 +200,12 @@
         <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
       </div>
       {{ device_picker('url-device') }}
+      {{ fit_picker('url-fit') }}
       <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='Loaded directly in your browser — final fit happens server-side.') %}
+    <img data-url-preview-bg alt="" class="preview-bg" aria-hidden="true" hidden>
     <img data-url-preview alt="" class="preview-image" hidden>
     <div class="preview-placeholder" data-url-preview-placeholder>
       <i class="ph-duotone ph-link" aria-hidden="true"></i>
@@ -193,6 +236,7 @@
       </div>
       <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
       {{ device_picker('webpage-device') }}
+      {{ fit_picker('webpage-fit') }}
       <div class="actions">{{ button('Render & push', icon='browser') }}</div>
     </form>
   </section>

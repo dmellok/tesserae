@@ -324,6 +324,22 @@ def choices(name: str) -> list[dict[str, Any]]:
     return out
 
 
+def resolve_image_path(folder: str, filename: str) -> Path | None:
+    """Map (folder, filename) to an on-disk image path, or None. Public so
+    the Send page can resolve a gallery image to push. ``safe_join`` lets
+    spaces / unicode round-trip while still rejecting traversal attempts."""
+    target_dir = _folder_path(folder, _data_dir())
+    if target_dir is None or not target_dir.exists() or not target_dir.is_dir():
+        return None
+    joined = safe_join(str(target_dir), filename)
+    if joined is None:
+        return None
+    path = Path(joined)
+    if not path.is_file() or path.suffix.lower() not in ALLOWED_SUFFIXES:
+        return None
+    return path
+
+
 # ----- admin blueprint ------------------------------------------------
 
 
@@ -494,51 +510,17 @@ def blueprint() -> Blueprint:
         return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
 
     def _resolve_existing_image(folder: str, filename: str) -> Path | None:
-        """Map (folder, filename) to an on-disk image path. Uses
-        ``safe_join`` so spaces / unicode in the filename round-trip
-        (``secure_filename`` would mangle them and miss the file)
-        while still rejecting traversal attempts."""
-        target_dir = _folder_path(folder, _data_dir())
-        if target_dir is None or not target_dir.exists() or not target_dir.is_dir():
-            return None
-        joined = safe_join(str(target_dir), filename)
-        if joined is None:
-            return None
-        path = Path(joined)
-        if not path.is_file() or path.suffix.lower() not in ALLOWED_SUFFIXES:
-            return None
-        return path
+        return resolve_image_path(folder, filename)
 
     @bp.post("/folders/<folder>/images/<path:filename>/send")
     def send_image(folder: str, filename: str) -> Response:
-        """Push a single image to every loaded renderer, bypassing the
-        dashboard composer. Same path as the Send page's File tab — we
-        hand the bytes to PushManager.push_image and let each renderer
-        fit the image to its panel."""
-        path = _resolve_existing_image(folder, filename)
-        if path is None:
+        """Hand off to the Send page with this image pre-loaded so the user
+        can pick which displays + fit mode to push with (rather than a blind
+        push to every renderer). Kept as a redirect for back-compat; the
+        gallery tiles now link straight to /send."""
+        if _resolve_existing_image(folder, filename) is None:
             abort(404)
-        display_name = path.name
-        try:
-            blob = path.read_bytes()
-        except OSError as err:
-            flash(f"Could not read {display_name}: {err}", "error")
-            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
-        push = current_app.config.get("PUSH_MANAGER")
-        if push is None:
-            flash("Push manager unavailable.", "error")
-            return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
-        label = f"gallery:{folder}/{display_name}"
-        result = push.push_image(blob, source_label=label)
-        if getattr(result, "status", "ok") == "ok":
-            flash(f"Pushed {display_name}.", "ok")
-        else:
-            flash(
-                f"Push of {display_name} returned {getattr(result, 'status', '?')}"
-                + (f": {result.error}" if getattr(result, "error", None) else ""),
-                "warn" if result.status == "busy" else "error",
-            )
-        return redirect(url_for("picture_gallery_admin.show_folder", folder=folder))
+        return redirect(url_for("send.index", tab="gallery", g_folder=folder, g_file=filename))
 
     @bp.post("/folders/<folder>/images/<path:filename>/delete")
     def delete_image(folder: str, filename: str) -> Response:

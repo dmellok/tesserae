@@ -198,17 +198,54 @@ def _history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     return out
 
 
+_FIT_MODES: frozenset[str] = frozenset({"fit", "fill", "stretch", "center", "blur"})
+
+
+def _form_fit() -> str | None:
+    """Chosen image fit mode, or None (each renderer's default) when unset
+    or not a recognised mode."""
+    raw = (request.form.get("fit") or "").strip().lower()
+    return raw if raw in _FIT_MODES else None
+
+
+def _gallery_module() -> Any:
+    reg = current_app.config.get("PLUGIN_REGISTRY")
+    plugin = reg.get("picture_gallery") if reg is not None else None
+    return plugin.server_module if plugin is not None else None
+
+
+def _gallery_ref() -> dict[str, str] | None:
+    """When opened from a gallery image (``?g_folder=&g_file=``), return
+    ``{folder, file, url}`` for the pre-loaded Gallery section — validating
+    the image exists via the picture_gallery plugin."""
+    folder = (request.args.get("g_folder") or "").strip()
+    filename = (request.args.get("g_file") or "").strip()
+    if not folder or not filename:
+        return None
+    gallery = _gallery_module()
+    if gallery is None or gallery.resolve_image_path(folder, filename) is None:
+        return None
+    return {
+        "folder": folder,
+        "file": filename,
+        "url": url_for("picture_gallery_admin.serve_image", folder=folder, filename=filename),
+    }
+
+
 @bp.get("")
 def index() -> str:
     history = _history_view(_events().list(type="push", limit=100))
     pages = _pages().list()
+    gallery = _gallery_ref()
+    tab = request.args.get("tab") or ("gallery" if gallery else "file")
     return render_template(
         "send.html",
         pages=pages,
         history=history,
         panel=resolve_settings_panel(_settings()),
         device_options=_device_options(),
-        tab=request.args.get("tab", "file"),
+        tab=tab,
+        gallery=gallery,
     )
 
 
@@ -223,10 +260,11 @@ def send_file() -> Response:
         flash("Uploaded file was empty.", "error")
         return redirect(url_for("send.index", tab="file"))
     filename = upload.filename
+    fit = _form_fit()
     _push_to_targets(
         f"File {filename!r}",
         _form_device_ids(),
-        lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid),
+        lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
 
@@ -248,10 +286,11 @@ def send_url() -> Response:
     if not url:
         flash("Paste an image URL first.", "error")
         return redirect(url_for("send.index", tab="url"))
+    fit = _form_fit()
     _push_to_targets(
         f"URL {url}",
         _form_device_ids(),
-        lambda tid: _push().push_url_image(url, device_id=tid),
+        lambda tid: _push().push_url_image(url, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
 
@@ -268,12 +307,39 @@ def send_webpage() -> Response:
     except ValueError:
         flash("Viewport dimensions must be integers.", "error")
         return redirect(url_for("send.index", tab="webpage"))
+    fit = _form_fit()
     _push_to_targets(
         f"Webpage {url}",
         _form_device_ids(),
         lambda tid: _push().push_webpage(
-            url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid
+            url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid, fit=fit
         ),
+    )
+    return redirect(url_for("send.index", tab="history"))
+
+
+@bp.post("/gallery")
+def send_gallery() -> Response:
+    """Push a gallery image to the chosen displays + fit. The Send page's
+    Gallery section posts here with the image reference (g_folder/g_file)."""
+    folder = (request.form.get("g_folder") or "").strip()
+    filename = (request.form.get("g_file") or "").strip()
+    gallery = _gallery_module()
+    path = gallery.resolve_image_path(folder, filename) if gallery is not None else None
+    if path is None:
+        flash("Gallery image not found.", "error")
+        return redirect(url_for("send.index"))
+    try:
+        image_bytes = path.read_bytes()
+    except OSError as err:
+        flash(f"Could not read {filename}: {err}", "error")
+        return redirect(url_for("send.index", tab="gallery", g_folder=folder, g_file=filename))
+    fit = _form_fit()
+    label = f"gallery:{folder}/{filename}"
+    _push_to_targets(
+        f"Gallery {filename!r}",
+        _form_device_ids(),
+        lambda tid: _push().push_image(image_bytes, source_label=label, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
 
