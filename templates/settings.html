@@ -302,6 +302,124 @@
 </div>
 {% endif %}
 
+{# ----- System: self-update + backup ----- #}
+{% if active_area == 'system' %}
+<div class="settings-actions">
+
+  <section class="card">
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Pull a newer revision of Tesserae from this repo and restart. A pre-update snapshot of data/ is always taken, and a rollback path is always one click away.') }}
+
+    {% if system_state %}
+    <p>
+      <strong>v{{ system_state.version }}</strong>
+      &middot; <code>{{ system_state.short_sha }}</code>
+      &middot; branch <code>{{ system_state.branch }}</code>
+      {% if system_state.dirty %} &middot; <span class="pill is-warn">working tree dirty</span>{% endif %}
+    </p>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('auth.system_update_check') }}" class="form">
+      <div class="field">
+        <label for="upd-channel">Channel</label>
+        <select id="upd-channel" name="channel">
+          <option value="edge"{% if not system_last_check or system_last_check.channel == 'edge' %} selected{% endif %}>Edge (latest commit on main)</option>
+          <option value="stable"{% if system_last_check and system_last_check.channel == 'stable' %} selected{% endif %}>Stable (latest release tag)</option>
+        </select>
+        <p class="field-help">Stable pins to the most recent release tag once you start publishing them; edge tracks the default branch.</p>
+      </div>
+      <div class="actions">{{ button('Check for updates', icon='arrows-counter-clockwise') }}</div>
+    </form>
+
+    {% if system_last_check %}
+    <section class="card card--compact">
+      {% if system_last_check.available %}
+      <p><strong>Update available</strong> — {{ system_last_check.commits_behind }} commit{% if system_last_check.commits_behind != 1 %}s{% endif %} behind <code>{{ system_last_check.target_ref }}</code> ({{ system_last_check.target_sha[:7] }}).</p>
+      {% if system_last_check.changelog %}
+      <details>
+        <summary>Incoming changes</summary>
+        <ul>
+          {% for entry in system_last_check.changelog %}
+          <li><code>{{ entry.sha }}</code> {{ entry.subject }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      <form method="post" action="{{ url_for('auth.system_update_apply') }}" class="form">
+        <input type="hidden" name="channel" value="{{ system_last_check.channel }}">
+        <p class="field-help">Updating takes a pre-update backup of <code>data/</code>, pulls the new revision, reinstalls deps if <code>pyproject.toml</code> changed, and re-execs the server. In-flight requests drop ({{ '~1s' }} blip).</p>
+        <div class="actions">
+          {{ button('Update & restart', icon='download-simple', variant='primary', disabled=system_dev_mode) }}
+          <label style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;font-size:13px;">
+            <input type="checkbox" name="force" value="1"> Force (discard local changes)
+          </label>
+        </div>
+      </form>
+      {% else %}
+      <p>Up to date with <code>{{ system_last_check.target_ref }}</code>.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if system_history %}
+    <section>
+      <h4>Recent updates</h4>
+      <ul>
+        {% for entry in system_history %}
+        <li><code>{{ entry.from_sha[:7] }} → {{ entry.to_sha[:7] }}</code> ({{ entry.channel }}){% if entry.pip_changed %} &middot; deps reinstalled{% endif %}</li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{{ url_for('auth.system_update_rollback') }}" class="form" onsubmit="return confirm('Roll back to {{ system_history[0].from_sha[:7] }} and restore its pre-update data snapshot? The server will restart.');">
+        <p class="field-help">Roll back the working tree to <code>{{ system_history[0].from_sha[:7] }}</code> AND restore the pre-update data snapshot. Use this when an update broke something.</p>
+        <div class="actions">{{ button('Roll back last update', icon='arrow-u-up-left', disabled=system_dev_mode) }}</div>
+      </form>
+    </section>
+    {% endif %}
+
+    {% if system_dev_mode %}
+    <p class="field-help">Update + Rollback are disabled under <code>--dev</code> &mdash; the Flask reloader owns restarts in dev mode.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Backups contain real secrets (API tokens, MQTT creds, OAuth) — keep them somewhere safe.') }}
+
+    <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">
+      <div class="field">
+        <label for="bk-note">Note (optional)</label>
+        <input type="text" id="bk-note" name="note" placeholder="e.g. before major restyle" maxlength="200">
+      </div>
+      <div class="actions">{{ button('Create backup', icon='download-simple') }}</div>
+    </form>
+
+    {% if system_backups %}
+    <ul style="list-style:none;padding:0;display:grid;gap:8px;">
+      {% for b in system_backups %}
+      <li class="card card--compact" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;">
+        <div style="min-width:0;">
+          <strong><code>{{ b.id }}</code></strong>
+          <span class="pill">{{ b.label }}</span>
+          {% if b.note %}<span class="muted"> &middot; {{ b.note }}</span>{% endif %}
+          <div class="muted" style="font-size:12px;">{{ (b.bytes / 1024) | round | int }} KB</div>
+        </div>
+        <div class="actions">
+          <a class="button ghost" href="{{ url_for('auth.system_backup_download', backup_id=b.id) }}"><i class="ph ph-download-simple"></i> Download</a>
+          <form method="post" action="{{ url_for('auth.system_backup_restore', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Restore from {{ b.id }}? Current data/ will be replaced and the server will restart.');">
+            <button type="submit" class="button ghost" {% if system_dev_mode %}disabled{% endif %}><i class="ph ph-arrow-counter-clockwise"></i> Restore</button>
+          </form>
+          <form method="post" action="{{ url_for('auth.system_backup_delete', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Delete this backup?');">
+            <button type="submit" class="button ghost danger"><i class="ph ph-trash"></i></button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="lede">No backups yet.</p>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+
 <script>
   // Built-in broker switch: show the embedded bind/port/auth fields and
   // hide the external host/port/auth fields when on — and vice versa.

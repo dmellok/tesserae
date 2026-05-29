@@ -28,10 +28,22 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, Flask, current_app, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Flask,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from werkzeug.wrappers import Response
 
 from app import auth, calibration, device_service
+from app import backup as _backup_mod
+from app import updater as _updater_mod
 from app.calibration import build_calibration_card, target_orientation
 from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
@@ -440,14 +452,17 @@ _AREAS: tuple[tuple[str, str], ...] = (
     ("renderers", "Renderers"),
     ("devices", "Devices"),
     ("plugins", "Plugins"),
+    ("system", "System"),
 )
 
-# Map area → section kinds that belong on that page.
+# Map area → section kinds that belong on that page. The "system" page
+# is hand-built (updates + backups) — no manifest-driven sections.
 _AREA_KINDS: dict[str, set[str]] = {
     "server": {"app", "panel", "broker"},
     "renderers": {"renderer"},
     "devices": {"device"},
     "plugins": {"plugin"},
+    "system": set(),
 }
 
 
@@ -483,6 +498,24 @@ def settings_area(area: str) -> str | Response:
     # Signature of what we're rendering, so the client-side poller knows
     # the baseline and can auto-refresh when the discovered set changes.
     discovered_sig = ",".join(sorted(f"{d['id']}:{d.get('kind') or ''}" for d in discovered))
+
+    # System page payload: current update state + cached check + recent
+    # history + on-disk backups. The check is NOT auto-refreshed (it hits
+    # the network); the user clicks "Check for updates" to refresh.
+    system_state = None
+    system_last_check = None
+    system_history: list[Any] = []
+    system_backups: list[Any] = []
+    if area == "system":
+        updater = current_app.config["UPDATER"]
+        try:
+            system_state = updater.current_state()
+        except _updater_mod.UpdaterError as err:
+            flash(f"Update state unavailable: {err}", "error")
+        system_last_check = updater.last_check
+        system_history = list(reversed(updater.history()))
+        system_backups = _backup_mod.list_all(current_app.config["DATA_ROOT"])
+
     return render_template(
         "settings.html",
         sections=sections,
@@ -496,6 +529,11 @@ def settings_area(area: str) -> str | Response:
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.
         calibrating=request.args.get("calibrating") or "",
+        system_state=system_state,
+        system_last_check=system_last_check,
+        system_history=system_history,
+        system_backups=system_backups,
+        system_dev_mode=bool(current_app.debug),
     )
 
 
@@ -522,6 +560,168 @@ def _redirect_to_section(section_kind: str) -> Response:
             _anchor=section_kind,
         )
     )
+
+
+# ====================================================================
+# Settings → System: self-update + backup endpoints.
+#
+# Updates and restore-from-backup both restart the process via os.execv
+# (the in-process Playwright renderer + admin UI come back ~1 s later).
+# Refused in --dev: the werkzeug reloader owns restarts there.
+# All gated by the push manager's lock so a frame push can't race with a
+# tree-mutating operation.
+# ====================================================================
+
+
+def _system_redirect() -> Response:
+    return redirect(url_for("auth.settings_area", area="system"))
+
+
+def _updater() -> _updater_mod.Updater:
+    return current_app.config["UPDATER"]  # type: ignore[no-any-return]
+
+
+def _data_root() -> Path:
+    return current_app.config["DATA_ROOT"]  # type: ignore[no-any-return]
+
+
+def _refuse_in_dev() -> Response | None:
+    if current_app.debug:
+        flash(
+            "Updates and restores only run on the production (waitress) server — "
+            "the --dev reloader owns restarts.",
+            "error",
+        )
+        return _system_redirect()
+    return None
+
+
+@bp.post("/settings/system/update/check")
+def system_update_check() -> Response:
+    channel = (request.form.get("channel") or "edge").strip()
+    try:
+        check = _updater().check_remote(channel)
+    except _updater_mod.UpdaterError as err:
+        flash(f"Check failed: {err}", "error")
+        return _system_redirect()
+    if check.available:
+        flash(
+            f"Update available: {check.commits_behind} commit"
+            f"{'s' if check.commits_behind != 1 else ''} behind "
+            f"{check.target_ref}.",
+            "ok",
+        )
+    else:
+        flash(f"Up to date with {check.target_ref}.", "ok")
+    return _system_redirect()
+
+
+@bp.post("/settings/system/update/apply")
+def system_update_apply() -> Response:
+    refused = _refuse_in_dev()
+    if refused is not None:
+        return refused
+    channel = (request.form.get("channel") or "edge").strip()
+    force = request.form.get("force") == "1"
+    push_mgr = _push_manager()
+    try:
+        result = _updater().apply_update(channel, force=force, push_lock=push_mgr._lock)
+    except _updater_mod.UpdaterError as err:
+        flash(str(err), "error")
+        return _system_redirect()
+    if not result.ok:
+        flash(f"Update failed: {result.error or 'unknown error'}", "error")
+        return _system_redirect()
+    if result.from_sha == result.to_sha:
+        flash(f"Already up to date ({result.to_sha[:7]}).", "ok")
+        return _system_redirect()
+    note = f"Updated {result.from_sha[:7]} → {result.to_sha[:7]}"
+    if result.pip_changed:
+        note += " (deps reinstalled)"
+    flash(note + ". Restarting…", "ok")
+    _updater().restart(delay_s=1.5)
+    return _system_redirect()
+
+
+@bp.post("/settings/system/update/rollback")
+def system_update_rollback() -> Response:
+    refused = _refuse_in_dev()
+    if refused is not None:
+        return refused
+    push_mgr = _push_manager()
+    try:
+        result = _updater().rollback_last(push_lock=push_mgr._lock)
+    except _updater_mod.UpdaterError as err:
+        flash(str(err), "error")
+        return _system_redirect()
+    if not result.ok:
+        flash(f"Rollback failed: {result.error or 'unknown error'}", "error")
+        return _system_redirect()
+    flash(f"Rolled back to {result.to_sha[:7]}. Restarting…", "ok")
+    _updater().restart(delay_s=1.5)
+    return _system_redirect()
+
+
+@bp.post("/settings/system/backup/create")
+def system_backup_create() -> Response:
+    note = (request.form.get("note") or "").strip()[:200]
+    try:
+        backup = _backup_mod.create(_data_root(), label=_backup_mod.LABEL_MANUAL, note=note)
+    except OSError as err:
+        flash(f"Backup failed: {err}", "error")
+        return _system_redirect()
+    flash(f"Backup created: {backup.id} ({backup.bytes // 1024} KB).", "ok")
+    return _system_redirect()
+
+
+@bp.get("/settings/system/backup/<backup_id>/download")
+def system_backup_download(backup_id: str) -> Response:
+    backup = _backup_mod.get(_data_root(), backup_id)
+    if backup is None:
+        return Response("backup not found", status=404)
+    # Serve from a BytesIO so the underlying file is fully read + closed
+    # before the response is built — avoids a lingering file handle that
+    # finalizers complain about under the test client.
+    import io
+
+    data = backup.path.read_bytes()
+    return send_file(
+        io.BytesIO(data),
+        as_attachment=True,
+        download_name=f"tesserae-backup-{backup_id}.zip",
+        mimetype="application/zip",
+    )
+
+
+@bp.post("/settings/system/backup/<backup_id>/restore")
+def system_backup_restore(backup_id: str) -> Response:
+    refused = _refuse_in_dev()
+    if refused is not None:
+        return refused
+    push_mgr = _push_manager()
+    if not push_mgr._lock.acquire(blocking=True, timeout=10):
+        flash("Another push is in flight — try again in a moment.", "error")
+        return _system_redirect()
+    try:
+        try:
+            _backup_mod.restore(_data_root(), backup_id)
+        except (FileNotFoundError, ValueError, OSError) as err:
+            flash(f"Restore failed: {err}", "error")
+            return _system_redirect()
+    finally:
+        push_mgr._lock.release()
+    flash(f"Restored from {backup_id}. Restarting…", "ok")
+    _updater().restart(delay_s=1.5)
+    return _system_redirect()
+
+
+@bp.post("/settings/system/backup/<backup_id>/delete")
+def system_backup_delete(backup_id: str) -> Response:
+    if _backup_mod.delete(_data_root(), backup_id):
+        flash(f"Deleted backup {backup_id}.", "ok")
+    else:
+        flash(f"No backup named {backup_id}.", "error")
+    return _system_redirect()
 
 
 @bp.post("/settings/<section_kind>")

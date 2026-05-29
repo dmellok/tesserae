@@ -162,6 +162,13 @@ def create_app(
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
+    app.config["DATA_ROOT"] = data_root
+    # Self-update + backup live under Settings → System. Both are no-ops
+    # under --dev (the reloader handles restarts there) and gated behind
+    # admin auth.
+    from app.updater import Updater as _Updater
+
+    app.config["UPDATER"] = _Updater(REPO_ROOT, data_root)
 
     # Transport + push manager are (re)built from current broker settings.
     # Holding the rebuilder in app.config lets settings_routes call it on a
