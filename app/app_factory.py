@@ -223,6 +223,25 @@ def create_app(
     if not is_watcher:
         rebuild_transport()
 
+    # Docker bridge networking gives us an internal IP that LAN
+    # clients can't reach. If TESSERAE_HOST_IP isn't set and the
+    # auto-detected IP looks like a Docker bridge, panels will see
+    # broken MQTT broker URLs AND broken render-frame URLs (both
+    # flow through detect_local_ip). Log a loud warning at startup
+    # so anyone reading `docker compose logs` sees it before
+    # spending time debugging.
+    from app.network import docker_bridge_ip_warning
+
+    if docker_bridge_ip_warning() and not testing:
+        logger.warning(
+            "%s",
+            "Docker bridge IP detected and TESSERAE_HOST_IP is not set. "
+            "Panels won't be able to reach the broker or fetch render frames. "
+            "Set TESSERAE_HOST_IP=<your-host-lan-ip> in docker-compose.yml "
+            "or use network_mode: host. See "
+            "https://dmellok.github.io/tesserae/install/docker/",
+        )
+
     # The Scheduler doesn't hold a static PushManager reference because
     # rebuild_transport replaces it on broker setting changes. The factory
     # resolves from app.config at fire-time so the scheduler always sees

@@ -104,14 +104,23 @@ services:
 Then set the broker host to `mosquitto` in Tesserae's settings (the
 service name is the resolvable hostname inside the compose network).
 
-## The built-in broker URL: `TESSERAE_HOST_IP`
+## `TESSERAE_HOST_IP` — the must-set env var on bridge networking
 
-If you're using the **built-in MQTT broker** (Settings → Server →
-MQTT), Tesserae shows your panels what `mqtt://...` address to point
-at. Under Docker's default bridge networking, the container has an
-internal IP (`172.18.0.x` or similar) that LAN clients can't reach —
-the broker URL the onboarding wizard would otherwise show is useless
-to your panels.
+Under Docker's default bridge networking, the container has an
+internal IP (`172.18.0.x` or similar) that LAN clients can't reach.
+Tesserae uses that IP in **two** places, and both break with no
+override:
+
+- The **broker URL** the onboarding wizard and Settings → MQTT
+  broker card show your panels to point at — they'd otherwise see
+  `mqtt://172.18.0.x:1883`.
+- The **render-frame URL** Tesserae embeds in every MQTT push so the
+  panel knows where to fetch the PNG / .bin frame from. The panel
+  receives `http://172.18.0.x:8000/renders/...` and times out trying
+  to reach it.
+
+Both flow through the same `detect_local_ip()` lookup, so the same
+env var fixes both at once.
 
 Two ways to fix it:
 
