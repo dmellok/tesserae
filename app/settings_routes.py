@@ -41,7 +41,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
-from app import auth, calibration, device_service
+from app import auth, calibration, device_service, device_timetable
 from app import backup as _backup_mod
 from app import updater as _updater_mod
 from app.calibration import build_calibration_card, target_orientation
@@ -1566,6 +1566,20 @@ def _build_sections() -> list[dict[str, Any]]:
                     url_for("auth.devices_update_quiet_hours", instance_id=device.id)
                     if is_instance
                     else None
+                ),
+                # Per-device rotation view: every Schedule whose target
+                # page binds to this device, sorted by window start.
+                # Pure read view — each row deep-links to the Schedules
+                # editor where the user can actually change it.
+                "timetable_entries": (
+                    device_timetable.timetable_for_device(
+                        device.id,
+                        devices=_devices(),
+                        pages=current_app.config["PAGE_STORE"],
+                        schedules=current_app.config["SCHEDULE_STORE"],
+                    )
+                    if is_instance
+                    else []
                 ),
             }
         )

@@ -263,6 +263,60 @@
   </div>
   {% endif %}
 
+  {% if section.timetable_entries is defined and section.quiet_hours_endpoint %}
+  {# Per-device timetable view — the answer to "what plays on this
+     panel, and when?" Reads off existing Schedules whose target Page
+     binds to this device; each row deep-links back to the Schedules
+     editor where the user actually changes it. No new data model
+     underneath; this is presentation only. #}
+  <div class="device-subsection">
+    <p class="device-subhead">Timetable</p>
+    {% if section.timetable_entries %}
+    <ul class="timetable-list">
+      {% for entry in section.timetable_entries %}
+      <li class="timetable-row {% if not entry.enabled %}is-disabled{% endif %}">
+        <div class="timetable-when">
+          {% if entry.type == 'daily' %}
+            <strong>Daily</strong>
+          {% elif entry.window_start and entry.window_end %}
+            <strong>{{ entry.window_start }} → {{ entry.window_end }}</strong>
+          {% elif entry.window_start %}
+            <strong>from {{ entry.window_start }}</strong>
+          {% else %}
+            <strong>Always</strong>
+          {% endif %}
+          <span class="muted"> · {{ entry.days_label }}</span>
+          {% if entry.interval_minutes %}
+            <span class="muted"> · every {{ entry.interval_minutes }} min</span>
+          {% endif %}
+        </div>
+        <div class="timetable-what">
+          <i class="ph ph-squares-four" aria-hidden="true"></i>
+          <span>{{ entry.page_name }}</span>
+          {% if not entry.enabled %}<span class="pill">disabled</span>{% endif %}
+        </div>
+        <div class="timetable-edit">
+          <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">
+            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+          </a>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="field-help">
+      Schedules whose target dashboard is bound to this device, sorted by window start.
+      Edit any row in the <a href="{{ url_for('schedules.index') }}">Schedules</a> page.
+    </p>
+    {% else %}
+    <p class="field-help">
+      No dashboards are scheduled to play on this device yet.
+      Create a schedule in the <a href="{{ url_for('schedules.index') }}">Schedules</a> page —
+      it'll appear here once it targets a dashboard bound to this device.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# Footer toolbar — secondary + destructive actions on one row,
      separated from the editable sections above by a divider. #}
   {% if section.calibrate_endpoint or section.delete_endpoint %}

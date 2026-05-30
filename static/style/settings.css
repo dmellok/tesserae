@@ -288,6 +288,52 @@
   gap: var(--t-space-4);
 }
 
+/* Rotation timetable — the per-device read view of which schedules
+   target this panel. Three columns at desktop (when, what, edit),
+   stacking under each other on phone. The .is-disabled state dims
+   the row so a turned-off schedule reads as inactive without
+   removing it from the timetable. */
+.timetable-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.timetable-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--t-space-3);
+  padding: 10px var(--t-space-3);
+  border-radius: var(--t-radius-sm, 6px);
+  background: var(--c-surface-2, rgba(0, 0, 0, 0.03));
+}
+.timetable-row.is-disabled {
+  opacity: 0.55;
+}
+.timetable-when {
+  min-width: 0;
+  font-size: var(--t-size-sm);
+}
+.timetable-what {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 500;
+}
+.timetable-what .ph {
+  color: var(--t-accent, currentColor);
+}
+.timetable-edit {
+  text-align: right;
+}
+@media (max-width: 640px) {
+  .timetable-row { grid-template-columns: 1fr; gap: 6px; }
+  .timetable-edit { text-align: left; }
+}
+
 .backup-meta {
   min-width: 0;
   display: grid;
