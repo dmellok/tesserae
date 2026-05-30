@@ -4,7 +4,7 @@ site_url: https://dmellok.github.io/tesserae/
 repo_url: https://github.com/dmellok/tesserae
 repo_name: dmellok/tesserae
 edit_uri: edit/main/docs/
-copyright: MIT-licensed. For tinkerers, not your mum.
+copyright: MIT-licensed. A self-hosted hobby project, built in the open.
 
 # docs/widget-build-prompt.md is an internal batch prompt, not a wiki page.
 exclude_docs: |

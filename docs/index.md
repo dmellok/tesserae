@@ -71,5 +71,3 @@ see [what's tested](compatibility.md#whats-been-tested-on-real-hardware) — but
 the panel matrix is still small, so testers on other displays are very
 welcome, as are contributors:
 [open an issue or PR](https://github.com/dmellok/tesserae).
-
-For tinkerers, not your mum.

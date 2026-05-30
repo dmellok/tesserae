@@ -15,10 +15,10 @@ install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/
 (47 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plugin/) (with AI).
 
-> **For tinkerers, not your mum.** Tesserae is a `docker compose up` or
-> `git clone → tinker` dashboard. Polished admin chrome, but the
-> deployment story still assumes you can read tracebacks. Aimed at
-> hobbyists running a Pi appliance at home.
+> **Self-hosted hobby project.** Tesserae installs with `docker compose up`
+> or a `git clone`. The admin UI is polished, but the deployment story
+> still assumes you can read tracebacks if something goes wrong. Aimed at
+> people running a Pi appliance at home.
 
 <details>
 <summary><b>Screenshots</b> — admin UI &amp; example device frames (click to expand)</summary>
