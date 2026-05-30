@@ -48,6 +48,15 @@ HISTORY_KEEP = 10
 GIT_TIMEOUT_S = 60
 PIP_TIMEOUT_S = 300
 
+
+def _is_windows() -> bool:
+    """Tested-as-a-function so the Windows / POSIX restart branches are
+    monkeypatch-able without mutating the global ``os.name``. Mutating
+    ``os.name`` globally breaks pathlib (``WindowsPath`` cannot be
+    instantiated on POSIX), which surfaces as a pytest ``INTERNALERROR``
+    when the test's failure formatter then tries to construct a Path."""
+    return os.name == "nt"
+
 Channel = str  # "edge" | "stable"
 CHANNELS: tuple[str, ...] = ("edge", "stable")
 
@@ -369,7 +378,7 @@ class Updater:
 
         def _go() -> None:
             logger.info("update: relaunching %s", argv)
-            if os.name == "nt":
+            if _is_windows():
                 env = os.environ.copy()
                 env["TESSERAE_PARENT_PID"] = str(os.getpid())
                 # CREATE_NEW_PROCESS_GROUP: the child ignores any
@@ -487,7 +496,7 @@ def wait_for_parent_exit() -> None:
     deadlock the relaunch — after that we proceed and accept the small
     chance of an ``EADDRINUSE``."""
     parent_pid = os.environ.pop(PARENT_PID_ENV, None)
-    if not parent_pid or os.name != "nt":
+    if not parent_pid or not _is_windows():
         return
     try:
         pid = int(parent_pid)

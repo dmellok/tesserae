@@ -304,7 +304,7 @@ def test_rollback_with_no_history_raises(tmp_path: Path) -> None:
 def test_restart_posix_uses_execv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """On POSIX the kernel hands the listening socket FD to the new
     Python — ``os.execv`` is the right primitive."""
-    monkeypatch.setattr("app.updater.os.name", "posix")
+    monkeypatch.setattr("app.updater._is_windows", lambda: False)
     captured: dict[str, Any] = {}
 
     def fake_execv(executable: str, argv: list[str]) -> None:
@@ -334,7 +334,7 @@ def test_restart_windows_spawns_detached_and_exits(
     and the old process exits via ``os._exit`` so the listening socket
     is released. The parent's PID rides along in ``TESSERAE_PARENT_PID``
     so the child knows whose grave to wait at."""
-    monkeypatch.setattr("app.updater.os.name", "nt")
+    monkeypatch.setattr("app.updater._is_windows", lambda: True)
     popen_calls: list[dict[str, Any]] = []
 
     class _FakePopen:
@@ -379,7 +379,7 @@ def test_wait_for_parent_exit_is_noop_on_posix(monkeypatch: pytest.MonkeyPatch) 
     present, since ctypes.WinDLL would explode on Linux."""
     from app.updater import PARENT_PID_ENV, wait_for_parent_exit
 
-    monkeypatch.setattr("app.updater.os.name", "posix")
+    monkeypatch.setattr("app.updater._is_windows", lambda: False)
     monkeypatch.setenv(PARENT_PID_ENV, "12345")
     wait_for_parent_exit()
     # And the env var should still be consumed so a re-entry doesn't
@@ -394,7 +394,7 @@ def test_wait_for_parent_exit_consumes_env_var(monkeypatch: pytest.MonkeyPatch) 
     *this* process doesn't inherit the relaunch handshake."""
     from app.updater import PARENT_PID_ENV, wait_for_parent_exit
 
-    monkeypatch.setattr("app.updater.os.name", "posix")
+    monkeypatch.setattr("app.updater._is_windows", lambda: False)
     monkeypatch.setenv(PARENT_PID_ENV, "999999")
     wait_for_parent_exit()
     import os as _os

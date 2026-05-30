@@ -180,8 +180,7 @@ def create_app(
     is_watcher = _is_reloader_watcher(dev) and not testing
     if is_watcher:
         logger.info(
-            "dev reloader parent: skipping MQTT/scheduler/telemetry init "
-            "(child process owns those)"
+            "dev reloader parent: skipping MQTT/scheduler/telemetry init (child process owns those)"
         )
     if testing or is_watcher:
         telemetry = _Telemetry.disabled()
