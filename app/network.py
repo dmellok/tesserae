@@ -58,3 +58,48 @@ def detect_base_url(port: int | None = None) -> str:
         env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
         port = int(env_port) if env_port.isdigit() else 8000
     return f"http://{detect_local_ip()}:{port}"
+
+
+def is_docker_bridge_ip(ip: str) -> bool:
+    """True if ``ip`` falls in a Docker bridge address range.
+
+    Docker's default bridge network uses 172.17.0.0/16; user-defined
+    bridges (the kind ``docker compose`` creates per project) typically
+    fall in 172.18.0.0/16 through 172.31.0.0/16 — collectively
+    172.16.0.0/12 by convention. These addresses route between
+    containers but aren't reachable from outside the host without
+    extra setup (host networking, port forwards, macvlan).
+
+    The onboarding wizard + Settings → MQTT broker card use this to
+    flag the case where ``detect_local_ip()`` returned a bridge
+    address that would be useless for LAN clients to connect to —
+    the user needs to set ``TESSERAE_HOST_IP`` to their actual host
+    IP, or switch to ``network_mode: host`` in compose.
+    """
+    if not ip or "." not in ip:
+        return False
+    try:
+        octets = [int(o) for o in ip.split(".")]
+    except ValueError:
+        return False
+    if len(octets) != 4:
+        return False
+    # 172.16.0.0/12 covers 172.16.x.x through 172.31.x.x — the
+    # standard Docker bridge range.
+    return octets[0] == 172 and 16 <= octets[1] <= 31
+
+
+def docker_bridge_ip_warning() -> bool:
+    """True when the admin UI should warn that ``detect_local_ip()``
+    returned a Docker bridge address — i.e. we're running inside the
+    official Docker image, the user hasn't set ``TESSERAE_HOST_IP``,
+    and the auto-detected IP is a bridge address that LAN clients
+    can't reach.
+
+    Centralises the "should we warn?" decision so the onboarding
+    wizard and the settings page produce the same answer."""
+    if not os.environ.get("TESSERAE_IN_DOCKER"):
+        return False
+    if os.environ.get("TESSERAE_HOST_IP", "").strip():
+        return False
+    return is_docker_bridge_ip(detect_local_ip())

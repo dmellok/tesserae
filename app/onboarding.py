@@ -34,7 +34,7 @@ from app import device_service
 from app.device_loader import DeviceRegistry
 from app.discovery import DiscoveryCache
 from app.layouts import LAYOUTS_BY_SLUG, to_panel_pixels
-from app.network import detect_local_ip
+from app.network import detect_local_ip, docker_bridge_ip_warning
 from app.panel import (
     PANEL_PRESET_CHOICES,
     PANEL_PRESETS,
@@ -180,6 +180,11 @@ def step(step: str) -> Response | str:
         # local_ip routes a UDP socket to find this host's LAN IP (no
         # packets sent); honours TESSERAE_HOST_IP.
         ctx["builtin_url"] = f"mqtt://{detect_local_ip()}:{port}"
+        # Under the Docker image with bridge networking, ``detect_local_ip``
+        # returns the container's bridge address (172.18.0.x or similar)
+        # — useless for LAN panels. Flag it so the wizard can show a hint
+        # about ``TESSERAE_HOST_IP`` / host networking.
+        ctx["builtin_url_is_bridge"] = docker_bridge_ip_warning()
     elif step == "device":
         # ``panel`` rides along on each kind so the form's preset
         # selector can auto-sync to the kind's declared size when the

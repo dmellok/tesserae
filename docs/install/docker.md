@@ -104,6 +104,40 @@ services:
 Then set the broker host to `mosquitto` in Tesserae's settings (the
 service name is the resolvable hostname inside the compose network).
 
+## The built-in broker URL: `TESSERAE_HOST_IP`
+
+If you're using the **built-in MQTT broker** (Settings → Server →
+MQTT), Tesserae shows your panels what `mqtt://...` address to point
+at. Under Docker's default bridge networking, the container has an
+internal IP (`172.18.0.x` or similar) that LAN clients can't reach —
+the broker URL the onboarding wizard would otherwise show is useless
+to your panels.
+
+Two ways to fix it:
+
+### Set `TESSERAE_HOST_IP` (simplest)
+
+Find your Docker host's LAN IP (typically what `ip addr show eth0` or
+`hostname -I` prints), then set it in `docker-compose.yml`:
+
+```yaml
+services:
+  tesserae:
+    environment:
+      TESSERAE_IN_DOCKER: "1"
+      TESSERAE_HOST_IP: "192.168.1.50"   # your host's actual LAN IP
+```
+
+`docker compose up -d` after editing. The onboarding wizard's broker
+URL and the Settings → MQTT broker card now show the right address.
+
+### Or use host networking
+
+`network_mode: host` shares the host's network namespace with the
+container, so `detect_local_ip()` returns the host's real LAN IP
+automatically — no env var needed. Also fixes the mDNS issue below.
+See the section below.
+
 ## mDNS / tesserae.local
 
 The mDNS advertiser needs **host networking** to announce

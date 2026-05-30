@@ -50,7 +50,16 @@
         <div class="field">
           <label>Point your clients at</label>
           <p class="wizard-broker-url"><code>{{ builtin_url }}</code></p>
+          {% if builtin_url_is_bridge %}
+          <p class="field-help wizard-broker-warning"><strong>That's a Docker bridge address — your panels won't reach it.</strong> Set <code>TESSERAE_HOST_IP</code> to your Docker host's LAN IP in your <code>docker-compose.yml</code>:
+          <br><br>
+          <code>environment:</code><br>
+          &nbsp;&nbsp;<code>TESSERAE_HOST_IP: "192.168.1.50"</code> &nbsp;<em>(your host's actual LAN IP)</em>
+          <br><br>
+          Then <code>docker compose up -d</code>. The alternative is <code>network_mode: host</code> in compose, which exposes the broker on the LAN directly. See <a href="https://dmellok.github.io/tesserae/install/docker/">the Docker install docs</a>.</p>
+          {% else %}
           <p class="field-help">The built-in broker binds all interfaces on port {{ builtin_port }}, so your Pi / ESP32 clients connect to this address. Set a username + password below to lock it down on your network.</p>
+          {% endif %}
           <p class="field-help"><strong>MQTT v3.1.1 only.</strong> Tesserae's own clients are fine (they speak 3.1.1), but external tools — MQTT Explorer, Home Assistant, Node-RED — default to v5 and will fail to connect. Either set their protocol version to 3.1.1, or install Mosquitto and point the External broker fields at it instead.</p>
         </div>
         {{ text_input('builtin-user', 'builtin_username', 'Username (optional)', value=broker.get('embedded_username', '')) }}

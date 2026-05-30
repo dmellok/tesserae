@@ -37,3 +37,11 @@ services:
       # hides the in-app self-update card (use `docker compose pull`
       # instead). Listed here so it's discoverable.
       TESSERAE_IN_DOCKER: "1"
+      # **Important if you're using the built-in MQTT broker.** Docker
+      # bridge networking assigns this container an internal IP
+      # (172.x.x.x) that your Pi / ESP32 panels can't reach. Set this
+      # to your Docker host's actual LAN IP so the onboarding wizard
+      # and Settings → MQTT broker page show the right `mqtt://` URL
+      # for your panels to point at. Replace with your real host IP
+      # before `docker compose up -d`.
+      # TESSERAE_HOST_IP: "192.168.1.50"

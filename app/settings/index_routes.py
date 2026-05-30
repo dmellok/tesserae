@@ -20,7 +20,7 @@ from app import backup as _backup_mod
 from app import device_timetable
 from app import updater as _updater_mod
 from app.device_loader import Device
-from app.network import detect_local_ip
+from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
 from app.state.settings_store import SECRET_MASK
 
@@ -434,7 +434,12 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
     broker config. For the built-in broker a 0.0.0.0 bind resolves to the
     host's LAN IP (what other machines actually connect to) and a loopback
     bind stays 127.0.0.1; for an external broker it's the configured
-    host:port. Returns ``—`` when no external host is set."""
+    host:port. Returns ``—`` when no external host is set.
+
+    Suffixes a hint when the resolved address is a Docker bridge — that
+    means we're running inside the official Docker image, the user hasn't
+    set ``TESSERAE_HOST_IP``, and the URL would be useless to clients on
+    the LAN. Surfaces the same warning the onboarding wizard shows."""
     if _truthy_setting(raw.get("embedded_enabled")):
         bind = str(raw.get("embedded_bind") or "127.0.0.1").strip() or "127.0.0.1"
         port = raw.get("embedded_port") or 1883
@@ -449,7 +454,10 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
         port = raw.get("port") or 1883
         if not host:
             return "—"
-    return f"mqtt://{host}:{port}"
+    url = f"mqtt://{host}:{port}"
+    if docker_bridge_ip_warning() and is_docker_bridge_ip(host):
+        url += " — set TESSERAE_HOST_IP"
+    return url
 
 
 def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:
