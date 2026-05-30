@@ -164,6 +164,19 @@ def update_instance_panel(
     if o not in ("landscape", "landscape_flipped", "portrait", "portrait_flipped"):
         o = "landscape"
 
+    # Normalise so portrait → tall canvas, landscape → wide, regardless
+    # of which dims the form happened to submit. The settings page has
+    # client-side JS that swaps w/h when the orientation dropdown moves
+    # between portrait and landscape variants, but a hand-crafted POST
+    # (or the JS not having fired before submit) can land here with a
+    # mismatch. The renderers derive the rotation from ``panel.w <
+    # panel.h``, so a mismatch silently keeps the panel rendering at
+    # the wrong orientation — exactly the bug the user hits when
+    # "even after setting rotation" the frame stays landscape.
+    is_portrait = o.startswith("portrait")
+    if (is_portrait and w > h) or (not is_portrait and h > w):
+        w, h = h, w
+
     inst_file = device.path
     try:
         raw = json.loads(inst_file.read_text(encoding="utf-8"))

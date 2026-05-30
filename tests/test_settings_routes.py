@@ -420,13 +420,17 @@ def test_update_panel_changes_instance_dims(app_with_gate: Flask, tmp_path: Path
     assert resp.status_code == 302
     dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
     assert dev is not None and dev.panel is not None
-    assert (dev.panel["w"], dev.panel["h"]) == (600, 448)
+    # 600×448 was landscape; portrait orientation triggers a server-side
+    # swap so the stored canvas is tall (renderers derive rotation from
+    # ``panel.w < panel.h``).
+    assert (dev.panel["w"], dev.panel["h"]) == (448, 600)
     assert dev.panel["orientation"] == "portrait"
     # Persisted to disk.
     import json as _json
 
     saved = _json.loads((tmp_path / "devices" / "esp32_lab.json").read_text())
-    assert saved["panel"]["w"] == 600
+    assert saved["panel"]["w"] == 448
+    assert saved["panel"]["h"] == 600
     assert saved["panel"]["orientation"] == "portrait"
 
 
@@ -486,7 +490,8 @@ def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
     assert resp.status_code == 302
     dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
     assert dev is not None and dev.panel is not None
-    assert (dev.panel["w"], dev.panel["h"]) == (600, 448)
+    # 600×448 was landscape; portrait orientation normalises to tall.
+    assert (dev.panel["w"], dev.panel["h"]) == (448, 600)
     assert dev.panel["orientation"] == "portrait"
     qh = dev.manifest.get("quiet_hours")
     assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}

@@ -388,8 +388,17 @@
   </div>
   {% endif %}
 
-  {# Footer toolbar — secondary + destructive actions on one row,
-     separated from the editable sections above by a divider. #}
+  {% if section.kind == 'device' %}
+    </div>
+  </details>
+  {% endif %}
+
+  {# Footer toolbar — Calibrate + Delete on one row, OUTSIDE the
+     collapsible <details> for device cards so a setup-time action
+     like Calibrate isn't hidden behind the Configure toggle. Stays
+     within the .card so it still reads as part of the device.
+     Renders for any section that has either endpoint (non-device
+     sections like renderers won't, so the block is skipped). #}
   {% if section.calibrate_endpoint or section.delete_endpoint %}
   <div class="device-footer">
     {% if section.calibrate_endpoint %}
@@ -427,10 +436,6 @@
     </form>
     {% endif %}
   </div>
-  {% endif %}
-  {% if section.kind == 'device' %}
-    </div>
-  </details>
   {% endif %}
 </section>
 {% endfor %}
@@ -819,9 +824,16 @@ docker compose up -d</code></pre>
   // swaps the width/height inputs live so the form stays WYSIWYG. The
   // upside-down variants share an aspect, so toggling normal↔flipped
   // within the same aspect must NOT swap dims.
+  //
+  // Selector matches both ``.device-combined-form`` (the per-device card
+  // form on Settings → Devices) and ``.add-device-form`` (the
+  // Add-device form at the top of the same page). ``.device-panel-form``
+  // is the legacy class name kept for any third-party admin templates.
   (function () {
     const isPortrait = (v) => v.indexOf('portrait') === 0;
-    document.querySelectorAll('.device-panel-form').forEach(function (form) {
+    document.querySelectorAll(
+      '.device-combined-form, .device-panel-form, .add-device-form'
+    ).forEach(function (form) {
       const orient = form.querySelector('select[name="panel_orientation"]');
       const w = form.querySelector('input[name="panel_w"]');
       const h = form.querySelector('input[name="panel_h"]');

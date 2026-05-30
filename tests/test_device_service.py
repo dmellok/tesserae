@@ -245,7 +245,15 @@ def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
     assert not dup.ok  # id already in use
 
 
-def test_update_panel_stores_dims_verbatim(registries) -> None:
+def test_update_panel_normalises_dims_to_orientation(registries) -> None:
+    """``update_instance_panel`` swaps w/h to match the chosen orientation
+    when they're inconsistent — portrait must end up tall, landscape
+    wide. The renderers derive rotation from ``panel.w < panel.h``, so
+    a mismatch silently keeps the panel rendering at the wrong
+    orientation. The settings page's client-side JS swaps the form's
+    visible inputs when the orientation dropdown changes; this is the
+    server-side belt + suspenders for hand-crafted POSTs or when the
+    JS hasn't fired before submit."""
     devices, renderers, data_root = registries
     device_service.create_instance(
         devices=devices,
@@ -254,6 +262,8 @@ def test_update_panel_stores_dims_verbatim(registries) -> None:
         instance_id="esp32_lab",
         kind_id="esp32_client",
     )
+    # Landscape dims (600 > 448) with a portrait orientation: server
+    # swaps them so the stored canvas is tall.
     result = device_service.update_instance_panel(
         devices=devices,
         renderers=renderers,
@@ -264,12 +274,36 @@ def test_update_panel_stores_dims_verbatim(registries) -> None:
         orientation="portrait",
     )
     assert result.ok and result.device is not None
-    # update stores exactly what's given — no swap (the form's JS already
-    # swapped the displayed inputs).
-    assert (result.device.panel["w"], result.device.panel["h"]) == (600, 448)
+    assert (result.device.panel["w"], result.device.panel["h"]) == (448, 600)
     assert result.device.panel["orientation"] == "portrait"
     saved = json.loads((data_root / "esp32_lab.json").read_text())
-    assert saved["panel"]["w"] == 600
+    assert saved["panel"]["w"] == 448
+    assert saved["panel"]["h"] == 600
+
+
+def test_update_panel_leaves_dims_when_already_consistent(registries) -> None:
+    """When the submitted dims already match the orientation aspect
+    (portrait + tall, or landscape + wide), the swap is a no-op."""
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        kind_id="esp32_client",
+    )
+    # Portrait dims (448 < 600) + portrait orientation — no swap.
+    result = device_service.update_instance_panel(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_lab",
+        w=448,
+        h=600,
+        orientation="portrait",
+    )
+    assert result.ok and result.device is not None
+    assert (result.device.panel["w"], result.device.panel["h"]) == (448, 600)
 
 
 def test_update_panel_persists_gamut_and_clamps_unknown(registries) -> None:
