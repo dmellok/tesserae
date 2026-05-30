@@ -15,6 +15,28 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
 hardware compatibility, and how to build a widget (with AI).
 
+## See it in action
+
+Two short screen recordings, both auto-generated from `scripts/record_*.py`
+(headed Playwright + a custom in-page cursor — see those scripts for the
+mechanism, or to re-record after a UI change).
+
+### First-run onboarding
+
+Set the admin password, point at a broker (built-in or your own), register
+the panel with its dimensions, push a starter dashboard, opt in to
+anonymous telemetry. ~1 min.
+
+<video src="docs/assets/videos/onboarding.mp4" controls width="100%"></video>
+
+### Building a dashboard
+
+Pick a layout preset, fill cells with widgets, then use the custom-layout
+editor to split a cell and drop in a third widget. Live preview updates
+as you go. ~1 min.
+
+<video src="docs/assets/videos/dashboard.mp4" controls width="100%"></video>
+
 ## Screenshots
 
 Compose in the browser — pick widgets, a theme, and which display(s) each
