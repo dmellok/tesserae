@@ -42,7 +42,7 @@ from flask import (
 )
 from werkzeug.wrappers import Response
 
-from app import auth, calibration, device_service, device_timetable
+from app import auth, calibration, device_service, device_timetable, renderer_loader
 from app import backup as _backup_mod
 from app import updater as _updater_mod
 from app.calibration import build_calibration_card, target_orientation
@@ -928,7 +928,10 @@ def settings_update(section_kind: str) -> Response:
         renderer = _renderers().get(rid)
         if renderer is None:
             return Response(f"unknown renderer {rid!r}", status=404)
-        fields = list(renderer.manifest.get("settings", []))
+        # device_setting fields belong on the device card, not the
+        # renderer card. Filter them here too so a hand-crafted POST
+        # to the renderer endpoint can't override per-device tuning.
+        fields = [f for f in renderer.manifest.get("settings", []) if not f.get("device_setting")]
         values = _values_from_form(fields)
         settings_store.update_for_namespace("renderers", rid, values, fields)
         # Per-renderer Enabled toggle lives outside the manifest, so it's
@@ -1064,6 +1067,11 @@ def devices_add() -> Response:
     if not result.ok or result.device is None:
         flash(result.error or "Failed to add device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    # New device's clones inherit picture-quality (dither/saturation/
+    # contrast) from the user's existing base-renderer values where
+    # available, so a freshly-added device matches the rest of the
+    # fleet rather than dropping back to the manifest defaults.
+    renderer_loader.seed_device_settings_from_base(_renderers(), _settings())
     _rebuild_transport_fn()()
     flash(f"Added device {result.device.name!r}.", "ok")
     return redirect(
@@ -1124,6 +1132,8 @@ def devices_register_discovered(discovered_id: str) -> Response:
         flash(result.error or "Failed to register device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
     cache.forget(discovered_id)
+    # Same picture-quality seeding as the manual add-device path.
+    renderer_loader.seed_device_settings_from_base(_renderers(), _settings())
     _rebuild_transport_fn()()
     flash(f"Registered discovered device {result.device.name!r}.", "ok")
     return redirect(
@@ -1294,7 +1304,46 @@ def devices_update_combined(instance_id: str) -> Response:
                 ok_messages.append("config saved (publish failed)")
             any_change = True
 
-    # 2. Panel (orientation + dims + gamut + icon + underscan).
+    # 2. Picture-quality fields per renderer clone. Inputs are named
+    # ``<clone_id>:<field>`` so a device with multiple renderers can
+    # surface the same field name (e.g. "saturation") for each without
+    # collision. Bucket by clone_id, then write each bucket to its
+    # clone's renderer-settings namespace.
+    pq_buckets: dict[str, dict[str, Any]] = {}
+    for raw_key in form:
+        if ":" not in raw_key:
+            continue
+        clone_id, _, field_name = raw_key.partition(":")
+        if "__" not in clone_id or not field_name:
+            continue
+        pq_buckets.setdefault(clone_id, {})[field_name] = form.get(raw_key)
+    if pq_buckets:
+        renderers_registry = _renderers()
+        pq_changed = False
+        for clone_id, raw_values in pq_buckets.items():
+            clone = renderers_registry.get(clone_id)
+            if clone is None:
+                continue
+            # Clone id is ``<base>__<instance>``; refuse cross-device
+            # writes rather than letting one card poke another's clone.
+            if clone_id.split("__", 1)[1] != instance_id:
+                continue
+            dev_fields = [f for f in clone.manifest.get("settings", []) if f.get("device_setting")]
+            if not dev_fields:
+                continue
+            coerced: dict[str, Any] = {}
+            for field in dev_fields:
+                name = str(field["name"])
+                if name in raw_values:
+                    coerced[name] = _coerce_form_value(field, raw_values[name])
+            if coerced:
+                settings_store.update_for_namespace("renderers", clone_id, coerced, dev_fields)
+                pq_changed = True
+        if pq_changed:
+            ok_messages.append("picture quality saved")
+            any_change = True
+
+    # 3. Panel (orientation + dims + gamut + icon + underscan).
     if "panel_w" in form or "panel_h" in form:
         try:
             new_w = int(form.get("panel_w") or 0)
@@ -1639,18 +1688,30 @@ def _build_sections() -> list[dict[str, Any]]:
         # (see renderer_loader.clone_for_instances).
         if "__" in renderer.id:
             continue
-        fields = list(renderer.manifest.get("settings", []))
+        # Renderer-wide fields only. Fields flagged ``device_setting:
+        # true`` (e.g. pi_bin's dither/saturation/contrast) live on the
+        # device card instead so each panel can be tuned independently.
+        all_fields = list(renderer.manifest.get("settings", []))
+        fields = [f for f in all_fields if not f.get("device_setting")]
+        has_device_fields = len(fields) != len(all_fields)
         sid = f"renderer-{renderer.id}"
         rid = renderer.id
         is_enabled = enabled_map.get(rid)
         if is_enabled is None:
             is_enabled = True
+        blurb = renderer.manifest.get("description") or ""
+        if has_device_fields:
+            blurb = (
+                (blurb + " " if blurb else "")
+                + "Picture-quality settings (dither / saturation / contrast) "
+                + "are per-device — set them under Settings → Devices."
+            ).strip()
         sections.append(
             {
                 "id": sid,
                 "kind": "renderer",
                 "title": f"Renderer: {renderer.name}",
-                "blurb": renderer.manifest.get("description") or "",
+                "blurb": blurb,
                 "fields": fields,
                 "state": _render_for_admin("renderers", renderer.id, fields),
                 "endpoint": url_for("auth.settings_update", section_kind=sid),
@@ -1674,6 +1735,31 @@ def _build_sections() -> list[dict[str, Any]]:
         sid = f"device-{device.id}"
         fields = _config_fields_from_schema(device.config_schema)
         is_instance = device.kind_of is not None
+        # Picture-quality (dither / saturation / contrast) lives on the
+        # clone renderer keyed ``<base_id>__<device_id>`` — one clone
+        # per renderer the device's kind consumes. Surface each clone's
+        # device_setting-flagged fields as a "Picture quality" subsection;
+        # the template renders them inside the combined form with the
+        # name pattern ``<clone_id>:<field_name>`` so the save handler
+        # can route each value back to the right clone's namespace.
+        picture_quality: list[dict[str, Any]] = []
+        if is_instance:
+            for clone in _renderers().for_device(device.id):
+                dev_fields = [
+                    f for f in clone.manifest.get("settings", []) if f.get("device_setting")
+                ]
+                if not dev_fields:
+                    continue
+                base_id = clone.id.split("__", 1)[0]
+                picture_quality.append(
+                    {
+                        "clone_id": clone.id,
+                        "base_id": base_id,
+                        "base_name": clone.name.split(" (", 1)[0],
+                        "fields": dev_fields,
+                        "state": settings_store.get_for_runtime("renderers", clone.id, dev_fields),
+                    }
+                )
         sections.append(
             {
                 "id": sid,
@@ -1738,6 +1824,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 # manifest so the form can preselect the user's
                 # current setting; ``quiet_hours_endpoint`` is None on
                 # kinds (only instances can override).
+                "picture_quality": picture_quality,
                 "quiet_hours": (device.manifest.get("quiet_hours") or {} if is_instance else {}),
                 "quiet_hours_endpoint": (
                     url_for("auth.devices_update_quiet_hours", instance_id=device.id)

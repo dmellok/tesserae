@@ -131,8 +131,13 @@ def create_app(
     # Multi-head: for each user-created device instance, clone the
     # renderers of its kind with the instance's id substituted into
     # the topic pattern. After this, each physical device has its own
-    # MQTT topics even when it inherits from a shared kind.
+    # MQTT topics even when it inherits from a shared kind. The seed
+    # call carries legacy renderer-wide values for ``device_setting``
+    # fields (dither/saturation/contrast) into the clone if it hasn't
+    # been tuned yet — keeps upgrades invisible and gives new devices
+    # the same defaults as the rest of the fleet.
     renderer_loader.clone_for_instances(renderers, devices)
+    renderer_loader.seed_device_settings_from_base(renderers, settings)
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")

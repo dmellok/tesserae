@@ -66,6 +66,70 @@ def test_topic_substitution(tmp_path: Path, schema_path: Path) -> None:
     assert renderer.topic == "tesserae/esp32/frame/bin"
 
 
+def test_seed_device_settings_copies_base_to_empty_clones(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    """Picture-quality (``device_setting: true``) fields used to live on
+    the renderer card. ``seed_device_settings_from_base`` carries any
+    legacy renderer-wide value forward into the per-device clone if the
+    clone hasn't been tuned yet — so upgrading is invisible and a newly-
+    added device matches the rest of the fleet."""
+    from app.state.settings_store import SettingsStore
+
+    plugins_dir = tmp_path / "renderers"
+    plugins_dir.mkdir()
+    manifest = {
+        "device": "pi_bin",
+        "settings": [
+            {
+                "name": "saturation",
+                "type": "slider",
+                "label": "Sat",
+                "default": 1.4,
+                "device_setting": True,
+            },
+            # A renderer-wide field that should NOT be touched by the seed.
+            {"name": "topic_prefix", "type": "text", "label": "Pfx", "default": "x"},
+        ],
+    }
+    _write_renderer(plugins_dir, "pi_bin", manifest, _VALID_BODY)
+    registry = renderer_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+
+    # Mint a clone manually (clone_for_instances needs a device registry;
+    # for this unit test the synthetic clone is enough).
+    base = registry.get("pi_bin")
+    assert base is not None
+    cloned_manifest = dict(base.manifest)
+    cloned_manifest["device"] = "kitchen"
+    cloned_manifest["name"] = f"{base.name} (kitchen)"
+    registry.renderers["pi_bin__kitchen"] = renderer_loader.Renderer(
+        id="pi_bin__kitchen",
+        path=base.path,
+        manifest=cloned_manifest,
+        module=base.module,
+        data_dir=base.data_dir,
+    )
+
+    # Seed the base with the legacy renderer-wide saturation value.
+    store = SettingsStore(tmp_path / "settings.json")
+    store.update_for_namespace("renderers", "pi_bin", {"saturation": 1.7}, manifest["settings"])
+
+    renderer_loader.seed_device_settings_from_base(registry, store)
+
+    clone_saved = store.get_for_runtime("renderers", "pi_bin__kitchen", manifest["settings"])
+    assert clone_saved["saturation"] == 1.7
+
+    # Idempotent: running again doesn't blow away clone-level changes.
+    store.update_for_namespace(
+        "renderers", "pi_bin__kitchen", {"saturation": 2.0}, manifest["settings"]
+    )
+    renderer_loader.seed_device_settings_from_base(registry, store)
+    re_read = store.get_for_runtime("renderers", "pi_bin__kitchen", manifest["settings"])
+    assert re_read["saturation"] == 2.0
+
+
 def test_for_device_filters(tmp_path: Path, schema_path: Path) -> None:
     plugins_dir = tmp_path / "renderers"
     plugins_dir.mkdir()

@@ -196,6 +196,25 @@
     </div>
     {% endif %}
 
+    {% for pq in section.picture_quality %}
+    {# Picture quality — fields the renderer manifest flagged as
+       ``device_setting: true`` (e.g. pi_bin's dither/saturation/contrast).
+       Each clone targeting this device gets its own block; the field
+       names are namespaced ``<clone_id>:<field>`` so the combined-save
+       handler can route values back to the right clone's settings. #}
+    <div class="device-subsection">
+      <p class="device-subhead">Picture quality{% if section.picture_quality|length > 1 %} — {{ pq.base_name }}{% endif %}</p>
+      {% for field in pq.fields %}
+        {% set value = pq.state.get(field.name, field.get('default', '')) %}
+        {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
+        {# Override the form name with the namespaced ``clone_id:field``
+           form so the save handler can route. auto_field passes the
+           name through unchanged via its ``name`` arg. #}
+        {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+      {% endfor %}
+    </div>
+    {% endfor %}
+
     {% if section.panel %}
     {# Panel edit — orientation + dims for a registered instance.
        The JS below swaps w/h live when the aspect (landscape↔portrait)

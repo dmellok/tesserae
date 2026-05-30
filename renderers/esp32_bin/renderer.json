@@ -15,6 +15,7 @@
       "type": "select",
       "label": "Dither mode",
       "default": "floyd-steinberg",
+      "device_setting": true,
       "choices": [
         { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
         { "value": "atkinson", "label": "Atkinson (contrasty, clean solids)" },
@@ -33,7 +34,8 @@
       "default": 1.0,
       "min": 0,
       "max": 3,
-      "step": 0.05
+      "step": 0.05,
+      "device_setting": true
     },
     {
       "name": "contrast",
@@ -42,7 +44,8 @@
       "default": 1.0,
       "min": 0,
       "max": 3,
-      "step": 0.05
+      "step": 0.05,
+      "device_setting": true
     }
   ]
 }

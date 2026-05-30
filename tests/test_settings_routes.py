@@ -289,7 +289,10 @@ def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
     assert saved["rotate"] == 2
     assert saved["scale"] == "fill"
     assert saved["bg"] == "black"
-    assert saved["saturation"] == 0.8
+    # ``saturation`` is now flagged ``device_setting: true`` and lives
+    # on the device card, not the renderer card. The renderer endpoint
+    # ignores it — get_for_runtime returns the manifest default.
+    assert saved["saturation"] == 0.5
 
 
 def test_add_device_instance_creates_clone(app_with_gate: Flask, tmp_path: Path) -> None:
@@ -484,6 +487,108 @@ def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
     assert dev.panel["orientation"] == "portrait"
     qh = dev.manifest.get("quiet_hours")
     assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
+
+
+def test_renderer_card_hides_device_settings(app_with_gate: Flask) -> None:
+    """Fields flagged ``device_setting: true`` (e.g. pi_bin's
+    dither/saturation/contrast) belong on the device card. The renderer
+    card must drop them — and surface a hint in the blurb that picture
+    quality lives under Devices."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/settings/renderers").get_data(as_text=True)
+    # The renderer's id appears (the card itself is there)…
+    assert "renderer-pi_bin" in body
+    # …but its device-flagged fields are NOT rendered as form inputs on
+    # this card. The exact ``name="dither"`` attribute is the smoking gun.
+    assert 'name="dither"' not in body
+    assert 'name="saturation"' not in body
+    assert 'name="contrast"' not in body
+    # And there's a hint pointing the user at the Devices tab.
+    assert "Picture-quality" in body
+
+
+def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
+    """Adding a device kind that consumes pi_bin gets a Picture quality
+    subsection on its card with the dither/saturation/contrast fields
+    namespaced as ``<clone_id>:<field>`` so the combined-save handler
+    can route them to the right clone's settings."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "pi_lab", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
+    )
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "Picture quality" in body
+    # Namespaced field names. Clone id is ``pi_bin__pi_lab``.
+    assert 'name="pi_bin__pi_lab:dither"' in body
+    assert 'name="pi_bin__pi_lab:saturation"' in body
+    assert 'name="pi_bin__pi_lab:contrast"' in body
+
+
+def test_combined_save_persists_picture_quality_on_clone(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """Picture-quality submitted through the combined save handler
+    lands in the *clone's* renderer-settings namespace
+    (``renderers.pi_bin__<id>``), not on the base renderer. The base
+    keeps whatever it had — devices override independently."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "pi_lab", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
+    )
+    resp = client.post(
+        "/settings/devices/pi_lab/save",
+        data={
+            "pi_bin__pi_lab:dither": "atkinson",
+            "pi_bin__pi_lab:saturation": "1.8",
+            "pi_bin__pi_lab:contrast": "1.1",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    store = SettingsStore(tmp_path / "core" / "settings.json")
+    pi_bin = app_with_gate.config["RENDERER_REGISTRY"].get("pi_bin")
+    clone = app_with_gate.config["RENDERER_REGISTRY"].get("pi_bin__pi_lab")
+    assert clone is not None
+    saved = store.get_for_runtime("renderers", "pi_bin__pi_lab", clone.manifest["settings"])
+    assert saved["dither"] == "atkinson"
+    assert saved["saturation"] == 1.8
+    assert saved["contrast"] == 1.1
+    # Base untouched.
+    base_saved = store.get_for_runtime("renderers", "pi_bin", pi_bin.manifest["settings"])
+    assert base_saved["dither"] == "floyd-steinberg"  # manifest default
+
+
+def test_combined_save_refuses_picture_quality_for_other_devices(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """An attempt to write to another device's clone (``<base>__<other>``)
+    through this device's save endpoint is silently dropped — the card
+    is only the source of truth for its own clones."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "pi_lab", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
+    )
+    client.post(
+        "/settings/devices/add",
+        data={"id": "pi_kitchen", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
+    )
+    # POST to pi_lab's endpoint but try to write to pi_kitchen's clone.
+    client.post(
+        "/settings/devices/pi_lab/save",
+        data={"pi_bin__pi_kitchen:saturation": "2.9"},
+    )
+    store = SettingsStore(tmp_path / "core" / "settings.json")
+    clone = app_with_gate.config["RENDERER_REGISTRY"].get("pi_bin__pi_kitchen")
+    assert clone is not None
+    saved = store.get_for_runtime("renderers", "pi_bin__pi_kitchen", clone.manifest["settings"])
+    assert saved["saturation"] != 2.9
 
 
 def test_combined_save_skips_subsections_with_no_fields(app_with_gate: Flask) -> None:

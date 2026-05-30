@@ -175,6 +175,49 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
             )
 
 
+def seed_device_settings_from_base(renderers: RendererRegistry, settings_store: Any) -> None:
+    """Carry forward legacy renderer-wide values for ``device_setting``
+    fields into each clone that hasn't been tuned yet.
+
+    Picture-quality fields (dither / saturation / contrast) used to be
+    edited renderer-wide on the Renderers tab; they're now per-device.
+    A user upgrading mid-flight has, say, ``renderers.pi_bin.saturation
+    = 1.6`` on disk but no clone-level value, and the Devices tab would
+    otherwise show the manifest default (1.4). One-shot seed each clone
+    that has no stored value yet so the upgrade is invisible — and the
+    same path gives newly-added devices the same defaults as the rest
+    of the fleet rather than a fresh manifest default.
+
+    Idempotent: a clone with an explicit user-tuned value is left alone.
+    Safe to call after every ``clone_for_instances``."""
+    if not callable(getattr(settings_store, "get_section", None)):
+        return
+    renderers_section = settings_store.get_section("renderers")
+    if not isinstance(renderers_section, dict):
+        return
+    for clone_id, clone in list(renderers.renderers.items()):
+        if "__" not in clone_id:
+            continue
+        base_id = clone_id.split("__", 1)[0]
+        base = renderers.get(base_id)
+        if base is None:
+            continue
+        dev_fields = [f for f in clone.manifest.get("settings", []) if f.get("device_setting")]
+        if not dev_fields:
+            continue
+        clone_values = renderers_section.get(clone_id) or {}
+        base_values = renderers_section.get(base_id) or {}
+        seed: dict[str, Any] = {}
+        for dev_field in dev_fields:
+            name = str(dev_field["name"])
+            if name in clone_values:
+                continue  # already tuned per-device
+            if name in base_values:
+                seed[name] = base_values[name]
+        if seed:
+            settings_store.update_for_namespace("renderers", clone_id, seed, dev_fields)
+
+
 def _load_schema(schema_path: Path) -> dict[str, Any]:
     raw = json.loads(schema_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
