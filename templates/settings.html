@@ -478,6 +478,36 @@
       </div>
     </form>
   </section>
+
+  <section class="card">
+    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP — Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
+
+    <p>
+      Status: {% if system_webhook_token_set %}
+        <span class="pill is-ok">token set</span>
+        <span class="muted">— masked in Settings → Server → App. Regenerate below to mint a new one.</span>
+      {% else %}
+        <span class="pill">no token</span>
+        <span class="muted">— generate one below, or paste your own into Settings → Server → App.</span>
+      {% endif %}
+    </p>
+
+    <details>
+      <summary>Example call</summary>
+      <pre class="code-snippet"><code>curl -X POST https://your-tesserae/api/v1/push \
+  -H "Authorization: Bearer &lt;your-token&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{"page_id": "hallway"}'</code></pre>
+      <p class="field-help"><code>device_ids</code> (optional array) restricts the fan-out; omit to push to every device the page is bound to. Quiet hours apply — a call hitting all-quiet devices returns 202 with <code>status: "quiet"</code>.</p>
+    </details>
+
+    <form method="post" action="{{ url_for('auth.system_webhook_regenerate') }}" class="form" onsubmit="return confirm('Generate a new token? Any automation using the old token will stop working.');">
+      <p class="field-help">Mints a fresh random token and shows it in plaintext one time so you can copy it. After the page reload it's masked like any other secret.</p>
+      <div class="actions">
+        {{ button('Regenerate token', icon='arrows-clockwise') }}
+      </div>
+    </form>
+  </section>
 </div>
 {% endif %}
 

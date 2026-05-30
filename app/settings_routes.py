@@ -177,6 +177,20 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "webhook_token",
+        "type": "text",
+        "label": "Webhook token",
+        "default": "",
+        "secret": True,
+        "help": (
+            "Bearer token for the POST /api/v1/push webhook endpoint. "
+            "Leave blank to disable webhooks entirely. Use the "
+            "'Regenerate' action in Settings → System to mint a fresh "
+            "random token; paste your own here if you want a specific "
+            "value (e.g. matching what your automation tool already has)."
+        ),
+    },
+    {
         "name": "telemetry_enabled",
         "type": "switch",
         "label": "Send anonymous usage telemetry",
@@ -558,6 +572,7 @@ def settings_area(area: str) -> str | Response:
     system_backups: list[Any] = []
     system_telemetry_enabled = False
     system_telemetry_host = ""
+    system_webhook_token_set = False
     if area == "system":
         updater = current_app.config["UPDATER"]
         try:
@@ -572,6 +587,15 @@ def settings_area(area: str) -> str | Response:
             system_telemetry_enabled = telemetry.enabled
             # endpoint is empty when disabled; surface host as a hint either way.
             system_telemetry_host = telemetry._cfg.host
+        # Surface only whether a webhook token is set — never the value
+        # itself — so a screenshot of Settings → System doesn't leak it.
+        # The disk key is ``webhook_token_secret`` (``_secret`` suffix
+        # is the convention for masked fields); ``get_section`` returns
+        # raw on-disk keys so we look up the suffixed form here.
+        _app_raw = _settings().get_section("app")
+        system_webhook_token_set = bool(
+            (_app_raw.get("webhook_token_secret") or _app_raw.get("webhook_token") or "").strip()
+        )
 
     return render_template(
         "settings.html",
@@ -593,6 +617,7 @@ def settings_area(area: str) -> str | Response:
         system_dev_mode=bool(current_app.debug),
         system_telemetry_enabled=system_telemetry_enabled,
         system_telemetry_host=system_telemetry_host,
+        system_webhook_token_set=system_webhook_token_set,
     )
 
 
@@ -791,6 +816,22 @@ def system_backup_delete(backup_id: str) -> Response:
         flash(f"Deleted backup {backup_id}.", "ok")
     else:
         flash(f"No backup named {backup_id}.", "error")
+    return _system_redirect()
+
+
+@bp.post("/settings/system/webhook/regenerate")
+def system_webhook_regenerate() -> Response:
+    """Mint a fresh random webhook token and persist it. Flashed once
+    in plaintext so the user can copy it — after the page reload the
+    Settings UI masks it like any other ``_secret`` value."""
+    from app.webhook_routes import generate_token
+
+    token = generate_token()
+    _settings().update_section("app", {"webhook_token_secret": token})
+    flash(
+        f"New webhook token: {token} — copy it now, it won't be shown in plaintext again.",
+        "ok",
+    )
     return _system_redirect()
 
 

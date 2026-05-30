@@ -42,6 +42,7 @@ from app import (
     send_routes,
     settings_routes,
     themes_routes,
+    webhook_routes,
 )
 from app.discovery import DiscoveryCache, device_id_from_status_topic
 from app.embedded_broker import EmbeddedBroker
@@ -258,6 +259,7 @@ def create_app(
     themes_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)
+    webhook_routes.register(app)
 
     if not testing:
         auth.install_gate(app, settings)

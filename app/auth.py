@@ -42,7 +42,17 @@ SESSION_KEY: Final[str] = "authed"
 # reachable from anywhere; compose is reachable from loopback (the
 # embedded Playwright renderer); renders is reachable from any private-
 # network client (the Pi / ESP32 fetching frame artifacts).
-_OPEN_PATHS: Final[tuple[str, ...]] = ("/static/", "/setup", "/login", "/logout", "/healthz")
+_OPEN_PATHS: Final[tuple[str, ...]] = (
+    "/static/",
+    "/setup",
+    "/login",
+    "/logout",
+    "/healthz",
+    # Webhook endpoints under /api/v1/ carry their own token-based auth
+    # (see app.webhook_routes._presented_token); the session gate would
+    # otherwise bounce every external caller to /login.
+    "/api/v1/",
+)
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/",)
 # Plugin assets — /plugins/<id>/<asset> only, NOT /plugins/ (the admin
