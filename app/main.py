@@ -177,7 +177,13 @@ def create_app(
 
     from app.telemetry import Telemetry as _Telemetry
 
-    if testing:
+    is_watcher = _is_reloader_watcher(dev) and not testing
+    if is_watcher:
+        logger.info(
+            "dev reloader parent: skipping MQTT/scheduler/telemetry init "
+            "(child process owns those)"
+        )
+    if testing or is_watcher:
         telemetry = _Telemetry.disabled()
     else:
         try:
@@ -214,7 +220,8 @@ def create_app(
         )
 
     app.config["REBUILD_TRANSPORT"] = rebuild_transport
-    rebuild_transport()
+    if not is_watcher:
+        rebuild_transport()
 
     # The Scheduler doesn't hold a static PushManager reference because
     # rebuild_transport replaces it on broker setting changes. The factory
@@ -240,7 +247,7 @@ def create_app(
         timezone_provider=_resolve_timezone,
     )
     app.config["SCHEDULER"] = scheduler
-    if not testing:
+    if not testing and not is_watcher:
         scheduler.start()
 
     plugin_loader.register_routes(app, plugins)
@@ -317,6 +324,21 @@ def create_app(
         return "ok", 200
 
     return app
+
+
+def _is_reloader_watcher(dev: bool) -> bool:
+    """Werkzeug's ``--dev`` reloader spawns a child process to actually
+    serve traffic; the parent just watches files and respawns the child
+    on changes. We want heavyweight startup work (MQTT connect,
+    scheduler tick loop, telemetry ``app.started`` send) to run ONLY in
+    the child — otherwise both processes init with the same MQTT client
+    id and the broker bounces each off the other in an endless
+    ping-pong, the scheduler fires every job twice, and every dev
+    restart costs two ``app.started`` events instead of one.
+
+    The child sets ``WERKZEUG_RUN_MAIN=true`` before re-importing the
+    module; the parent leaves it unset."""
+    return dev and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
 
 def _resolve_client_id(configured: Any, *, dev: bool) -> str:
