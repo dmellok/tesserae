@@ -31,6 +31,20 @@ def _sign_in(client) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
 
 
+def _register_device(client, device_id: str = "esp32_demo", kind: str = "esp32_client") -> str:
+    """Register an instance so the Send page's target-device picker has
+    something to tick. ``send_routes`` now refuses image-sends without
+    a chosen device — calling this once at the top of each test that
+    posts to /send/file|url|webpage|gallery keeps the tests honest."""
+    resp = client.post(
+        "/settings/devices/add",
+        data={"id": device_id, "kind": kind},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302, f"device add failed: {resp.status_code} {resp.data!r}"
+    return device_id
+
+
 def _png_bytes(w: int = 50, h: int = 50) -> bytes:
     img = Image.new("RGB", (w, h), (0, 128, 200))
     buf = io.BytesIO()
@@ -50,15 +64,18 @@ def test_send_index_renders_all_tabs(app: Flask) -> None:
 
 
 def test_file_upload_invokes_push_image(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    # Mock must be installed AFTER device registration — devices_add
+    # calls _rebuild_transport_fn() which constructs a fresh PushManager
+    # and overwrites whatever was in app.config["PUSH_MANAGER"].
     pm = MagicMock()
     pm.push_image.return_value = PushResult(status="sent", page_id="x.png", composition_digest="d")
     app.config["PUSH_MANAGER"] = pm
-
-    client = app.test_client()
-    _sign_in(client)
     resp = client.post(
         "/send/file",
-        data={"image": (io.BytesIO(_png_bytes()), "x.png")},
+        data={"image": (io.BytesIO(_png_bytes()), "x.png"), "device_id": dev},
         content_type="multipart/form-data",
         follow_redirects=False,
     )
@@ -87,36 +104,41 @@ def test_saved_dashboard_invokes_push(app: Flask) -> None:
 
 
 def test_url_invokes_push_url_image(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
     pm = MagicMock()
     pm.push_url_image.return_value = PushResult(status="sent", page_id="https://x")
     app.config["PUSH_MANAGER"] = pm
-
-    client = app.test_client()
-    _sign_in(client)
     client.post(
         "/send/url",
-        data={"url": "https://example.com/img.png"},
+        data={"url": "https://example.com/img.png", "device_id": dev},
         follow_redirects=False,
     )
     pm.push_url_image.assert_called_once_with(
-        "https://example.com/img.png", device_id=None, fit=None
+        "https://example.com/img.png", device_id=dev, fit=None
     )
 
 
 def test_webpage_invokes_push_webpage_with_viewport(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
     pm = MagicMock()
     pm.push_webpage.return_value = PushResult(status="sent", page_id="https://x")
     app.config["PUSH_MANAGER"] = pm
-
-    client = app.test_client()
-    _sign_in(client)
     client.post(
         "/send/webpage",
-        data={"url": "https://example.com", "viewport_w": "800", "viewport_h": "600"},
+        data={
+            "url": "https://example.com",
+            "viewport_w": "800",
+            "viewport_h": "600",
+            "device_id": dev,
+        },
         follow_redirects=False,
     )
     pm.push_webpage.assert_called_once_with(
-        "https://example.com", viewport_w=800, viewport_h=600, device_id=None, fit=None
+        "https://example.com", viewport_w=800, viewport_h=600, device_id=dev, fit=None
     )
 
 
@@ -152,22 +174,26 @@ def test_send_with_device_id_routes_to_that_device(app: Flask) -> None:
     )
 
 
-def test_send_with_unknown_device_id_falls_back_to_none(app: Flask) -> None:
+def test_send_with_only_unknown_device_ids_is_refused(app: Flask) -> None:
+    """An unknown device id is dropped from the target set; if nothing
+    valid survives, the send is refused with a flash error rather than
+    silently falling through to the old virtual-panel fan-out (which
+    rendered at the global panel preset and shipped the wrong-sized
+    frame to every device)."""
     client = app.test_client()
     _sign_in(client)
     pm = MagicMock()
-    pm.push_url_image.return_value = PushResult(status="sent", page_id="https://x")
     app.config["PUSH_MANAGER"] = pm
-    client.post(
+    resp = client.post(
         "/send/url",
         data={"url": "https://example.com/img.png", "device_id": "ghost_device"},
-        follow_redirects=False,
+        follow_redirects=True,
     )
-    # Unknown id is dropped rather than passed through — avoids routing
-    # a push to a device that doesn't exist.
-    pm.push_url_image.assert_called_once_with(
-        "https://example.com/img.png", device_id=None, fit=None
-    )
+    pm.push_url_image.assert_not_called()
+    body = resp.get_data(as_text=True)
+    # Either "Pick at least one" (when other devices exist but none
+    # were ticked) or "No devices registered" (when none at all).
+    assert "device" in body.lower() and ("Pick" in body or "No devices" in body)
 
 
 def test_history_lists_event_log_rows(app: Flask, tmp_path: Path) -> None:
@@ -223,25 +249,33 @@ def test_root_redirects_to_send(app: Flask) -> None:
 
 
 def test_fit_threaded_through_url(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
     pm = MagicMock()
     pm.push_url_image.return_value = PushResult(status="sent", page_id="x")
     app.config["PUSH_MANAGER"] = pm
-    client = app.test_client()
-    _sign_in(client)
-    client.post("/send/url", data={"url": "https://example.com/i.png", "fit": "blur"})
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/i.png", "fit": "blur", "device_id": dev},
+    )
     pm.push_url_image.assert_called_once_with(
-        "https://example.com/i.png", device_id=None, fit="blur"
+        "https://example.com/i.png", device_id=dev, fit="blur"
     )
 
 
 def test_invalid_fit_falls_back_to_none(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
     pm = MagicMock()
     pm.push_url_image.return_value = PushResult(status="sent", page_id="x")
     app.config["PUSH_MANAGER"] = pm
-    client = app.test_client()
-    _sign_in(client)
-    client.post("/send/url", data={"url": "https://example.com/i.png", "fit": "bogus"})
-    pm.push_url_image.assert_called_once_with("https://example.com/i.png", device_id=None, fit=None)
+    client.post(
+        "/send/url",
+        data={"url": "https://example.com/i.png", "fit": "bogus", "device_id": dev},
+    )
+    pm.push_url_image.assert_called_once_with("https://example.com/i.png", device_id=dev, fit=None)
 
 
 def test_gallery_query_shows_section(app: Flask, tmp_path: Path, monkeypatch) -> None:
@@ -262,14 +296,18 @@ def test_send_gallery_pushes_resolved_image(app: Flask, tmp_path: Path, monkeypa
     img.write_bytes(b"\xff\xd8\xff")
     gal = app.config["PLUGIN_REGISTRY"].get("picture_gallery").server_module
     monkeypatch.setattr(gal, "resolve_image_path", lambda f, n: img if n == "pic.jpg" else None)
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
     pm = MagicMock()
     pm.push_image.return_value = PushResult(status="sent", page_id="x")
     app.config["PUSH_MANAGER"] = pm
-    client = app.test_client()
-    _sign_in(client)
-    client.post("/send/gallery", data={"g_folder": "trips", "g_file": "pic.jpg", "fit": "fill"})
+    client.post(
+        "/send/gallery",
+        data={"g_folder": "trips", "g_file": "pic.jpg", "fit": "fill", "device_id": dev},
+    )
     pm.push_image.assert_called_once()
     args, kwargs = pm.push_image.call_args
     assert args[0] == b"\xff\xd8\xff"
     assert kwargs["fit"] == "fill"
-    assert kwargs["device_id"] is None
+    assert kwargs["device_id"] == dev

@@ -85,8 +85,11 @@ def _device_options() -> list[dict[str, str]]:
 
 def _form_device_ids() -> list[str]:
     """Read + validate the multi-select target-device field. Unknown ids
-    are dropped; an empty list means "any" (fan out to every renderer
-    using the virtual panel)."""
+    are dropped; an empty list means "no selection" (the caller is
+    expected to reject the request via :func:`_require_target_devices`,
+    not silently fan out to every renderer — that path produced a
+    frame rendered at the global panel preset and shipped it to every
+    device, including ones whose actual panel didn't match)."""
     registry = _devices()
     if registry is None:
         return []
@@ -95,6 +98,31 @@ def _form_device_ids() -> list[str]:
         for raw in (v.strip() for v in request.form.getlist("device_id"))
         if raw and raw in registry.devices
     ]
+
+
+def _require_target_devices(tab: str) -> list[str] | Response:
+    """Read the form's target-device picks, or short-circuit with a
+    flash + redirect if the user didn't tick any.
+
+    The Send page's File / URL / Webpage / Gallery flows used to
+    silently fall through to a "virtual panel" fan-out when no device
+    was selected — Tesserae rendered at the global panel preset and
+    blasted the same frame to every renderer in the registry. Devices
+    with a different actual panel rejected the frame with a noisy
+    ``ValueError: frame size X != expected Y`` in their heartbeat.
+    Better to refuse to send and tell the user to pick a target."""
+    ids = _form_device_ids()
+    if ids:
+        return ids
+    registry = _devices()
+    have_any = bool(registry and registry.devices)
+    msg = (
+        "Pick at least one device to push to."
+        if have_any
+        else "No devices registered yet — add one in Settings → Devices."
+    )
+    flash(msg, "error")
+    return redirect(url_for("send.index", tab=tab))
 
 
 def _flash_result(label: str, status: str, error: str | None) -> None:
@@ -261,9 +289,12 @@ def send_file() -> Response:
         return redirect(url_for("send.index", tab="file"))
     filename = upload.filename
     fit = _form_fit()
+    targets = _require_target_devices("file")
+    if isinstance(targets, Response):
+        return targets
     _push_to_targets(
         f"File {filename!r}",
-        _form_device_ids(),
+        targets,
         lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
@@ -287,9 +318,12 @@ def send_url() -> Response:
         flash("Paste an image URL first.", "error")
         return redirect(url_for("send.index", tab="url"))
     fit = _form_fit()
+    targets = _require_target_devices("url")
+    if isinstance(targets, Response):
+        return targets
     _push_to_targets(
         f"URL {url}",
-        _form_device_ids(),
+        targets,
         lambda tid: _push().push_url_image(url, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
@@ -308,9 +342,12 @@ def send_webpage() -> Response:
         flash("Viewport dimensions must be integers.", "error")
         return redirect(url_for("send.index", tab="webpage"))
     fit = _form_fit()
+    targets = _require_target_devices("webpage")
+    if isinstance(targets, Response):
+        return targets
     _push_to_targets(
         f"Webpage {url}",
-        _form_device_ids(),
+        targets,
         lambda tid: _push().push_webpage(
             url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid, fit=fit
         ),
@@ -336,9 +373,12 @@ def send_gallery() -> Response:
         return redirect(url_for("send.index", tab="gallery", g_folder=folder, g_file=filename))
     fit = _form_fit()
     label = f"gallery:{folder}/{filename}"
+    targets = _require_target_devices("gallery")
+    if isinstance(targets, Response):
+        return targets
     _push_to_targets(
         f"Gallery {filename!r}",
-        _form_device_ids(),
+        targets,
         lambda tid: _push().push_image(image_bytes, source_label=label, device_id=tid, fit=fit),
     )
     return redirect(url_for("send.index", tab="history"))
