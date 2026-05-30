@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import hashlib
 import logging
 import threading
 from pathlib import Path
@@ -107,13 +106,28 @@ class EmbeddedBroker:
         self._broker = None
 
     def _write_passwd_file(self) -> Path | None:
-        """Write a SHA-512 ``user:hash`` password file amqtt's file auth
-        plugin can read. Returns the path (or None if no creds set)."""
+        """Write a passlib-formatted ``user:hash`` password file amqtt's
+        FileAuthPlugin can read. Returns the path (or None if no creds
+        set).
+
+        amqtt 0.11.x verifies passwords via
+        ``passlib.apps.custom_app_context.verify`` — that means the hash
+        must be in a passlib-recognised format (``$pbkdf2-sha256$...``,
+        ``$6$...``, etc.), not a raw SHA-512 hex digest. The old
+        ``hashlib.sha512().hexdigest()`` we used to write produced a
+        string passlib couldn't identify, so every authenticated
+        connection was silently rejected with "hash could not be
+        identified" in the broker thread — the user just saw "can't
+        connect" client-side."""
         if not (self._username and self._password):
             return None
         if self._passwd_path is None:
             raise RuntimeError("embedded broker: passwd_path required when credentials are set")
-        digest = hashlib.sha512(self._password.encode("utf-8")).hexdigest()
+        # Match the verifier amqtt itself uses; importing it at write
+        # time keeps the broker module light when no creds are set.
+        from passlib.apps import custom_app_context as pwd_context
+
+        digest = pwd_context.hash(self._password)
         self._passwd_path.parent.mkdir(parents=True, exist_ok=True)
         # Mode 600 so the password hash isn't world-readable on a
         # multi-user host.
@@ -132,22 +146,30 @@ class EmbeddedBroker:
             },
         }
         passwd_file = self._write_passwd_file()
+        # amqtt 0.11.x deprecated the top-level ``auth`` / ``topic-check``
+        # blocks in favour of a single ``plugins`` dict keyed by the
+        # dotted import path of each plugin's class. With ``auth`` still
+        # specified, amqtt silently drops the password-file lookup and
+        # the sys plugin's interval, which surfaced as
+        #   * "Configuration parameter 'password-file' not found"
+        #   * TypeError: '>' not supported between NoneType and int
+        # — and as a broker that listened but rejected every client.
+        # See amqtt/contexts.py:default_broker_plugins for the canonical
+        # shape. Config keys are underscore-separated, not hyphen.
+        plugins: dict[str, dict[str, Any]] = {
+            "amqtt.plugins.sys.broker.BrokerSysPlugin": {"sys_interval": 20},
+        }
         if passwd_file is not None:
-            auth: dict[str, Any] = {
-                "allow-anonymous": False,
-                "password-file": str(passwd_file),
-                "plugins": ["auth_file"],
+            plugins["amqtt.plugins.authentication.FileAuthPlugin"] = {
+                "password_file": str(passwd_file),
             }
         else:
-            auth = {
-                "allow-anonymous": True,
-                "plugins": ["auth_anonymous"],
+            plugins["amqtt.plugins.authentication.AnonymousAuthPlugin"] = {
+                "allow_anonymous": True,
             }
-        cfg = {
+        cfg: dict[str, Any] = {
             "listeners": listeners,
-            "auth": auth,
-            # Keep the broker quiet; amqtt is chatty at INFO.
-            "topic-check": {"enabled": False},
+            "plugins": plugins,
         }
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

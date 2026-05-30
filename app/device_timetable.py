@@ -117,8 +117,8 @@ def timetable_for_device(
     for schedule in schedules.all():
         if schedule.page_id not in matching_page_ids:
             continue
-        page = pages_by_id.get(schedule.page_id)
-        page_name = page.name if page else schedule.page_id
+        bound_page = pages_by_id.get(schedule.page_id)
+        page_name = bound_page.name if bound_page else schedule.page_id
         entries.append(
             TimetableEntry(
                 schedule_id=schedule.id,
