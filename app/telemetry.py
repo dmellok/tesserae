@@ -109,27 +109,28 @@ class TelemetryConfig:
 
     @property
     def post_url(self) -> str:
-        return f"{self.host.rstrip('/')}/api/v0/event"
+        # ``/api/v0/events`` (plural) is the live endpoint — see the
+        # official aptabase-python SDK. The singular ``/event`` accepts
+        # the POST silently on some self-hosted deployments but never
+        # indexes the event, so the dashboard stays empty.
+        return f"{self.host.rstrip('/')}/api/v0/events"
 
 
 def _system_props(app_version: str) -> dict[str, object]:
-    """Aptabase's required ``systemProps`` block. All values are stable
-    OS/runtime facts, no identifiers.
+    """Aptabase's required ``systemProps`` block. Field names + types
+    track the official aptabase-python SDK's ``SystemProperties`` —
+    keeping us bug-for-bug compatible with the canonical wire format
+    means a server upgrade can't suddenly start rejecting our shape.
 
-    Aptabase's validator is strict:
-      * ``isDebug`` is a real boolean — not the string ``"false"``.
-      * ``sdkVersion`` must match ``<name>@<version>`` (a ``/`` 400s).
-    Both lessons learned the hard way (HTTP 400 from /api/v0/event)."""
+    All values are stable OS/runtime facts; no identifiers."""
     return {
-        "isDebug": False,
+        "locale": "en-US",
         "osName": _platform.system() or "Unknown",
         "osVersion": _platform.release() or "",
-        "locale": "en-US",
+        "deviceModel": _platform.machine() or "",
+        "isDebug": False,
         "appVersion": app_version,
-        "appBuildNumber": "0",
         "sdkVersion": f"aptabase-tesserae@{app_version}",
-        "engineName": "cpython",
-        "engineVersion": _platform.python_version(),
     }
 
 
@@ -280,13 +281,18 @@ class Telemetry:
         Records a ``type="telemetry"`` row in the event log either way so
         the Events tab can show success / failure side-by-side with push
         history."""
-        body = {
+        # ``/api/v0/events`` takes a JSON array even when there's just
+        # one event in it (batched API). Sending a bare object 2xx's on
+        # some self-hosted server versions but never lands in the
+        # dashboard. Match the official SDK exactly: list of one.
+        event = {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
             "eventName": event_name,
             "systemProps": _system_props(self._cfg.app_version),
             "props": props,
         }
+        body = [event]
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             self._cfg.post_url,

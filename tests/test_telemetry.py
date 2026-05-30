@@ -62,7 +62,7 @@ def test_baked_constants_are_used_when_no_env_override(
         data_root=tmp_path, app_version="0.3.0", settings_app={"telemetry_enabled": True}
     )
     assert t.enabled is True
-    assert t.endpoint == "https://baked.example/api/v0/event"
+    assert t.endpoint == "https://baked.example/api/v0/events"
     t.shutdown(timeout=1.0)
 
 
@@ -85,7 +85,7 @@ def test_settings_cannot_override_baked_endpoint(
             "telemetry_app_key": "EVIL",
         },
     )
-    assert t.endpoint == "https://baked.example/api/v0/event"
+    assert t.endpoint == "https://baked.example/api/v0/events"
     t.shutdown(timeout=1.0)
 
 
@@ -113,7 +113,7 @@ def test_env_vars_override_baked_constants(tmp_path: Path, monkeypatch: pytest.M
         data_root=tmp_path, app_version="0.3.0", settings_app={"telemetry_enabled": True}
     )
     assert t.enabled is True
-    assert t.endpoint == "https://staging.example/api/v0/event"
+    assert t.endpoint == "https://staging.example/api/v0/events"
     t.shutdown(timeout=1.0)
 
 
@@ -184,19 +184,21 @@ def test_send_posts_aptabase_shaped_payload(
     finally:
         t.shutdown(timeout=1.0)
 
-    assert captured["url"] == "https://analytics.example.com/api/v0/event"
+    assert captured["url"] == "https://analytics.example.com/api/v0/events"
     headers = {k.lower(): v for k, v in captured["headers"].items()}  # type: ignore[union-attr]
     assert headers.get("App-key".lower()) == "AK-1234"
     assert headers.get("content-type") == "application/json"
 
     body = captured["body"]
-    assert isinstance(body, dict)
-    assert body["eventName"] == "app.started"
-    assert body["sessionId"] == t.instance_id
-    assert body["systemProps"]["appVersion"] == "0.3.0"
-    assert body["systemProps"]["osName"]  # something non-empty
-    assert body["props"] == {}
-    assert "timestamp" in body
+    # /api/v0/events takes a JSON array, even for a single event.
+    assert isinstance(body, list) and len(body) == 1
+    event = body[0]
+    assert event["eventName"] == "app.started"
+    assert event["sessionId"] == t.instance_id
+    assert event["systemProps"]["appVersion"] == "0.3.0"
+    assert event["systemProps"]["osName"]  # something non-empty
+    assert event["props"] == {}
+    assert "timestamp" in event
 
 
 def test_system_props_match_aptabase_strict_shape(
@@ -219,11 +221,14 @@ def test_system_props_match_aptabase_strict_shape(
     finally:
         t.shutdown(timeout=1.0)
     body = captured["body"]
-    assert isinstance(body, dict)
-    sys_props = body["systemProps"]
+    assert isinstance(body, list) and len(body) == 1
+    sys_props = body[0]["systemProps"]
     assert sys_props["isDebug"] is False, "Aptabase requires bool, not 'false'"
     assert "@" in sys_props["sdkVersion"], "Aptabase requires name@version, not name/version"
     assert "/" not in sys_props["sdkVersion"]
+    # deviceModel is sent by the official SDK; mirror it so a server-side
+    # required-fields check doesn't silently drop our events.
+    assert "deviceModel" in sys_props
 
 
 def test_failure_silent_when_endpoint_unreachable(
@@ -309,7 +314,7 @@ def test_test_send_returns_error_string_on_http_failure(
     def http_error(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
         del req, timeout
         raise urllib.error.HTTPError(
-            url="https://x/api/v0/event",
+            url="https://x/api/v0/events",
             code=401,
             msg="Unauthorized",
             hdrs=None,  # type: ignore[arg-type]
@@ -389,11 +394,13 @@ def test_test_send_records_success_row_in_event_log(
     # surface what we shipped — this is what made the v0.4.2 -> v0.4.3
     # 400-debugging session quick (the body shape was visible).
     payload = row.extra["payload"]
-    assert payload["eventName"] == "app.started"
-    assert payload["sessionId"] == t.instance_id
-    assert payload["systemProps"]["isDebug"] is False
-    assert "@" in payload["systemProps"]["sdkVersion"]
-    assert row.extra["endpoint"].endswith("/api/v0/event")
+    assert isinstance(payload, list) and len(payload) == 1
+    event = payload[0]
+    assert event["eventName"] == "app.started"
+    assert event["sessionId"] == t.instance_id
+    assert event["systemProps"]["isDebug"] is False
+    assert "@" in event["systemProps"]["sdkVersion"]
+    assert row.extra["endpoint"].endswith("/api/v0/events")
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")
@@ -403,7 +410,7 @@ def test_test_send_records_failure_row_in_event_log(
     def http_error(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
         del req, timeout
         raise urllib.error.HTTPError(
-            url="https://x/api/v0/event",
+            url="https://x/api/v0/events",
             code=401,
             msg="Unauthorized",
             hdrs=None,  # type: ignore[arg-type]
