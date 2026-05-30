@@ -64,15 +64,16 @@ RUN pip install -e /app
 # host path or named volume here is all docker-compose has to do.
 VOLUME ["/app/data"]
 
-# Run as a dedicated unprivileged user. Defence in depth, not a widget
-# sandbox — widgets execute in the same Python process and can read
-# anything this user can read (tracked separately as issue #3). This
-# just stops a container escape from landing in root.
-RUN groupadd --system --gid 1001 tesserae && \
-    useradd  --system --uid 1001 --gid tesserae --home-dir /app --shell /usr/sbin/nologin tesserae && \
-    mkdir -p /app/data && \
-    chown -R tesserae:tesserae /app
-USER tesserae
+# Run as the unprivileged ``pwuser`` (uid 1001) that the Playwright
+# base image already provisions for Chromium. Reusing it avoids the
+# gid/uid 1001 collision a fresh useradd would hit, and pwuser has
+# the right `/ms-playwright` permissions Chromium needs at run time.
+# Defence in depth, not a widget sandbox — widgets execute in the
+# same Python process and can read anything pwuser can read (tracked
+# separately as issue #3). This just stops a container escape from
+# landing in root.
+RUN mkdir -p /app/data && chown -R pwuser:pwuser /app
+USER pwuser
 
 # HTTP admin / renders endpoint. The embedded MQTT broker (if the
 # user enables it via Settings → Server → MQTT) listens on 1883 —
