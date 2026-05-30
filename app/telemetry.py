@@ -109,29 +109,37 @@ class TelemetryConfig:
 
     @property
     def post_url(self) -> str:
-        # ``/api/v0/events`` (plural) is the live endpoint — see the
-        # official aptabase-python SDK. The singular ``/event`` accepts
-        # the POST silently on some self-hosted deployments but never
-        # indexes the event, so the dashboard stays empty.
-        return f"{self.host.rstrip('/')}/api/v0/events"
+        # ``/api/v0/event`` (singular) is the canonical endpoint used by
+        # every published Aptabase SDK *except* the experimental Python
+        # one (which targets ``/events`` with a batched array). The
+        # Aptabase server doesn't accept the plural form, so we follow
+        # the JS / Swift / Flutter / Kotlin / MAUI lineage and POST a
+        # single event object here.
+        return f"{self.host.rstrip('/')}/api/v0/event"
 
 
 def _system_props(app_version: str) -> dict[str, object]:
-    """Aptabase's required ``systemProps`` block. Field names + types
-    track the official aptabase-python SDK's ``SystemProperties`` —
-    keeping us bug-for-bug compatible with the canonical wire format
-    means a server upgrade can't suddenly start rejecting our shape.
-
-    All values are stable OS/runtime facts; no identifiers."""
+    """Aptabase's required ``systemProps`` block. Field set mirrors the
+    JS SDK's ``sendEvent`` payload exactly — locale, isDebug,
+    appVersion, sdkVersion. The Python SDK adds osName / osVersion /
+    deviceModel but the Aptabase server doesn't actually require them,
+    and extras have historically tripped server-side schema validation.
+    Stay minimal."""
     return {
         "locale": "en-US",
-        "osName": _platform.system() or "Unknown",
-        "osVersion": _platform.release() or "",
-        "deviceModel": _platform.machine() or "",
         "isDebug": False,
         "appVersion": app_version,
         "sdkVersion": f"aptabase-tesserae@{app_version}",
     }
+
+
+def _user_agent(app_version: str) -> str:
+    """Aptabase's server requires a Mozilla-like User-Agent for non-
+    browser clients — see the JS SDK's ``getUserAgent``. A plain
+    ``tesserae/<version>`` UA returns 2xx but never indexes."""
+    platform_map = {"Darwin": "Macintosh", "Windows": "Windows", "Linux": "Linux"}
+    name = platform_map.get(_platform.system(), _platform.system() or "Unknown")
+    return f"Mozilla/5.0 ({name}) Not-A-Browser tesserae/{app_version}"
 
 
 class Telemetry:
@@ -281,18 +289,14 @@ class Telemetry:
         Records a ``type="telemetry"`` row in the event log either way so
         the Events tab can show success / failure side-by-side with push
         history."""
-        # ``/api/v0/events`` takes a JSON array even when there's just
-        # one event in it (batched API). Sending a bare object 2xx's on
-        # some self-hosted server versions but never lands in the
-        # dashboard. Match the official SDK exactly: list of one.
-        event = {
+        # Singular ``/api/v0/event`` takes a bare object — see JS SDK.
+        body = {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
             "eventName": event_name,
             "systemProps": _system_props(self._cfg.app_version),
             "props": props,
         }
-        body = [event]
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
             self._cfg.post_url,
@@ -300,7 +304,7 @@ class Telemetry:
             headers={
                 "Content-Type": "application/json",
                 "App-Key": self._cfg.app_key,
-                "User-Agent": f"tesserae/{self._cfg.app_version}",
+                "User-Agent": _user_agent(self._cfg.app_version),
             },
             method="POST",
         )

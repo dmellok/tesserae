@@ -304,7 +304,7 @@
 
 {# ----- System: self-update + backup ----- #}
 {% if active_area == 'system' %}
-<div class="settings-actions">
+<div class="settings-stack">
 
   <section class="card">
     {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Pull a newer revision of Tesserae from this repo and restart. A pre-update snapshot of data/ is always taken, and a rollback path is always one click away.') }}
@@ -392,29 +392,36 @@
     </form>
 
     {% if system_backups %}
-    <ul class="backup-list">
-      {% for b in system_backups %}
-      <li class="card card--compact backup-row">
-        <div class="backup-meta">
-          <div class="backup-top">
-            <code>{{ b.id }}</code>
-            <span class="pill">{{ b.label }}</span>
-            <span class="backup-size">{{ (b.bytes / 1024) | round | int }} KB</span>
+    <details class="backups-disclosure">
+      <summary>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+        <span>Existing backups</span>
+        <span class="pill">{{ system_backups | length }}</span>
+      </summary>
+      <ul class="backup-list">
+        {% for b in system_backups %}
+        <li class="card card--compact backup-row">
+          <div class="backup-meta">
+            <div class="backup-top">
+              <code>{{ b.id }}</code>
+              <span class="pill">{{ b.label }}</span>
+              <span class="backup-size">{{ (b.bytes / 1024) | round | int }} KB</span>
+            </div>
+            {% if b.note %}<div class="backup-note">{{ b.note }}</div>{% endif %}
           </div>
-          {% if b.note %}<div class="backup-note">{{ b.note }}</div>{% endif %}
-        </div>
-        <div class="backup-actions">
-          <a class="button ghost" href="{{ url_for('auth.system_backup_download', backup_id=b.id) }}"><i class="ph ph-download-simple"></i> Download</a>
-          <form method="post" action="{{ url_for('auth.system_backup_restore', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Restore from {{ b.id }}? Current data/ will be replaced and the server will restart.');">
-            <button type="submit" class="button ghost" {% if system_dev_mode %}disabled{% endif %}><i class="ph ph-arrow-counter-clockwise"></i> Restore</button>
-          </form>
-          <form method="post" action="{{ url_for('auth.system_backup_delete', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Delete this backup?');">
-            <button type="submit" class="button ghost danger" aria-label="Delete backup"><i class="ph ph-trash"></i></button>
-          </form>
-        </div>
-      </li>
-      {% endfor %}
-    </ul>
+          <div class="backup-actions">
+            <a class="button ghost" href="{{ url_for('auth.system_backup_download', backup_id=b.id) }}"><i class="ph ph-download-simple"></i> Download</a>
+            <form method="post" action="{{ url_for('auth.system_backup_restore', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Restore from {{ b.id }}? Current data/ will be replaced and the server will restart.');">
+              <button type="submit" class="button ghost" {% if system_dev_mode %}disabled{% endif %}><i class="ph ph-arrow-counter-clockwise"></i> Restore</button>
+            </form>
+            <form method="post" action="{{ url_for('auth.system_backup_delete', backup_id=b.id) }}" class="inline" onsubmit="return confirm('Delete this backup?');">
+              <button type="submit" class="button ghost danger" aria-label="Delete backup"><i class="ph ph-trash"></i></button>
+            </form>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
     {% else %}
     <p class="lede">No backups yet.</p>
     {% endif %}

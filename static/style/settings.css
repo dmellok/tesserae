@@ -10,6 +10,47 @@
   gap: var(--t-space-3);
   margin-top: var(--t-space-4);
 }
+
+/* Settings → System uses this in place of the auto-fit grid: the three
+   cards (Updates / Backups / Telemetry) each carry multi-paragraph
+   forms, so stacking reads better than the side-by-side grid. */
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-4);
+  margin-top: var(--t-space-4);
+}
+
+/* Backups disclosure — collapsed by default so the System page leads
+   with "create a backup" rather than a wall of old snapshots. */
+.backups-disclosure {
+  margin-top: var(--t-space-3);
+}
+.backups-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--t-radius-sm, 6px);
+  user-select: none;
+}
+.backups-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+.backups-disclosure > summary:hover {
+  background: var(--c-surface-2, rgba(255, 255, 255, 0.04));
+}
+.backups-disclosure[open] > summary > .ph-caret-right {
+  transform: rotate(90deg);
+}
+.backups-disclosure > summary > .ph-caret-right {
+  transition: transform 0.12s ease;
+}
+.backups-disclosure > .backup-list {
+  margin-top: var(--t-space-3);
+}
 .settings-actions .card--compact {
   margin: 0;
   padding: var(--t-space-4);
