@@ -15,6 +15,7 @@
       "type": "select",
       "label": "Client rotation (quarter-turns)",
       "default": 0,
+      "device_setting": true,
       "choices": [
         { "value": 0, "label": "0°" },
         { "value": 1, "label": "90° CW" },
@@ -27,6 +28,7 @@
       "type": "select",
       "label": "Client-side scale mode",
       "default": "fit",
+      "device_setting": true,
       "choices": [
         { "value": "fit", "label": "Fit" },
         { "value": "fill", "label": "Fill" },
@@ -39,6 +41,7 @@
       "type": "select",
       "label": "Letterbox colour",
       "default": "white",
+      "device_setting": true,
       "choices": [
         { "value": "white", "label": "White" },
         { "value": "black", "label": "Black" },

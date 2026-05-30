@@ -197,13 +197,15 @@
     {% endif %}
 
     {% for pq in section.picture_quality %}
-    {# Picture quality — fields the renderer manifest flagged as
-       ``device_setting: true`` (e.g. pi_bin's dither/saturation/contrast).
-       Each clone targeting this device gets its own block; the field
-       names are namespaced ``<clone_id>:<field>`` so the combined-save
-       handler can route values back to the right clone's settings. #}
+    {# Per-display renderer settings — fields the renderer manifest
+       flagged as ``device_setting: true`` (e.g. pi_bin's dither /
+       saturation / contrast, pi_png's rotate / scale / bg / saturation).
+       Each clone targeting this device gets its own block named after
+       its base renderer; the field names are namespaced
+       ``<clone_id>:<field>`` so the combined-save handler can route
+       values back to the right clone's settings. #}
     <div class="device-subsection">
-      <p class="device-subhead">Picture quality{% if section.picture_quality|length > 1 %} — {{ pq.base_name }}{% endif %}</p>
+      <p class="device-subhead">{{ pq.base_name }} settings</p>
       {% for field in pq.fields %}
         {% set value = pq.state.get(field.name, field.get('default', '')) %}
         {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}

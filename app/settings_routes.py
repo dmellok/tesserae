@@ -1703,8 +1703,8 @@ def _build_sections() -> list[dict[str, Any]]:
         if has_device_fields:
             blurb = (
                 (blurb + " " if blurb else "")
-                + "Picture-quality settings (dither / saturation / contrast) "
-                + "are per-device — set them under Settings → Devices."
+                + "Per-display settings live on each device card under "
+                + "Settings → Devices so every panel can be tuned independently."
             ).strip()
         sections.append(
             {

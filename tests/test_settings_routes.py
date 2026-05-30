@@ -266,7 +266,12 @@ def test_broker_password_resubmit_masked_keeps_existing(
     assert store.get_section("broker")["host"] == "b2"
 
 
-def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
+def test_renderer_save_ignores_device_settings(app_with_gate: Flask, tmp_path: Path) -> None:
+    """All of pi_png's settings (rotate / scale / bg / saturation) are
+    per-display and live on the device card now. The renderer save
+    endpoint filters ``device_setting`` fields out so a hand-crafted
+    POST to the renderer endpoint can't override per-device tuning —
+    the stored values stay at the manifest defaults."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     resp = client.post(
@@ -286,12 +291,10 @@ def test_renderer_settings_save(app_with_gate: Flask, tmp_path: Path) -> None:
         "pi_png",
         app_with_gate.config["RENDERER_REGISTRY"].get("pi_png").manifest["settings"],
     )
-    assert saved["rotate"] == 2
-    assert saved["scale"] == "fill"
-    assert saved["bg"] == "black"
-    # ``saturation`` is now flagged ``device_setting: true`` and lives
-    # on the device card, not the renderer card. The renderer endpoint
-    # ignores it — get_for_runtime returns the manifest default.
+    # Manifest defaults, not the POSTed values.
+    assert saved["rotate"] == 0
+    assert saved["scale"] == "fit"
+    assert saved["bg"] == "white"
     assert saved["saturation"] == 0.5
 
 
@@ -490,10 +493,9 @@ def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
 
 
 def test_renderer_card_hides_device_settings(app_with_gate: Flask) -> None:
-    """Fields flagged ``device_setting: true`` (e.g. pi_bin's
-    dither/saturation/contrast) belong on the device card. The renderer
-    card must drop them — and surface a hint in the blurb that picture
-    quality lives under Devices."""
+    """Fields flagged ``device_setting: true`` belong on the device
+    card. The renderer card must drop them — and surface a hint in the
+    blurb that those settings live under Devices."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     body = client.get("/settings/renderers").get_data(as_text=True)
@@ -505,14 +507,15 @@ def test_renderer_card_hides_device_settings(app_with_gate: Flask) -> None:
     assert 'name="saturation"' not in body
     assert 'name="contrast"' not in body
     # And there's a hint pointing the user at the Devices tab.
-    assert "Picture-quality" in body
+    assert "Per-display settings" in body
 
 
 def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
-    """Adding a device kind that consumes pi_bin gets a Picture quality
-    subsection on its card with the dither/saturation/contrast fields
-    namespaced as ``<clone_id>:<field>`` so the combined-save handler
-    can route them to the right clone's settings."""
+    """Adding a device kind that consumes pi_bin gets a per-display
+    settings subsection (titled after the renderer) on its card with
+    the dither/saturation/contrast fields namespaced as
+    ``<clone_id>:<field>`` so the combined-save handler can route them
+    to the right clone's settings."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post(
@@ -520,11 +523,29 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
         data={"id": "pi_lab", "kind": "pi_bin_client", "panel_preset": "inky_7_3"},
     )
     body = client.get("/settings/devices").get_data(as_text=True)
-    assert "Picture quality" in body
+    # Subsection titled after the renderer's base name.
+    assert "Pi BIN client settings" in body
     # Namespaced field names. Clone id is ``pi_bin__pi_lab``.
     assert 'name="pi_bin__pi_lab:dither"' in body
     assert 'name="pi_bin__pi_lab:saturation"' in body
     assert 'name="pi_bin__pi_lab:contrast"' in body
+
+
+def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
+    """Pi PNG client devices get rotate / scale / bg / saturation on
+    the device card — none of those are renderer-wide any more."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "png_lab", "kind": "pi_png_client", "panel_preset": "inky_7_3"},
+    )
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "Pi PNG client settings" in body
+    assert 'name="pi_png__png_lab:rotate"' in body
+    assert 'name="pi_png__png_lab:scale"' in body
+    assert 'name="pi_png__png_lab:bg"' in body
+    assert 'name="pi_png__png_lab:saturation"' in body
 
 
 def test_combined_save_persists_picture_quality_on_clone(
