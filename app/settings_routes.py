@@ -1142,6 +1142,44 @@ def devices_update_panel(instance_id: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
 
+@bp.post("/settings/devices/<instance_id>/quiet-hours")
+def devices_update_quiet_hours(instance_id: str) -> Response:
+    """Save a per-device override for the global quiet-hours window.
+
+    The override is keyed off the device's manifest ``quiet_hours``
+    block; ``app.quiet_hours.resolve_quiet_hours`` reads it and prefers
+    it over the app-level setting when ``enabled`` is true. Clearing
+    every field drops the block entirely so the device falls back to
+    the app default."""
+    anchor = f"device-{instance_id}"
+    form = request.form
+    result = device_service.update_instance_quiet_hours(
+        devices=_devices(),
+        renderers=_renderers(),
+        data_root=_device_data_root(),
+        instance_id=instance_id,
+        enabled=bool(form.get("quiet_hours_enabled")),
+        start=form.get("quiet_hours_start"),
+        end=form.get("quiet_hours_end"),
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Couldn't save quiet hours.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    qh = (result.device.manifest.get("quiet_hours") or {}) if result.device else {}
+    if qh.get("enabled") and qh.get("start") and qh.get("end"):
+        flash(
+            f"Saved quiet hours for {result.device.name!r}: {qh.get('start')} → {qh.get('end')}.",
+            "ok",
+        )
+    else:
+        flash(
+            f"Cleared per-device quiet hours for {result.device.name!r} "
+            f"(falls back to app setting).",
+            "ok",
+        )
+    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
@@ -1475,6 +1513,16 @@ def _build_sections() -> list[dict[str, Any]]:
                 ),
                 "calibrate_apply_endpoint": (
                     url_for("auth.devices_calibrate_apply", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                # Per-device quiet-hours override. Read from the
+                # manifest so the form can preselect the user's
+                # current setting; ``quiet_hours_endpoint`` is None on
+                # kinds (only instances can override).
+                "quiet_hours": (device.manifest.get("quiet_hours") or {} if is_instance else {}),
+                "quiet_hours_endpoint": (
+                    url_for("auth.devices_update_quiet_hours", instance_id=device.id)
                     if is_instance
                     else None
                 ),

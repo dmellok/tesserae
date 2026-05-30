@@ -399,6 +399,10 @@ def load_instance_file(
             inst_manifest["config_topic"] = str(topic)
     if isinstance(raw_inst.get("panel"), dict):
         inst_manifest["panel"] = dict(raw_inst["panel"])
+    # Per-device quiet-hours override (see app.quiet_hours). Optional;
+    # absent or empty means fall back to the app-level setting.
+    if isinstance(raw_inst.get("quiet_hours"), dict):
+        inst_manifest["quiet_hours"] = dict(raw_inst["quiet_hours"])
     # Point the instance at its cloned renderers so the settings UI
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.

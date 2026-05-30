@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, slider, text_input %}
+{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, slider, switch, text_input %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
@@ -232,6 +232,33 @@
           help='Match the physical panel. The .bin frame quantises to this palette; pick 7-colour for the older ACeP Inky Impression (e.g. 5.7") so orange renders and colours map correctly.') }}
       {% endif %}
       <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
+    </form>
+  </div>
+  {% endif %}
+
+  {% if section.quiet_hours_endpoint %}
+  {# Per-device quiet-hours override. Resolves first in
+     app.quiet_hours.resolve_quiet_hours — when enabled here, this
+     window takes priority over the global Settings → Server → App
+     setting. Disabling (or clearing all fields) drops the block and
+     the device falls back to the global default. #}
+  <div class="device-subsection">
+    <p class="device-subhead">Quiet hours override</p>
+    <form method="post" action="{{ section.quiet_hours_endpoint }}" class="form device-quiet-hours-form">
+      {{ switch(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Override the global quiet-hours window for this device',
+                checked=section.quiet_hours.get('enabled', False),
+                help='When off, the device follows whatever Settings → Server → App says (or has no quiet hours if that is off too).') }}
+      <div class="field-grid">
+        {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
+                      value=section.quiet_hours.get('start', ''),
+                      placeholder='HH:MM', type='time',
+                      help='When this device goes quiet. Honours the app timezone.') }}
+        {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
+                      value=section.quiet_hours.get('end', ''),
+                      placeholder='HH:MM', type='time',
+                      help='When this device wakes up. End < start wraps midnight (e.g. 22:00 → 07:00 = overnight).') }}
+      </div>
+      <div class="actions">{{ button('Save quiet hours', icon='moon', variant='ghost') }}</div>
     </form>
   </div>
   {% endif %}

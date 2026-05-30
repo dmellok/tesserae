@@ -144,6 +144,66 @@ def test_update_panel_sets_flipped_orientation(registries) -> None:
     assert r1.device.panel["orientation"] == "landscape_flipped"
 
 
+def test_update_quiet_hours_persists_and_reloads(registries) -> None:
+    """An enabled quiet-hours override writes ``quiet_hours`` to the
+    instance manifest and the reloaded Device exposes it."""
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        kind_id="esp32_client",
+    )
+    result = device_service.update_instance_quiet_hours(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        enabled=True,
+        start="22:30",
+        end="07:00",
+    )
+    assert result.ok and result.device is not None
+    qh = result.device.manifest.get("quiet_hours")
+    assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
+
+
+def test_update_quiet_hours_clearing_drops_block(registries) -> None:
+    """Saving with everything blank + disabled removes the block from
+    the manifest so the device falls back to the app-level setting."""
+    devices, renderers, data_root = registries
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        kind_id="esp32_client",
+    )
+    # First set it.
+    device_service.update_instance_quiet_hours(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        enabled=True,
+        start="22:30",
+        end="07:00",
+    )
+    # Then clear it.
+    result = device_service.update_instance_quiet_hours(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="hallway",
+        enabled=False,
+        start="",
+        end="",
+    )
+    assert result.ok and result.device is not None
+    assert "quiet_hours" not in result.device.manifest
+
+
 def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
     devices, renderers, data_root = registries
     # Mixed case is forgivingly lowercased, but a leading digit / spaces

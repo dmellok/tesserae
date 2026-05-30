@@ -197,6 +197,58 @@ def update_instance_panel(
     return InstanceResult(reloaded)
 
 
+def update_instance_quiet_hours(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    enabled: bool,
+    start: str | None,
+    end: str | None,
+) -> InstanceResult:
+    """Patch a registered instance's ``quiet_hours`` block on disk and
+    hot-reload it in place. Empty or invalid times disable the
+    override (the helper resolver treats both as "no window").
+
+    The block on disk is the shape :mod:`app.quiet_hours` reads:
+    ``{enabled: bool, start: 'HH:MM', end: 'HH:MM'}``. When the user
+    clears every field we drop the block entirely so the device falls
+    back to the app-level setting on next reload."""
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        return InstanceResult(None, f"Unknown device {instance_id!r}.")
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
+
+    clean_start = (start or "").strip()
+    clean_end = (end or "").strip()
+    if not enabled and not clean_start and not clean_end:
+        # Fully cleared — drop the block entirely so the next reload
+        # sees a manifest with no override and uses the app setting.
+        raw.pop("quiet_hours", None)
+    else:
+        raw["quiet_hours"] = {
+            "enabled": bool(enabled),
+            "start": clean_start,
+            "end": clean_end,
+        }
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        return InstanceResult(None, last_err.message if last_err else "unknown error")
+    clone_for_instances(renderers, devices)
+    return InstanceResult(reloaded)
+
+
 def delete_instance(
     *,
     devices: DeviceRegistry,

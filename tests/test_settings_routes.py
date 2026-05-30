@@ -424,6 +424,34 @@ def test_update_panel_changes_instance_dims(app_with_gate: Flask, tmp_path: Path
     assert saved["panel"]["orientation"] == "portrait"
 
 
+def test_update_quiet_hours_persists_per_device_override(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """The per-device quiet-hours form lives next to the panel form
+    in Settings → Devices. POSTing it rewrites the instance JSON and
+    the reloaded Device exposes the override on its manifest."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    resp = client.post(
+        "/settings/devices/esp32_lab/quiet-hours",
+        data={
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "22:30",
+            "quiet_hours_end": "07:00",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None
+    qh = dev.manifest.get("quiet_hours")
+    assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
+
+
 def test_update_panel_refuses_built_in_kind(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
