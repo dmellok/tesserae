@@ -6,6 +6,10 @@ and Windows. You'll also need an **MQTT broker** (e.g. Mosquitto, or the one
 built into Home Assistant) and at least one [client](clients.md) to paint a
 panel.
 
+!!! tip "Or use Docker"
+    If you'd rather not touch Python, the [Docker install path](docker.md)
+    has you running with one `docker compose up -d`.
+
 ## Quick install
 
 === "macOS / Linux / Raspberry Pi"

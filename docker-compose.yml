@@ -1,0 +1,39 @@
+# Tesserae — minimal docker-compose example.
+#
+# Copy this file next to where you want to keep your data, then:
+#
+#     docker compose up -d
+#
+# The admin UI lands at http://localhost:8000 — the first request
+# walks through password setup and the onboarding wizard.
+#
+# Pin to a specific tag (not :latest) in any setup you care about so
+# `docker compose pull && up -d` is the deliberate upgrade step.
+# See `docs/install/docker.md` for the Mosquitto sidecar variant
+# (full MQTT v5) and the host-networking variant (so the mDNS
+# advertiser publishes tesserae.local on your LAN).
+
+services:
+  tesserae:
+    image: ghcr.io/dmellok/tesserae:latest
+    container_name: tesserae
+    restart: unless-stopped
+    ports:
+      # Admin UI + the /renders endpoint that the Pi/ESP32 clients
+      # fetch their PNG frames from. If you're running clients on a
+      # different machine, they need to reach this port.
+      - "8000:8000"
+      # Uncomment when running the built-in MQTT broker (Settings →
+      # Server → MQTT → "Built-in broker"). LAN devices subscribe
+      # here. Leave commented if you point at an external broker.
+      # - "1883:1883"
+    volumes:
+      # Settings, pages, schedules, event log, render cache, gallery
+      # photos, backups. Replace `./data` with a host path you back
+      # up (or a named volume) — losing this loses everything.
+      - ./data:/app/data
+    environment:
+      # The image sets this already so the Settings → System tab
+      # hides the in-app self-update card (use `docker compose pull`
+      # instead). Listed here so it's discoverable.
+      TESSERAE_IN_DOCKER: "1"

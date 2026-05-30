@@ -83,6 +83,37 @@ def test_backup_download_404_when_missing(app: Flask) -> None:
     assert resp.status_code == 404
 
 
+def test_system_page_swaps_update_card_under_docker(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Under the official Docker image (``TESSERAE_IN_DOCKER=1``) the
+    in-app self-update card is hidden and replaced by a ``docker
+    compose pull`` hint — a ``git pull`` inside a layered filesystem
+    would lose changes on the next image rebuild."""
+    monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings/system").get_data(as_text=True)
+    assert "docker compose pull" in body
+    # The check / apply / rollback forms are not in the rendered Update card.
+    assert "Check for updates" not in body
+    assert "Update &amp; restart" not in body
+
+
+def test_update_apply_refused_under_docker(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hand-crafted POST to /settings/system/update/apply under the
+    Docker image is server-side refused too, not just hidden in the UI."""
+    monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/settings/system/update/apply", follow_redirects=True)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "docker compose pull" in body
+
+
 def test_telemetry_test_button_is_dev_only(app: Flask) -> None:
     """The "Send test event" button is dev-only — the card is hidden in
     production builds and the route is gated to ``current_app.debug``.

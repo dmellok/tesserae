@@ -1,0 +1,53 @@
+# Anything not needed at runtime — keeps the build context small and
+# stops accidental secrets (a local data/ with real broker creds)
+# from leaking into the image.
+
+# Local state — must not bake into the image. The container starts
+# with an empty data/ and lets the user mount their own at /app/data.
+data/
+data.bak*/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python build / cache artefacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+dist/
+build/
+
+# Source control + editor noise
+.git/
+.gitignore
+.gitattributes
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# Docs + scripts that don't belong in the runtime image
+docs/
+site/
+mkdocs.yml
+install.sh
+install.ps1
+scripts/
+tests/
+conftest.py
+
+# Front-end build output
+node_modules/
+static/dist/
+
+# Local backup files (e.g. settings.css.bak)
+*.bak

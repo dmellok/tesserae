@@ -73,6 +73,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Install Tesserae: install/server.md
+  - Install via Docker: install/docker.md
   - Install a client: install/clients.md
   - Set up a device: install/devices.md
   - Screens & compatibility: compatibility.md

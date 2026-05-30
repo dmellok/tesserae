@@ -16,6 +16,7 @@ detail.
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -267,6 +268,24 @@ def refuse_in_dev() -> Response | None:
         flash(
             "Updates and restores only run on the production (waitress) server — "
             "the --dev reloader owns restarts.",
+            "error",
+        )
+        return system_redirect()
+    return None
+
+
+def refuse_in_container() -> Response | None:
+    """Refuse in-app self-updates / restore-from-backup when running
+    inside the official Docker image. A ``git pull`` against a layered
+    filesystem would lose the next image rebuild, and restarts go
+    through the container manager rather than ``os.execv``. Users
+    upgrade via ``docker compose pull`` instead — the Settings →
+    System tab shows that hint when ``TESSERAE_IN_DOCKER=1`` is set.
+    Gated server-side too so a hand-crafted POST can't sneak through."""
+    if os.environ.get("TESSERAE_IN_DOCKER"):
+        flash(
+            "Updates and restores aren't supported in the Docker image — "
+            "use `docker compose pull && docker compose up -d` to upgrade.",
             "error",
         )
         return system_redirect()

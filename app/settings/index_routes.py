@@ -9,6 +9,7 @@ shape regardless of source. Helpers below (``_values_for_core``,
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Any
 
@@ -131,6 +132,11 @@ def settings_area(area: str) -> str | Response:
         system_history=system_history,
         system_backups=system_backups,
         system_dev_mode=bool(current_app.debug),
+        # The official Docker image sets TESSERAE_IN_DOCKER=1 so the
+        # Settings → System tab can hide the in-app self-update card
+        # (a layered filesystem would lose changes on the next image
+        # rebuild) and show a "docker pull" hint instead.
+        system_in_container=bool(os.environ.get("TESSERAE_IN_DOCKER")),
         system_telemetry_enabled=system_telemetry_enabled,
         system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,

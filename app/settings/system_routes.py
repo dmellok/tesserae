@@ -21,6 +21,7 @@ from ._shared import (
     bp,
     data_root,
     push_manager,
+    refuse_in_container,
     refuse_in_dev,
     settings_store,
     system_redirect,
@@ -52,7 +53,7 @@ def system_update_check() -> Response:
 
 @bp.post("/settings/system/update/apply")
 def system_update_apply() -> Response:
-    refused = refuse_in_dev()
+    refused = refuse_in_dev() or refuse_in_container()
     if refused is not None:
         return refused
     channel = (request.form.get("channel") or "edge").strip()
@@ -90,7 +91,7 @@ def system_update_apply() -> Response:
 
 @bp.post("/settings/system/update/rollback")
 def system_update_rollback() -> Response:
-    refused = refuse_in_dev()
+    refused = refuse_in_dev() or refuse_in_container()
     if refused is not None:
         return refused
     push_mgr = push_manager()
@@ -141,7 +142,7 @@ def system_backup_download(backup_id: str) -> Response:
 
 @bp.post("/settings/system/backup/<backup_id>/restore")
 def system_backup_restore(backup_id: str) -> Response:
-    refused = refuse_in_dev()
+    refused = refuse_in_dev() or refuse_in_container()
     if refused is not None:
         return refused
     push_mgr = push_manager()

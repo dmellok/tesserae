@@ -1,0 +1,84 @@
+# Build + publish the official Docker image to GHCR.
+#
+# Triggers:
+#   * push of a v* tag — builds & publishes :<version> + :latest
+#   * manual dispatch — builds + publishes :latest (smoke test).
+#   * PR or push to main — builds without push so the Dockerfile
+#     stays correct without spamming the registry.
+#
+# Multi-arch: linux/amd64 + linux/arm64. arm64 covers Raspberry Pi 4/5,
+# the only ARM target most users will care about. arm/v7 (Pi 3 and
+# below) is intentionally not built — Playwright Chromium isn't
+# available there.
+
+name: docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build${{ github.event_name == 'pull_request' && '' || ' + publish' }}
+    runs-on: ubuntu-latest
+    permissions:
+      # GHCR push uses the workflow's GITHUB_TOKEN scoped to packages.
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up QEMU
+        # Needed for cross-arch builds — arm64 layer steps run under
+        # emulation on the amd64 runner.
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # Owner-name comes from the repo so a fork lands in its own
+          # GHCR namespace without editing the workflow.
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            # v0.7.4 → :0.7.4 + :0.7 + :latest
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            # Push to main → :main (handy for tracking the bleeding edge
+            # without firing the tag-only flow). Latest is reserved for
+            # the most recent semver tag.
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          # PRs build but don't push — keeps Dockerfile drift caught
+          # without polluting the registry.
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
