@@ -57,7 +57,7 @@ class SettingsStore:
     def _load(self) -> None:
         if not self._path.exists():
             return
-        raw = json.loads(self._path.read_text())
+        raw = json.loads(self._path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ValueError(f"{self._path} must contain a JSON object")
         self._data = raw
@@ -65,7 +65,7 @@ class SettingsStore:
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(self._path.suffix + ".tmp")
-        tmp.write_text(json.dumps(self._data, indent=2, sort_keys=True))
+        tmp.write_text(json.dumps(self._data, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(self._path)
 
     # -- generic section access -------------------------------------------

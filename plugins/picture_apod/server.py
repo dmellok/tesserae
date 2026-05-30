@@ -52,7 +52,7 @@ def fetch(
     cache = data_dir / "apod.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text())  # type: ignore[no-any-return]
+            return json.loads(cache.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -91,5 +91,5 @@ def fetch(
         "fetched_at": int(time.time()),
     }
     with contextlib.suppress(OSError):
-        cache.write_text(json.dumps(result))
+        cache.write_text(json.dumps(result), encoding="utf-8")
     return result

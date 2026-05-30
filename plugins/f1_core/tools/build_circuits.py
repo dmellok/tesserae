@@ -134,7 +134,7 @@ def main() -> None:
 
     target = Path(__file__).resolve().parents[1] / "static" / "circuits.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(out, separators=(",", ":")) + "\n")
+    target.write_text(json.dumps(out, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"\nWrote {len(out)} circuits to {target} ({target.stat().st_size:,} bytes)")
 
 

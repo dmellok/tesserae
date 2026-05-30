@@ -27,7 +27,7 @@ def _cached(path: Path) -> dict[str, Any] | None:
     if not path.exists() or time.time() - path.stat().st_mtime >= CACHE_TTL_S:
         return None
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return None
 
@@ -149,5 +149,5 @@ def fetch(
         "current": current.get("temperature_2m"),
     }
     with contextlib.suppress(OSError):
-        cache_path.write_text(json.dumps(result))
+        cache_path.write_text(json.dumps(result), encoding="utf-8")
     return result

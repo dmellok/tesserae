@@ -150,7 +150,7 @@ def _read_cache(path: Path, ttl: int) -> dict[str, Any] | None:
     if time.time() - path.stat().st_mtime >= ttl:
         return None
     try:
-        return json.loads(path.read_text())  # type: ignore[no-any-return]
+        return json.loads(path.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
     except (json.JSONDecodeError, OSError):
         return None
 
@@ -158,7 +158,7 @@ def _read_cache(path: Path, ttl: int) -> dict[str, Any] | None:
 def _write_cache(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
-        path.write_text(json.dumps(payload))
+        path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _load_manifest(token: str, data_dir: Path) -> dict[str, Any]:
@@ -306,12 +306,12 @@ def fetch(
         suffix = f"_{orientation}" if orientation != "any" else ""
         idx_file = data_dir / f".seq_idx_{_safe_cache_key(token)}{suffix}"
         try:
-            current = int(idx_file.read_text())
+            current = int(idx_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError):
             current = -1
         next_idx = (current + 1) % len(filtered)
         with contextlib.suppress(OSError):
-            idx_file.write_text(str(next_idx))
+            idx_file.write_text(str(next_idx), encoding="utf-8")
         photo = filtered[next_idx]
     else:
         photo = random.choice(filtered)

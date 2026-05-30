@@ -117,7 +117,7 @@ class EmbeddedBroker:
         self._passwd_path.parent.mkdir(parents=True, exist_ok=True)
         # Mode 600 so the password hash isn't world-readable on a
         # multi-user host.
-        self._passwd_path.write_text(f"{self._username}:{digest}\n")
+        self._passwd_path.write_text(f"{self._username}:{digest}\n", encoding="utf-8")
         with contextlib.suppress(Exception):
             self._passwd_path.chmod(0o600)
         return self._passwd_path

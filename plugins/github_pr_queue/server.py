@@ -57,7 +57,7 @@ def fetch(
     cache = data_dir / f"pr_{user}_{max_results}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text())
+            return json.loads(cache.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -75,5 +75,5 @@ def fetch(
     review = q(f"is:pr is:open review-requested:{user}")
     result = {"user": user, "yours": yours, "review": review}
     with contextlib.suppress(OSError):
-        cache.write_text(json.dumps(result))
+        cache.write_text(json.dumps(result), encoding="utf-8")
     return result

@@ -176,7 +176,7 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
 
 
 def _load_schema(schema_path: Path) -> dict[str, Any]:
-    raw = json.loads(schema_path.read_text())
+    raw = json.loads(schema_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{schema_path} must contain a JSON object")
     return raw
@@ -247,7 +247,7 @@ def discover(
             continue
 
         try:
-            raw = json.loads(manifest_path.read_text())
+            raw = json.loads(manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as err:
             registry.errors.append(
                 LoaderError(renderer_id, child, f"renderer.json invalid JSON: {err}")

@@ -56,7 +56,7 @@ def _load_raw(data_dir: Path | None = None) -> dict[str, Any]:
     if not path.exists():
         return {"lists": []}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {"lists": []}
     if not isinstance(data, dict) or not isinstance(data.get("lists"), list):
@@ -67,7 +67,7 @@ def _load_raw(data_dir: Path | None = None) -> dict[str, Any]:
 def _save(data: dict[str, Any], data_dir: Path | None = None) -> None:
     path = _lists_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def _now_iso() -> str:

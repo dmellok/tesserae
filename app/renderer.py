@@ -43,7 +43,7 @@ def _chromium_launch_kwargs() -> dict[str, Any]:
     path = os.environ.get("TESSERAE_CHROMIUM_PATH", "").strip()
     if not path:
         try:
-            path = _CHROMIUM_SIDECAR.read_text().strip()
+            path = _CHROMIUM_SIDECAR.read_text(encoding="utf-8").strip()
         except OSError:
             path = ""
     return {"executable_path": path} if path else {}

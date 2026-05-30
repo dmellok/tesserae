@@ -38,7 +38,7 @@ def fetch(
     cache = data_dir / f"bom_warnings_{state}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            cached = json.loads(cache.read_text())
+            cached = json.loads(cache.read_text(encoding="utf-8"))
             # Honour the freshly-set max_results / hide_cancelled even
             # when serving cached raw data.
             return _apply_view(cached, max_results, hide_cancelled, state)
@@ -58,7 +58,7 @@ def fetch(
         "raw": raw_warnings,
     }
     with contextlib.suppress(OSError):
-        cache.write_text(json.dumps(cache_record))
+        cache.write_text(json.dumps(cache_record), encoding="utf-8")
     return _apply_view(cache_record, max_results, hide_cancelled, state)
 
 

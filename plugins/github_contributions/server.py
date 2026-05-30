@@ -66,7 +66,7 @@ def fetch(
     cache = data_dir / f"contrib_v2_{user}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text())
+            return json.loads(cache.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             pass
     # Drop any v1 file lying around from earlier versions.
@@ -150,5 +150,5 @@ def fetch(
         "this_month": this_month,
     }
     with contextlib.suppress(OSError):
-        cache.write_text(json.dumps(result))
+        cache.write_text(json.dumps(result), encoding="utf-8")
     return result

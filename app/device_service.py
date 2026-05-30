@@ -121,7 +121,7 @@ def create_instance(
     inst_file = data_root / f"{instance_id}.json"
     if inst_file.exists():
         return InstanceResult(None, f"An instance file at {inst_file.name} already exists.")
-    inst_file.write_text(json.dumps(manifest, indent=2) + "\n")
+    inst_file.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     device = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
     if device is None:
@@ -166,7 +166,7 @@ def update_instance_panel(
 
     inst_file = device.path
     try:
-        raw = json.loads(inst_file.read_text())
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as err:
         return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
     panel_block = dict(raw.get("panel") or {})
@@ -185,7 +185,7 @@ def update_instance_panel(
             raw["icon"] = cleaned
         else:
             raw.pop("icon", None)
-    inst_file.write_text(json.dumps(raw, indent=2) + "\n")
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
 
     devices.devices.pop(instance_id, None)
     _drop_clones(renderers, instance_id)

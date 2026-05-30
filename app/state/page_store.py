@@ -171,7 +171,7 @@ class PageStore:
     def _load(self) -> None:
         if not self._path.exists():
             return
-        raw = json.loads(self._path.read_text())
+        raw = json.loads(self._path.read_text(encoding="utf-8"))
         if not isinstance(raw, dict):
             raise ValueError(f"{self._path} must contain a JSON object keyed by page id")
         self._pages = {pid: Page.model_validate(p) for pid, p in raw.items()}
@@ -183,7 +183,7 @@ class PageStore:
             pid: page.model_dump(mode="json", exclude_none=True)
             for pid, page in self._pages.items()
         }
-        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True))
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(self._path)
 
     def get(self, page_id: str) -> Page | None:

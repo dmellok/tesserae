@@ -192,7 +192,7 @@ class DeviceRegistry:
 
 
 def _load_schema(schema_path: Path) -> dict[str, Any]:
-    raw = json.loads(schema_path.read_text())
+    raw = json.loads(schema_path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"{schema_path} must contain a JSON object")
     return raw
@@ -259,7 +259,7 @@ def discover(
             continue
 
         try:
-            raw = json.loads(manifest_path.read_text())
+            raw = json.loads(manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as err:
             registry.errors.append(
                 LoaderError(device_id, child, f"device.json invalid JSON: {err}")
@@ -360,7 +360,7 @@ def load_instance_file(
     add-device flow so both go through identical validation."""
     instance_id = inst_file.stem
     try:
-        raw_inst = json.loads(inst_file.read_text())
+        raw_inst = json.loads(inst_file.read_text(encoding="utf-8"))
     except json.JSONDecodeError as err:
         registry.errors.append(LoaderError(instance_id, inst_file, f"invalid JSON: {err}"))
         return None

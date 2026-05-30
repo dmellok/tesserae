@@ -74,7 +74,7 @@ class UserThemeStore:
         if not self._path.exists():
             return []
         try:
-            data = json.loads(self._path.read_text())
+            data = json.loads(self._path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             return []
         if not isinstance(data, list):
@@ -84,7 +84,7 @@ class UserThemeStore:
     def _save_raw(self, raw: list[dict[str, Any]]) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(self._path.suffix + ".tmp")
-        tmp.write_text(json.dumps(raw, indent=2, sort_keys=True))
+        tmp.write_text(json.dumps(raw, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(self._path)
 
     def load(self) -> list[UserTheme]:

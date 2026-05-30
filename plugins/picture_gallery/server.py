@@ -80,7 +80,7 @@ def _load_meta(data_dir: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -89,7 +89,7 @@ def _load_meta(data_dir: Path) -> dict[str, dict[str, Any]]:
 def _save_meta(data_dir: Path, meta: dict[str, dict[str, Any]]) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     tmp = _meta_path(data_dir).with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(meta, indent=2, sort_keys=True))
+    tmp.write_text(json.dumps(meta, indent=2, sort_keys=True), encoding="utf-8")
     os.replace(tmp, _meta_path(data_dir))
 
 
@@ -186,7 +186,7 @@ def _load_orient_cache(data_dir: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -196,7 +196,7 @@ def _save_orient_cache(data_dir: Path, cache: dict[str, dict[str, Any]]) -> None
     data_dir.mkdir(parents=True, exist_ok=True)
     tmp = _orient_cache_path(data_dir).with_suffix(".json.tmp")
     with contextlib.suppress(OSError):
-        tmp.write_text(json.dumps(cache, separators=(",", ":")))
+        tmp.write_text(json.dumps(cache, separators=(",", ":")), encoding="utf-8")
         os.replace(tmp, _orient_cache_path(data_dir))
 
 
@@ -283,12 +283,12 @@ def fetch(
         suffix = f"_{orientation}" if orientation != "any" else ""
         idx_file = data_dir / f".sequential_index_{folder_segment}{suffix}"
         try:
-            current = int(idx_file.read_text())
+            current = int(idx_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError):
             current = -1
         next_idx = (current + 1) % len(images)
         with contextlib.suppress(OSError):
-            idx_file.write_text(str(next_idx))
+            idx_file.write_text(str(next_idx), encoding="utf-8")
         chosen = images[next_idx]
     else:
         chosen = random.choice(images)

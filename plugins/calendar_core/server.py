@@ -71,7 +71,7 @@ def _load_feeds(data_dir: Path | None = None) -> dict[str, Any]:
     if not path.exists():
         return {"feeds": []}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {"feeds": []}
     if not isinstance(data, dict) or not isinstance(data.get("feeds"), list):
@@ -82,7 +82,7 @@ def _load_feeds(data_dir: Path | None = None) -> dict[str, Any]:
 def _save_feeds(data: dict[str, Any], data_dir: Path | None = None) -> None:
     path = _feeds_path(data_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2))
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def _slugify(s: str) -> str:

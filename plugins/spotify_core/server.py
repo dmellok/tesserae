@@ -100,7 +100,7 @@ def _load_tokens() -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -110,7 +110,7 @@ def _save_tokens(tokens: dict[str, Any]) -> None:
     data_dir = _data_dir()
     data_dir.mkdir(parents=True, exist_ok=True)
     tmp = _tokens_path().with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(tokens, indent=2))
+    tmp.write_text(json.dumps(tokens, indent=2), encoding="utf-8")
     tmp.replace(_tokens_path())
 
 
