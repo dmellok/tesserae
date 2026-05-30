@@ -16,26 +16,28 @@ pointing at the most recent release tag.
 
 ## Quick start
 
-Save this as `docker-compose.yml` somewhere you want to keep your
-data, then run `docker compose up -d`:
-
-```yaml
-services:
-  tesserae:
-    image: ghcr.io/dmellok/tesserae:latest
-    container_name: tesserae
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
+```sh
+mkdir ~/tesserae && cd ~/tesserae
+curl -fsSLO https://raw.githubusercontent.com/dmellok/tesserae/main/docker-compose.yml
+docker compose up -d
 ```
 
-Open `http://localhost:8000` — the first request walks you through
-password setup and the onboarding wizard.
+That's it. Open `http://<host-ip>:8000` (or
+`http://tesserae.local:8000` once mDNS comes up) — the first request
+walks through password setup and the onboarding wizard.
 
-The same compose file ships in the repo at the project root if you'd
-rather `git clone` and pick it up there.
+The default `docker-compose.yml` uses **host networking**, which is
+the right choice for a self-hosted Pi / mini-PC / NAS appliance:
+
+- The render-frame URL Tesserae embeds in every MQTT push points at
+  the host's real LAN IP, so your panels can actually fetch frames.
+- The built-in MQTT broker is reachable on the host's port 1883
+  without you publishing it from a `ports:` block.
+- mDNS works, so `tesserae.local` resolves on the LAN.
+
+Linux only, though. Docker Desktop on Mac / Windows handles host
+networking differently — see [Bridge networking](#bridge-networking)
+below if you're testing there.
 
 ## What's in the image
 
@@ -104,69 +106,47 @@ services:
 Then set the broker host to `mosquitto` in Tesserae's settings (the
 service name is the resolvable hostname inside the compose network).
 
-## `TESSERAE_HOST_IP` — the must-set env var on bridge networking
+## Bridge networking
 
-Under Docker's default bridge networking, the container has an
-internal IP (`172.18.0.x` or similar) that LAN clients can't reach.
-Tesserae uses that IP in **two** places, and both break with no
-override:
+If you can't use host networking — typically Docker Desktop on Mac /
+Windows, or a setup with port conflicts on the host — switch to
+bridge networking. Two things break under bridge that host networking
+got for free, and **both need fixing** before your panels can talk to
+Tesserae:
 
-- The **broker URL** the onboarding wizard and Settings → MQTT
-  broker card show your panels to point at — they'd otherwise see
-  `mqtt://172.18.0.x:1883`.
-- The **render-frame URL** Tesserae embeds in every MQTT push so the
-  panel knows where to fetch the PNG / .bin frame from. The panel
-  receives `http://172.18.0.x:8000/renders/...` and times out trying
-  to reach it.
+1. The **render-frame URL** in every MQTT push and the **MQTT broker
+   URL** the wizard shows your panels both point at
+   `detect_local_ip()`. Under bridge networking that resolves to the
+   container's internal `172.x.x.x` address, which LAN clients can't
+   reach. The fix: set `TESSERAE_HOST_IP` to your host's real LAN IP.
+2. mDNS multicast doesn't escape the bridge network, so
+   `tesserae.local` won't resolve on the LAN. That one you can't
+   easily fix on bridge — use the host's IP directly, or run a
+   separate mDNS reflector (out of scope here).
 
-Both flow through the same `detect_local_ip()` lookup, so the same
-env var fixes both at once.
-
-Two ways to fix it:
-
-### Set `TESSERAE_HOST_IP` (simplest)
-
-Find your Docker host's LAN IP (typically what `ip addr show eth0` or
-`hostname -I` prints), then set it in `docker-compose.yml`:
-
-```yaml
-services:
-  tesserae:
-    environment:
-      TESSERAE_IN_DOCKER: "1"
-      TESSERAE_HOST_IP: "192.168.1.50"   # your host's actual LAN IP
-```
-
-`docker compose up -d` after editing. The onboarding wizard's broker
-URL and the Settings → MQTT broker card now show the right address.
-
-### Or use host networking
-
-`network_mode: host` shares the host's network namespace with the
-container, so `detect_local_ip()` returns the host's real LAN IP
-automatically — no env var needed. Also fixes the mDNS issue below.
-See the section below.
-
-## mDNS / tesserae.local
-
-The mDNS advertiser needs **host networking** to announce
-`tesserae.local` on your LAN — Docker's default bridge network is
-isolated, so multicast doesn't escape. If you want
-`http://tesserae.local:8000` to resolve from another machine on the
-LAN:
+The compose snippet:
 
 ```yaml
 services:
   tesserae:
     image: ghcr.io/dmellok/tesserae:latest
-    network_mode: host
+    container_name: tesserae
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "1883:1883"          # only if using the built-in MQTT broker
     volumes:
       - ./data:/app/data
+    environment:
+      TESSERAE_IN_DOCKER: "1"
+      TESSERAE_HOST_IP: "192.168.1.50"   # your host's actual LAN IP
 ```
 
-Drop the `ports:` block when using host networking — the container
-listens directly on the host's port 8000. Linux only; host mode is a
-no-op on Docker Desktop for Mac/Windows.
+Find your host's LAN IP with `hostname -I` (first address printed) or
+`ip addr show eth0`. Without `TESSERAE_HOST_IP` set, Tesserae logs a
+loud warning on startup and the admin UI flags the bad URL — but it
+won't auto-fix itself, because the host's IP isn't introspectable
+from inside a bridge-networked container.
 
 ## Upgrading
 

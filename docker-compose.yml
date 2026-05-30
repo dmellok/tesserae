@@ -4,44 +4,64 @@
 #
 #     docker compose up -d
 #
-# The admin UI lands at http://localhost:8000 — the first request
+# The admin UI lands at http://<host-ip>:8000 — the first request
 # walks through password setup and the onboarding wizard.
 #
 # Pin to a specific tag (not :latest) in any setup you care about so
 # `docker compose pull && up -d` is the deliberate upgrade step.
-# See `docs/install/docker.md` for the Mosquitto sidecar variant
-# (full MQTT v5) and the host-networking variant (so the mDNS
-# advertiser publishes tesserae.local on your LAN).
+#
+# This file uses **host networking** (Linux only). That's the right
+# default for a self-hosted Pi / mini-PC / NAS appliance because:
+#
+#   * The render-frame URL Tesserae embeds in MQTT pushes points at
+#     the host's actual LAN IP — your panels can reach it. (Bridge
+#     networking gives the container a 172.x.x.x address LAN clients
+#     can't see, which breaks both frame fetching and the built-in
+#     MQTT broker URL.)
+#   * mDNS works, so `http://tesserae.local:8000` resolves on your
+#     LAN without extra plumbing.
+#   * The built-in MQTT broker is reachable on port 1883 without you
+#     publishing it from a `ports:` block.
+#
+# Docker Desktop on Mac / Windows handles host networking differently
+# (it's still in beta there) — if you're testing on Mac or Windows,
+# switch to bridge networking by deleting the `network_mode: host`
+# line and uncommenting the `ports:` + `TESSERAE_HOST_IP` block at the
+# bottom. See `docs/install/docker.md` for the bridge variant and the
+# Mosquitto sidecar variant (full MQTT v5).
 
 services:
   tesserae:
     image: ghcr.io/dmellok/tesserae:latest
     container_name: tesserae
     restart: unless-stopped
-    ports:
-      # Admin UI + the /renders endpoint that the Pi/ESP32 clients
-      # fetch their PNG frames from. If you're running clients on a
-      # different machine, they need to reach this port.
-      - "8000:8000"
-      # Uncomment when running the built-in MQTT broker (Settings →
-      # Server → MQTT → "Built-in broker"). LAN devices subscribe
-      # here. Leave commented if you point at an external broker.
-      # - "1883:1883"
+
+    # Linux: share the host's network namespace. Tesserae binds 8000
+    # directly on the host — same as if you `pip install`'d it on the
+    # box. Auto-fixes the bridge IP problem, lets mDNS work, exposes
+    # the built-in MQTT broker on 1883 without `ports:`.
+    network_mode: host
+
     volumes:
       # Settings, pages, schedules, event log, render cache, gallery
       # photos, backups. Replace `./data` with a host path you back
       # up (or a named volume) — losing this loses everything.
       - ./data:/app/data
+
     environment:
       # The image sets this already so the Settings → System tab
       # hides the in-app self-update card (use `docker compose pull`
       # instead). Listed here so it's discoverable.
       TESSERAE_IN_DOCKER: "1"
-      # **Important if you're using the built-in MQTT broker.** Docker
-      # bridge networking assigns this container an internal IP
-      # (172.x.x.x) that your Pi / ESP32 panels can't reach. Set this
-      # to your Docker host's actual LAN IP so the onboarding wizard
-      # and Settings → MQTT broker page show the right `mqtt://` URL
-      # for your panels to point at. Replace with your real host IP
-      # before `docker compose up -d`.
-      # TESSERAE_HOST_IP: "192.168.1.50"
+
+    # ---- Bridge-networking alternative (Docker Desktop on Mac/Windows,
+    # or any setup where host networking isn't an option) -------------
+    #
+    # Delete `network_mode: host` above and uncomment the block below:
+    #
+    # ports:
+    #   - "8000:8000"
+    #   - "1883:1883"          # only if using the built-in MQTT broker
+    # environment:
+    #   TESSERAE_IN_DOCKER: "1"
+    #   TESSERAE_HOST_IP: "192.168.1.50"   # **required** — your host's LAN IP
