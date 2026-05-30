@@ -512,12 +512,16 @@ async def _record_with(
         await browser.close()
 
 
-def _transcode_to_mp4(src: Path, dst: Path) -> None:
+def _need_ffmpeg(msg_for: str) -> None:
     if not shutil.which("ffmpeg"):
         raise RuntimeError(
-            "ffmpeg not found on PATH — install it (`brew install ffmpeg`) or "
-            "drop --mp4 to keep the raw .webm output."
+            f"ffmpeg not found on PATH — install it (`brew install ffmpeg`) or "
+            f"output a raw .webm instead of {msg_for}."
         )
+
+
+def _transcode_to_mp4(src: Path, dst: Path) -> None:
+    _need_ffmpeg(".mp4")
     subprocess.run(
         [
             "ffmpeg",
@@ -540,17 +544,96 @@ def _transcode_to_mp4(src: Path, dst: Path) -> None:
     )
 
 
+def _transcode_to_gif(
+    src: Path,
+    dst: Path,
+    *,
+    fps: int = 12,
+    width: int = 800,
+) -> None:
+    """Two-pass GIF transcode via ffmpeg's palettegen / paletteuse.
+
+    Why two passes: a single-pass GIF uses ffmpeg's default 256-colour
+    web-safe palette which butchers UI gradients and rings. Generating
+    a *content-specific* palette in pass 1 and applying it in pass 2
+    with a tiny dither produces a noticeably cleaner result at roughly
+    half the file size.
+
+    ``fps`` 12 is a sweet spot for screen recordings — smooth enough
+    for cursor motion without inflating the file. ``width`` 800 keeps
+    the README embed legible while staying well under the ~25 MB
+    GitHub embed cap on a one-minute recording."""
+    _need_ffmpeg(".gif")
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as palette:
+        palette_path = Path(palette.name)
+    try:
+        # Pass 1 — generate the palette.
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-vf",
+                f"fps={fps},scale={width}:-1:flags=lanczos,palettegen=stats_mode=diff",
+                str(palette_path),
+            ],
+            check=True,
+        )
+        # Pass 2 — apply it with a light Bayer dither.
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(src),
+                "-i",
+                str(palette_path),
+                "-filter_complex",
+                (
+                    f"fps={fps},scale={width}:-1:flags=lanczos[x];"
+                    "[x][1:v]paletteuse=dither=bayer:bayer_scale=5"
+                ),
+                "-loop",
+                "0",
+                str(dst),
+            ],
+            check=True,
+        )
+    finally:
+        palette_path.unlink(missing_ok=True)
+
+
 def add_common_cli_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--output",
         required=True,
-        help="Output file path. Suffix .mp4 implies --mp4; .webm keeps "
-        "the raw Playwright recording.",
+        help="Output file path. Suffix decides format: .mp4 transcodes "
+        "to H.264, .gif via two-pass palettegen, .webm keeps the raw "
+        "Playwright recording.",
     )
     parser.add_argument(
         "--mp4",
         action="store_true",
         help="Force transcode to H.264 mp4 via ffmpeg.",
+    )
+    parser.add_argument(
+        "--gif",
+        action="store_true",
+        help="Force transcode to GIF via two-pass palettegen.",
+    )
+    parser.add_argument(
+        "--gif-fps",
+        type=int,
+        default=12,
+        help="Frames per second for GIF output (default: 12).",
+    )
+    parser.add_argument(
+        "--gif-width",
+        type=int,
+        default=800,
+        help="Width in pixels for GIF output, height auto-scales "
+        "(default: 800).",
     )
     parser.add_argument("--viewport-width", type=int, default=1280)
     parser.add_argument("--viewport-height", type=int, default=1024)
@@ -567,7 +650,11 @@ def run_scenario(
     via ``prepare``, then run ``drive`` against a recording Playwright
     context. ffmpeg-transcode the result if requested."""
     output = Path(args.output).expanduser().resolve()
-    want_mp4 = args.mp4 or output.suffix.lower() == ".mp4"
+    suffix = output.suffix.lower()
+    want_gif = args.gif or suffix == ".gif"
+    want_mp4 = args.mp4 or suffix == ".mp4"
+    if want_gif and want_mp4:
+        raise RuntimeError("pick one of --gif / --mp4, not both")
     viewport = {"width": args.viewport_width, "height": args.viewport_height}
 
     with tempfile.TemporaryDirectory(prefix=f"tesserae-record-{scenario_name}-") as td:
@@ -598,8 +685,13 @@ def run_scenario(
         webm = webms[0]
 
         output.parent.mkdir(parents=True, exist_ok=True)
-        if want_mp4:
-            print(f"[record] transcoding to {output}")
+        if want_gif:
+            print(f"[record] transcoding to gif → {output}")
+            _transcode_to_gif(
+                webm, output, fps=args.gif_fps, width=args.gif_width
+            )
+        elif want_mp4:
+            print(f"[record] transcoding to mp4 → {output}")
             _transcode_to_mp4(webm, output)
         else:
             shutil.copy(webm, output)

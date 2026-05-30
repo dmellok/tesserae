@@ -27,7 +27,7 @@ Set the admin password, point at a broker (built-in or your own), register
 the panel with its dimensions, push a starter dashboard, opt in to
 anonymous telemetry. ~1 min.
 
-<video src="docs/assets/videos/onboarding.mp4" controls width="100%"></video>
+![Onboarding](docs/assets/videos/onboarding.gif)
 
 ### Building a dashboard
 
@@ -35,7 +35,7 @@ Pick a layout preset, fill cells with widgets, then use the custom-layout
 editor to split a cell and drop in a third widget. Live preview updates
 as you go. ~1 min.
 
-<video src="docs/assets/videos/dashboard.mp4" controls width="100%"></video>
+![Building a dashboard](docs/assets/videos/dashboard.gif)
 
 ## Screenshots
 
