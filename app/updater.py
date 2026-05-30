@@ -57,6 +57,7 @@ def _is_windows() -> bool:
     when the test's failure formatter then tries to construct a Path."""
     return os.name == "nt"
 
+
 Channel = str  # "edge" | "stable"
 CHANNELS: tuple[str, ...] = ("edge", "stable")
 

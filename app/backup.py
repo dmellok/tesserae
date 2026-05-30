@@ -27,6 +27,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 BACKUPS_SUBDIR = "core/backups"  # relative to data_root
 META_NAME = ".tesserae-backup.json"
@@ -153,7 +154,7 @@ def create(
                     zf.write(src, str(rel))
             else:
                 zf.write(src, str(rel))
-        meta = {
+        meta: dict[str, Any] = {
             "tool": "tesserae",
             "version": META_VERSION,
             "created_at": time.time(),
@@ -173,14 +174,15 @@ def create(
     )
 
 
-def _read_meta(path: Path) -> dict | None:
+def _read_meta(path: Path) -> dict[str, Any] | None:
     try:
         with zipfile.ZipFile(path) as zf:
             if META_NAME not in zf.namelist():
                 return None
-            return json.loads(zf.read(META_NAME))
+            data = json.loads(zf.read(META_NAME))
     except (zipfile.BadZipFile, OSError, json.JSONDecodeError):
         return None
+    return data if isinstance(data, dict) else None
 
 
 def list_all(data_root: Path) -> list[Backup]:

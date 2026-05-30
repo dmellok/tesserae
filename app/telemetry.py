@@ -51,7 +51,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.state.event_log import EventLog
@@ -176,7 +176,7 @@ class Telemetry:
         *,
         data_root: Path,
         app_version: str,
-        settings_app: dict,
+        settings_app: dict[str, Any],
         event_log: EventLog | None = None,
         is_debug: bool = False,
     ) -> Telemetry:

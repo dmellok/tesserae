@@ -536,7 +536,7 @@ def settings_area(area: str) -> str | Response:
         if telemetry is not None:
             system_telemetry_enabled = telemetry.enabled
             # endpoint is empty when disabled; surface host as a hint either way.
-            system_telemetry_host = telemetry._cfg.host  # type: ignore[attr-defined]
+            system_telemetry_host = telemetry._cfg.host
 
     return render_template(
         "settings.html",
