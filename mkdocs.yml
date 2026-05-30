@@ -77,8 +77,12 @@ nav:
   - Install a client: install/clients.md
   - Set up a device: install/devices.md
   - Screens & compatibility: compatibility.md
-  - Widget gallery: widgets/gallery.md
+  - Widgets:
+      - Gallery: widgets/gallery.md
+      - Stability tiers: widgets/tiers.md
   - Plugin development:
+      - Architecture: dev/architecture.md
       - Build a widget with AI: dev/writing-a-plugin.md
       - Widget contract & design system: widgets.md
       - Design brief template: widget-design-brief.md
+  - Privacy & telemetry: privacy.md
