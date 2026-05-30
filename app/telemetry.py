@@ -70,6 +70,11 @@ APTABASE_APP_KEY: str = "A-SH-4940410345"
 INSTANCE_ID_FILE = "core/.instance_id"
 SEND_TIMEOUT_S = 4.0
 QUEUE_CAPACITY = 64  # Bounded — drop new events when backlogged.
+# Match Aptabase's default session timeout so each heartbeat keeps the
+# current session alive for the full time the user has Tesserae running.
+# Cheap (~24 events/day per install); valuable: lets the maintainer see
+# session duration + DAU instead of just process-start counts.
+HEARTBEAT_INTERVAL_S = 60 * 60
 
 
 def _ensure_instance_id(data_root: Path) -> str:
@@ -106,6 +111,10 @@ class TelemetryConfig:
     app_key: str
     instance_id: str
     app_version: str
+    # When True we mark events with ``isDebug: true`` so the maintainer's
+    # Aptabase dashboard can filter dev traffic out of the prod view.
+    # Wired from the ``--dev`` flag in ``app.main._serve``.
+    is_debug: bool = False
 
     @property
     def post_url(self) -> str:
@@ -118,7 +127,7 @@ class TelemetryConfig:
         return f"{self.host.rstrip('/')}/api/v0/event"
 
 
-def _system_props(app_version: str) -> dict[str, object]:
+def _system_props(app_version: str, *, is_debug: bool) -> dict[str, object]:
     """Aptabase's required ``systemProps`` block. Field set mirrors the
     JS SDK's ``sendEvent`` payload exactly — locale, isDebug,
     appVersion, sdkVersion. The Python SDK adds osName / osVersion /
@@ -127,7 +136,7 @@ def _system_props(app_version: str) -> dict[str, object]:
     Stay minimal."""
     return {
         "locale": "en-US",
-        "isDebug": False,
+        "isDebug": is_debug,
         "appVersion": app_version,
         "sdkVersion": f"aptabase-tesserae@{app_version}",
     }
@@ -157,11 +166,9 @@ class Telemetry:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._heartbeat_thread: threading.Thread | None = None
         if self.enabled:
-            self._thread = threading.Thread(
-                target=self._worker, name="tesserae-telemetry", daemon=True
-            )
-            self._thread.start()
+            self._start_workers()
 
     @classmethod
     def from_settings(
@@ -171,6 +178,7 @@ class Telemetry:
         app_version: str,
         settings_app: dict,
         event_log: EventLog | None = None,
+        is_debug: bool = False,
     ) -> Telemetry:
         """Resolve enable-flag + env-var endpoint overrides into a config.
 
@@ -182,7 +190,11 @@ class Telemetry:
 
         ``event_log`` (optional): when provided, each send attempt is
         recorded as a ``type="telemetry"`` row so the Events tab shows
-        whether the endpoint is actually reachable."""
+        whether the endpoint is actually reachable.
+
+        ``is_debug``: marks events as debug traffic so the maintainer's
+        Aptabase dashboard can filter them out of the prod view. Passed
+        as ``args.dev`` from ``app.main._serve``."""
         enabled_setting = bool(settings_app.get("telemetry_enabled", False))
         host = os.environ.get("TESSERAE_TELEMETRY_HOST", "").strip() or APTABASE_HOST
         key = os.environ.get("TESSERAE_TELEMETRY_APP_KEY", "").strip() or APTABASE_APP_KEY
@@ -194,6 +206,7 @@ class Telemetry:
                 app_key=key,
                 instance_id=_ensure_instance_id(data_root),
                 app_version=app_version,
+                is_debug=is_debug,
             ),
             event_log=event_log,
         )
@@ -238,19 +251,30 @@ class Telemetry:
 
     def set_enabled(self, on: bool) -> None:
         """Toggle the enabled state at runtime. Spins up the worker
-        thread on the first transition to on (so a fresh app where
-        startup created a disabled Telemetry doesn't have to be
-        restarted after the user flips the toggle). On→off keeps the
-        worker around but ``send`` drops everything, so a future re-
-        enable picks up immediately."""
+        and heartbeat threads on the first transition to on (so a fresh
+        app where startup created a disabled Telemetry doesn't have to
+        be restarted after the user flips the toggle). On→off keeps the
+        threads around but ``send`` drops everything, so a future
+        re-enable picks up immediately."""
         can_enable = on and bool(self._cfg.host) and bool(self._cfg.app_key)
         self._cfg = dataclasses.replace(self._cfg, enabled=can_enable)
-        if can_enable and (self._thread is None or not self._thread.is_alive()):
+        if can_enable:
             self._stop.clear()
+            self._start_workers()
+
+    def _start_workers(self) -> None:
+        """Idempotent: only spawns a worker / heartbeat thread if one
+        isn't already running."""
+        if self._thread is None or not self._thread.is_alive():
             self._thread = threading.Thread(
                 target=self._worker, name="tesserae-telemetry", daemon=True
             )
             self._thread.start()
+        if self._heartbeat_thread is None or not self._heartbeat_thread.is_alive():
+            self._heartbeat_thread = threading.Thread(
+                target=self._heartbeat, name="tesserae-telemetry-heartbeat", daemon=True
+            )
+            self._heartbeat_thread.start()
 
     def test_send(self) -> str | None:
         """Synchronous send for immediate UI feedback when a user flips
@@ -268,8 +292,18 @@ class Telemetry:
             self._queue.put_nowait(None)  # wake the worker
         if self._thread is not None:
             self._thread.join(timeout=timeout)
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=timeout)
 
     # -- worker ---------------------------------------------------------
+
+    def _heartbeat(self) -> None:
+        """Fire ``app.heartbeat`` every ``HEARTBEAT_INTERVAL_S`` while
+        enabled. Wakes early on ``_stop`` so shutdown isn't blocked
+        waiting out the full hour."""
+        while not self._stop.wait(timeout=HEARTBEAT_INTERVAL_S):
+            if self.enabled:
+                self.send("app.heartbeat", {})
 
     def _worker(self) -> None:
         while not self._stop.is_set():
@@ -294,7 +328,7 @@ class Telemetry:
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
             "eventName": event_name,
-            "systemProps": _system_props(self._cfg.app_version),
+            "systemProps": _system_props(self._cfg.app_version, is_debug=self._cfg.is_debug),
             "props": props,
         }
         data = json.dumps(body).encode("utf-8")

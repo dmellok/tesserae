@@ -235,6 +235,77 @@ def test_system_props_match_aptabase_strict_shape(
     assert set(sys_props.keys()) == {"locale", "isDebug", "appVersion", "sdkVersion"}
 
 
+def test_heartbeat_fires_app_heartbeat_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The heartbeat thread should send an ``app.heartbeat`` after each
+    HEARTBEAT_INTERVAL_S window. We shorten the interval to a few ms so
+    the test isn't slow."""
+    captured_names: list[str] = []
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        body = json.loads(req.data or b"{}")
+        captured_names.append(body.get("eventName", ""))
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(tm, "HEARTBEAT_INTERVAL_S", 0.05)
+    t = _make_enabled(tmp_path, monkeypatch)
+    try:
+        # Give the heartbeat loop room for at least two ticks.
+        time.sleep(0.18)
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    assert captured_names.count("app.heartbeat") >= 2
+
+
+def test_heartbeat_stops_on_shutdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``shutdown()`` must cancel the heartbeat thread cleanly — without
+    this an idle Tesserae process would prevent a clean test teardown."""
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _FakeResp())
+    monkeypatch.setattr(tm, "HEARTBEAT_INTERVAL_S", 0.05)
+    t = _make_enabled(tmp_path, monkeypatch)
+    assert t._heartbeat_thread is not None and t._heartbeat_thread.is_alive()
+    t.shutdown(timeout=1.0)
+    assert not t._heartbeat_thread.is_alive()
+
+
+def test_is_debug_flag_threads_through_to_payload(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``--dev`` should mark events as debug traffic so the maintainer's
+    Aptabase dashboard can separate dev sessions from prod."""
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        captured["body"] = json.loads(req.data or b"{}")
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_HOST", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_APP_KEY", raising=False)
+    monkeypatch.setattr(tm, "APTABASE_HOST", "https://analytics.example.com")
+    monkeypatch.setattr(tm, "APTABASE_APP_KEY", "AK-1234")
+    t = tm.Telemetry.from_settings(
+        data_root=tmp_path,
+        app_version="0.4.6",
+        settings_app={"telemetry_enabled": True},
+        is_debug=True,
+    )
+    try:
+        t.send("app.started", {})
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    body = captured["body"]
+    assert isinstance(body, dict)
+    assert body["systemProps"]["isDebug"] is True
+
+
 def test_failure_silent_when_endpoint_unreachable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
