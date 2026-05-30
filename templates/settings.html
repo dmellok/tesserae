@@ -112,7 +112,55 @@
 
 {% set KIND_ICONS = {'app':'desktop-tower','panel':'frame-corners','broker':'broadcast','renderer':'image-square','device':'device-mobile','plugin':'puzzle-piece'} %}
 {% for section in sections %}
-<section class="card {% if section.kind == 'panel' %}panel-section{% endif %}" id="{{ section.id }}">
+<section class="card {% if section.kind == 'panel' %}panel-section{% endif %} {% if section.kind == 'device' %}device-card{% endif %}" id="{{ section.id }}">
+  {% if section.kind == 'device' %}
+  {# Device cards collapse to header + status by default. The whole
+     summary doubles as the toggle: click anywhere on the header (or
+     the dedicated chevron) to expand the configurable subsections.
+     ``open`` is set when the user is mid-calibration so the
+     "which number is in the top-left?" form is visible without an
+     extra click. #}
+  <details class="device-card-details"{% if calibrating == section.device_id %} open{% endif %}>
+    <summary class="device-card-summary">
+      <div class="device-card-summary-main">
+        <header class="card-head">
+          <h2>
+            <span class="icon-box"><i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
+            <span>{{ section.title }}</span>
+          </h2>
+          {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
+          {% if section.meta %}
+          <dl class="meta">
+            {% for key, value in section.meta.items() %}
+            <div><dt>{{ key }}</dt><dd><code>{{ value }}</code></dd></div>
+            {% endfor %}
+          </dl>
+          {% endif %}
+        </header>
+        {% if section.status %}
+        <div class="device-status">
+          <div class="status-line">
+            <span class="status-dot is-{{ section.status.health }}" aria-hidden="true"></span>
+            <span class="status-label">{{ section.status.relative }}</span>
+          </div>
+          {% if section.status.parsed %}
+          <dl class="status-fields">
+            {% for key, value in section.status.parsed.items() %}
+            <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
+            {% endfor %}
+          </dl>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+      <span class="device-card-toggle" aria-hidden="true">
+        <span class="device-card-toggle-label when-closed">Configure</span>
+        <span class="device-card-toggle-label when-open">Hide settings</span>
+        <i class="ph ph-caret-down device-card-chevron"></i>
+      </span>
+    </summary>
+    <div class="device-card-body">
+  {% else %}
   <header class="card-head">
     <h2>
       <span class="icon-box"><i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
@@ -127,21 +175,6 @@
     </dl>
     {% endif %}
   </header>
-
-  {% if section.kind == 'device' and section.status %}
-  <div class="device-status">
-    <div class="status-line">
-      <span class="status-dot is-{{ section.status.health }}" aria-hidden="true"></span>
-      <span class="status-label">{{ section.status.relative }}</span>
-    </div>
-    {% if section.status.parsed %}
-    <dl class="status-fields">
-      {% for key, value in section.status.parsed.items() %}
-      <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
-      {% endfor %}
-    </dl>
-    {% endif %}
-  </div>
   {% endif %}
 
   {% if section.endpoint %}
@@ -231,7 +264,7 @@
                    {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
           help='Match the physical panel. The .bin frame quantises to this palette; pick 7-colour for the older ACeP Inky Impression (e.g. 5.7") so orange renders and colours map correctly.') }}
       {% endif %}
-      <div class="actions">{{ button('Save panel', icon='frame-corners', variant='ghost') }}</div>
+      <div class="actions">{{ button('Save panel', icon='frame-corners') }}</div>
     </form>
   </div>
   {% endif %}
@@ -258,7 +291,7 @@
                       placeholder='HH:MM', type='time',
                       help='When this device wakes up. End < start wraps midnight (e.g. 22:00 → 07:00 = overnight).') }}
       </div>
-      <div class="actions">{{ button('Save quiet hours', icon='moon', variant='ghost') }}</div>
+      <div class="actions">{{ button('Save quiet hours', icon='moon') }}</div>
     </form>
   </div>
   {% endif %}
@@ -356,6 +389,10 @@
     </form>
     {% endif %}
   </div>
+  {% endif %}
+  {% if section.kind == 'device' %}
+    </div>
+  </details>
   {% endif %}
 </section>
 {% endfor %}
@@ -511,6 +548,7 @@
     {% endif %}
   </section>
 
+  {% if system_dev_mode %}
   <section class="card">
     {{ card_head('Telemetry', icon_name='broadcast', blurb='Two events (app.started, update.applied) go to ' ~ (system_telemetry_host or 'the project backend') ~ '. Every attempt is recorded as a "telemetry" row in the Events tab so you can see exactly what landed.') }}
 
@@ -525,13 +563,14 @@
     </p>
 
     <form method="post" action="{{ url_for('auth.system_telemetry_test') }}" class="form">
-      <p class="field-help">Fires a synchronous <code>app.started</code> event and flashes the outcome. If the backend is reachable you'll also see a new row under Events. Useful for re-checking the endpoint without toggling the setting off and on.</p>
+      <p class="field-help">Dev-mode only. Fires a synchronous <code>app.started</code> event and flashes the outcome. If the backend is reachable you'll also see a new row under Events.</p>
       <div class="actions">
         {{ button('Send test event', icon='paper-plane-tilt', disabled=not system_telemetry_enabled) }}
         <a class="button ghost" href="{{ url_for('events.index') }}?type=telemetry"><i class="ph ph-pulse"></i> View in Events</a>
       </div>
     </form>
   </section>
+  {% endif %}
 
   <section class="card">
     {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP — Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
@@ -563,6 +602,69 @@
     </form>
   </section>
 </div>
+
+{% if system_webhook_reveal_token %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="webhook-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="webhook-reveal-title"><i class="ph ph-webhooks-logo"></i> New webhook token</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Copy this now — it won't be shown in plaintext again. Refresh and it's masked like any other secret.</p>
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ system_webhook_reveal_token }}" readonly data-modal-token aria-label="Webhook token">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[data-modal]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        } catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok
+          ? '<i class="ph ph-check"></i> Copied'
+          : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
+{% endif %}
 {% endif %}
 
 <script>

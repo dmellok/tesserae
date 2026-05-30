@@ -190,22 +190,31 @@ def test_webhook_path_is_session_gate_bypassed(app: Flask) -> None:
 
 
 def test_regenerate_token_endpoint_persists_a_new_value(app: Flask) -> None:
-    """Settings → System → Regenerate mints + saves a token and the
-    next webhook call accepts it."""
+    """Settings → System → Regenerate mints + saves a token and surfaces
+    it once in a one-shot reveal modal (data-modal-token input on the
+    follow-up GET). After that render the value is gone from the
+    session; only the masked on-disk secret remains."""
     client = app.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     resp = client.post("/settings/system/webhook/regenerate", follow_redirects=True)
     assert resp.status_code == 200
-    # The flashed body contains the new token (one-shot reveal).
     body = resp.get_data(as_text=True)
-    # Token is 32 hex chars (TOKEN_BYTES=16, .hex() doubles it).
+    # Token is 32 hex chars (TOKEN_BYTES=16, .hex() doubles it). It
+    # renders inside the modal's <input data-modal-token value="…">.
     import re
 
-    match = re.search(r"New webhook token: ([0-9a-f]{32})", body)
-    assert match, "regenerate should flash the new token in plaintext"
+    match = re.search(r'data-modal-token[^>]*value="([0-9a-f]{32})"', body)
+    if match is None:
+        # Attribute order isn't guaranteed; try the reverse pairing.
+        match = re.search(r'value="([0-9a-f]{32})"[^>]*data-modal-token', body)
+    assert match, "regenerate should reveal the new token in a modal"
     token = match.group(1)
-    # The stored value matches what was flashed. The on-disk key is
-    # ``webhook_token_secret`` (``_secret`` suffix marks it for masking
-    # in the admin UI); ``get_section`` returns raw keys.
+    # The stored value matches the modal-displayed token. The on-disk
+    # key is ``webhook_token_secret`` (``_secret`` suffix marks it for
+    # masking in the admin UI); ``get_section`` returns raw keys.
     stored = app.config["SETTINGS_STORE"].get_section("app").get("webhook_token_secret")
     assert stored == token
+    # Reload the System page — the session-stashed reveal is popped on
+    # first GET, so a refresh must NOT re-show the token.
+    refresh = client.get("/settings/system").get_data(as_text=True)
+    assert token not in refresh

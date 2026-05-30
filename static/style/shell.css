@@ -624,3 +624,83 @@ body.lightbox-open { overflow: hidden; }
   from { opacity: 0; }
   to   { opacity: 1; }
 }
+
+
+/* ----- Modal ------------------------------------------------------- */
+/* Generic centred modal for one-shot reveals (e.g. freshly-minted
+   webhook tokens that won't ever be shown again). Driven by a small
+   inline script — open by inclusion in the rendered HTML, close via
+   the [data-modal-close] buttons, ESC, or backdrop click. */
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  animation: lightbox-fade 120ms ease-out;
+}
+.modal-card {
+  background: var(--surface, #fff);
+  color: var(--text, #111);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.modal-head,
+.modal-foot {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.modal-head { border-bottom: 1px solid var(--rule, rgba(0, 0, 0, 0.08)); }
+.modal-foot {
+  border-top: 1px solid var(--rule, rgba(0, 0, 0, 0.08));
+  justify-content: flex-end;
+}
+.modal-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  font-size: 18px;
+}
+.modal-close:hover { background: rgba(0, 0, 0, 0.06); }
+.modal-body { padding: 20px; }
+.modal-body .lede { margin-top: 0; }
+.token-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.token-row .token-input {
+  flex: 1;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.95rem;
+  padding: 10px 12px;
+  border: 1px solid var(--rule, rgba(0, 0, 0, 0.14));
+  border-radius: 4px;
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  color: inherit;
+  min-width: 0;
+}
+body.modal-open { overflow: hidden; }

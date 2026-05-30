@@ -37,6 +37,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 from werkzeug.wrappers import Response
@@ -580,6 +581,12 @@ def settings_area(area: str) -> str | Response:
     system_telemetry_enabled = False
     system_telemetry_host = ""
     system_webhook_token_set = False
+    # One-shot reveal after /settings/system/webhook/regenerate — pop
+    # so a refresh doesn't re-show the token. Only honoured on the
+    # System tab, which is the only place the modal renders.
+    system_webhook_reveal_token = (
+        session.pop("_webhook_token_reveal", "") if area == "system" else ""
+    )
     if area == "system":
         updater = current_app.config["UPDATER"]
         try:
@@ -625,6 +632,7 @@ def settings_area(area: str) -> str | Response:
         system_telemetry_enabled=system_telemetry_enabled,
         system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,
+        system_webhook_reveal_token=system_webhook_reveal_token,
     )
 
 
@@ -828,25 +836,27 @@ def system_backup_delete(backup_id: str) -> Response:
 
 @bp.post("/settings/system/webhook/regenerate")
 def system_webhook_regenerate() -> Response:
-    """Mint a fresh random webhook token and persist it. Flashed once
-    in plaintext so the user can copy it — after the page reload the
-    Settings UI masks it like any other ``_secret`` value."""
+    """Mint a fresh random webhook token and persist it. Stashed in the
+    session as ``_webhook_token_reveal`` so the Settings GET that follows
+    the redirect can pop it into a one-shot modal with a copy button.
+    After that render it's gone — the disk value is masked like any
+    other ``_secret`` field."""
     from app.webhook_routes import generate_token
 
     token = generate_token()
     _settings().update_section("app", {"webhook_token_secret": token})
-    flash(
-        f"New webhook token: {token} — copy it now, it won't be shown in plaintext again.",
-        "ok",
-    )
+    session["_webhook_token_reveal"] = token
     return _system_redirect()
 
 
 @bp.post("/settings/system/telemetry/test")
 def system_telemetry_test() -> Response:
     """Fire a synchronous app.started and surface the outcome in a flash
-    + the Events tab. Useful for re-checking the endpoint without
-    toggling the setting off and on."""
+    + the Events tab. Dev-only — the card is hidden in production
+    builds, so this route is gated to ``current_app.debug`` to avoid
+    leaving an undocumented endpoint exposed."""
+    if not current_app.debug:
+        return _system_redirect()
     telemetry = current_app.config.get("TELEMETRY")
     if telemetry is None or not telemetry.enabled:
         flash(

@@ -83,10 +83,26 @@ def test_backup_download_404_when_missing(app: Flask) -> None:
     assert resp.status_code == 404
 
 
+def test_telemetry_test_button_is_dev_only(app: Flask) -> None:
+    """The "Send test event" button is dev-only — the card is hidden in
+    production builds and the route is gated to ``current_app.debug``.
+    Hitting it without debug should be a silent no-op redirect, not a
+    flash that admits the route exists."""
+    client = app.test_client()
+    _sign_in(client)
+    # Test mode runs with debug=False, so the route returns the system
+    # redirect without flashing anything.
+    resp = client.post("/settings/system/telemetry/test", follow_redirects=True)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Telemetry is off" not in body
+
+
 def test_telemetry_test_button_flashes_when_disabled(app: Flask) -> None:
-    """When telemetry is off (the default in testing mode), the test-event
-    button should bounce back with a friendly explanation rather than
-    pretending to send."""
+    """In dev mode, when telemetry is off, the test-event button should
+    bounce back with a friendly explanation rather than pretending to
+    send."""
+    app.debug = True
     client = app.test_client()
     _sign_in(client)
     resp = client.post("/settings/system/telemetry/test", follow_redirects=True)
@@ -99,7 +115,9 @@ def test_telemetry_test_button_records_event_when_enabled(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With telemetry enabled and a stubbed urlopen, hitting the test
-    route should write a telemetry row to the EventLog."""
+    route should write a telemetry row to the EventLog. The route is
+    dev-gated, so flip ``app.debug`` for the test."""
+    app.debug = True
     import dataclasses
     from io import BytesIO
 
