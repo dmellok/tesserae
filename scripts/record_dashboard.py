@@ -41,9 +41,9 @@ HOLD_EDITOR_INTRO = 4.5
 HOLD_AFTER_LAYOUT = 3.5
 HOLD_CELL_PICK = 2.8
 HOLD_AFTER_WIDGET = 3.0
-HOLD_CUSTOM_OPEN = 2.5    # the Custom-layout details expanded
-HOLD_AFTER_INSERT = 3.0   # let the new cell settle into the board
-HOLD_PREVIEW = 5.5        # the payoff frame — give it room
+HOLD_CUSTOM_OPEN = 2.5  # the Custom-layout details expanded
+HOLD_AFTER_INSERT = 3.0  # let the new cell settle into the board
+HOLD_PREVIEW = 5.5  # the payoff frame — give it room
 HOLD_DONE = 1.0
 BEAT_S = 0.5
 READ_PAUSE_S = 1.2
@@ -134,9 +134,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     # browser's built-in label-for-input wiring AND lets the label's
     # own focus/hover styling animate in the recording, which clicking
     # the bare input wouldn't.
-    await cursor.click(
-        page.locator('label.device-check:has(input[value="hallway"])')
-    )
+    await cursor.click(page.locator('label.device-check:has(input[value="hallway"])'))
     # data-reload-on-change reloads the editor after the check; wait
     # for the editor grid to re-appear before continuing.
     await page.wait_for_selector(".editor-grid", state="visible", timeout=10_000)
@@ -187,9 +185,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await cursor.click(page.locator("details.custom-layout > summary"))
     # The board re-uses the same cells data; wait for its DOM nodes to
     # render before reaching for them.
-    await page.wait_for_selector(
-        "[data-layout-board] .le-cell", state="visible", timeout=10_000
-    )
+    await page.wait_for_selector("[data-layout-board] .le-cell", state="visible", timeout=10_000)
     await cursor.park_centre()
     await asyncio.sleep(HOLD_CUSTOM_OPEN)
 

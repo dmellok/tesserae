@@ -30,7 +30,7 @@ from _recording import CursorDriver, add_common_cli_args, run_scenario
 HOLD_SETUP = 2.8
 HOLD_WELCOME = 2.8
 HOLD_BROKER = 3.8
-HOLD_DEVICE = 5.5     # id, kind, panel preset, custom w/h, rotation
+HOLD_DEVICE = 5.5  # id, kind, panel preset, custom w/h, rotation
 HOLD_DASHBOARD = 3.8
 HOLD_TELEMETRY = 6.5  # full consent block, what gets sent, what doesn't
 HOLD_DONE = 1.0

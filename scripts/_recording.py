@@ -291,16 +291,14 @@ class CursorDriver:
             )
         # Update last_pos so the next glide starts from the parked
         # position rather than the previous page's stale coords.
-        self.last_pos[0] = await self.page.evaluate(
-            "() => window.innerWidth / 2"
-        ) or self.last_pos[0]
-        self.last_pos[1] = await self.page.evaluate(
-            "() => window.innerHeight / 2"
-        ) or self.last_pos[1]
+        self.last_pos[0] = (
+            await self.page.evaluate("() => window.innerWidth / 2") or self.last_pos[0]
+        )
+        self.last_pos[1] = (
+            await self.page.evaluate("() => window.innerHeight / 2") or self.last_pos[1]
+        )
 
-    async def focus_on(
-        self, locator: Any, *, hold_s: float | None = None
-    ) -> tuple[float, float]:
+    async def focus_on(self, locator: Any, *, hold_s: float | None = None) -> tuple[float, float]:
         if hold_s is None:
             hold_s = self.FOCUS_HOLD_S
         # Smooth scroll instead of Playwright's instant
@@ -333,15 +331,12 @@ class CursorDriver:
         distance = (dx * dx + dy * dy) ** 0.5
         duration_ms = int(self.GLIDE_BASE_MS + distance * self.GLIDE_PER_PX_MS)
         await self.page.evaluate(
-            "([fx, fy, tx, ty, dur, arc]) => "
-            "window.__tesserae_glide(fx, fy, tx, ty, dur, arc)",
+            "([fx, fy, tx, ty, dur, arc]) => window.__tesserae_glide(fx, fy, tx, ty, dur, arc)",
             [fx, fy, cx, cy, duration_ms, self.GLIDE_ARC],
         )
         self.last_pos[0], self.last_pos[1] = cx, cy
         await asyncio.sleep(duration_ms / 1000)
-        await self.page.evaluate(
-            "([x, y]) => window.__tesserae_focus(x, y)", [cx, cy]
-        )
+        await self.page.evaluate("([x, y]) => window.__tesserae_focus(x, y)", [cx, cy])
         await asyncio.sleep(hold_s)
         return (cx, cy)
 
@@ -358,9 +353,7 @@ class CursorDriver:
         sticky topbar that scroll_into_view_if_needed can't unstick."""
         cx, cy = await self.focus_on(locator, hold_s=hold_s)
         if cx or cy:
-            await self.page.evaluate(
-                "([x, y]) => window.__tesserae_click(x, y)", [cx, cy]
-            )
+            await self.page.evaluate("([x, y]) => window.__tesserae_click(x, y)", [cx, cy])
         await locator.click(force=force)
         # The click may trigger a navigation that tears down the JS
         # context before the blur evaluate lands. That's a cosmetic
@@ -368,9 +361,7 @@ class CursorDriver:
         with contextlib.suppress(Exception):
             await self.page.evaluate("() => window.__tesserae_blur()")
 
-    async def type_into(
-        self, locator: Any, text: str, *, hold_s: float | None = None
-    ) -> None:
+    async def type_into(self, locator: Any, text: str, *, hold_s: float | None = None) -> None:
         await self.focus_on(locator, hold_s=hold_s)
         await locator.type(text, delay=self.TYPE_DELAY_MS)
         with contextlib.suppress(Exception):
@@ -389,9 +380,7 @@ class CursorDriver:
         control and ring it so the viewer sees an action happened."""
         cx, cy = await self.focus_on(locator, hold_s=hold_s)
         if cx or cy:
-            await self.page.evaluate(
-                "([x, y]) => window.__tesserae_click(x, y)", [cx, cy]
-            )
+            await self.page.evaluate("([x, y]) => window.__tesserae_click(x, y)", [cx, cy])
         await locator.select_option(value)
         with contextlib.suppress(Exception):
             await self.page.evaluate("() => window.__tesserae_blur()")
@@ -423,9 +412,7 @@ class CursorDriver:
         # "click the select").
         cx, cy = await self.focus_on(locator, hold_s=hold_s)
         if cx or cy:
-            await self.page.evaluate(
-                "([x, y]) => window.__tesserae_click(x, y)", [cx, cy]
-            )
+            await self.page.evaluate("([x, y]) => window.__tesserae_click(x, y)", [cx, cy])
 
         # Promote the select into a listbox. ``size`` makes the options
         # render as a sibling block inside the document, captured by
@@ -458,19 +445,14 @@ class CursorDriver:
             distance = (dx * dx + dy * dy) ** 0.5
             duration_ms = int(self.GLIDE_BASE_MS + distance * self.GLIDE_PER_PX_MS)
             await self.page.evaluate(
-                "([fx, fy, tx, ty, dur, arc]) => "
-                "window.__tesserae_glide(fx, fy, tx, ty, dur, arc)",
+                "([fx, fy, tx, ty, dur, arc]) => window.__tesserae_glide(fx, fy, tx, ty, dur, arc)",
                 [fx, fy, ox, oy, duration_ms, self.GLIDE_ARC],
             )
             self.last_pos[0], self.last_pos[1] = ox, oy
             await asyncio.sleep(duration_ms / 1000)
-            await self.page.evaluate(
-                "([x, y]) => window.__tesserae_focus(x, y)", [ox, oy]
-            )
+            await self.page.evaluate("([x, y]) => window.__tesserae_focus(x, y)", [ox, oy])
             await asyncio.sleep(option_hold_s)
-            await self.page.evaluate(
-                "([x, y]) => window.__tesserae_click(x, y)", [ox, oy]
-            )
+            await self.page.evaluate("([x, y]) => window.__tesserae_click(x, y)", [ox, oy])
 
         # Click the option for real — this fires ``change`` and any
         # ``data-reload-on-change`` handler swaps the cell's contents.
@@ -632,8 +614,7 @@ def add_common_cli_args(parser: argparse.ArgumentParser) -> None:
         "--gif-width",
         type=int,
         default=800,
-        help="Width in pixels for GIF output, height auto-scales "
-        "(default: 800).",
+        help="Width in pixels for GIF output, height auto-scales (default: 800).",
     )
     parser.add_argument("--viewport-width", type=int, default=1280)
     parser.add_argument("--viewport-height", type=int, default=1024)
@@ -687,9 +668,7 @@ def run_scenario(
         output.parent.mkdir(parents=True, exist_ok=True)
         if want_gif:
             print(f"[record] transcoding to gif → {output}")
-            _transcode_to_gif(
-                webm, output, fps=args.gif_fps, width=args.gif_width
-            )
+            _transcode_to_gif(webm, output, fps=args.gif_fps, width=args.gif_width)
         elif want_mp4:
             print(f"[record] transcoding to mp4 → {output}")
             _transcode_to_mp4(webm, output)
