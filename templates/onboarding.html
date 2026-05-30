@@ -51,6 +51,7 @@
           <label>Point your clients at</label>
           <p class="wizard-broker-url"><code>{{ builtin_url }}</code></p>
           <p class="field-help">The built-in broker binds all interfaces on port {{ builtin_port }}, so your Pi / ESP32 clients connect to this address. Set a username + password below to lock it down on your network.</p>
+          <p class="field-help"><strong>MQTT v3.1.1 only.</strong> Tesserae's own clients are fine (they speak 3.1.1), but external tools — MQTT Explorer, Home Assistant, Node-RED — default to v5 and will fail to connect. Either set their protocol version to 3.1.1, or install Mosquitto and point the External broker fields at it instead.</p>
         </div>
         {{ text_input('builtin-user', 'builtin_username', 'Username (optional)', value=broker.get('embedded_username', '')) }}
         {{ text_input('builtin-pass', 'builtin_password', 'Password (optional)', value='', type='password') }}

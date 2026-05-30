@@ -261,7 +261,14 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "help": (
             "Run an in-process MQTT broker (amqtt). Convenient when you "
             "don't have a Mosquitto host handy; leave off to point Tesserae "
-            "at an external broker instead."
+            "at an external broker instead. "
+            "Heads-up: amqtt only speaks MQTT v3.1.1. Tesserae's own Pi / "
+            "ESP32 clients are fine (paho-mqtt defaults to 3.1.1), but if "
+            "you connect with MQTT Explorer / MQTTX / Home Assistant / "
+            "Node-RED you'll need to set their protocol version to 3.1.1 — "
+            'v5 clients get rejected with "Invalid protocol". Need full '
+            "v5 support? Install Mosquitto (apt/brew) and point Tesserae "
+            "at it via the Host / Port fields below."
         ),
     },
     {"name": "host", "type": "string", "label": "Host", "default": ""},
