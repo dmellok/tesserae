@@ -177,54 +177,31 @@
   </header>
   {% endif %}
 
-  {% if section.endpoint %}
-  <form method="post" action="{{ section.endpoint }}" class="form">
-    {% if section.supports_toggle %}
-      {{ auto_field(section.id ~ '-enabled', '_enabled', {
-          'type': 'switch',
-          'label': 'Enabled',
-          'help': 'Push pipeline skips this renderer when off — settings stay saved.',
-      }, section.enabled) }}
-    {% endif %}
-    {# Broker card: wrap the external-broker fields and the built-in-broker
-       fields in two groups the script below shows/hides off the
-       ``embedded_enabled`` switch. Other sections render flat. #}
-    {% set ns = namespace(group=none) %}
-    {% for field in section.fields %}
-      {% set value = section.state.get(field.name, field.get('default', '')) %}
-      {% set field_id = section.id ~ '-' ~ field.name %}
-      {% set this_group = none %}
-      {% if section.kind == 'broker' %}
-        {% if field.name in ('host', 'port', 'username', 'password') %}
-          {% set this_group = 'external' %}
-        {% elif field.name in ('embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password') %}
-          {% set this_group = 'embedded' %}
-        {% endif %}
-      {% endif %}
-      {% if this_group != ns.group %}
-        {% if ns.group %}</div>{% endif %}
-        {% if this_group == 'external' %}<div class="external-broker-fields">
-        {% elif this_group == 'embedded' %}<div class="embedded-broker-fields">{% endif %}
-        {% set ns.group = this_group %}
-      {% endif %}
-      {% if section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
-        <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
-      {% else %}
-        {{ auto_field(field_id, field.name, field, value) }}
-      {% endif %}
-    {% endfor %}
-    {% if ns.group %}</div>{% endif %}
-    <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
-  </form>
-  {% endif %}
+  {% if section.kind == 'device' and section.combined_endpoint %}
+  {# Single form for the whole device card — renderer-config + panel
+     + quiet-hours. The handler at section.combined_endpoint fans out
+     to the same service helpers the per-subsection endpoints
+     (/panel, /quiet-hours, /settings/device-<id>) call, so behaviour
+     matches one-for-one. One Save at the bottom for the whole stack. #}
+  <form method="post" action="{{ section.combined_endpoint }}" class="form device-combined-form">
 
-  {% if section.panel_endpoint and section.panel %}
-  {# Panel edit — display orientation + dims for a registered instance.
-     The JS below swaps w/h live when the aspect (landscape↔portrait)
-     changes so the form is WYSIWYG; the backend persists what's shown. #}
-  <div class="device-subsection">
-    <p class="device-subhead">Appearance &amp; panel</p>
-    <form method="post" action="{{ section.panel_endpoint }}" class="form device-panel-form">
+    {% if section.fields %}
+    <div class="device-subsection">
+      <p class="device-subhead">Device config</p>
+      {% for field in section.fields %}
+        {% set value = section.state.get(field.name, field.get('default', '')) %}
+        {% set field_id = section.id ~ '-' ~ field.name %}
+        {{ auto_field(field_id, field.name, field, value) }}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if section.panel %}
+    {# Panel edit — orientation + dims for a registered instance.
+       The JS below swaps w/h live when the aspect (landscape↔portrait)
+       changes so the form is WYSIWYG; the backend persists what's shown. #}
+    <div class="device-subsection">
+      <p class="device-subhead">Appearance &amp; panel</p>
       {# Curated device icons — a small, display-oriented set rather than the
          editor's full icon search; covers form-factors + a few rooms. A
          current value outside the set is appended so it stays selectable. #}
@@ -264,20 +241,17 @@
                    {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
           help='Match the physical panel. The .bin frame quantises to this palette; pick 7-colour for the older ACeP Inky Impression (e.g. 5.7") so orange renders and colours map correctly.') }}
       {% endif %}
-      <div class="actions">{{ button('Save panel', icon='frame-corners') }}</div>
-    </form>
-  </div>
-  {% endif %}
+    </div>
+    {% endif %}
 
-  {% if section.quiet_hours_endpoint %}
-  {# Per-device quiet-hours override. Resolves first in
-     app.quiet_hours.resolve_quiet_hours — when enabled here, this
-     window takes priority over the global Settings → Server → App
-     setting. Disabling (or clearing all fields) drops the block and
-     the device falls back to the global default. #}
-  <div class="device-subsection">
-    <p class="device-subhead">Quiet hours override</p>
-    <form method="post" action="{{ section.quiet_hours_endpoint }}" class="form device-quiet-hours-form">
+    {% if section.quiet_hours_endpoint %}
+    {# Per-device quiet-hours override. Resolves first in
+       app.quiet_hours.resolve_quiet_hours — when enabled here, this
+       window takes priority over the global Settings → Server → App
+       setting. Disabling (or clearing all fields) drops the block and
+       the device falls back to the global default. #}
+    <div class="device-subsection">
+      <p class="device-subhead">Quiet hours override</p>
       {{ switch(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Override the global quiet-hours window for this device',
                 checked=section.quiet_hours.get('enabled', False),
                 help='When off, the device follows whatever Settings → Server → App says (or has no quiet hours if that is off too).') }}
@@ -291,9 +265,52 @@
                       placeholder='HH:MM', type='time',
                       help='When this device wakes up. End < start wraps midnight (e.g. 22:00 → 07:00 = overnight).') }}
       </div>
-      <div class="actions">{{ button('Save quiet hours', icon='moon') }}</div>
-    </form>
-  </div>
+    </div>
+    {% endif %}
+
+    <div class="actions device-combined-actions">
+      {{ button('Save changes', icon='floppy-disk') }}
+    </div>
+  </form>
+  {% elif section.endpoint %}
+  <form method="post" action="{{ section.endpoint }}" class="form">
+    {% if section.supports_toggle %}
+      {{ auto_field(section.id ~ '-enabled', '_enabled', {
+          'type': 'switch',
+          'label': 'Enabled',
+          'help': 'Push pipeline skips this renderer when off — settings stay saved.',
+      }, section.enabled) }}
+    {% endif %}
+    {# Broker card: wrap the external-broker fields and the built-in-broker
+       fields in two groups the script below shows/hides off the
+       ``embedded_enabled`` switch. Other sections render flat. #}
+    {% set ns = namespace(group=none) %}
+    {% for field in section.fields %}
+      {% set value = section.state.get(field.name, field.get('default', '')) %}
+      {% set field_id = section.id ~ '-' ~ field.name %}
+      {% set this_group = none %}
+      {% if section.kind == 'broker' %}
+        {% if field.name in ('host', 'port', 'username', 'password') %}
+          {% set this_group = 'external' %}
+        {% elif field.name in ('embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password') %}
+          {% set this_group = 'embedded' %}
+        {% endif %}
+      {% endif %}
+      {% if this_group != ns.group %}
+        {% if ns.group %}</div>{% endif %}
+        {% if this_group == 'external' %}<div class="external-broker-fields">
+        {% elif this_group == 'embedded' %}<div class="embedded-broker-fields">{% endif %}
+        {% set ns.group = this_group %}
+      {% endif %}
+      {% if section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
+        <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
+      {% else %}
+        {{ auto_field(field_id, field.name, field, value) }}
+      {% endif %}
+    {% endfor %}
+    {% if ns.group %}</div>{% endif %}
+    <div class="actions">{{ button('Save', icon='floppy-disk') }}</div>
+  </form>
   {% endif %}
 
   {% if section.timetable_entries is defined and section.quiet_hours_endpoint %}
@@ -578,10 +595,10 @@
     <p>
       Status: {% if system_webhook_token_set %}
         <span class="pill is-ok">token set</span>
-        <span class="muted">— masked in Settings → Server → App. Regenerate below to mint a new one.</span>
+        <span class="muted">— masked. Regenerate to mint a new one, or paste a custom value below.</span>
       {% else %}
         <span class="pill">no token</span>
-        <span class="muted">— generate one below, or paste your own into Settings → Server → App.</span>
+        <span class="muted">— webhooks are disabled until you set one. Regenerate below, or paste your own.</span>
       {% endif %}
     </p>
 
@@ -595,9 +612,24 @@
     </details>
 
     <form method="post" action="{{ url_for('auth.system_webhook_regenerate') }}" class="form" onsubmit="return confirm('Generate a new token? Any automation using the old token will stop working.');">
-      <p class="field-help">Mints a fresh random token and shows it in plaintext one time so you can copy it. After the page reload it's masked like any other secret.</p>
+      <p class="field-help">Mints a fresh random token and shows it in a one-shot modal so you can copy it. After that it's masked like any other secret.</p>
       <div class="actions">
         {{ button('Regenerate token', icon='arrows-clockwise') }}
+      </div>
+    </form>
+
+    <form method="post" action="{{ url_for('auth.system_webhook_set') }}" class="form">
+      {{ text_input('webhook-custom-token', 'webhook_token', 'Custom token',
+                    value='', placeholder='Paste a token to match what your automation already uses',
+                    help='Use this only if you need a specific value (e.g. an existing secret in Home Assistant). Leave blank and click Clear to disable webhooks entirely.') }}
+      <div class="actions">
+        {{ button('Save custom token', icon='floppy-disk') }}
+        {% if system_webhook_token_set %}
+        <button type="submit" class="ghost" name="clear" value="1"
+                onclick="return confirm('Clear the webhook token? POST /api/v1/push will return 503 until you set or regenerate one.');">
+          <i class="ph ph-x" aria-hidden="true"></i><span>Clear</span>
+        </button>
+        {% endif %}
       </div>
     </form>
   </section>

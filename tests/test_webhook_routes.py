@@ -218,3 +218,37 @@ def test_regenerate_token_endpoint_persists_a_new_value(app: Flask) -> None:
     # first GET, so a refresh must NOT re-show the token.
     refresh = client.get("/settings/system").get_data(as_text=True)
     assert token not in refresh
+
+
+def test_set_endpoint_saves_a_custom_token(app: Flask) -> None:
+    """Settings → System → Webhook also accepts a pasted custom token,
+    for users who need to match a secret their automation tool already
+    has. Posts to /settings/system/webhook/set."""
+    client = app.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/settings/system/webhook/set",
+        data={"webhook_token": "my-custom-secret"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    stored = app.config["SETTINGS_STORE"].get_section("app").get("webhook_token_secret")
+    assert stored == "my-custom-secret"
+
+
+def test_set_endpoint_clear_wipes_the_token(app: Flask) -> None:
+    """The Clear button on the Webhook card POSTs the same endpoint
+    with ``clear=1`` and the on-disk secret is wiped — POST /api/v1/push
+    returns 503 again."""
+    client = app.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    # Seed a token, then clear it.
+    client.post("/settings/system/webhook/set", data={"webhook_token": "abc123"})
+    resp = client.post(
+        "/settings/system/webhook/set",
+        data={"clear": "1"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    stored = app.config["SETTINGS_STORE"].get_section("app").get("webhook_token_secret")
+    assert not stored

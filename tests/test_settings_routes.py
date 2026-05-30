@@ -452,6 +452,71 @@ def test_update_quiet_hours_persists_per_device_override(
     assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
 
 
+def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
+    app_with_gate: Flask, tmp_path: Path
+) -> None:
+    """The device card now has a single Save button posting to
+    ``/settings/devices/<id>/save``. The handler fans out to the same
+    service helpers the per-subsection endpoints call, so a single
+    POST with panel + quiet-hours inputs persists both atomically."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    resp = client.post(
+        "/settings/devices/esp32_lab/save",
+        data={
+            "panel_w": "600",
+            "panel_h": "448",
+            "panel_orientation": "portrait",
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "22:30",
+            "quiet_hours_end": "07:00",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev is not None and dev.panel is not None
+    assert (dev.panel["w"], dev.panel["h"]) == (600, 448)
+    assert dev.panel["orientation"] == "portrait"
+    qh = dev.manifest.get("quiet_hours")
+    assert qh == {"enabled": True, "start": "22:30", "end": "07:00"}
+
+
+def test_combined_save_skips_subsections_with_no_fields(app_with_gate: Flask) -> None:
+    """The combined handler detects each subsection by presence of its
+    inputs. A POST missing panel_w/panel_h leaves the panel alone."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    dev_before = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev_before is not None and dev_before.panel is not None
+    panel_before = dict(dev_before.panel)
+    # Only quiet-hours fields submitted — panel untouched.
+    resp = client.post(
+        "/settings/devices/esp32_lab/save",
+        data={
+            "quiet_hours_enabled": "on",
+            "quiet_hours_start": "01:00",
+            "quiet_hours_end": "02:00",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    dev_after = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
+    assert dev_after is not None and dev_after.panel is not None
+    assert (dev_after.panel["w"], dev_after.panel["h"]) == (
+        panel_before["w"],
+        panel_before["h"],
+    )
+
+
 def test_update_panel_refuses_built_in_kind(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

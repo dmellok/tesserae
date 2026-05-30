@@ -178,20 +178,6 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
-        "name": "webhook_token",
-        "type": "text",
-        "label": "Webhook token",
-        "default": "",
-        "secret": True,
-        "help": (
-            "Bearer token for the POST /api/v1/push webhook endpoint. "
-            "Leave blank to disable webhooks entirely. Use the "
-            "'Regenerate' action in Settings → System to mint a fresh "
-            "random token; paste your own here if you want a specific "
-            "value (e.g. matching what your automation tool already has)."
-        ),
-    },
-    {
         "name": "telemetry_enabled",
         "type": "switch",
         "label": "Send anonymous usage telemetry",
@@ -849,6 +835,26 @@ def system_webhook_regenerate() -> Response:
     return _system_redirect()
 
 
+@bp.post("/settings/system/webhook/set")
+def system_webhook_set() -> Response:
+    """Set or clear the webhook bearer token by hand. ``clear=1`` wipes
+    the on-disk value (webhooks return 503 until re-set). Otherwise the
+    pasted ``webhook_token`` value replaces whatever was there. Used
+    when an automation tool already has a specific secret and the user
+    wants Tesserae to match it instead of issuing a fresh one."""
+    if request.form.get("clear"):
+        _settings().update_section("app", {"webhook_token_secret": ""})
+        flash("Webhook token cleared. POST /api/v1/push will return 503.", "ok")
+        return _system_redirect()
+    token = (request.form.get("webhook_token") or "").strip()
+    if not token:
+        flash("Paste a token first, or use Clear to disable webhooks.", "error")
+        return _system_redirect()
+    _settings().update_section("app", {"webhook_token_secret": token})
+    flash("Webhook token saved.", "ok")
+    return _system_redirect()
+
+
 @bp.post("/settings/system/telemetry/test")
 def system_telemetry_test() -> Response:
     """Fire a synchronous app.started and surface the outcome in a flash
@@ -1238,6 +1244,115 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
 
+@bp.post("/settings/devices/<instance_id>/save")
+def devices_update_combined(instance_id: str) -> Response:
+    """One-shot save for the whole device card.
+
+    The card composes three independent subsections — renderer-defined
+    config fields, panel (orientation/dims/gamut/icon/underscan), and
+    per-device quiet-hours override. The template now wraps them in
+    one form posting here; this handler fans out to the same service
+    helpers the per-subsection endpoints (``/panel``, ``/quiet-hours``,
+    and ``/settings/device-<id>``) call so behaviour matches one-for-
+    one. Each subsection is detected by presence of its inputs and
+    runs independently — an error in one is flashed but doesn't block
+    the others. Transport rebuild happens once at the end."""
+    anchor = f"device-{instance_id}"
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+    devices_registry = _devices()
+    device = devices_registry.get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+
+    form = request.form
+    settings_store = _settings()
+    ok_messages: list[str] = []
+    any_change = False
+
+    # 1. Renderer-defined config fields. Mirror settings_update("device-<id>").
+    schema_fields = _config_fields_from_schema(device.config_schema)
+    if schema_fields and device.config_topic is not None:
+        values = _values_from_form(schema_fields)
+        ok, err = device.validate_config(values)
+        if not ok:
+            flash(f"Invalid {device.name} config: {err}", "error")
+        else:
+            settings_store.update_for_namespace("devices", instance_id, values, schema_fields)
+            transport = _transport()
+            try:
+                transport.publish(
+                    device.config_topic,
+                    json.dumps(values).encode("utf-8"),
+                    qos=1,
+                    retain=True,
+                )
+                ok_messages.append("config saved and published")
+            except RuntimeError as exc:
+                flash(f"{device.name} config saved, publish failed: {exc}", "error")
+                ok_messages.append("config saved (publish failed)")
+            any_change = True
+
+    # 2. Panel (orientation + dims + gamut + icon + underscan).
+    if "panel_w" in form or "panel_h" in form:
+        try:
+            new_w = int(form.get("panel_w") or 0)
+            new_h = int(form.get("panel_h") or 0)
+        except ValueError:
+            flash("Panel width and height must be whole numbers.", "error")
+            return redirect_to
+        underscan_raw = form.get("panel_underscan")
+        underscan: int | None = None
+        if underscan_raw:
+            try:
+                underscan = max(0, int(underscan_raw))
+            except ValueError:
+                underscan = 0
+        panel_result = device_service.update_instance_panel(
+            devices=devices_registry,
+            renderers=_renderers(),
+            data_root=_device_data_root(),
+            instance_id=instance_id,
+            w=new_w,
+            h=new_h,
+            orientation=form.get("panel_orientation") or "landscape",
+            gamut=form.get("panel_gamut"),
+            underscan=underscan,
+            icon=form.get("device_icon"),
+        )
+        if not panel_result.ok or panel_result.device is None:
+            flash(panel_result.error or "Panel update failed.", "error")
+        else:
+            ok_messages.append("panel updated")
+            any_change = True
+
+    # 3. Quiet-hours override. The inputs always submit on the combined
+    # form (toggle, start, end). Empty start+end with toggle off clears
+    # the block; the service helper handles that.
+    if "quiet_hours_enabled" in form or "quiet_hours_start" in form or "quiet_hours_end" in form:
+        qh_result = device_service.update_instance_quiet_hours(
+            devices=devices_registry,
+            renderers=_renderers(),
+            data_root=_device_data_root(),
+            instance_id=instance_id,
+            enabled=bool(form.get("quiet_hours_enabled")),
+            start=form.get("quiet_hours_start"),
+            end=form.get("quiet_hours_end"),
+        )
+        if not qh_result.ok:
+            flash(qh_result.error or "Couldn't save quiet hours.", "error")
+        else:
+            ok_messages.append("quiet hours saved")
+            any_change = True
+
+    if any_change:
+        _rebuild_transport_fn()()
+    if ok_messages:
+        flash(f"{device.name}: {', '.join(ok_messages)}.", "ok")
+    return redirect_to
+
+
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
@@ -1571,6 +1686,18 @@ def _build_sections() -> list[dict[str, Any]]:
                     settings_store.get_for_runtime("devices", device.id, fields) if fields else {}
                 ),
                 "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
+                # Single Save for the whole device card — the template
+                # wraps the renderer-config + panel + quiet-hours fields
+                # in one form posting here, and this handler fans out to
+                # the same service helpers the per-subsection endpoints
+                # call. Only present on instances (kinds aren't editable
+                # in the UI). The per-subsection endpoints above stay
+                # available for programmatic callers / direct hits.
+                "combined_endpoint": (
+                    url_for("auth.devices_update_combined", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
                 "meta": {
                     "Renderers": ", ".join(device.renderer_ids),
                     "Status topic": device.status_topic,

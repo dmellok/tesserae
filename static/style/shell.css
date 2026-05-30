@@ -630,7 +630,9 @@ body.lightbox-open { overflow: hidden; }
 /* Generic centred modal for one-shot reveals (e.g. freshly-minted
    webhook tokens that won't ever be shown again). Driven by a small
    inline script — open by inclusion in the rendered HTML, close via
-   the [data-modal-close] buttons, ESC, or backdrop click. */
+   the [data-modal-close] buttons, ESC, or backdrop click. All colours
+   reference the theme tokens in base.css so dark mode flips with the
+   rest of the UI. */
 .modal {
   position: fixed;
   inset: 0;
@@ -642,9 +644,10 @@ body.lightbox-open { overflow: hidden; }
   animation: lightbox-fade 120ms ease-out;
 }
 .modal-card {
-  background: var(--surface, #fff);
-  color: var(--text, #111);
-  border-radius: 8px;
+  background: var(--t-surface);
+  color: var(--t-fg);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md, 10px);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
   width: min(560px, 100%);
   max-height: calc(100vh - 48px);
@@ -659,34 +662,40 @@ body.lightbox-open { overflow: hidden; }
   align-items: center;
   gap: 12px;
 }
-.modal-head { border-bottom: 1px solid var(--rule, rgba(0, 0, 0, 0.08)); }
+.modal-head { border-bottom: 1px solid var(--t-border); }
 .modal-foot {
-  border-top: 1px solid var(--rule, rgba(0, 0, 0, 0.08));
+  border-top: 1px solid var(--t-border);
   justify-content: flex-end;
 }
 .modal-head h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--t-size-lg, 16px);
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 1;
+  color: var(--t-fg);
 }
 .modal-close {
   background: transparent;
   border: none;
-  color: inherit;
+  color: var(--t-fg-soft);
   cursor: pointer;
   width: 32px;
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--t-radius-sm, 4px);
   font-size: 18px;
+  transition: background 120ms ease, color 120ms ease;
 }
-.modal-close:hover { background: rgba(0, 0, 0, 0.06); }
-.modal-body { padding: 20px; }
-.modal-body .lede { margin-top: 0; }
+.modal-close:hover {
+  background: var(--t-surface-soft);
+  color: var(--t-fg);
+}
+.modal-body { padding: 20px; color: var(--t-fg); }
+.modal-body .lede { margin-top: 0; color: var(--t-fg-soft); }
 .token-row {
   display: flex;
   gap: 8px;
@@ -694,13 +703,18 @@ body.lightbox-open { overflow: hidden; }
 }
 .token-row .token-input {
   flex: 1;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.95rem;
+  font-family: var(--t-font-mono);
+  font-size: var(--t-size-md, 13px);
   padding: 10px 12px;
-  border: 1px solid var(--rule, rgba(0, 0, 0, 0.14));
-  border-radius: 4px;
-  background: var(--surface-2, rgba(0, 0, 0, 0.03));
-  color: inherit;
+  border: 1px solid var(--t-border-strong);
+  border-radius: var(--t-radius-sm, 4px);
+  background: var(--t-surface-soft);
+  color: var(--t-fg);
   min-width: 0;
+}
+.token-row .token-input:focus {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+  border-color: var(--t-accent);
 }
 body.modal-open { overflow: hidden; }
