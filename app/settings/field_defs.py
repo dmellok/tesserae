@@ -1,0 +1,276 @@
+"""Hardcoded "core" section field specs.
+
+These three lists drive the App, Virtual-panel, and Broker cards on
+Settings → Server. They use the same field-spec shape as plugin /
+renderer ``settings`` so the template can render them through the same
+auto-field path.
+
+Kept in their own module (rather than the route handlers) because they
+are also imported by tests and were referenced from the original
+``app.settings_routes`` module path — the ``app.settings_routes`` shim
+re-exports ``APP_FIELDS`` for that reason.
+"""
+
+from __future__ import annotations
+
+import zoneinfo
+from typing import Any
+
+from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES
+
+# Canonical Area/City zones only, plus a "system" sentinel and explicit UTC.
+# ``zoneinfo.available_timezones()`` also returns legacy/compat buckets
+# (Etc/* fixed offsets, SystemV/*, country aliases like US/* and Brazil/*,
+# and single-word names like GMT or Japan) that just clutter a picker — we
+# drop those and keep the modern ``Area/City`` form most pickers show.
+# ``tzdata`` is a dependency so the list is complete regardless of host OS.
+_LEGACY_TZ_PREFIXES = ("Etc/", "SystemV/", "US/", "Canada/", "Brazil/", "Mexico/", "Chile/")
+_TZ_CHOICES: list[dict[str, str]] = [
+    {"value": "system", "label": "System (host local time)"},
+    {"value": "UTC", "label": "UTC"},
+    *(
+        {"value": tz, "label": tz}
+        for tz in sorted(zoneinfo.available_timezones())
+        if "/" in tz and not tz.startswith(_LEGACY_TZ_PREFIXES)
+    ),
+]
+
+
+APP_FIELDS: list[dict[str, Any]] = [
+    {
+        "name": "timezone",
+        "type": "select",
+        "label": "Timezone",
+        "default": "system",
+        "choices": _TZ_CHOICES,
+        "help": (
+            "Used by the scheduler when interpreting daily fire times and "
+            "time-of-day windows. 'System' uses the host's local time."
+        ),
+    },
+    {
+        "name": "latitude",
+        "type": "number",
+        "label": "Latitude",
+        "default": "",
+        "step": "any",  # decimal degrees — a default step of 1 rejects e.g. -37.8136
+        "help": (
+            "Default location for weather / sky / sunrise widgets, so you don't "
+            "re-enter coordinates per widget. A widget can still override it with "
+            "its own latitude/longitude. Decimal degrees, e.g. -37.8136."
+        ),
+    },
+    {
+        "name": "longitude",
+        "type": "number",
+        "label": "Longitude",
+        "default": "",
+        "step": "any",
+        "help": "Decimal degrees, e.g. 144.9631. Paired with Latitude above.",
+    },
+    {
+        "name": "ha_discovery_enabled",
+        "type": "switch",
+        "label": "Home Assistant MQTT discovery",
+        "default": False,
+        "help": (
+            "Publish HA autodiscovery configs so a button per saved dashboard, "
+            "an image entity for the most-recent render, and diagnostic sensors "
+            "appear under a 'Tesserae' device in HA. Default off."
+        ),
+    },
+    {
+        "name": "mdns_enabled",
+        "type": "switch",
+        "label": "Advertise tesserae.local over mDNS",
+        "default": False,
+        "help": (
+            "Announce this server as tesserae.local (and an _http._tcp service) "
+            "over mDNS / Bonjour so you can reach it by name without changing "
+            "the host machine's hostname. Default off."
+        ),
+    },
+    {
+        "name": "quiet_hours_enabled",
+        "type": "switch",
+        "label": "Quiet hours",
+        "default": False,
+        "help": (
+            "Suppress automated pushes (scheduler firings, webhook calls) during "
+            "a daily time window — typical use is to stop the panel waking the room "
+            "overnight. Manual pushes from the Send page or Push-now buttons still go "
+            "through; quiet hours filter automation, not deliberate user intent. "
+            "Each device can override the window in Settings → Devices."
+        ),
+    },
+    {
+        "name": "quiet_hours_start",
+        "type": "time",
+        "label": "Quiet hours start",
+        "default": "22:00",
+        "help": "When the daily quiet window begins. Honours Settings → Server → App → Timezone.",
+    },
+    {
+        "name": "quiet_hours_end",
+        "type": "time",
+        "label": "Quiet hours end",
+        "default": "07:00",
+        "help": (
+            "When the daily quiet window ends. If end < start, the window wraps "
+            "across midnight (e.g. 22:00 → 07:00 = overnight)."
+        ),
+    },
+    {
+        "name": "telemetry_enabled",
+        "type": "switch",
+        "label": "Send anonymous usage telemetry",
+        "default": False,
+        "help": (
+            "Two events to the project's analytics backend — app.started "
+            "(version + platform) and update.applied (from/to short SHA + "
+            "channel). Identified only by a random instance UUID; no IPs, "
+            "paths, settings, secrets, or push contents. Suggested on during "
+            "onboarding so the maintainer can see how many people are running "
+            "Tesserae and what versions they're on — flip it off here if "
+            "you'd rather not. TESSERAE_TELEMETRY=0 also disables."
+        ),
+    },
+]
+
+PANEL_FIELDS: list[dict[str, Any]] = [
+    {
+        "name": "panel_preset",
+        "type": "select",
+        "label": "Panel size",
+        "default": DEFAULT_PRESET,
+        "choices": PANEL_PRESET_CHOICES,
+        "help": "Common Inky / Waveshare panels. Pick Custom to set width + height manually.",
+    },
+    {
+        "name": "panel_orientation",
+        "type": "switch",
+        "label": "Portrait orientation",
+        "default": False,
+        "help": "Swap the panel width + height. Default off renders the panel landscape-native.",
+    },
+    {
+        "name": "panel_w",
+        "type": "slider",
+        "label": "Panel width (px)",
+        "default": 1600,
+        "min": 100,
+        "max": 3000,
+        "step": 1,
+        "unit": "px",
+        "help": "Only used when Panel size is Custom.",
+    },
+    {
+        "name": "panel_h",
+        "type": "slider",
+        "label": "Panel height (px)",
+        "default": 1200,
+        "min": 100,
+        "max": 3000,
+        "step": 1,
+        "unit": "px",
+    },
+]
+
+# Field order matters: the settings template groups the external-broker
+# fields (host/port/username/password) and the built-in-broker fields
+# (embedded_*) into two contiguous blocks it can show/hide. The
+# ``embedded_enabled`` switch leads the card; flipping it hides whichever
+# block is irrelevant. ``keepalive``/``client_id`` configure the client
+# connection either way, so they stay visible at the bottom.
+BROKER_FIELDS: list[dict[str, Any]] = [
+    {
+        "name": "embedded_enabled",
+        "type": "switch",
+        "label": "Built-in broker",
+        "default": False,
+        "help": (
+            "Run an in-process MQTT broker (amqtt). Convenient when you "
+            "don't have a Mosquitto host handy; leave off to point Tesserae "
+            "at an external broker instead. "
+            "Heads-up: amqtt only speaks MQTT v3.1.1. Tesserae's own Pi / "
+            "ESP32 clients are fine (paho-mqtt defaults to 3.1.1), but if "
+            "you connect with MQTT Explorer / MQTTX / Home Assistant / "
+            "Node-RED you'll need to set their protocol version to 3.1.1 — "
+            'v5 clients get rejected with "Invalid protocol". Need full '
+            "v5 support? Install Mosquitto (apt/brew) and point Tesserae "
+            "at it via the Host / Port fields below."
+        ),
+    },
+    {"name": "host", "type": "string", "label": "Host", "default": ""},
+    {
+        "name": "port",
+        "type": "number",
+        "label": "Port",
+        "default": 1883,
+        "min": 1,
+        "max": 65535,
+    },
+    {"name": "username", "type": "string", "label": "Username", "default": ""},
+    {"name": "password", "type": "string", "label": "Password", "default": "", "secret": True},
+    {
+        "name": "embedded_port",
+        "type": "number",
+        "label": "Built-in broker port",
+        "default": 1883,
+        "min": 1024,
+        "max": 65535,
+        "step": 1,
+        "help": "Port the built-in broker listens on. Tesserae's transport auto-connects here when host is empty.",
+    },
+    {
+        "name": "embedded_bind",
+        "type": "string",
+        "label": "Built-in broker bind address",
+        "default": "127.0.0.1",
+        "help": (
+            "127.0.0.1 keeps the broker loopback-only (only this host can "
+            "reach it). Set to 0.0.0.0 to accept connections from any LAN "
+            "client — set a username + password below if you do."
+        ),
+    },
+    {
+        "name": "embedded_username",
+        "type": "string",
+        "label": "Built-in broker username",
+        "default": "",
+        "help": (
+            "Optional. When set with a password, anonymous logins are "
+            "rejected. Leave both blank for an open broker."
+        ),
+    },
+    {
+        "name": "embedded_password",
+        "type": "string",
+        "label": "Built-in broker password",
+        "default": "",
+        "secret": True,
+        "help": "Stored on disk in a hashed password file the broker reads on start.",
+    },
+    {
+        "name": "keepalive",
+        "type": "slider",
+        "label": "Keepalive (seconds)",
+        "default": 60,
+        "min": 10,
+        "max": 600,
+        "step": 5,
+        "unit": "s",
+    },
+    {
+        "name": "client_id",
+        "type": "string",
+        "label": "MQTT client id",
+        "default": "",
+        "help": (
+            "Must be unique per instance — a broker evicts a duplicate client "
+            "id the moment another connects with it, which causes an endless "
+            "reconnect loop. Leave blank to auto-use 'tesserae-<hostname>'; the "
+            "--dev server appends '-dev'."
+        ),
+    },
+]

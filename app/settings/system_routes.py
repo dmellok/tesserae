@@ -1,0 +1,234 @@
+"""Settings → System endpoints: self-update, backup, webhook, telemetry.
+
+Updates and restore-from-backup both restart the process via os.execv
+(the in-process Playwright renderer + admin UI come back ~1 s later).
+Refused in ``--dev``: the werkzeug reloader owns restarts there.
+All gated by the push manager's lock so a frame push can't race with a
+tree-mutating operation.
+"""
+
+from __future__ import annotations
+
+import io
+
+from flask import current_app, flash, request, send_file, session
+from werkzeug.wrappers import Response
+
+from app import backup as _backup_mod
+from app import updater as _updater_mod
+
+from ._shared import (
+    bp,
+    data_root,
+    push_manager,
+    refuse_in_dev,
+    settings_store,
+    system_redirect,
+    updater,
+)
+
+# -- updates ------------------------------------------------------------
+
+
+@bp.post("/settings/system/update/check")
+def system_update_check() -> Response:
+    channel = (request.form.get("channel") or "edge").strip()
+    try:
+        check = updater().check_remote(channel)
+    except _updater_mod.UpdaterError as err:
+        flash(f"Check failed: {err}", "error")
+        return system_redirect()
+    if check.available:
+        flash(
+            f"Update available: {check.commits_behind} commit"
+            f"{'s' if check.commits_behind != 1 else ''} behind "
+            f"{check.target_ref}.",
+            "ok",
+        )
+    else:
+        flash(f"Up to date with {check.target_ref}.", "ok")
+    return system_redirect()
+
+
+@bp.post("/settings/system/update/apply")
+def system_update_apply() -> Response:
+    refused = refuse_in_dev()
+    if refused is not None:
+        return refused
+    channel = (request.form.get("channel") or "edge").strip()
+    force = request.form.get("force") == "1"
+    push_mgr = push_manager()
+    try:
+        result = updater().apply_update(channel, force=force, push_lock=push_mgr._lock)
+    except _updater_mod.UpdaterError as err:
+        flash(str(err), "error")
+        return system_redirect()
+    if not result.ok:
+        flash(f"Update failed: {result.error or 'unknown error'}", "error")
+        return system_redirect()
+    if result.from_sha == result.to_sha:
+        flash(f"Already up to date ({result.to_sha[:7]}).", "ok")
+        return system_redirect()
+    note = f"Updated {result.from_sha[:7]} → {result.to_sha[:7]}"
+    if result.pip_changed:
+        note += " (deps reinstalled)"
+    flash(note + ". Restarting…", "ok")
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is not None:
+        telemetry.send(
+            "update.applied",
+            {
+                "from": result.from_sha[:7],
+                "to": result.to_sha[:7],
+                "channel": channel,
+                "pip_changed": "yes" if result.pip_changed else "no",
+            },
+        )
+    updater().restart(delay_s=1.5)
+    return system_redirect()
+
+
+@bp.post("/settings/system/update/rollback")
+def system_update_rollback() -> Response:
+    refused = refuse_in_dev()
+    if refused is not None:
+        return refused
+    push_mgr = push_manager()
+    try:
+        result = updater().rollback_last(push_lock=push_mgr._lock)
+    except _updater_mod.UpdaterError as err:
+        flash(str(err), "error")
+        return system_redirect()
+    if not result.ok:
+        flash(f"Rollback failed: {result.error or 'unknown error'}", "error")
+        return system_redirect()
+    flash(f"Rolled back to {result.to_sha[:7]}. Restarting…", "ok")
+    updater().restart(delay_s=1.5)
+    return system_redirect()
+
+
+# -- backups ------------------------------------------------------------
+
+
+@bp.post("/settings/system/backup/create")
+def system_backup_create() -> Response:
+    note = (request.form.get("note") or "").strip()[:200]
+    try:
+        backup = _backup_mod.create(data_root(), label=_backup_mod.LABEL_MANUAL, note=note)
+    except OSError as err:
+        flash(f"Backup failed: {err}", "error")
+        return system_redirect()
+    flash(f"Backup created: {backup.id} ({backup.bytes // 1024} KB).", "ok")
+    return system_redirect()
+
+
+@bp.get("/settings/system/backup/<backup_id>/download")
+def system_backup_download(backup_id: str) -> Response:
+    backup = _backup_mod.get(data_root(), backup_id)
+    if backup is None:
+        return Response("backup not found", status=404)
+    # Serve from a BytesIO so the underlying file is fully read + closed
+    # before the response is built — avoids a lingering file handle that
+    # finalizers complain about under the test client.
+    data = backup.path.read_bytes()
+    return send_file(
+        io.BytesIO(data),
+        as_attachment=True,
+        download_name=f"tesserae-backup-{backup_id}.zip",
+        mimetype="application/zip",
+    )
+
+
+@bp.post("/settings/system/backup/<backup_id>/restore")
+def system_backup_restore(backup_id: str) -> Response:
+    refused = refuse_in_dev()
+    if refused is not None:
+        return refused
+    push_mgr = push_manager()
+    if not push_mgr._lock.acquire(blocking=True, timeout=10):
+        flash("Another push is in flight — try again in a moment.", "error")
+        return system_redirect()
+    try:
+        try:
+            _backup_mod.restore(data_root(), backup_id)
+        except (FileNotFoundError, ValueError, OSError) as err:
+            flash(f"Restore failed: {err}", "error")
+            return system_redirect()
+    finally:
+        push_mgr._lock.release()
+    flash(f"Restored from {backup_id}. Restarting…", "ok")
+    updater().restart(delay_s=1.5)
+    return system_redirect()
+
+
+@bp.post("/settings/system/backup/<backup_id>/delete")
+def system_backup_delete(backup_id: str) -> Response:
+    if _backup_mod.delete(data_root(), backup_id):
+        flash(f"Deleted backup {backup_id}.", "ok")
+    else:
+        flash(f"No backup named {backup_id}.", "error")
+    return system_redirect()
+
+
+# -- webhook ------------------------------------------------------------
+
+
+@bp.post("/settings/system/webhook/regenerate")
+def system_webhook_regenerate() -> Response:
+    """Mint a fresh random webhook token and persist it. Stashed in the
+    session as ``_webhook_token_reveal`` so the Settings GET that follows
+    the redirect can pop it into a one-shot modal with a copy button.
+    After that render it's gone — the disk value is masked like any
+    other ``_secret`` field."""
+    from app.webhook_routes import generate_token
+
+    token = generate_token()
+    settings_store().update_section("app", {"webhook_token_secret": token})
+    session["_webhook_token_reveal"] = token
+    return system_redirect()
+
+
+@bp.post("/settings/system/webhook/set")
+def system_webhook_set() -> Response:
+    """Set or clear the webhook bearer token by hand. ``clear=1`` wipes
+    the on-disk value (webhooks return 503 until re-set). Otherwise the
+    pasted ``webhook_token`` value replaces whatever was there. Used
+    when an automation tool already has a specific secret and the user
+    wants Tesserae to match it instead of issuing a fresh one."""
+    if request.form.get("clear"):
+        settings_store().update_section("app", {"webhook_token_secret": ""})
+        flash("Webhook token cleared. POST /api/v1/push will return 503.", "ok")
+        return system_redirect()
+    token = (request.form.get("webhook_token") or "").strip()
+    if not token:
+        flash("Paste a token first, or use Clear to disable webhooks.", "error")
+        return system_redirect()
+    settings_store().update_section("app", {"webhook_token_secret": token})
+    flash("Webhook token saved.", "ok")
+    return system_redirect()
+
+
+# -- telemetry ----------------------------------------------------------
+
+
+@bp.post("/settings/system/telemetry/test")
+def system_telemetry_test() -> Response:
+    """Fire a synchronous app.started and surface the outcome in a flash
+    + the Events tab. Dev-only — the card is hidden in production
+    builds, so this route is gated to ``current_app.debug`` to avoid
+    leaving an undocumented endpoint exposed."""
+    if not current_app.debug:
+        return system_redirect()
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is None or not telemetry.enabled:
+        flash(
+            "Telemetry is off. Tick the toggle in Settings → Server → App first.",
+            "error",
+        )
+        return system_redirect()
+    err = telemetry.test_send()
+    if err:
+        flash(f"Test event failed: {err}. Check the endpoint config.", "error")
+    else:
+        flash("Test event delivered. Check the Events tab for the row.", "ok")
+    return system_redirect()
