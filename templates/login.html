@@ -11,6 +11,15 @@
   </header>
   <form method="post" class="form">
     <input type="hidden" name="next" value="{{ next }}">
+    {# Match the username on the setup form so Safari / iCloud Keychain
+       (and 1Password, Bitwarden, Chrome) can autofill the saved
+       credential on return visits. Off-screen rather than display:none
+       because some password managers skip display:none fields when
+       looking for the username to fill. See setup.html for the same
+       pattern. #}
+    <div style="position:absolute; left:-9999px; height:0; overflow:hidden;" aria-hidden="true">
+      <input type="text" name="username" value="tesserae" autocomplete="username" tabindex="-1" readonly>
+    </div>
     <div class="field">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" required autocomplete="current-password" autofocus>

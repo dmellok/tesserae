@@ -14,6 +14,19 @@
     </p>
   </header>
   <form method="post" class="form">
+    {# Tesserae has a single admin login (no per-user accounts), so the
+       form has no username field for the user to fill in. Safari /
+       iCloud Keychain refuses to save a credential without one, and
+       the prompt it shows is awkward. Give the form a constant
+       ``tesserae`` username via an off-screen field so the password
+       manager can save it sensibly as ``tesserae@<host>``.
+
+       Visually hidden (off-screen rather than display:none) because
+       some password managers skip display:none fields entirely when
+       looking for the username to associate with a password. #}
+    <div style="position:absolute; left:-9999px; height:0; overflow:hidden;" aria-hidden="true">
+      <input type="text" name="username" value="tesserae" autocomplete="username" tabindex="-1" readonly>
+    </div>
     <div class="field">
       <label for="password">Password</label>
       <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
