@@ -318,17 +318,17 @@
     </p>
     {% endif %}
 
-    <form method="post" action="{{ url_for('auth.system_update_check') }}" class="form">
-      <div class="field">
+    <form method="post" action="{{ url_for('auth.system_update_check') }}" class="form form--row">
+      <div class="field field--grow">
         <label for="upd-channel">Channel</label>
         <select id="upd-channel" name="channel">
           <option value="edge"{% if not system_last_check or system_last_check.channel == 'edge' %} selected{% endif %}>Edge (latest commit on main)</option>
           <option value="stable"{% if system_last_check and system_last_check.channel == 'stable' %} selected{% endif %}>Stable (latest release tag)</option>
         </select>
-        <p class="field-help">Stable pins to the most recent release tag once you start publishing them; edge tracks the default branch.</p>
       </div>
-      <div class="actions">{{ button('Check for updates', icon='arrows-counter-clockwise') }}</div>
+      <div class="actions actions--bottom">{{ button('Check for updates', icon='arrows-counter-clockwise') }}</div>
     </form>
+    <p class="field-help">Stable pins to the most recent release tag once you start publishing them; edge tracks the default branch.</p>
 
     {% if system_last_check %}
     <section class="card card--compact">
@@ -347,11 +347,12 @@
       <form method="post" action="{{ url_for('auth.system_update_apply') }}" class="form">
         <input type="hidden" name="channel" value="{{ system_last_check.channel }}">
         <p class="field-help">Updating takes a pre-update backup of <code>data/</code>, pulls the new revision, reinstalls deps if <code>pyproject.toml</code> changed, and re-execs the server. In-flight requests drop ({{ '~1s' }} blip).</p>
+        <label class="check-row">
+          <input type="checkbox" name="force" value="1">
+          <span>Force — discard any local changes to tracked files before pulling.</span>
+        </label>
         <div class="actions">
           {{ button('Update & restart', icon='download-simple', variant='primary', disabled=system_dev_mode) }}
-          <label style="display:inline-flex;align-items:center;gap:6px;margin-left:12px;font-size:13px;">
-            <input type="checkbox" name="force" value="1"> Force (discard local changes)
-          </label>
         </div>
       </form>
       {% else %}
@@ -361,17 +362,19 @@
     {% endif %}
 
     {% if system_history %}
-    <section>
-      <h4>Recent updates</h4>
-      <ul>
+    <section class="history-block">
+      <div class="history-head">
+        <h4>Recent updates</h4>
+        <form method="post" action="{{ url_for('auth.system_update_rollback') }}" class="inline" onsubmit="return confirm('Roll back to {{ system_history[0].from_sha[:7] }} and restore its pre-update data snapshot? The server will restart.');">
+          <button type="submit" class="button ghost"{% if system_dev_mode %} disabled{% endif %}><i class="ph ph-arrow-u-up-left"></i> Roll back to {{ system_history[0].from_sha[:7] }}</button>
+        </form>
+      </div>
+      <ul class="history-list">
         {% for entry in system_history %}
         <li><code>{{ entry.from_sha[:7] }} → {{ entry.to_sha[:7] }}</code> ({{ entry.channel }}){% if entry.pip_changed %} &middot; deps reinstalled{% endif %}</li>
         {% endfor %}
       </ul>
-      <form method="post" action="{{ url_for('auth.system_update_rollback') }}" class="form" onsubmit="return confirm('Roll back to {{ system_history[0].from_sha[:7] }} and restore its pre-update data snapshot? The server will restart.');">
-        <p class="field-help">Roll back the working tree to <code>{{ system_history[0].from_sha[:7] }}</code> AND restore the pre-update data snapshot. Use this when an update broke something.</p>
-        <div class="actions">{{ button('Roll back last update', icon='arrow-u-up-left', disabled=system_dev_mode) }}</div>
-      </form>
+      <p class="field-help">Rolling back restores the pre-update <code>data/</code> snapshot too. Use this when an update broke something.</p>
     </section>
     {% endif %}
 

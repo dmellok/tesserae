@@ -21,6 +21,66 @@
   margin-top: var(--t-space-4);
 }
 
+/* Updates card: channel select + check-button on one row.
+   Without form--row, the .actions block right-aligns onto its own line
+   and the button looks orphaned. */
+.form--row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-3);
+  align-items: flex-end;
+}
+.form--row .field--grow {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.form--row .actions--bottom {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* Force checkbox row above the Update & restart button. Putting the
+   checkbox after the button in .actions hid it as a trailing modifier;
+   surfacing it as a full-width row makes "discard local changes" a
+   deliberate opt-in. */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: var(--t-space-2) 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+.check-row > input[type="checkbox"] {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+.check-row > span {
+  line-height: 1.5;
+}
+
+/* Recent-updates block: heading + roll-back button on the same line,
+   so the button visually belongs to its section instead of floating at
+   the card footer. */
+.history-block {
+  margin-top: var(--t-space-4);
+}
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  flex-wrap: wrap;
+}
+.history-head > h4 {
+  margin: 0;
+}
+.history-list {
+  margin: var(--t-space-2) 0 0;
+  padding-left: var(--t-space-4);
+}
+
 /* Backups disclosure — collapsed by default so the System page leads
    with "create a backup" rather than a wall of old snapshots. */
 .backups-disclosure {
