@@ -35,7 +35,13 @@ from app.device_loader import DeviceRegistry
 from app.discovery import DiscoveryCache
 from app.layouts import LAYOUTS_BY_SLUG, to_panel_pixels
 from app.network import detect_local_ip
-from app.panel import resolve_panel_for_page, resolve_settings_panel
+from app.panel import (
+    PANEL_PRESET_CHOICES,
+    PANEL_PRESETS,
+    panel_overrides_from_form,
+    resolve_panel_for_page,
+    resolve_settings_panel,
+)
 from app.push import PushManager
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
@@ -175,8 +181,14 @@ def step(step: str) -> Response | str:
         # packets sent); honours TESSERAE_HOST_IP.
         ctx["builtin_url"] = f"mqtt://{detect_local_ip()}:{port}"
     elif step == "device":
+        # ``panel`` rides along on each kind so the form's preset
+        # selector can auto-sync to the kind's declared size when the
+        # user picks a kind, and so the resulting w/h match Settings →
+        # Devices' panel UI exactly.
         ctx["device_kinds"] = [
-            {"id": d.id, "name": d.name} for d in _devices().all() if d.kind_of is None
+            {"id": d.id, "name": d.name, "panel": d.panel}
+            for d in _devices().all()
+            if d.kind_of is None
         ]
         ctx["instances"] = [
             {"id": d.id, "name": d.name} for d in _devices().all() if d.kind_of is not None
@@ -190,6 +202,9 @@ def step(step: str) -> Response | str:
         ctx["discovered_sig"] = ",".join(
             sorted(f"{d['id']}:{d['kind'] or ''}" for d in ctx["discovered"])
         )
+        # Panel-preset chrome (mirrors Settings → Devices' add form).
+        ctx["panel_preset_choices"] = PANEL_PRESET_CHOICES
+        ctx["panel_presets"] = PANEL_PRESETS
     elif step == "dashboard":
         ctx["pages"] = [{"id": p.id, "name": p.name} for p in _pages().list()]
     return render_template("onboarding.html", **ctx)
@@ -246,6 +261,7 @@ def add_device() -> Response:
         instance_id=form.get("id") or "",
         kind_id=(form.get("kind") or "").strip(),
         name=form.get("name") or "",
+        panel_overrides=panel_overrides_from_form(form),
         orientation=form.get("panel_orientation"),
     )
     if not result.ok or result.device is None:

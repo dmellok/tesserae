@@ -142,6 +142,45 @@ def test_device_manual_add_via_wizard(app: Flask) -> None:
     assert app.config["DEVICE_REGISTRY"].get("esp32_hallway") is not None
 
 
+def test_device_manual_add_panel_preset_overrides_kind_default(app: Flask) -> None:
+    """The onboarding manual-add form now exposes a panel-size picker;
+    picking a preset must override the kind's manifest dims so a user
+    on a 13.3″ Inky doesn't end up with the kind's default 800×480."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/onboarding/device",
+        data={
+            "id": "pi_hall",
+            "kind": "pi_png_client",
+            "panel_preset": "inky_13_3",
+        },
+    )
+    dev = app.config["DEVICE_REGISTRY"].get("pi_hall")
+    assert dev is not None
+    assert dev.panel["w"] == 1600 and dev.panel["h"] == 1200
+
+
+def test_device_manual_add_panel_custom_w_h_overrides(app: Flask) -> None:
+    """``panel_preset=custom`` + explicit ``panel_w`` / ``panel_h`` lets
+    the user enter dims that aren't in the preset list."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/onboarding/device",
+        data={
+            "id": "pi_odd",
+            "kind": "pi_png_client",
+            "panel_preset": "custom",
+            "panel_w": "1024",
+            "panel_h": "768",
+        },
+    )
+    dev = app.config["DEVICE_REGISTRY"].get("pi_odd")
+    assert dev is not None
+    assert dev.panel["w"] == 1024 and dev.panel["h"] == 768
+
+
 def test_register_discovered_via_wizard(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

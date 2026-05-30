@@ -21,6 +21,7 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
+import contextlib
 from math import gcd
 from typing import TYPE_CHECKING, Any
 
@@ -52,6 +53,24 @@ PANEL_PRESET_CHOICES: list[dict[str, str]] = [
 ]
 
 DEFAULT_PRESET: str = "inky_13_3"
+
+
+def panel_overrides_from_form(form: Any) -> dict[str, Any]:
+    """Resolve an Add-device form's panel size into a ``{"w","h"}``
+    override dict. A named preset wins; otherwise the custom width /
+    height inputs are used (ignored if non-numeric). Shared between
+    Settings → Devices and the onboarding wizard's manual-add form."""
+    preset = (form.get("panel_preset") or "").strip()
+    if preset in PANEL_PRESETS:
+        w, h = PANEL_PRESETS[preset]
+        return {"w": w, "h": h}
+    overrides: dict[str, Any] = {}
+    for field_name, key in (("panel_w", "w"), ("panel_h", "h")):
+        raw = form.get(field_name)
+        if raw:
+            with contextlib.suppress(ValueError):
+                overrides[key] = int(raw)
+    return overrides
 
 
 def resolve_settings_panel(settings: SettingsStore) -> Panel:

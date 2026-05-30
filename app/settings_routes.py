@@ -48,7 +48,12 @@ from app.calibration import build_calibration_card, target_orientation
 from app.device_loader import Device, DeviceRegistry
 from app.discovery import DiscoveredDevice, DiscoveryCache
 from app.network import detect_local_ip
-from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES, PANEL_PRESETS
+from app.panel import (
+    DEFAULT_PRESET,
+    PANEL_PRESET_CHOICES,
+    PANEL_PRESETS,
+    panel_overrides_from_form,
+)
 from app.plugin_loader import PluginRegistry
 from app.push import PushManager
 from app.renderer_loader import RendererRegistry
@@ -946,23 +951,6 @@ def _orientation_label(orientation: str) -> str:
     return _ORIENTATION_DEGREES.get(orientation, orientation)
 
 
-def _panel_overrides_from_form(form: Any) -> dict[str, Any]:
-    """Resolve the Add-device form's panel size into a ``{"w","h"}``
-    override dict. A preset wins; otherwise the custom width/height
-    inputs are used (ignored if non-numeric)."""
-    preset = (form.get("panel_preset") or "").strip()
-    if preset in PANEL_PRESETS:
-        w, h = PANEL_PRESETS[preset]
-        return {"w": w, "h": h}
-    overrides: dict[str, Any] = {}
-    for field_name, key in (("panel_w", "w"), ("panel_h", "h")):
-        raw = form.get(field_name)
-        if raw:
-            with contextlib.suppress(ValueError):
-                overrides[key] = int(raw)
-    return overrides
-
-
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form. No restart
@@ -976,7 +964,7 @@ def devices_add() -> Response:
         instance_id=form.get("id") or "",
         kind_id=(form.get("kind") or "").strip(),
         name=form.get("name") or "",
-        panel_overrides=_panel_overrides_from_form(form),
+        panel_overrides=panel_overrides_from_form(form),
         orientation=form.get("panel_orientation"),
     )
     if not result.ok or result.device is None:
