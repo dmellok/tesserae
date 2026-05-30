@@ -345,15 +345,48 @@ class Updater:
                     push_lock.release()  # type: ignore[attr-defined]
 
     def restart(self, *, delay_s: float = 1.0) -> None:
-        """Schedule ``os.execv`` after ``delay_s`` so an in-flight HTTP
-        response has time to flush. The new process picks up the freshly-
-        pulled code; in-flight requests drop. No-op under ``--dev`` (the
-        werkzeug reloader handles restarts there)."""
+        """Schedule a relaunch after ``delay_s`` so an in-flight HTTP
+        response has time to flush. The new process picks up the
+        freshly-pulled code; in-flight requests drop. No-op under
+        ``--dev`` (the werkzeug reloader handles restarts there).
+
+        Implementation differs by OS:
+
+        * **POSIX**: ``os.execv`` replaces the current process image —
+          the kernel hands the listening socket FD straight to the new
+          Python, which re-imports everything from the new files. Clean
+          and atomic.
+        * **Windows**: ``os.execv`` is *not* a real exec — CPython
+          implements it as spawn + exit, which (a) tangles console
+          handles so the new process can die when the parent's console
+          closes, and (b) races the listening socket's TIME_WAIT release
+          so ``waitress`` ``EADDRINUSE``s at startup. Instead we Popen
+          a child in its own process group, stash our PID in
+          ``TESSERAE_PARENT_PID``, and ``os._exit(0)``. The child
+          (see :func:`wait_for_parent_exit`) blocks until that PID has
+          gone before binding."""
         argv = [sys.executable, "-m", "app.main", *sys.argv[1:]]
 
         def _go() -> None:
-            logger.info("update: re-exec %s", argv)
-            os.execv(sys.executable, argv)
+            logger.info("update: relaunching %s", argv)
+            if os.name == "nt":
+                env = os.environ.copy()
+                env["TESSERAE_PARENT_PID"] = str(os.getpid())
+                # CREATE_NEW_PROCESS_GROUP: the child ignores any
+                # CTRL_C aimed at us, so it survives the parent's exit
+                # cleanly. We deliberately don't pass DETACHED_PROCESS
+                # — keeping the inherited console means startup logs
+                # continue to flow into the user's terminal.
+                CREATE_NEW_PROCESS_GROUP = 0x00000200
+                subprocess.Popen(
+                    argv,
+                    env=env,
+                    creationflags=CREATE_NEW_PROCESS_GROUP,
+                    close_fds=False,
+                )
+                os._exit(0)
+            else:
+                os.execv(sys.executable, argv)
 
         threading.Timer(delay_s, _go).start()
 
@@ -434,3 +467,53 @@ class Updater:
         items.append(entry)
         items = items[-HISTORY_KEEP:]
         path.write_text(json.dumps([asdict(e) for e in items], indent=2), encoding="utf-8")
+
+
+# ----- restart helpers (consumed by main._serve) ---------------------
+
+
+PARENT_PID_ENV = "TESSERAE_PARENT_PID"
+_PARENT_WAIT_TIMEOUT_S = 10.0
+_PARENT_GRACE_S = 0.5
+
+
+def wait_for_parent_exit() -> None:
+    """Windows-only: block until the relaunching parent process (see
+    :meth:`Updater.restart`) has actually exited, then a brief grace
+    pause so the OS reclaims the listening socket before waitress tries
+    to bind it. No-op on POSIX (``os.execv`` already gave us the FD).
+
+    Bounded by :data:`_PARENT_WAIT_TIMEOUT_S` so a stuck parent can't
+    deadlock the relaunch — after that we proceed and accept the small
+    chance of an ``EADDRINUSE``."""
+    parent_pid = os.environ.pop(PARENT_PID_ENV, None)
+    if not parent_pid or os.name != "nt":
+        return
+    try:
+        pid = int(parent_pid)
+    except ValueError:
+        return
+
+    import ctypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return  # parent already gone — go.
+    try:
+        deadline = time.monotonic() + _PARENT_WAIT_TIMEOUT_S
+        code = ctypes.c_ulong(STILL_ACTIVE)
+        while time.monotonic() < deadline:
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                break
+            if code.value != STILL_ACTIVE:
+                break
+            time.sleep(0.1)
+    finally:
+        kernel32.CloseHandle(handle)
+    # Brief grace so the kernel reclaims the listening socket before
+    # waitress tries to bind. Without this we still occasionally lose
+    # the bind race on Windows even after the parent process is dead.
+    time.sleep(_PARENT_GRACE_S)

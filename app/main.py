@@ -713,6 +713,13 @@ def _serve(argv: list[str] | None = None) -> None:
     """
     import argparse
 
+    # Windows-only no-op on POSIX: when we were spawned by the in-app
+    # updater's restart(), block until the parent has fully exited so the
+    # listening socket is released before waitress tries to bind it.
+    from app.updater import wait_for_parent_exit
+
+    wait_for_parent_exit()
+
     parser = argparse.ArgumentParser(prog="tesserae", description="Tesserae dashboard server.")
     parser.add_argument(
         "--dev",

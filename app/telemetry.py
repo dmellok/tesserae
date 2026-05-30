@@ -316,6 +316,12 @@ class Telemetry:
             with contextlib.suppress(Exception):
                 # Logging is best-effort — never let an event-log issue
                 # take down the worker thread or the request thread.
+                # We stash the exact JSON body in ``extra`` so the Events
+                # tab can show the user what we shipped (or tried to
+                # ship) — handy for diagnosing 400s like the
+                # isDebug/sdkVersion shape one. sessionId is the only
+                # identifier and it's anonymous (instance UUID), so
+                # surfacing it is fine.
                 self._event_log.record(
                     type="telemetry",
                     source=event_name,
@@ -323,5 +329,6 @@ class Telemetry:
                     status="sent" if err_msg is None else "failed",
                     error=err_msg,
                     duration_s=datetime.now(UTC).timestamp() - started,
+                    extra={"payload": body, "endpoint": self._cfg.post_url},
                 )
         return err_msg

@@ -385,6 +385,15 @@ def test_test_send_records_success_row_in_event_log(
     assert row.status == "sent"
     assert row.error is None
     assert row.target == "https://analytics.example.com"
+    # The exact payload is exposed in ``extra`` so the Events tab can
+    # surface what we shipped — this is what made the v0.4.2 -> v0.4.3
+    # 400-debugging session quick (the body shape was visible).
+    payload = row.extra["payload"]
+    assert payload["eventName"] == "app.started"
+    assert payload["sessionId"] == t.instance_id
+    assert payload["systemProps"]["isDebug"] is False
+    assert "@" in payload["systemProps"]["sdkVersion"]
+    assert row.extra["endpoint"].endswith("/api/v0/event")
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnraisableExceptionWarning")

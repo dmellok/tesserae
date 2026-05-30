@@ -296,3 +296,107 @@ def test_rollback_with_no_history_raises(tmp_path: Path) -> None:
     u = _FakeUpdater(repo_root=tmp_path, data_root=_new_data_root(tmp_path), responses={})
     with pytest.raises(UpdaterError, match="no previous update"):
         u.rollback_last()
+
+
+# ----- restart: POSIX execv vs Windows Popen ---------------------------
+
+
+def test_restart_posix_uses_execv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """On POSIX the kernel hands the listening socket FD to the new
+    Python — ``os.execv`` is the right primitive."""
+    monkeypatch.setattr("app.updater.os.name", "posix")
+    captured: dict[str, Any] = {}
+
+    def fake_execv(executable: str, argv: list[str]) -> None:
+        captured["executable"] = executable
+        captured["argv"] = argv
+
+    monkeypatch.setattr("app.updater.os.execv", fake_execv)
+
+    u = _FakeUpdater(repo_root=tmp_path, data_root=_new_data_root(tmp_path), responses={})
+    u.restart(delay_s=0.0)
+    # Timer is async; wait for it to fire.
+    for _ in range(50):
+        if "argv" in captured:
+            break
+        import time as _time
+
+        _time.sleep(0.01)
+    assert "argv" in captured
+    assert captured["argv"][0] == captured["executable"]  # sys.executable repeated
+    assert "app.main" in captured["argv"]
+
+
+def test_restart_windows_spawns_detached_and_exits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On Windows the new process is spawned in its own process group
+    and the old process exits via ``os._exit`` so the listening socket
+    is released. The parent's PID rides along in ``TESSERAE_PARENT_PID``
+    so the child knows whose grave to wait at."""
+    monkeypatch.setattr("app.updater.os.name", "nt")
+    popen_calls: list[dict[str, Any]] = []
+
+    class _FakePopen:
+        def __init__(self, argv: list[str], **kwargs: Any) -> None:
+            popen_calls.append({"argv": argv, **kwargs})
+
+    exit_calls: list[int] = []
+
+    def fake_exit(code: int) -> None:
+        exit_calls.append(code)
+
+    monkeypatch.setattr("app.updater.subprocess.Popen", _FakePopen)
+    monkeypatch.setattr("app.updater.os._exit", fake_exit)
+
+    u = _FakeUpdater(repo_root=tmp_path, data_root=_new_data_root(tmp_path), responses={})
+    u.restart(delay_s=0.0)
+    for _ in range(50):
+        if popen_calls:
+            break
+        import time as _time
+
+        _time.sleep(0.01)
+    assert popen_calls, "Popen never called"
+    call = popen_calls[0]
+    env = call["env"]
+    assert env["TESSERAE_PARENT_PID"]  # not empty
+    assert int(env["TESSERAE_PARENT_PID"]) > 0
+    # CREATE_NEW_PROCESS_GROUP = 0x200; the child must be in its own
+    # group so a Ctrl+C aimed at the parent can't kill it.
+    assert call["creationflags"] & 0x00000200
+    # And we must have asked the parent process to die so the port is
+    # released for the child.
+    assert exit_calls == [0]
+
+
+# ----- wait_for_parent_exit -----------------------------------------
+
+
+def test_wait_for_parent_exit_is_noop_on_posix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POSIX never sets TESSERAE_PARENT_PID (execv replaces in place);
+    the helper must return immediately even if the env var is somehow
+    present, since ctypes.WinDLL would explode on Linux."""
+    from app.updater import PARENT_PID_ENV, wait_for_parent_exit
+
+    monkeypatch.setattr("app.updater.os.name", "posix")
+    monkeypatch.setenv(PARENT_PID_ENV, "12345")
+    wait_for_parent_exit()
+    # And the env var should still be consumed so a re-entry doesn't
+    # confuse a future call (defence-in-depth).
+    import os as _os
+
+    assert PARENT_PID_ENV not in _os.environ
+
+
+def test_wait_for_parent_exit_consumes_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The env var is single-shot: read once at startup so a child of
+    *this* process doesn't inherit the relaunch handshake."""
+    from app.updater import PARENT_PID_ENV, wait_for_parent_exit
+
+    monkeypatch.setattr("app.updater.os.name", "posix")
+    monkeypatch.setenv(PARENT_PID_ENV, "999999")
+    wait_for_parent_exit()
+    import os as _os
+
+    assert PARENT_PID_ENV not in _os.environ
