@@ -186,7 +186,7 @@ class Scheduler:
     def _tick_once(self, now: datetime) -> None:
         self._observe(now)
         for schedule in self.find_due(now):
-            self._fire(schedule, now)
+            self._fire(schedule, now, respect_quiet_hours=True)
 
     def _observe(self, now: datetime) -> None:
         """Maintain ``_first_seen``. Drop entries for ids no longer enabled
@@ -200,12 +200,32 @@ class Scheduler:
             for sid in enabled_ids:
                 self._first_seen.setdefault(sid, now.timestamp())
 
-    def _fire(self, schedule: Schedule, now: datetime) -> PushResult:
+    def _fire(
+        self,
+        schedule: Schedule,
+        now: datetime,
+        *,
+        respect_quiet_hours: bool = False,
+    ) -> PushResult:
         logger.info("Firing schedule %s -> page %s", schedule.id, schedule.page_id)
-        result = self._push_factory().push(schedule.page_id)
+        # Tick-driven firings (the background loop) are automation —
+        # they should respect quiet hours so a 22:30 schedule doesn't
+        # wake the room. fire_now() is the manual "Fire" button on the
+        # Schedules page; user intent always goes through, so it leaves
+        # respect_quiet_hours off.
+        result = self._push_factory().push(
+            schedule.page_id,
+            respect_quiet_hours=respect_quiet_hours,
+        )
         # Successful fires bump last_fired so the daily / interval gates
         # work; a failed push doesn't update it (the next tick can retry).
-        if result.status == "sent":
+        # A ``quiet`` result also bumps it — every device was in quiet
+        # hours, so the user's "no pushes overnight" intent is being
+        # honoured. Treating it like a sent fire stops us from re-
+        # attempting (and re-logging) on every tick through the quiet
+        # window. The interval / daily gate then naturally re-arms for
+        # the next slot.
+        if result.status in ("sent", "quiet"):
             with self._lock:
                 self._last_fired[schedule.id] = now.timestamp()
         if self._event_log is not None:

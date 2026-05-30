@@ -47,6 +47,7 @@ from app.panel import (
     panel_groups_for_push,
     resolve_settings_panel,
 )
+from app.quiet_hours import device_is_quiet
 from app.renderer import RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
@@ -66,7 +67,7 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
 
 logger = logging.getLogger(__name__)
 
-PushStatus = Literal["sent", "busy", "failed", "not_found"]
+PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet"]
 
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
 # Larger downloads are rejected before going through Pillow.
@@ -177,19 +178,37 @@ class PushManager:
 
     # -- public API ------------------------------------------------------
 
-    def push(self, page_id: str, *, device_ids: set[str] | None = None) -> PushResult:
+    def push(
+        self,
+        page_id: str,
+        *,
+        device_ids: set[str] | None = None,
+        respect_quiet_hours: bool = False,
+    ) -> PushResult:
         """Render a saved Page through the composer and publish.
 
         ``device_ids`` (optional): restrict the fan-out to these devices.
         The page renders at each matching device's panel and only that
         device's renderers fire — used to push a dashboard to one display
         even when it's bound to several. ``None`` keeps the default
-        behaviour (every device the page is bound to)."""
+        behaviour (every device the page is bound to).
+
+        ``respect_quiet_hours`` (default ``False``): when ``True``, the
+        device set is filtered against each device's effective
+        quiet-hours window before render. If every bound device is
+        quiet the push is logged as ``status="quiet"`` and skipped.
+        Scheduler firings and webhook calls pass ``True``; manual Send
+        / Push-now flows leave it ``False`` so user intent always
+        goes through."""
         if not self._lock.acquire(blocking=False):
             result = self._log_busy(source="page", target=page_id)
         else:
             try:
-                result = self._push_page_locked(page_id, device_ids=device_ids)
+                result = self._push_page_locked(
+                    page_id,
+                    device_ids=device_ids,
+                    respect_quiet_hours=respect_quiet_hours,
+                )
             finally:
                 self._lock.release()
         self._notify(result)
@@ -363,7 +382,12 @@ class PushManager:
 
     # -- internals -------------------------------------------------------
 
-    def _push_page_locked(self, page_id: str, device_ids: set[str] | None = None) -> PushResult:
+    def _push_page_locked(
+        self,
+        page_id: str,
+        device_ids: set[str] | None = None,
+        respect_quiet_hours: bool = False,
+    ) -> PushResult:
         started = time.monotonic()
         page = self._page_store.get(page_id)
         if page is None:
@@ -390,6 +414,13 @@ class PushManager:
                     status="failed",
                     error="dashboard targets none of the requested device(s)",
                 )
+        if respect_quiet_hours:
+            groups = self._filter_quiet_devices(groups)
+            if not groups:
+                # Every bound device is currently quiet. Log a soft skip
+                # and return — not a failure (the user intent is
+                # respected) but not a successful push either.
+                return self._log_quiet_skip(page_id)
         base_url = self._base_url_fn().rstrip("/")
 
         all_renderers: list[RendererResult] = []
@@ -690,5 +721,58 @@ class PushManager:
             page_id=target,
             duration_s=duration_s,
             error=error,
+            event_id=event_id,
+        )
+
+    def _filter_quiet_devices(
+        self, groups: list[tuple[Panel, list[str]]]
+    ) -> list[tuple[Panel, list[str]]]:
+        """Drop devices currently in their effective quiet-hours window
+        from each panel group, then drop any group that's now empty.
+
+        Resolves timezone the same way the scheduler does — from
+        ``app.timezone`` settings, falling back to host local time when
+        unset or ``"system"``."""
+        from datetime import datetime
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+        app_settings = self._settings.get_section("app")
+        tz: Any | None = None
+        tz_raw = str(app_settings.get("timezone") or "system").strip()
+        if tz_raw and tz_raw.lower() != "system":
+            try:
+                tz = ZoneInfo(tz_raw)
+            except ZoneInfoNotFoundError:
+                tz = None
+        now = datetime.now(tz) if tz else datetime.now()
+
+        kept: list[tuple[Panel, list[str]]] = []
+        for panel, dids in groups:
+            surviving: list[str] = []
+            for did in dids:
+                device = self._devices.devices.get(did) if self._devices is not None else None
+                if device is None or not device_is_quiet(app_settings, device, now, tz):
+                    surviving.append(did)
+            if surviving:
+                kept.append((panel, surviving))
+        return kept
+
+    def _log_quiet_skip(self, page_id: str) -> PushResult:
+        """Record a soft skip when every bound device is currently in
+        quiet hours. Not a failure — the user's "no pushes overnight"
+        intent is being honoured — but worth surfacing in the Events
+        tab so a head-scratching "why didn't this fire?" turns into a
+        one-look answer."""
+        event_id = self._event_log.record(
+            type="push",
+            source="page",
+            target=page_id,
+            status="quiet",
+            error="all bound devices in quiet hours",
+        )
+        return PushResult(
+            status="quiet",
+            page_id=page_id,
+            error="all bound devices in quiet hours",
             event_id=event_id,
         )

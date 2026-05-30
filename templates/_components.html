@@ -353,6 +353,10 @@ macro here instead.
     {% endif %}
   {% elif ftype == 'color' %}
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
+  {% elif ftype == 'time' %}
+    {{ text_input(field_id, name, label, value=value or spec.get('default', ''),
+                  placeholder=spec.get('placeholder', 'HH:MM'),
+                  type='time', help=help_text) }}
   {% else %}
     {{ text_input(field_id, name, label, value=value or '',
                   placeholder=spec.get('placeholder', ''),

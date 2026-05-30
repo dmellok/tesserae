@@ -147,6 +147,36 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "quiet_hours_enabled",
+        "type": "switch",
+        "label": "Quiet hours",
+        "default": False,
+        "help": (
+            "Suppress automated pushes (scheduler firings, webhook calls) during "
+            "a daily time window — typical use is to stop the panel waking the room "
+            "overnight. Manual pushes from the Send page or Push-now buttons still go "
+            "through; quiet hours filter automation, not deliberate user intent. "
+            "Each device can override the window in Settings → Devices."
+        ),
+    },
+    {
+        "name": "quiet_hours_start",
+        "type": "time",
+        "label": "Quiet hours start",
+        "default": "22:00",
+        "help": "When the daily quiet window begins. Honours Settings → Server → App → Timezone.",
+    },
+    {
+        "name": "quiet_hours_end",
+        "type": "time",
+        "label": "Quiet hours end",
+        "default": "07:00",
+        "help": (
+            "When the daily quiet window ends. If end < start, the window wraps "
+            "across midnight (e.g. 22:00 → 07:00 = overnight)."
+        ),
+    },
+    {
         "name": "telemetry_enabled",
         "type": "switch",
         "label": "Send anonymous usage telemetry",
