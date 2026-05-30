@@ -1335,17 +1335,45 @@ def diagnostics_test_broker() -> Response:
     """Open a fresh connection with the currently-saved broker settings,
     publish a no-op probe, then disconnect. Independent of the running
     transport so it actually tests the saved values rather than whatever
-    the app currently has loaded."""
+    the app currently has loaded.
+
+    Resolves the same way ``app.main._rebuild_transport`` does:
+      * external broker → ``host``/``port``/creds from the broker section
+      * built-in broker → loopback + ``embedded_port`` (and the embedded
+        creds when they're set)
+
+    Used to bail with "no host configured" whenever the built-in broker
+    was enabled, because the user typically leaves the external ``host``
+    field blank in that mode — which made the button useless for the
+    most common single-machine setup."""
     raw = _settings().get_section("broker")
     host = str(raw.get("host") or "").strip()
+    port = int(raw.get("port") or 1883)
+    username = raw.get("username") or None
+    password = raw.get("password_secret") or None
+    embedded_enabled = bool(raw.get("embedded_enabled"))
     if not host:
-        flash("Broker test: no host configured.", "error")
-        return redirect(url_for("auth.settings_area", area="server"))
+        if not embedded_enabled:
+            flash(
+                "Broker test: no host configured and built-in broker is off.",
+                "error",
+            )
+            return redirect(url_for("auth.settings_area", area="server"))
+        # Mirror app.main's "connect to ourselves on loopback" logic: the
+        # embedded bind may be 0.0.0.0 for clients on the LAN, but that's
+        # not a connectable address — use 127.0.0.1.
+        host = "127.0.0.1"
+        port = int(raw.get("embedded_port") or 1883)
+        embedded_user = str(raw.get("embedded_username") or "").strip() or None
+        embedded_pass = raw.get("embedded_password_secret") or None
+        if embedded_user and not username:
+            username = embedded_user
+            password = embedded_pass
     config = BrokerConfig(
         host=host,
-        port=int(raw.get("port") or 1883),
-        username=raw.get("username") or None,
-        password=raw.get("password_secret") or None,
+        port=port,
+        username=username,
+        password=password,
         keepalive=int(raw.get("keepalive") or 60),
         client_id=str(raw.get("client_id") or "tesserae") + "-probe",
     )
@@ -1356,7 +1384,12 @@ def diagnostics_test_broker() -> Response:
     except Exception as exc:
         flash(f"Broker test failed: {type(exc).__name__}: {exc}", "error")
     else:
-        flash(f"Broker test ok: connected to {host}:{config.port} and published.", "ok")
+        target = (
+            f"built-in broker on {host}:{port}"
+            if embedded_enabled and host == "127.0.0.1"
+            else f"{host}:{config.port}"
+        )
+        flash(f"Broker test ok: connected to {target} and published.", "ok")
     finally:
         with contextlib.suppress(Exception):
             probe.disconnect()
