@@ -9,8 +9,9 @@
 # people who own the version coupling, so it's the right base for a
 # renderer that launches a browser to compose dashboards.
 #
-# Size: ~1.5 GB. Most of that is Chromium + its sandboxes. Worth it
-# for a self-hosted appliance that needs to render real web pages.
+# Size: ~970 MB compressed to pull, ~2.5 GB on disk uncompressed.
+# Most of that is Chromium and its sandboxes — worth it for a self-
+# hosted appliance that needs to render real web pages.
 
 # Pin the Playwright minor that matches our pyproject constraint
 # (playwright>=1.42,<2). Bumping the image tag and the constraint

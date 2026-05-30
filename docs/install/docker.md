@@ -156,6 +156,7 @@ tarball) covers everything Tesserae has, including those backups.
 - **mDNS needs host networking.** See above.
 - **arm/v7 is not built.** Pi 3 and below would need a different
   Playwright story; not currently in scope.
-- **The image is ~1.5 GB.** Most of that is Chromium and its
-  sandboxes. There's no smaller Tesserae image plan — the renderer
-  fundamentally needs a real browser.
+- **The image is ~970 MB to pull**, ~2.5 GB on disk uncompressed.
+  Most of that is Chromium and its sandboxes. There's no smaller
+  Tesserae image plan — the renderer fundamentally needs a real
+  browser.

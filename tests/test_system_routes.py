@@ -100,9 +100,7 @@ def test_system_page_swaps_update_card_under_docker(
     assert "Update &amp; restart" not in body
 
 
-def test_update_apply_refused_under_docker(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_update_apply_refused_under_docker(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     """A hand-crafted POST to /settings/system/update/apply under the
     Docker image is server-side refused too, not just hidden in the UI."""
     monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
