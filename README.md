@@ -89,15 +89,21 @@ Waveshare 13.3" Spectra 6.
 |---|---|---|---|---|---|
 | Inky pHAT | 212×104 | 2 / 3 colour | ✓ | — | — |
 | Inky wHAT | 400×300 | 2 / 3 colour | ✓ | — | — |
+| Inky Impression 4" (ACeP) | 640×400 | 7 colour (ACeP) | ✓ | ✓ | — |
 | Inky Impression 4" (PIM789) | 640×400 | 6 colour (Spectra 6) | ✓ | ✓ | — |
-| Inky Impression 5.7" | 600×448 | 7 colour (ACeP) | ✓ | ✓ | — |
+| Inky Impression 5.7" | 600×448 | 7 colour (ACeP) | ✓ | ✓ | ✅ |
+| Inky Impression 7.3" (ACeP) | 800×480 | 7 colour (ACeP) | ✓ | ✓ | — |
 | Inky Impression 7.3" (PIM773) | 800×480 | 6 colour (Spectra 6) | ✓ | ✓ | — |
 | Inky Impression 13.3" | 1600×1200 | 6 colour (Spectra 6) | ✓ | ✓ | ✅ |
 
 The `pi_bin` path is faster (the server packs the 4-bpp buffer) but
 needs an Impression — the smaller pHAT / wHAT panels go through the
-slower-but-universal `pi_png` route. Untested doesn't mean broken — it
-just means nobody's confirmed it on real hardware yet.
+slower-but-universal `pi_png` route. The older ACeP and current
+Spectra 6 revisions of the 4" and 7.3" are listed separately because
+their palette and pre-quantise saturation defaults differ (the colour
+gamut picker on each device card switches between them). Untested
+doesn't mean broken — it just means nobody's confirmed it on real
+hardware yet.
 [Open an issue or PR](https://github.com/dmellok/tesserae/issues) if
 you've run a panel that isn't ticked.
 
