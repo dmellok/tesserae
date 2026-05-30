@@ -59,28 +59,45 @@ COPY static/     /app/static/
 # REPO_ROOT = /app so the loaders find their content.
 RUN pip install -e /app
 
+# ``gosu`` is what the entrypoint uses to drop privileges after fixing
+# the bind-mount ownership. It's a single ~2 MB static binary; the
+# obvious alternative ``su-exec`` only ships on Alpine. The base
+# image's ``setpriv`` works too but lacks gosu's standard semantics.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/* \
+    && gosu nobody true
+
 # Persistent state — settings.json, pages, schedules, events DB, render
 # cache, gallery photos, backups. Tesserae's default data_root is
 # REPO_ROOT/data, which inside the image is /app/data. Mounting a
 # host path or named volume here is all docker-compose has to do.
 VOLUME ["/app/data"]
 
-# Run as the unprivileged ``pwuser`` (uid 1001) that the Playwright
-# base image already provisions for Chromium. Reusing it avoids the
-# gid/uid 1001 collision a fresh useradd would hit, and pwuser has
-# the right `/ms-playwright` permissions Chromium needs at run time.
-# Defence in depth, not a widget sandbox — widgets execute in the
-# same Python process and can read anything pwuser can read (tracked
-# separately as issue #3). This just stops a container escape from
-# landing in root.
-RUN mkdir -p /app/data && chown -R pwuser:pwuser /app
-USER pwuser
+# Entrypoint script starts as root, chowns /app/data to pwuser (uid
+# 1001) so a host-side bind mount with the wrong UID still works, then
+# re-execs the command under ``gosu pwuser`` so the actual Tesserae
+# process runs unprivileged. Without this, ``docker compose up`` on a
+# fresh host creates ./data as the host user (typically uid 1000) and
+# Tesserae's first ``mkdir(data/plugins)`` EPERMs. Defence in depth,
+# not a widget sandbox — widgets execute in the same Python process
+# and can read anything pwuser can read (tracked separately as issue
+# #3). This just stops a container escape from landing in root.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
+    mkdir -p /app/data && \
+    chown -R pwuser:pwuser /app
+
+# NOTE: no ``USER pwuser`` here. The entrypoint runs as root just long
+# enough to fix /app/data ownership, then drops to pwuser via gosu
+# before exec'ing the CMD.
 
 # HTTP admin / renders endpoint. The embedded MQTT broker (if the
 # user enables it via Settings → Server → MQTT) listens on 1883 —
 # that port only matters if the operator publishes it from compose.
 EXPOSE 8000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 # `tesserae` is the console script declared in pyproject [project.scripts].
 # Defaults to waitress on 0.0.0.0:8000.
 CMD ["tesserae", "--host", "0.0.0.0", "--port", "8000"]
