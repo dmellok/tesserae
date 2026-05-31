@@ -211,7 +211,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_actions](../screenshots/widgets/github_actions.png)
 
-    Most recent CI runs across watched repos with status pills (success / failure / in-progress). Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
+    Most recent CI runs across watched repos — four Bauhaus / Swiss visual directions to choose from. Variants pair a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -221,7 +221,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_activity](../screenshots/widgets/github_activity.png)
 
-    Recent public activity for a GitHub user — pushes, pull requests, issues, releases. Defaults to the username configured in Plugins → GitHub Core; override per cell.
+    Recent public activity for a GitHub user — four Bauhaus / Swiss visual directions to choose from. Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -231,7 +231,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_contributions](../screenshots/widgets/github_contributions.png)
 
-    The familiar 53-week contributions heatmap for a user. Requires a PAT in Plugins → GitHub Core (uses GitHub's GraphQL API which doesn't accept unauthenticated requests).
+    The familiar 53-week contributions heatmap for a user — four Bauhaus / Swiss visual directions to choose from. Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -241,7 +241,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_pr_queue](../screenshots/widgets/github_pr_queue.png)
 
-    Your open PRs across orgs + PRs awaiting your review. Requires a PAT in Plugins → GitHub Core (search API needs auth). Two sections: 'Yours' and 'Awaiting review'.
+    Your open PRs + PRs awaiting your review — four Bauhaus / Swiss visual directions to choose from. Each variant shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -261,7 +261,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_repo](../screenshots/widgets/github_repo.png)
 
-    Single-repo card: stars / forks / open issues / language / last commit / latest release. Public repos work without a token.
+    Single-repo card — four Bauhaus / Swiss visual directions to choose from. Each pairs the language split + stars / forks / issues / release stats with a 52-week commit activity chart. Public repos work without a token.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 

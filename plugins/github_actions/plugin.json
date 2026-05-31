@@ -1,12 +1,24 @@
 {
   "tesserae_compat": "1.x",
   "name": "GitHub — Actions",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Most recent CI runs across watched repos with status pills (success / failure / in-progress). Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.",
+  "description": "Most recent CI runs across watched repos — four Bauhaus / Swiss visual directions to choose from. Variants pair a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.",
   "icon": "ph-play-circle",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "ci1",
+      "choices": [
+        { "value": "ci1", "label": "1 · Refined" },
+        { "value": "ci2", "label": "2 · Geometric" },
+        { "value": "ci3", "label": "3 · Swiss" },
+        { "value": "ci4", "label": "4 · Data" }
+      ]
+    },
     { "name": "repos",       "type": "textarea", "label": "Repos (one per line, owner/repo)", "default": "" },
     { "name": "max_results", "type": "number",   "label": "Max runs per repo",                 "default": 3 }
   ],

@@ -8,6 +8,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.0] — 2026-06-01
+
+### Added
+
+- **Four visual directions per GitHub widget.** `github_activity`,
+  `github_actions`, `github_contributions`, `github_pr_queue`, and
+  `github_repo` each ship four selectable looks from a Bauhaus / Swiss
+  handoff: Refined (charcoal `DarkHeader` + solid stat tiles), Geometric
+  (De Stijl colour blocks), Swiss / International (hairlines only), and
+  Data (donut + bars + outlined tiles). Pick per cell via the new
+  `variant` option.
+
+### Changed
+
+- GitHub widgets map the design's categorical accent palette (green /
+  red / yellow / blue / ink / muted) to `--c-data-2` / `--c-accent` /
+  `--c-data-3` / `--c-data-4` / `--c-text` / `--c-text-soft` —
+  intentionally NOT `--c-ok` / `--c-warn` / `--c-danger`, since the
+  GitHub accents code identity, not semantic status.
+
 ## [0.10.1] — 2026-06-01
 
 ### Changed

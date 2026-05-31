@@ -1,12 +1,24 @@
 {
   "tesserae_compat": "1.x",
   "name": "GitHub — Repo Card",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Single-repo card: stars / forks / open issues / language / last commit / latest release. Public repos work without a token.",
+  "description": "Single-repo card — four Bauhaus / Swiss visual directions to choose from. Each pairs the language split + stars / forks / issues / release stats with a 52-week commit activity chart. Public repos work without a token.",
   "icon": "ph-book-bookmark",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "re1",
+      "choices": [
+        { "value": "re1", "label": "1 · Refined" },
+        { "value": "re2", "label": "2 · Geometric" },
+        { "value": "re3", "label": "3 · Swiss" },
+        { "value": "re4", "label": "4 · Data" }
+      ]
+    },
     { "name": "repo", "type": "string", "label": "owner/repo", "default": "torvalds/linux" }
   ],
   "render": { "dither": "none", "needs_network": true }
