@@ -1,0 +1,80 @@
+name: Hardware compatibility report
+description: Tell us what works (or doesn't) on a panel + client combination.
+title: "[Hardware]: "
+labels: ["hardware-report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports feed the [compatibility matrix](https://dmellok.github.io/tesserae/compatibility/) so other people can buy with confidence. Even "it just works" reports are worth filing — that's how panels move from ❔ to ✅ in the README.
+
+  - type: input
+    id: panel
+    attributes:
+      label: Panel
+      description: Manufacturer + model + size + revision if known.
+      placeholder: "Pimoroni Inky Impression 5.7\" (ACeP, original)"
+    validations:
+      required: true
+
+  - type: input
+    id: resolution
+    attributes:
+      label: Resolution
+      placeholder: "600×448"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Which client are you using?
+      options:
+        - tesserae-pi-png-client
+        - tesserae-pi-bin-client
+        - tesserae-esp32-bin-client
+        - KOReader trmnl-display plugin (BYOS)
+        - Native TRMNL firmware
+        - Custom / other (describe below)
+    validations:
+      required: true
+
+  - type: input
+    id: client-version
+    attributes:
+      label: Client version / commit
+      placeholder: "tesserae-pi-bin-client v0.4.1"
+
+  - type: input
+    id: server-version
+    attributes:
+      label: Tesserae server version
+      placeholder: "0.8.3"
+    validations:
+      required: true
+
+  - type: textarea
+    id: works
+    attributes:
+      label: What works
+      description: Frames render, colours look right, refresh time, anything you've measured.
+    validations:
+      required: true
+
+  - type: textarea
+    id: broken
+    attributes:
+      label: What doesn't work (if anything)
+      description: Quirks, missing features, things you had to patch.
+
+  - type: textarea
+    id: tips
+    attributes:
+      label: Tips for others on this panel
+      description: Gamut settings, orientation quirks, mounting tricks, anything you wish you'd known on day one.
+
+  - type: input
+    id: photo
+    attributes:
+      label: Photo / video link
+      description: Optional, but great for the gallery. Paste a URL or drag-drop after submitting.

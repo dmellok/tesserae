@@ -1,0 +1,99 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. The more specific you can be — version, hardware, exact steps — the faster it can be fixed. If this is a "how do I…" question, please use [Discussions](https://github.com/dmellok/tesserae/discussions) instead.
+
+  - type: input
+    id: version
+    attributes:
+      label: Tesserae version
+      description: From Settings → Server, the bottom of the page, or `git describe`.
+      placeholder: "0.8.3"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: How is Tesserae running?
+      options:
+        - Docker compose
+        - Native (install.sh / install.ps1)
+        - From source (git clone + venv)
+        - Other (describe in steps)
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Include version. e.g. "Debian 12 on Raspberry Pi 5", "macOS 15.0", "Windows 11".
+    validations:
+      required: true
+
+  - type: input
+    id: panel
+    attributes:
+      label: Panel hardware
+      description: Manufacturer + model + size. "N/A" if the bug doesn't touch a panel.
+      placeholder: "Pimoroni Inky Impression 13.3\""
+
+  - type: input
+    id: client
+    attributes:
+      label: Client repo + version
+      description: e.g. tesserae-pi-bin-client v0.4.1, KOReader trmnl-display plugin.
+
+  - type: input
+    id: broker
+    attributes:
+      label: MQTT broker
+      description: e.g. "Mosquitto 2.0.20 embedded", "external Mosquitto", "N/A (TRMNL HTTP only)".
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Number the steps. Assume the reader is starting from a fresh dashboard.
+      placeholder: |
+        1. Open Settings → Devices
+        2. Click Register on the discovered Kindle
+        3. Submit the form
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: Trim to ±30 lines around the error — full transcripts get truncated by GitHub.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched [existing issues](https://github.com/dmellok/tesserae/issues?q=is%3Aissue) and didn't find a duplicate.
+          required: true
+        - label: If I could, I tried reproducing on the latest minor release.

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions / how-do-I / discussions
+    url: https://github.com/dmellok/tesserae/discussions
+    about: For anything that's not a clear bug or a concrete feature, head to Discussions first.
+  - name: Security vulnerability
+    url: https://github.com/dmellok/tesserae/security/advisories/new
+    about: Don't open a public issue. See SECURITY.md for the disclosure process.
