@@ -1,14 +1,16 @@
 # Tesserae
 
+[![License](https://img.shields.io/github/license/dmellok/tesserae)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/dmellok/tesserae)](https://github.com/dmellok/tesserae/releases/latest)
+[![CI](https://github.com/dmellok/tesserae/actions/workflows/ci.yml/badge.svg)](https://github.com/dmellok/tesserae/actions/workflows/ci.yml)
+[![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae)](https://github.com/dmellok/tesserae/discussions)
+
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices (Pi,
 ESP32) over MQTT.
 
-Sibling rebuild of [inky-dash](https://github.com/dmellok/inky-dash) —
-same job, but renderers and devices are drop-a-folder plugins, so adding
-new hardware is a contained change. The name: a
-[*tessera*](https://en.wikipedia.org/wiki/Tessera) is the individual
-tile of a mosaic; the editor composes a dashboard out of cells.
+Renderers and devices are drop-a-folder plugins — adding new hardware
+is a contained change.
 
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** —
 install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
@@ -19,6 +21,13 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 > or a `git clone`. The admin UI is polished, but the deployment story
 > still assumes you can read tracebacks if something goes wrong. Aimed at
 > people running a Pi appliance at home.
+
+## Community
+
+- **[Discussions](https://github.com/dmellok/tesserae/discussions)** — show your dashboard, pitch a widget, ask "how do I…", or feed back on what's coming next.
+- **[Contributing](CONTRIBUTING.md)** — dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
+- **[Security policy](SECURITY.md)** — how to report a vulnerability privately.
+- **[Code of conduct](CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
 
 <details>
 <summary><b>Screenshots</b> — admin UI &amp; example device frames (click to expand)</summary>
@@ -63,6 +72,8 @@ for an upfront read on which depend on undocumented upstreams.
 
 Tests + ruff + mypy `--strict` (on contract modules) clean. CI runs on
 every push.
+
+For support, head to [Discussions](https://github.com/dmellok/tesserae/discussions).
 
 ## Clients
 
