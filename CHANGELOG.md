@@ -8,37 +8,73 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.8.3] — 2026-05-31
+
+### Added
+
+- **Six monochrome themes** for 1-bit panels (Paper, Carbon, Newsprint,
+  Halftone, Ash, Graphite). Designed for the Kindle / native TRMNL
+  rendering pipeline — Paper / Carbon are flat for sharp text, Newsprint
+  / Halftone are halftone-friendly for printed-page texture, Ash /
+  Graphite sit between as softer alternatives.
+- **`tags` field on themes** to support family grouping. The theme
+  picker on the page editor now groups by family in `<optgroup>`s, so
+  the six mono themes cluster together — someone setting up a Kindle
+  dashboard can spot them without scrolling past 20 colour themes.
+
+## [0.8.2] — 2026-05-31
+
+### Fixed
+
+- TRMNL discovery headers are case-insensitive, so KOReader's
+  `Png-Width` / `Png-Height` (Title-case) land as `panel_w` / `panel_h`
+  in the cache and pre-fill the Register form — previously they only
+  matched the lowercase / native-TRMNL spellings and were silently
+  dropped.
+
+### Changed
+
+- README updated with a "TRMNL-compatible (HTTP pull)" panels subsection;
+  Kindle Paperwhite 2 (jailbroken, KOReader trmnl-display plugin) listed
+  as tested.
+
+## [0.8.1] — 2026-05-31
+
+### Fixed
+
+- Scheduler skips schedules whose target page was deleted instead of
+  letting them fire every tick and log "page not found" to the History
+  view. Warns once per session per stale schedule so the operator sees
+  something actionable in the log without spam.
+- Schedules editor flags stale schedules with a red "page deleted" pill
+  + a subtle row tint, so the user can rebind or delete them.
+
 ## [0.8.0] — 2026-05-31
 
 TRMNL HTTP-pull compatibility lets a jailbroken Kindle (running the
 KOReader trmnl-display plugin) or any native TRMNL hardware paint a
 Tesserae-managed dashboard alongside the existing MQTT-push Pi / ESP32
-panels. Plus a clutch of polish: a stale-discovery sweep on HA start, a
-scheduler guard for deleted-target schedules, and a new monochrome
-theme family for 1-bit panels.
+panels. Plus a stale-discovery sweep on HA start so deleted device
+tiles stop ghosting Home Assistant.
 
 ### Added
 
 - **TRMNL BYOS protocol.** New `trmnl_client` device kind, `trmnl_png`
-  renderer (greyscale + 1-bit quantise), and `/api/display` / `/api/setup`
-  / `/api/log` HTTP blueprint authed by per-device 5-char access tokens.
-  Onboarded clients show up in the existing *Discovered* strip with
-  panel dims pre-filled.
-- **Six monochrome themes** for 1-bit panels (Paper, Carbon, Newsprint,
-  Halftone, Ash, Graphite). Theme picker groups by family — mono themes
-  cluster in their own optgroup so they're easy to find on a Kindle
-  setup.
-- **`tags` field on themes** to support family grouping; theme manifest
-  schema updated accordingly.
-- **Per-device Display name** field on the Settings card (re-publishes
-  to Home Assistant on save).
+  renderer (greyscale + 1-bit quantise), and `/api/display` /
+  `/api/setup` / `/api/log` HTTP blueprint authed by per-device 5-char
+  access tokens. Onboarded clients show up in the existing *Discovered*
+  strip with panel dims pre-filled; tokens are short on purpose so they
+  can be typed into clients without a keyboard.
+- **Per-device Display name** field on the Settings card; saving
+  re-publishes Home Assistant discovery so the HA device tile title
+  updates without a Tesserae restart.
 
 ### Changed
 
 - TRMNL device heartbeats (request headers) feed the same
   `DEVICE_STATUS` cache + HA discovery path as MQTT clients, so battery
   / signal / IP sensors appear in HA for TRMNL panels too.
-- `latest_render_for(device_id)` on PushManager is now persisted to
+- `latest_render_for(device_id)` on `PushManager` is now persisted to
   `data/core/latest_renders.json` so fresh polls after a restart don't
   serve placeholders.
 
@@ -46,13 +82,7 @@ theme family for 1-bit panels.
 
 - HA discovery orphan sweep on start — retained discovery configs for
   devices deleted while Tesserae was offline get blanked, so HA stops
-  showing ghost device tiles (0.8.0).
-- Scheduler skips schedules whose target page was deleted + warns once
-  per session, so the History view doesn't fill with "page not found"
-  rows (0.8.1).
-- TRMNL discovery headers are case-insensitive so KOReader's
-  `Png-Width` / `Png-Height` land as `panel_w` / `panel_h` for the
-  Register form (0.8.2).
+  showing ghost device tiles forever.
 
 ## [0.7.0] — 2026-05-30
 
@@ -277,6 +307,9 @@ gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
 [Unreleased]: https://github.com/dmellok/tesserae/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/dmellok/tesserae/releases/tag/v0.8.3
+[0.8.2]: https://github.com/dmellok/tesserae/releases/tag/v0.8.2
+[0.8.1]: https://github.com/dmellok/tesserae/releases/tag/v0.8.1
 [0.8.0]: https://github.com/dmellok/tesserae/releases/tag/v0.8.0
 [0.7.0]: https://github.com/dmellok/tesserae/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dmellok/tesserae/releases/tag/v0.6.0
