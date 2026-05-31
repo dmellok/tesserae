@@ -420,6 +420,37 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
     assert "format" not in cell.options
 
 
+def test_update_cell_zoom_round_trips(app: Flask, tmp_path: Path) -> None:
+    """Per-cell content zoom is persisted on the cell so the slider
+    survives saves and rides through to the panel render."""
+    _set_panel(app, 400, 300)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "zoom": "1.5"},
+    )
+    cell = _store(tmp_path).get(pid).cells[0]
+    assert cell.zoom == 1.5
+
+
+def test_update_cell_zoom_clamps_to_model_bounds(app: Flask, tmp_path: Path) -> None:
+    """The slider exposes 0.7–2.0; the persistence layer clamps the
+    wider 0.5–3.0 envelope from _apply_cell_form so a wild explicit
+    POST can't write a value the pydantic Cell rejects."""
+    _set_panel(app, 400, 300)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a", "zoom": "10"})
+    assert _store(tmp_path).get(pid).cells[0].zoom == 3.0
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a", "zoom": "0.1"})
+    assert _store(tmp_path).get(pid).cells[0].zoom == 0.5
+
+
 def test_update_cell_clamps_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     _set_panel(app, 400, 300)
     client = app.test_client()

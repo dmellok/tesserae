@@ -78,6 +78,13 @@
                       value=cell.font or '', options=font_options,
                       blank_label='Inherit page') }}
     </div>
+    {# Content zoom — inverse-sized at render time. 1.0 == native; >1
+       paints the widget into a smaller virtual container then scales it
+       up so text/icons grow without breaking layout. Persisted on the
+       cell so the zoom rides through to the panel push. #}
+    {{ slider('cell-' ~ cell.id ~ '-zoom', 'zoom', 'Content zoom',
+              value=cell.zoom, min=0.7, max=2.0, step=0.05, unit='×',
+              help='Pretends the cell is smaller, then scales the widget back up — text and icons grow without breaking layout. Persists through to the panel.') }}
 
     {# Geometry is owned by the layout editor (drag handles + presets)
        and persisted via /cells/batch. Don't send x/y/w/h from here —

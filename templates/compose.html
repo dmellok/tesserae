@@ -40,9 +40,6 @@
          doesn't shrink the plugin's render area. */
       outline: 1px solid var(--theme-divider);
       outline-offset: -1px;
-      /* Each cell is a sizing container so plugins can use cqw/cqh CSS units
-         to auto-scale to their cell dimensions. */
-      container-type: size;
 
       /* Semantic token layer. Widgets paint from these --c-* tokens, NEVER
          the raw --theme-* primitives. Defined on the cell host so every
@@ -70,6 +67,28 @@
       --c-warn:        var(--theme-warn);
       --c-danger:      var(--theme-danger);
       --c-info:        var(--theme-accent);
+    }
+    /* Per-cell zoom — the inner box paints into a 1/zoom virtual area
+       then transform-scales back up to fill the cell, so widgets see a
+       smaller container (both CSS via cqw/cqh AND JS via ctx.cell.w/h
+       which composer.js divides by zoom). Container query unit lives
+       here, not on .cell, so cqw/cqh reflect the *virtual* dims.
+       --c-zoom defaults to 1 (no change) when no inline override is
+       present. */
+    /* --c-zoom is set on the parent .cell (inline style at first paint,
+       postMessage patches thereafter). Don't declare a separate value
+       on .cell-content — that would shadow the inherited one, since
+       custom properties don't take "default" declarations; the var()
+       fallback is the only way to express the 1.0 baseline. */
+    .cell-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: calc(100% / var(--c-zoom, 1));
+      height: calc(100% / var(--c-zoom, 1));
+      transform: scale(var(--c-zoom, 1));
+      transform-origin: top left;
+      container-type: size;
     }
     .cell.full-bleed { outline: 0; }
     .cell.error { outline: 2px solid {{ page.palette.danger }}; }
@@ -108,17 +127,21 @@
          data-panel-h="{{ page.panel.h }}"
          data-theme-palette='{{ cell.palette|tojson }}'
          data-font-family="{{ cell.font_family }}"
+         data-cell-zoom="{{ cell.zoom }}"
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;
                 font-family: '{{ cell.font_family }}', system-ui, sans-serif;
                 --theme-font: '{{ cell.font_family }}', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
                 --theme-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                --c-zoom: {{ cell.zoom }};
                 {% for key, val in cell.palette.items() %}--theme-{{ key }}: {{ val }};{% endfor %}">
-      {% if not cell.plugin %}
-      <div class="cell-empty-placeholder">
-        <strong>Cell {{ loop.index }}</strong>
-        <span>pick a widget</span>
+      <div class="cell-content">
+        {% if not cell.plugin %}
+        <div class="cell-empty-placeholder">
+          <strong>Cell {{ loop.index }}</strong>
+          <span>pick a widget</span>
+        </div>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
     {% endfor %}
   </div>
