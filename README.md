@@ -25,9 +25,9 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 ## Community
 
 - **[Discussions](https://github.com/dmellok/tesserae/discussions)** — show your dashboard, pitch a widget, ask "how do I…", or feed back on what's coming next.
-- **[Contributing](CONTRIBUTING.md)** — dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
-- **[Security policy](SECURITY.md)** — how to report a vulnerability privately.
-- **[Code of conduct](CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
+- **[Contributing](.github/CONTRIBUTING.md)** — dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
+- **[Security policy](.github/SECURITY.md)** — how to report a vulnerability privately.
+- **[Code of conduct](.github/CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
 
 <details>
 <summary><b>Screenshots</b> — admin UI &amp; example device frames (click to expand)</summary>
