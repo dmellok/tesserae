@@ -225,6 +225,17 @@ ESP32 panel are especially welcome — the matrix is small and we
 mark verified panels in
 [Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/#whats-been-tested-on-real-hardware).
 
+## Built with
+
+Tesserae stands on generously-licensed open source:
+
+- **[Phosphor Icons](https://phosphoricons.com/)** — every icon in the admin UI + widgets (4 weights, MIT).
+- **[Chart.js](https://chartjs.org/)** v4.4.0 — the line / bar / radar / pie / horizon plots across finance, weather, and stats widgets (MIT).
+- **15 typefaces** under SIL OFL or Apache 2.0 — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, and a dozen more in the `fonts_core` plugin.
+- **[KOReader](https://github.com/koreader/koreader)** trmnl-display plugin — the upstream Lua client that turns a jailbroken Kindle into a TRMNL-compatible panel.
+
+Full list in [docs/credits](https://dmellok.github.io/tesserae/credits/).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
