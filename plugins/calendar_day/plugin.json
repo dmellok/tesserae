@@ -1,12 +1,26 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar — Day",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Today's agenda — chronological list of events with time, summary, location, and a colour stripe per feed. Reads from feeds configured in Plugins → Calendar Feeds.",
+  "description": "Today's agenda — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.",
   "icon": "ph-calendar-check",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "d1",
+      "choices": [
+        { "value": "d1", "label": "1 · Bauhaus Refined" },
+        { "value": "d2", "label": "2 · Bauhaus Geometric" },
+        { "value": "d3", "label": "3 · Swiss / International" },
+        { "value": "d4", "label": "4 · Timeline Rail" },
+        { "value": "d5", "label": "5 · Editorial Almanac" },
+        { "value": "d6", "label": "6 · Glanceable Cards" }
+      ]
+    },
     { "name": "hours_ahead",  "type": "number", "label": "Hours of agenda to show",                "default": 24 },
     { "name": "max_events",   "type": "number", "label": "Max events (0 = all)",                   "default": 0 },
     { "name": "feeds_filter", "type": "string", "label": "Feed IDs (comma-separated; blank = all enabled)", "default": "" }

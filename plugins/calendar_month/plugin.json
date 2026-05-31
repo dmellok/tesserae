@@ -1,12 +1,26 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar — Month",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Month-grid view of upcoming events. Reads from feeds configured in Plugins → Calendar Feeds. Today is highlighted; each day cell stacks up to N event chips colour-coded by feed.",
+  "description": "Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
   "supports": { "sizes": ["md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "m1",
+      "choices": [
+        { "value": "m1", "label": "1 · Bauhaus Refined" },
+        { "value": "m2", "label": "2 · Bauhaus Geometric" },
+        { "value": "m3", "label": "3 · Swiss / International" },
+        { "value": "m4", "label": "4 · Agenda Split" },
+        { "value": "m5", "label": "5 · Editorial" },
+        { "value": "m6", "label": "6 · Dot Density" }
+      ]
+    },
     {
       "name": "week_start",
       "type": "select",

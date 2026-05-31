@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.9.0] — 2026-06-01
+
+### Added
+
+- **Six visual directions per calendar widget.** `calendar_day`,
+  `calendar_week`, and `calendar_month` each ship six selectable looks
+  pulled from a Bauhaus / Swiss design handoff: Refined, Geometric,
+  Swiss / International, Timeline / Agenda Split, Editorial, and
+  Glanceable / Dot Density. Pick per cell via the new `variant` option.
+  Each direction maps cleanly onto the theme's `--c-*` tokens, so the
+  same widget restyles across colour, mono, and neon themes without
+  hard-coded hex. Per-event colour comes from the feed configured in
+  *Plugins → Calendar Feeds*.
+
 ## [0.8.3] — 2026-05-31
 
 ### Added

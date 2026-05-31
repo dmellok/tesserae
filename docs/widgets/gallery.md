@@ -19,7 +19,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Air Quality Index (European or US scale) plus PM2.5, PM10, O3, NO2 readings. Data from Open-Meteo CAMS (no API key). Colour-coded panel block reflects the AQI band.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — Forecast** &middot; `weather_forecast`
 
@@ -29,7 +29,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — Hourly** &middot; `weather_hourly`
 
@@ -39,7 +39,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — Now** &middot; `weather_now`
 
@@ -49,7 +49,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — Pollen Count** &middot; `weather_pollen_count`
 
@@ -59,7 +59,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS — Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -95,7 +95,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Today's sunrise, sunset, golden hour, and day length for a chosen lat/lon. The hero shows a sun-arc visualisation with the current position marked. Data from Open-Meteo (no key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Clock — Word** &middot; `clock_word`
 
@@ -129,9 +129,9 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_day](../screenshots/widgets/calendar_day.png)
 
-    Today's agenda — chronological list of events with time, summary, location, and a colour stripe per feed. Reads from feeds configured in Plugins → Calendar Feeds.
+    Today's agenda — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Calendar — Month** &middot; `calendar_month`
 
@@ -139,9 +139,9 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_month](../screenshots/widgets/calendar_month.png)
 
-    Month-grid view of upcoming events. Reads from feeds configured in Plugins → Calendar Feeds. Today is highlighted; each day cell stacks up to N event chips colour-coded by feed.
+    Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
 
-    **Sizes:** `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `md` `lg` &middot; **Tier:** —
 
 -   **Calendar — Week** &middot; `calendar_week`
 
@@ -149,9 +149,9 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
-    Seven-day strip of upcoming events. Each day is a column with that day's agenda underneath. Reads from feeds configured in Plugins → Calendar Feeds.
+    Seven-day strip — six Bauhaus / Swiss visual directions to choose from. Each event's colour comes from its feed (Plugins → Calendar Feeds).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -167,7 +167,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Podium from the most recently completed F1 race: P1/P2/P3 with driver, team, time/gap, fastest-lap badge, plus the circuit silhouette. Data from Jolpica-F1 (no API key).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **F1 — Next Race** &middot; `f1_next`
 
@@ -177,7 +177,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Countdown to the next F1 race with circuit silhouette, race name, round number, and local session time. Data from Jolpica-F1 (Ergast successor, no API key). Circuits from the bundled f1_core plugin.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **F1 — Driver Standings** &middot; `f1_standings_drivers`
 
@@ -187,7 +187,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Current F1 driver championship: position, driver, team, points, wins. Constructor colour stripe on the left of each row. Top 3 shown on xs/sm, top 10 on md, top 20 on lg. Data from Jolpica-F1 (no API key).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **F1 — Race Weekend** &middot; `f1_weekend`
 
@@ -197,7 +197,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Session schedule for the upcoming F1 race weekend (FP1, FP2, FP3, Sprint where applicable, Qualifying, Race) with circuit silhouette. Times shown in the viewer's local timezone. Data from Jolpica-F1 (no API key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -213,7 +213,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Most recent CI runs across watched repos with status pills (success / failure / in-progress). Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **GitHub — Activity** &middot; `github_activity`
 
@@ -223,7 +223,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Recent public activity for a GitHub user — pushes, pull requests, issues, releases. Defaults to the username configured in Plugins → GitHub Core; override per cell.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **GitHub — Contributions** &middot; `github_contributions`
 
@@ -233,7 +233,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     The familiar 53-week contributions heatmap for a user. Requires a PAT in Plugins → GitHub Core (uses GitHub's GraphQL API which doesn't accept unauthenticated requests).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **GitHub — PR Queue** &middot; `github_pr_queue`
 
@@ -243,7 +243,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Your open PRs across orgs + PRs awaiting your review. Requires a PAT in Plugins → GitHub Core (search API needs auth). Two sections: 'Yours' and 'Awaiting review'.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **GitHub — Releases** &middot; `github_releases`
 
@@ -253,7 +253,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Latest releases from a list of watched repos. Useful for tracking your dependencies' versions. Public repos work without a token.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **GitHub — Repo Card** &middot; `github_repo`
 
@@ -263,7 +263,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Single-repo card: stars / forks / open issues / language / last commit / latest release. Public repos work without a token.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -279,7 +279,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Top / new / best / show / ask stories from Hacker News. Uses the free Firebase API (no auth, no key). Click-through opens the story; the lightbox doesn't apply.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **News — Reddit** &middot; `news_reddit`
 
@@ -289,7 +289,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Top posts from a subreddit using the free .json endpoint (no API key, no OAuth). Pick the subreddit and time window per cell.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Fragile
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **News — RSS / Atom** &middot; `news_rss`
 
@@ -299,7 +299,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **News — Wikipedia On This Day** &middot; `news_wikipedia_otd`
 
@@ -309,7 +309,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Wikipedia 'On this day' — featured historical events for today's date. Uses the free Wikimedia REST API (no key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -325,7 +325,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Single crypto with current price, 24h change, and a 24h sparkline. Data from CoinGecko (free, no API key). Coin ID is the lowercase slug from coingecko.com (e.g. bitcoin, ethereum, solana).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Finance — Currency (FX)** &middot; `finance_currency`
 
@@ -335,7 +335,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Single FX pair (e.g. AUD/USD) with current rate + 30-day sparkline. Data from frankfurter.app (free, no key, sourced from European Central Bank). ISO 4217 currency codes.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Finance — Stock** &middot; `finance_stock`
 
@@ -345,7 +345,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Single stock ticker with current price + intraday sparkline + day change. Uses Yahoo Finance's public chart endpoint (query1.finance.yahoo.com) — undocumented but stable for years. Symbol format follows Yahoo's: e.g. 'AAPL', 'CBA.AX' (ASX), '^GSPC' (S&P 500 index).
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Best-effort
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -361,7 +361,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Flights currently overhead at your location via OpenSky Network (free, no key). Shows count + the nearest N flights with callsign / origin country / altitude / speed.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Sky — Aurora Forecast** &middot; `sky_aurora`
 
@@ -371,7 +371,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Current planetary Kp index + 3-day forecast from NOAA SWPC. Higher Kp = aurora visible further from the poles. Includes a viewer-latitude hint so the band reads as 'visible from your location' when conditions allow.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — BoM Warnings** &middot; `sky_bom_warnings`
 
@@ -461,7 +461,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![spotify_now_playing](../screenshots/widgets/spotify_now_playing.png)
 
-    Currently-playing Spotify track: album art, title, artist and album, with an optional progress bar. Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
+    Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -479,7 +479,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     NASA's Astronomy Picture of the Day, full bleed. Walks back day-by-day past video entries so the cell always shows an image. Uses DEMO_KEY by default; paste your own key at https://api.nasa.gov for a higher rate limit.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Picture — Apple Shared Album** &middot; `picture_apple_album`
 
@@ -489,7 +489,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Rotates through photos in a public iCloud Shared Album, full bleed. Enable Public Website on the album in Photos, then paste its share link (https://www.icloud.com/sharedalbum/#B0xxxxxx) or just the token. NOTE: uses Apple's reverse-engineered shared-album endpoints — undocumented but stable for ~10 years.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Best-effort
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Picture — Gallery** &middot; `picture_gallery`
 
@@ -509,7 +509,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -525,7 +525,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.
 
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Stable
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 

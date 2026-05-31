@@ -1,76 +1,59 @@
-/* calendar_day — today's agenda list. */
+/* calendar_day — six visual directions (D1–D6).
+ *
+ * All colour roles map to the theme's --c-* tokens; raw palette through
+ * --theme-* on the cell host. The four reference categorical hues
+ * (red/blue/yellow/green) come from each event's feed colour, not a
+ * hard-coded enum — so every Tesserae theme (colour, mono, neon)
+ * restyles cleanly. Per-row `--chip` carries that colour into each
+ * variant's stripe / marker / fill.
+ */
 
 :host {
-  display: block; width: 100%; height: 100%;
-  color: var(--c-text); background: var(--c-bg);
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--c-text);
+  background: var(--c-bg);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
+
 .root {
-  width: 100%; height: 100%;
-  display: grid; grid-template-rows: auto 1fr;
-  box-sizing: border-box; overflow: hidden;
+  width: 100%;
+  height: 100%;
+  display: block;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--c-bg);
+}
+.variant {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
-.cd-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cd-count { font-variant-numeric: tabular-nums; }
-
-.cd-list {
+/* -- Shared error / empty states ----------------------------------- */
+.root.error {
   display: grid;
-  grid-auto-rows: min-content;
-  align-content: start;
-  gap: clamp(2px, 0.4cqh, 6px);
-  padding: clamp(4px, 0.8cqh, 10px) 0;
-  background: var(--c-surface);
-  min-height: 0;
-  overflow: hidden;
+  place-items: center;
+  text-align: center;
+  color: var(--c-danger);
+  padding: 16px;
+  gap: 8px;
 }
-.cd-ev {
-  display: grid;
-  grid-template-columns: clamp(60px, 12cqw, 110px) 1fr;
-  align-items: start;
-  gap: clamp(6px, 1.2cqw, 12px);
-  padding: clamp(4px, 0.8cqh, 8px) clamp(8px, 1.6cqw, 16px);
-  border-left: 4px solid var(--chip);
-  min-width: 0;
+.root.error .ph { font-size: 28px; }
+.root.error span {
+  font: 12px/1.4 var(--theme-font-mono, ui-monospace);
+  word-break: break-word;
 }
-.cd-when {
-  font: 700 clamp(10px, 1.6cqw, 13px)/1.2 var(--theme-font-mono, ui-monospace);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--c-text-soft);
-}
-.cd-body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-.cd-summary {
-  font-size: clamp(11px, 1.9cqw, 16px);
-  font-weight: 700;
-  letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cd-loc {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: clamp(9px, 1.4cqw, 11px);
-  color: var(--c-text-soft);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.cd-loc .ph { font-size: 1.05em; }
-
 .cd-empty {
   display: grid;
   place-content: center;
   text-align: center;
   gap: clamp(4px, 1cqw, 10px);
   padding: clamp(12px, 2.4cqw, 28px);
-  background: var(--c-surface);
+  height: 100%;
 }
 .cd-empty .ph-duotone {
   font-size: clamp(28px, 8cqw, 64px);
@@ -88,15 +71,532 @@
   color: var(--c-text-soft);
 }
 
-/* xs: collapse to next event only */
-.root.size-xs .cd-ev { padding: 3px 6px; gap: 6px; grid-template-columns: auto 1fr; }
-.root.size-xs .cd-when { font-size: 9px; }
-.root.size-xs .cd-summary { font-size: 11px; }
-.root.size-xs .cd-loc { display: none; }
-
-.root.error {
-  display: grid; place-items: center; text-align: center;
-  color: var(--c-danger); padding: 16px; gap: 8px;
+/* =================================================================
+ * D1 — BAUHAUS REFINED
+ * =================================================================
+ * Big black numeral + bold day abbreviation, accent rule, evenly
+ * distributed rows with coloured stripe + mono times + bold title.
+ * The live event gets a tint wash + ● NOW marker.
+ */
+.variant-d1 { display: grid; grid-template-rows: auto auto 1fr; }
+.d1-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: clamp(10px, 2.4cqh, 22px) clamp(12px, 2.6cqw, 24px) clamp(8px, 1.8cqh, 16px);
+  gap: clamp(8px, 1.6cqw, 16px);
 }
-.root.error .ph { font-size: 28px; }
-.root.error span { font: 12px/1.4 monospace; word-break: break-word; }
+.d1-date-block { display: flex; align-items: baseline; gap: clamp(6px, 1.4cqw, 12px); min-width: 0; }
+.d1-day-num {
+  font: 900 clamp(28px, 9cqh, 56px)/0.8 var(--theme-font, system-ui);
+  letter-spacing: -0.02em;
+}
+.d1-date-meta { line-height: 1.05; min-width: 0; }
+.d1-dow {
+  font: 900 clamp(11px, 2cqw, 18px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.02em;
+}
+.d1-month {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.04em;
+  color: var(--c-text-soft);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d1-meta {
+  text-align: right;
+  font: 700 clamp(8px, 1.4cqw, 11px)/1.4 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.d1-now { color: var(--c-accent); font-weight: 700; margin-top: 2px; }
+.d1-rule { height: clamp(3px, 0.8cqh, 5px); background: var(--c-accent); }
+.d1-list { display: grid; grid-auto-rows: 1fr; min-height: 0; overflow: hidden; }
+.d1-row {
+  display: grid;
+  grid-template-columns: clamp(6px, 1.6cqw, 9px) clamp(60px, 12cqw, 110px) 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.6cqw, 14px);
+  padding: clamp(4px, 0.8cqh, 8px) clamp(12px, 2.4cqw, 22px) clamp(4px, 0.8cqh, 8px) 0;
+  border-bottom: 1px solid var(--c-text);
+  min-width: 0;
+  background: transparent;
+}
+.d1-row:last-child { border-bottom: 0; }
+.d1-row--live {
+  background: var(--c-accent-soft, color-mix(in oklab, var(--c-accent) 14%, transparent));
+}
+.d1-stripe { align-self: stretch; background: var(--chip); }
+.d1-time {
+  font: 700 clamp(9px, 1.7cqw, 12px)/1.25 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+}
+.d1-time-start { color: var(--c-text); }
+.d1-body { min-width: 0; display: grid; gap: 2px; }
+.d1-title {
+  font-size: clamp(12px, 2.4cqw, 19px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d1-loc {
+  font-size: clamp(9px, 1.4cqw, 11px);
+  color: var(--c-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d1-now-tag {
+  font: 700 clamp(8px, 1.2cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-accent);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+/* =================================================================
+ * D2 — BAUHAUS GEOMETRIC (De Stijl)
+ * =================================================================
+ * Header: accent square date + warn-coloured title band + accent2
+ * stripe. Each row has a circle marker (in feed colour) + bold mono
+ * time + heavy title; live row gets a tint + small red dot.
+ */
+.variant-d2 { display: grid; grid-template-rows: auto 1fr; }
+.d2-header {
+  display: grid;
+  grid-template-columns: clamp(64px, 16cqw, 110px) 1fr clamp(12px, 2.6cqw, 22px);
+  border-bottom: clamp(2px, 0.6cqh, 4px) solid var(--c-text);
+  min-height: clamp(60px, 18cqh, 110px);
+}
+.d2-date-tile {
+  background: var(--c-accent);
+  color: var(--c-bg);
+  display: grid;
+  place-items: center;
+  border-right: clamp(2px, 0.6cqh, 4px) solid var(--c-text);
+}
+.d2-day-num {
+  font: 900 clamp(34px, 11cqh, 66px)/1 var(--theme-font, system-ui);
+}
+.d2-title-band {
+  background: var(--c-data-2);
+  color: var(--c-text);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 clamp(10px, 2cqw, 20px);
+  min-width: 0;
+}
+.d2-day-full {
+  font: 900 clamp(16px, 3.4cqw, 28px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d2-meta {
+  font: 700 clamp(8px, 1.4cqw, 12px)/1.2 var(--theme-font-mono, ui-monospace);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d2-accent-band {
+  background: var(--c-data-3, var(--c-accent2));
+  border-left: clamp(2px, 0.6cqh, 4px) solid var(--c-text);
+}
+.d2-list { display: grid; grid-auto-rows: 1fr; min-height: 0; }
+.d2-row {
+  display: grid;
+  grid-template-columns: auto clamp(40px, 8cqw, 60px) 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 1.8cqw, 16px);
+  padding: 0 clamp(12px, 2.4cqw, 20px);
+  border-bottom: clamp(2px, 0.5cqh, 3px) solid var(--c-text);
+  background: transparent;
+  min-width: 0;
+}
+.d2-row:last-child { border-bottom: 0; }
+.d2-row--live {
+  background: var(--c-accent-soft, color-mix(in oklab, var(--c-accent) 14%, transparent));
+}
+.d2-mark {
+  display: inline-block;
+  width: clamp(10px, 2.4cqw, 18px);
+  height: clamp(10px, 2.4cqw, 18px);
+  background: var(--chip);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.d2-time {
+  font: 700 clamp(10px, 1.8cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
+}
+.d2-title {
+  font-size: clamp(12px, 2.4cqw, 19px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d2-now-dot {
+  width: clamp(8px, 1.6cqw, 12px);
+  height: clamp(8px, 1.6cqw, 12px);
+  background: var(--c-accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* =================================================================
+ * D3 — SWISS / INTERNATIONAL
+ * =================================================================
+ * Restrained: caps-lock eyebrow, single accent for today + live, all
+ * rules are hairlines.
+ */
+.variant-d3 {
+  padding: clamp(14px, 3cqh, 26px) clamp(14px, 3cqw, 26px) clamp(10px, 2cqh, 20px);
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  font-family: var(--theme-font, system-ui);
+}
+.d3-eyebrow {
+  font: 500 clamp(8px, 1.5cqw, 10.5px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.26em;
+  color: var(--c-text-soft);
+  text-transform: uppercase;
+}
+.d3-titlebar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: clamp(8px, 1.6cqw, 16px);
+  margin-top: 2px;
+}
+.d3-date {
+  font: 700 clamp(10px, 1.8cqw, 13px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.06em;
+}
+.d3-meta {
+  font: 400 clamp(8px, 1.5cqw, 10.5px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.16em;
+  color: var(--c-text-soft);
+}
+.d3-rule { height: 2px; background: var(--c-text); margin: clamp(8px, 1.8cqh, 14px) 0 0; }
+.d3-list { display: grid; grid-auto-rows: 1fr; min-height: 0; align-content: stretch; }
+.d3-row {
+  display: grid;
+  grid-template-columns: clamp(70px, 14cqw, 110px) 1fr auto;
+  align-items: baseline;
+  gap: clamp(12px, 2.4cqw, 18px);
+  border-bottom: 1px solid color-mix(in oklab, var(--c-text) 18%, transparent);
+  padding: clamp(4px, 0.8cqh, 8px) 0;
+  min-width: 0;
+}
+.d3-row:last-child { border-bottom: 0; }
+.d3-time {
+  font: 400 clamp(9px, 1.7cqw, 12.5px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  letter-spacing: -0.02em;
+}
+.d3-row--live .d3-time { color: var(--c-accent); }
+.d3-title {
+  font-size: clamp(12px, 2.3cqw, 18px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.d3-row--live .d3-title { font-weight: 700; color: var(--c-accent); }
+.d3-now-mark {
+  width: 8px;
+  height: 8px;
+  background: var(--c-accent);
+  flex-shrink: 0;
+}
+.d3-loc {
+  font: 400 clamp(7px, 1.3cqw, 9.5px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.14em;
+  color: var(--c-text-soft);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* =================================================================
+ * D4 — TIMELINE RAIL
+ * =================================================================
+ * Vertical time axis with hour gridlines; events sized by duration;
+ * NOW line draws across the rail with a dot + tag.
+ */
+.variant-d4 {
+  padding: clamp(10px, 2cqh, 18px) clamp(10px, 2cqw, 20px) 0;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  font-family: var(--theme-font, system-ui);
+}
+.d4-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: clamp(6px, 1.2cqh, 10px);
+  gap: 8px;
+}
+.d4-title {
+  font: 900 clamp(14px, 3cqw, 22px)/1 var(--theme-font, system-ui);
+  letter-spacing: -0.01em;
+}
+.d4-meta {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  letter-spacing: 0.04em;
+}
+.d4-rail {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+.d4-hour {
+  position: absolute;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.d4-hour-label {
+  font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  width: 38px;
+  flex-shrink: 0;
+}
+.d4-hour-line {
+  flex: 1;
+  height: 1px;
+  background: color-mix(in oklab, var(--c-text) 16%, transparent);
+}
+.d4-event {
+  position: absolute;
+  left: 46px;
+  right: 4px;
+  background: var(--c-accent-soft, color-mix(in oklab, var(--chip) 18%, transparent));
+  border-left: 5px solid var(--chip);
+  padding: clamp(2px, 0.4cqh, 4px) clamp(6px, 1.2cqw, 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  min-height: 22px;
+}
+.d4-event--live {
+  background: var(--chip);
+  color: var(--c-bg);
+}
+.d4-event-title {
+  font-weight: 800;
+  font-size: clamp(10px, 1.8cqw, 14px);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d4-event-time {
+  font: 400 clamp(7px, 1.3cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  opacity: 0.9;
+}
+.d4-event--live .d4-event-time { color: var(--c-bg); opacity: 0.85; }
+.d4-now {
+  position: absolute;
+  left: 38px;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  z-index: 5;
+}
+.d4-now-dot {
+  width: 9px;
+  height: 9px;
+  background: var(--c-accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.d4-now-line { flex: 1; height: 2px; background: var(--c-accent); }
+.d4-now-tag {
+  font: 700 clamp(7px, 1.3cqw, 9px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-bg);
+  background: var(--c-accent);
+  padding: 2px 5px;
+  letter-spacing: 0.06em;
+}
+
+/* =================================================================
+ * D5 — EDITORIAL / ALMANAC
+ * =================================================================
+ * Serif numerals + double rule, italic NOW. Warm planner feel.
+ */
+.variant-d5 {
+  padding: clamp(14px, 3cqh, 26px) clamp(16px, 3.2cqw, 30px) clamp(10px, 2cqh, 22px);
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  font-family: var(--theme-font, Georgia, serif);
+}
+.d5-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.d5-meta {
+  font: 700 clamp(8px, 1.5cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.2em;
+  color: var(--c-text-soft);
+}
+.d5-date-row { display: flex; align-items: flex-start; justify-content: space-between; width: 100%; }
+.d5-day-num {
+  font: 400 clamp(40px, 12cqh, 78px)/0.82 var(--theme-font, Georgia, serif);
+  margin-top: 4px;
+}
+.d5-month-italic {
+  font: italic 400 clamp(11px, 2.1cqw, 17px)/1.05 var(--theme-font, Georgia, serif);
+  color: var(--c-text-soft);
+  text-align: right;
+  padding-top: 8px;
+}
+.d5-rules { margin: clamp(10px, 2.4cqh, 16px) 0 6px; }
+.d5-rule { background: var(--c-text); }
+.d5-rule--thick { height: 3px; }
+.d5-rule--thin { height: 1px; margin-top: 1px; }
+.d5-list { display: grid; grid-auto-rows: 1fr; min-height: 0; }
+.d5-row {
+  display: grid;
+  grid-template-columns: clamp(36px, 7cqw, 50px) auto 1fr auto;
+  align-items: baseline;
+  gap: clamp(8px, 1.6cqw, 14px);
+  border-bottom: 1px solid color-mix(in oklab, var(--c-text) 20%, transparent);
+  padding: clamp(2px, 0.6cqh, 6px) 0;
+  min-width: 0;
+}
+.d5-row:last-child { border-bottom: 0; }
+.d5-time {
+  font: 400 clamp(9px, 1.5cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+}
+.d5-mark {
+  width: clamp(7px, 1.4cqw, 11px);
+  height: clamp(7px, 1.4cqw, 11px);
+  background: var(--chip);
+  border-radius: 50%;
+  align-self: center;
+}
+.d5-title {
+  font-size: clamp(13px, 2.6cqw, 21px);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d5-row--live .d5-title { font-style: italic; font-weight: 600; }
+.d5-now {
+  font: 400 clamp(7px, 1.3cqw, 9px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-accent);
+  letter-spacing: 0.1em;
+}
+.d5-footer {
+  font: 400 clamp(8px, 1.5cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.18em;
+  color: var(--c-text-soft);
+  text-align: center;
+  padding-top: clamp(6px, 1.2cqh, 10px);
+}
+
+/* =================================================================
+ * D6 — GLANCEABLE CARDS
+ * =================================================================
+ * Bold 2×2 cards; live card gets a solid fill in feed colour.
+ */
+.variant-d6 {
+  padding: clamp(12px, 2.4cqw, 18px);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: clamp(10px, 1.8cqh, 14px);
+  font-family: var(--theme-font, system-ui);
+}
+.d6-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 8px; }
+.d6-date {
+  font: 900 clamp(16px, 3.4cqw, 26px)/1 var(--theme-font, system-ui);
+  letter-spacing: -0.01em;
+}
+.d6-now-pill {
+  font: 700 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-bg);
+  background: var(--c-accent);
+  padding: 3px 8px;
+  letter-spacing: 0.08em;
+}
+.d6-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: clamp(8px, 1.4cqw, 12px);
+  min-height: 0;
+}
+.d6-card {
+  border: 3px solid var(--chip);
+  background: var(--c-bg);
+  color: var(--c-text);
+  padding: clamp(8px, 1.6cqw, 14px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
+}
+.d6-card--live {
+  background: var(--chip);
+  color: var(--c-bg);
+}
+.d6-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.d6-mark {
+  width: clamp(10px, 1.8cqw, 14px);
+  height: clamp(10px, 1.8cqw, 14px);
+  background: var(--chip);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.d6-card--live .d6-mark {
+  background: var(--c-bg);
+  border: 2px solid var(--c-bg);
+}
+.d6-tag {
+  font: 700 clamp(7px, 1.2cqw, 9px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+.d6-tag--next { color: var(--c-text-soft); letter-spacing: 0.06em; }
+.d6-time {
+  font: 700 clamp(9px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--chip);
+}
+.d6-card--live .d6-time { color: var(--c-bg); }
+.d6-title {
+  font-weight: 700;
+  font-size: clamp(12px, 2.2cqw, 18px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
