@@ -4,6 +4,192 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versions are
 [SemVer](https://semver.org/) (pre-1.0, so minors can carry breaking changes).
 
+## [Unreleased]
+
+— in flight on `main` —
+
+## [0.8.0] — 2026-05-31
+
+TRMNL HTTP-pull compatibility lets a jailbroken Kindle (running the
+KOReader trmnl-display plugin) or any native TRMNL hardware paint a
+Tesserae-managed dashboard alongside the existing MQTT-push Pi / ESP32
+panels. Plus a clutch of polish: a stale-discovery sweep on HA start, a
+scheduler guard for deleted-target schedules, and a new monochrome
+theme family for 1-bit panels.
+
+### Added
+
+- **TRMNL BYOS protocol.** New `trmnl_client` device kind, `trmnl_png`
+  renderer (greyscale + 1-bit quantise), and `/api/display` / `/api/setup`
+  / `/api/log` HTTP blueprint authed by per-device 5-char access tokens.
+  Onboarded clients show up in the existing *Discovered* strip with
+  panel dims pre-filled.
+- **Six monochrome themes** for 1-bit panels (Paper, Carbon, Newsprint,
+  Halftone, Ash, Graphite). Theme picker groups by family — mono themes
+  cluster in their own optgroup so they're easy to find on a Kindle
+  setup.
+- **`tags` field on themes** to support family grouping; theme manifest
+  schema updated accordingly.
+- **Per-device Display name** field on the Settings card (re-publishes
+  to Home Assistant on save).
+
+### Changed
+
+- TRMNL device heartbeats (request headers) feed the same
+  `DEVICE_STATUS` cache + HA discovery path as MQTT clients, so battery
+  / signal / IP sensors appear in HA for TRMNL panels too.
+- `latest_render_for(device_id)` on PushManager is now persisted to
+  `data/core/latest_renders.json` so fresh polls after a restart don't
+  serve placeholders.
+
+### Fixed
+
+- HA discovery orphan sweep on start — retained discovery configs for
+  devices deleted while Tesserae was offline get blanked, so HA stops
+  showing ghost device tiles (0.8.0).
+- Scheduler skips schedules whose target page was deleted + warns once
+  per session, so the History view doesn't fill with "page not found"
+  rows (0.8.1).
+- TRMNL discovery headers are case-insensitive so KOReader's
+  `Png-Width` / `Png-Height` land as `panel_w` / `panel_h` for the
+  Register form (0.8.2).
+
+## [0.7.0] — 2026-05-30
+
+Docker shipped, Settings got a refactor + a complete picture-quality
+control surface, and themes were curated down from a sprawl to 25
+deliberate variants.
+
+### Added
+
+- **Official Docker image + compose** publishing to GHCR. Host
+  networking by default (so mDNS and broker discovery work without YAML
+  edits); `TESSERAE_HOST_IP` env-var surfaces the right LAN IP in
+  render URLs when running bridged.
+- **Per-device picture quality** controls (dither / saturation /
+  contrast) on the device card; per-device renderer clones inherit
+  their fleet's averaged defaults on creation.
+- **Curated theme set** — 25 named themes across light, dark, and neon
+  families, with a dev-only widget-gallery theme picker.
+
+### Changed
+
+- `app/main.py` split into `app_factory` + `transport_wiring`;
+  `settings_routes.py` split into the `app/settings/` package.
+- README trimmed; depth lives in the MkDocs wiki.
+
+### Fixed
+
+- Portrait rotation actually rotates (was no-op'd by a wrong axis swap).
+- Docker entrypoint chowns `/app/data` then drops privileges via
+  `gosu`.
+- Safari login auto-save works (hidden username field on setup + login).
+
+## [0.6.0] — 2026-05-30
+
+Quiet hours, webhooks, per-device timetable, and a stack of embedded-
+broker fixes.
+
+### Added
+
+- **Quiet hours** — suppress automated pushes during a configurable
+  window, with a per-device override in Settings → Devices.
+- **Webhook push API** — `POST /api/v1/push` for external automation
+  (Home Assistant, n8n, etc.).
+- **Per-device Timetable card** — read-only view of which schedules
+  reach this display, sorted by next-fire.
+- **Modal webhook-token reveal** so the secret isn't pasted into the
+  Settings form.
+
+### Changed
+
+- Device card saves all subsections via one "Save changes" button.
+- Collapsible device cards keep the Settings page scannable when the
+  fleet grows.
+
+### Fixed
+
+- Embedded broker rebuilt against `amqtt` 0.11 (auth + system topics
+  restored).
+- "Test broker connect" works for the built-in broker.
+- Send page auto-ticks the only registered device instead of erroring
+  on submit.
+
+## [0.5.0] — 2026-05-30
+
+Onboarding polish + recording infrastructure for the docs.
+
+### Added
+
+- Panel-size picker on the onboarding device step.
+- Playwright-driven recording scripts for the onboarding + dashboard
+  flows (used to generate the docs GIFs).
+
+### Changed
+
+- Telemetry consent copy softened on the onboarding step.
+
+## [0.4.0] — 2026-05-30
+
+Anonymous opt-in telemetry (Aptabase) and the Windows port. Several
+quick follow-ups to align with Aptabase's wire format and fix Windows
+self-restart.
+
+### Added
+
+- **Anonymous opt-in telemetry.** Off by default; `app.started` and
+  `update.applied` events sent to a self-hosted Aptabase instance with
+  no PII. Consent prompt added to onboarding.
+- Test-event button in the System tab + telemetry attempts surfaced in
+  the Events tab.
+- Pre-push hook that nudges when `pyproject.toml` hasn't been bumped.
+
+### Fixed
+
+- Aptabase wire format: `isDebug` must be a bool, SDK version must be
+  `name@version` (0.4.3).
+- Windows self-restart no longer hangs — replaces `os.execv` with
+  `Popen + os._exit + parent-pid handshake` (0.4.4).
+- Every `Path.read_text` / `Path.write_text` pinned to
+  `encoding="utf-8"` so Windows doesn't mangle em-dashes (0.4.8).
+- Reloader-watcher process no longer double-inits MQTT, scheduler, and
+  telemetry in dev mode (0.4.8).
+
+## [0.3.0] — 2026-05-30
+
+A System tab (self-update + backup/restore), the `--c-*` semantic theme
+token layer used by every widget, an event-log dedup, and the MkDocs
+wiki scaffold.
+
+### Added
+
+- **Settings → System** — self-update from a GitHub tag, full data
+  backup/restore (zips `data/` minus user-controlled exclusions like
+  the picture-gallery cache).
+- **MkDocs wiki** under `docs/` with auto-generated widget gallery and
+  compatibility tables; deploys to GitHub Pages.
+- **mDNS advertiser** — opt-in `tesserae.local` (and
+  `tesserae-dev.local` in `--dev`).
+- **Per-push image-fit picker** on the Send page with an accurate live
+  preview.
+- **Spotify Now Playing** gains five selectable layout variants.
+
+### Changed
+
+- Theme system now exposes a `--c-*` semantic token layer; every widget
+  reads from it instead of raw palette tokens, so a single theme switch
+  updates the whole dashboard.
+- Event log caps device-status rows separately from push events and
+  skips unchanged heartbeats, so the log stays useful at high panel
+  count.
+- MQTT default client id is per-host so multiple Tesserae instances on
+  the same broker don't reconnect-loop.
+
+### Fixed
+
+- `news_reddit` widget reads the RSS feed — Reddit's `.json` endpoint
+  now 403-blocks unauthenticated clients.
+
 ## [0.2.0] — 2026-05-28
 
 First release aimed at fellow hobbyists: multi-panel support is now
@@ -90,5 +276,12 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.8.3...HEAD
+[0.8.0]: https://github.com/dmellok/tesserae/releases/tag/v0.8.0
+[0.7.0]: https://github.com/dmellok/tesserae/releases/tag/v0.7.0
+[0.6.0]: https://github.com/dmellok/tesserae/releases/tag/v0.6.0
+[0.5.0]: https://github.com/dmellok/tesserae/releases/tag/v0.5.0
+[0.4.0]: https://github.com/dmellok/tesserae/releases/tag/v0.4.0
+[0.3.0]: https://github.com/dmellok/tesserae/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dmellok/tesserae/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dmellok/tesserae/releases/tag/v0.1.0
