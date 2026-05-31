@@ -62,7 +62,7 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     "/api/trmnl/",
 )
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
-_LAN_PATHS: Final[tuple[str, ...]] = ("/renders/",)
+_LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/")
 # Plugin assets — /plugins/<id>/<asset> only, NOT /plugins/ (the admin
 # index, which stays authed). The composer's dynamic import pulls
 # /plugins/<id>/client.js while rendering from loopback, so it has to

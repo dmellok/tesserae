@@ -361,6 +361,54 @@ def create_app(
             abort(404)
         return send_from_directory(renders_dir, filename)
 
+    # Device ID validation mirrors device_service so a 404 reflects an
+    # unknown device rather than a path-traversal attempt.
+    from app.device_service import DEVICE_ID_RE as _DEVICE_ID_RE
+
+    @app.get("/preview/<device_id>.png")
+    def preview_png(device_id: str) -> Response:
+        """Stable per-device alias for the most-recent composition PNG.
+
+        Unlike ``/renders/<digest>.png`` (where the URL changes every push
+        because it's content-addressed), this URL stays the same as long
+        as the device exists — drop it into Home Assistant's `generic`
+        camera, a Grafana panel, or any wallboard and you get a
+        self-updating preview without subscribing to MQTT.
+
+        Always serves the composition PNG (what Playwright wrote before
+        the per-renderer transform), so it stays viewable even when the
+        device's actual artifact is a packed binary buffer (pi_bin,
+        esp32_bin). Reachable from any private-network client; the
+        ``/preview/`` prefix is on the LAN-bypass list in auth.py."""
+        if not _DEVICE_ID_RE.match(device_id):
+            abort(404)
+        push_mgr = app.config.get("PUSH_MANAGER")
+        if push_mgr is None:
+            abort(503)
+        latest = push_mgr.latest_render_for(device_id)
+        if not latest:
+            # No render yet for this device — return 404 rather than a
+            # placeholder so HA's camera entity shows "unavailable",
+            # which matches reality.
+            abort(404)
+        comp_digest = latest.get("composition_digest")
+        if not isinstance(comp_digest, str) or not comp_digest:
+            # Pre-0.8.6 entries don't carry the composition digest. They
+            # get refreshed on the next push; until then, fall back to
+            # the per-renderer artifact, which is at least the right
+            # bytes even if not a .png on packed-binary devices.
+            comp_digest = latest.get("digest")
+            ext = latest.get("ext", "png")
+            if not comp_digest:
+                abort(404)
+            resp = send_from_directory(renders_dir, f"{comp_digest}.{ext}")
+        else:
+            resp = send_from_directory(renders_dir, f"{comp_digest}.png")
+        # The URL is stable but the bytes change every push — make sure
+        # HA / browsers refetch instead of serving a cached frame.
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+        return resp
+
     @app.get("/healthz")
     def healthz() -> tuple[str, int]:
         return "ok", 200

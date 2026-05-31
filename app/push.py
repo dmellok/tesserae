@@ -638,6 +638,13 @@ class PushManager:
                     "filename": f"{result.digest}.{renderer.extension}",
                     "renderer_id": renderer.id,
                     "timestamp": time.time(),
+                    # The composition PNG (always a viewable .png — what
+                    # Playwright wrote before the per-renderer transform).
+                    # Used by /preview/<device>.png so HA's generic
+                    # camera / dashboards / wallboards can poll a stable
+                    # URL that always serves a viewable frame, even when
+                    # the per-renderer artifact is a packed binary buffer.
+                    "composition_digest": comp_digest,
                 }
                 self._save_latest_renders()
             # One event per renderer per push: lets /events filter for a
