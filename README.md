@@ -66,16 +66,24 @@ every push.
 
 ## Clients
 
-The server publishes; something downstream paints the panel. Three
-reference clients live in their own repos — pick whichever matches your
-hardware. Each takes a `device_id` (the topic prefix) and announces
-itself on `tesserae/<device_id>/status` so the server can auto-discover it.
+The server publishes; something downstream paints the panel. Tesserae
+supports two transport shapes:
 
-| Client | Pairs with | What it's for |
-|---|---|---|
-| [**tesserae-pi-png-client**](https://github.com/dmellok/tesserae-pi-png-client) | `pi_png` renderer | Pi-side Python daemon using [`inky`](https://github.com/pimoroni/inky)'s `set_image()`. Works on every panel the inky lib supports. Slower of the two Pi paths (quantises every frame) but wire-compatible with the inky-dash v3/v4 protocol. |
-| [**tesserae-pi-bin-client**](https://github.com/dmellok/tesserae-pi-bin-client) | `pi_bin` renderer | Same Pi-side shape but writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf` — no PIL on the paint path. Fastest path on a Pimoroni Inky Impression. |
-| [**tesserae-esp32-bin-client**](https://github.com/dmellok/tesserae-esp32-bin-client) | `esp32_bin` renderer | Battery-powered ESP32-S3 firmware for the Waveshare 13.3" Spectra 6 panel. Deep-sleeps between wakes; months of battery life from a single Li-Po. Refresh cadence set via `sleep_interval_s` config. |
+* **MQTT push** — server publishes a frame the moment a dashboard
+  changes; the panel boots, subscribes, paints the retained frame.
+  Lowest latency, best for plugged-in Pi / ESP32 panels.
+* **HTTP pull** — TRMNL [BYOS](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
+  protocol. The panel polls `GET /api/display` on a server-set cadence
+  and paints whatever PNG comes back. Best for battery-constrained
+  pollers (jailbroken Kindles, native TRMNL hardware) — they
+  deep-sleep between polls.
+
+| Client | Pairs with | Transport | What it's for |
+|---|---|---|---|
+| [**tesserae-pi-png-client**](https://github.com/dmellok/tesserae-pi-png-client) | `pi_png` renderer | MQTT | Pi-side Python daemon using [`inky`](https://github.com/pimoroni/inky)'s `set_image()`. Works on every panel the inky lib supports. Slower of the two Pi paths (quantises every frame) but wire-compatible with the inky-dash v3/v4 protocol. |
+| [**tesserae-pi-bin-client**](https://github.com/dmellok/tesserae-pi-bin-client) | `pi_bin` renderer | MQTT | Same Pi-side shape but writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf` — no PIL on the paint path. Fastest path on a Pimoroni Inky Impression. |
+| [**tesserae-esp32-bin-client**](https://github.com/dmellok/tesserae-esp32-bin-client) | `esp32_bin` renderer | MQTT | Battery-powered ESP32-S3 firmware for the Waveshare 13.3" Spectra 6 panel. Deep-sleeps between wakes; months of battery life from a single Li-Po. Refresh cadence set via `sleep_interval_s` config. |
+| Any BYOS-compatible client | `trmnl_png` renderer | HTTP | TRMNL-spec client. Pair via the **Add device → TRMNL** flow in Settings: server mints a short access token, you paste it into the client, the client polls. Tested with the [KOReader trmnl-display plugin](https://github.com/koreader/koreader) on a jailbroken Kindle. |
 
 ## Compatible displays
 
@@ -112,6 +120,24 @@ you've run a panel that isn't ticked.
 | Panel | Resolution | Colours | Client | Tested |
 |---|---|---|---|---|
 | Waveshare 13.3" E6 (ESP32-S3) | 1600×1200 | 6 colour (Spectra 6) | ESP32 `esp32_bin` | ✅ |
+
+### TRMNL-compatible (HTTP pull)
+
+Any client implementing the TRMNL BYOS spec works against the
+`trmnl_png` renderer. The renderer fits / contrast-tweaks / quantises
+to 1-bit greyscale PNG; the client just paints what it polls. Pair via
+**Add device → TRMNL** in Settings — the server mints a short access
+token you paste into the client config.
+
+| Panel | Resolution | Colours | Client | Tested |
+|---|---|---|---|---|
+| Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | greyscale | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
+| [Native TRMNL device](https://usetrmnl.com/) | 800×480 | 1-bit | TRMNL firmware | — |
+
+The token is short on purpose (5 chars from a typeable alphabet)
+because the typical client has an on-screen keyboard. It's
+LAN-safe rather than internet-safe — use a Tailscale-style overlay or
+keep Tesserae bound to your LAN.
 
 ### Custom panels
 

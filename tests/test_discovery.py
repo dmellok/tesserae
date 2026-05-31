@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 from flask import Flask
 
-from app.discovery import DiscoveryCache, device_id_from_status_topic
+from app.discovery import DiscoveryCache, device_id_from_status_topic, record_trmnl_discovery
 from app.main import create_app
 
 
@@ -108,6 +108,26 @@ def test_cache_snapshot_is_most_recent_first() -> None:
     cache.record("second", b"{}")
     ids = [d.id for d in cache.all()]
     assert ids == ["second", "first"]
+
+
+def test_trmnl_discovery_picks_up_panel_dims_case_insensitively() -> None:
+    """KOReader sends ``Png-Width`` / ``Png-Height`` (Title-case), the
+    recon scripts send ``png-width`` (lowercase), native TRMNL sends
+    ``Width``. All three should land in the cache so the discovered-
+    device strip pre-fills the panel dims and the user doesn't have to
+    type them in after one-click register."""
+    cache = DiscoveryCache()
+    entry = record_trmnl_discovery(
+        cache,
+        token="kfrxz",
+        headers={"Png-Width": "758", "Png-Height": "1024", "User-Agent": "KOReader/2024"},
+        remote_addr="192.168.1.42",
+    )
+    assert entry is not None
+    assert entry.panel_w == 758
+    assert entry.panel_h == 1024
+    assert entry.fw_version == "KOReader/2024"
+    assert entry.ip == "192.168.1.42"
 
 
 def test_cache_forget_returns_truthy_only_when_present() -> None:

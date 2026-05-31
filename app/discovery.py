@@ -92,14 +92,19 @@ def record_trmnl_discovery(
         "access_token": token,
     }
     # Map BYOS-style headers to the discovery schema the UI already
-    # understands (kind / panel_w / panel_h / fw_version / ip).
+    # understands (kind / panel_w / panel_h / fw_version / ip). Lookup is
+    # case-insensitive — different BYOS clients spell the same field
+    # ``Png-Width`` (KOReader), ``png-width`` (recon scripts), or
+    # ``Width`` (native TRMNL firmware) and we want the panel dims to
+    # pre-fill the Register form regardless.
+    folded = {k.casefold(): v for k, v in headers.items() if isinstance(k, str)}
     for src_keys, dest in (
-        (("png-width", "Width"), "panel_w"),
-        (("png-height", "Height"), "panel_h"),
-        (("User-Agent",), "fw_version"),
+        (("png-width", "width"), "panel_w"),
+        (("png-height", "height"), "panel_h"),
+        (("user-agent",), "fw_version"),
     ):
         for k in src_keys:
-            value = headers.get(k)
+            value = folded.get(k)
             if value:
                 parsed[dest] = value
                 break
