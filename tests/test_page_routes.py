@@ -80,6 +80,57 @@ def _new(client, **data: Any) -> str:
 # -- /pages list + new -----------------------------------------------
 
 
+def test_preview_returns_hydrated_state_per_panel(app: Flask, tmp_path: Path) -> None:
+    """AJAX callers (the editor) get a JSON envelope back with the
+    hydrated page state per requested panel size, so the iframe can
+    patch in place rather than full-reload on every keystroke. Without
+    the X-Requested-With header we keep the old flash-redirect shape so
+    nothing existing breaks."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    from werkzeug.datastructures import MultiDict
+
+    resp = client.post(
+        f"/pages/{pid}/preview",
+        data=MultiDict(
+            [
+                ("panels[]", "800x600"),
+                ("panels[]", "400x300"),
+                ("theme", "default"),
+            ]
+        ),
+        headers={"X-Requested-With": "fetch"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True
+    groups = body["groups"]
+    assert {(g["w"], g["h"]) for g in groups} == {(800, 600), (400, 300)}
+    # Each group's state mirrors the shape compose.html renders against —
+    # palette, font_face_css, per-cell context.
+    state = next(g["state"] for g in groups if g["w"] == 800)
+    assert "palette" in state and isinstance(state["palette"], dict)
+    assert "fg" in state["palette"]
+    assert isinstance(state["cells"], list)
+    assert len(state["cells"]) == 1
+    assert state["cells"][0]["w"] == 800
+
+
+def test_preview_falls_back_to_redirect_for_non_ajax(app: Flask, tmp_path: Path) -> None:
+    """Plain-browser POSTs (no X-Requested-With) still flash + redirect
+    so a stray direct hit doesn't 500 or leak JSON."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    resp = client.post(f"/pages/{pid}/preview", data={"theme": "default"})
+    # _flash_save returns either redirect or 200 depending on the helper;
+    # the important thing is the body isn't JSON.
+    assert resp.content_type != "application/json"
+
+
 def test_empty_list_renders_with_create_link(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

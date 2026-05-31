@@ -46,6 +46,12 @@
     if (saveBtn) saveBtn.disabled = !dirty;
   }
 
+  // Cache of the last hydrated state we know each iframe is rendering,
+  // keyed by the iframe element. Used to compute postMessage patches so
+  // a theme nudge / gap tweak / single-cell option change doesn't tear
+  // down the whole iframe DOM — see applyPreviewGroups below.
+  const lastStateByFrame = new WeakMap();
+
   // Reload the preview iframe in place. A short opacity fade hides
   // the blank-during-load state without doubling the live iframe.
   //
@@ -62,6 +68,9 @@
         "load",
         () => {
           iframe.style.opacity = "1";
+          // The iframe's contents are fresh — drop the cached state so
+          // the next preview cycle diffs against what's actually painted.
+          lastStateByFrame.delete(iframe);
         },
         { once: true },
       );
@@ -69,9 +78,135 @@
     });
   }
 
+  // Parse "WxH" out of an iframe's src so each frame can be matched up
+  // with the matching group in the /preview response.
+  function frameSize(iframe) {
+    const u = new URL(iframe.src, location.origin);
+    const w = Number(u.searchParams.get("w"));
+    const h = Number(u.searchParams.get("h"));
+    return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0
+      ? { w, h }
+      : null;
+  }
+
+  // Decide whether two hydrated states can be reconciled in-place via a
+  // postMessage patch, or whether the iframe needs a full reload. Hard
+  // requirements for a patch:
+  //   - same set of cell ids (no add/remove)
+  //   - same plugin id per cell (plugin swap needs a fresh module import)
+  //   - same full_bleed flag (changes the cell's CSS shape)
+  // Anything looser is handled by the patch handler in composer.js.
+  function canPatch(prev, next) {
+    if (!prev || !next) return false;
+    if (prev.cells.length !== next.cells.length) return false;
+    for (let i = 0; i < prev.cells.length; i++) {
+      const a = prev.cells[i];
+      const b = next.cells[i];
+      if (a.id !== b.id) return false;
+      if ((a.plugin || "") !== (b.plugin || "")) return false;
+      if (Boolean(a.full_bleed) !== Boolean(b.full_bleed)) return false;
+    }
+    return true;
+  }
+
+  // Build the postMessage patch the iframe applies. We always send the
+  // full next-state (the iframe walks it and updates anything that
+  // changed) — simpler than a true JSON-diff and the payload is small.
+  function buildPatch(next) {
+    return {
+      type: "tesserae-patch",
+      page: {
+        palette: next.palette,
+        font_family: next.font_family,
+        font_face_css: next.font_face_css,
+        bleed_color: next.bleed_color,
+        corner_radius: next.corner_radius,
+        gap: next.gap,
+        panel: next.panel,
+      },
+      cells: next.cells.map((c) => ({
+        id: c.id,
+        plugin: c.plugin || "",
+        x: c.x, y: c.y, w: c.w, h: c.h,
+        zoom: typeof c.zoom === "number" ? c.zoom : 1,
+        options: c.options,
+        data: c.data,
+        palette: c.palette,
+        font_family: c.font_family,
+        full_bleed: Boolean(c.full_bleed),
+      })),
+    };
+  }
+
+  // Hand each /preview group off to its matching iframe — patch if we
+  // can, otherwise full reload. If the response carries no groups (server
+  // didn't get a panels[] hint, or hydration failed) we fall back to a
+  // blanket reload so we never silently desync.
+  function applyPreviewGroups(groups) {
+    const frames = Array.from(previewFrames());
+    if (!Array.isArray(groups) || groups.length === 0) {
+      reloadPreview();
+      return;
+    }
+    let appliedAny = false;
+    frames.forEach((iframe) => {
+      const size = frameSize(iframe);
+      if (!size) return;
+      const match = groups.find((g) => g.w === size.w && g.h === size.h);
+      if (!match || !match.state) return;
+      const prev = lastStateByFrame.get(iframe);
+      if (canPatch(prev, match.state)) {
+        try {
+          iframe.contentWindow.postMessage(
+            buildPatch(match.state),
+            location.origin,
+          );
+          lastStateByFrame.set(iframe, match.state);
+          appliedAny = true;
+        } catch (err) {
+          console.warn("[editor] patch postMessage failed, will reload:", err);
+        }
+      }
+    });
+    // Reload every frame that didn't accept a patch (structural change,
+    // no cached prev state, or postMessage threw).
+    let needsReload = false;
+    frames.forEach((iframe) => {
+      const size = frameSize(iframe);
+      if (!size) return;
+      const match = groups.find((g) => g.w === size.w && g.h === size.h);
+      if (!match || !match.state) {
+        needsReload = true;
+        return;
+      }
+      const prev = lastStateByFrame.get(iframe);
+      if (!canPatch(prev, match.state)) {
+        // Reload this specific frame; record the next state so the
+        // *next* cycle (post-load) can patch against it.
+        const u = new URL(iframe.src, location.origin);
+        u.searchParams.set("_t", String(Date.now()));
+        iframe.style.transition = "opacity 140ms ease";
+        iframe.style.opacity = "0.35";
+        iframe.addEventListener(
+          "load",
+          () => {
+            iframe.style.opacity = "1";
+            lastStateByFrame.set(iframe, match.state);
+          },
+          { once: true },
+        );
+        iframe.src = u.pathname + u.search;
+      }
+    });
+    if (needsReload && !appliedAny) reloadPreview();
+  }
+
   // Build a single FormData containing every editor-form's fields,
   // with each cell form's fields namespaced `cell_<id>__<field>` so
-  // the preview endpoint can demux them back to per-cell buckets.
+  // the preview endpoint can demux them back to per-cell buckets. Also
+  // appends ``panels[]=WxH`` for every preview iframe so the server can
+  // hydrate the draft per panel size and return state envelopes the
+  // client uses to compute postMessage patches.
   function aggregateForms() {
     const combined = new FormData();
     forms().forEach((form) => {
@@ -81,6 +216,10 @@
         const outKey = cellId ? `cell_${cellId}__${key}` : key;
         combined.append(outKey, value);
       }
+    });
+    previewFrames().forEach((iframe) => {
+      const size = frameSize(iframe);
+      if (size) combined.append("panels[]", `${size.w}x${size.h}`);
     });
     return combined;
   }
@@ -102,7 +241,12 @@
           credentials: "same-origin",
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        reloadPreview();
+        // Server returns the hydrated state per requested panel size when
+        // the request was AJAX (it is here — see X-Requested-With). Hand
+        // each group to its matching iframe; the patch path postMessages
+        // CSS / cell updates in place, the fallback path full-reloads.
+        const body = await resp.json().catch(() => null);
+        applyPreviewGroups(body && body.groups);
       })();
       try {
         await previewInFlight;

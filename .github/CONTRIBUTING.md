@@ -69,5 +69,5 @@ plugin; it'll save you guessing at field names.
 
 ## Code of conduct
 
-By participating you agree to the [Code of Conduct](CODE_OF_CONDUCT.md).
+By participating you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).
 TL;DR: be kind, assume good faith, don't be a jerk.

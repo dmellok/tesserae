@@ -45,6 +45,7 @@ from flask import (
 from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
+from app.composer import _hydrate_page
 from app.layouts import LAYOUTS, LAYOUTS_BY_SLUG, detect_layout, to_panel_pixels
 from app.panel import (
     fit_cells_to_panel,
@@ -108,6 +109,23 @@ def _random_page_id(taken: set[str]) -> str:
         pid = uuid.uuid4().hex[:12]
         if pid not in taken:
             return pid
+
+
+def _coerce_float(
+    raw: str | None, default: float, *, lo: float | None = None, hi: float | None = None
+) -> float:
+    if raw is None or raw == "":
+        value = default
+    else:
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            value = default
+    if lo is not None:
+        value = max(lo, value)
+    if hi is not None:
+        value = min(hi, value)
+    return value
 
 
 def _coerce_int(
@@ -594,6 +612,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "font": (form.get("font") or None),
             "options": options,
             "palette_overrides": _palette_overrides_from_form(form),
+            "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
         }
     )
 
@@ -662,6 +681,37 @@ def preview(page_id: str) -> Response:
         draft = page.model_copy(update={"cells": new_cells})
 
     current_app.config.setdefault("PREVIEW_CACHE", {})[page_id] = draft
+
+    # Hydrate the draft for each panel size the editor's iframes care
+    # about. The client uses these to compute postMessage patches so a
+    # gentle edit (theme swap, gap nudge, single-cell option) doesn't
+    # require a full iframe reload — see static/pages/editor.js.
+    # ``panels`` form field carries one or more ``WxH`` strings; missing
+    # ⇒ no hydrated state returned and the client falls back to full
+    # iframe reload, same behaviour as before this change.
+    hydrated_groups: list[dict[str, Any]] = []
+    requested_panels = form.getlist("panels[]") or form.getlist("panels")
+    for spec in requested_panels:
+        try:
+            w_str, h_str = str(spec).lower().split("x", 1)
+            pw, ph = int(w_str), int(h_str)
+        except (ValueError, AttributeError):
+            continue
+        if pw <= 0 or ph <= 0:
+            continue
+        page_dict = draft.model_dump(mode="json", exclude_none=True)
+        page_dict["panel"] = {"w": pw, "h": ph}
+        try:
+            hydrated = _hydrate_page(page_dict, preview=True)
+        except Exception:
+            current_app.logger.exception("preview hydrate failed for %sx%s", pw, ph)
+            continue
+        hydrated_groups.append({"w": pw, "h": ph, "state": hydrated})
+
+    # AJAX caller (the editor) wants JSON; non-AJAX (rare — direct curl
+    # for debugging) keeps the existing flash-redirect behaviour.
+    if request.headers.get("X-Requested-With") == "fetch":
+        return jsonify({"ok": True, "groups": hydrated_groups})
     return _flash_save(True, "preview-ready")
 
 
