@@ -80,6 +80,16 @@
           {% endif %}
         </div>
       </details>
+      {% if config.DEV_MODE %}
+      {# Dev-only review surface — every widget at every supported size
+         iframed via /_test/render, with theme + orientation pickers.
+         Hidden in production builds because the underlying routes are
+         themselves gated on ``current_app.debug or .testing``. #}
+      <a href="{{ url_for('composer.test_widget_gallery') }}"
+         class="{% if request.endpoint in ('composer.test_widget_gallery', 'composer.test_render') %}is-active{% endif %}">
+         <i class="ph ph-binoculars" aria-hidden="true"></i><span>Widget gallery</span>
+      </a>
+      {% endif %}
       <a href="{{ url_for('auth.settings') }}"
          class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
          <i class="ph ph-gear-six" aria-hidden="true"></i><span>Settings</span>

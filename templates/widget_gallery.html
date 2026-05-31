@@ -155,11 +155,57 @@ Not linked from the main nav — visit /_test/widgets directly. #}
     }
     .main-head p { margin: 4px 0 0; color: var(--fgSoft); font-size: 13px; }
 
+    /* Wraps the theme picker + orientation toggle on the right of the
+       header so they group as one cluster of viewing controls. */
+    .gallery-controls {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Theme picker — palette icon + native <select>. Sized to match
+       the orientation toggle so they read as a pair. */
+    .theme-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 10px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--fgSoft);
+    }
+    .theme-picker .ph { font-size: 14px; }
+    .theme-picker select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 6px 18px 6px 0;
+      color: var(--fg);
+      font: 600 12px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      /* Native caret glyph since we hid the OS one with appearance:none. */
+      background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position: calc(100% - 9px) center, calc(100% - 5px) center;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    .visually-hidden {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0);
+      border: 0;
+    }
+
     /* Orientation toggle pill — landscape / portrait. Swaps every
        iframe's width/height in place and re-loads them so widgets
        lay out for the new aspect via their container queries. */
     .orient-toggle {
-      margin-left: auto;
       display: inline-flex;
       background: var(--panel);
       border: 1px solid var(--border);
@@ -344,13 +390,38 @@ Not linked from the main nav — visit /_test/widgets directly. #}
         <h1>Widget gallery</h1>
         <p>Every loaded widget at every supported render size. Iframed via <code>/_test/render</code>; what you see here is what the composer paints into a cell.</p>
       </div>
-      <div class="orient-toggle" role="radiogroup" aria-label="Orientation">
-        <button type="button" data-orient="landscape" class="is-active" aria-pressed="true">
-          <i class="ph ph-rectangle" aria-hidden="true"></i>Landscape
-        </button>
-        <button type="button" data-orient="portrait" aria-pressed="false">
-          <i class="ph ph-rectangle" style="transform: rotate(90deg);" aria-hidden="true"></i>Portrait
-        </button>
+      <div class="gallery-controls">
+        {% if themes %}
+        {# Theme picker — passes ?theme=<id> through to /_test/render so
+           every iframe in the gallery re-renders against the chosen
+           theme. Grouped by mode so light/dark themes don't blur
+           together in a long list. Persists to localStorage so the
+           next reload remembers what you were eyeballing. #}
+        <label class="theme-picker">
+          <i class="ph ph-palette" aria-hidden="true"></i>
+          <span class="visually-hidden">Theme</span>
+          <select data-theme-picker>
+            {% set ns = namespace(group=none) %}
+            {% for t in themes %}
+              {% if t.mode != ns.group %}
+                {% if ns.group %}</optgroup>{% endif %}
+                <optgroup label="{{ t.mode|capitalize or 'Other' }}">
+                {% set ns.group = t.mode %}
+              {% endif %}
+              <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+            {% if ns.group %}</optgroup>{% endif %}
+          </select>
+        </label>
+        {% endif %}
+        <div class="orient-toggle" role="radiogroup" aria-label="Orientation">
+          <button type="button" data-orient="landscape" class="is-active" aria-pressed="true">
+            <i class="ph ph-rectangle" aria-hidden="true"></i>Landscape
+          </button>
+          <button type="button" data-orient="portrait" aria-pressed="false">
+            <i class="ph ph-rectangle" style="transform: rotate(90deg);" aria-hidden="true"></i>Portrait
+          </button>
+        </div>
       </div>
     </header>
 
@@ -488,6 +559,41 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       if (saved === "portrait") initial = "portrait";
     } catch {}
     apply(initial);
+  })();
+
+  // Theme picker — set ?theme=<id> on every iframe so /_test/render
+  // re-renders against the chosen theme. Persisted to localStorage
+  // (and applied on init) so revisiting the gallery keeps the same
+  // theme without re-picking.
+  (function () {
+    const STORAGE_KEY = "tesserae:gallery-theme";
+    const picker = document.querySelector("[data-theme-picker]");
+    if (!picker) return;
+
+    function apply(themeId) {
+      document.querySelectorAll("iframe").forEach((iframe) => {
+        const url = new URL(iframe.src, location.origin);
+        url.searchParams.set("theme", themeId);
+        iframe.src = url.pathname + url.search;
+      });
+    }
+
+    picker.addEventListener("change", () => {
+      const v = picker.value;
+      try { localStorage.setItem(STORAGE_KEY, v); } catch {}
+      apply(v);
+    });
+
+    // Restore on init only if the saved value is a real option —
+    // a theme that's been removed mid-session shouldn't pin the
+    // dropdown to a ghost id.
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved && [...picker.options].some((o) => o.value === saved)) {
+        picker.value = saved;
+        apply(saved);
+      }
+    } catch {}
   })();
 </script>
 </body>

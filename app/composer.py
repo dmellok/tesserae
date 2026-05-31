@@ -319,12 +319,22 @@ def test_render() -> str:
     if size not in SIZE_DIMENSIONS:
         abort(400)
 
+    # Theme picker on the gallery passes ?theme=<id> so a reviewer can
+    # eyeball every widget against any installed theme without saving
+    # a page. Unknown ids fall back to default rather than 400ing —
+    # keeps the gallery resilient when a theme gets renamed or removed
+    # from the plugin manifest mid-session.
+    theme_id = request.args.get("theme") or "default"
+    theme_registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
+    if theme_id not in theme_registry.themes:
+        theme_id = "default"
+
     cell_w, cell_h = SIZE_DIMENSIONS[size]
     page = {
         "id": "_test",
         "name": f"Test: {plugin_id} @ {size}",
         "panel": {"w": cell_w, "h": cell_h},
-        "theme": "default",
+        "theme": theme_id,
         "font": "default",
         "cells": [
             {
@@ -372,8 +382,18 @@ def test_widget_gallery() -> str:
                 "sizes": sizes,
             }
         )
+    # Theme picker lets a reviewer scan every widget against any
+    # installed theme without saving a page. ``default`` always exists
+    # (it's the seed theme themes_core ships with) and leads so the
+    # gallery loads with the same look the composer defaults to.
+    theme_registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
+    themes = sorted(
+        ({"id": t.id, "name": t.name, "mode": t.mode} for t in theme_registry.themes.values()),
+        key=lambda t: (t["id"] != "default", t["mode"], t["name"].lower()),
+    )
     return render_template(
         "widget_gallery.html",
         widgets=rows,
         size_dims=SIZE_DIMENSIONS,
+        themes=themes,
     )
