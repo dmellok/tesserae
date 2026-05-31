@@ -372,20 +372,12 @@ code {
 }
 .icon-picker-popover[hidden] { display: none !important; }
 .icon-picker-search {
-  position: relative;
   display: flex;
   align-items: center;
 }
-.icon-picker-search .ph {
-  position: absolute;
-  left: 10px;
-  font-size: 14px;
-  color: var(--t-muted);
-  pointer-events: none;
-}
 .icon-picker-search input {
   width: 100%;
-  padding: 8px 10px 8px 32px;
+  padding: 8px 10px;
   font: inherit;
   font-size: var(--t-size-md);
   background: var(--t-surface-soft);

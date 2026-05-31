@@ -268,13 +268,33 @@
    label keep the groups legible instead of one long form. */
 
 .device-subsection {
-  margin-top: var(--t-space-4);
-  padding-top: var(--t-space-4);
+  /* Bumped from space-4 to space-6 so the divider has real breathing
+   * room between sections — previously the slider value badge / last
+   * input sat right against the next section's caps-lock subhead. */
+  margin-top: var(--t-space-6);
+  padding-top: var(--t-space-6);
   border-top: 1px solid var(--t-border);
+}
+/* Each subsection's first field also needs space below the subhead
+ * label — the cascade isn't enough since some fields are macros that
+ * own their top margin. */
+.device-subsection > .field,
+.device-subsection > .field-grid,
+.device-subsection > .form-group,
+.device-subsection > details,
+.device-subsection > .actions {
+  margin-top: var(--t-space-3);
+}
+/* Vertical rhythm between sibling fields within a subsection —
+ * sliders especially were colliding with the next field's label. */
+.device-subsection .field + .field,
+.device-subsection .field-grid + .field,
+.device-subsection .field + .field-grid {
+  margin-top: var(--t-space-3);
 }
 
 .device-subhead {
-  margin: 0 0 var(--t-space-3);
+  margin: 0;
   font-size: var(--t-size-xs);
   font-weight: 700;
   text-transform: uppercase;

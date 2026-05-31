@@ -235,21 +235,31 @@
        changes so the form is WYSIWYG; the backend persists what's shown. #}
     <div class="device-subsection">
       <p class="device-subhead">Appearance &amp; panel</p>
-      {# Curated device icons — a small, display-oriented set rather than the
-         editor's full icon search; covers form-factors + a few rooms. A
-         current value outside the set is appended so it stays selectable. #}
-      {% set base_device_icons = ['monitor','device-tablet','device-mobile','desktop','television-simple','frame-corners','image-square','squares-four','house','couch','coffee','briefcase'] %}
+      {# Full Phosphor icon picker — same component the page editor uses.
+         data-icon-picker-id pairs the hidden input with its picker so
+         the reusable static/icon-picker.js can wire them without
+         relying on form-level loose lookup. #}
       {% set current_icon = section.icon or 'monitor' %}
-      {% set device_icons = base_device_icons if current_icon in base_device_icons else base_device_icons + [current_icon] %}
+      {% set picker_id = section.id ~ '-icon' %}
+      <input type="hidden" name="device_icon" value="{{ current_icon }}"
+             data-icon-value data-icon-picker-id="{{ picker_id }}">
       <div class="field">
-        <label>Icon{{ info_pop('Shown in device pickers, the dashboard editor, and the send page.') }}</label>
-        <div class="device-icon-grid" role="radiogroup" aria-label="Device icon">
-          {% for ic in device_icons %}
-          <label class="device-icon-pick" title="{{ ic }}">
-            <input type="radio" name="device_icon" value="{{ ic }}" {% if ic == current_icon %}checked{% endif %}>
-            <i class="ph ph-{{ ic }}" aria-hidden="true"></i>
-          </label>
-          {% endfor %}
+        <label for="{{ picker_id }}-btn">Icon{{ info_pop('Shown in device pickers, the dashboard editor, and the send page.') }}</label>
+        <div class="icon-picker" data-icon-picker data-icon-picker-id="{{ picker_id }}">
+          <button type="button" id="{{ picker_id }}-btn" class="icon-picker-trigger" data-icon-trigger>
+            <span class="icon-picker-current">
+              <i class="ph ph-{{ current_icon }}" aria-hidden="true"></i>
+            </span>
+            <span class="icon-picker-label" data-icon-label>{{ current_icon }}</span>
+            <i class="ph ph-caret-down" aria-hidden="true" style="font-size:13px; opacity:.6; margin-left:auto;"></i>
+          </button>
+          <div class="icon-picker-popover" data-icon-popover hidden>
+            <div class="icon-picker-search">
+              <input type="search" placeholder="Search icons…" data-icon-search autocomplete="off" spellcheck="false">
+            </div>
+            <div class="icon-picker-grid" data-icon-grid></div>
+            <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
+          </div>
         </div>
       </div>
       {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',

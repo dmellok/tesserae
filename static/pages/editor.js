@@ -346,121 +346,11 @@
     });
   }
 
-  // Icon picker — popover dropdown with a search filter over every
-  // available Phosphor icon. Lazily fetches the manifest the first
-  // time the user opens the popover.
-  function watchIconPicker() {
-    const picker = document.querySelector("[data-icon-picker]");
-    if (!picker) return;
-    const trigger = picker.querySelector("[data-icon-trigger]");
-    const popover = picker.querySelector("[data-icon-popover]");
-    const grid = picker.querySelector("[data-icon-grid]");
-    const search = picker.querySelector("[data-icon-search]");
-    const empty = picker.querySelector("[data-icon-empty]");
-    const labelEl = picker.querySelector("[data-icon-label]");
-    const current = picker.querySelector(".icon-picker-current");
-    const form = picker.closest("form[data-editor-form]");
-    // The hidden value input is a direct child of the form, not inside the
-    // picker's .field — so search the form, not picker.parentElement.
-    const input = form ? form.querySelector("[data-icon-value]") : null;
-    let icons = null;
-
-    function pick(name) {
-      if (input) {
-        input.value = name || "";
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      if (current) {
-        current.innerHTML = name
-          ? '<i class="ph ph-' + name + '" aria-hidden="true"></i>'
-          : '<i class="ph ph-prohibit" aria-hidden="true"></i>';
-      }
-      if (labelEl) labelEl.textContent = name || "No icon";
-      const headerIcon = document.querySelector("[data-editor-name-icon]");
-      if (headerIcon) {
-        headerIcon.innerHTML = name
-          ? '<i class="ph ph-' + name + '" aria-hidden="true"></i>'
-          : "";
-      }
-      grid.querySelectorAll(".icon-pick").forEach((b) =>
-        b.classList.toggle("is-active", (b.dataset.icon || "") === (name || "")),
-      );
-      if (form) {
-        setDirty(true);
-        schedulePreview();
-      }
-    }
-
-    function render(filter) {
-      if (!icons) return;
-      const q = (filter || "").trim().toLowerCase();
-      const matched = q
-        ? icons.filter((n) => n.indexOf(q) !== -1)
-        : icons;
-      const cap = 600;
-      const slice = matched.slice(0, cap);
-      const chosen = (input && input.value) || "";
-      let html = '';
-      // "No icon" tile is always first.
-      if (!q) {
-        html += '<button type="button" class="icon-pick' +
-          (chosen === '' ? ' is-active' : '') +
-          '" data-icon="" title="No icon" aria-label="No icon">' +
-          '<i class="ph ph-prohibit" aria-hidden="true"></i></button>';
-      }
-      for (const name of slice) {
-        html += '<button type="button" class="icon-pick' +
-          (chosen === name ? ' is-active' : '') +
-          '" data-icon="' + name + '" title="' + name + '" aria-label="' + name + '">' +
-          '<i class="ph ph-' + name + '" aria-hidden="true"></i></button>';
-      }
-      grid.innerHTML = html;
-      empty.hidden = slice.length > 0 || !q;
-    }
-
-    async function loadIcons() {
-      if (icons) return;
-      try {
-        const resp = await fetch("/static/icons/phosphor/manifest.json");
-        icons = await resp.json();
-      } catch (err) {
-        console.error("[editor] icon manifest fetch failed:", err);
-        icons = [];
-      }
-      render(search.value);
-    }
-
-    function open() {
-      popover.hidden = false;
-      picker.classList.add("is-open");
-      loadIcons().then(() => {
-        search.value = "";
-        search.focus();
-      });
-    }
-    function close() {
-      popover.hidden = true;
-      picker.classList.remove("is-open");
-    }
-
-    trigger.addEventListener("click", (e) => {
-      e.stopPropagation();
-      popover.hidden ? open() : close();
-    });
-    search.addEventListener("input", () => render(search.value));
-    grid.addEventListener("click", (e) => {
-      const btn = e.target.closest(".icon-pick");
-      if (!btn) return;
-      pick(btn.dataset.icon || "");
-      close();
-    });
-    document.addEventListener("click", (e) => {
-      if (!picker.contains(e.target)) close();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !popover.hidden) close();
-    });
-  }
+  // Icon picker lives in static/icon-picker.js as a reusable shared
+  // module — it auto-binds every [data-icon-picker] on page load. The
+  // editor's only contribution is the existing 'input' listener on the
+  // hidden value field, which already fires setDirty + schedulePreview
+  // because watchForms() listens on the whole form for 'input' events.
 
   // Multi-select checklists (e.g. the HA entity pickers): a client-side
   // filter box narrows the list, and a count shows how many are ticked.
@@ -544,7 +434,6 @@
   }
   watchForms();
   watchLayoutForms();
-  watchIconPicker();
   watchMultiSelect();
   setStatus("saved");
 })();
