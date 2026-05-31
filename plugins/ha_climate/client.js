@@ -43,7 +43,7 @@ const STATE_VAR = {
 };
 function stateColor(s) { return STATE_VAR[s] || "var(--c-text-soft)"; }
 function stateTint(s) {
-  if (s === "off" || s === "idle") return "var(--c-bg, transparent)";
+  if (s === "off" || s === "idle") return "var(--c-bg)";
   return `color-mix(in oklab, ${stateColor(s)} 18%, transparent)`;
 }
 

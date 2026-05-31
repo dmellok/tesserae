@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.10.1] — 2026-06-01
+
+### Changed
+
+- `ha_climate`: dropped a dead `transparent` fallback on
+  `var(--c-bg)` — the semantic token is always defined on the cell
+  host, so the fallback never fired. Cosmetic; no behaviour change.
+
 ## [0.10.0] — 2026-06-01
 
 ### Added
