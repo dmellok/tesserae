@@ -78,6 +78,7 @@ class Scheduler:
         push_manager: Callable[[], PushManager],
         event_log: EventLog | None = None,
         timezone_provider: TimezoneProvider | None = None,
+        page_exists: Callable[[str], bool] | None = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
@@ -90,11 +91,19 @@ class Scheduler:
 
         ``timezone_provider`` is a zero-arg callable resolving the active
         timezone (or None for host-local). Called on every tick so a
-        settings change applies without restarting the scheduler thread."""
+        settings change applies without restarting the scheduler thread.
+
+        ``page_exists`` is a zero-arg-but-takes-page_id callable used to
+        skip schedules whose target dashboard was deleted, so the History
+        view doesn't fill up with 0.00s "page not found" rows once a
+        minute. When ``None`` the scheduler is permissive (every schedule
+        is dispatched and PushManager logs the miss itself) — that matches
+        existing tests, which don't care about staleness."""
         self._store = store
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
+        self._page_exists = page_exists
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -104,6 +113,11 @@ class Scheduler:
         # schedule gets disabled or removed, so re-enable starts a fresh
         # window. Used to suppress daily backfill (see find_due).
         self._first_seen: dict[str, float] = {}
+        # schedule_id we've already warned about for a missing target page,
+        # so a stale schedule doesn't spam the log on every tick. Cleared
+        # implicitly: re-enabling or re-binding the schedule re-warns
+        # because the new page check will pass (so we never re-add).
+        self._warned_missing_page: set[str] = set()
         self._lock = threading.Lock()
 
     def start(self) -> None:
@@ -138,6 +152,23 @@ class Scheduler:
         candidates: list[Schedule] = []
         for s in self._store.all():
             if not s.enabled:
+                continue
+            # Skip schedules pointing at deleted pages. The PushManager
+            # would still log a "page not found" event if we let it run,
+            # which clogs the History view (and surprises the user days
+            # later). Warn once per session per schedule so the operator
+            # sees something actionable in the log.
+            if self._page_exists is not None and not self._page_exists(s.page_id):
+                with self._lock:
+                    if s.id not in self._warned_missing_page:
+                        self._warned_missing_page.add(s.id)
+                        logger.warning(
+                            "schedule %r (%s) targets missing page %r — skipping "
+                            "until it's rebound or deleted",
+                            s.name,
+                            s.id,
+                            s.page_id,
+                        )
                 continue
             if s.type == "interval":
                 if not _matches_dow(s, now, tz):

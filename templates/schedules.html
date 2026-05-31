@@ -178,13 +178,21 @@
     </thead>
     <tbody>
       {% for s in schedules %}
-      <tr {% if not s.enabled %}class="is-disabled"{% endif %}>
+      {% set stale = not page_names.get(s.page_id) %}
+      <tr class="{% if not s.enabled %}is-disabled {% endif %}{% if stale %}is-stale{% endif %}">
         <td><strong>{{ s.name }}</strong></td>
         <td class="col-page">
-          {% if page_names.get(s.page_id) %}
+          {% if not stale %}
             {{ page_names[s.page_id] }}
           {% else %}
-            <span class="muted">deleted page</span>
+            {# The dashboard the schedule was bound to has been deleted.
+               The scheduler skips this row in find_due so the History
+               view stays clean; surface that here so the user knows to
+               edit-rebind or delete the schedule. #}
+            <span class="pill is-danger" title="The dashboard this schedule pointed at no longer exists. Edit to rebind or delete the schedule.">
+              <i class="ph ph-warning-circle" aria-hidden="true"></i>
+              page deleted
+            </span>
           {% endif %}
         </td>
         <td>

@@ -118,6 +118,7 @@
 }
 
 .data-table tr.is-disabled td { opacity: 0.55; }
+.data-table tr.is-stale td { background: color-mix(in oklab, var(--t-danger) 8%, transparent); }
 .data-table .muted-row { color: var(--t-muted); font-size: 11px; margin-top: 2px; }
 .data-table .actions-col {
   white-space: nowrap;

@@ -265,6 +265,7 @@ def create_app(
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,
+        page_exists=lambda page_id: page_store.get(page_id) is not None,
     )
     app.config["SCHEDULER"] = scheduler
     if not testing and not is_watcher:

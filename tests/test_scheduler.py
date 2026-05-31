@@ -79,6 +79,33 @@ def test_disabled_schedule_skipped(scheduler: Scheduler, store: ScheduleStore) -
     assert scheduler.find_due(datetime(2026, 6, 1, 12, tzinfo=UTC)) == []
 
 
+def test_skips_schedule_with_deleted_target_page(
+    store: ScheduleStore, push_manager, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A schedule whose ``page_id`` no longer resolves is filtered out of
+    find_due so the History view doesn't fill with "page not found" rows.
+    The first miss logs a warning; subsequent ticks stay quiet."""
+    sched = Scheduler(
+        store=store,
+        push_manager=lambda: push_manager,
+        page_exists=lambda pid: pid == "home",
+    )
+    store.upsert(
+        Schedule(id="ghost", name="Ghost", page_id="vanished", type="interval", interval_minutes=15)
+    )
+    store.upsert(
+        Schedule(id="live", name="Live", page_id="home", type="interval", interval_minutes=15)
+    )
+    now = datetime(2026, 6, 1, 10, 0, tzinfo=UTC)
+    with caplog.at_level("WARNING", logger="app.scheduler"):
+        due = sched.find_due(now)
+        assert [d.id for d in due] == ["live"]
+        assert sum("vanished" in r.message for r in caplog.records) == 1
+        # Second pass: still skips, but no second warning.
+        sched.find_due(now)
+        assert sum("vanished" in r.message for r in caplog.records) == 1
+
+
 def test_priority_ordering(scheduler: Scheduler, store: ScheduleStore) -> None:
     store.upsert(
         Schedule(
