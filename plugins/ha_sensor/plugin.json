@@ -1,12 +1,26 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Sensor",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "One or more Home Assistant entities as bold Bauhaus value blocks — each with its unit and a device-class icon. A single entity fills the cell as a hero number; several lay out as a coloured stat grid. Works for temperature, humidity, power, battery, CO₂, or a plain on/off state. Requires the Home Assistant Core plugin.",
+  "description": "One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "s1",
+      "choices": [
+        { "value": "s1", "label": "1 · Bauhaus Refined" },
+        { "value": "s2", "label": "2 · Bauhaus Geometric" },
+        { "value": "s3", "label": "3 · Swiss / International" },
+        { "value": "s4", "label": "4 · Ring Gauges" },
+        { "value": "s5", "label": "5 · Editorial" },
+        { "value": "s6", "label": "6 · Glanceable" }
+      ]
+    },
     { "name": "title", "type": "string", "label": "Title (blank = entity name / \"Sensors\")", "default": "" },
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
     { "name": "show_unit", "type": "boolean", "label": "Show units", "default": true }

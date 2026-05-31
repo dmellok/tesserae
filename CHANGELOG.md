@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.10.0] — 2026-06-01
+
+### Added
+
+- **Six visual directions per Home Assistant widget.** `ha_climate`,
+  `ha_entities`, `ha_history`, and `ha_sensor` each ship six selectable
+  looks from a Bauhaus / Swiss handoff: Refined, Geometric (De Stijl),
+  Swiss / International, Data (Gauge Dial / Meters / Chart / Ring
+  Gauges), Editorial / Editorial Ledger, and Glanceable. Pick per cell
+  via the new `variant` option. State→colour (heat/cool/ok/warn/idle)
+  is derived from each entity's current action/value and maps to the
+  theme's `--c-*` semantic tokens, so every Tesserae theme restyles
+  cleanly across colour, mono, and neon.
+
 ## [0.9.0] — 2026-06-01
 
 ### Added

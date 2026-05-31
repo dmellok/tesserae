@@ -1,4 +1,10 @@
-/* ha_climate — Bauhaus thermostat tiles. */
+/* ha_climate — six visual directions (C1–C6).
+ *
+ * All colour roles map to the theme's --c-* semantic layer. State→colour
+ * is computed per-tile in JS and pushed in via --chip, so each tile's
+ * stripe / chip / fill follows its current action (heating / cooling /
+ * idle / off).
+ */
 
 :host {
   display: block;
@@ -7,141 +13,25 @@
   color: var(--c-text);
   background: var(--c-bg);
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  container-type: size;
 }
-
 .root {
   width: 100%;
   height: 100%;
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: block;
   box-sizing: border-box;
   overflow: hidden;
+  background: var(--c-bg);
 }
-
-/* --- tone tints (shared by hero + tiles) --- */
-.tone-heat { background: var(--c-data-2); color: var(--c-bg); }
-.tone-cool { background: var(--c-accent); color: var(--c-bg); }
-.tone-idle { background: var(--c-raised); color: var(--c-text); }
-.tone-neutral { background: var(--c-surface); color: var(--c-text); }
-
-/* --- single-entity hero --- */
-.hc-hero {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  min-height: 0;
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
-}
-.hc-hero-text { padding: clamp(10px, 2cqw, 24px); min-width: 0; }
-.hc-hero-icon {
-  align-self: stretch;
-  display: grid;
-  place-items: center;
-  background: color-mix(in oklab, currentColor 12%, transparent);
-}
-.hc-hero-icon .ph-bold { font-size: clamp(56px, 24cqmin, 200px); line-height: 1; }
-.hc-current {
-  font-weight: 900;
-  line-height: 0.9;
-  letter-spacing: -0.03em;
-  font-size: clamp(40px, 20cqmin, 150px);
-  display: inline-flex;
-  align-items: flex-start;
-}
-.hc-deg { font-size: 0.4em; font-weight: 800; margin-top: 0.12em; }
-
-.hc-meta {
+.variant {
+  width: 100%;
+  height: 100%;
   display: flex;
-  align-items: center;
-  gap: clamp(5px, 1.2cqw, 12px);
-  flex-wrap: wrap;
-  margin-top: clamp(4px, 1cqh, 12px);
-}
-.hc-target {
-  font-size: clamp(11px, 2.2cqw, 18px);
-  font-weight: 800;
-  letter-spacing: -0.01em;
-}
-.hc-chip {
-  font-size: clamp(9px, 1.8cqw, 14px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 0.2em 0.6em;
-  background: color-mix(in oklab, currentColor 18%, transparent);
+  box-sizing: border-box;
 }
 
-/* --- multi-entity grid --- */
-.hc-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
-  min-height: 0;
-}
-.root[style*="--hc-count:3"] .hc-grid,
-.root[style*="--hc-count:5"] .hc-grid,
-.root[style*="--hc-count:6"] .hc-grid {
-  grid-template-columns: repeat(3, 1fr);
-}
-@container (max-aspect-ratio: 0.8) {
-  .hc-grid { grid-template-columns: 1fr !important; }
-}
-
-.hc-tile {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  gap: clamp(3px, 0.8cqh, 8px);
-  padding: clamp(8px, 1.8cqw, 18px);
-  min-width: 0;
-  overflow: hidden;
-}
-.hc-tile-head {
-  display: flex;
-  align-items: center;
-  gap: clamp(5px, 1cqw, 10px);
-  min-width: 0;
-}
-.hc-tile-icon { font-size: clamp(16px, 3.6cqw, 30px); line-height: 1; }
-.hc-tile-name {
-  font-size: clamp(9px, 1.6cqw, 13px);
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-.hc-tile-current {
-  font-weight: 900;
-  line-height: 0.95;
-  letter-spacing: -0.02em;
-  font-size: clamp(28px, 9cqw, 64px);
-  display: inline-flex;
-  align-items: flex-start;
-}
-.hc-tile .hc-meta { margin-top: 0; }
-.hc-tile.is-unavailable { opacity: 0.55; }
-
-/* --- size adaptations --- */
-.root.size-sm .hc-current { font-size: clamp(36px, 18cqmin, 80px); }
-.root.size-sm .hc-tile-current { font-size: clamp(24px, 9cqw, 44px); }
-
-/* --- empty stub --- */
-.hc-stub {
-  display: grid;
-  place-content: center;
-  text-align: center;
-  gap: clamp(6px, 1.2cqw, 12px);
-  padding: clamp(16px, 3cqw, 36px);
-  background: var(--c-surface);
-  border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
-}
-.hc-stub .ph-duotone { font-size: clamp(36px, 10cqw, 88px); color: var(--c-text); opacity: 0.5; }
-.hc-stub-primary { font-size: clamp(13px, 2.4cqw, 20px); font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
-.hc-stub-secondary { font-size: clamp(11px, 1.8cqw, 14px); color: var(--c-text-soft); }
-
-/* --- error state --- */
+/* Shared error / empty states */
 .root.error {
   display: grid;
   place-items: center;
@@ -151,4 +41,409 @@
   gap: 8px;
 }
 .root.error .ph { font-size: 28px; }
-.root.error span { font: 12px/1.4 monospace; word-break: break-word; }
+.root.error span {
+  font: 12px/1.4 var(--theme-font-mono, ui-monospace);
+  word-break: break-word;
+}
+.hc-stub {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: clamp(4px, 1cqw, 10px);
+  padding: clamp(12px, 2.4cqw, 28px);
+  height: 100%;
+}
+.hc-stub .ph-duotone {
+  font-size: clamp(28px, 8cqw, 64px);
+  color: var(--c-text);
+  opacity: 0.55;
+}
+.hc-stub-primary {
+  font-size: clamp(13px, 2.4cqw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.hc-stub-secondary {
+  font-size: clamp(10px, 1.7cqw, 13px);
+  color: var(--c-text-soft);
+}
+
+/* =================================================================
+ * C1 — BAUHAUS REFINED
+ * ================================================================= */
+.variant-c1 { display: grid; grid-template-rows: auto auto 1fr; }
+.c1-header {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.6cqw, 12px);
+  padding: clamp(8px, 1.8cqh, 16px) clamp(10px, 2.2cqw, 20px);
+}
+.c1-mark {
+  width: clamp(8px, 1.6cqw, 14px);
+  height: clamp(8px, 1.6cqw, 14px);
+  background: var(--c-danger);
+  flex-shrink: 0;
+}
+.c1-title {
+  flex: 1;
+  font: 900 clamp(13px, 2.4cqw, 18px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.02em;
+}
+.c1-header-icon { color: var(--c-text-soft); font-size: clamp(13px, 2.4cqw, 20px); }
+.c1-accent { height: clamp(3px, 0.7cqh, 5px); background: var(--c-danger); }
+.c1-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  min-height: 0;
+}
+.c1-tile {
+  padding: clamp(10px, 2cqw, 20px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  border-right: 1px solid var(--c-line);
+}
+.c1-tile:last-child { border-right: none; }
+.c1-tile-head {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1.2cqw, 10px);
+}
+.c1-tile-head .ph-bold { font-size: clamp(14px, 2.6cqw, 22px); }
+.c1-tile-name {
+  font: 800 clamp(10px, 1.8cqw, 14px)/1.1 var(--theme-font, system-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c1-tile-cur {
+  font: 900 clamp(38px, 10cqh, 72px)/0.9 var(--theme-font, system-ui);
+  display: inline-flex;
+  align-items: flex-start;
+}
+.c1-deg { font-size: 0.5em; font-weight: 800; margin-top: 0.1em; }
+.c1-tile-meta {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.4cqw, 12px);
+}
+.c1-target {
+  font: 700 clamp(9px, 1.6cqw, 13px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+}
+.c1-chip {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.08em;
+  padding: 0.25em 0.7em;
+  color: var(--c-bg);
+}
+
+/* =================================================================
+ * C2 — BAUHAUS GEOMETRIC
+ * ================================================================= */
+.variant-c2 {
+  background: var(--c-text);
+  gap: clamp(2px, 0.6cqw, 4px);
+  padding: clamp(2px, 0.6cqw, 4px);
+}
+.c2-tile {
+  flex: 1;
+  background: var(--c-bg);
+  color: var(--c-text);
+  padding: clamp(10px, 2.2cqw, 22px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+.c2-tile--active {
+  background: var(--chip);
+  color: var(--c-bg);
+}
+.c2-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 1.4cqw, 12px);
+}
+.c2-tile-name {
+  font: 700 clamp(11px, 1.9cqw, 15px)/1.1 var(--theme-font, system-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c2-tile-icon { font-size: clamp(18px, 4cqw, 30px); }
+.c2-tile-cur {
+  font: 900 clamp(40px, 11cqh, 82px)/0.85 var(--theme-font, system-ui);
+}
+.c2-deg { font-size: 0.46em; }
+.c2-tile-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 1.4cqw, 12px);
+  font: 700 clamp(9px, 1.6cqw, 14px)/1 var(--theme-font-mono, ui-monospace);
+}
+.c2-chip {
+  padding: 0.3em 0.7em;
+  background: var(--c-bg);
+  color: var(--chip);
+}
+.c2-tile--active .c2-chip { background: var(--c-bg); color: var(--chip); }
+.c2-tile:not(.c2-tile--active) .c2-chip {
+  background: var(--c-text);
+  color: var(--c-bg);
+}
+
+/* =================================================================
+ * C3 — SWISS / INTERNATIONAL
+ * ================================================================= */
+.variant-c3 {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  padding: clamp(10px, 2.2cqh, 20px) clamp(12px, 2.4cqw, 24px);
+  font-family: var(--theme-font, "Helvetica Neue", system-ui);
+}
+.c3-eyebrow {
+  display: flex;
+  justify-content: space-between;
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--c-text-soft);
+  margin-bottom: clamp(6px, 1.2cqh, 12px);
+}
+.c3-rule { height: 2px; background: var(--c-text); }
+.c3-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  min-height: 0;
+}
+.c3-col {
+  padding-top: clamp(10px, 2cqh, 18px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+  padding-right: clamp(8px, 2cqw, 20px);
+}
+.c3-col--sep {
+  padding-left: clamp(12px, 2.6cqw, 28px);
+  border-left: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent);
+}
+.c3-col-name {
+  font: 700 clamp(9px, 1.7cqw, 12px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.c3-col-cur {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(2px, 0.5cqw, 4px);
+  margin-top: clamp(6px, 1.2cqh, 10px);
+}
+.c3-cur {
+  font: 300 clamp(36px, 10cqh, 68px)/0.9 var(--theme-font, system-ui);
+  letter-spacing: -0.02em;
+}
+.c3-unit {
+  font: 300 clamp(14px, 3cqw, 24px)/1 var(--theme-font, system-ui);
+}
+.c3-col-foot {
+  display: flex;
+  align-items: center;
+  gap: clamp(5px, 1.2cqw, 8px);
+  font: 400 clamp(9px, 1.5cqw, 11.5px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.06em;
+  color: var(--c-text-soft);
+}
+.c3-dot {
+  width: clamp(5px, 1cqw, 8px);
+  height: clamp(5px, 1cqw, 8px);
+  flex-shrink: 0;
+}
+
+/* =================================================================
+ * C4 — GAUGE DIAL
+ * ================================================================= */
+.variant-c4 {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  font-family: var(--theme-font, system-ui);
+}
+.c4-header {
+  font: 900 clamp(12px, 2.2cqw, 16px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.04em;
+  padding: clamp(8px, 1.6cqh, 14px) clamp(10px, 2.2cqw, 20px) clamp(4px, 0.8cqh, 8px);
+}
+.c4-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  min-height: 0;
+}
+.c4-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.2cqh, 10px);
+  padding: 0 clamp(8px, 1.6cqw, 14px) clamp(8px, 1.6cqh, 14px);
+  min-width: 0;
+}
+.c4-tile--sep { border-left: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent); }
+.c4-gauge {
+  width: clamp(80px, 22cqmin, 160px);
+  height: clamp(80px, 22cqmin, 160px);
+}
+.c4-gauge-text {
+  font-family: var(--theme-font, system-ui);
+  font-weight: 900;
+  font-size: 30px;
+  fill: var(--c-text);
+}
+.c4-tile-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(2px, 0.5cqh, 4px);
+}
+.c4-tile-name {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 1cqw, 8px);
+  font: 700 clamp(9px, 1.6cqw, 12px)/1 var(--theme-font, system-ui);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.c4-tile-set {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+}
+
+/* =================================================================
+ * C5 — EDITORIAL
+ * ================================================================= */
+.variant-c5 {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  padding: clamp(8px, 1.8cqh, 18px) clamp(12px, 2.6cqw, 26px);
+  font-family: var(--theme-font-serif, Georgia, "Times New Roman", serif);
+}
+.c5-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.c5-title {
+  font: 400 clamp(16px, 3.2cqh, 26px)/1 var(--theme-font-serif, Georgia, serif);
+}
+.c5-meta {
+  font: 700 clamp(7px, 1.3cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.16em;
+  color: var(--c-text-soft);
+}
+.c5-rules { display: flex; flex-direction: column; gap: 1px; margin-top: clamp(6px, 1cqh, 10px); }
+.c5-rule { background: var(--c-text); }
+.c5-rule--thick { height: clamp(2px, 0.4cqh, 3px); }
+.c5-rule--thin { height: 1px; }
+.c5-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  min-height: 0;
+}
+.c5-col {
+  padding-top: clamp(8px, 1.4cqh, 14px);
+  padding-right: clamp(8px, 1.6cqw, 18px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+.c5-col--sep {
+  padding-left: clamp(12px, 2.4cqw, 26px);
+  border-left: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent);
+}
+.c5-col-name {
+  font: 700 clamp(7px, 1.3cqw, 10.5px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.14em;
+  color: var(--c-text-soft);
+}
+.c5-col-cur {
+  font: 400 clamp(38px, 10cqh, 76px)/0.85 var(--theme-font-serif, Georgia, serif);
+}
+.c5-deg { font-size: 0.45em; }
+.c5-col-foot {
+  font: italic 400 clamp(11px, 2.1cqw, 16px)/1.2 var(--theme-font-serif, Georgia, serif);
+  color: var(--c-text-soft);
+}
+.c5-mode {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  font-style: normal;
+  letter-spacing: 0.06em;
+}
+
+/* =================================================================
+ * C6 — GLANCEABLE
+ * ================================================================= */
+.variant-c6 {
+  padding: clamp(8px, 1.6cqw, 16px);
+  gap: clamp(6px, 1.4cqw, 14px);
+}
+.c6-tile {
+  flex: 1;
+  border: clamp(2px, 0.5cqw, 3px) solid var(--chip, var(--c-text));
+  background: var(--c-bg);
+  color: var(--c-text);
+  padding: clamp(10px, 2cqw, 18px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-width: 0;
+}
+.c6-tile--active {
+  background: var(--chip);
+  color: var(--c-bg);
+}
+.c6-tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(6px, 1.4cqw, 12px);
+}
+.c6-tile-head .ph-bold { font-size: clamp(18px, 4cqw, 28px); }
+.c6-mode {
+  font: 700 clamp(8px, 1.4cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.08em;
+  padding: 0.25em 0.7em;
+  border: clamp(1.5px, 0.3cqw, 2px) solid currentColor;
+}
+.c6-tile-cur {
+  font: 900 clamp(42px, 11cqh, 78px)/0.85 var(--theme-font, system-ui);
+}
+.c6-deg { font-size: 0.43em; }
+.c6-tile-name {
+  font: 700 clamp(11px, 2cqw, 15px)/1.05 var(--theme-font, system-ui);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c6-tile-set {
+  font: 600 clamp(8px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  opacity: 0.8;
+  margin-top: clamp(1px, 0.3cqh, 3px);
+}

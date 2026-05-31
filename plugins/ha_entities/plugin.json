@@ -1,12 +1,26 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Entities",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "A status grid of several Home Assistant entities — lights, switches, locks, doors, presence — each with a state dot and its current value. List the entity ids (one per line, or comma-separated). Requires the Home Assistant Core plugin.",
+  "description": "A status grid of several Home Assistant entities — six Bauhaus / Swiss visual directions to choose from. Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.",
   "icon": "ph-squares-four",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "e1",
+      "choices": [
+        { "value": "e1", "label": "1 · Bauhaus Refined" },
+        { "value": "e2", "label": "2 · Bauhaus Geometric" },
+        { "value": "e3", "label": "3 · Swiss / International" },
+        { "value": "e4", "label": "4 · Data Meters" },
+        { "value": "e5", "label": "5 · Editorial Ledger" },
+        { "value": "e6", "label": "6 · Glanceable Cards" }
+      ]
+    },
     { "name": "title", "type": "string", "label": "Title", "default": "Entities" },
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" }
   ],

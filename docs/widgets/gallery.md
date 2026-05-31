@@ -405,7 +405,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_climate](../screenshots/widgets/ha_climate.png)
 
-    One or more Home Assistant climate / thermostat entities as Bauhaus tiles: current temperature, target (or range), HVAC mode and what each is doing right now (heating / cooling / idle), tinted accordingly. Requires the Home Assistant Core plugin.
+    One or more Home Assistant climate / thermostat entities — six Bauhaus / Swiss visual directions to choose from. Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -415,7 +415,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_entities](../screenshots/widgets/ha_entities.png)
 
-    A status grid of several Home Assistant entities — lights, switches, locks, doors, presence — each with a state dot and its current value. List the entity ids (one per line, or comma-separated). Requires the Home Assistant Core plugin.
+    A status grid of several Home Assistant entities — six Bauhaus / Swiss visual directions to choose from. Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -425,7 +425,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    One or more numeric Home Assistant sensors over time as Bauhaus sparklines, each with its current value, a trend arrow and min/max for the window. Great for temperature, power, or anything that trends. Requires the Home Assistant Core plugin.
+    A numeric Home Assistant sensor over time — six Bauhaus / Swiss visual directions to choose from. Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -435,7 +435,7 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_sensor](../screenshots/widgets/ha_sensor.png)
 
-    One or more Home Assistant entities as bold Bauhaus value blocks — each with its unit and a device-class icon. A single entity fills the cell as a hero number; several lay out as a coloured stat grid. Works for temperature, humidity, power, battery, CO₂, or a plain on/off state. Requires the Home Assistant Core plugin.
+    One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 

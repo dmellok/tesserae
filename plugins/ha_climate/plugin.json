@@ -1,12 +1,26 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Climate",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "widget",
-  "description": "One or more Home Assistant climate / thermostat entities as Bauhaus tiles: current temperature, target (or range), HVAC mode and what each is doing right now (heating / cooling / idle), tinted accordingly. Requires the Home Assistant Core plugin.",
+  "description": "One or more Home Assistant climate / thermostat entities — six Bauhaus / Swiss visual directions to choose from. Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.",
   "icon": "ph-thermometer-simple",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "c1",
+      "choices": [
+        { "value": "c1", "label": "1 · Bauhaus Refined" },
+        { "value": "c2", "label": "2 · Bauhaus Geometric" },
+        { "value": "c3", "label": "3 · Swiss / International" },
+        { "value": "c4", "label": "4 · Gauge Dial" },
+        { "value": "c5", "label": "5 · Editorial" },
+        { "value": "c6", "label": "6 · Glanceable" }
+      ]
+    },
     { "name": "title", "type": "string", "label": "Title (blank = entity name / \"Climate\")", "default": "" },
     { "name": "entities", "type": "multiselect", "label": "Climate entities", "default": [], "choices_from": "entity" }
   ],
