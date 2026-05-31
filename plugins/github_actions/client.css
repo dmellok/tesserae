@@ -16,7 +16,14 @@
   width: clamp(72px, 14cqw, 110px);
   height: clamp(72px, 14cqw, 110px);
   border-radius: 50%;
-  display: grid; place-items: center;
+  /* Stacked flex centers value + label vertically inside the inner
+     ring; grid `place-items: center` worked at small sizes but had no
+     way to limit content width, so "100%" ran into the inner-ring edge
+     at the larger clamps. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   background:
     conic-gradient(
       var(--gauge-fill, var(--c-accent)) 0 var(--ring),
@@ -26,24 +33,30 @@
 }
 .ga-gauge::after {
   content: "";
-  position: absolute; inset: 12%;
+  /* 18% inset (was 12%) — gives the centred text a little more
+     horizontal margin inside the circle so 3-digit values + "%"
+     don't graze the ring edge. */
+  position: absolute; inset: 18%;
   border-radius: 50%;
   background: var(--c-surface);
   z-index: 0;
 }
 .ga-gauge-v {
   position: relative; z-index: 1;
-  font: 900 clamp(20px, 4cqw, 32px)/1 var(--theme-font-mono, ui-monospace);
+  /* Trimmed max from 32px to 26px and slowed the cqw scale (4cqw → 3.2cqw)
+     so "100" + the % superscript always fits comfortably inside the
+     inner ring. The label below has room to breathe too. */
+  font: 900 clamp(18px, 3.2cqw, 26px)/1 var(--theme-font-mono, ui-monospace);
   letter-spacing: -0.04em;
   color: var(--c-text);
 }
-.ga-gauge-v small { font-size: 0.5em; font-weight: 700; margin-left: 2px; opacity: 0.7; }
+.ga-gauge-v small { font-size: 0.5em; font-weight: 700; margin-left: 1px; opacity: 0.7; }
 .ga-gauge-l {
   position: relative; z-index: 1;
-  font: 800 clamp(8px, 1.3cqw, 10px)/1 var(--theme-font, system-ui);
+  font: 800 clamp(7px, 1.1cqw, 9px)/1 var(--theme-font, system-ui);
   text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--c-text-soft);
-  margin-top: 3px;
+  margin-top: 4px;
 }
 .ga-gauge.gauge--ok    { --gauge-fill: var(--c-accent); }
 .ga-gauge.gauge--mixed { --gauge-fill: var(--c-data-2); }
