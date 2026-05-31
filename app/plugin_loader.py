@@ -63,6 +63,11 @@ class Theme:
     palette: dict[str, str]
     plugin_id: str
     is_user: bool = False
+    # Optional family / use-case tags from the manifest. The picker groups
+    # by the first tag so users on a 1-bit panel can spot the ``mono``
+    # family without scrolling past the colour themes. Empty tuple means
+    # the theme falls into the default (un-grouped) bucket.
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -256,12 +261,15 @@ def discover(
 
         if plugin.kind == "theme":
             for raw_theme in manifest.get("themes", []):
+                raw_tags = raw_theme.get("tags") or ()
+                tags = tuple(str(t) for t in raw_tags) if isinstance(raw_tags, list) else ()
                 theme = Theme(
                     id=str(raw_theme["id"]),
                     name=str(raw_theme["name"]),
                     mode=str(raw_theme.get("mode", "")),
                     palette={k: str(v) for k, v in raw_theme["palette"].items()},
                     plugin_id=plugin_id,
+                    tags=tags,
                 )
                 if theme.id in registry.themes:
                     registry.errors.append(

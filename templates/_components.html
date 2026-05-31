@@ -95,18 +95,29 @@ macro here instead.
 {%- endmacro -%}
 
 {%- macro select_field(field_id, name, label, value='', options=[], help=None, blank_label=None) -%}
-{#- options: list of {value, label} dicts OR (value, label) tuples. -#}
+{#- options: list of {value, label} dicts (optionally with {group}) OR
+    (value, label) tuples. Consecutive options sharing the same non-empty
+    ``group`` are wrapped in a single <optgroup> labelled with the group
+    name — so callers can keep the picker single-element while users see
+    related themes / fonts / etc. clustered. -#}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}</label>
   <select id="{{ field_id }}" name="{{ name }}">
     {% if blank_label is not none %}
     <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
     {% endif %}
+    {% set ns = namespace(group='') %}
     {% for opt in options %}
-      {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}
-      {% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% endif %}
+      {% if opt is mapping %}{% set v = opt.value %}{% set l = opt.label %}{% set g = opt.get('group', '') %}
+      {% else %}{% set v = opt[0] %}{% set l = opt[1] %}{% set g = '' %}{% endif %}
+      {% if g != ns.group %}
+        {% if ns.group %}</optgroup>{% endif %}
+        {% if g %}<optgroup label="{{ g }}">{% endif %}
+        {% set ns.group = g %}
+      {% endif %}
       <option value="{{ v }}" {% if value == v %}selected{% endif %}>{{ l }}</option>
     {% endfor %}
+    {% if ns.group %}</optgroup>{% endif %}
   </select>
   {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>

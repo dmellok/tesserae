@@ -64,7 +64,11 @@
     </div>
 
     {% if plugin %}
-    {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
+    {# Theme picker groups by family so the mono variants (sharp on 1-bit
+       panels) cluster together rather than scattering through 20 colour
+       themes. ``themes`` is pre-sorted family-first by _editor_context. #}
+    {% set _theme_groups = {'mono': 'Monochrome', 'neon': 'Neon'} %}
+    {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name, 'group': _theme_groups.get(t.tags[0] if t.tags else '', '')}) %}{% endfor %}
     {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
     <div class="field-grid">
       {{ select_field('cell-' ~ cell.id ~ '-theme', 'theme', 'Theme override',
@@ -202,7 +206,11 @@
         {# Sentinel so update() knows this form owns device_ids even when
            every checkbox is unticked (unchecked boxes send nothing). #}
         <input type="hidden" name="device_ids_present" value="1">
-        {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name}) %}{% endfor %}
+        {# Theme picker groups by family so the mono variants (sharp on 1-bit
+       panels) cluster together rather than scattering through 20 colour
+       themes. ``themes`` is pre-sorted family-first by _editor_context. #}
+    {% set _theme_groups = {'mono': 'Monochrome', 'neon': 'Neon'} %}
+    {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name, 'group': _theme_groups.get(t.tags[0] if t.tags else '', '')}) %}{% endfor %}
         {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
 
         <div class="field">

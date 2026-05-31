@@ -356,7 +356,17 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "panel": panel,
         "plugins": widgets,
         "plugin_cell_options": _materialize_cell_options(widgets),
-        "themes": sorted(plugins.themes.values(), key=lambda t: t.name.lower()),
+        # Sort by family (untagged Ramen first, then mono, then neon) and
+        # within a family by name. The picker renders each family as an
+        # <optgroup> so a user setting up a 1-bit panel can spot the mono
+        # themes without scrolling past 20 colour ones.
+        "themes": sorted(
+            plugins.themes.values(),
+            key=lambda t: (
+                {"": 0, "mono": 1, "neon": 2}.get(t.tags[0] if t.tags else "", 3),
+                t.name.lower(),
+            ),
+        ),
         "fonts": sorted(plugins.fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,

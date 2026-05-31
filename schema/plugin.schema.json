@@ -105,6 +105,12 @@
           "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
           "name": { "type": "string", "minLength": 1 },
           "mode": { "enum": ["light", "dark"] },
+          "tags": {
+            "description": "Optional family / use-case markers. The theme picker groups its dropdown by tag (e.g. monochrome themes for 1-bit panels stay together) so the right options are easy to spot. Themes without a tag fall into the default family.",
+            "type": "array",
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
+            "uniqueItems": true
+          },
           "palette": {
             "type": "object",
             "required": [

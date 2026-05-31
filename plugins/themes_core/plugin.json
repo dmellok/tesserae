@@ -1,14 +1,18 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core themes",
-  "version": "0.8.0",
+  "version": "0.8.3",
   "kind": "theme",
-  "description": "Curated theme set in three families. Ten light + ten dark variants share the Ramen design DNA — warm undertones, dusty muted accents, papery flat surfaces (surface == bg). Five neon dark themes break the rules deliberately for synthwave/cyberpunk dashboards. Each theme picks three coherent decorative tokens — accent / accent2 / accent3 — that the widgets paint with for colour-blocked layouts. warn / danger / ok stay reserved for actual semantic states (errors, warnings, success badges) and never appear in regular UI. User themes save under data/plugins/themes_core/user.json.",
+  "description": "Curated theme set in four families. Ten light + ten dark variants share the Ramen design DNA — warm undertones, dusty muted accents, papery flat surfaces (surface == bg). Five neon dark themes break the rules deliberately for synthwave/cyberpunk dashboards. Six monochrome themes drop colour entirely for greyscale or 1-bit panels — Kindle BYOS, native TRMNL hardware — so widgets read cleanly after the renderer quantises: Paper / Ash (light, flat) for sharp text, Newsprint / Halftone (warm, halftone-friendly) for printed-page texture, Carbon / Graphite (dark) for night-mode panels. Each theme picks three coherent decorative tokens — accent / accent2 / accent3 — that the widgets paint with for colour-blocked layouts. warn / danger / ok stay reserved for actual semantic states (errors, warnings, success badges) and never appear in regular UI. User themes save under data/plugins/themes_core/user.json.",
   "supports": {
-    "sizes": ["xs", "sm", "md", "lg"]
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
   },
   "themes": [
-
     {
       "id": "default",
       "name": "Ramen",
@@ -30,7 +34,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "sakura",
       "name": "Sakura",
@@ -52,7 +55,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "sage",
       "name": "Sage",
@@ -74,7 +76,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "marigold",
       "name": "Marigold",
@@ -96,7 +97,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "lavender",
       "name": "Lavender",
@@ -118,7 +118,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "driftwood",
       "name": "Driftwood",
@@ -140,7 +139,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "persimmon",
       "name": "Persimmon",
@@ -162,7 +160,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "linen",
       "name": "Linen",
@@ -184,7 +181,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "eucalyptus",
       "name": "Eucalyptus",
@@ -206,7 +202,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "clay",
       "name": "Clay",
@@ -228,7 +223,6 @@
         "ok": "#16a34a"
       }
     },
-
     {
       "id": "ramen-noir",
       "name": "Ramen Noir",
@@ -250,7 +244,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "sake",
       "name": "Saké",
@@ -272,7 +265,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "pine",
       "name": "Pine",
@@ -294,7 +286,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "plum",
       "name": "Plum",
@@ -316,7 +307,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "cocoa",
       "name": "Cocoa",
@@ -338,7 +328,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "slate",
       "name": "Slate",
@@ -360,7 +349,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "ember",
       "name": "Ember",
@@ -382,7 +370,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "mulberry",
       "name": "Mulberry",
@@ -404,7 +391,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "ink",
       "name": "Ink",
@@ -426,7 +412,6 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "walnut",
       "name": "Walnut",
@@ -448,11 +433,13 @@
         "ok": "#4ade80"
       }
     },
-
     {
       "id": "tokyo-neon",
       "name": "Tokyo Neon",
       "mode": "dark",
+      "tags": [
+        "neon"
+      ],
       "palette": {
         "bg": "#0a0a14",
         "surface": "#0a0a14",
@@ -470,11 +457,13 @@
         "ok": "#00ff8a"
       }
     },
-
     {
       "id": "synthwave",
       "name": "Synthwave",
       "mode": "dark",
+      "tags": [
+        "neon"
+      ],
       "palette": {
         "bg": "#0d0a1a",
         "surface": "#0d0a1a",
@@ -492,11 +481,13 @@
         "ok": "#34ffba"
       }
     },
-
     {
       "id": "cyberpunk",
       "name": "Cyberpunk",
       "mode": "dark",
+      "tags": [
+        "neon"
+      ],
       "palette": {
         "bg": "#08080c",
         "surface": "#0e0e14",
@@ -514,11 +505,13 @@
         "ok": "#00ff8a"
       }
     },
-
     {
       "id": "vaporwave",
       "name": "Vaporwave",
       "mode": "dark",
+      "tags": [
+        "neon"
+      ],
       "palette": {
         "bg": "#10081a",
         "surface": "#10081a",
@@ -536,11 +529,13 @@
         "ok": "#80ffd5"
       }
     },
-
     {
       "id": "matrix",
       "name": "Matrix",
       "mode": "dark",
+      "tags": [
+        "neon"
+      ],
       "palette": {
         "bg": "#000000",
         "surface": "#050a05",
@@ -556,6 +551,150 @@
         "danger": "#ff4d4d",
         "warn": "#ffeb1c",
         "ok": "#00ff66"
+      }
+    },
+    {
+      "id": "paper",
+      "name": "Paper",
+      "mode": "light",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#ffffff",
+        "surface": "#ffffff",
+        "surface2": "#f0f0f0",
+        "fg": "#0a0a0a",
+        "fgSoft": "#2c2c2c",
+        "muted": "#7a7a7a",
+        "accent": "#1a1a1a",
+        "accent2": "#5a5a5a",
+        "accent3": "#9a9a9a",
+        "accentSoft": "#e6e6e6",
+        "divider": "#d0d0d0",
+        "danger": "#0a0a0a",
+        "warn": "#5a5a5a",
+        "ok": "#2c2c2c"
+      }
+    },
+    {
+      "id": "carbon",
+      "name": "Carbon",
+      "mode": "dark",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#050505",
+        "surface": "#050505",
+        "surface2": "#1a1a1a",
+        "fg": "#f5f5f5",
+        "fgSoft": "#d0d0d0",
+        "muted": "#888888",
+        "accent": "#f5f5f5",
+        "accent2": "#b0b0b0",
+        "accent3": "#707070",
+        "accentSoft": "#252525",
+        "divider": "#2e2e2e",
+        "danger": "#f5f5f5",
+        "warn": "#b0b0b0",
+        "ok": "#d0d0d0"
+      }
+    },
+    {
+      "id": "newsprint",
+      "name": "Newsprint",
+      "mode": "light",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#f0eadc",
+        "surface": "#f0eadc",
+        "surface2": "#d8cfba",
+        "fg": "#14110b",
+        "fgSoft": "#423d32",
+        "muted": "#807760",
+        "accent": "#1c1812",
+        "accent2": "#5c5444",
+        "accent3": "#968a72",
+        "accentSoft": "#e2dac3",
+        "divider": "#b8af96",
+        "danger": "#1c1812",
+        "warn": "#5c5444",
+        "ok": "#423d32"
+      }
+    },
+    {
+      "id": "halftone",
+      "name": "Halftone",
+      "mode": "dark",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#1a1612",
+        "surface": "#1a1612",
+        "surface2": "#2e2820",
+        "fg": "#f0e6d2",
+        "fgSoft": "#c0b598",
+        "muted": "#807562",
+        "accent": "#f0e6d2",
+        "accent2": "#b0a583",
+        "accent3": "#707058",
+        "accentSoft": "#3a3225",
+        "divider": "#3a3225",
+        "danger": "#f0e6d2",
+        "warn": "#b0a583",
+        "ok": "#c0b598"
+      }
+    },
+    {
+      "id": "ash",
+      "name": "Ash",
+      "mode": "light",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#ededed",
+        "surface": "#ededed",
+        "surface2": "#dadada",
+        "fg": "#0e0e0e",
+        "fgSoft": "#2e2e2e",
+        "muted": "#7a7a7a",
+        "accent": "#1a1a1a",
+        "accent2": "#5a5a5a",
+        "accent3": "#9a9a9a",
+        "accentSoft": "#d4d4d4",
+        "divider": "#c4c4c4",
+        "danger": "#1a1a1a",
+        "warn": "#5a5a5a",
+        "ok": "#2e2e2e"
+      }
+    },
+    {
+      "id": "graphite",
+      "name": "Graphite",
+      "mode": "dark",
+      "tags": [
+        "mono"
+      ],
+      "palette": {
+        "bg": "#1e1e1e",
+        "surface": "#1e1e1e",
+        "surface2": "#2c2c2c",
+        "fg": "#e8e8e8",
+        "fgSoft": "#b0b0b0",
+        "muted": "#6e6e6e",
+        "accent": "#e8e8e8",
+        "accent2": "#9a9a9a",
+        "accent3": "#6e6e6e",
+        "accentSoft": "#2c2c2c",
+        "divider": "#383838",
+        "danger": "#e8e8e8",
+        "warn": "#9a9a9a",
+        "ok": "#b0b0b0"
       }
     }
   ]
