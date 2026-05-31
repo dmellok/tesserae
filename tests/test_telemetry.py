@@ -261,6 +261,64 @@ def test_heartbeat_fires_app_heartbeat_event(
     assert captured_names.count("app.heartbeat") >= 2
 
 
+def test_heartbeat_carries_props_from_registered_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Once a provider is registered, the heartbeat folds its dict into
+    the event's ``props``. The maintainer's Aptabase view sees fleet
+    shape + activity counters under the same event name."""
+    captured: list[dict[str, str]] = []
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        body = json.loads(req.data or b"{}")
+        if body.get("eventName") == "app.heartbeat":
+            captured.append(body.get("props") or {})
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(tm, "HEARTBEAT_INTERVAL_S", 0.05)
+    t = _make_enabled(tmp_path, monkeypatch)
+    t.set_heartbeat_props_provider(lambda: {"n_devices": "3", "device_kinds": "esp32_client"})
+    try:
+        time.sleep(0.18)
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    assert any(p.get("n_devices") == "3" for p in captured)
+    assert any(p.get("device_kinds") == "esp32_client" for p in captured)
+
+
+def test_heartbeat_survives_provider_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A provider that raises must not silence the heartbeat — the event
+    still fires with empty props so the maintainer's liveness signal
+    keeps working even when the props provider is broken."""
+    captured_names: list[str] = []
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        body = json.loads(req.data or b"{}")
+        captured_names.append(body.get("eventName", ""))
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(tm, "HEARTBEAT_INTERVAL_S", 0.05)
+    t = _make_enabled(tmp_path, monkeypatch)
+
+    def boom() -> dict[str, str]:
+        raise RuntimeError("provider broke")
+
+    t.set_heartbeat_props_provider(boom)
+    try:
+        time.sleep(0.18)
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    assert captured_names.count("app.heartbeat") >= 2
+
+
 def test_heartbeat_stops_on_shutdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``shutdown()`` must cancel the heartbeat thread cleanly — without
     this an idle Tesserae process would prevent a clean test teardown."""

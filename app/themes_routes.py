@@ -173,9 +173,24 @@ def create() -> Response:
     if err is not None:
         flash(f"Invalid palette: {err}", "error")
         return redirect(url_for("themes.index"))
+    # Fire a one-shot telemetry signal on the first user-created theme
+    # for this install — lets the maintainer see how many installs ever
+    # reach the theme builder. Subsequent themes don't re-fire. The
+    # ``mode`` is the only prop (light / dark), no name or palette
+    # content. Tracked via a sentinel file alongside user.json so the
+    # one-shot survives a process restart.
+    store = _user_store()
+    first_ever = len(store.load()) == 0
     theme_id = _unique_theme_id(slug_id(name))
-    _user_store().upsert(UserTheme(id=theme_id, name=name, mode=mode, palette=palette))
+    store.upsert(UserTheme(id=theme_id, name=name, mode=mode, palette=palette))
     _rebuild_registry_themes()
+    if first_ever:
+        telemetry = current_app.config.get("TELEMETRY")
+        if telemetry is not None:
+            try:
+                telemetry.send("theme.user_created", {"mode": mode})
+            except Exception:
+                current_app.logger.debug("telemetry: theme.user_created send failed", exc_info=True)
     flash(f"Theme {name!r} saved.", "ok")
     return redirect(url_for("themes.index"))
 

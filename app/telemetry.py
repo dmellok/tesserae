@@ -1,18 +1,29 @@
 """Anonymous, opt-in usage telemetry.
 
-When enabled, posts two events to the maintainer's analytics backend
-(running the open-source ``aptabase/aptabase``):
+When enabled, posts a small set of events to the maintainer's analytics
+backend (running the open-source ``aptabase/aptabase``):
 
 * ``app.started`` — once per process start (Tesserae version, Python
   version, platform are in ``systemProps``; no custom props).
+* ``app.heartbeat`` — every hour while the process is running. Props
+  carry fleet-shape counts (``n_devices``, ``device_kinds``, ``n_pages``,
+  ``n_user_themes``) and activity counters since the previous heartbeat
+  (``n_pushes_since_last``, ``n_push_failures_since_last``,
+  ``n_widget_errors_since_last``). The provider closure is registered
+  by ``app_factory`` so the telemetry module stays free of any direct
+  knowledge of devices / pages / push internals.
 * ``update.applied`` — when the in-app updater successfully applies a
   new revision; props carry the from/to short SHAs and channel.
+* ``theme.user_created`` — first time the user persists a custom theme.
+  Fires once per instance, so the maintainer sees how often the theme
+  builder is actually reached. Props carry no theme content.
 
 What it does **not** send: IP addresses, hostnames, paths, settings,
-secrets, push contents, dashboard layouts, or anything tied to a real
-identity. The only stable identifier is a random UUID generated on first
-run and persisted to ``data/core/.instance_id`` so the same install
-counts as one across restarts.
+secrets, push contents, dashboard layouts, theme palettes, widget data,
+or anything tied to a real identity. The only stable identifier is a
+random UUID generated on first run and persisted to
+``data/core/.instance_id`` so the same install counts as one across
+restarts.
 
 The endpoint and app key are **baked into this module** — users cannot
 re-aim Tesserae's telemetry at a different server. That's deliberate:
@@ -48,6 +59,7 @@ import threading
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -167,6 +179,10 @@ class Telemetry:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._heartbeat_thread: threading.Thread | None = None
+        # Optional closure that returns rich props to fold into each
+        # ``app.heartbeat``. Registered by app_factory after PushManager
+        # + the registries exist (this module knows nothing about them).
+        self._heartbeat_props_fn: Callable[[], dict[str, str]] | None = None
         if self.enabled:
             self._start_workers()
 
@@ -249,6 +265,14 @@ class Telemetry:
         except queue.Full:
             logger.debug("telemetry: queue full, dropping %s", event_name)
 
+    def set_heartbeat_props_provider(self, fn: Callable[[], dict[str, str]] | None) -> None:
+        """Register a closure that contributes fleet-shape + activity
+        props to each ``app.heartbeat``. ``None`` removes the provider.
+        Errors thrown inside the provider are logged + ignored — a bad
+        provider must never silence the heartbeat itself, since the
+        heartbeat doubles as a liveness signal."""
+        self._heartbeat_props_fn = fn
+
     def set_enabled(self, on: bool) -> None:
         """Toggle the enabled state at runtime. Spins up the worker
         and heartbeat threads on the first transition to on (so a fresh
@@ -300,10 +324,20 @@ class Telemetry:
     def _heartbeat(self) -> None:
         """Fire ``app.heartbeat`` every ``HEARTBEAT_INTERVAL_S`` while
         enabled. Wakes early on ``_stop`` so shutdown isn't blocked
-        waiting out the full hour."""
+        waiting out the full hour. Props from the registered provider
+        (fleet shape + activity counters) get folded in here; provider
+        failure leaves the heartbeat bare but still firing."""
         while not self._stop.wait(timeout=HEARTBEAT_INTERVAL_S):
-            if self.enabled:
-                self.send("app.heartbeat", {})
+            if not self.enabled:
+                continue
+            props: dict[str, str] = {}
+            if self._heartbeat_props_fn is not None:
+                try:
+                    props = dict(self._heartbeat_props_fn())
+                except Exception:
+                    logger.debug("telemetry: heartbeat props provider raised", exc_info=True)
+                    props = {}
+            self.send("app.heartbeat", props)
 
     def _worker(self) -> None:
         while not self._stop.is_set():
