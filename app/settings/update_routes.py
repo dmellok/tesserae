@@ -186,7 +186,28 @@ def _update_core(section_name: str, fields: list[dict[str, Any]]) -> str:
 
 
 def _apply_broker_change() -> None:
-    """Hot-swap the MQTT transport on broker setting changes."""
+    """Hot-swap the MQTT transport on broker setting changes.
+
+    Also reconciles the keep-warm browser pool: when the App-section
+    toggle flips to off, stop the pool so the resident Chromium memory
+    is freed. When it flips back on, the next render lazy-starts the
+    pool (no work needed here)."""
     rebuild = current_app.config.get("REBUILD_TRANSPORT")
     if callable(rebuild):
         rebuild()
+    pool = current_app.config.get("BROWSER_POOL")
+    if pool is not None:
+        from app.state.settings_store import SettingsStore
+
+        store: SettingsStore = current_app.config["SETTINGS_STORE"]
+        keep_warm = bool(store.get_section("app").get("keep_browser_warm", True))
+        if not keep_warm:
+            try:
+                pool.stop()
+            except Exception:
+                current_app.logger.exception("browser pool stop failed")
+            # Replace with a fresh instance so a later re-enable can
+            # lazy-start cleanly — the stopped one is one-shot.
+            from app.renderer import BrowserPool
+
+            current_app.config["BROWSER_POOL"] = BrowserPool()

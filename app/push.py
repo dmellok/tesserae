@@ -48,7 +48,7 @@ from app.panel import (
     resolve_settings_panel,
 )
 from app.quiet_hours import device_is_quiet
-from app.renderer import RenderRequest, render_to_png, to_loopback_url
+from app.renderer import BrowserPool, RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore, Panel
@@ -131,6 +131,7 @@ class PushManager:
         renders_dir: Path,
         base_url_fn: Callable[[], str],
         devices: DeviceRegistry | None = None,
+        browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -140,6 +141,11 @@ class PushManager:
         self._renders_dir = renders_dir
         self._renders_dir.mkdir(parents=True, exist_ok=True)
         self._base_url_fn = base_url_fn
+        # Lazy lookup so the App-settings toggle (``keep_browser_warm``)
+        # can flip the warm path on/off without a PushManager rebuild.
+        # Returning ``None`` falls back to the cold per-render Chromium
+        # spin-up; returning a pool reuses the warm browser.
+        self._browser_pool_fn = browser_pool_fn or (lambda: None)
         # Optional — enables multi-head routing. When a page sets a
         # device_id, the panel comes from that device's manifest and
         # only its renderers fire in _fan_out.
@@ -356,7 +362,8 @@ class PushManager:
                 started = time.monotonic()
                 try:
                     composition = render_to_png(
-                        RenderRequest(url=url, viewport_w=viewport_w, viewport_h=viewport_h)
+                        RenderRequest(url=url, viewport_w=viewport_w, viewport_h=viewport_h),
+                        pool=self._browser_pool_fn(),
                     )
                 except Exception as err:
                     result = self._log_failure(
@@ -504,7 +511,8 @@ class PushManager:
             )
             try:
                 composition_png = render_to_png(
-                    RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h)
+                    RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h),
+                    pool=self._browser_pool_fn(),
                 )
             except Exception as err:
                 group_results.append(

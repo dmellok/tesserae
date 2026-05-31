@@ -29,6 +29,7 @@ from app.ha_discovery import HomeAssistantDiscovery
 from app.mdns import MdnsAdvertiser
 from app.network import detect_base_url
 from app.push import PushManager
+from app.renderer import BrowserPool
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
 from app.state.settings_store import SettingsStore
@@ -46,6 +47,20 @@ _VOLATILE_STATUS_KEYS: frozenset[str] = frozenset(
 
 
 # -- small helpers ------------------------------------------------------
+
+
+def _current_browser_pool(app: Flask) -> BrowserPool | None:
+    """Return the warm BrowserPool when the App-settings toggle is on,
+    else None. PushManager calls this per render so a live toggle change
+    switches the pipeline without a rebuild. When the toggle is flipped
+    off, ``_apply_app_settings_change`` stops the pool to free the
+    resident Chromium memory."""
+    pool: BrowserPool | None = app.config.get("BROWSER_POOL")
+    if pool is None:
+        return None
+    settings: SettingsStore = app.config["SETTINGS_STORE"]
+    app_section = settings.get_section("app")
+    return pool if _truthy(app_section.get("keep_browser_warm", True)) else None
 
 
 def _truthy(value: object) -> bool:
@@ -395,6 +410,10 @@ def _rebuild_transport(
         renders_dir=renders_dir,
         base_url_fn=_base_url,
         devices=devices,
+        # Resolved per-render rather than baked at construction so a live
+        # toggle of ``keep_browser_warm`` switches the pipeline without
+        # rebuilding the PushManager.
+        browser_pool_fn=lambda: _current_browser_pool(app),
     )
     # Sweep render artifacts orphaned by event-log eviction (or a manual
     # history clear) at boot. Idempotent + never fatal.

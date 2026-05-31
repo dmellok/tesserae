@@ -201,6 +201,25 @@ def create_app(
         telemetry.send("app.started")
     app.config["TELEMETRY"] = telemetry
 
+    # Long-running Chromium owned by a dedicated thread. The pool is
+    # *created* unconditionally but only *started* when something calls
+    # .render() on it — see ``_current_browser_pool`` in transport_wiring
+    # for the App-settings toggle that gates routing. Tests + the dev
+    # reloader parent skip it; the cold per-render path still works.
+    from app.renderer import BrowserPool as _BrowserPool
+
+    if testing or is_watcher:
+        app.config["BROWSER_POOL"] = None
+    else:
+        _browser_pool = _BrowserPool()
+        app.config["BROWSER_POOL"] = _browser_pool
+        # Shut Chromium down cleanly on Python exit so the worker thread,
+        # child Chromium process, and the playwright event loop unwind in
+        # order. atexit fires for waitress + the dev reloader child alike.
+        import atexit as _atexit
+
+        _atexit.register(_browser_pool.stop)
+
     # Transport + push manager are (re)built from current broker settings.
     # Holding the rebuilder in app.config lets settings_routes call it on a
     # broker change without restarting the process. Device subscriptions

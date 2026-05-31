@@ -121,6 +121,20 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "keep_browser_warm",
+        "type": "switch",
+        "label": "Keep the renderer browser warm",
+        "default": True,
+        "help": (
+            "Holds a single Chromium process resident between renders, so each "
+            "push reuses it rather than launching cold. Cuts per-push render time "
+            "from ~1–2 s to ~200 ms — noticeable on schedule fires and the editor. "
+            "Costs ~150 MB of idle RAM; turn off if you're on a constrained host "
+            "(1 GB Pi, tight VM). Each render still runs in a fresh browser context "
+            "so cookies / localStorage never leak between dashboards."
+        ),
+    },
+    {
         "name": "telemetry_enabled",
         "type": "switch",
         "label": "Send anonymous usage telemetry",
