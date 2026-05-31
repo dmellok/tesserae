@@ -4,7 +4,7 @@
   "title": "Tesserae device manifest",
   "description": "Shape of device.json. A device is the consumer side of one or more renderers: it subscribes to a status heartbeat topic, optionally publishes to a config topic, and (informationally) lists which renderers it can ingest.",
   "type": "object",
-  "required": ["tesserae_compat", "name", "version", "renderers", "status_topic"],
+  "required": ["tesserae_compat", "name", "version", "renderers"],
   "properties": {
     "tesserae_compat": {
       "type": "string",
@@ -27,12 +27,12 @@
     "status_topic": {
       "type": "string",
       "minLength": 1,
-      "description": "MQTT topic the device publishes its heartbeat to. Tesserae subscribes and parses payloads through device.parse_status()."
+      "description": "MQTT topic the device publishes its heartbeat to. Tesserae subscribes and parses payloads through device.parse_status(). Omit for devices that don't use MQTT for status (e.g. HTTP-polled clients like TRMNL — their status comes from request headers, parsed by app/trmnl_api.py)."
     },
     "config_topic": {
       "type": "string",
       "minLength": 1,
-      "description": "MQTT topic for outbound config. Omit if the device has no configurable knobs."
+      "description": "MQTT topic for outbound config. Omit if the device has no configurable knobs OR pushes config through a non-MQTT channel (TRMNL embeds refresh_rate in /api/display responses, not over MQTT)."
     },
     "config_schema": {
       "type": "object",

@@ -124,15 +124,23 @@ def settings_update(section_kind: str) -> Response:
         device = devices().get(did)
         if device is None:
             return Response(f"unknown device {did!r}", status=404)
-        if device.config_topic is None:
-            return Response(f"device {did!r} has no config topic", status=400)
         fields = config_fields_from_schema(device.config_schema)
+        if not fields:
+            # No config schema at all — nothing to save. Refuse rather
+            # than silently no-op so the route stays loud about misuse.
+            return Response(f"device {did!r} has no configurable fields", status=400)
         values = values_from_form(fields)
         ok, err = device.validate_config(values)
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
             return redirect_to_section(section_kind)
         store.update_for_namespace("devices", did, values, fields)
+        if device.config_topic is None:
+            # Non-MQTT device (e.g. HTTP-polled TRMNL). Config flows
+            # back to the device via the next /api/display response,
+            # not a transport publish — the save itself is the action.
+            flash(f"{device.name} config saved.", "ok")
+            return redirect_to_section(section_kind)
         tr = transport()
         try:
             tr.publish(

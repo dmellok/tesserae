@@ -50,6 +50,7 @@
         <div class="discovery-id"><code>{{ d.id }}</code></div>
         <dl class="discovery-meta">
           <div><dt>Kind</dt><dd>{{ d.kind or '—' }}</dd></div>
+          {% if d.parsed.access_token %}<div><dt>Access token</dt><dd><code>{{ d.parsed.access_token }}</code></dd></div>{% endif %}
           {% if d.panel_w and d.panel_h %}<div><dt>Panel</dt><dd>{{ d.panel_w }}×{{ d.panel_h }}</dd></div>{% endif %}
           {% if d.fw_version %}<div><dt>FW</dt><dd>{{ d.fw_version }}</dd></div>{% endif %}
           {% if d.ip %}<div><dt>IP</dt><dd><code>{{ d.ip }}</code></dd></div>{% endif %}
@@ -184,6 +185,19 @@
      (/panel, /quiet-hours, /settings/device-<id>) call, so behaviour
      matches one-for-one. One Save at the bottom for the whole stack. #}
   <form method="post" action="{{ section.combined_endpoint }}" class="form device-combined-form">
+
+    {% if section.device_name is not none %}
+    {# Display name — instance only (built-in kinds aren't editable).
+       Saved through the combined-save dispatch like the other
+       subsections, so the global Save button at the bottom commits it
+       alongside any other edits. #}
+    <div class="device-subsection">
+      <p class="device-subhead">Display name</p>
+      {{ text_input(section.id ~ '-device-name', 'device_name', 'Name',
+          value=section.device_name, required=True,
+          help='Shown on this card, device pickers, and the Home Assistant device tile.') }}
+    </div>
+    {% endif %}
 
     {% if section.fields %}
     <div class="device-subsection">
@@ -399,8 +413,18 @@
      within the .card so it still reads as part of the device.
      Renders for any section that has either endpoint (non-device
      sections like renderers won't, so the block is skipped). #}
-  {% if section.calibrate_endpoint or section.delete_endpoint %}
+  {% if section.calibrate_endpoint or section.delete_endpoint or section.regenerate_token_endpoint %}
   <div class="device-footer">
+    {% if section.regenerate_token_endpoint %}
+    {# Regenerate access token — present only on TRMNL-style devices.
+       Old token stops working the moment this is clicked, so the
+       confirm dialog spells out the consequence. #}
+    <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form form--inline"
+          onsubmit="return confirm('Regenerate the access token? The current token stops working immediately — update the client config with the new one shown after.');">
+      <div class="actions">{{ button('Regenerate token', icon='arrows-clockwise', variant='ghost') }}</div>
+    </form>
+    {% endif %}
+
     {% if section.calibrate_endpoint %}
     {# Orientation calibration: send a numbered test card to the panel,
        then map the reported top-left number to the right orientation. #}
@@ -743,6 +767,75 @@ docker compose up -d</code></pre>
   })();
 </script>
 {% endif %}
+{% endif %}
+
+{# One-shot access-token reveal after adding a TRMNL device. Pattern
+   mirrors the System → Webhook token reveal above — same modal CSS,
+   same close + copy JS, just a different label and a per-device
+   token. Pop from session in app/settings/index_routes.py. #}
+{% if trmnl_token_reveal %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="trmnl-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="trmnl-reveal-title"><i class="ph ph-device-tablet-speaker"></i> TRMNL access token</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings, or native TRMNL app config). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Copy it now — refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ trmnl_token_reveal.token }}" readonly data-modal-token aria-label="TRMNL access token">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
+      <p class="field-help"><strong>LAN-safe, not internet-safe.</strong> The short token is fine for a homelab Tesserae behind a firewall / Tailscale / VPN. If your instance is reachable from the public internet, stack additional auth in front (reverse proxy with HTTP basic auth, OAuth, Cloudflare Access — anything) — five characters won't survive a determined brute-force.</p>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[data-modal]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        } catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok
+          ? '<i class="ph ph-check"></i> Copied'
+          : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
 {% endif %}
 
 <script>

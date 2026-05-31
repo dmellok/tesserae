@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "TRMNL client",
+  "icon": "device-tablet-speaker",
+  "version": "0.1.0",
+  "description": "HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. Devices (jailbroken Kindles running the KOReader trmnl-display plugin, native TRMNL hardware, anything that speaks the protocol) poll GET /api/display on a fixed cadence and paint the latest frame. Identity is the access_token the user generates in Tesserae and pastes into the client config — no MAC, no MQTT, no pairing flow.",
+  "renderers": ["trmnl_png"],
+  "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "TRMNL panel" },
+  "config_schema": {
+    "refresh_rate_s": {
+      "type": "int",
+      "label": "Refresh rate",
+      "default": 900,
+      "min": 30,
+      "max": 86400,
+      "presets": [
+        {"value": 60,    "label": "1 minute"},
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "How often the client polls /api/display for a new frame. The server echoes this back in the response so the client honours it (though some clients keep their own poll rate)."
+    }
+  }
+}

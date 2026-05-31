@@ -90,6 +90,13 @@ def settings_area(area: str) -> str | Response:
     system_webhook_reveal_token = (
         session.pop("_webhook_token_reveal", "") if area == "system" else ""
     )
+    # Same one-shot pattern for TRMNL access tokens after devices_add
+    # creates a trmnl_client instance. Only honoured on the Devices
+    # tab — that's where the modal lives and where the user is when
+    # the redirect lands.
+    trmnl_token_reveal: dict[str, Any] | None = (
+        session.pop("_trmnl_token_reveal", None) if area == "devices" else None
+    )
     if area == "system":
         upd = current_app.config["UPDATER"]
         try:
@@ -141,6 +148,7 @@ def settings_area(area: str) -> str | Response:
         system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,
         system_webhook_reveal_token=system_webhook_reveal_token,
+        trmnl_token_reveal=trmnl_token_reveal,
     )
 
 
@@ -298,12 +306,7 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
-                "meta": {
-                    "Renderers": ", ".join(device.renderer_ids),
-                    "Status topic": device.status_topic,
-                    "Config topic": device.config_topic or "—",
-                    **({"Instance of": str(device.kind_of)} if is_instance else {}),
-                },
+                "meta": _device_meta_block(device, is_instance),
                 "status": _status_view(device),
                 # The colour-gamut control only matters for the .bin Pi path
                 # (pi_bin packs server-side to a fixed palette). PNG clients
@@ -315,6 +318,21 @@ def _build_sections() -> list[dict[str, Any]]:
                 "delete_endpoint": (
                     url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
                 ),
+                # Regenerate token — only present on devices that use
+                # access tokens (TRMNL). The template gates the button
+                # on this being non-None so a Pi/ESP32 card doesn't
+                # grow a meaningless control.
+                "regenerate_token_endpoint": (
+                    url_for("auth.devices_regenerate_token", instance_id=device.id)
+                    if is_instance and "access_token" in device.manifest
+                    else None
+                ),
+                # The Display-name field reads ``device_name`` (raw) for
+                # the input's value, separately from ``title`` (which gets
+                # a "Device: " prefix for the card heading). Instance-only;
+                # built-in kinds aren't editable, and ``None`` hides the
+                # field via a Jinja ``is not none`` check.
+                "device_name": device.name if is_instance else None,
                 # Panel edit (orientation + dims) is only offered on
                 # instances — kinds aren't shown here at all.
                 "panel": device.panel if is_instance else None,
@@ -380,6 +398,29 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
+    """Compose the meta key/value block shown at the top of each
+    device card. Branches on transport: MQTT devices get their
+    status/config topics; HTTP-polled devices (TRMNL) get a transport
+    label, their access token (it's a short typeable string, not
+    really a secret), and the server URL the client should point at."""
+    meta: dict[str, Any] = {"Renderers": ", ".join(device.renderer_ids)}
+    access_token = device.manifest.get("access_token")
+    if isinstance(access_token, str) and access_token:
+        # HTTP-polled device — surface the token + server URL so the
+        # user can configure their client without leaving the page.
+        meta["Transport"] = "HTTP polling"
+        meta["Access token"] = access_token
+        meta["Server URL"] = f"http://{request.host}"
+    else:
+        # MQTT device — keep the topic-pair display.
+        meta["Status topic"] = device.status_topic or "—"
+        meta["Config topic"] = device.config_topic or "—"
+    if is_instance:
+        meta["Instance of"] = str(device.kind_of)
+    return meta
 
 
 def _status_view(device: Device) -> dict[str, Any]:

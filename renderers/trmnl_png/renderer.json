@@ -1,0 +1,42 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "TRMNL client (1-bit PNG)",
+  "version": "0.1.0",
+  "description": "Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. Output is a 1-bit greyscale PNG that the KOReader trmnl-display plugin (and native TRMNL hardware) paints directly. Per-device picture quality (dither / contrast) lives on the device card and tunes the output for the specific panel — Kindle Paperwhite, native TRMNL panel, ESP32 SPI-attached, etc.",
+  "orientation": "composition",
+  "mime": "image/png",
+  "extension": "png",
+  "topic_pattern": "tesserae/{device}/frame/trmnl",
+  "device": "trmnl",
+  "retain": false,
+  "settings": [
+    {
+      "name": "dither",
+      "type": "select",
+      "label": "Dither mode",
+      "default": "floyd-steinberg",
+      "device_setting": true,
+      "choices": [
+        { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
+        { "value": "atkinson", "label": "Atkinson (contrasty, clean solids)" },
+        { "value": "jarvis", "label": "Jarvis-Judice-Ninke (smoothest)" },
+        { "value": "stucki", "label": "Stucki" },
+        { "value": "bayer-8x8", "label": "Bayer 8x8 (ordered)" },
+        { "value": "halftone", "label": "Halftone dots" },
+        { "value": "crosshatch", "label": "Crosshatch" },
+        { "value": "none", "label": "None (threshold)" }
+      ]
+    },
+    {
+      "name": "contrast",
+      "type": "slider",
+      "label": "Pre-dither contrast",
+      "default": 1.0,
+      "min": 0.5,
+      "max": 2.5,
+      "step": 0.05,
+      "device_setting": true,
+      "help": "Push midtones toward black or white before the dither pass. 1.0 leaves the image alone; > 1.0 deepens contrast (good for photos with grey skies); < 1.0 softens (good for text-heavy dashboards)."
+    }
+  ]
+}

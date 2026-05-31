@@ -41,6 +41,7 @@ from app import (
     send_routes,
     settings_routes,
     themes_routes,
+    trmnl_api,
     webhook_routes,
 )
 from app.discovery import DiscoveryCache
@@ -279,6 +280,7 @@ def create_app(
     page_routes.register(app)
     onboarding.register(app)
     webhook_routes.register(app)
+    trmnl_api.register(app)
 
     if not testing:
         auth.install_gate(app, settings)

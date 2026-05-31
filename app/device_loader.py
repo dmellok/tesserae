@@ -98,8 +98,13 @@ class Device:
         return [str(r) for r in self.manifest.get("renderers", [])]
 
     @property
-    def status_topic(self) -> str:
-        return str(self.manifest["status_topic"])
+    def status_topic(self) -> str | None:
+        """MQTT topic for status heartbeats. ``None`` for devices that
+        don't use MQTT — e.g. TRMNL clients poll ``/api/display`` and
+        their status comes from HTTP request headers, parsed by
+        ``app.trmnl_api`` rather than a transport subscription."""
+        topic = self.manifest.get("status_topic")
+        return str(topic) if isinstance(topic, str) and topic else None
 
     @property
     def config_topic(self) -> str | None:
@@ -155,9 +160,14 @@ class Device:
         return dict(result)
 
     def validate_config(self, payload: dict[str, Any]) -> tuple[bool, str | None]:
-        """Pre-publish validation. Devices without a config topic raise."""
-        if self.config_topic is None:
-            raise RuntimeError(f"device {self.id} has no config_topic")
+        """Check a config payload against the device's validator.
+
+        Used both before an MQTT publish (transport-bound devices like
+        ESP32 / Pi clients) and before stashing config for the next
+        non-MQTT exchange (HTTP-polled TRMNL clients embed the saved
+        values in the next ``/api/display`` response). Independent of
+        the transport — the validator decides validity, the caller
+        decides what to do with the bytes."""
         validate_fn = getattr(self.module, "validate_config", None)
         if not callable(validate_fn):
             return True, None
@@ -327,7 +337,7 @@ def discover(
             "Loaded device %s (renderers=%s, status=%s)",
             device_id,
             manifest.get("renderers"),
-            manifest["status_topic"],
+            manifest.get("status_topic") or "http-polled",
         )
 
     # ----- user-defined instances ------------------------------------
@@ -403,6 +413,12 @@ def load_instance_file(
     # absent or empty means fall back to the app-level setting.
     if isinstance(raw_inst.get("quiet_hours"), dict):
         inst_manifest["quiet_hours"] = dict(raw_inst["quiet_hours"])
+    # Per-device access token — currently only TRMNL devices use this
+    # (HTTP-polled clients identify themselves by token in lieu of MQTT
+    # topics). Carry it through so app.trmnl_api can look up the
+    # device on incoming /api/display requests.
+    if isinstance(raw_inst.get("access_token"), str) and raw_inst["access_token"].strip():
+        inst_manifest["access_token"] = raw_inst["access_token"].strip()
     # Point the instance at its cloned renderers so the settings UI
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.

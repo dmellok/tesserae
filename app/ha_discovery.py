@@ -423,6 +423,7 @@ class HomeAssistantDiscovery:
             self._started = True
         logger.info("HA discovery: starting")
         self._publish_str(AVAILABILITY_TOPIC, "online", retain=True)
+        self._sweep_stale_retained()
         self._publish_entity_configs()
         self._transport.subscribe(CMD_TOPIC_PUSH_PAGE, self._on_push_page_cmd, qos=1)
         self._transport.subscribe(CMD_TOPIC_ACTIVE_PAGE, self._on_active_page_cmd, qos=1)
@@ -586,6 +587,81 @@ class HomeAssistantDiscovery:
             raise
 
     # -- discovery publishing ------------------------------------------
+
+    def _sweep_stale_retained(self) -> None:
+        """One-shot scan at start(): blank retained discovery configs left
+        on the broker by a previous Tesserae session for devices or
+        dashboards that no longer exist.
+
+        In-session deletes are already handled by ``_publish_entity_configs``
+        (it diffs against ``_published_device_ids`` / ``_published_button_ids``
+        and blanks the difference). But when a device is deleted while
+        Tesserae is *not* running, the next session has no memory of
+        previously publishing for that id, so the retained config sits
+        on the broker forever — HA keeps showing a ghost device with the
+        old name. This sweep closes that gap by treating the broker
+        itself as source-of-truth for what's already been published.
+
+        We collect retained configs for a short window, identify which
+        ones reference current devices/pages, and blank everything else
+        under our discovery namespace."""
+        import time
+
+        live_device_ids = {d.id for d in self._bindable_devices()}
+        live_page_ids = {p.id for p in self._page_store.list()}
+        to_blank: set[str] = set()
+
+        def on_config(topic: str, payload: bytes) -> None:
+            if not payload:
+                return
+            try:
+                cfg = json.loads(payload.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                # Corrupt payloads also count as stale — blank them.
+                to_blank.add(topic)
+                return
+            if not isinstance(cfg, dict):
+                to_blank.add(topic)
+                return
+            device = cfg.get("device") or {}
+            ids = device.get("identifiers") if isinstance(device, dict) else None
+            primary = ids[0] if isinstance(ids, list) and ids else None
+            if primary == "tesserae":
+                # Hub-owned entity. The only hub entities that come and go are
+                # per-dashboard buttons (object_id `page_<page_id>`); the
+                # fixed ones (active_page, last_render, diagnostics) always
+                # belong, so leave them alone.
+                obj = cfg.get("object_id")
+                if isinstance(obj, str) and obj.startswith("page_"):
+                    page_id = obj[len("page_") :]
+                    if page_id not in live_page_ids:
+                        to_blank.add(topic)
+                return
+            if isinstance(primary, str) and primary.startswith("tesserae_dev_"):
+                device_id = primary[len("tesserae_dev_") :]
+                if device_id not in live_device_ids:
+                    to_blank.add(topic)
+                return
+            # Unknown identifier shape under our prefix — leave it; HA will
+            # ignore it if it's not ours.
+
+        wildcard = f"{DISCOVERY_PREFIX}/+/{NODE_ID}/+/config"
+        try:
+            self._transport.subscribe(wildcard, on_config, qos=0)
+        except Exception:
+            logger.warning("HA discovery: sweep subscribe failed", exc_info=True)
+            return
+        # Brokers deliver retained messages immediately on subscribe; 1.5s
+        # is comfortably over the round-trip even on slow LAN.
+        time.sleep(1.5)
+        try:
+            self._transport.unsubscribe(on_config)
+        except Exception:
+            logger.warning("HA discovery: sweep unsubscribe failed", exc_info=True)
+        for topic in to_blank:
+            self._publish_str(topic, "", retain=True)
+        if to_blank:
+            logger.info("HA discovery: cleared %d stale retained config(s)", len(to_blank))
 
     def _publish_entity_configs(self) -> None:
         pages = self._page_store.list()

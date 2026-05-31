@@ -48,6 +48,61 @@ class InstanceResult:
         return self.error is None
 
 
+def _kind_uses_access_token(kind: Device) -> bool:
+    """True for kinds whose protocol uses an HTTP access token instead
+    of (or in addition to) an MQTT status/config topic. Currently just
+    TRMNL clients; extracted as a helper so a new HTTP-polled kind can
+    opt in by appearing in this list rather than threading a new
+    manifest field through the loader."""
+    return kind.id == "trmnl_client"
+
+
+# Alphabet for short access tokens. Lowercase letters plus 2–9, with
+# the visually ambiguous characters (0 / 1 / i / l / o) removed so a
+# user reading the modal and typing on a soft keyboard doesn't have to
+# guess which character is which. 30 characters → 30^5 ≈ 24 million
+# combinations.
+_TOKEN_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
+_TOKEN_LENGTH = 5
+
+
+def generate_access_token(devices: DeviceRegistry) -> str:
+    """Generate a short access token that isn't already in use.
+
+    Five characters from a 30-char typeable alphabet gives ~25 bits
+    of entropy — fine for a Tesserae that's only reachable on the
+    LAN (homelab + firewall + Tailscale are the typical setup), NOT
+    fine for a publicly-exposed instance. The tradeoff is deliberate:
+    TRMNL clients are paired by entering the token on a Kindle
+    on-screen keyboard or button-by-button on the native hardware,
+    and a 32-hex-character token there is brutal. If you're putting
+    Tesserae on the public internet, stack additional access control
+    (reverse-proxy auth, Tailscale, etc.) on top — the token alone
+    is not sufficient at this length.
+
+    Uniqueness within the registry is checked so a regenerate can't
+    silently collide with an existing device's token (a 1-in-24M
+    chance per attempt, but the loop costs nothing and removes the
+    foot-gun)."""
+    import secrets
+
+    existing = {
+        d.manifest.get("access_token")
+        for d in devices.all()
+        if isinstance(d.manifest.get("access_token"), str)
+    }
+    for _ in range(64):
+        token = "".join(secrets.choice(_TOKEN_ALPHABET) for _ in range(_TOKEN_LENGTH))
+        if token not in existing:
+            return token
+    # Astronomically unlikely (would need millions of TRMNL devices
+    # already registered). Raise loudly rather than recurse — the
+    # caller will see the error and bump _TOKEN_LENGTH.
+    raise RuntimeError(
+        f"could not generate a unique {_TOKEN_LENGTH}-char access token after 64 attempts"
+    )
+
+
 def derive_topic(kind_topic: str, new_id: str, *, suffix: str) -> str:
     """Derive an instance topic from the kind's by swapping the prefix
     segment: ``tesserae/<kind_prefix>/status`` → ``tesserae/<id>/status``.
@@ -78,6 +133,7 @@ def create_instance(
     name: str = "",
     panel_overrides: dict[str, Any] | None = None,
     orientation: str | None = None,
+    access_token: str | None = None,
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
@@ -105,8 +161,12 @@ def create_instance(
         "id": instance_id,
         "kind": kind_id,
         "name": name.strip() or f"{kind.name} ({instance_id})",
-        "status_topic": derive_topic(kind.status_topic, instance_id, suffix="status"),
     }
+    # Kinds that don't speak MQTT (e.g. HTTP-polled TRMNL) declare no
+    # status/config topic at all. Skip both derivations cleanly rather
+    # than synthesising a placeholder.
+    if kind.status_topic:
+        manifest["status_topic"] = derive_topic(kind.status_topic, instance_id, suffix="status")
     if kind.config_topic:
         manifest["config_topic"] = derive_topic(kind.config_topic, instance_id, suffix="config")
 
@@ -116,6 +176,18 @@ def create_instance(
     _apply_orientation(panel, orientation)
     if panel:
         manifest["panel"] = panel
+
+    # TRMNL-style clients identify themselves by a token rather than a
+    # MAC or topic. Two paths:
+    #
+    #  * Manual add: ``access_token`` not supplied → generate one. The
+    #    user copies the new token from the reveal modal into their
+    #    client config.
+    #  * Discovered register: caller hands us the token the client is
+    #    already polling with — preserve it so the user doesn't have
+    #    to update the client config after registering.
+    if _kind_uses_access_token(kind):
+        manifest["access_token"] = access_token or generate_access_token(devices)
 
     data_root.mkdir(parents=True, exist_ok=True)
     inst_file = data_root / f"{instance_id}.json"

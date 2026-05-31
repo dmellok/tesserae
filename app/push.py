@@ -155,6 +155,17 @@ class PushManager:
         # logged and swallowed so a buggy subscriber can't break a push.
         self._listener_lock = threading.Lock()
         self._listeners: list[Callable[[PushResult], None]] = []
+        # Most-recent render per device-id. Populated by ``_fan_out``
+        # after each successful publish; read by pull-based transports
+        # (``app.trmnl_api.display``) that need to answer "what's the
+        # latest frame for this device?" without subscribing to MQTT.
+        # Persisted to ``data/core/latest_renders.json`` (lives next to
+        # the renders directory so the artifact files and their pointer
+        # share a lifecycle) so a Tesserae restart between pushes
+        # doesn't leave the Kindle staring at a placeholder until the
+        # next scheduled push lands.
+        self._latest_renders_path = self._renders_dir.parent / "latest_renders.json"
+        self._latest_renders: dict[str, dict[str, Any]] = self._load_latest_renders()
 
     # -- listeners -------------------------------------------------------
 
@@ -175,6 +186,68 @@ class PushManager:
                 cb(result)
             except Exception:
                 logger.exception("push listener %r raised", cb)
+
+    # -- latest-render lookup --------------------------------------------
+
+    def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
+        """The most recently published render for a device, or ``None``
+        if nothing has been pushed since startup.
+
+        Returns a dict ``{digest, ext, filename, timestamp, renderer_id}``
+        — same shape ``_fan_out`` writes into the in-memory map. Used
+        by pull-based transports (``app.trmnl_api.display``) so a TRMNL
+        client polling ``/api/display`` gets the URL of the actual
+        frame the renderer just wrote, not a stale guess."""
+        return self._latest_renders.get(device_id)
+
+    def _load_latest_renders(self) -> dict[str, dict[str, Any]]:
+        """Read the persisted latest-render map from disk if present.
+
+        Survives Tesserae restarts so an HTTP-polled device (TRMNL
+        client) gets the actual frame it should have, not a placeholder,
+        on the first ``/api/display`` after a server reboot. Any read
+        error (missing file, bad JSON, corrupt entry) silently falls
+        back to an empty map — the worst case is one placeholder
+        render until the next push repopulates."""
+        path = self._latest_renders_path
+        if not path.exists():
+            return {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logger.warning("latest_renders: failed to read %s, starting empty", path)
+            return {}
+        if not isinstance(raw, dict):
+            return {}
+        # Drop entries whose underlying artifact has been swept by the
+        # orphan-prune. ``/api/display`` would 404 on that URL otherwise.
+        out: dict[str, dict[str, Any]] = {}
+        for device_id, entry in raw.items():
+            if not isinstance(entry, dict):
+                continue
+            filename = entry.get("filename")
+            if not isinstance(filename, str):
+                continue
+            if (self._renders_dir / filename).exists():
+                out[str(device_id)] = dict(entry)
+        return out
+
+    def _save_latest_renders(self) -> None:
+        """Atomically persist the latest-render map.
+
+        Writes to a sibling temp file and renames so a crash mid-write
+        can't corrupt the live file (one of the few times rename's
+        cross-platform atomicity actually matters here). Errors are
+        logged but not raised — the cost of an out-of-disk write is
+        less than the cost of breaking a push because the disk filled."""
+        path = self._latest_renders_path
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(self._latest_renders, indent=2), encoding="utf-8")
+            tmp.replace(path)
+        except OSError:
+            logger.exception("latest_renders: failed to persist to %s", path)
 
     # -- public API ------------------------------------------------------
 
@@ -543,6 +616,22 @@ class PushManager:
                     error=f"{type(err).__name__}: {err}",
                 )
             results.append(result)
+            # Stamp the latest-render map for the device this renderer
+            # is bound to (clones set ``renderer.device`` to the
+            # instance id). HTTP-polled transports (TRMNL) read from
+            # this map to answer "what's the latest frame for me?"
+            # without subscribing to MQTT. MQTT-only devices still
+            # populate it harmlessly — useful for future debug / REST
+            # access to a device's most recent frame.
+            if result.error is None and result.digest:
+                self._latest_renders[renderer.device] = {
+                    "digest": result.digest,
+                    "ext": renderer.extension,
+                    "filename": f"{result.digest}.{renderer.extension}",
+                    "renderer_id": renderer.id,
+                    "timestamp": time.time(),
+                }
+                self._save_latest_renders()
             # One event per renderer per push: lets /events filter for a
             # single renderer's history without scanning every push's
             # nested extras.

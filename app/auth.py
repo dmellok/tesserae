@@ -52,6 +52,14 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     # (see app.webhook_routes._presented_token); the session gate would
     # otherwise bounce every external caller to /login.
     "/api/v1/",
+    # TRMNL BYOS protocol endpoints — each request carries an
+    # ``access-token`` header that ``app.trmnl_api`` resolves to a
+    # device. Jailbroken Kindles + native TRMNL hardware don't carry
+    # sessions, so the gate has to let them through.
+    "/api/display",
+    "/api/setup",
+    "/api/log",
+    "/api/trmnl/",
 )
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/",)

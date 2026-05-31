@@ -159,7 +159,7 @@ def _subscribe_device_status(
             event_log.record(
                 type="device",
                 source=device.id,
-                target=device.status_topic,
+                target=device.status_topic or "",
                 status="error" if "error" in parsed else "ok",
                 error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
                 extra={"parsed": merged},
@@ -171,6 +171,11 @@ def _subscribe_device_status(
             except Exception:
                 logger.exception("HA discovery: heartbeat notify failed for %s", device.id)
 
+    # Devices without a status topic (e.g. HTTP-polled TRMNL clients)
+    # don't get an MQTT subscription — their status arrives via the
+    # /api/display request headers handled in ``app.trmnl_api`` instead.
+    if device.status_topic is None:
+        return
     transport.subscribe(device.status_topic, on_status, qos=1)
 
 

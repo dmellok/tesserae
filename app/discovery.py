@@ -68,6 +68,47 @@ class DiscoveredDevice:
         return str(value) if isinstance(value, str) else None
 
 
+def record_trmnl_discovery(
+    cache: DiscoveryCache,
+    *,
+    token: str,
+    headers: dict[str, Any],
+    remote_addr: str | None,
+) -> DiscoveredDevice | None:
+    """Cache an HTTP-polled TRMNL client that polled with an unknown
+    token, so the Settings → Devices → Discovered strip surfaces it
+    for one-click adoption — same UX as MQTT-side discovery.
+
+    The cache id is synthetic (``trmnl_<token>``) since TRMNL devices
+    don't have an MQTT topic. The cached payload includes the original
+    ``access_token`` so the register flow can preserve it (the user
+    already has it pasted into their Kindle config — making them
+    re-paste a freshly-generated one would defeat the point of
+    discovery)."""
+    safe = re.sub(r"[^a-z0-9_-]", "", token.lower())[:20]
+    synthetic_id = f"trmnl_{safe}" if safe else "trmnl_unknown"
+    parsed: dict[str, Any] = {
+        "kind": "trmnl_client",
+        "access_token": token,
+    }
+    # Map BYOS-style headers to the discovery schema the UI already
+    # understands (kind / panel_w / panel_h / fw_version / ip).
+    for src_keys, dest in (
+        (("png-width", "Width"), "panel_w"),
+        (("png-height", "Height"), "panel_h"),
+        (("User-Agent",), "fw_version"),
+    ):
+        for k in src_keys:
+            value = headers.get(k)
+            if value:
+                parsed[dest] = value
+                break
+    if remote_addr:
+        parsed["ip"] = remote_addr
+    payload = json.dumps(parsed).encode("utf-8")
+    return cache.record(synthetic_id, payload)
+
+
 def _maybe_int(value: Any) -> int | None:
     if isinstance(value, bool):
         return None

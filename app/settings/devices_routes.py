@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from flask import current_app, flash, redirect, request, url_for
+from flask import current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app import calibration, device_service, renderer_loader
@@ -64,6 +64,17 @@ def devices_add() -> Response:
     if not result.ok or result.device is None:
         flash(result.error or "Failed to add device.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    # TRMNL-style clients need their access token displayed once so the
+    # user can paste it into the client config. Stash in session and let
+    # the Settings GET that follows the redirect pop it into a one-shot
+    # reveal modal (same flow as the webhook-token reveal in System).
+    token = result.device.manifest.get("access_token")
+    if isinstance(token, str) and token:
+        session["_trmnl_token_reveal"] = {
+            "device_id": result.device.id,
+            "device_name": result.device.name,
+            "token": token,
+        }
     # New device's clones inherit picture-quality (dither/saturation/
     # contrast) from the user's existing base-renderer values where
     # available, so a freshly-added device matches the rest of the
@@ -74,6 +85,68 @@ def devices_add() -> Response:
     return redirect(
         url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")
     )
+
+
+def _apply_rename(device: Any, new_name: str) -> None:
+    """Rewrite the instance JSON's ``name`` field + the in-memory manifest,
+    then nudge HA discovery to re-publish so its device tile title updates
+    without a Tesserae restart. Caller is responsible for input validation
+    (non-empty, sane length) and any flash messaging."""
+    raw = json.loads(device.path.read_text(encoding="utf-8"))
+    raw["name"] = new_name
+    device.path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    device.manifest["name"] = new_name
+    ha = current_app.config.get("HA_DISCOVERY")
+    if ha is not None:
+        try:
+            ha.refresh_entity_configs()
+        except Exception:
+            current_app.logger.exception("HA discovery: refresh after rename failed")
+
+
+@bp.post("/settings/devices/<instance_id>/regenerate-token")
+def devices_regenerate_token(instance_id: str) -> Response:
+    """Mint a fresh access token for a TRMNL device.
+
+    Used when the existing token has been shoulder-surfed, written down
+    in the wrong notebook, or otherwise needs invalidating. The new
+    token replaces the stored one and gets stashed in the session so
+    the next Settings → Devices render pops the same one-shot modal as
+    the add-device flow. The old token stops working immediately —
+    the client will fail its next poll and need its config updated."""
+    anchor = f"device-{instance_id}"
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+    devs = devices()
+    device = devs.get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+    if "access_token" not in device.manifest:
+        flash(f"{device.name!r} doesn't use access tokens.", "error")
+        return redirect_to
+
+    new_token = device_service.generate_access_token(devs)
+    # Rewrite the instance JSON on disk + the in-memory manifest. The
+    # manifest dict is technically owned by the loader but it's a plain
+    # dict so direct mutation is what every other "update an instance
+    # field" path does (panel, quiet hours, etc.).
+    try:
+        raw = json.loads(device.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        flash(f"Couldn't read {device.path.name}: {err}", "error")
+        return redirect_to
+    raw["access_token"] = new_token
+    device.path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    device.manifest["access_token"] = new_token
+
+    session["_trmnl_token_reveal"] = {
+        "device_id": device.id,
+        "device_name": device.name,
+        "token": new_token,
+    }
+    flash(f"Regenerated access token for {device.name!r}. Update the client config.", "ok")
+    return redirect_to
 
 
 @bp.get("/settings/devices/discovered.json")
@@ -116,14 +189,28 @@ def devices_register_discovered(discovered_id: str) -> Response:
     if entry.panel_h is not None:
         panel_overrides["h"] = entry.panel_h
 
+    # TRMNL discoveries carry the original access_token in the cache
+    # entry's parsed payload so create_instance can preserve it — the
+    # user already has it pasted into their client config, and the
+    # whole point of one-click pairing is not making them re-paste a
+    # freshly-generated one.
+    discovered_token = entry.parsed.get("access_token") if kind_id == "trmnl_client" else None
+    # The synthetic discovery id for TRMNL entries (``trmnl_<token>``)
+    # leaks the token into the device id if used as-is; default the
+    # instance id to a friendlier one and let the user override if
+    # they want.
+    default_id = discovered_id
+    if kind_id == "trmnl_client" and default_id.startswith("trmnl_"):
+        default_id = "trmnl_" + (discovered_token[:5] if isinstance(discovered_token, str) else "")
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers(),
         data_root=device_data_root(),
-        instance_id=form.get("id") or discovered_id,
+        instance_id=form.get("id") or default_id,
         kind_id=kind_id,
         name=form.get("name") or "",
         panel_overrides=panel_overrides,
+        access_token=discovered_token if isinstance(discovered_token, str) else None,
     )
     if not result.ok or result.device is None:
         flash(result.error or "Failed to register device.", "error")
@@ -287,13 +374,40 @@ def devices_update_combined(instance_id: str) -> Response:
     ok_messages: list[str] = []
     any_change = False
 
+    # 0. Display name. Input is only present for instances; the field is
+    # bounded at 64 chars in the template, but we trim + cap here too so a
+    # crafted POST can't sneak past. A blank submission is rejected (not
+    # silently restored) because that's likely a UI error worth flagging.
+    if "device_name" in form:
+        new_name = (form.get("device_name") or "").strip()[:64]
+        if not new_name:
+            flash(f"{device.name} display name can't be empty.", "error")
+        elif new_name != device.name:
+            rename_err: str | None = None
+            try:
+                _apply_rename(device, new_name)
+            except (OSError, json.JSONDecodeError) as exc:
+                rename_err = str(exc)
+            if rename_err is not None:
+                flash(f"Couldn't rename {device.name!r}: {rename_err}", "error")
+            else:
+                ok_messages.append(f"renamed to {new_name!r}")
+                any_change = True
+
     # 1. Renderer-defined config fields. Mirror settings_update("device-<id>").
+    # Two paths: MQTT publish (when ``config_topic`` is set) and
+    # save-only (when it isn't — HTTP-polled TRMNL clients pick up
+    # config from the next /api/display response).
     schema_fields = config_fields_from_schema(device.config_schema)
-    if schema_fields and device.config_topic is not None:
+    if schema_fields:
         values = values_from_form(schema_fields)
         ok, err = device.validate_config(values)
         if not ok:
             flash(f"Invalid {device.name} config: {err}", "error")
+        elif device.config_topic is None:
+            store.update_for_namespace("devices", instance_id, values, schema_fields)
+            ok_messages.append("config saved")
+            any_change = True
         else:
             store.update_for_namespace("devices", instance_id, values, schema_fields)
             tr = transport()
