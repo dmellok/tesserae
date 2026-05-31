@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button %}
+{% from "_components.html" import card_head, button, info_pop %}
 {% block title %}Send — Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
@@ -76,7 +76,7 @@
    Shared by File / URL / Webpage / Gallery. #}
 {% macro fit_picker(field_id) %}
 <div class="field">
-  <label for="{{ field_id }}">Image fit</label>
+  <label for="{{ field_id }}">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
   <select id="{{ field_id }}" name="fit">
     <option value="fit">Fit — letterbox (keep aspect)</option>
     <option value="fill">Fill — crop to cover</option>
@@ -84,7 +84,6 @@
     <option value="center">Center — no scaling</option>
     <option value="blur">Center + blurred background</option>
   </select>
-  <p class="field-help">How the image maps onto the panel when it isn't already panel-sized.</p>
 </div>
 {% endmacro %}
 
@@ -152,10 +151,12 @@
           </button>
         </div>
       </label>
-      <p class="field-help">The renderers fit the upload to the configured {{ panel.w }} × {{ panel.h }} panel.</p>
       {{ device_picker('file-device') }}
       {{ fit_picker('file-fit') }}
-      <div class="actions">{{ button('Push file', icon='paper-plane-tilt') }}</div>
+      <div class="actions">
+        {{ button('Push file', icon='paper-plane-tilt') }}
+        {{ info_pop('The renderers fit the upload to the configured ' ~ panel.w ~ ' × ' ~ panel.h ~ ' panel.') }}
+      </div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
@@ -174,14 +175,13 @@
     {{ card_head('Saved dashboard', icon_name='squares-four') }}
     <form method="post" action="{{ url_for('send.send_page') }}" class="form">
       <div class="field">
-        <label for="saved-page">Dashboard</label>
+        <label for="saved-page">Dashboard{{ info_pop('The dashboard renders through the composer, then publishes through every loaded renderer.') }}</label>
         <select id="saved-page" name="page_id" required data-saved-preview-target>
           {% if not pages %}<option value="">(no saved dashboards yet)</option>{% endif %}
           {% for p in pages %}
           <option value="{{ p.id }}">{{ p.name }}</option>
           {% endfor %}
         </select>
-        <p class="field-help">The dashboard renders through the composer, then publishes through every loaded renderer.</p>
       </div>
       <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
     </form>
@@ -207,9 +207,8 @@
     {{ card_head('Image URL', icon_name='link') }}
     <form method="post" action="{{ url_for('send.send_url') }}" class="form">
       <div class="field">
-        <label for="url-input">URL</label>
+        <label for="url-input">URL{{ info_pop('Downloaded server-side (16 MiB max). Same fit/push path as file upload.') }}</label>
         <input type="url" id="url-input" name="url" placeholder="https://..." required data-url-preview-target>
-        <p class="field-help">Downloaded server-side (16 MiB max). Same fit/push path as file upload.</p>
       </div>
       {{ device_picker('url-device') }}
       {{ fit_picker('url-fit') }}
@@ -232,13 +231,12 @@
     {{ card_head('Webpage', icon_name='globe') }}
     <form method="post" action="{{ url_for('send.send_webpage') }}" class="form" target="webpage-preview-iframe">
       <div class="field">
-        <label for="webpage-url">URL</label>
+        <label for="webpage-url">URL{{ info_pop('Rendered headlessly with Chromium at the viewport below, then fit + pushed.') }}</label>
         <input type="url" id="webpage-url" name="url" placeholder="https://..." required data-webpage-preview-target>
-        <p class="field-help">Rendered headlessly with Chromium at the viewport below, then fit + pushed.</p>
       </div>
       <div class="field-grid">
         <div class="field">
-          <label for="webpage-w">Viewport width</label>
+          <label for="webpage-w">Viewport width{{ info_pop('Defaults match your panel (' ~ panel.w ~ ' × ' ~ panel.h ~ '). Override for higher-DPI captures.') }}</label>
           <input type="number" id="webpage-w" name="viewport_w" value="{{ panel.w }}" min="200" step="1">
         </div>
         <div class="field">
@@ -246,7 +244,6 @@
           <input type="number" id="webpage-h" name="viewport_h" value="{{ panel.h }}" min="200" step="1">
         </div>
       </div>
-      <p class="field-help">Defaults match your panel ({{ panel.w }} × {{ panel.h }}). Override for higher-DPI captures.</p>
       {{ device_picker('webpage-device') }}
       {{ fit_picker('webpage-fit') }}
       <div class="actions">{{ button('Render & push', icon='browser') }}</div>

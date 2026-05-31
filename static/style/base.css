@@ -330,3 +330,65 @@ a:hover { color: var(--t-accent-hover); }
 .icon-box.is-lg { width: 40px; height: 40px; font-size: 22px; }
 .icon-box.is-muted { background: var(--t-surface-sunk); color: var(--t-fg-soft); }
 
+/* -- info-pop: click-to-open contextual help icon --------------------
+ *
+ * Replaces what used to be paragraphs of always-visible field-help and
+ * card-blurb text. The icon sits inline next to a label or heading and
+ * pops a small panel below the icon when clicked. Click-away or Escape
+ * closes; only one popover open at a time. JS in static/info-pop.js. */
+.info-pop-wrap {
+  display: inline-block;
+  position: relative;
+  vertical-align: baseline;
+  line-height: 0;
+  margin-left: 4px;
+}
+.info-pop {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 1px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: color 80ms ease, background 80ms ease;
+}
+.info-pop:hover { color: var(--t-accent); }
+.info-pop:focus-visible {
+  outline: 2px solid var(--t-accent);
+  outline-offset: 2px;
+}
+.info-pop[aria-expanded="true"] {
+  color: var(--t-accent);
+  background: var(--t-accent-soft);
+}
+.info-pop .ph { font-size: inherit; }
+.info-pop-content {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 220px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 10px 12px;
+  background: var(--t-surface);
+  color: var(--t-fg);
+  border: 1px solid var(--t-line);
+  border-radius: var(--t-radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  font-size: var(--t-size-sm);
+  line-height: 1.45;
+  white-space: normal;
+  display: block;
+}
+.info-pop-content[hidden] { display: none; }
+/* JS adds .is-flipped when the popover would overflow the right edge so
+ * it anchors to the right of the icon instead of the left. */
+.info-pop-content.is-flipped {
+  left: auto;
+  right: 0;
+}
+

@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, number_input, select_field, settings_tabs, slider, switch, text_input %}
+{% from "_components.html" import auto_field, button, card_head, info_pop, number_input, select_field, settings_tabs, slider, switch, text_input %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Plugins'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
 {% set AREA_BLURBS = {
@@ -127,9 +127,8 @@
         <header class="card-head">
           <h2>
             <span class="icon-box"><i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
-            <span>{{ section.title }}</span>
+            <span>{{ section.title }}</span>{{ info_pop(section.blurb) }}
           </h2>
-          {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
           {% if section.meta %}
           <dl class="meta">
             {% for key, value in section.meta.items() %}
@@ -165,9 +164,8 @@
   <header class="card-head">
     <h2>
       <span class="icon-box"><i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'gear-six') }}" aria-hidden="true"></i></span>
-      <span>{{ section.title }}</span>
+      <span>{{ section.title }}</span>{{ info_pop(section.blurb) }}
     </h2>
-    {% if section.blurb %}<p class="lede">{{ section.blurb }}</p>{% endif %}
     {% if section.meta %}
     <dl class="meta">
       {% for key, value in section.meta.items() %}
@@ -244,7 +242,7 @@
       {% set current_icon = section.icon or 'monitor' %}
       {% set device_icons = base_device_icons if current_icon in base_device_icons else base_device_icons + [current_icon] %}
       <div class="field">
-        <label>Icon</label>
+        <label>Icon{{ info_pop('Shown in device pickers, the dashboard editor, and the send page.') }}</label>
         <div class="device-icon-grid" role="radiogroup" aria-label="Device icon">
           {% for ic in device_icons %}
           <label class="device-icon-pick" title="{{ ic }}">
@@ -253,7 +251,6 @@
           </label>
           {% endfor %}
         </div>
-        <p class="field-help">Shown in device pickers, the dashboard editor, and the send page.</p>
       </div>
       {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
           value=section.panel.get('orientation', 'landscape'),
@@ -530,9 +527,8 @@ docker compose up -d</code></pre>
           <option value="stable"{% if system_last_check and system_last_check.channel == 'stable' %} selected{% endif %}>Stable (latest release tag)</option>
         </select>
       </div>
-      <div class="actions actions--bottom">{{ button('Check for updates', icon='arrows-counter-clockwise') }}</div>
+      <div class="actions actions--bottom">{{ button('Check for updates', icon='arrows-counter-clockwise') }}{{ info_pop('Stable pins to the most recent release tag once you start publishing them; edge tracks the default branch.') }}</div>
     </form>
-    <p class="field-help">Stable pins to the most recent release tag once you start publishing them; edge tracks the default branch.</p>
 
     {% if system_last_check %}
     <section class="card card--compact">

@@ -15,32 +15,50 @@ Conventions:
   * Switches render a real <input type="checkbox"> hidden behind a
     track/thumb so form submission semantics are unchanged.
   * Buttons take ``variant`` (``primary`` | ``ghost`` | ``ghost danger``).
+  * ``help=…`` arguments render as a click-to-pop ``?`` icon next to the
+    label instead of always-visible help text. See the ``info_pop`` macro
+    + ``static/info-pop.js`` for the open/close behaviour. Hover is NOT
+    supported (touchscreens, accidental brush-by); click + Escape only.
 
 If you find yourself reaching for the raw HTML for a form field, add a
 macro here instead.
 -#}
 
+{%- macro info_pop(content) -%}
+{#- Small click-to-open info popover. Pops a panel with the help text
+    below the icon; click-away or Escape closes. Use for field-level
+    explanation, card subhead blurbs, anywhere a paragraph of context
+    used to live inline. The content arg is escaped — pass HTML via
+    ``content|safe`` if you need it. -#}
+{%- if content -%}
+<span class="info-pop-wrap">
+  <button type="button" class="info-pop" aria-label="More information" aria-expanded="false">
+    <i class="ph ph-info" aria-hidden="true"></i>
+  </button>
+  <span class="info-pop-content" role="tooltip" hidden>{{ content }}</span>
+</span>
+{%- endif -%}
+{%- endmacro -%}
+
 {%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text') -%}
 <div class="field">
-  <label for="{{ field_id }}">{{ label }}</label>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="{{ type }}" id="{{ field_id }}" name="{{ name }}"
          value="{{ value|default('', true) }}"
          {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
          {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
          {% if required %}required{% endif %}
          {% if autofocus %}autofocus{% endif %}>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
 {%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None) -%}
 <div class="field">
-  <label for="{{ field_id }}">{{ label }}</label>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="number" id="{{ field_id }}" name="{{ name }}" value="{{ value }}"
          {% if min is not none %}min="{{ min }}"{% endif %}
          {% if max is not none %}max="{{ max }}"{% endif %}
          step="{{ step }}">
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
@@ -52,7 +70,7 @@ macro here instead.
 {%- set preset_values = presets | map(attribute='value') | list -%}
 {%- set is_custom = value is not none and value not in preset_values -%}
 <div class="field field--preset" data-preset-field>
-  <label for="{{ field_id }}-preset">{{ label }}</label>
+  <label for="{{ field_id }}-preset">{{ label }}{{ info_pop(help) }}</label>
   <select id="{{ field_id }}-preset" class="preset-select" data-preset-select>
     {% for preset in presets %}
     <option value="{{ preset.value }}" {% if not is_custom and preset.value == value %}selected{% endif %}>{{ preset.label }}</option>
@@ -66,20 +84,18 @@ macro here instead.
          {% if max is not none %}max="{{ max }}"{% endif %}
          step="{{ step }}"
          {% if not is_custom %}hidden{% endif %}>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
 {%- macro slider(field_id, name, label, value=0, min=0, max=100, step=1, unit='', help=None) -%}
 <div class="field field--slider">
   <div class="slider-header">
-    <label for="{{ field_id }}">{{ label }}</label>
+    <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
     <output for="{{ field_id }}" class="slider-value">{{ value }}{{ unit }}</output>
   </div>
   <input type="range" class="slider" id="{{ field_id }}" name="{{ name }}"
          value="{{ value }}" min="{{ min }}" max="{{ max }}" step="{{ step }}"
          data-output-suffix="{{ unit }}">
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
@@ -89,8 +105,7 @@ macro here instead.
     <input type="checkbox" id="{{ field_id }}" name="{{ name }}" {% if checked %}checked{% endif %}>
     <span class="switch-track"><span class="switch-thumb"></span></span>
     <span class="switch-label">{{ label }}</span>
-  </label>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
+  </label>{{ info_pop(help) }}
 </div>
 {%- endmacro -%}
 
@@ -101,7 +116,7 @@ macro here instead.
     name — so callers can keep the picker single-element while users see
     related themes / fonts / etc. clustered. -#}
 <div class="field">
-  <label for="{{ field_id }}">{{ label }}</label>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <select id="{{ field_id }}" name="{{ name }}">
     {% if blank_label is not none %}
     <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
@@ -119,24 +134,21 @@ macro here instead.
     {% endfor %}
     {% if ns.group %}</optgroup>{% endif %}
   </select>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
 {%- macro color_input(field_id, name, label, value='#000000', help=None) -%}
 <div class="field">
-  <label for="{{ field_id }}">{{ label }}</label>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="color" id="{{ field_id }}" name="{{ name }}" value="{{ value or '#000000' }}">
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
 {%- macro textarea_field(field_id, name, label, value='', rows=3, placeholder='', help=None) -%}
 <div class="field">
-  <label for="{{ field_id }}">{{ label }}</label>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <textarea id="{{ field_id }}" name="{{ name }}" rows="{{ rows }}"
             {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}>{{ value|default('', true) }}</textarea>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
@@ -151,7 +163,7 @@ macro here instead.
   {%- set sel_str = sel | map('string') | list -%}
   {%- set real = options | selectattr('value') | list -%}
 <div class="field">
-  <label>{{ label }}</label>
+  <label>{{ label }}{{ info_pop(help) }}</label>
   <div class="multiselect" data-multiselect>
     {% if real %}
     <div class="multiselect-search">
@@ -174,7 +186,6 @@ macro here instead.
     <p class="multiselect-hint">{{ (options[0].label if options else None) or 'No options available.' }}</p>
     {% endif %}
   </div>
-  {% if help %}<p class="field-help">{{ help }}</p>{% endif %}
 </div>
 {%- endmacro -%}
 
@@ -215,17 +226,20 @@ macro here instead.
 {%- endmacro -%}
 
 {%- macro card_head(title, icon_name=None, level=2, blurb=None, action=None) -%}
-{#- Card header with an optional icon-box on the left, blurb below, and
-   a right-aligned action slot (typically a small button or link). -#}
+{#- Card header with an optional icon-box on the left, blurb popover
+   next to the title, and a right-aligned action slot (typically a
+   small button or link). The blurb used to render as a visible lede
+   paragraph — now it's a click-to-pop ``?`` icon next to the title,
+   per the UI-cleanup pass. Pages that want the descriptive paragraph
+   inline can still render a ``<p class="lede">…</p>`` themselves. -#}
 <header class="card-head">
   <div class="card-head-row">
     <h{{ level }}>
       {% if icon_name %}<span class="icon-box"><i class="ph ph-{{ icon_name }}" aria-hidden="true"></i></span>{% endif %}
-      <span>{{ title }}</span>
+      <span>{{ title }}</span>{{ info_pop(blurb) }}
     </h{{ level }}>
     {% if action %}<div class="card-head-action">{{ action }}</div>{% endif %}
   </div>
-  {% if blurb %}<p class="lede">{{ blurb }}</p>{% endif %}
 </header>
 {%- endmacro -%}
 

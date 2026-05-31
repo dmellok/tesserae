@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button, empty_state, switch %}
+{% from "_components.html" import card_head, button, empty_state, info_pop, switch %}
 {% block title %}Schedules — Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
@@ -51,7 +51,7 @@
              value="{{ s.interval_minutes or 30 }}" min="1" max="10080">
     </div>
     <div class="field type-interval sf-window">
-      <label>Active window <span class="field-opt">optional</span></label>
+      <label>Active window <span class="field-opt">optional</span>{{ info_pop('Leave blank to fire around the clock.') }}</label>
       <div class="sf-window-pair">
         <input type="time" aria-label="Window start" name="time_of_day_start"
                value="{{ s.time_of_day_start or '' }}">
@@ -59,7 +59,6 @@
         <input type="time" aria-label="Window end" name="time_of_day_end"
                value="{{ s.time_of_day_end or '' }}">
       </div>
-      <p class="field-help">Leave blank to fire around the clock.</p>
     </div>
     <div class="field type-daily">
       <label for="sf-{{ s.id or 'new' }}-fires-at">Fire at</label>
