@@ -176,12 +176,16 @@ def build_select_config(page_names: list[str], *, base_url: str) -> tuple[str, d
 
 def build_image_config(*, base_url: str) -> tuple[str, dict[str, Any]]:
     topic = _discovery_topic("image", "last_render")
+    # HA's MQTT image schema treats ``content_type`` and ``url_topic`` as
+    # mutually exclusive (``content_type`` is only valid with the bytes-
+    # over-topic form, ``image_topic``). Setting both makes HA reject the
+    # discovery config entirely, so the entity never appears. We're URL-
+    # based — the content type is inferred from the HTTP response.
     payload = {
         "name": "Last render",
         "unique_id": "tesserae_last_render",
         "object_id": "tesserae_last_render",
         "url_topic": STATE_TOPIC_IMAGE_URL,
-        "content_type": "image/png",
         "availability": _availability_block(),
         "device": _hub_device(base_url),
     }
@@ -258,12 +262,13 @@ def build_device_configs(
     return [
         (
             _discovery_topic("image", f"dev_{device_id}_frame"),
+            # See note in build_image_config — ``content_type`` is invalid
+            # alongside ``url_topic`` (HA infers it from the HTTP response).
             {
                 "name": "Frame",
                 "unique_id": f"tesserae_dev_{device_id}_frame",
                 "object_id": f"tesserae_dev_{device_id}_frame",
                 "url_topic": _dev_state(device_id, "image_url"),
-                "content_type": "image/png",
                 "availability": avail,
                 "device": dev,
             },
@@ -435,6 +440,17 @@ class HomeAssistantDiscovery:
         self._publish_str(STATE_TOPIC_PUSH_COUNT, str(self._push_count), retain=True)
         self._publish_str(STATE_TOPIC_LAST_ERROR, "", retain=True)
         self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
+        # Drop any stale current_page / active_page retained values left
+        # over from older Tesserae versions that published the raw
+        # page_id (a digest or source label) instead of the resolved
+        # name — those weren't in the select's options list, so HA
+        # logged an "Invalid option" warning on every restart until the
+        # next valid page push overwrote them. Empty retained payload
+        # clears the retained message per MQTT spec; next valid push
+        # repopulates with a real name (see _publish_device_push_state).
+        self._publish_str(STATE_TOPIC_ACTIVE_PAGE, "", retain=True)
+        for device in self._bindable_devices():
+            self._publish_str(_dev_state(device.id, "current_page"), "", retain=True)
         self._seed_device_state()
 
     def stop(self) -> None:
@@ -491,13 +507,28 @@ class HomeAssistantDiscovery:
 
     def _publish_device_push_state(self, result: PushResult, iso: str) -> None:
         """Update each display the push actually reached: current dashboard,
-        frame image, and last-updated timestamp."""
-        page_name = self._page_name(result.page_id)
+        frame image, and last-updated timestamp.
+
+        ``current_page`` and the hub-level ``active_page`` only get
+        written when the push corresponds to a saved Page — non-page
+        pushes (file uploads, ``push_image``, ``push_webpage``) carry a
+        ``page_id`` that's actually a source label or URL, which would
+        otherwise land on the select's state topic as an invalid option
+        (HA logs a warning per push). Frame image + last-update still
+        fire for every push, since those are informational, not
+        constrained to a fixed options list."""
+        saved_page = self._page_store.get(result.page_id)
+        page_name = saved_page.name if saved_page is not None else None
         image_url = (
             f"{self._base_url()}/renders/{result.composition_digest}.png"
             if result.composition_digest
             else ""
         )
+        if page_name is not None:
+            # Keep the hub-level active-dashboard select in sync. Without
+            # this, a push fired from Tesserae's own UI leaves HA's
+            # select showing whatever the user last picked there.
+            self._publish_str(STATE_TOPIC_ACTIVE_PAGE, page_name, retain=True)
         seen: set[str] = set()
         for renderer in result.renderers:
             if renderer.error:
@@ -506,7 +537,8 @@ class HomeAssistantDiscovery:
             if device_id is None or device_id in seen:
                 continue
             seen.add(device_id)
-            self._publish_str(_dev_state(device_id, "current_page"), page_name, retain=True)
+            if page_name is not None:
+                self._publish_str(_dev_state(device_id, "current_page"), page_name, retain=True)
             self._publish_str(_dev_state(device_id, "last_update"), iso, retain=True)
             if image_url:
                 self._publish_str(_dev_state(device_id, "image_url"), image_url, retain=True)

@@ -334,6 +334,83 @@ def test_push_result_updates_per_device_state(tmp_path: Path) -> None:
     assert _payload_for(client, "tesserae/ha/dev/lounge/state/last_update") is not None
 
 
+def test_image_configs_omit_content_type(tmp_path: Path) -> None:
+    """HA's MQTT image schema treats ``content_type`` and ``url_topic`` as
+    mutually exclusive — a discovery payload carrying both gets rejected
+    with no entity created. The user observed thousands of these errors
+    in HA's log; verify both hub-level + per-device image configs are
+    free of the offending key."""
+    import json as _json
+
+    ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
+    ha.start()
+    hub = _payload_for(client, "homeassistant/image/tesserae/last_render/config")
+    dev = _payload_for(client, "homeassistant/image/tesserae/dev_lounge_frame/config")
+    assert hub is not None and dev is not None
+    assert "content_type" not in _json.loads(hub.decode())
+    assert "content_type" not in _json.loads(dev.decode())
+    # The URL-side wiring is still in place so HA knows where to fetch.
+    assert "url_topic" in _json.loads(hub.decode())
+    assert "url_topic" in _json.loads(dev.decode())
+
+
+def test_non_page_push_does_not_publish_invalid_select_state(tmp_path: Path) -> None:
+    """File / URL / gallery pushes carry a page_id that's actually a
+    source label (e.g. ``gallery:japanese_posters/72.jpg``). The HA
+    select for current/active dashboard only accepts options that match
+    saved page names — publishing the source label drives HA's
+    "Invalid option" log warning. We now skip those writes; frame URL
+    + last-updated still fire so the dashboard's image entity keeps
+    refreshing."""
+    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    # No matching Page saved — simulating a non-page push.
+    ha.start()
+    client.published.clear()
+    ha._on_push_result(
+        PushResult(
+            status="sent",
+            page_id="gallery:japanese_posters/72.jpg",
+            composition_digest="deadbeef0011",
+            renderers=[
+                RendererResult(
+                    renderer_id="pi_bin__lounge",
+                    topic="t",
+                    digest="d",
+                    url="u",
+                    bytes_written=1,
+                )
+            ],
+        )
+    )
+    # No state writes for the constrained selects (would log "Invalid option").
+    fresh = [
+        item
+        for item in client.published
+        if item[0] == "tesserae/ha/dev/lounge/state/current_page"
+        or item[0] == "tesserae/ha/state/active_page"
+    ]
+    assert fresh == []
+    # But the frame image URL + last-update timestamp still fire — they're
+    # informational and not constrained to an options list.
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/image_url") is not None
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/last_update") is not None
+
+
+def test_start_clears_stale_select_state(tmp_path: Path) -> None:
+    """Older Tesserae versions published the raw page_id (digest or
+    source label) to the active_page topic — which then lived as a
+    retained message HA replayed on every restart. ``start()`` clears
+    those topics with an empty retained payload so the next valid push
+    can repopulate them with a real name."""
+    ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
+    ha.start()
+    # Empty retained payload IS the MQTT-spec way to delete a retained
+    # message; assert both the hub-level select state and the per-device
+    # current_page topics get that treatment on start.
+    assert _payload_for(client, "tesserae/ha/state/active_page") == b""
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/current_page") == b""
+
+
 def test_heartbeat_publishes_last_seen_and_dynamic_sensors(tmp_path: Path) -> None:
     ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
     ha.start()
