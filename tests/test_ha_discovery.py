@@ -362,7 +362,7 @@ def test_non_page_push_does_not_publish_invalid_select_state(tmp_path: Path) -> 
     "Invalid option" log warning. We now skip those writes; frame URL
     + last-updated still fire so the dashboard's image entity keeps
     refreshing."""
-    ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
+    ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
     # No matching Page saved — simulating a non-page push.
     ha.start()
     client.published.clear()
