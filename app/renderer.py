@@ -97,6 +97,21 @@ class RenderRequest:
     wait_until: WaitUntil = "networkidle"
 
 
+@dataclass(frozen=True)
+class FetchRequest:
+    """An out-of-band fetch through Chromium's network stack — used by
+    widgets whose upstream blocks vanilla ``urllib`` (Reddit, CDNs
+    behind JA3 / TLS-fingerprint gates). A fresh context per fetch keeps
+    cookies from leaking between widgets / sites; the browser is the
+    pool's warm Chromium so cost is one ``new_context`` per call, not
+    a full launch."""
+
+    url: str
+    timeout_ms: int = 15_000
+    user_agent: str | None = None
+    accept: str | None = None
+
+
 _FONT_WAIT_JS: Final[str] = """async () => {
     if (!document.fonts || !document.fonts.load) return;
     const families = new Set();
@@ -167,6 +182,39 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
             logger.debug("context close failed (continuing)", exc_info=True)
 
 
+def _fetch_one(browser: Browser, request: FetchRequest) -> str:
+    """One-shot fetch through a fresh incognito context's APIRequest
+    pipeline. We don't navigate a page (Reddit serves RSS as XML — the
+    browser would render a tree but the response body is the only thing
+    we want), we just use the context's network stack to GET the URL.
+
+    Going via Chromium gets us the browser's TLS/JA3 fingerprint and
+    realistic HTTP/2 frame ordering, which is what upstreams like Reddit
+    actually fingerprint on. ``urllib`` looks bot-shaped at that layer
+    even with a Safari User-Agent.
+
+    Raises on non-2xx so the caller can decide whether to fall back."""
+    extra_headers: dict[str, str] = {}
+    if request.accept:
+        extra_headers["Accept"] = request.accept
+    context_kwargs: dict[str, Any] = {}
+    if request.user_agent:
+        context_kwargs["user_agent"] = request.user_agent
+    if extra_headers:
+        context_kwargs["extra_http_headers"] = extra_headers
+    context = browser.new_context(**context_kwargs)
+    try:
+        response = context.request.get(request.url, timeout=request.timeout_ms)
+        if not response.ok:
+            raise RuntimeError(f"HTTP {response.status} {response.status_text}")
+        return response.text()
+    finally:
+        try:
+            context.close()
+        except Exception:
+            logger.debug("fetch context close failed (continuing)", exc_info=True)
+
+
 def render_to_png(request: RenderRequest, *, pool: BrowserPool | None = None) -> bytes:
     """Open the URL in headless Chromium and return a PNG screenshot.
 
@@ -209,9 +257,15 @@ class BrowserPool:
     _SENTINEL: Final = ()  # signal the worker to drain + exit
 
     def __init__(self) -> None:
-        self._q: queue.Queue[tuple[RenderRequest, concurrent.futures.Future[bytes]] | tuple[()]] = (
-            queue.Queue()
-        )
+        # Queue carries either a render task (RenderRequest, Future[bytes]),
+        # a fetch task (FetchRequest, Future[str]), or the empty-tuple
+        # sentinel that signals "drain + exit". The worker discriminates
+        # by ``isinstance(request, FetchRequest)``.
+        self._q: queue.Queue[
+            tuple[RenderRequest, concurrent.futures.Future[bytes]]
+            | tuple[FetchRequest, concurrent.futures.Future[str]]
+            | tuple[()]
+        ] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._stopped = False
@@ -251,6 +305,20 @@ class BrowserPool:
         # context setup; the pool isn't meant to be a hard timeout layer.
         return fut.result(timeout=request.timeout_ms / 1000 + 60)
 
+    def fetch_text(self, request: FetchRequest) -> str:
+        """Fetch a URL through the pooled Chromium's network stack.
+        Returns the response body as text. Each call spawns a fresh
+        incognito context so cookies don't carry between widgets / sites
+        — important for Reddit, which keys its rate-limit / challenge on
+        the cookie jar."""
+        if self._thread is None:
+            self.start()
+        if self._stopped:
+            raise RuntimeError("browser pool has been stopped")
+        fut: concurrent.futures.Future[str] = concurrent.futures.Future()
+        self._q.put((request, fut))
+        return fut.result(timeout=request.timeout_ms / 1000 + 60)
+
     def _run(self) -> None:
         pw: Playwright | None = None
         browser: Browser | None = None
@@ -269,7 +337,10 @@ class BrowserPool:
                             with contextlib.suppress(Exception):
                                 browser.close()
                         browser = pw.chromium.launch(**_chromium_launch_kwargs())
-                    fut.set_result(_screenshot_one(browser, request))
+                    if isinstance(request, FetchRequest):
+                        fut.set_result(_fetch_one(browser, request))
+                    else:
+                        fut.set_result(_screenshot_one(browser, request))
                 except Exception as exc:
                     fut.set_exception(exc)
                     # If the failure was a browser-level crash, drop the

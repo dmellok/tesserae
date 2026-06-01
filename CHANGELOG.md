@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.5] — 2026-06-01
+
+### Changed
+
+- **`news_reddit` widget gets a Chromium-fingerprinted fetch path.**
+  Reddit's public RSS feed intermittently blocks plain `urllib`
+  requests regardless of User-Agent — the bot-shape filter
+  fingerprints on TLS / JA3 / HTTP/2 framing, not just the UA. The
+  widget now prefers the warm `BrowserPool`'s `fetch_text` (Chromium's
+  real fingerprint) and falls back to `urllib` only when the pool is
+  off or the Playwright fetch fails. Each pool fetch uses a fresh
+  incognito context so cookies don't accumulate.
+- `BrowserPool` gains a generic `fetch_text(FetchRequest)` method
+  alongside `render(RenderRequest)` so other widgets hitting flaky
+  upstreams can opt in without touching the renderer code.
+
 ## [0.11.4] — 2026-06-01
 
 ### Added

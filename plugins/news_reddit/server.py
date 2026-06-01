@@ -5,12 +5,21 @@ challenge page) for server-side reads regardless of User-Agent. The per-
 subreddit RSS feed (``/r/<sub>/<sort>.rss``) is still served, so we parse
 that instead. The trade-off: RSS carries title / author / permalink / time
 but **not** score or comment counts — the client hides those when absent.
+
+Fetch strategy: prefer the warm BrowserPool's ``fetch_text`` (Chromium's
+TLS/JA3 fingerprint slips past the bot-shape filter that catches plain
+``urllib`` requests), falling back to ``urllib`` when the pool isn't
+running or the Playwright fetch raises. Each pool fetch uses a fresh
+incognito context — no cookies carry between widgets, so Reddit can't
+correlate this widget's fetches with anyone else's traffic going through
+the same Chromium.
 """
 
 from __future__ import annotations
 
 import contextlib
 import json
+import logging
 import re
 import time
 import urllib.request
@@ -19,6 +28,10 @@ from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
+
+from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 CACHE_TTL_S = 600
 HTTP_TIMEOUT_S = 12
@@ -57,6 +70,58 @@ def _author(entry: ET.Element) -> str:
     return name.removeprefix("/u/").removeprefix("u/")
 
 
+def _fetch_via_pool(url: str) -> ET.Element | None:
+    """Try the warm BrowserPool's ``fetch_text``. Returns the parsed feed
+    on success, ``None`` when the pool isn't available (toggle off, tests,
+    pool not yet wired). Raises if the pool exists but the fetch failed —
+    the caller catches and falls back to urllib."""
+    try:
+        pool = current_app.config.get("BROWSER_POOL")
+    except RuntimeError:
+        # No app context (some test code paths). The widget always runs
+        # under a request, so this only fires in unusual setups.
+        return None
+    if pool is None:
+        return None
+    from app.renderer import FetchRequest as _FetchRequest
+
+    body = pool.fetch_text(
+        _FetchRequest(
+            url=url,
+            timeout_ms=HTTP_TIMEOUT_S * 1000,
+            user_agent=USER_AGENT,
+            accept="application/atom+xml, application/xml",
+        )
+    )
+    return ET.fromstring(body)
+
+
+def _fetch_via_urllib(url: str) -> ET.Element:
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/atom+xml, application/xml"},
+    )
+    with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
+        return ET.fromstring(resp.read())
+
+
+def _fetch_feed(url: str) -> ET.Element | str:
+    """Try pool → urllib. Returns the parsed feed on success, or an error
+    string with both attempts' details when both fail. We always log
+    the pool failure (DEBUG) so a flaky upstream is visible in the logs
+    without surfacing two errors to the user."""
+    try:
+        pooled = _fetch_via_pool(url)
+        if pooled is not None:
+            return pooled
+    except Exception as err:
+        logger.debug("news_reddit: pool fetch failed (%s), falling back to urllib", err)
+    try:
+        return _fetch_via_urllib(url)
+    except Exception as err:
+        return f"{type(err).__name__}: {err}"
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -87,15 +152,11 @@ def fetch(
     url = f"https://www.reddit.com/r/{sub}/{sort}.rss?limit={max_items}"
     if sort == "top":
         url += f"&t={window}"
-    try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": USER_AGENT, "Accept": "application/atom+xml, application/xml"},
-        )
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            feed = ET.fromstring(resp.read())
-    except Exception as err:
-        return {"error": f"{type(err).__name__}: {err}", "posts": []}
+
+    feed = _fetch_feed(url)
+    if isinstance(feed, str):
+        # _fetch_feed returns the error string when both paths failed.
+        return {"error": feed, "posts": []}
 
     posts = []
     for entry in feed.findall(f"{ATOM_NS}entry")[:max_items]:
