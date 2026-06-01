@@ -14,6 +14,8 @@ Tabs:
 
 from __future__ import annotations
 
+import logging
+import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -38,6 +40,8 @@ from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog, EventRow
 from app.state.page_store import PageStore
 from app.state.settings_store import SettingsStore
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("send", __name__, url_prefix="/send")
 
@@ -125,13 +129,37 @@ def _require_target_devices(tab: str) -> list[str] | Response:
     return redirect(url_for("send.index", tab=tab))
 
 
-def _flash_result(label: str, status: str, error: str | None) -> None:
-    if status == "sent":
-        flash(f"{label}: sent.", "ok")
-    elif status == "busy":
-        flash(f"{label}: another push in flight — try again.", "error")
-    else:
-        flash(f"{label}: {status}{(' — ' + error) if error else ''}", "error")
+def _run_in_background(work: Callable[[], object], *, label: str) -> None:
+    """Run a push off the request thread so the browser isn't blocked on
+    the render + transport round-trip (5–15 s for a 1600×1200 panel).
+
+    The push manager already writes a ``type='push'`` event on success
+    or failure, and the History tab updates live via SSE — so the user
+    sees the result there instead of waiting for the form-POST to
+    return. Failures inside ``work()`` get logged but never propagate
+    (the request thread is already gone).
+
+    Under ``app.testing`` we run synchronously: a daemon thread is
+    fundamentally racy against the test client's ``assert_called_with``
+    pattern (the thread may not have run before the assert fires), and
+    the latency the bg path exists to hide doesn't matter in tests."""
+    app: Flask = current_app._get_current_object()  # type: ignore[attr-defined]
+
+    if app.testing:
+        try:
+            work()
+        except Exception:
+            logger.exception("send (%s) failed", label)
+        return
+
+    def _runner() -> None:
+        with app.app_context():
+            try:
+                work()
+            except Exception:
+                logger.exception("background send (%s) failed", label)
+
+    threading.Thread(target=_runner, daemon=True, name=f"send-bg:{label}").start()
 
 
 def _device_label(device_id: str | None) -> str:
@@ -146,27 +174,25 @@ def _device_label(device_id: str | None) -> str:
 def _push_to_targets(
     label: str, targets: list[str], push: Callable[[str | None], PushResult]
 ) -> None:
-    """Run a one-off push once per selected device (or once with ``None`` —
-    the virtual-panel fan-out — when none are selected), then flash one
-    combined summary. Each call logs its own History row."""
+    """Queue a push once per selected device (or once with ``None`` — the
+    virtual-panel fan-out — when none are selected). Each call logs its
+    own History row via the push manager, so the user sees per-target
+    results stream into the History tab without the request thread
+    waiting for the render + transport round-trip."""
     ids: list[str | None] = list(targets) if targets else [None]
-    results = [(tid, push(tid)) for tid in ids]
-    sent = [tid for tid, r in results if r.status == "sent"]
-    failed = [(tid, r) for tid, r in results if r.status != "sent"]
-    if sent and not failed:
-        flash(f"{label}: sent to {', '.join(_device_label(t) for t in sent)}.", "ok")
-    elif sent and failed:
-        names = ", ".join(_device_label(t) for t, _ in failed)
-        flash(
-            f"{label}: sent to {', '.join(_device_label(t) for t in sent)}; failed for {names}.",
-            "warn",
-        )
-    else:
-        _, first = failed[0]
-        if first.status == "busy":
-            flash(f"{label}: another push in flight — try again.", "error")
-        else:
-            flash(f"{label}: {first.status}{(' — ' + first.error) if first.error else ''}", "error")
+    target_count = len(ids)
+    target_summary = ", ".join(_device_label(t) for t in ids) if targets else "all renderers"
+
+    def _work() -> None:
+        for tid in ids:
+            push(tid)
+
+    _run_in_background(_work, label=label)
+    flash(
+        f"{label}: queued for {target_summary}. "
+        f"Watch the History tab for {target_count} render{'s' if target_count != 1 else ''}.",
+        "ok",
+    )
 
 
 def _relative(epoch: float) -> str:
@@ -306,8 +332,12 @@ def send_page() -> Response:
     if not page_id:
         flash("Pick a saved dashboard first.", "error")
         return redirect(url_for("send.index", tab="saved"))
-    result = _push().push(page_id)
-    _flash_result(f"Page {page_id!r}", result.status, result.error)
+    page_name = next((p.name for p in _pages().list() if p.id == page_id), page_id)
+    _run_in_background(lambda: _push().push(page_id), label=f"page:{page_id}")
+    flash(
+        f"Sending {page_name!r}. The History tab will update when the render lands.",
+        "ok",
+    )
     return redirect(url_for("send.index", tab="history"))
 
 
@@ -386,8 +416,11 @@ def send_gallery() -> Response:
 
 @bp.post("/history/<int:event_id>/resend")
 def resend(event_id: int) -> Response:
-    result = _push().republish(event_id)
-    _flash_result(f"Resend #{event_id}", result.status, result.error)
+    _run_in_background(lambda: _push().republish(event_id), label=f"resend:{event_id}")
+    flash(
+        f"Resending #{event_id}. The History tab will update when the render lands.",
+        "ok",
+    )
     return redirect(url_for("send.index", tab="history"))
 
 

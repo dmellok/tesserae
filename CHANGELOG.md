@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.7] — 2026-06-02
+
+### Changed
+
+- **Send page no longer blocks the browser on long renders.** All
+  five Send-tab POSTs (File, Saved page, URL, Webpage, Gallery) and
+  the History "Resend" button now hand the push off to a daemon
+  thread and redirect immediately with a "queued" flash. The actual
+  render + transport (5–15 s for a 1600×1200 panel) happens off the
+  request thread; results stream into the History tab live via the
+  existing SSE event log. No more frozen tab.
+- Tests run the bg path synchronously (under `app.testing`) so
+  ``assert_called_with`` patterns stay deterministic.
+
 ## [0.11.6] — 2026-06-01
 
 ### Fixed
