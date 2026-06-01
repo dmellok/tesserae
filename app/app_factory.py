@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import tzinfo
 from pathlib import Path
 from typing import Any
@@ -76,6 +77,43 @@ def create_app(
         static_url_path="/static",
     )
     app.testing = testing
+
+    # Resolve the running package version. Prefer pyproject.toml on disk
+    # (so a source checkout reflects post-pip-install bumps) and fall
+    # back to importlib.metadata for installed wheels. Used by both
+    # telemetry and the static asset cache-buster below.
+    def _resolve_pkg_version() -> str:
+        pyproject = REPO_ROOT / "pyproject.toml"
+        if pyproject.exists():
+            try:
+                import tomllib
+
+                return str(
+                    tomllib.loads(pyproject.read_text(encoding="utf-8"))["project"]["version"]
+                )
+            except (OSError, KeyError, ValueError):
+                pass
+        try:
+            from importlib import metadata as _metadata
+
+            return _metadata.version("tesserae")
+        except Exception:
+            return "0.0.0"
+
+    pkg_version = _resolve_pkg_version()
+    app.config["APP_VERSION"] = pkg_version
+
+    # Bust browser caches on every ship. In prod the version alone is
+    # enough (every release bumps it). In dev we suffix the startup time
+    # so each `--dev` restart also breaks the cache without the user
+    # having to hard-reload after editing client.js / .css.
+    static_version = pkg_version if not dev else f"{pkg_version}-{int(time.time())}"
+    app.config["STATIC_VERSION"] = static_version
+
+    @app.url_defaults
+    def _add_static_version(endpoint: str, values: dict[str, Any]) -> None:
+        if endpoint == "static" and "v" not in values:
+            values["v"] = static_version
 
     # Human-readable timestamp filter for templates. Used by the events
     # page so each row reads as "Jun  1 14:23:45" (local time) instead
@@ -190,8 +228,6 @@ def create_app(
     # Anonymous, opt-in telemetry — disabled by default; configure in
     # Settings → Server → App. Tests skip it entirely so no test run can
     # accidentally hit a real endpoint.
-    from importlib import metadata as _metadata
-
     from app.telemetry import Telemetry as _Telemetry
 
     is_watcher = _is_reloader_watcher(dev) and not testing
@@ -202,31 +238,9 @@ def create_app(
     if testing or is_watcher:
         telemetry = _Telemetry.disabled()
     else:
-        # importlib.metadata reads frozen wheel metadata, so an
-        # ``-e .``-installed source checkout keeps reporting whatever
-        # pyproject.toml said at the last ``pip install`` — even if
-        # the version got bumped on disk after. Read pyproject.toml
-        # directly when it's there (source checkouts) and fall back
-        # to metadata for actual installed wheels.
-        _pkg_version = "0.0.0"
-        _pyproject = REPO_ROOT / "pyproject.toml"
-        if _pyproject.exists():
-            try:
-                import tomllib
-
-                _pkg_version = str(
-                    tomllib.loads(_pyproject.read_text(encoding="utf-8"))["project"]["version"]
-                )
-            except (OSError, KeyError, ValueError):
-                _pkg_version = "0.0.0"
-        if _pkg_version == "0.0.0":
-            try:
-                _pkg_version = _metadata.version("tesserae")
-            except _metadata.PackageNotFoundError:
-                _pkg_version = "0.0.0"
         telemetry = _Telemetry.from_settings(
             data_root=data_root,
-            app_version=_pkg_version,
+            app_version=pkg_version,
             settings_app=settings.get_section("app"),
             event_log=event_log,
             is_debug=dev,

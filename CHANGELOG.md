@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.3] — 2026-06-01
+
+### Changed
+
+- **Cache-busting on every static asset.** `url_for('static', …)` now
+  auto-appends `?v=<version>` via a `url_defaults` hook, so a shipped
+  JS / CSS change picks up on a soft reload instead of needing
+  `Cmd+Shift+R`. In prod the suffix is the app version (busts on every
+  release); in `--dev` it's `<version>-<startup-ts>` so each dev restart
+  also breaks the cache (useful when iterating on client.js / .css).
+- App version is now resolved once in `create_app` and exposed via
+  `app.config["APP_VERSION"]` for reuse by telemetry and the static-
+  asset cache buster, with pyproject.toml taking precedence over
+  `importlib.metadata` (the source-checkout vs. installed-wheel split
+  already shipped in 0.11.2).
+
 ## [0.11.2] — 2026-06-01
 
 ### Fixed
