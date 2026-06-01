@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.4] — 2026-06-01
+
+### Added
+
+- **Docker self-update awareness.** The Settings → System "Updates"
+  card now does the right thing inside the official container: hits
+  GitHub's release API (with a `/tags` fallback for repos that don't
+  publish Releases yet) to show whether a newer version is out, and
+  surfaces a copy-pasteable `docker compose pull && docker compose up
+  -d` instead of the git-based "Apply update" button. Result is cached
+  for an hour to stay under GitHub's 60/hr anonymous rate limit. Source
+  installs keep the existing git-pull / re-exec self-updater.
+
 ## [0.11.3] — 2026-06-01
 
 ### Changed

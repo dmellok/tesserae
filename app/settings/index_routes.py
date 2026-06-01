@@ -97,14 +97,30 @@ def settings_area(area: str) -> str | Response:
     trmnl_token_reveal: dict[str, Any] | None = (
         session.pop("_trmnl_token_reveal", None) if area == "devices" else None
     )
+    in_container = bool(os.environ.get("TESSERAE_IN_DOCKER"))
+    system_release_check = None
     if area == "system":
         upd = current_app.config["UPDATER"]
-        try:
-            system_state = upd.current_state()
-        except _updater_mod.UpdaterError as err:
-            flash(f"Update state unavailable: {err}", "error")
-        system_last_check = upd.last_check
-        system_history = list(reversed(upd.history()))
+        if in_container:
+            # No ``.git`` in the Docker image, so the git-based state +
+            # check_remote can't run. Use the GitHub release API instead
+            # and skip the history/rollback machinery (rollback is also
+            # git-based). The Settings card renders a docker-compose
+            # hint when ``system_release_check.behind`` is True.
+            # Skip the live API call under ``app.testing`` so tests
+            # don't depend on network reachability — the docker hint
+            # still renders from the rest of the branch.
+            if not current_app.testing:
+                system_release_check = upd.latest_release_via_api(
+                    current_app.config.get("APP_VERSION", "0.0.0")
+                )
+        else:
+            try:
+                system_state = upd.current_state()
+            except _updater_mod.UpdaterError as err:
+                flash(f"Update state unavailable: {err}", "error")
+            system_last_check = upd.last_check
+            system_history = list(reversed(upd.history()))
         system_backups = _backup_mod.list_all(current_app.config["DATA_ROOT"])
         telemetry = current_app.config.get("TELEMETRY")
         if telemetry is not None:
@@ -143,7 +159,8 @@ def settings_area(area: str) -> str | Response:
         # Settings → System tab can hide the in-app self-update card
         # (a layered filesystem would lose changes on the next image
         # rebuild) and show a "docker pull" hint instead.
-        system_in_container=bool(os.environ.get("TESSERAE_IN_DOCKER")),
+        system_in_container=in_container,
+        system_release_check=system_release_check,
         system_telemetry_enabled=system_telemetry_enabled,
         system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,

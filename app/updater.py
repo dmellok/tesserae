@@ -109,6 +109,20 @@ class HistoryEntry:
     pip_changed: bool
 
 
+@dataclass(frozen=True)
+class ReleaseCheck:
+    """GitHub-API-based version check for the Docker case where ``.git``
+    isn't shipped in the image. Strings carry ``v`` prefixes intact so
+    they format as users see them on GitHub."""
+
+    current_version: str  # the running app's reported version
+    latest_tag: str  # the most recent release tag on GitHub
+    latest_url: str  # browser URL for the release
+    behind: bool  # latest != current
+    fetched_at: float  # time.time() of the API hit (drives cache TTL)
+    error: str | None = None  # populated when the API call failed
+
+
 class UpdaterError(RuntimeError):
     """Distinguishes our deliberate refuse-to-proceed from incidental
     subprocess failures."""
@@ -126,12 +140,100 @@ class Updater:
         # Settings → System page can show "X commits behind" without
         # re-hitting the network on every render. Reset on restart.
         self._last_check: RemoteCheck | None = None
+        # Cached GitHub-API release check for the Docker case (no .git
+        # in the image, so check_remote can't run). TTL'd to avoid
+        # hammering the API on every Settings → System render — 60/hr
+        # unauth'd limit is plenty for one self-hosted instance but a
+        # multi-tab user would burn through it quickly without caching.
+        self._latest_release: ReleaseCheck | None = None
 
     @property
     def last_check(self) -> RemoteCheck | None:
         return self._last_check
 
     # -- queries --------------------------------------------------------
+
+    def latest_release_via_api(
+        self,
+        current_version: str,
+        *,
+        repo: str = "dmellok/tesserae",
+        ttl_s: int = 3600,
+    ) -> ReleaseCheck:
+        """Ask GitHub for the most recent release tag. Used by the Docker
+        case where ``.git`` isn't shipped in the image, so the git-based
+        ``check_remote`` can't run. Cached for ``ttl_s`` to stay well
+        under the 60/hr unauthenticated rate limit on a multi-tab user.
+
+        Network or parse failures populate ``error`` rather than raise,
+        so a transient hiccup degrades to "couldn't check" in the UI
+        instead of bouncing the System page."""
+        import json
+        import time
+        import urllib.error
+        import urllib.request
+
+        now = time.time()
+        cached = self._latest_release
+        if cached is not None and now - cached.fetched_at < ttl_s:
+            return cached
+
+        headers = {
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"tesserae/{current_version}",
+        }
+
+        def _fetch_json(api_path: str) -> object:
+            req = urllib.request.Request(
+                f"https://api.github.com/repos/{repo}{api_path}", headers=headers
+            )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        check: ReleaseCheck
+        tag = ""
+        html = f"https://github.com/{repo}/releases"
+        err_msg: str | None = None
+        # Prefer ``/releases/latest`` (published Releases with notes).
+        # Fall back to ``/tags`` so a project that's pushed tags but hasn't
+        # published Releases yet still gets a meaningful answer — GitHub
+        # returns the tag list in commit-date order, newest first.
+        try:
+            payload = _fetch_json("/releases/latest")
+            assert isinstance(payload, dict)
+            tag = str(payload.get("tag_name") or "").strip()
+            html = str(payload.get("html_url") or html)
+        except urllib.error.HTTPError as err:
+            if err.code == 404:
+                try:
+                    tags = _fetch_json("/tags")
+                    if isinstance(tags, list) and tags:
+                        first = tags[0]
+                        if isinstance(first, dict):
+                            tag = str(first.get("name") or "").strip()
+                            if tag:
+                                html = f"https://github.com/{repo}/releases/tag/{tag}"
+                except (urllib.error.URLError, json.JSONDecodeError, OSError) as err2:
+                    err_msg = str(err2)
+            else:
+                err_msg = f"HTTP {err.code} {err.reason}"
+        except (urllib.error.URLError, json.JSONDecodeError, OSError) as err:
+            err_msg = str(err)
+
+        if err_msg is None and not tag:
+            err_msg = "no tags found"
+        check = ReleaseCheck(
+            current_version=current_version,
+            latest_tag=tag,
+            latest_url=html,
+            # Compare with leading-``v`` stripped since GitHub tags are
+            # vX.Y.Z but pyproject ships X.Y.Z.
+            behind=(tag.lstrip("v") != current_version.lstrip("v")) if tag else False,
+            fetched_at=now,
+            error=err_msg,
+        )
+        self._latest_release = check
+        return check
 
     def current_state(self) -> UpdateState:
         sha = self._git("rev-parse", "HEAD")

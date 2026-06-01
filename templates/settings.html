@@ -499,22 +499,36 @@
 <div class="settings-stack">
 
   {% if system_in_container %}
-  {# Running under the official Docker image — the in-app self-update
-     flow doesn't apply (a `git pull` inside a layered filesystem
-     would lose changes on the next image rebuild). Show a hint
-     pointing at `docker compose pull` instead. #}
+  {# Running under the official Docker image — the git-based self-update
+     flow can't run (no .git in the image, layered filesystem loses
+     edits on the next rebuild). Show the running version, ask GitHub
+     for the latest release, surface the docker compose command. #}
   <section class="card">
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull.') }}
-    {% if system_state %}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull — but we still check GitHub for newer releases so you know when one is out.') }}
+
+    {% if system_release_check %}
     <p>
-      <strong>v{{ system_state.version }}</strong>
-      &middot; <code>{{ system_state.short_sha }}</code>
+      <strong>v{{ system_release_check.current_version }}</strong>
+      {% if system_release_check.behind and system_release_check.latest_tag %}
+        &middot; <span class="pill is-warn">{{ system_release_check.latest_tag }} available</span>
+      {% elif not system_release_check.error and system_release_check.latest_tag %}
+        &middot; <span class="pill is-ok">up to date</span>
+      {% endif %}
     </p>
+
+    {% if system_release_check.error %}
+    <p class="field-help">Couldn't reach GitHub to check for a newer release ({{ system_release_check.error }}). The current version stays shown above; try again later.</p>
+    {% elif system_release_check.behind and system_release_check.latest_tag %}
+    <p>The latest release on GitHub is <a href="{{ system_release_check.latest_url }}" target="_blank" rel="noopener"><code>{{ system_release_check.latest_tag }}</code></a>.</p>
+    {% else %}
+    <p class="field-help">No newer release on GitHub. When one ships, this card will say so on next page load (cached for an hour to stay under GitHub's anonymous rate limit).</p>
     {% endif %}
-    <p class="field-help">To upgrade, pull a newer image and recreate the container:</p>
+    {% endif %}
+
+    <p class="field-help">To upgrade, run this on the host the container is running on:</p>
     <pre class="code-snippet"><code>docker compose pull
 docker compose up -d</code></pre>
-    <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the upgrade. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps.</p>
+    <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the recreate. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps. The container restarts on the new image — expect a ~1s blip.</p>
   </section>
   {% else %}
   <section class="card">
