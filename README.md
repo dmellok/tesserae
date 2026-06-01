@@ -5,6 +5,12 @@
 [![CI](https://github.com/dmellok/tesserae/actions/workflows/ci.yml/badge.svg)](https://github.com/dmellok/tesserae/actions/workflows/ci.yml)
 [![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae)](https://github.com/dmellok/tesserae/discussions)
 
+<p align="center">
+  <a href="docs/screenshots/hero-dashboards.jpg">
+    <img src="docs/screenshots/hero-dashboards.jpg" alt="Five e-ink panels running Tesserae dashboards" width="820">
+  </a>
+</p>
+
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices (Pi,
 ESP32) over MQTT.
@@ -30,28 +36,21 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 - **[Code of conduct](.github/CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
 
 <details>
-<summary><b>Screenshots</b> — admin UI &amp; example device frames (click to expand)</summary>
-
-<table>
-  <tr>
-    <td align="center" width="50%"><a href="docs/screenshots/ui-dashboards.png"><img src="docs/screenshots/ui-dashboards.png" width="340" alt="Dashboards list"></a><br><sub>Dashboards</sub></td>
-    <td align="center" width="50%"><a href="docs/screenshots/ui-editor.png"><img src="docs/screenshots/ui-editor.png" width="340" alt="Editor with live preview"></a><br><sub>Editor + live preview</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="docs/screenshots/ui-send.png"><img src="docs/screenshots/ui-send.png" width="340" alt="Send page"></a><br><sub>Send</sub></td>
-    <td align="center"><a href="docs/screenshots/ui-schedules.png"><img src="docs/screenshots/ui-schedules.png" width="340" alt="Schedules"></a><br><sub>Schedules</sub></td>
-  </tr>
-</table>
+<summary><b>More dashboards</b> — example frames rendered by Tesserae (click to expand)</summary>
 
 <sub>Each dashboard renders to a panel-sized frame and publishes only to the display(s) it's bound to.</sub>
 
 <table>
   <tr>
-    <td align="center"><a href="docs/screenshots/dash-morning.png"><img src="docs/screenshots/dash-morning.png" height="160" alt="Morning"></a></td>
-    <td align="center"><a href="docs/screenshots/dash-lounge.png"><img src="docs/screenshots/dash-lounge.png" height="160" alt="Lounge"></a></td>
-    <td align="center"><a href="docs/screenshots/dash-office.png"><img src="docs/screenshots/dash-office.png" height="160" alt="Office"></a></td>
-    <td align="center"><a href="docs/screenshots/dash-dev.png"><img src="docs/screenshots/dash-dev.png" height="160" alt="Dev"></a></td>
-    <td align="center"><a href="docs/screenshots/dash-glance.png"><img src="docs/screenshots/dash-glance.png" height="160" alt="Glance"></a></td>
+    <td align="center"><a href="docs/screenshots/dash-music.png"><img src="docs/screenshots/dash-music.png" height="220" alt="Morning — weather, music, Reddit, forecast"></a><br><sub>Morning</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-f1.png"><img src="docs/screenshots/dash-f1.png" height="220" alt="F1 — driver standings + next race"></a><br><sub>F1</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="docs/screenshots/dash-github.png"><img src="docs/screenshots/dash-github.png" height="220" alt="GitHub — activity, CI runs, contributions heatmap"></a><br><sub>GitHub</sub></td>
+    <td align="center"><a href="docs/screenshots/dash-calendar.png"><img src="docs/screenshots/dash-calendar.png" height="220" alt="Calendar — day, week, month"></a><br><sub>Calendar</sub></td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2"><a href="docs/screenshots/dash-todo.png"><img src="docs/screenshots/dash-todo.png" height="220" alt="Todo + word clock"></a><br><sub>Todo + word clock</sub></td>
   </tr>
 </table>
 
