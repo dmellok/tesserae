@@ -74,6 +74,97 @@ every push.
 
 For support, head to [Discussions](https://github.com/dmellok/tesserae/discussions).
 
+<details>
+<summary><b>Full feature list</b> — what's actually in the box (click to expand)</summary>
+
+### Composition
+
+- **Browser-based page editor** with form-driven cell options, live preview, and per-cell content-zoom slider.
+- **17 layout presets** (1-cell → 3×2 → sidebar → hero+strip) — fraction-based so the same layout works at any panel size.
+- **Per-cell overrides**: theme, font, content zoom, any of the 14 palette tokens.
+- **47 widgets bundled** across 11 categories — weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
+- **Drop-a-folder widget plugins** — `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The four calendar / Home-Assistant / GitHub widget families each ship 4–6 selectable visual directions per widget.
+
+### Rendering
+
+- **Headless Playwright** server-side renderer with a persistent browser pool (toggle to fall back to one-shot).
+- **Drop-a-folder renderer plugins** — currently 4: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 over MQTT), `trmnl_png` (1-bit greyscale PNG over HTTP).
+- **Cell-level palette pre-quantisation** so widgets dither cleanly on Spectra 6 / ACeP panels.
+- **Per-device gamut switching** (ACeP vs Spectra 6) for Impressions sold in both revisions.
+- **Partial-update preview** in the composer — skips full iframe reloads.
+- **Stable per-device preview alias** for Home Assistant generic-camera entities.
+
+### Devices & multi-head
+
+- **Drop-a-folder device plugins** — 4 bundled (`pi_png_client`, `pi_bin_client`, `esp32_client`, `trmnl_client`).
+- **Multi-head**: register multiple devices, bind a dashboard to a specific one, each can run its own theme.
+- **MQTT push** (Pi / ESP32) and **HTTP pull** (Kindle / TRMNL BYOS) supported side-by-side.
+- **mDNS auto-discovery** of LAN clients; discovered devices show up in the *Discovered* strip with panel dims pre-filled.
+- **TRMNL pairing** mints a short 5-char access token (typeable on devices with no real keyboard).
+- Per-device sleep cadence, rotation (CCW quarters), and panel dimensions.
+
+### Scheduling & push
+
+- **Background scheduler** (30s tick), two kinds of schedule:
+  - **interval** — fires every N minutes inside a day-of-week mask + time-of-day window.
+  - **daily** — once per day at a wall-clock time inside a day-of-week mask.
+- **Schedule priority** ordering, **quiet hours** suppression, **stale-schedule detection** (deleted-page schedules don't fire silently).
+- **Send page** for one-shot manual pushes.
+- **Retained MQTT frames** — panels that boot mid-cycle get the latest frame on subscribe.
+
+### Home Assistant integration
+
+- **HA MQTT discovery** — every device shows up automatically as an HA device tile.
+- Per-device **display name** that re-publishes discovery on save.
+- **Generic-camera** preview via the per-device alias.
+- **HA sensors** for battery, signal, IP, last-render time per device.
+- **HA widget set** — `ha_climate`, `ha_entities`, `ha_history`, `ha_sensor`, each with 6 selectable visual directions.
+- **Stale-discovery sweep on start** so deleted Tesserae devices stop ghosting HA tiles.
+
+### Themes & typography
+
+- **21 bundled themes** in 4 families: 10 light + 10 dark (warm-undertone, dusty-accent Ramen DNA), 5 neon dark (synthwave/cyberpunk), 6 monochrome (Paper, Carbon, Newsprint, Halftone, Ash, Graphite) for 1-bit Kindle / TRMNL panels.
+- **Theme builder** in the admin UI with **palette extraction** from any uploaded image.
+- **User-saved themes** persist under `data/plugins/themes_core/user.json`.
+- **15 bundled typefaces** (SIL OFL / Apache 2.0) — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, etc.
+- **Semantic token layer** (`--c-*`) — widgets paint from semantic tokens, never raw palette primitives. CI test enforces it so a theme retune touches every widget cleanly.
+
+### Administration & ops
+
+- **First-run onboarding wizard** — welcome → broker → device → dashboard. Every step skippable.
+- **Settings UI**: server, broker, telemetry, auth, devices, themes, fonts, diagnostics.
+- **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts).
+- **Backup** the `data/` directory as a tarball; restore on a fresh install.
+- **Event log** captures every push, schedule fire, and discovery event for the History view.
+- **Auth**: password setup on first request, persistent session, logout.
+
+### Networking
+
+- **MQTT** transport (default `tesserae/<device>/frame/...`).
+- **Embedded Mosquitto-compatible broker** as a fallback when no external broker is configured.
+- **mDNS** — `tesserae-<host>.local` on port 8000.
+- **HTTP API** for the TRMNL BYOS protocol (`/api/display`, `/api/setup`, `/api/log`) authed by per-device tokens.
+
+### Cross-platform
+
+- **Install methods**: Docker / Docker Compose, shell installer (`install.sh` for macOS / Linux / Pi), PowerShell installer (`install.ps1` for Windows).
+- **Windows-specific**: re-exec via Popen + parent-PID handshake (`os.execv` is broken there); UTF-8 default encoding on every file I/O.
+- **32-bit Pi OS** fallback to system Chromium when Playwright's bundled browser can't install.
+
+### Telemetry & privacy
+
+- **Off by default.** Two anonymous events when opted in (`app.started`, `update.applied`). No IPs, paths, settings, secrets, or push contents.
+- Disable with `TESSERAE_TELEMETRY=0` or the Settings toggle.
+
+### Quality
+
+- **596 tests** (pytest) green; CI runs every push.
+- **`ruff check` + `ruff format --check`** in CI.
+- **`mypy --strict`** on contract modules (plugin loader, scheduler, push, onboarding).
+- **Semantic-token enforcement test** fails CI if any widget references raw `--theme-*` primitives instead of the `--c-*` layer.
+
+</details>
+
 ## Clients
 
 The server publishes; something downstream paints the panel. Tesserae
