@@ -267,7 +267,7 @@
   {{ card_head('History', icon_name='clock-counter-clockwise',
                blurb='Last ' ~ history|length ~ ' push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
   {% if not history %}
-  <p class="lede">No pushes yet.</p>
+  <p class="lede" data-history-empty>No pushes yet.</p>
   {% else %}
   <ul class="history">
     {% for ev in history %}
@@ -432,4 +432,5 @@
     });
   })();
 </script>
+<script src="{{ url_for('static', filename='pages/send.js') }}"></script>
 {% endblock %}

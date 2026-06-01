@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.8] — 2026-06-02
+
+### Changed
+
+- **Send page's History tab updates live.** v0.11.7 backgrounded the
+  push so the browser didn't freeze, but the History tab still
+  required a manual reload to see the new row land. Subscribed it to
+  the same `/events/stream?type=push` SSE feed the Events tab uses;
+  on each push event, the tab refreshes the history list in place
+  (debounced 300 ms to collapse multi-target fan-outs into one swap).
+
 ## [0.11.7] — 2026-06-02
 
 ### Changed
