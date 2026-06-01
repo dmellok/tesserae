@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.6] — 2026-06-01
+
+### Fixed
+
+- mypy `--strict` was failing in CI on the v0.11.5 `BrowserPool`
+  worker because the queue's union type `Future[bytes] | Future[str]`
+  didn't narrow when `request` was narrowed by `isinstance(request,
+  FetchRequest)`. Cast the future explicitly on each branch.
+
 ## [0.11.5] — 2026-06-01
 
 ### Changed

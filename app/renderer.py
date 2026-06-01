@@ -31,7 +31,7 @@ import queue
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Final, Literal
+from typing import Any, Final, Literal, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
@@ -337,10 +337,20 @@ class BrowserPool:
                             with contextlib.suppress(Exception):
                                 browser.close()
                         browser = pw.chromium.launch(**_chromium_launch_kwargs())
+                    # mypy can narrow ``request`` here but the queue's
+                    # union widens ``fut`` to ``Future[str] | Future[bytes]``;
+                    # the isinstance check on the request half doesn't
+                    # propagate. Casting the future on each branch is
+                    # cheaper than restructuring the queue to a tagged
+                    # union.
                     if isinstance(request, FetchRequest):
-                        fut.set_result(_fetch_one(browser, request))
+                        cast(concurrent.futures.Future[str], fut).set_result(
+                            _fetch_one(browser, request)
+                        )
                     else:
-                        fut.set_result(_screenshot_one(browser, request))
+                        cast(concurrent.futures.Future[bytes], fut).set_result(
+                            _screenshot_one(browser, request)
+                        )
                 except Exception as exc:
                     fut.set_exception(exc)
                     # If the failure was a browser-level crash, drop the
