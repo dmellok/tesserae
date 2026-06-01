@@ -8,6 +8,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.9] — 2026-06-02
+
+### Added
+
+- **Update + Rollback show a modal with a throbber and stage hint.**
+  Clicking "Update & restart" used to freeze the tab for 30+ seconds
+  during git fetch + pip install and then show a browser connection
+  error during the os.execv restart. Now a modal pops up with a
+  spinner ("Pulling the new revision…" → "Installing dependencies if
+  needed…" → "Almost there…" → "Restarting…"), polls /healthz until
+  the server comes back, and auto-reloads the page. Same flow for
+  the Rollback button (which carries the same restart cost). Pure
+  client-side wiring; no backend changes.
+
+### Fixed
+
+- **Send page History tab now actually live-updates after a push.**
+  v0.11.8 wired the SSE subscription but listened for the wrong
+  event name (``event`` / default ``onmessage``), so push events
+  came through under the SSE endpoint's actual name (``log``) and
+  were silently dropped. Listener corrected to ``log``.
+
 ## [0.11.8] — 2026-06-02
 
 ### Changed

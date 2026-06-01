@@ -55,8 +55,8 @@
   }
 
   const es = new EventSource("/events/stream?type=push");
-  es.addEventListener("event", scheduleSwap);
-  // Some Flask SSE wrappers emit unnamed messages instead of named
-  // ``event`` events; cover both.
-  es.onmessage = scheduleSwap;
+  // The SSE endpoint names its event "log" (see app/events_routes.py:
+  // ``event: log\ndata: …``). Listening for "event" or default
+  // ``onmessage`` would silently miss every push.
+  es.addEventListener("log", scheduleSwap);
 })();

@@ -477,3 +477,70 @@
   .backup-actions { justify-content: flex-end; }
 }
 
+
+/* Restart modal (Update + Rollback) ------------------------------ */
+.restart-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.restart-modal[hidden] { display: none; }
+.restart-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  animation: lightbox-fade 120ms ease-out;
+}
+.restart-modal-card {
+  position: relative;
+  z-index: 1;
+  background: var(--t-surface);
+  color: var(--t-fg);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md, 10px);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  padding: 28px 28px 24px;
+  width: min(440px, 100%);
+  text-align: center;
+}
+.restart-modal-spinner {
+  font-size: 32px;
+  color: var(--t-accent, var(--t-fg));
+  margin-bottom: 12px;
+  display: inline-flex;
+  animation: restart-spin 1s linear infinite;
+}
+.restart-modal-card h2 {
+  margin: 0 0 6px;
+  font-size: var(--t-size-lg, 16px);
+  font-weight: 700;
+  color: var(--t-fg);
+}
+.restart-modal-stage {
+  margin: 0 0 14px;
+  color: var(--t-fg);
+  font-weight: 500;
+  min-height: 1.4em;
+}
+.restart-modal-help {
+  margin: 0;
+  font-size: 13px;
+  color: var(--t-fg-soft, var(--t-fg));
+  line-height: 1.45;
+}
+.restart-modal-error {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--t-danger, #b91c1c);
+  border-radius: var(--t-radius-sm, 6px);
+  font-size: 13px;
+  text-align: left;
+}
+@keyframes restart-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
