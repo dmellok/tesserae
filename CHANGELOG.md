@@ -8,6 +8,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.1] — 2026-06-01
+
+### Changed
+
+- `github_repo` — tightened the four directions to match an updated
+  handoff for the repo card specifically:
+  - RE1 (Refined): repo name stays lowercase; stat row is hairlines now
+    (no solid-colour tiles), and description carries inline lang +
+    license chips.
+  - RE2 (Geometric): added the slim paper description strip between the
+    green header and the language strip.
+  - RE3 (Swiss): repo name lowercase + bold (not uppercase); stats
+    swapped from dots to small squares; numerals are light-weight (300);
+    ink bars fill the bottom more densely.
+  - RE4 (Data): repo name lowercase; left column is now a vertical
+    language list (row per language, distributed to fill the column)
+    instead of a wrapped legend.
+
 ## [0.11.0] — 2026-06-01
 
 ### Added

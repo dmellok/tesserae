@@ -1,4 +1,9 @@
-/* github_repo — four visual directions (RE1–RE4). */
+/* github_repo — four visual directions (RE1–RE4).
+ *
+ * Mapped from a Bauhaus / Swiss handoff tuned specifically for the repo
+ * card. All colours come from --c-* tokens — no --c-ok/warn/danger and
+ * no hex literals (transparent is only used as a color-mix endpoint).
+ */
 
 :host {
   display: block;
@@ -39,47 +44,19 @@
   word-break: break-word;
 }
 
-/* Shared dark header */
-.gh-dark {
-  display: flex;
-  align-items: center;
-  gap: clamp(6px, 1.4cqw, 12px);
-  background: var(--c-text);
-  color: var(--c-bg);
-  padding: clamp(6px, 1.4cqh, 11px) clamp(10px, 2cqw, 16px);
-  flex-shrink: 0;
-}
-.gh-dark-chip { width: clamp(9px, 1.6cqw, 14px); height: clamp(9px, 1.6cqw, 14px); flex-shrink: 0; }
-.gh-dark-title {
-  flex: 1;
-  font: 900 clamp(11px, 2cqw, 16px)/1 var(--theme-font, system-ui);
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.gh-dark-meta {
-  font: 700 clamp(9px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
-  letter-spacing: 0.04em;
-  display: flex;
-  align-items: center;
-  gap: clamp(4px, 0.8cqw, 8px);
-  flex-shrink: 0;
-}
-
-/* Shared lang bar + legend */
+/* Shared lang bar + legend ---------------------------------------- */
 .re-langbar {
   display: flex;
-  height: clamp(6px, 1.5cqh, 11px);
+  height: var(--bar-h, clamp(6px, 1.5cqh, 12px));
   width: 100%;
   gap: clamp(1px, 0.3cqw, 2px);
 }
+.re-langbar--thick { height: clamp(10px, 2.4cqh, 18px); }
 .re-langlegend {
   display: flex;
   flex-wrap: wrap;
   gap: clamp(2px, 0.5cqh, 4px) clamp(8px, 2cqw, 16px);
-  font: 400 clamp(7px, 1.3cqw, 10.5px)/1 var(--theme-font-mono, ui-monospace);
+  font: 400 clamp(8px, 1.3cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--c-text-soft);
 }
 .re-lang-item {
@@ -93,14 +70,15 @@
   border-radius: 50%;
 }
 
-/* Shared activity bars */
+/* Shared activity bars -------------------------------------------- */
 .re-bars {
   display: flex;
   align-items: flex-end;
   gap: clamp(1px, 0.3cqw, 2px);
   width: 100%;
-  height: clamp(28px, 6cqh, 56px);
-  border-bottom: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent);
+  height: 100%;
+  min-height: 0;
+  flex: 1;
 }
 .re-bar { flex: 1; min-height: 2px; }
 .re-bars-empty {
@@ -113,119 +91,202 @@
 /* =================================================================
  * RE1 — REFINED
  * ================================================================= */
-.variant-re1 { display: grid; grid-template-rows: auto auto auto 1fr; }
-.re1-meta {
-  padding: clamp(8px, 1.6cqh, 12px) clamp(10px, 2cqw, 18px) 0;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(6px, 1.2cqh, 10px);
+.variant-re1 {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
 }
-.re1-meta-row {
+.re1-dark {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: clamp(6px, 1.4cqw, 10px);
+  gap: clamp(6px, 1.4cqw, 12px);
+  background: var(--c-text);
+  color: var(--c-bg);
+  padding: clamp(7px, 1.4cqh, 11px) clamp(10px, 2cqw, 18px);
 }
-.re1-desc {
-  font: 400 clamp(10px, 1.8cqw, 15px)/1.2 var(--theme-font, system-ui);
+.re1-dark-chip {
+  width: clamp(9px, 1.6cqw, 14px);
+  height: clamp(9px, 1.6cqw, 14px);
+  background: var(--c-data-2);
+  flex-shrink: 0;
+}
+.re1-dark-title {
+  flex: 1;
+  font: 900 clamp(11px, 2cqw, 16px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.re1-langlic {
+.re1-dark-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(4px, 0.8cqw, 7px);
+  font: 700 clamp(9px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.06em;
+}
+.re1-dark-meta .ph { font-size: clamp(11px, 2cqw, 14px); }
+
+.re1-meta {
   display: flex;
-  gap: clamp(4px, 1cqw, 8px);
-  font: 400 clamp(8px, 1.4cqw, 10.5px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--c-text-soft);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(8px, 1.6cqw, 14px);
+  padding: clamp(8px, 1.6cqh, 14px) clamp(10px, 2cqw, 18px) clamp(4px, 0.8cqh, 8px);
+  min-width: 0;
+}
+.re1-desc {
+  font: 400 clamp(11px, 2cqw, 16px)/1.25 var(--theme-font, system-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.re1-chips {
+  display: flex;
+  gap: clamp(4px, 0.8cqw, 7px);
   flex-shrink: 0;
 }
-.re1-langlic-item { display: flex; align-items: center; gap: clamp(3px, 0.6cqw, 5px); }
-.re1-lang-dot {
-  width: clamp(6px, 1.1cqw, 8px);
-  height: clamp(6px, 1.1cqw, 8px);
+.re1-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(3px, 0.6cqw, 5px);
+  padding: clamp(2px, 0.5cqh, 4px) clamp(5px, 1.2cqw, 9px);
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.04em;
+}
+.re1-chip--lang { background: color-mix(in oklab, var(--c-data-2) 18%, transparent); }
+.re1-chip--lic { background: color-mix(in srgb, var(--c-text) 8%, transparent); color: var(--c-text-soft); }
+.re1-chip-dot {
+  width: clamp(5px, 0.9cqw, 7px);
+  height: clamp(5px, 0.9cqw, 7px);
   border-radius: 50%;
 }
-.re1-stats { display: grid; grid-template-columns: repeat(4, 1fr); }
+
+.re1-lang {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 0.8cqh, 7px);
+  padding: clamp(4px, 0.8cqh, 6px) clamp(10px, 2cqw, 18px);
+}
+
+.re1-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: clamp(1.5px, 0.4cqh, 2px) solid var(--c-text);
+  border-bottom: 1px solid var(--c-text);
+  margin: clamp(4px, 0.8cqh, 6px) clamp(10px, 2cqw, 18px) 0;
+}
 .re1-stat {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.4cqw, 10px);
-  padding: clamp(7px, 1.4cqh, 10px) clamp(10px, 2cqw, 16px);
-  border-right: clamp(1px, 0.4cqw, 2px) solid var(--c-bg);
+  gap: clamp(7px, 1.4cqw, 12px);
+  padding: clamp(8px, 1.6cqh, 12px) clamp(8px, 1.6cqw, 14px);
+  border-right: 1px solid color-mix(in srgb, var(--c-line) 70%, transparent);
   min-width: 0;
 }
 .re1-stat:last-child { border-right: none; }
-.re1-stat .ph-bold { font-size: clamp(13px, 2.4cqw, 20px); }
+.re1-stat .ph { font-size: clamp(15px, 3cqw, 24px); }
 .re1-stat-value {
-  font: 900 clamp(14px, 3.2cqw, 24px)/1 var(--theme-font, system-ui);
+  font: 900 clamp(18px, 4cqw, 28px)/1 var(--theme-font, system-ui);
 }
 .re1-stat-label {
-  font: 700 clamp(7px, 1.3cqw, 9.5px)/1 var(--theme-font-mono, ui-monospace);
-  letter-spacing: 0.05em;
-  opacity: 0.85;
+  font: 700 clamp(7px, 1.3cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.06em;
+  color: var(--c-text-soft);
   margin-top: 2px;
 }
+
 .re1-activity {
   display: flex;
   flex-direction: column;
-  padding: clamp(8px, 1.4cqh, 10px) clamp(10px, 2cqw, 18px);
   gap: clamp(4px, 0.8cqh, 6px);
+  padding: clamp(8px, 1.4cqh, 12px) clamp(10px, 2cqw, 18px) clamp(4px, 0.8cqh, 6px);
   min-height: 0;
 }
-.re1-activity-head,
-.re1-activity-foot {
+.re1-activity-head {
   display: flex;
   justify-content: space-between;
-  font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--c-text-soft);
+  font: 700 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
   letter-spacing: 0.06em;
+  color: var(--c-text-soft);
 }
-.re1-activity-foot { gap: clamp(4px, 0.8cqw, 6px); align-items: center; justify-content: flex-start; }
-.re1-activity-foot .ph { font-size: clamp(10px, 1.7cqw, 13px); }
+.re1-activity .re-bars {
+  border-bottom: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent);
+}
+.re1-foot {
+  display: flex;
+  align-items: center;
+  gap: clamp(4px, 0.8cqw, 6px);
+  padding: 0 clamp(10px, 2cqw, 18px) clamp(6px, 1.2cqh, 10px);
+  font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.05em;
+  color: var(--c-text-soft);
+}
+.re1-foot .ph { font-size: clamp(10px, 1.7cqw, 13px); }
 
 /* =================================================================
- * RE2 — GEOMETRIC
+ * RE2 — GEOMETRIC (De Stijl)
  * ================================================================= */
 .variant-re2 {
   background: var(--c-text);
-  gap: clamp(2px, 0.6cqw, 4px);
+  gap: clamp(2px, 0.6cqh, 4px);
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr;
 }
 .re2-header {
-  padding: clamp(8px, 1.6cqh, 10px) clamp(12px, 2.4cqw, 18px);
+  padding: clamp(8px, 1.6cqh, 12px) clamp(12px, 2.4cqw, 20px);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: clamp(8px, 1.6cqw, 14px);
 }
 .re2-title {
-  font: 900 clamp(13px, 2.8cqw, 20px)/1 var(--theme-font, system-ui);
+  font: 900 clamp(14px, 3cqw, 22px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .re2-meta {
   font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.re2-desc {
+  background: var(--c-bg);
+  color: var(--c-text);
+  padding: clamp(6px, 1.2cqh, 10px) clamp(12px, 2.4cqw, 20px);
+  font: 400 clamp(10px, 1.8cqw, 14px)/1.2 var(--theme-font, system-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .re2-lang {
   background: var(--c-bg);
-  padding: clamp(8px, 1.6cqh, 10px) clamp(12px, 2.4cqw, 18px);
-  display: flex;
-  flex-wrap: wrap;
-  gap: clamp(2px, 0.5cqw, 3px);
+  padding: clamp(4px, 0.8cqh, 6px) clamp(12px, 2.4cqw, 20px) clamp(8px, 1.6cqh, 12px);
 }
-.re2-lang-cell { height: clamp(12px, 2.4cqh, 16px); }
 .re2-stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: clamp(2px, 0.6cqw, 4px);
 }
 .re2-stat {
-  padding: clamp(7px, 1.4cqh, 10px) clamp(10px, 2cqw, 16px);
+  padding: clamp(8px, 1.6cqh, 12px) clamp(12px, 2.4cqw, 18px);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: space-between;
+  gap: clamp(4px, 0.8cqh, 6px);
+  min-height: clamp(56px, 13cqh, 80px);
 }
-.re2-stat-value { font: 900 clamp(16px, 3.4cqw, 26px)/1 var(--theme-font, system-ui); }
-.re2-stat-label { font: 700 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace); letter-spacing: 0.06em; }
+.re2-stat-label {
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.06em;
+}
+.re2-stat-value {
+  font: 900 clamp(22px, 5cqw, 38px)/0.9 var(--theme-font, system-ui);
+}
 .re2-activity {
-  flex: 1;
-  padding: clamp(6px, 1.2cqh, 8px) clamp(12px, 2.4cqw, 18px);
+  padding: clamp(6px, 1.2cqh, 10px) clamp(12px, 2.4cqw, 20px) clamp(8px, 1.6cqh, 12px);
   display: flex;
   flex-direction: column;
   gap: clamp(4px, 0.8cqh, 6px);
@@ -234,74 +295,92 @@
 .re2-activity-head {
   display: flex;
   justify-content: space-between;
-  font: 700 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
-  letter-spacing: 0.04em;
+  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.05em;
 }
-.re2-activity .re-bars { border-bottom: none; flex: 1; height: 100%; }
+.re2-activity .re-bars { border-bottom: none; }
 
 /* =================================================================
- * RE3 — SWISS
+ * RE3 — SWISS / INTERNATIONAL
  * ================================================================= */
 .variant-re3 {
   padding: clamp(10px, 2cqh, 18px) clamp(12px, 2.4cqw, 24px);
-  display: flex;
-  flex-direction: column;
-  gap: clamp(6px, 1.2cqh, 10px);
+  display: grid;
+  grid-template-rows: auto auto auto auto auto 1fr auto;
+  gap: clamp(5px, 1cqh, 9px);
   font-family: var(--theme-font, "Helvetica Neue", system-ui);
 }
-.re3-eyebrow {
+.re3-head {
   display: flex;
-  justify-content: space-between;
   align-items: baseline;
-  font: 700 clamp(11px, 2cqw, 15px)/1 var(--theme-font, system-ui);
-  letter-spacing: 0.02em;
+  justify-content: space-between;
+  gap: clamp(8px, 1.6cqw, 14px);
 }
-.re3-eyebrow span:last-child {
-  font-size: 0.78em;
+.re3-head-left { min-width: 0; }
+.re3-name {
+  font: 700 clamp(12px, 2.2cqw, 16px)/1.1 var(--theme-font, system-ui);
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.re3-desc {
+  font: 400 clamp(10px, 1.7cqw, 13px)/1.2 var(--theme-font, system-ui);
+  color: var(--c-text);
+  margin-top: clamp(1px, 0.3cqh, 3px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.re3-head-right {
+  font: 400 clamp(8px, 1.4cqw, 10.5px)/1 var(--theme-font, system-ui);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--c-text-soft);
-  font-weight: 400;
+  flex-shrink: 0;
 }
-.re3-desc {
-  font: 400 clamp(10px, 1.7cqw, 13px)/1.3 var(--theme-font, system-ui);
-  color: var(--c-text-soft);
-}
-.re3-lang-wrap .re-langbar { height: clamp(4px, 0.9cqh, 6px); }
+.re3-lang-wrap .re-langbar { height: clamp(4px, 1cqh, 7px); }
 .re3-rule {
   height: 1px;
   background: color-mix(in srgb, var(--c-line) 60%, transparent);
-  margin: clamp(8px, 1.4cqh, 14px) 0;
+  margin: clamp(2px, 0.4cqh, 4px) 0;
 }
 .re3-stats {
   display: flex;
-  gap: clamp(22px, 5.5cqw, 44px);
+  gap: clamp(20px, 5cqw, 44px);
   flex-wrap: wrap;
+  align-items: baseline;
 }
 .re3-stat {
   display: flex;
   align-items: baseline;
   gap: clamp(5px, 1cqw, 8px);
 }
-.re3-dot { width: clamp(6px, 1cqw, 8px); height: clamp(6px, 1cqw, 8px); flex-shrink: 0; }
-.re3-stat-value { font: 300 clamp(18px, 4cqw, 26px)/1 var(--theme-font, system-ui); }
+.re3-square {
+  width: clamp(7px, 1.3cqw, 10px);
+  height: clamp(7px, 1.3cqw, 10px);
+  flex-shrink: 0;
+  align-self: center;
+}
+.re3-stat-value {
+  font: 300 clamp(20px, 4.4cqw, 32px)/1 var(--theme-font, system-ui);
+  letter-spacing: -0.02em;
+}
 .re3-stat-label {
   font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font, system-ui);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--c-text-soft);
 }
 .re3-activity {
-  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: clamp(3px, 0.6cqh, 5px);
   min-height: 0;
 }
-.re3-activity .re-bars { height: clamp(28px, 6cqh, 40px); }
-.re3-activity-foot {
-  font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+.re3-activity .re-bars { height: 100%; min-height: clamp(40px, 12cqh, 110px); }
+.re3-foot {
+  font: 400 clamp(8px, 1.4cqw, 10.5px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--c-text-soft);
 }
 
@@ -315,10 +394,15 @@
   gap: clamp(6px, 1.2cqh, 10px);
   font-family: var(--theme-font, system-ui);
 }
-.re4-header { display: flex; justify-content: space-between; align-items: baseline; gap: clamp(8px, 1.6cqw, 14px); }
+.re4-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: clamp(8px, 1.6cqw, 14px);
+}
 .re4-title {
-  font: 900 clamp(13px, 2.6cqw, 18px)/1 var(--theme-font, system-ui);
-  letter-spacing: 0.02em;
+  font: 700 clamp(12px, 2.4cqw, 18px)/1 var(--theme-font, system-ui);
+  letter-spacing: 0.01em;
 }
 .re4-meta {
   font: 400 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
@@ -340,45 +424,73 @@
   gap: clamp(5px, 1cqw, 8px);
   min-width: 0;
 }
-.re4-stat .ph { font-size: clamp(13px, 2.4cqw, 18px); }
+.re4-stat .ph { font-size: clamp(13px, 2.4cqw, 18px); flex-shrink: 0; }
 .re4-stat-value { font: 900 clamp(14px, 3cqw, 22px)/1 var(--theme-font, system-ui); }
 .re4-stat-label {
   margin-left: auto;
   font: 400 clamp(7px, 1.3cqw, 9.5px)/1 var(--theme-font-mono, ui-monospace);
   color: var(--c-text-soft);
 }
-.re4-meta-row {
-  display: flex;
-  justify-content: space-between;
-  font: 400 clamp(7px, 1.3cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--c-text-soft);
-  letter-spacing: 0.06em;
-}
 .re4-body {
   flex: 1;
   display: flex;
-  gap: clamp(8px, 1.6cqw, 14px);
+  gap: clamp(10px, 2cqw, 16px);
   min-height: 0;
 }
 .re4-lang-col {
-  width: clamp(180px, 35cqw, 280px);
+  width: clamp(180px, 32cqw, 280px);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: clamp(4px, 0.8cqh, 6px);
 }
-.re4-lang-col .re-langbar { height: clamp(6px, 1.4cqh, 10px); }
+.re4-col-head {
+  display: flex;
+  justify-content: space-between;
+  font: 700 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.06em;
+  color: var(--c-text-soft);
+}
+.re4-lang-col .re-langbar { height: clamp(5px, 1.2cqh, 8px); }
+.re4-lang-list {
+  flex: 1;
+  display: grid;
+  grid-auto-rows: 1fr;
+  min-height: 0;
+}
+.re4-lang-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(6px, 1.4cqw, 10px);
+  border-top: 1px solid color-mix(in srgb, var(--c-line) 40%, transparent);
+  font: 400 clamp(9px, 1.7cqw, 13px)/1 var(--theme-font, system-ui);
+  min-width: 0;
+}
+.re4-lang-row:first-child { border-top: none; }
+.re4-lang-dot {
+  width: clamp(7px, 1.3cqw, 9px);
+  height: clamp(7px, 1.3cqw, 9px);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.re4-lang-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.re4-lang-pct {
+  font: 400 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+}
 .re4-activity {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  gap: clamp(3px, 0.6cqh, 5px);
+  gap: clamp(4px, 0.8cqh, 6px);
   border-left: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent);
-  padding-left: clamp(8px, 1.6cqw, 14px);
+  padding-left: clamp(10px, 2cqw, 16px);
+  min-height: 0;
 }
-.re4-activity .re-bars { height: clamp(32px, 8cqh, 56px); }
+.re4-activity .re-bars { flex: 1; min-height: clamp(40px, 10cqh, 100px); }
 .re4-activity-foot {
   font: 400 clamp(8px, 1.4cqw, 10px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.05em;
   color: var(--c-text-soft);
 }
