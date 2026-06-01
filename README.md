@@ -153,7 +153,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Telemetry & privacy
 
-- **Off by default.** Two anonymous events when opted in (`app.started`, `update.applied`). No IPs, paths, settings, secrets, or push contents.
+- **Off by default.** When opted in, four anonymous events: `app.started` (per process start), `app.heartbeat` (hourly fleet shape + activity counters — shape only, never content), `update.applied` (in-app updater applied a new revision), `theme.user_created` (first time a custom theme is saved — no theme content). No IPs, paths, settings, secrets, or push contents.
 - Disable with `TESSERAE_TELEMETRY=0` or the Settings toggle.
 
 ### Quality
@@ -299,11 +299,23 @@ for the deep guide (broker config, Chromium overrides, dev workflow).
 ## Privacy & telemetry
 
 **Off by default.** When opted in (Settings → Server → App), Tesserae
-posts two anonymous events (`app.started`, `update.applied`) to the
-project's [aptabase](https://github.com/aptabase/aptabase) backend. No
-IPs, paths, settings, secrets, push contents, or anything tied to a
-real-world identity. Disable with `TESSERAE_TELEMETRY=0` or the toggle
-in Settings. Full details:
+posts four anonymous events to the project's
+[aptabase](https://github.com/aptabase/aptabase) backend:
+
+- `app.started` — per process start (version, Python, platform).
+- `app.heartbeat` — hourly. Fleet shape (number of devices / pages /
+  user themes, device kinds, `is_docker`) + activity counters since
+  the previous heartbeat (pushes, push failures, widget errors). Shape
+  and counts only — never push content, never settings values.
+- `update.applied` — the in-app updater applied a new revision (from /
+  to short SHAs + channel).
+- `theme.user_created` — fired the first time a user persists a custom
+  theme. No theme content is sent — just the fact that the theme
+  builder got reached.
+
+No IPs, paths, settings values, secrets, push contents, or anything
+tied to a real-world identity. Disable with `TESSERAE_TELEMETRY=0` or
+the toggle in Settings. Full details:
 [**Privacy & telemetry**](https://dmellok.github.io/tesserae/privacy/).
 
 ## Contributing
