@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.2] — 2026-06-01
+
+### Fixed
+
+- **Telemetry was reporting the wrong version.** The app version sent in
+  `appVersion` / `sdkVersion` came from `importlib.metadata.version("tesserae")`,
+  which reads frozen wheel metadata — so an `-e .` install kept reporting
+  whatever pyproject.toml said at the last `pip install`, even if the
+  version got bumped on disk after. Source checkouts now read
+  `pyproject.toml` directly; installed wheels still fall back to
+  `importlib.metadata`.
+- **Events page timestamps are now human-readable** (`Jun 1 14:23:45`,
+  local time) on both the server-rendered rows and the live SSE stream.
+  The machine-readable ISO timestamp stays in the `<time datetime="…">`
+  attribute for accessibility.
+
 ## [0.11.1] — 2026-06-01
 
 ### Changed

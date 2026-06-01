@@ -76,6 +76,20 @@ def create_app(
         static_url_path="/static",
     )
     app.testing = testing
+
+    # Human-readable timestamp filter for templates. Used by the events
+    # page so each row reads as "Jun  1 14:23:45" (local time) instead
+    # of a raw unix float. Same shape on the client streamer.
+    def _fmt_time(ts: float | int) -> str:
+        from datetime import datetime as _dt
+
+        try:
+            return _dt.fromtimestamp(float(ts)).strftime("%b %e %H:%M:%S").replace("  ", " ")
+        except (TypeError, ValueError, OSError):
+            return ""
+
+    app.jinja_env.filters["fmt_time"] = _fmt_time
+
     # Surfaced to templates so the admin UI can flag a --dev instance
     # (reddish-orange accent) and the mDNS advertiser picks tesserae-dev.local.
     app.config["DEV_MODE"] = dev
@@ -188,10 +202,28 @@ def create_app(
     if testing or is_watcher:
         telemetry = _Telemetry.disabled()
     else:
-        try:
-            _pkg_version = _metadata.version("tesserae")
-        except _metadata.PackageNotFoundError:
-            _pkg_version = "0.0.0"
+        # importlib.metadata reads frozen wheel metadata, so an
+        # ``-e .``-installed source checkout keeps reporting whatever
+        # pyproject.toml said at the last ``pip install`` — even if
+        # the version got bumped on disk after. Read pyproject.toml
+        # directly when it's there (source checkouts) and fall back
+        # to metadata for actual installed wheels.
+        _pkg_version = "0.0.0"
+        _pyproject = REPO_ROOT / "pyproject.toml"
+        if _pyproject.exists():
+            try:
+                import tomllib
+
+                _pkg_version = str(
+                    tomllib.loads(_pyproject.read_text(encoding="utf-8"))["project"]["version"]
+                )
+            except (OSError, KeyError, ValueError):
+                _pkg_version = "0.0.0"
+        if _pkg_version == "0.0.0":
+            try:
+                _pkg_version = _metadata.version("tesserae")
+            except _metadata.PackageNotFoundError:
+                _pkg_version = "0.0.0"
         telemetry = _Telemetry.from_settings(
             data_root=data_root,
             app_version=_pkg_version,

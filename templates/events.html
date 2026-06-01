@@ -54,7 +54,7 @@
         <code class="event-target">{{ ev.target }}</code>
       </div>
       <div class="event-sub">
-        <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|int }}</time>
+        <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|fmt_time }}</time>
         {% if ev.duration_s %}<span class="muted">·</span><span>{{ '%.3f'|format(ev.duration_s) }} s</span>{% endif %}
         {% if ev.digest %}<span class="muted">·</span><code class="digest">{{ ev.digest }}</code>{% endif %}
         {% if ev.error %}<span class="muted">·</span><span class="event-err">{{ ev.error }}</span>{% endif %}
