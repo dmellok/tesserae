@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.10] — 2026-06-02
+
+### Added
+
+- **App footer with version + GitHub link.** Subtle dotted-underline
+  link in the bottom margin of every page, deep-linked to the
+  matching release tag on GitHub (`/releases/tag/vX.Y.Z`). Reads as
+  "Tesserae v0.11.10". 60% opacity by default, brightens to 95% on
+  hover. Pure cosmetic; no layout impact above the fold.
+
 ## [0.11.9] — 2026-06-02
 
 ### Added

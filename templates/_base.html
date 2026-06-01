@@ -128,6 +128,11 @@
   <main class="page {% block page_class %}{% endblock %}">
     {% block main %}{% endblock %}
   </main>
+  <footer class="app-footer" aria-label="Project info">
+    <a href="https://github.com/dmellok/tesserae/releases/tag/v{{ config.APP_VERSION }}" target="_blank" rel="noopener" title="View v{{ config.APP_VERSION }} on GitHub">
+      Tesserae v{{ config.APP_VERSION }}
+    </a>
+  </footer>
   <script src="{{ url_for('static', filename='components.js') }}"></script>
   <script src="{{ url_for('static', filename='info-pop.js') }}"></script>
   <script src="{{ url_for('static', filename='icon-picker.js') }}"></script>
