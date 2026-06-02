@@ -135,6 +135,99 @@ def _font_face_css(fonts: dict[str, Font]) -> str:
     return "\n".join(rules)
 
 
+# Hydration-time hard caps. These bound the page-render budget against
+# misbehaving widgets — a single hung fetch shouldn't take the rest
+# down with it. Per-widget cap is sized comfortably above the slowest
+# legitimate fetch path (plugin_http.fetch_json at 15s + 1s backoff +
+# retry = ~31s). Overall is the budget the renderer's page.goto has
+# to land within.
+_HYDRATE_PER_WIDGET_TIMEOUT_S: float = 35.0
+_HYDRATE_OVERALL_TIMEOUT_S: float = 45.0
+# Max concurrent in-flight widget fetches. Eight is enough for typical
+# dashboards (~6 cells) without spawning a thread per cell on giant
+# dashboards.
+_HYDRATE_MAX_WORKERS: int = 8
+
+
+def _parallel_fetch_plugin_data(
+    cells_meta: list[dict[str, Any]],
+    panel_w: int,
+    panel_h: int,
+    preview: bool,
+) -> dict[int, Any]:
+    """Run each cell's ``server.py`` fetch() in a worker thread.
+
+    Returns ``{cell_index: data}``. Cells with no plugin or whose plugin
+    has no fetch() function are absent from the result (the caller
+    treats them as ``None``-data). Cells whose fetch raises or exceeds
+    the per-widget timeout get a ``{"error": …}`` payload, matching the
+    serial path's failure shape so widget templates keep rendering an
+    error state instead of crashing the whole page.
+    """
+    import concurrent.futures
+
+    indexed: list[tuple[int, str, dict[str, Any]]] = []
+    for idx, meta in enumerate(cells_meta):
+        plugin_id = meta["plugin_id"]
+        if not plugin_id:
+            continue
+        plugin = _registry().get(plugin_id)
+        if plugin is None or plugin.server_module is None:
+            continue
+        if getattr(plugin.server_module, "fetch", None) is None:
+            continue
+        indexed.append((idx, plugin_id, meta["resolved_options"]))
+
+    if not indexed:
+        return {}
+
+    # Capture the live Flask app object so worker threads can push
+    # ``app.app_context()`` themselves — ``current_app`` is a thread-
+    # local proxy and won't follow us off the request thread.
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+
+    def _worker(plugin_id: str, options: dict[str, Any]) -> Any:
+        with app.app_context():
+            return _fetch_plugin_data(plugin_id, options, panel_w, panel_h, preview)
+
+    results: dict[int, Any] = {}
+    max_workers = min(_HYDRATE_MAX_WORKERS, len(indexed))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_worker, plugin_id, options): idx for idx, plugin_id, options in indexed
+        }
+        try:
+            for fut in concurrent.futures.as_completed(futures, timeout=_HYDRATE_OVERALL_TIMEOUT_S):
+                idx = futures[fut]
+                try:
+                    results[idx] = fut.result(timeout=_HYDRATE_PER_WIDGET_TIMEOUT_S)
+                except Exception as err:
+                    logger.warning(
+                        "widget hydration failed (cell #%d): %s: %s",
+                        idx,
+                        type(err).__name__,
+                        err,
+                    )
+                    results[idx] = {"error": f"{type(err).__name__}: {err}"}
+        except concurrent.futures.TimeoutError:
+            # Overall budget blew; any unfinished cells get a synthetic
+            # error so the widget templates render a clear failure
+            # message rather than ``None`` (which most widgets handle
+            # as "no data").
+            for _fut, idx in futures.items():
+                if idx in results:
+                    continue
+                results[idx] = {
+                    "error": "TimeoutError: widget data fetch exceeded the page-render budget"
+                }
+            logger.warning(
+                "page hydration overall timeout (%.1fs); cells still running: %d",
+                _HYDRATE_OVERALL_TIMEOUT_S,
+                sum(1 for f in futures if not f.done()),
+            )
+    return results
+
+
 def _fetch_plugin_data(
     plugin_id: str,
     options: dict[str, Any],
@@ -205,7 +298,11 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
         ],
     }
 
-    cells_out: list[dict[str, Any]] = []
+    # First pass: assemble the layout, palette, font, options for each
+    # cell synchronously. These are all in-memory operations (registry
+    # lookups + token resolution); the slow part — server-side widget
+    # data fetches — is split out so it can run in parallel below.
+    cells_meta: list[dict[str, Any]] = []
     for cell in page_dict["cells"]:
         cell_palette = dict(
             _resolve_palette(cell["theme"], registry) if cell.get("theme") else page_palette
@@ -225,23 +322,47 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
         top_pad = outer_pad if cell["y"] == 0 else inner_pad
         right_pad = outer_pad if cell["x"] + cell["w"] == panel_w else inner_pad
         bottom_pad = outer_pad if cell["y"] + cell["h"] == panel_h else inner_pad
-        cells_out.append(
+        cells_meta.append(
             {
-                **cell,
-                "x": cell["x"] + left_pad,
-                "y": cell["y"] + top_pad,
-                "w": max(1, cell["w"] - left_pad - right_pad),
-                "h": max(1, cell["h"] - top_pad - bottom_pad),
-                "plugin": plugin_id or "",
-                "options": resolved_options,
-                "data": (
-                    _fetch_plugin_data(plugin_id, resolved_options, panel_w, panel_h, preview)
-                    if plugin_id
-                    else None
-                ),
+                "cell": cell,
+                "plugin_id": plugin_id,
+                "resolved_options": resolved_options,
+                "layout": {
+                    "x": cell["x"] + left_pad,
+                    "y": cell["y"] + top_pad,
+                    "w": max(1, cell["w"] - left_pad - right_pad),
+                    "h": max(1, cell["h"] - top_pad - bottom_pad),
+                },
                 "palette": cell_palette,
                 "font_family": cell_font_family,
                 "full_bleed": full_bleed,
+            }
+        )
+
+    # Second pass: fetch widget data in parallel. Before this, slow
+    # upstreams (Open-Meteo, GitHub, …) added up — six 15s timeouts
+    # in series is 90s, blowing past Playwright's navigation budget
+    # and surfacing as a blank/timeout PNG. Workers share the Flask
+    # app context the caller holds so each fetch can still read
+    # SETTINGS_STORE / plugin registry from current_app.
+    data_by_cell_index: dict[int, Any] = _parallel_fetch_plugin_data(
+        cells_meta, panel_w, panel_h, preview
+    )
+
+    cells_out: list[dict[str, Any]] = []
+    for idx, meta in enumerate(cells_meta):
+        cell = meta["cell"]
+        plugin_id = meta["plugin_id"]
+        cells_out.append(
+            {
+                **cell,
+                **meta["layout"],
+                "plugin": plugin_id or "",
+                "options": meta["resolved_options"],
+                "data": data_by_cell_index.get(idx),
+                "palette": meta["palette"],
+                "font_family": meta["font_family"],
+                "full_bleed": meta["full_bleed"],
             }
         )
 

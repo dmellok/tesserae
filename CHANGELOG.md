@@ -8,6 +8,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.9] — 2026-06-02
+
+### Fixed
+
+- **Widget data fetches now run in parallel per page render.** The
+  hydration loop in `app/composer.py` fetched each cell's `server.py`
+  fetch() serially: six widgets each waiting 15s on a slow upstream
+  meant 90s of compose-endpoint time, which blew past Playwright's
+  navigation budget and surfaced as a blank PNG or a "TimeoutError:
+  the read operation timed out" rendered into the cell. Hydration now
+  uses a `ThreadPoolExecutor` (max 8 workers), so a dashboard's
+  render time is bound by the slowest single widget rather than
+  their sum. Two safety caps: per-widget 35s, overall 45s — beyond
+  those an unfinished cell gets a synthetic `{"error": …}` so the
+  widget template renders a clean failure state rather than blocking
+  the whole page.
+
 ## [0.12.8] — 2026-06-02
 
 ### Fixed
