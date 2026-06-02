@@ -52,6 +52,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve edge version
+        # Builds a per-commit immutable tag that the companion HA Add-on's
+        # edge channel pins to. Format: ``<pyproject-version>-edge.<sha7>``,
+        # e.g. ``0.11.14-edge.265bd45``. Only meaningful on main pushes
+        # (where the add-on sync workflow will then bump the edge add-on's
+        # ``version:`` field to match); on tag pushes the stable flow
+        # already covers tagging, so the extra raw tag is a harmless dup.
+        id: edge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          ver="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
+          sha="$(echo '${{ github.sha }}' | cut -c1-7)"
+          edge_tag="${ver}-edge.${sha}"
+          echo "tag=${edge_tag}" >> "$GITHUB_OUTPUT"
+          echo "Resolved edge tag: ${edge_tag}"
+
       - name: Compute image tags
         id: meta
         uses: docker/metadata-action@v5
@@ -68,6 +84,10 @@ jobs:
             # the most recent semver tag.
             type=ref,event=branch
             type=raw,value=latest,enable={{is_default_branch}}
+            # Push to main → :<pyproject>-edge.<sha7> for the HA Add-on
+            # edge channel to pin to. ``enable=`` makes the tag conditional
+            # so non-main events don't try to push an empty value.
+            type=raw,value=${{ steps.edge.outputs.tag }},enable=${{ steps.edge.outputs.tag != '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6

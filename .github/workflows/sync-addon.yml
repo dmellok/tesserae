@@ -1,45 +1,46 @@
-# Sync the companion HA Add-on repo on every published GitHub Release.
+# Sync the companion HA Add-on repo.
 #
-# Triggers:
-#   * release: published — when ``gh release create vX.Y.Z --latest …``
-#     fires (the explicit user-facing "this is shipped" signal — not
-#     every patch tag).
-#   * workflow_dispatch — manual run with an explicit version, useful
-#     for back-filling or smoke-testing the sync.
+# Two channels, two jobs:
 #
-# What it does on the add-on repo
-# (https://github.com/dmellok/homeassistant-tesserae-addon):
-#   * tesserae/config.yaml   — ``version: "X.Y.Z"``
-#   * tesserae/Dockerfile    — ``ghcr.io/dmellok/tesserae:X.Y.Z``
-#   * tesserae/CHANGELOG.md  — prepend "## X.Y.Z — <date>" entry
-#     linking back to the core release.
-# Then commits + pushes to the add-on repo.
+# * **stable**: triggered on ``release: published`` + ``workflow_dispatch``.
+#   Bumps ``tesserae/config.yaml`` to the release version. Fires when
+#   ``gh release create vX.Y.Z --latest …`` runs; routine patch tags
+#   that don't carry a Release do not churn the add-on.
 #
-# Requires the ``ADDON_REPO_PAT`` secret: a fine-grained GitHub PAT
-# scoped to ``Contents: read+write`` on the add-on repo only.
-# Belt-and-braces — using the default ``GITHUB_TOKEN`` wouldn't reach
-# across repos, and a broader PAT would be over-permissioned.
+# * **edge**: triggered on ``push: branches: [main]``.
+#   Bumps ``tesserae-edge/config.yaml`` to ``<pyproject>-edge.<sha7>``.
+#   The matching docker image tag is pushed by ``docker.yml`` on the
+#   same main-push event, so HA Supervisor's pull always resolves.
+#
+# Both jobs push a single commit to
+# https://github.com/dmellok/homeassistant-tesserae-addon via the
+# ``ADDON_REPO_PAT`` secret (fine-grained PAT, Contents: read+write on
+# the add-on repo only).
 
 name: sync-addon
 
 on:
   release:
     types: [published]
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to sync (without leading 'v'). Defaults to the latest release."
+        description: "Version to sync (stable channel; without leading 'v'). Defaults to the latest release."
         required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: sync-addon
+  group: sync-addon-${{ github.event_name }}
   cancel-in-progress: false
 
 jobs:
-  bump:
+  # Stable bump — release: published + workflow_dispatch.
+  bump-stable:
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Resolve version
@@ -68,8 +69,6 @@ jobs:
           repository: dmellok/homeassistant-tesserae-addon
           token: ${{ secrets.ADDON_REPO_PAT }}
           path: addon
-          # Full history so we don't accidentally rebase or amend; we
-          # only ever add a single commit on top.
           fetch-depth: 0
 
       - name: Bump config.yaml + Dockerfile + CHANGELOG
@@ -79,31 +78,18 @@ jobs:
           TAG: ${{ steps.ver.outputs.tag }}
         run: |
           set -euo pipefail
-          # 1. config.yaml: replace `version: "X.Y.Z"` (any value) with
-          #    the new one. The regex anchors on the start of the line
-          #    so a `version:` inside a description block can't match.
           sed -i -E "s/^(version:[[:space:]]*\")[^\"]+(\".*)$/\1${VERSION}\2/" tesserae/config.yaml
 
-          # 2. Dockerfile: replace any tag on the tesserae image
-          #    reference. Matches numbers + a `latest` literal as well
-          #    in case the file was hand-edited to that earlier. The
-          #    add-on uses ``image:`` in config.yaml and no custom
-          #    Dockerfile by default; skip silently when the file's
-          #    been removed.
           if [ -f tesserae/Dockerfile ]; then
               sed -i -E "s|(ghcr\.io/dmellok/tesserae:)[0-9A-Za-z._-]+|\1${VERSION}|g" tesserae/Dockerfile
           fi
 
-          # 3. CHANGELOG.md: prepend a new entry directly after the
-          #    `# Changelog` H1. If the H1 is missing (older file
-          #    format), prepend to the top of the file.
           date_iso="$(date -u +'%Y-%m-%d')"
           entry="## ${VERSION} — ${date_iso}
 
           - Tracks Tesserae [${TAG}](https://github.com/dmellok/tesserae/releases/tag/${TAG}).
 
           "
-          # Strip the leading indent that the heredoc preserves.
           entry="$(printf '%s' "${entry}" | sed -E 's/^ {10}//')"
 
           python3 - <<PYEOF
@@ -114,8 +100,6 @@ jobs:
           marker = "# Changelog\n"
           if marker in src:
               head, _, rest = src.partition(marker)
-              # Skip any blank line right after the H1 so the new entry
-              # sits flush against the title-then-blank pattern.
               rest = rest.lstrip("\n")
               p.write_text(head + marker + "\n" + entry + rest, encoding="utf-8")
           else:
@@ -131,9 +115,6 @@ jobs:
           set -euo pipefail
           git config user.name "tesserae-bot"
           git config user.email "[email protected]"
-          # Stage only files that exist; tolerate the Dockerfile being
-          # absent (the add-on switched to `image:` + `environment:`
-          # in config.yaml and dropped the wrapper).
           git add tesserae/config.yaml tesserae/CHANGELOG.md
           [ -f tesserae/Dockerfile ] && git add tesserae/Dockerfile || true
           if git diff --cached --quiet; then
@@ -142,7 +123,118 @@ jobs:
           fi
           git commit -m "Track Tesserae ${TAG}
 
-          Auto-synced by sync-addon.yml on the core repo.
+          Auto-synced by sync-addon.yml (stable channel).
           Release: https://github.com/dmellok/tesserae/releases/tag/${TAG}"
           git push
-          echo "Bumped add-on to ${VERSION} on the main branch."
+          echo "Bumped stable add-on to ${VERSION}."
+
+  # Edge bump — push: branches: [main]. Tracks every main commit.
+  bump-edge:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tesserae core (for pyproject.toml + log subject)
+        uses: actions/checkout@v6
+        with:
+          # Just the tip commit — we only need pyproject.toml + the
+          # commit subject for the CHANGELOG entry.
+          fetch-depth: 2
+
+      - name: Resolve edge version
+        id: ver
+        env:
+          GITHUB_SHA_FULL: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Pyproject version is the "base" of the edge version string —
+          # so an edge of 0.11.14-era main pushes resolves to
+          # 0.11.14-edge.<sha7>. Matches the docker.yml edge-tag step.
+          base="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
+          sha="$(echo "${GITHUB_SHA_FULL}" | cut -c1-7)"
+          edge_version="${base}-edge.${sha}"
+          subject="$(git log -1 --pretty=format:'%s' "${GITHUB_SHA_FULL}")"
+          # Escape backticks / quotes for safety later — leave most punctuation.
+          echo "version=${edge_version}" >> "$GITHUB_OUTPUT"
+          echo "sha=${sha}" >> "$GITHUB_OUTPUT"
+          {
+            echo "subject<<SUBJ_EOF"
+            echo "${subject}"
+            echo "SUBJ_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "Resolved edge version=${edge_version} sha=${sha}"
+
+      - name: Check out add-on repo
+        uses: actions/checkout@v6
+        with:
+          repository: dmellok/homeassistant-tesserae-addon
+          token: ${{ secrets.ADDON_REPO_PAT }}
+          path: addon
+          fetch-depth: 0
+
+      - name: Bump tesserae-edge/config.yaml + CHANGELOG
+        working-directory: addon
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.ver.outputs.sha }}
+          SUBJECT: ${{ steps.ver.outputs.subject }}
+          FULL_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # If the edge directory doesn't exist yet, give up loudly —
+          # we scaffold it manually once; the workflow doesn't try to
+          # create it.
+          if [ ! -d tesserae-edge ]; then
+              echo "::warning::tesserae-edge/ not present on the add-on repo — skipping. Scaffold it first."
+              exit 0
+          fi
+
+          sed -i -E "s/^(version:[[:space:]]*\")[^\"]+(\".*)$/\1${VERSION}\2/" tesserae-edge/config.yaml
+
+          date_iso="$(date -u +'%Y-%m-%d')"
+          # Single-line subject keeps the entry compact since edge ships
+          # many commits per day.
+          entry="## ${VERSION} — ${date_iso}
+
+          - [\`${SHA}\`](https://github.com/dmellok/tesserae/commit/${FULL_SHA}) ${SUBJECT}
+
+          "
+          entry="$(printf '%s' "${entry}" | sed -E 's/^ {10}//')"
+
+          python3 - <<PYEOF
+          from pathlib import Path
+          p = Path("tesserae-edge/CHANGELOG.md")
+          src = p.read_text(encoding="utf-8") if p.exists() else ""
+          entry = """${entry}"""
+          marker = "# Changelog\n"
+          if marker in src:
+              head, _, rest = src.partition(marker)
+              rest = rest.lstrip("\n")
+              p.write_text(head + marker + "\n" + entry + rest, encoding="utf-8")
+          else:
+              p.write_text("# Changelog\n\n" + entry + src, encoding="utf-8")
+          PYEOF
+
+      - name: Commit + push
+        working-directory: addon
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SHA: ${{ steps.ver.outputs.sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -d tesserae-edge ]; then
+              echo "No edge dir to commit — exiting cleanly."
+              exit 0
+          fi
+          git config user.name "tesserae-bot"
+          git config user.email "[email protected]"
+          git add tesserae-edge/config.yaml tesserae-edge/CHANGELOG.md
+          if git diff --cached --quiet; then
+              echo "Edge add-on already at ${VERSION} — nothing to commit."
+              exit 0
+          fi
+          git commit -m "edge: track Tesserae main @ ${SHA}
+
+          Auto-synced by sync-addon.yml (edge channel).
+          Commit: https://github.com/dmellok/tesserae/commit/${SHA}"
+          git push
+          echo "Bumped edge add-on to ${VERSION}."

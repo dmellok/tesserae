@@ -8,6 +8,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.15] — 2026-06-02
+
+### Added
+
+- **HA Add-on edge channel.** Every push to `main` now builds and
+  publishes a per-commit Docker tag
+  `ghcr.io/dmellok/tesserae:<pyproject>-edge.<sha7>` (in addition
+  to the existing `:main` and `:latest`). The companion add-on repo
+  gained a parallel `tesserae-edge/` add-on definition that tracks
+  those tags via the sync-addon workflow, which now has two jobs:
+  - `bump-stable` — fires on `release: published`, edits
+    `tesserae/config.yaml`.
+  - `bump-edge` — fires on `push: branches: [main]`, edits
+    `tesserae-edge/config.yaml` to the per-commit edge version.
+  HA users see two add-ons in the store. Stable installs the
+  released Tesserae; edge installs whatever's on `main` right now.
+  Both can be installed in parallel (different `slug:`, different
+  persistent `/data` volume); edge intentionally doesn't expose
+  port 8000 on the host so it can coexist with stable.
+
 ## [0.11.14] — 2026-06-02
 
 ### Fixed
