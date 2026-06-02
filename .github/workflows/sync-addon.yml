@@ -131,7 +131,11 @@ jobs:
           set -euo pipefail
           git config user.name "tesserae-bot"
           git config user.email "[email protected]"
-          git add tesserae/config.yaml tesserae/Dockerfile tesserae/CHANGELOG.md
+          # Stage only files that exist; tolerate the Dockerfile being
+          # absent (the add-on switched to `image:` + `environment:`
+          # in config.yaml and dropped the wrapper).
+          git add tesserae/config.yaml tesserae/CHANGELOG.md
+          [ -f tesserae/Dockerfile ] && git add tesserae/Dockerfile || true
           if git diff --cached --quiet; then
               echo "Add-on already at version ${VERSION} — nothing to commit."
               exit 0
