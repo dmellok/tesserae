@@ -8,6 +8,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.13] — 2026-06-02
+
+### Fixed
+
+- **First push of a dashboard with a slow upstream painted
+  "TimeoutError" into the cell; pushing again worked.** Users found
+  themselves manually double-pushing because the executor's stragglers
+  finished after the timeout and populated the on-disk cache, so the
+  second attempt hit cache and rendered fine. The composer now keeps a
+  process-lifetime "last-good" cache keyed on
+  (plugin_id, options, panel_w, panel_h); when a widget hydration
+  errors (or exceeds the 12s overall cap), we fall back to the most
+  recent successful result for the same key instead of rendering an
+  error state. Net effect: a transient upstream blip shows
+  stale-but-real data, not red error text. Cleared on process restart
+  (a fresh install has no fallback to serve anyway).
+
 ## [0.12.12] — 2026-06-02
 
 ### Fixed

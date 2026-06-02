@@ -12,6 +12,7 @@ embeds the result as ``data-data`` on the cell so client.js receives it via
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -148,6 +149,28 @@ _HYDRATE_OVERALL_TIMEOUT_S: float = 12.0
 # dashboards.
 _HYDRATE_MAX_WORKERS: int = 8
 
+# Process-lifetime "last good" cache. When a widget's server.py fetch()
+# returns an error dict (or its fetch was cancelled by the hydration
+# timeout), the composer falls back to the most recent successful
+# result for the same (plugin_id, options, panel size) tuple. Without
+# this, the first push of a dashboard with a slow upstream paints a
+# "TimeoutError" into the cell; the second push (after the executor's
+# straggler completes and writes the on-disk cache) is the workaround
+# users found themselves doing manually. Now they don't have to —
+# pushes after the first one show stale-but-real data instead of an
+# error state. Cleared on process restart, which is fine for fresh
+# installs (no fallback available either way).
+_LAST_GOOD_DATA: dict[str, Any] = {}
+
+
+def _last_good_key(plugin_id: str, options: dict[str, Any], panel_w: int, panel_h: int) -> str:
+    """Stable key for ``_LAST_GOOD_DATA``. Same widget at the same panel
+    dims with the same options resolves to the same key, so the fallback
+    is on-target rather than serving a 1200×1600 result into a tall
+    portrait cell."""
+    opts = json.dumps(options, sort_keys=True, default=str)
+    return f"{plugin_id}::{panel_w}x{panel_h}::{opts}"
+
 
 def _parallel_fetch_plugin_data(
     cells_meta: list[dict[str, Any]],
@@ -191,6 +214,15 @@ def _parallel_fetch_plugin_data(
             return _fetch_plugin_data(plugin_id, options, panel_w, panel_h, preview)
 
     results: dict[int, Any] = {}
+    # Cells whose result was synthesised by US (executor caught an
+    # exception, or the future never completed before the overall
+    # timeout) rather than returned by the widget's own ``fetch()``.
+    # Only these are candidates for the last-good fallback — a widget
+    # that legitimately returns something error-shaped (e.g.
+    # ``{"connected": false, "error": "Spotify not connected"}``) is
+    # providing real data and must NOT get overridden by a stale prior
+    # result.
+    synthesised_errors: set[int] = set()
     max_workers = min(_HYDRATE_MAX_WORKERS, len(indexed))
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
@@ -209,6 +241,7 @@ def _parallel_fetch_plugin_data(
                         err,
                     )
                     results[idx] = {"error": f"{type(err).__name__}: {err}"}
+                    synthesised_errors.add(idx)
         except concurrent.futures.TimeoutError:
             # Overall budget blew; any unfinished cells get a synthetic
             # error so the widget templates render a clear failure
@@ -220,11 +253,30 @@ def _parallel_fetch_plugin_data(
                 results[idx] = {
                     "error": "TimeoutError: widget data fetch exceeded the page-render budget"
                 }
+                synthesised_errors.add(idx)
             logger.warning(
                 "page hydration overall timeout (%.1fs); cells still running: %d",
                 _HYDRATE_OVERALL_TIMEOUT_S,
                 sum(1 for f in futures if not f.done()),
             )
+
+    # Last-good fallback. Walk each cell's result; if it came back from
+    # ``fetch()`` cleanly (whatever its shape — including widget-
+    # returned error states), stash it under its (plugin, options,
+    # panel) key. If we synthesised the error (executor exception or
+    # overall timeout), try to serve the previous successful result.
+    for idx, plugin_id, options in indexed:
+        result = results.get(idx)
+        if result is None:
+            continue
+        key = _last_good_key(plugin_id, options, panel_w, panel_h)
+        if idx not in synthesised_errors:
+            _LAST_GOOD_DATA[key] = result
+            continue
+        fallback = _LAST_GOOD_DATA.get(key)
+        if fallback is not None:
+            logger.info("widget hydration fallback to last-good for cell #%d (%s)", idx, plugin_id)
+            results[idx] = fallback
     return results
 
 
