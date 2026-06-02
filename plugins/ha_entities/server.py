@@ -56,11 +56,19 @@ def _icon_for(entity_id: str, attrs: dict[str, Any], status: str) -> str:
 
 
 def _humanise(raw: str, unit: str) -> str:
+    """Format an HA state for display. Numeric states are rounded to
+    two decimal places (then trimmed of trailing zeros) so a noisy
+    sensor reading like ``18.42857`` reads ``18.43`` instead of taking
+    up half a cell. Non-numeric states fall through unchanged with
+    underscores → spaces and title-case."""
     try:
-        float(raw)
-        return f"{raw} {unit}".strip()
+        value = float(raw)
     except ValueError:
         return raw.replace("_", " ").capitalize()
+    rounded = round(value, 2)
+    # Trim trailing zeros so 21.00 → "21" and 18.40 → "18.4".
+    rendered = f"{rounded:g}"
+    return f"{rendered} {unit}".strip()
 
 
 def choices(name: str) -> list[dict[str, str]]:

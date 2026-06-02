@@ -86,7 +86,9 @@ def test_downsamples_and_clamps_hours(app: Flask, monkeypatch) -> None:
         monkeypatch.setattr(core, "get_states", lambda: _STATES)
         monkeypatch.setattr(core, "history", fake_history)
         out = hist.fetch({"entities": "sensor.temp", "hours": 9999}, {}, ctx={})
-    assert captured["hours"] == 168
+    # 3-month upper bound — widened from 168h (1 week) when the new
+    # ``window`` select grew long-range presets in v0.3.1.
+    assert captured["hours"] == 2160
     vals = out["items"][0]["values"]
     assert len(vals) <= 80 and vals[0] == 0.0 and vals[-1] == 499.0
 

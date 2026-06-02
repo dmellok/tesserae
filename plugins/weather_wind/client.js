@@ -105,6 +105,7 @@ function styleBlock() {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
+    <link rel="stylesheet" href="/static/icons/phosphor/fill/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus-wx.css">
   `;

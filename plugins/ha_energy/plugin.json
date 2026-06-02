@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Energy",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.",
+  "icon": "ph-lightning",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "solar_entity", "type": "select", "label": "Solar power entity", "default": "", "choices_from": "entity" },
+    { "name": "grid_entity", "type": "select", "label": "Grid power entity (+ import / − export)", "default": "", "choices_from": "entity" },
+    { "name": "battery_entity", "type": "select", "label": "Battery power entity (+ charge / − discharge)", "default": "", "choices_from": "entity" },
+    { "name": "house_entity", "type": "select", "label": "House consumption entity", "default": "", "choices_from": "entity" },
+    { "name": "battery_soc_entity", "type": "select", "label": "Battery SoC entity (optional)", "default": "", "choices_from": "entity" },
+    { "name": "solar_today_entity", "type": "select", "label": "Solar energy today (kWh) entity (optional)", "default": "", "choices_from": "entity" },
+    { "name": "label", "type": "string", "label": "Place label", "default": "Home" },
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Refined" },
+        { "value": "g2", "label": "2 · Geometric" },
+        { "value": "s3", "label": "3 · Swiss" },
+        { "value": "d4", "label": "4 · Data" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

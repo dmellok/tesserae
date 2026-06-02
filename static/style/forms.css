@@ -834,7 +834,26 @@ input[type="range"].slider:focus::-moz-range-thumb {
   border-top: 1px solid var(--t-border);
 }
 .multiselect-opt:first-of-type { border-top: 0; }
-.multiselect-opt input { position: absolute; opacity: 0; pointer-events: none; }
+/* Canonical "visually hidden" idiom — clipped to a 1px footprint so the
+ * browser's "scroll focused element into view" treats the checkbox as
+ * an in-flow element with negligible bounds. The previous
+ * ``position: absolute; opacity: 0`` made the hidden checkbox occupy
+ * its parent label's full size, and clicking an option further down a
+ * scrollable .multiselect-list propagated the auto-focus scroll up
+ * to the document and yanked the whole page back to the top. */
+.multiselect-opt input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .multiselect-opt:hover { background: var(--t-surface-soft); }
 .multiselect-tick {
   flex: 0 0 auto;

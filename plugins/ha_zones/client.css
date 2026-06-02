@@ -1,0 +1,16 @@
+/* ha_zones — all variant styling lives inline in client.js via the
+ * shared widget-bauhaus-wx tokens. This file only holds the error
+ * shell selector. */
+
+.root.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--c-danger, #c44a3a);
+  background: var(--c-bg, #fff);
+  height: 100%;
+  box-sizing: border-box;
+}

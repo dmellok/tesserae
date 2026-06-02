@@ -301,12 +301,29 @@
 }
 .c4-tile--sep { border-left: 1px solid color-mix(in srgb, var(--c-line) 50%, transparent); }
 .c4-gauge {
-  width: clamp(80px, 22cqmin, 160px);
-  height: clamp(80px, 22cqmin, 160px);
+  /* Fill the tile rather than capping at a fixed ratio of the virtual
+   * cell. Previously ``clamp(80px, 22cqmin, 160px)`` made the gauge
+   * shrink-proof but also growth-proof — the cqmin ratio cancels out the
+   * per-cell zoom (zoom shrinks the virtual viewport, then transform
+   * scales it back up, so the gauge stays the same visual size at any
+   * zoom). Using % of the parent tile lets the gauge actually respond
+   * to the zoom slider: the user dials up zoom, the tile renders smaller
+   * virtually but the gauge still fills it, and the outer transform
+   * scales the whole thing up for a bigger visible dial.
+   *
+   * ``min(100%, 360px)`` keeps very-wide single-entity layouts from
+   * blowing the dial up to absurdity at low zoom; aspect-ratio keeps it
+   * perfectly circular without needing height: cqmin too. */
+  width: min(100%, 360px);
+  aspect-ratio: 1 / 1;
+  height: auto;
 }
 .c4-gauge-text {
   font-family: var(--theme-font, system-ui);
   font-weight: 900;
+  /* The SVG viewBox is 0–150; ``font-size`` here is interpreted in user
+   * units, so 30 is ~20% of the viewBox width — proportional to the
+   * gauge's visual size regardless of how big it renders. */
   font-size: 30px;
   fill: var(--c-text);
 }

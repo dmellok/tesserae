@@ -48,6 +48,18 @@ _DOMAIN_ICONS: dict[str, str] = {
 _UNAVAILABLE = {"unavailable", "unknown", "none", ""}
 
 
+def _format_value(raw: str) -> str:
+    """Round numeric HA states to 2 decimal places (then trim trailing
+    zeros so 21.00 → "21" / 18.40 → "18.4"). Non-numeric states pass
+    through unchanged so a state like ``on`` or ``cooling`` keeps its
+    spelling."""
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return raw
+    return f"{round(value, 2):g}"
+
+
 def _core() -> Any:
     plugin = current_app.config["PLUGIN_REGISTRY"].get("ha_core")
     return plugin.server_module if plugin is not None else None
@@ -109,7 +121,7 @@ def fetch(
         items.append(
             {
                 "name": core.friendly_name(st),
-                "value": raw,
+                "value": _format_value(raw),
                 "unit": str(attrs.get("unit_of_measurement") or "") if show_unit else "",
                 "icon": _icon_for(eid, attrs),
                 "unavailable": raw.lower() in _UNAVAILABLE,

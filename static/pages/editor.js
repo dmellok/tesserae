@@ -407,7 +407,12 @@
       if (match) target = card;
     });
     if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    // ``block: "nearest"`` only scrolls when the card is actually out of
+    // view — previously ``"center"`` would jump the page whenever the
+    // user clicked any cell-area item, which was disorienting on long
+    // list widgets (ha_entities, ha_history) where the user clicked an
+    // entity row to inspect it.
+    target.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const field = target.querySelector("select, input, textarea, button");
     if (field) {
       try { field.focus({ preventScroll: true }); } catch (e) { field.focus(); }

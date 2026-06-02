@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Lights",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.",
+  "icon": "ph-lightbulb",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "entities", "type": "multiselect", "label": "Lights to show (blank = every light in HA)", "default": [], "choices_from": "entity" },
+    { "name": "label", "type": "string", "label": "Place label", "default": "Home" },
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Refined" },
+        { "value": "g2", "label": "2 · Geometric" },
+        { "value": "s3", "label": "3 · Swiss" },
+        { "value": "d4", "label": "4 · Data" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

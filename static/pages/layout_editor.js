@@ -431,8 +431,22 @@
       alert("Can't delete the last cell.");
       return;
     }
+    // Absorption needs a neighbour (or a row/column of neighbours) that
+    // tiles the deleted cell's edge exactly. If no direction qualifies
+    // we'd leave a literal hole in the panel partition — and any edge
+    // that *was* shared with the deleted cell is no longer shared with
+    // anything, so the user can't resize the cells on either side. Bail
+    // out with a clear hint instead of silently breaking the layout.
+    const updates = findAbsorbers(cell);
+    if (updates === null) {
+      alert(
+        "Can't delete this cell — no neighbour can absorb the gap.\n\n" +
+          "Resize or delete one of the adjacent cells first so a single " +
+          "row or column lines up with this one's edge.",
+      );
+      return;
+    }
     if (!confirm("Delete this cell?")) return;
-    const updates = findAbsorbers(cell) || [];
     postBatch({ deletes: [cell.id], updates }, { reload: true }).catch(reportErr);
   }
 

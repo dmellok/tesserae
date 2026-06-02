@@ -53,11 +53,19 @@ def _downsample(values: list[float], cap: int = _MAX_POINTS) -> list[float]:
 
 
 def _clamp_hours(raw: Any) -> int:
+    """Coerce a window option to a sane hour count.
+
+    Accepts either the new ``window`` select (preset string-of-int from
+    the plugin.json choices) or the legacy ``hours`` number field that
+    earlier cells were saved with. Clamps 1 hour ≤ window ≤ 3 months —
+    HA's history API can technically span longer but the widget would
+    spend most of its time downsampling for a chart that won't read
+    meaningfully on an e-ink panel anyway."""
     try:
         h = int(float(raw))
     except (TypeError, ValueError):
         return 24
-    return max(1, min(h, 168))  # 1 hour … 1 week
+    return max(1, min(h, 2160))  # 1 hour … 90 days
 
 
 def _trend(values: list[float]) -> str:
@@ -86,7 +94,12 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
     name = core.friendly_name(st)
     unit = str(attrs.get("unit_of_measurement") or "")
     raw_state = str(st.get("state") or "")
-    current = "" if raw_state.lower() in _UNAVAILABLE else raw_state
+    # Round numeric current values to 2 decimal places (trimmed) so the
+    # widget doesn't render ``18.42857143`` in the hero numeral.
+    current = ""
+    if raw_state.lower() not in _UNAVAILABLE:
+        current_f = _to_float(raw_state)
+        current = f"{round(current_f, 2):g}" if current_f is not None else raw_state
 
     samples = core.history(eid, hours=hours)
     values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
@@ -100,6 +113,10 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
             "trend": "flat",
         }
     values = _downsample(values)
+    # Round each sample to 2 decimals so the chart's tooltip / axis
+    # labels stay clean (the chart itself just plots floats so the
+    # rounding is purely cosmetic at the client layer).
+    values = [round(v, 2) for v in values]
     lo, hi = min(values), max(values)
     return {
         "name": name,
@@ -126,7 +143,9 @@ def fetch(
     if not wanted:
         return {"empty": True, "title": title}
 
-    hours = _clamp_hours(options.get("hours", 24))
+    # Prefer the new ``window`` select; fall back to ``hours`` for cells
+    # saved before the picker existed.
+    hours = _clamp_hours(options.get("window") or options.get("hours") or 24)
 
     try:
         states = core.get_states()

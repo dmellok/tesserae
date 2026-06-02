@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Locks & Doors",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.",
+  "icon": "ph-lock",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "label", "type": "string", "label": "Place label", "default": "Doors & locks" },
+    { "name": "entities", "type": "multiselect", "label": "Entities to show (blank = auto-discover locks + door/window sensors)", "default": [], "choices_from": "entity" },
+    { "name": "include_doors", "type": "boolean", "label": "Include door sensors (auto-discover only)", "default": true },
+    { "name": "include_windows", "type": "boolean", "label": "Include window sensors (auto-discover only)", "default": true },
+    { "name": "limit", "type": "number", "label": "Max entries shown", "default": 12 },
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Refined" },
+        { "value": "g2", "label": "2 · Geometric" },
+        { "value": "s3", "label": "3 · Swiss" },
+        { "value": "d4", "label": "4 · Data" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}

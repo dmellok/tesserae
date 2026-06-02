@@ -23,7 +23,22 @@
     },
     { "name": "title", "type": "string", "label": "Title (blank = entity name / \"History\")", "default": "" },
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
-    { "name": "hours", "type": "number", "label": "Window (hours)", "default": 24 }
+    {
+      "name": "window",
+      "type": "select",
+      "label": "Time window",
+      "default": "24",
+      "choices": [
+        { "value": "6", "label": "Last 6 hours" },
+        { "value": "12", "label": "Last 12 hours" },
+        { "value": "24", "label": "Last 24 hours" },
+        { "value": "72", "label": "Last 3 days" },
+        { "value": "168", "label": "Last week" },
+        { "value": "336", "label": "Last 2 weeks" },
+        { "value": "720", "label": "Last month" },
+        { "value": "2160", "label": "Last 3 months" }
+      ]
+    }
   ],
   "render": { "dither": "none", "needs_network": true }
 }

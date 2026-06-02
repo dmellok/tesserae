@@ -1,0 +1,26 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Media",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Four selectable visual directions. Requires the Home Assistant Core plugin.",
+  "icon": "ph-play-circle",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    { "name": "entity_id", "type": "select", "label": "media_player entity", "default": "", "choices_from": "entity" },
+    { "name": "show_progress", "type": "boolean", "label": "Show progress bar", "default": true },
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Refined" },
+        { "value": "g2", "label": "2 · Geometric" },
+        { "value": "s3", "label": "3 · Swiss" },
+        { "value": "d4", "label": "4 · Data" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": true }
+}
