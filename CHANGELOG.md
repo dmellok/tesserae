@@ -8,6 +8,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.16] — 2026-06-02
+
+### Fixed
+
+- **HA Add-on: panel base_url pointed at the docker bridge IP.**
+  Tesserae's `detect_local_ip()` used a UDP-getsockname trick to find
+  the host's outbound IPv4. Under `host_network: false` (which all HA
+  Add-ons use) the trick returns the docker bridge address
+  (172.x.x.x), which no LAN client can reach. Panels listening for
+  MQTT push frames or polling the TRMNL BYOS endpoint at that URL
+  would silently fail. Resolution order is now:
+  1. `TESSERAE_HOST_IP` env var (unchanged, always wins).
+  2. HA Supervisor's `/network/info` API — picks the primary
+     interface's IPv4 address. Only reachable when
+     `hassio_api: true` is set on the add-on (both add-on definitions
+     bump that in the companion repo).
+  3. The existing UDP-getsockname trick.
+
+  Result is cached for the process lifetime so we don't hammer the
+  Supervisor API on every `detect_local_ip()` call (multiple admin
+  routes / page renders use it).
+
 ## [0.11.15] — 2026-06-02
 
 ### Added

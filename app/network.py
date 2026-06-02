@@ -11,29 +11,112 @@ mypy --strict applies to this module — see pyproject.toml.
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import socket
+import urllib.error
+import urllib.request
+
+logger = logging.getLogger(__name__)
+
+
+# Cached Supervisor lookup. The host IP doesn't change between
+# Tesserae restarts (and if it does, the user restarts the add-on
+# anyway), so a process-lifetime cache is fine. The sentinel
+# distinguishes "never looked up" from "looked up, got None" — without
+# it we'd re-query on every detect_local_ip call when Supervisor is
+# unreachable.
+_SUPERVISOR_IP_CACHE: tuple[str | None] | None = None
+
+
+def _supervisor_host_ip() -> str | None:
+    """Ask HA Supervisor for the host's LAN address.
+
+    Under the official HA Add-on, the container runs on a docker bridge
+    network. ``detect_local_ip()``'s socket trick would return the
+    bridge IP (172.x.y.z), which LAN panels can't reach. HA Supervisor
+    knows the host's real LAN address and exposes it through the
+    add-on API at ``http://supervisor/network/info`` — guarded by a
+    bearer token Supervisor injects as ``SUPERVISOR_TOKEN`` whenever
+    ``hassio_api: true`` is set on the add-on.
+
+    Returns the primary interface's first IPv4 address with the CIDR
+    suffix stripped, or ``None`` when we're not in an HA Add-on (no
+    token), the API call fails (network blip), or the host has no
+    routable IPv4 (IPv6-only). The caller falls back to the socket
+    trick in those cases.
+
+    Result is cached for the process lifetime so repeated calls don't
+    hammer Supervisor."""
+    global _SUPERVISOR_IP_CACHE
+    if _SUPERVISOR_IP_CACHE is not None:
+        return _SUPERVISOR_IP_CACHE[0]
+    token = os.environ.get("SUPERVISOR_TOKEN", "").strip()
+    if not token:
+        _SUPERVISOR_IP_CACHE = (None,)
+        return None
+    resolved: str | None = None
+    try:
+        req = urllib.request.Request(
+            "http://supervisor/network/info",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.URLError, json.JSONDecodeError, OSError) as err:
+        logger.debug("supervisor host-ip lookup failed: %s", err)
+        _SUPERVISOR_IP_CACHE = (None,)
+        return None
+    interfaces = (payload.get("data") or {}).get("interfaces") or []
+    # Prefer the interface flagged ``primary: true``; fall back to the
+    # first interface with a usable IPv4 address.
+    interfaces = sorted(interfaces, key=lambda i: 0 if i.get("primary") else 1)
+    for iface in interfaces:
+        addrs = ((iface.get("ipv4") or {}).get("address")) or []
+        for addr in addrs:
+            ip = str(addr).split("/", 1)[0].strip()
+            if ip and not ip.startswith("127.") and ":" not in ip:
+                logger.info(
+                    "Resolved host IP via HA Supervisor: %s (iface=%s)",
+                    ip,
+                    iface.get("interface", "?"),
+                )
+                resolved = ip
+                break
+        if resolved is not None:
+            break
+    _SUPERVISOR_IP_CACHE = (resolved,)
+    return resolved
 
 
 def detect_local_ip(fallback: str = "127.0.0.1") -> str:
     """Return the host's primary outbound IPv4 address.
 
-    Uses the classic trick of opening a UDP socket "to" a public host
-    (no actual packets are sent) and reading ``getsockname()`` — that
-    forces the OS to consult its routing table and pick the interface
-    it would use, which is exactly the address we want for the
-    artifact URLs we hand to panel listeners.
+    Resolution order:
+      1. ``TESSERAE_HOST_IP`` env var (always wins).
+      2. HA Supervisor's ``network/info`` API (only reachable from
+         inside an HA Add-on with ``hassio_api: true``).
+      3. The classic UDP-getsockname trick (opens a socket "to" a
+         public host without sending packets; the OS consults its
+         routing table and we read which source IP it'd use).
 
-    Falls back to ``fallback`` (127.0.0.1 by default) if the trick
-    fails — happens on hosts with no default route (e.g. CI sandboxes
-    with networking stubbed out).
+    Falls back to ``fallback`` (127.0.0.1 by default) when every probe
+    fails — typical on hosts with no default route (CI sandboxes,
+    locked-down test environments).
     """
-    # Honour an explicit override — handy for unusual setups (reverse
-    # proxies, Docker Compose networks) or when running behind NAT.
+    # 1. Explicit override — handy for unusual setups (reverse proxies,
+    #    Docker Compose networks) or NAT.
     override = os.environ.get("TESSERAE_HOST_IP", "").strip()
     if override:
         return override
 
+    # 2. HA Supervisor (only meaningful inside an HA Add-on).
+    supervisor_ip = _supervisor_host_ip()
+    if supervisor_ip:
+        return supervisor_ip
+
+    # 3. Socket-trick fallback.
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # 8.8.8.8 is just a routing hint — no packet ever leaves.
