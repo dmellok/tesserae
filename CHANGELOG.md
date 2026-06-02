@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.12] — 2026-06-02
+
+### Added
+
+- **CI workflow that syncs the companion HA Add-on repo on each
+  published Release.** Watches `release: published`; on each new
+  Release, bumps `tesserae/config.yaml` `version:`, the
+  `Dockerfile`'s `ghcr.io/dmellok/tesserae:<tag>` reference, and
+  prepends a CHANGELOG entry on
+  [dmellok/homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
+  Requires an `ADDON_REPO_PAT` secret on this repo (fine-grained PAT
+  with Contents: read+write on the add-on repo only). Patch tags
+  without a matching GitHub Release do NOT churn the add-on.
+
 ## [0.11.11] — 2026-06-02
 
 ### Added

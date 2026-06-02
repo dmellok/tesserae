@@ -1,0 +1,139 @@
+# Sync the companion HA Add-on repo on every published GitHub Release.
+#
+# Triggers:
+#   * release: published — when ``gh release create vX.Y.Z --latest …``
+#     fires (the explicit user-facing "this is shipped" signal — not
+#     every patch tag).
+#   * workflow_dispatch — manual run with an explicit version, useful
+#     for back-filling or smoke-testing the sync.
+#
+# What it does on the add-on repo
+# (https://github.com/dmellok/homeassistant-tesserae-addon):
+#   * tesserae/config.yaml   — ``version: "X.Y.Z"``
+#   * tesserae/Dockerfile    — ``ghcr.io/dmellok/tesserae:X.Y.Z``
+#   * tesserae/CHANGELOG.md  — prepend "## X.Y.Z — <date>" entry
+#     linking back to the core release.
+# Then commits + pushes to the add-on repo.
+#
+# Requires the ``ADDON_REPO_PAT`` secret: a fine-grained GitHub PAT
+# scoped to ``Contents: read+write`` on the add-on repo only.
+# Belt-and-braces — using the default ``GITHUB_TOKEN`` wouldn't reach
+# across repos, and a broader PAT would be over-permissioned.
+
+name: sync-addon
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to sync (without leading 'v'). Defaults to the latest release."
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-addon
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve version
+        id: ver
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [ -n "${INPUT_VERSION:-}" ]; then
+              version="${INPUT_VERSION#v}"
+          else
+              version="${RELEASE_TAG#v}"
+          fi
+          if [ -z "${version}" ]; then
+              echo "::error::Couldn't resolve a version to sync"
+              exit 1
+          fi
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Resolved version=${version} tag=${tag}"
+
+      - name: Check out add-on repo
+        uses: actions/checkout@v6
+        with:
+          repository: dmellok/homeassistant-tesserae-addon
+          token: ${{ secrets.ADDON_REPO_PAT }}
+          path: addon
+          # Full history so we don't accidentally rebase or amend; we
+          # only ever add a single commit on top.
+          fetch-depth: 0
+
+      - name: Bump config.yaml + Dockerfile + CHANGELOG
+        working-directory: addon
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # 1. config.yaml: replace `version: "X.Y.Z"` (any value) with
+          #    the new one. The regex anchors on the start of the line
+          #    so a `version:` inside a description block can't match.
+          sed -i -E "s/^(version:[[:space:]]*\")[^\"]+(\".*)$/\1${VERSION}\2/" tesserae/config.yaml
+
+          # 2. Dockerfile: replace any tag on the tesserae image
+          #    reference. Matches numbers + a `latest` literal as well
+          #    in case the file was hand-edited to that earlier.
+          sed -i -E "s|(ghcr\.io/dmellok/tesserae:)[0-9A-Za-z._-]+|\1${VERSION}|g" tesserae/Dockerfile
+
+          # 3. CHANGELOG.md: prepend a new entry directly after the
+          #    `# Changelog` H1. If the H1 is missing (older file
+          #    format), prepend to the top of the file.
+          date_iso="$(date -u +'%Y-%m-%d')"
+          entry="## ${VERSION} — ${date_iso}
+
+          - Tracks Tesserae [${TAG}](https://github.com/dmellok/tesserae/releases/tag/${TAG}).
+
+          "
+          # Strip the leading indent that the heredoc preserves.
+          entry="$(printf '%s' "${entry}" | sed -E 's/^ {10}//')"
+
+          python3 - <<PYEOF
+          from pathlib import Path
+          p = Path("tesserae/CHANGELOG.md")
+          src = p.read_text(encoding="utf-8") if p.exists() else ""
+          entry = """${entry}"""
+          marker = "# Changelog\n"
+          if marker in src:
+              head, _, rest = src.partition(marker)
+              # Skip any blank line right after the H1 so the new entry
+              # sits flush against the title-then-blank pattern.
+              rest = rest.lstrip("\n")
+              p.write_text(head + marker + "\n" + entry + rest, encoding="utf-8")
+          else:
+              p.write_text("# Changelog\n\n" + entry + src, encoding="utf-8")
+          PYEOF
+
+      - name: Commit + push
+        working-directory: addon
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git config user.name "tesserae-bot"
+          git config user.email "[email protected]"
+          git add tesserae/config.yaml tesserae/Dockerfile tesserae/CHANGELOG.md
+          if git diff --cached --quiet; then
+              echo "Add-on already at version ${VERSION} — nothing to commit."
+              exit 0
+          fi
+          git commit -m "Track Tesserae ${TAG}
+
+          Auto-synced by sync-addon.yml on the core repo.
+          Release: https://github.com/dmellok/tesserae/releases/tag/${TAG}"
+          git push
+          echo "Bumped add-on to ${VERSION} on the main branch."
