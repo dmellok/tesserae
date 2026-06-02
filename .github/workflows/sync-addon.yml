@@ -86,8 +86,13 @@ jobs:
 
           # 2. Dockerfile: replace any tag on the tesserae image
           #    reference. Matches numbers + a `latest` literal as well
-          #    in case the file was hand-edited to that earlier.
-          sed -i -E "s|(ghcr\.io/dmellok/tesserae:)[0-9A-Za-z._-]+|\1${VERSION}|g" tesserae/Dockerfile
+          #    in case the file was hand-edited to that earlier. The
+          #    add-on uses ``image:`` in config.yaml and no custom
+          #    Dockerfile by default; skip silently when the file's
+          #    been removed.
+          if [ -f tesserae/Dockerfile ]; then
+              sed -i -E "s|(ghcr\.io/dmellok/tesserae:)[0-9A-Za-z._-]+|\1${VERSION}|g" tesserae/Dockerfile
+          fi
 
           # 3. CHANGELOG.md: prepend a new entry directly after the
           #    `# Changelog` H1. If the H1 is missing (older file
