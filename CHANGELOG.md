@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.7] — 2026-06-02
+
+### Fixed
+
+- **Pushes failing with "Execution context was destroyed" after ~75s.**
+  Under HA, every dashboard push from the user's edge install fell
+  through with that Playwright error, suggesting the persistent
+  BrowserPool's Chromium had got into a state where `new_context()`
+  produced pages whose evaluate hooks raced with an unfinished
+  navigation. Two defenses: the `_FONT_WAIT_JS` evaluate is now
+  best-effort (a missed font wait beats a whole-render fail), and the
+  BrowserPool's exception handler now treats "Execution context was
+  destroyed" / "target … has been closed" the same as a dead browser
+  — drops the handle so the next render relaunches Chromium cleanly,
+  even when `is_connected()` still returns True.
+
 ## [0.12.6] — 2026-06-02
 
 ### Added

@@ -35,6 +35,7 @@ from typing import Any, Final, Literal, cast
 from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -176,7 +177,16 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         # Block screenshot until every cell's font is actually loaded.
         # ``document.fonts.ready`` only awaits fonts already pending;
         # ``document.fonts.load()`` triggers the request and waits.
-        page.evaluate(_FONT_WAIT_JS)
+        #
+        # Best-effort: if the page is mid-navigation when we hit evaluate
+        # ("Execution context was destroyed"), or the font CSS itself
+        # raises, fall through to the screenshot anyway. Most cells have
+        # already settled by this point; a missed font wait beats a
+        # whole-render failure on what's a cosmetic refinement.
+        try:
+            page.evaluate(_FONT_WAIT_JS)
+        except PlaywrightError as err:
+            logger.warning("font wait skipped: %s", err)
         png: bytes = page.screenshot(
             full_page=False,
             type="png",
@@ -365,9 +375,21 @@ class BrowserPool:
                         )
                 except Exception as exc:
                     fut.set_exception(exc)
-                    # If the failure was a browser-level crash, drop the
-                    # handle so the next render relaunches Chromium cleanly.
-                    if browser is not None and not browser.is_connected():
+                    # Force a relaunch if the browser is actually dead, OR
+                    # if Playwright reported "Execution context was
+                    # destroyed" — that error indicates the page-level
+                    # state is corrupted in ways the next ``new_context``
+                    # might not recover from. ``is_connected()`` returns
+                    # True on a dead-but-still-attached Chromium, so we
+                    # need both checks.
+                    exc_str = str(exc).lower()
+                    poisoned = (
+                        "execution context was destroyed" in exc_str
+                        or "target page, context or browser has been closed" in exc_str
+                    )
+                    if browser is not None and (not browser.is_connected() or poisoned):
+                        with contextlib.suppress(Exception):
+                            browser.close()
                         browser = None
         finally:
             if browser is not None:
