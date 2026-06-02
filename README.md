@@ -142,7 +142,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 - **MQTT** transport (default `tesserae/<device>/frame/...`).
 - **Embedded Mosquitto-compatible broker** as a fallback when no external broker is configured.
-- **mDNS** — `tesserae-<host>.local` on port 8000.
+- **mDNS** — `tesserae-<host>.local` on port 8765.
 - **HTTP API** for the TRMNL BYOS protocol (`/api/display`, `/api/setup`, `/api/log`) authed by per-device tokens.
 
 ### Cross-platform
@@ -259,7 +259,7 @@ curl -fsSLO https://raw.githubusercontent.com/dmellok/tesserae/main/docker-compo
 docker compose up -d
 ```
 
-Open <http://localhost:8000>. See
+Open <http://localhost:8765>. See
 [**Install via Docker**](https://dmellok.github.io/tesserae/install/docker/)
 for the Mosquitto sidecar variant, host-networking for mDNS, and the
 upgrade story.
@@ -287,11 +287,11 @@ git clone https://github.com/dmellok/tesserae.git
 cd tesserae
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m app.main         # production: waitress, port 8000
+.venv/bin/python -m app.main         # production: waitress, port 8765
 .venv/bin/python -m app.main --dev   # Flask dev server with reload + debugger
 ```
 
-After it's running, visit <http://localhost:8000> — first request walks
+After it's running, visit <http://localhost:8765> — first request walks
 through password setup and the onboarding wizard. See
 [**Install Tesserae**](https://dmellok.github.io/tesserae/install/server/)
 for the deep guide (broker config, Chromium overrides, dev workflow).

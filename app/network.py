@@ -134,12 +134,12 @@ def detect_base_url(port: int | None = None) -> str:
 
     ``port`` defaults to the value captured at first-request time by
     ``app/main.py`` (so it tracks the actual Flask bind port, whatever
-    it is), and falls back to 8000 / the ``TESSERAE_HTTP_PORT`` env
+    it is), and falls back to 8765 / the ``TESSERAE_HTTP_PORT`` env
     var if nothing has been captured yet.
     """
     if port is None:
         env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
-        port = int(env_port) if env_port.isdigit() else 8000
+        port = int(env_port) if env_port.isdigit() else 8765
     return f"http://{detect_local_ip()}:{port}"
 
 

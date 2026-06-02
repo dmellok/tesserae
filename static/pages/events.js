@@ -12,10 +12,11 @@
   // the same param so we get matched filtering server-side.
   const params = new URLSearchParams(location.search);
   const typeFilter = params.get("type") || "all";
+  const prefix = window.TESSERAE_URL_PREFIX || "";
   const streamUrl =
     typeFilter && typeFilter !== "all"
-      ? `/events/stream?type=${encodeURIComponent(typeFilter)}`
-      : "/events/stream";
+      ? `${prefix}/events/stream?type=${encodeURIComponent(typeFilter)}`
+      : `${prefix}/events/stream`;
 
   function setLive(state) {
     if (!live) return;
@@ -68,9 +69,9 @@
   function rowHtml(ev) {
     const thumb =
       ev.type === "push" && ev.digest
-        ? `<a class="event-thumb" href="/renders/${encodeURIComponent(
+        ? `<a class="event-thumb" href="${prefix}/renders/${encodeURIComponent(
             ev.digest,
-          )}.png" target="_blank"><img src="/renders/${encodeURIComponent(
+          )}.png" target="_blank"><img src="${prefix}/renders/${encodeURIComponent(
             ev.digest,
           )}.png" alt=""></a>`
         : "";

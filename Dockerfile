@@ -95,9 +95,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
 # HTTP admin / renders endpoint. The embedded MQTT broker (if the
 # user enables it via Settings → Server → MQTT) listens on 1883 —
 # that port only matters if the operator publishes it from compose.
-EXPOSE 8000
+EXPOSE 8765
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 # `tesserae` is the console script declared in pyproject [project.scripts].
-# Defaults to waitress on 0.0.0.0:8000.
-CMD ["tesserae", "--host", "0.0.0.0", "--port", "8000"]
+# Defaults to waitress on 0.0.0.0:8765.
+CMD ["tesserae", "--host", "0.0.0.0", "--port", "8765"]

@@ -27,7 +27,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PLUGINS_DIR = REPO_ROOT / "plugins"
 OUT_DIR = REPO_ROOT / "docs" / "screenshots" / "widgets"
-BASE_URL = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8000").rstrip("/")
+BASE_URL = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 
 # Preferred capture size, then fallbacks. md (640×400) gives a tidy,
 # uniform gallery thumbnail; fall back to whatever the widget supports.

@@ -353,6 +353,19 @@ def _rebuild_transport(
     # address. When the operator's also set credentials we feed them
     # back into the transport so it can auth against its own broker.
     embedded_enabled = _truthy(broker_raw.get("embedded_enabled"))
+    # Inside HA the bundled Mosquitto add-on is already listening on
+    # 1883; bringing up our own broker on the same host causes pointless
+    # confusion (which one are devices actually talking to?) and, when
+    # the embedded broker binds 0.0.0.0, port clashes with anything else
+    # on the host. Disable it unconditionally — the broker section's UI
+    # also hides the option, this is the defensive runtime layer.
+    if embedded_enabled and app.config.get("HA_INGRESS_MODE"):
+        logger.info(
+            "HA add-on detected; ignoring embedded_enabled=true and using the "
+            "external broker fields. Point Host at core-mosquitto (or your "
+            "own broker) instead."
+        )
+        embedded_enabled = False
     embedded_port = int(broker_raw.get("embedded_port") or 1883)
     embedded_bind = str(broker_raw.get("embedded_bind") or "127.0.0.1").strip() or "127.0.0.1"
     embedded_user = (str(broker_raw.get("embedded_username") or "")).strip()
@@ -520,7 +533,7 @@ def _rebuild_transport(
         # back to the env/default. Only the SRV record cares about the port
         # — the tesserae.local A record resolves regardless.
         env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
-        default_port = int(env_port) if env_port.isdigit() else 8000
+        default_port = int(env_port) if env_port.isdigit() else 8765
         port = int(app.config.get("DETECTED_HTTP_PORT") or default_port)
         # Dev server advertises tesserae-dev.local so it can coexist with a
         # production instance on the same LAN without a name clash.

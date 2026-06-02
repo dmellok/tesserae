@@ -185,6 +185,14 @@ def step(step: str) -> Response | str:
         # — useless for LAN panels. Flag it so the wizard can show a hint
         # about ``TESSERAE_HOST_IP`` / host networking.
         ctx["builtin_url_is_bridge"] = docker_bridge_ip_warning()
+        # Hide the built-in broker option under HA. The bundled Mosquitto
+        # add-on already owns port 1883 on the host; offering a second
+        # broker there just confuses users about which devices connect
+        # where. The template uses this to suppress the "use built-in"
+        # card and pre-fill the external host with core-mosquitto.
+        ctx["ha_ingress"] = bool(current_app.config.get("HA_INGRESS_MODE"))
+        if ctx["ha_ingress"] and not broker.get("host"):
+            ctx["broker"] = {**broker, "host": "core-mosquitto", "port": 1883}
     elif step == "device":
         # ``panel`` rides along on each kind so the form's preset
         # selector can auto-sync to the kind's declared size when the
@@ -220,7 +228,12 @@ def save_broker() -> Response:
     """Enable the built-in broker, or point the transport at an external
     one, then rebuild so the connection takes effect immediately."""
     form = request.form
-    if form.get("use_builtin"):
+    # Under HA the built-in broker is intentionally not offered (see the
+    # broker step template + transport_wiring.HA_INGRESS_MODE guard).
+    # Treat any stale ``use_builtin`` post as "external broker" so a
+    # cached page can't sneak it back in.
+    ha_ingress = bool(current_app.config.get("HA_INGRESS_MODE"))
+    if form.get("use_builtin") and not ha_ingress:
         # Bind all interfaces so LAN clients (Pi / ESP32) can reach it;
         # the transport self-connects over loopback (see _rebuild_transport).
         patch: dict[str, Any] = {

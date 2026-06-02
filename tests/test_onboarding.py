@@ -135,6 +135,42 @@ def test_broker_external_saves_host(app: Flask) -> None:
     assert broker["password_secret"] == "p"
 
 
+def test_broker_step_under_ha_hides_builtin_toggle_and_suggests_core_mosquitto(
+    tmp_path: Path,
+) -> None:
+    """Under HA the built-in broker is off-limits (port clash with the
+    Mosquitto add-on). The wizard hides the toggle and pre-fills the
+    external host with ``core-mosquitto``."""
+    a = create_app(testing=True, data_root=tmp_path, devices_dir=REPO_ROOT / "devices")
+    a.config["TESTING"] = True
+    a.config["HA_INGRESS_MODE"] = True
+    client = a.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/onboarding/broker").get_data(as_text=True)
+    assert 'name="use_builtin"' not in body
+    assert "core-mosquitto" in body
+
+
+def test_broker_step_under_ha_ignores_stale_use_builtin_post(tmp_path: Path) -> None:
+    """A stale form post with use_builtin=on must not re-enable the
+    embedded broker under HA — the runtime guard would skip it anyway,
+    but settings still need to record host so onboarding completes."""
+    a = create_app(testing=True, data_root=tmp_path, devices_dir=REPO_ROOT / "devices")
+    a.config["TESTING"] = True
+    a.config["HA_INGRESS_MODE"] = True
+    client = a.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    resp = client.post(
+        "/onboarding/broker",
+        data={"use_builtin": "on", "host": "core-mosquitto", "port": "1883"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    broker = a.config["SETTINGS_STORE"].get_section("broker")
+    assert broker["embedded_enabled"] is False
+    assert broker["host"] == "core-mosquitto"
+
+
 def test_device_manual_add_via_wizard(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

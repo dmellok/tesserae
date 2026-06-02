@@ -35,9 +35,9 @@ python3 -m venv .venv
 
 Sign in once (these routes need the dev server **and** a session — they
 aren't loopback-exempt), then iterate at
-`http://127.0.0.1:8000/_test/render?plugin=<id>&size=md` (also
+`http://127.0.0.1:8765/_test/render?plugin=<id>&size=md` (also
 `size=xs|sm|lg`). The whole-gallery review page is at
-`http://127.0.0.1:8000/_test/widgets`.
+`http://127.0.0.1:8765/_test/widgets`.
 
 ## The loop
 

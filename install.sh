@@ -9,7 +9,7 @@
 #
 # Optional env vars (pre-answer the prompts; useful in CI / scripts):
 #   TESSERAE_DIR=/path/to/install   (default: ~/tesserae)
-#   TESSERAE_PORT=8765               (default: 8000, prompted interactively)
+#   TESSERAE_PORT=8765               (default: 8765, prompted interactively)
 #   PYTHON=python3.12                (default: python3)
 #   SKIP_PLAYWRIGHT=1                skip the Chromium download step
 #   NONINTERACTIVE=1                 skip all prompts, use defaults / env
@@ -96,13 +96,13 @@ info "Platform: $OS / $ARCH"
 
 # ---------- interactive prompts ----------
 if [[ -z "$PORT" ]]; then
-  PORT="$(prompt "Listen on which port?" "8000")"
+  PORT="$(prompt "Listen on which port?" "8765")"
 fi
-# Defensive: strip non-digits, fall back to 8000 if user typed garbage.
+# Defensive: strip non-digits, fall back to 8765 if user typed garbage.
 PORT="${PORT//[^0-9]/}"
 if [[ -z "$PORT" || "$PORT" -lt 1 || "$PORT" -gt 65535 ]]; then
-  warn "Invalid port '${PORT}', using 8000"
-  PORT=8000
+  warn "Invalid port '${PORT}', using 8765"
+  PORT=8765
 fi
 info "Port: $PORT"
 

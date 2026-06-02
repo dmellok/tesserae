@@ -788,15 +788,28 @@ class HomeAssistantDiscovery:
     # -- publish wrappers ----------------------------------------------
 
     def _publish_json(self, topic: str, payload: dict[str, Any], *, retain: bool = True) -> None:
+        if not self._transport.connected:
+            # Discovery configs are retained — they'll re-publish on the
+            # next start()/refresh after reconnect. Dropping silently
+            # keeps shutdown / settings-swap from dumping tracebacks.
+            logger.debug("HA discovery: skipping publish to %s (broker disconnected)", topic)
+            return
         try:
             self._transport.publish(
                 topic, json.dumps(payload, sort_keys=True).encode("utf-8"), qos=1, retain=retain
             )
+        except RuntimeError as err:
+            logger.debug("HA discovery: publish to %s skipped: %s", topic, err)
         except Exception:
             logger.warning("HA discovery: publish to %s failed", topic, exc_info=True)
 
     def _publish_str(self, topic: str, payload: str, *, retain: bool = False) -> None:
+        if not self._transport.connected:
+            logger.debug("HA discovery: skipping publish to %s (broker disconnected)", topic)
+            return
         try:
             self._transport.publish(topic, payload.encode("utf-8"), qos=1, retain=retain)
+        except RuntimeError as err:
+            logger.debug("HA discovery: publish to %s skipped: %s", topic, err)
         except Exception:
             logger.warning("HA discovery: publish to %s failed", topic, exc_info=True)

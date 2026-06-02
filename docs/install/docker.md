@@ -22,8 +22,8 @@ curl -fsSLO https://raw.githubusercontent.com/dmellok/tesserae/main/docker-compo
 docker compose up -d
 ```
 
-That's it. Open `http://<host-ip>:8000` (or
-`http://tesserae.local:8000` once mDNS comes up) — the first request
+That's it. Open `http://<host-ip>:8765` (or
+`http://tesserae.local:8765` once mDNS comes up) — the first request
 walks through password setup and the onboarding wizard.
 
 The default `docker-compose.yml` uses **host networking**, which is
@@ -67,7 +67,7 @@ services:
   tesserae:
     image: ghcr.io/dmellok/tesserae:latest
     ports:
-      - "8000:8000"
+      - "8765:8765"
       - "1883:1883"        # built-in broker
     volumes:
       - ./data:/app/data
@@ -91,7 +91,7 @@ yourself:
 services:
   tesserae:
     image: ghcr.io/dmellok/tesserae:latest
-    ports: ["8000:8000"]
+    ports: ["8765:8765"]
     volumes: ["./data:/app/data"]
     depends_on: [mosquitto]
 
@@ -133,7 +133,7 @@ services:
     container_name: tesserae
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8765:8765"
       - "1883:1883"          # only if using the built-in MQTT broker
     volumes:
       - ./data:/app/data

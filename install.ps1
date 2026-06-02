@@ -8,7 +8,7 @@
 #
 # Optional env vars (pre-answer the prompts):
 #   $env:TESSERAE_DIR   default: $HOME\tesserae
-#   $env:TESSERAE_PORT  default: 8000 (otherwise prompted)
+#   $env:TESSERAE_PORT  default: 8765 (otherwise prompted)
 #   $env:PYTHON         default: python
 #   $env:SKIP_PLAYWRIGHT = '1'  to skip Chromium
 #   $env:NONINTERACTIVE  = '1'  skip prompts, use defaults
@@ -52,12 +52,12 @@ Ok "git + $Python ($pyVer)"
 
 # ---------- port ----------
 if (-not $Port) {
-  $Port = Prompt-Default "Listen on which port?" "8000"
+  $Port = Prompt-Default "Listen on which port?" "8765"
 }
 $Port = ($Port -replace '[^0-9]', '')
 if (-not $Port -or [int]$Port -lt 1 -or [int]$Port -gt 65535) {
-  Warn "Invalid port, using 8000"
-  $Port = '8000'
+  Warn "Invalid port, using 8765"
+  $Port = '8765'
 }
 Info "Port: $Port"
 

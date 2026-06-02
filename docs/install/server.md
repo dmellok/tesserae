@@ -29,12 +29,12 @@ The installer:
 - Sanity-checks `git` + Python 3.11+
 - Clones the repo (default `~/tesserae`, override with `TESSERAE_DIR`)
 - Creates a venv and installs the project
-- Asks for a port (default `8000`)
+- Asks for a port (default `8765`)
 - Installs Chromium via Playwright for webpage rendering (with a system-browser fallback — see below)
 - Writes a `run.sh` (or `run.ps1`) shortcut in the install dir
 
 When it finishes, start the server with `./run.sh` (or `.\run.ps1`) from the
-install dir and open `http://localhost:8000/`.
+install dir and open `http://localhost:8765/`.
 
 ## Manual install
 
@@ -46,7 +46,7 @@ cd tesserae
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 
-.venv/bin/python -m app.main         # production: waitress, port 8000
+.venv/bin/python -m app.main         # production: waitress, port 8765
 .venv/bin/python -m app.main --dev   # Flask dev server: auto-reload + debugger
 ```
 
@@ -63,13 +63,13 @@ when you're hacking on the admin.
 
 ## First run
 
-1. Open `http://127.0.0.1:8000/` — on first boot you're sent to `/setup` to pick an admin password.
+1. Open `http://127.0.0.1:8765/` — on first boot you're sent to `/setup` to pick an admin password.
 2. Sign in at `/login`, then go to **Settings → Server** and point Tesserae at your **MQTT broker** and set the **base URL** the panel uses to fetch frames.
 3. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
 
 To preview a single widget without composing a dashboard, run `--dev`, sign
 in, then open
-`http://127.0.0.1:8000/_test/render?plugin=clock_analog&size=md` in your
+`http://127.0.0.1:8765/_test/render?plugin=clock_analog&size=md` in your
 browser. `/_test/render` needs the dev (or test) server **and** a logged-in
 session — it isn't loopback-exempt. The loopback bypass is only for
 `/compose/`, `/renders/`, and `/plugins/<id>/<asset>`, which the in-process

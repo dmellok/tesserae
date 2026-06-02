@@ -36,8 +36,13 @@
     {# ---------- Broker ---------- #}
     {% elif step == 'broker' %}
     <h1>Connect a broker</h1>
+    {% if ha_ingress %}
+    <p class="lede">Point Tesserae at an MQTT broker. Home Assistant's Mosquitto add-on lives at <code>core-mosquitto</code> — that's filled in below, change it if you run a different broker.</p>
+    {% else %}
     <p class="lede">Tesserae publishes frames over MQTT. Use the built-in broker if you don't already run one, or point at an existing broker.</p>
+    {% endif %}
     <form method="post" action="{{ url_for('onboarding.save_broker') }}" class="form wizard-broker-form">
+      {% if not ha_ingress %}
       <div class="field field--switch">
         <label class="switch" for="use-builtin">
           <input type="checkbox" id="use-builtin" name="use_builtin" {% if broker.embedded_enabled or not broker.host %}checked{% endif %}>
@@ -65,6 +70,7 @@
         {{ text_input('builtin-user', 'builtin_username', 'Username (optional)', value=broker.get('embedded_username', '')) }}
         {{ text_input('builtin-pass', 'builtin_password', 'Password (optional)', value='', type='password') }}
       </div>
+      {% endif %}
 
       <div class="wizard-broker-external">
         {{ text_input('broker-host', 'host', 'Broker host', value=broker.get('host', ''), placeholder='192.168.1.50') }}

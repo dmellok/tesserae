@@ -272,9 +272,9 @@
   <ul class="history">
     {% for ev in history %}
     <li class="history-row">
-      <a class="history-thumb" {% if ev.digest %}href="/renders/{{ ev.digest }}.png" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
+      <a class="history-thumb" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
         {% if ev.digest %}
-        <img src="/renders/{{ ev.digest }}.png" alt="">
+        <img src="{{ url_for('renders', filename=ev.digest ~ '.png') }}" alt="">
         {% else %}
         <span class="history-thumb-empty">no preview</span>
         {% endif %}

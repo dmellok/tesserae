@@ -63,7 +63,7 @@ def _serve(argv: list[str] | None = None) -> None:
         "Default is waitress, a production WSGI server.",
     )
     parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(

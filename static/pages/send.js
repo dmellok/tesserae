@@ -54,7 +54,8 @@
     }, 300);
   }
 
-  const es = new EventSource("/events/stream?type=push");
+  const prefix = window.TESSERAE_URL_PREFIX || "";
+  const es = new EventSource(`${prefix}/events/stream?type=push`);
   // The SSE endpoint names its event "log" (see app/events_routes.py:
   // ``event: log\ndata: …``). Listening for "event" or default
   // ``onmessage`` would silently miss every push.

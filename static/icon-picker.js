@@ -31,7 +31,8 @@
   let iconsPromise = null;
   function loadIcons() {
     if (iconsPromise) return iconsPromise;
-    iconsPromise = fetch("/static/icons/phosphor/manifest.json")
+    const prefix = window.TESSERAE_URL_PREFIX || "";
+    iconsPromise = fetch(`${prefix}/static/icons/phosphor/manifest.json`)
       .then((r) => r.json())
       .catch((err) => {
         console.error("[icon-picker] manifest fetch failed:", err);

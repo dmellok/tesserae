@@ -42,7 +42,7 @@ class MdnsAdvertiser:
         self,
         *,
         hostname: str = "tesserae",
-        port: int = 8000,
+        port: int = 8765,
         ip: str | None = None,
         zeroconf_factory: Callable[[], Any] | None = None,
     ) -> None:

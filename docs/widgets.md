@@ -577,7 +577,7 @@ Run: `./.venv/bin/python -m pytest plugins/<id>/ -q`
 4. `plugins/<id>/server.py` — optional, if you need server-side data.
 5. `plugins/<id>/tests/test_smoke.py` — parametrised over sizes.
 
-Then hit `http://127.0.0.1:8000/_test/render?plugin=<id>&size=md` in
+Then hit `http://127.0.0.1:8765/_test/render?plugin=<id>&size=md` in
 the browser to iterate. The Flask dev server auto-reloads on file
 changes; refresh the page to see updates.
 

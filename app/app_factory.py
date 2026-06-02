@@ -9,7 +9,7 @@ Usage::
 
     from app.main import create_app
     app = create_app()
-    app.run(host="0.0.0.0", port=8000)
+    app.run(host="0.0.0.0", port=8765)
 
 For tests, ``create_app(testing=True)`` swaps in a tmp data root, skips
 the broker connection (via the no-op MQTT client in
@@ -506,7 +506,7 @@ def create_app(
         """Stash the actual HTTP port the server is bound to so the
         base_url emitted in MQTT payloads matches reality (the user
         might have started us with `flask run --port 5050` instead of
-        the default 8000). On first request, also refresh HA discovery
+        the default 8765). On first request, also refresh HA discovery
         configs so HA's stored URLs pick up the new port."""
         from flask import request
 

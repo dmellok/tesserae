@@ -234,7 +234,8 @@
       // the next so the iframe doesn't thrash.
       if (previewInFlight) await previewInFlight.catch(() => {});
       previewInFlight = (async () => {
-        const resp = await fetch(`/pages/${pageId}/preview`, {
+        const prefix = window.TESSERAE_URL_PREFIX || "";
+        const resp = await fetch(`${prefix}/pages/${pageId}/preview`, {
           method: "POST",
           body: aggregateForms(),
           headers: { "X-Requested-With": "fetch" },

@@ -8,6 +8,60 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.0] — 2026-06-02
+
+### Breaking
+
+- **Default HTTP port is now 8765** (was 8000). Picked to dodge the
+  pile of dev tooling that owns 8000 (Django runserver, `python -m
+  http.server`, generic admin UIs) so a fresh `docker compose up`
+  doesn't immediately collide with whatever else the user has. Affects
+  every entry point — `tesserae --port`, the Dockerfile EXPOSE, the
+  compose example, the install.sh / install.ps1 prompt default, mDNS,
+  and `TESSERAE_HTTP_PORT`'s fallback. ESP32 / Pi firmware images with
+  `:8000` baked into the saved base URL will need their Tesserae URL
+  re-pointed; the panel listeners pick up the new URL on the next push
+  once you update it. The HA Add-on (stable) now exposes host `8765`;
+  the Edge add-on uses host `8766` so the two can run side-by-side and
+  both stay LAN-reachable.
+
+### Changed
+
+- **Built-in broker disabled under the HA Add-on.** Home Assistant's
+  bundled Mosquitto add-on already owns port 1883 on the host, so
+  running Tesserae's embedded amqtt alongside it creates two brokers
+  on the same address — devices end up talking to whichever one their
+  client happens to hit, and nothing reliable works. Inside an HA
+  install the Settings → MQTT broker card hides every `embedded_*`
+  field (toggle included) and the onboarding wizard skips the
+  "use built-in" path and pre-fills Host with `core-mosquitto`. The
+  transport-rebuild path treats `embedded_enabled` as false under HA
+  regardless of saved settings, so a legacy config import can't
+  re-enable it.
+
+### Fixed
+
+- **Events page indicator stuck on "offline" inside HA Ingress.** The
+  Events page (and the live History tab on Send) opened `EventSource`
+  against a root-relative `/events/stream` path. Inside the Ingress
+  iframe that resolves to the Home Assistant host root, not the add-on,
+  so the connection failed immediately and the indicator flipped to
+  offline even though SSE / MQTT were both fine. The same bug affected
+  the icon picker's Phosphor manifest fetch and the editor preview
+  fetch. The base template now exposes `window.TESSERAE_URL_PREFIX`
+  (Flask's `request.script_root` — the ingress prefix the WSGI
+  middleware extracted from `X-Ingress-Path`, empty otherwise), and the
+  four affected JS sites prepend it.
+- **Noisy `ha_discovery` tracebacks during broker reconnect / shutdown.**
+  When the MQTT transport is explicitly disconnected (settings swap,
+  process exit), the discovery publishers used to fire a full
+  `RuntimeError` stack trace per retained config — dozens of them per
+  shutdown. Discovery configs are already retained on the broker and
+  get re-published when discovery next starts, so we now skip publishes
+  silently when the transport is disconnected and log any in-flight
+  disconnect race at `debug` instead of `warning` with `exc_info`.
+  Other publish failures still log loudly with a traceback.
+
 ## [0.11.17] — 2026-06-02
 
 ### Fixed

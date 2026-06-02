@@ -12,6 +12,11 @@
         if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
       } catch (e) { /* localStorage unavailable */ }
     })();
+    // SCRIPT_NAME under HA Ingress (e.g. /api/hassio_ingress/<token>), empty
+    // otherwise. JS that builds absolute paths must prepend this — root-
+    // relative URLs from inside the ingress iframe would otherwise resolve
+    // to the HA host root, not the add-on.
+    window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
   </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">

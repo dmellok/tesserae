@@ -4,7 +4,7 @@
 #
 #     docker compose up -d
 #
-# The admin UI lands at http://<host-ip>:8000 — the first request
+# The admin UI lands at http://<host-ip>:8765 — the first request
 # walks through password setup and the onboarding wizard.
 #
 # Pin to a specific tag (not :latest) in any setup you care about so
@@ -18,7 +18,7 @@
 #     networking gives the container a 172.x.x.x address LAN clients
 #     can't see, which breaks both frame fetching and the built-in
 #     MQTT broker URL.)
-#   * mDNS works, so `http://tesserae.local:8000` resolves on your
+#   * mDNS works, so `http://tesserae.local:8765` resolves on your
 #     LAN without extra plumbing.
 #   * The built-in MQTT broker is reachable on port 1883 without you
 #     publishing it from a `ports:` block.
@@ -36,7 +36,7 @@ services:
     container_name: tesserae
     restart: unless-stopped
 
-    # Linux: share the host's network namespace. Tesserae binds 8000
+    # Linux: share the host's network namespace. Tesserae binds 8765
     # directly on the host — same as if you `pip install`'d it on the
     # box. Auto-fixes the bridge IP problem, lets mDNS work, exposes
     # the built-in MQTT broker on 1883 without `ports:`.
@@ -60,7 +60,7 @@ services:
     # Delete `network_mode: host` above and uncomment the block below:
     #
     # ports:
-    #   - "8000:8000"
+    #   - "8765:8765"
     #   - "1883:1883"          # only if using the built-in MQTT broker
     # environment:
     #   TESSERAE_IN_DOCKER: "1"

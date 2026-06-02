@@ -518,15 +518,33 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
     return url
 
 
+_EMBEDDED_BROKER_FIELD_NAMES = frozenset(
+    {
+        "embedded_enabled",
+        "embedded_port",
+        "embedded_bind",
+        "embedded_username",
+        "embedded_password",
+    }
+)
+
+
 def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:
     """BROKER_FIELDS with the client_id field's placeholder set to the live
     (auto) client id, so a blank field shows what it actually connects as
-    (e.g. ``tesserae-<hostname>`` / ``…-dev``) rather than looking unset."""
+    (e.g. ``tesserae-<hostname>`` / ``…-dev``) rather than looking unset.
+
+    Under HA Ingress the embedded broker fields are stripped — the bundled
+    Mosquitto add-on is already on 1883 and offering a second broker on
+    the same host is a footgun (see transport_wiring._rebuild_transport)."""
+    fields = BROKER_FIELDS
+    if current_app.config.get("HA_INGRESS_MODE"):
+        fields = [f for f in fields if f.get("name") not in _EMBEDDED_BROKER_FIELD_NAMES]
     transport_obj = current_app.config.get("MQTT_TRANSPORT")
     auto = getattr(transport_obj, "client_id", "") or ""
     if not auto:
-        return BROKER_FIELDS
+        return list(fields)
     return [
         {**f, "placeholder": f"{auto} (auto)"} if f.get("name") == "client_id" else f
-        for f in BROKER_FIELDS
+        for f in fields
     ]
