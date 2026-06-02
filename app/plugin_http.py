@@ -27,6 +27,43 @@ DEFAULT_TIMEOUT_S: float = 15.0
 DEFAULT_USER_AGENT: str = "tesserae/widget (+https://github.com/dmellok/tesserae)"
 
 
+def fetch_text(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    timeout: float = DEFAULT_TIMEOUT_S,
+    retries: int = 0,
+    backoff_s: float = 1.0,
+) -> str:
+    """GET ``url`` and decode the response as UTF-8 text.
+
+    Same retry semantics as ``fetch_json`` but for non-JSON endpoints
+    (HTML scrapes, RSS, etc.). Default ``retries=0`` because text
+    scrape fallbacks tend to be slow / unreliable upstreams the caller
+    is already treating as best-effort — they shouldn't keep the
+    dashboard waiting.
+    """
+    req_headers = {"User-Agent": DEFAULT_USER_AGENT}
+    if headers:
+        req_headers.update(headers)
+    last_err: Exception | None = None
+    attempts = max(1, retries + 1)
+    for attempt in range(attempts):
+        try:
+            req = urllib.request.Request(url, headers=req_headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                text: str = resp.read().decode("utf-8", errors="ignore")
+                return text
+        except (urllib.error.URLError, TimeoutError, OSError) as err:
+            last_err = err
+            if attempt < attempts - 1:
+                time.sleep(backoff_s)
+                continue
+            break
+    assert last_err is not None
+    raise last_err
+
+
 def fetch_json(
     url: str,
     *,

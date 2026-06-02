@@ -136,13 +136,13 @@ def _font_face_css(fonts: dict[str, Font]) -> str:
 
 
 # Hydration-time hard caps. These bound the page-render budget against
-# misbehaving widgets — a single hung fetch shouldn't take the rest
-# down with it. Per-widget cap is sized comfortably above the slowest
-# legitimate fetch path (plugin_http.fetch_json at 15s + 1s backoff +
-# retry = ~31s). Overall is the budget the renderer's page.goto has
-# to land within.
-_HYDRATE_PER_WIDGET_TIMEOUT_S: float = 35.0
-_HYDRATE_OVERALL_TIMEOUT_S: float = 45.0
+# misbehaving widgets — a single hung fetch shouldn't sink the dashboard.
+# Sized to fit inside the renderer's 15s page.goto budget: if hydration
+# blows past goto's timeout, Playwright reports a broken navigation and
+# the screenshot captures an empty page. Per-widget cap is the safety
+# net; the overall cap is what actually fires when an upstream is dead.
+_HYDRATE_PER_WIDGET_TIMEOUT_S: float = 10.0
+_HYDRATE_OVERALL_TIMEOUT_S: float = 12.0
 # Max concurrent in-flight widget fetches. Eight is enough for typical
 # dashboards (~6 cells) without spawning a thread per cell on giant
 # dashboards.

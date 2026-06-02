@@ -17,11 +17,10 @@ import contextlib
 import json
 import re
 import time
-import urllib.request
 from pathlib import Path
 from typing import Any
 
-from app.plugin_http import fetch_json
+from app.plugin_http import fetch_json, fetch_text
 
 CACHE_TTL_S = 1800
 HTTP_TIMEOUT_S = 15
@@ -95,13 +94,16 @@ def _open_meteo(lat: float, lon: float) -> dict[str, Any] | None:
 
 
 def _scrape_melbourne_pollen() -> dict[str, Any] | None:
+    # Best-effort fallback — short timeout, no retries. melbournepollen
+    # is third-party and not reliably fast; the upstream open-meteo
+    # data is the canonical source. A slow scrape can't be allowed to
+    # blow past the page hydration budget.
     try:
-        req = urllib.request.Request(
+        html = fetch_text(
             "https://www.melbournepollen.com.au/",
             headers={"User-Agent": USER_AGENT},
+            timeout=5.0,
         )
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
     except Exception:
         return None
 

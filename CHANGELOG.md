@@ -8,6 +8,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.11] — 2026-06-02
+
+### Fixed
+
+- **Hydration timeouts (45s overall / 35s per widget) blew past the
+  renderer's 15s `page.goto` budget.** Caught by the per-phase render
+  log added in v0.12.8: a Weather dashboard push showed
+  `goto=15.02s evaluate=57.44s screenshot=0.19s` — total 73s — with a
+  matching `page hydration overall timeout (45.0s)` warning. The
+  server was still computing the response when Playwright timed out,
+  so the browser saw a delayed/aborted navigation and the `evaluate`
+  call stalled waiting for the page to stabilise. Hydration is now
+  capped at 12s overall / 10s per widget so the compose endpoint
+  always responds inside `goto`'s 15s window. Widgets whose upstream
+  doesn't respond in 10s render an error state for that cycle rather
+  than holding up the dashboard.
+
+- **`weather_pollen_count` blocked hydration with a slow Melbourne
+  scrape.** The fallback HTML scrape of `melbournepollen.com.au`
+  still used bare `urllib.request.urlopen` with the 15s widget-level
+  timeout, on top of the open-meteo fetch — worst case 46s for that
+  one widget alone, blowing the new hydration cap. Switched to a new
+  `app.plugin_http.fetch_text` helper (5s timeout, no retries —
+  it's an explicitly-best-effort fallback).
+
+### Added
+
+- **`fetch_text()` in `app.plugin_http`** — sibling to `fetch_json`
+  for non-JSON endpoints (HTML scrapes, RSS feeds). Same retry +
+  backoff machinery; defaults to zero retries since text-scrape
+  fallbacks shouldn't be retried into hydration timeouts.
+
 ## [0.12.10] — 2026-06-02
 
 ### Fixed
