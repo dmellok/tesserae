@@ -64,8 +64,8 @@
       {% endif %}
     </div>
     {% if ev.type == 'push' and ev.digest %}
-    <a class="event-thumb" href="/renders/{{ ev.digest }}.png" data-lightbox aria-label="Event #{{ ev.id }}">
-      <img src="/renders/{{ ev.digest }}.png" alt="">
+    <a class="event-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Event #{{ ev.id }}">
+      <img src="{{ url_for('renders', filename=ev.digest ~ '.png') }}" alt="">
     </a>
     {% endif %}
   </li>

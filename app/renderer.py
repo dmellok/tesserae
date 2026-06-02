@@ -82,8 +82,20 @@ def to_loopback_url(url: str) -> str:
     public render links). This helper is for the in-process renderer only.
     """
     parts = urlsplit(url)
+    # Prefer the actual bind port the server is listening on internally,
+    # since under HA the URL's port is the *host* mapping (e.g. 8766 for
+    # edge) and nothing is listening on it inside the container — the
+    # add-on always binds 8765 internally. ``TESSERAE_BIND_PORT`` is set
+    # by the add-on config; fall back to the URL's port otherwise so a
+    # bare-metal install with ``tesserae --port 5050`` keeps working.
+    import os as _os
+
+    bind_port_raw = _os.environ.get("TESSERAE_BIND_PORT", "").strip()
+    bind_port = int(bind_port_raw) if bind_port_raw.isdigit() else None
     netloc = "127.0.0.1"
-    if parts.port:
+    if bind_port:
+        netloc = f"127.0.0.1:{bind_port}"
+    elif parts.port:
         netloc = f"127.0.0.1:{parts.port}"
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 

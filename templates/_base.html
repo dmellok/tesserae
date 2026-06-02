@@ -39,7 +39,7 @@
 </head>
 <body class="admin{% if config.DEV_MODE %} dev-mode{% endif %}">
   <header class="topbar">
-    <a class="brand" href="/">
+    <a class="brand" href="{{ url_for('index') }}">
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">Tesserae</span>
     </a>
@@ -76,7 +76,7 @@
           {% if nav_admin_plugins %}
           <div class="nav-dropdown-sep">Admin pages</div>
           {% for p in nav_admin_plugins %}
-          <a class="nav-dropdown-link" href="/plugins/{{ p.id }}/">
+          <a class="nav-dropdown-link" href="{{ request.script_root }}/plugins/{{ p.id }}/">
             <i class="ph ph-{{ p.manifest.get('icon', 'ph-puzzle-piece').removeprefix('ph-') }}" aria-hidden="true"></i>{{ p.name }}
           </a>
           {% endfor %}

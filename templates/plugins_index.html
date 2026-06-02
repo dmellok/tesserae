@@ -48,7 +48,7 @@
       {% endif %}
       {% if plugin.has_admin %}
       <div class="plugin-row-actions">
-        <a class="ghost-link" href="/plugins/{{ plugin.id }}/">
+        <a class="ghost-link" href="{{ request.script_root }}/plugins/{{ plugin.id }}/">
           <i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open admin</span>
         </a>
       </div>

@@ -159,7 +159,7 @@
       <li>
         <span><i class="ph ph-squares-four" aria-hidden="true"></i> {{ p.name }}</span>
         <span class="wizard-page-actions">
-          <a class="ghost" href="/pages/{{ p.id }}"><i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span></a>
+          <a class="ghost" href="{{ url_for('pages.edit', page_id=p.id) }}"><i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span></a>
           <form method="post" action="{{ url_for('onboarding.push_starter', page_id=p.id) }}" class="form form--inline">
             <div class="actions">{{ button('Push to panel', icon='paper-plane-tilt', variant='ghost') }}</div>
           </form>

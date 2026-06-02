@@ -13,7 +13,7 @@
 (function () {
   const marker = document.querySelector("[data-discovered-poll]");
   if (!marker) return;
-  const ENDPOINT = "/settings/devices/discovered.json";
+  const ENDPOINT = (window.TESSERAE_URL_PREFIX || "") + "/settings/devices/discovered.json";
   // Baseline = what the server actually rendered (carried in the marker),
   // NOT the first poll. Otherwise a device that announces itself between
   // page render and the first poll gets adopted silently and never shows.

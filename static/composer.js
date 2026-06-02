@@ -33,6 +33,28 @@ const FALLBACK_THEME = {
   divider: "#c8c8c8", danger: "#c44a3a", warn: "#c89028", ok: "#3a8848",
 };
 
+// Walk a freshly-rendered widget shadow root and prepend
+// ``TESSERAE_URL_PREFIX`` to root-relative href / src attributes. Under
+// HA Ingress that prefix is e.g. ``/api/hassio_ingress/<token>``;
+// outside ingress it's empty and this is a no-op. Lets widget authors
+// keep writing ``<link href="/static/foo.css">`` without each one
+// having to know about ingress paths.
+//
+// Only ``/single-leading-slash`` paths are rewritten; protocol-relative
+// (``//cdn…``) and already-prefixed URLs are left alone. Inline CSS
+// ``url(…)`` is not touched — no widget currently uses absolute
+// ``url("/…")`` so the regex sweep isn't worth it.
+function prefixShadowUrls(root, prefix) {
+  if (!prefix) return;
+  for (const el of root.querySelectorAll("[href], [src]")) {
+    for (const attr of ["href", "src"]) {
+      const v = el.getAttribute(attr);
+      if (!v || !v.startsWith("/") || v.startsWith("//") || v.startsWith(prefix)) continue;
+      el.setAttribute(attr, prefix + v);
+    }
+  }
+}
+
 function reportError(cell, shadow, pluginId, err) {
   cell.classList.add("error");
   cell.dataset.error = err.message || String(err);
@@ -120,6 +142,7 @@ async function mountCell(cell) {
     // without re-fetching the module or recomputing data server-side.
     cellState.set(cell.dataset.cellId, { module: mod, pluginId, shadow });
     await mod.default(shadow, ctx);
+    prefixShadowUrls(shadow, prefix);
   } catch (err) {
     reportError(cell, shadow, pluginId, err);
   }
@@ -236,6 +259,7 @@ async function applyCellPatch(patch) {
   state.shadow.innerHTML = "";
   try {
     await state.module.default(state.shadow, ctx);
+    prefixShadowUrls(state.shadow, window.TESSERAE_URL_PREFIX || "");
   } catch (err) {
     reportError(cell, state.shadow, state.pluginId, err);
   }

@@ -8,6 +8,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.4] — 2026-06-02
+
+### Fixed
+
+- **Widgets rendered with no CSS, fonts, or icons inside the HA Ingress
+  composer / preview.** Every widget's `client.js` set
+  `shadow.innerHTML` with root-relative `<link href="/static/…">` and
+  `<link href="/plugins/…">`. Inside the ingress iframe those resolved
+  to the HA host root and 404'd, so each shadow DOM rendered with
+  default user-agent styles. `composer.js` now walks the freshly-
+  rendered shadow root and prepends `TESSERAE_URL_PREFIX` to root-
+  relative `href` / `src` attributes — one place, catches all 51
+  widget files without touching them.
+- **Inter / JetBrains Mono fonts missing under HA Ingress.** The
+  `@font-face` rules in `static/style/base.css` used absolute
+  `url("/plugins/fonts_core/…")` which resolved against the HA host
+  root. Switched to CSS-relative `url("../../plugins/fonts_core/…")` so
+  the browser resolves them against `base.css`'s own URL — works with
+  or without an ingress prefix without runtime substitution.
+- **Tesserae nav logo took users back to the HA dashboard.** The brand
+  link in `_base.html` was a hardcoded `href="/"` which inside the
+  ingress iframe meant the HA host root, not Tesserae's index. Now
+  uses `url_for('index')`.
+- **Onboarding "Edit page" + plugin admin links + Events thumbnails +
+  device-discovery poller** all used absolute paths that bypassed the
+  ingress prefix. All switched to `url_for(...)` or
+  `request.script_root + …`.
+- **Headless renderer hit the wrong loopback port on Edge.** The Edge
+  add-on publishes its API on host port 8766, container 8765 — but
+  `to_loopback_url` preserved the URL's port (8766), so it tried
+  `http://127.0.0.1:8766` inside the container where nothing was
+  listening. A new `TESSERAE_BIND_PORT` env var (set in both add-on
+  configs) tells the renderer which internal port the server actually
+  binds, independent of the host-side mapping.
+
 ## [0.12.3] — 2026-06-02
 
 ### Added
