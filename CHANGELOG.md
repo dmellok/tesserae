@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.6] — 2026-06-02
+
+### Added
+
+- **Brand mark as a real asset.** The in-nav brand mark was previously
+  only available as a pure-CSS shape, so the browser tab showed a
+  generic icon and the HA add-on store had no graphic. New
+  `static/brand/icon.svg` bakes the shape into a vector that the
+  browser tab and HA add-on share. A small `scripts/render_brand.py`
+  rasterises the SVG into PNGs (128 for the HA sidebar, 32 for the
+  Safari favicon fallback, 512 for future social cards). The HA stable
+  + edge add-on directories now ship the 128 PNG as `icon.png`.
+
 ## [0.12.5] — 2026-06-02
 
 ### Fixed

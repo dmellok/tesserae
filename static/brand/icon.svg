@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Tesserae brand mark. Bakes the in-nav CSS mark from shell.css into a
+  static SVG so the browser tab, HA add-on sidebar, and any social card
+  carry the same shape.
+
+  Geometry (256×256 viewBox, scaled from the 28×28 nav mark):
+    * Outer rounded square — radius 72, gradient #0d8c7e → #0a6f63
+      (CSS --t-accent → --t-accent-hover, 135deg).
+    * Inner block — 146×146 at (55, 55), rx 27, masking two 73×73
+      quadrants painted in white at 0.85 alpha. The quadrant pattern is
+      top-right + bottom-left filled (the conic-gradient stops in
+      shell.css), which reads as a tessellated mosaic on the diagonal.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="tess-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d8c7e"/>
+      <stop offset="1" stop-color="#0a6f63"/>
+    </linearGradient>
+    <clipPath id="tess-inner">
+      <rect x="55" y="55" width="146" height="146" rx="27" ry="27"/>
+    </clipPath>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="72" ry="72" fill="url(#tess-bg)"/>
+  <g clip-path="url(#tess-inner)" fill="#ffffff" fill-opacity="0.85">
+    <rect x="128" y="55" width="73" height="73"/>
+    <rect x="55" y="128" width="73" height="73"/>
+  </g>
+</svg>
