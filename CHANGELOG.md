@@ -8,6 +8,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.12] — 2026-06-02
+
+### Fixed
+
+- **Renders still capped at 73s even after v0.12.11's hydration fix.**
+  The per-phase log surfaced the real culprit: a 57s `evaluate` phase
+  every time. Root cause was `page.goto(wait_until="networkidle")`.
+  Widget client.js imports, font fetches, and the Phosphor icon CSS
+  keep the network busy long after the page is visually ready, so
+  `networkidle` timed out on every render. When that timed out,
+  Playwright aborted the navigation — putting the page in a
+  half-aborted state where the next `page.evaluate` stalled for
+  ~60s waiting for stability. Two changes to fix:
+  * `page.goto` now waits for `load` (deterministic, fast).
+  * `composer.js` sets `window.__tesseraeComposed = true` after every
+    cell mount-promise resolves; the renderer polls for that flag via
+    `page.wait_for_function`, which is a precise "ready to screenshot"
+    signal rather than the squishy `networkidle`.
+  Per-phase log now includes a `compose=` field separate from `goto=`
+  so a stuck-widget mount can be diagnosed independently from a slow
+  page-load.
+
 ## [0.12.11] — 2026-06-02
 
 ### Fixed

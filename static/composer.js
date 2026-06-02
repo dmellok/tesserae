@@ -277,6 +277,14 @@ window.addEventListener("message", async (ev) => {
 
 const cells = document.querySelectorAll(".cell[data-plugin]");
 await Promise.all(Array.from(cells).map(mountCell));
+// Explicit "we're done" signal the headless renderer polls for. Way
+// more reliable than ``networkidle`` — widget client.js loads, font
+// fetches, and Phosphor icon CSS keep the network busy long after
+// the page is visually ready, and a networkidle timeout in
+// ``page.goto`` puts the page in a weird half-aborted state that
+// makes the next ``page.evaluate`` stall for ages. See
+// app/renderer.py for the corresponding ``wait_for_function`` poll.
+window.__tesseraeComposed = true;
 // Seed each cell's fingerprint so the first patch doesn't unnecessarily
 // re-render content the mount already painted.
 for (const [id, state] of cellState.entries()) {

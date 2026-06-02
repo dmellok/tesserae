@@ -37,7 +37,6 @@ from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -174,17 +173,31 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         # "render took 70s" investigation can point at the specific
         # Playwright stage that timed out instead of guessing.
         t0 = time.monotonic()
-        # Best-effort ``networkidle``: a single widget holding a long-poll
-        # open shouldn't block the whole render. On timeout, fall back to
-        # ``load`` — DOM is laid out, the font wait below gives one more
-        # settle point before screenshotting.
+        # ``load`` fires when the main document + critical subresources
+        # have downloaded — fast and deterministic. ``networkidle`` was
+        # the previous default but routinely timed out (widget client.js
+        # imports, font fetches, and Phosphor CSS keep network busy long
+        # after the page is visually ready). When goto's networkidle
+        # timed out, Playwright aborted the navigation and the next
+        # ``page.evaluate`` stalled for ~60s waiting for stability —
+        # which is how a normal render ballooned to 73s.
         if request.wait_until == "networkidle":
-            try:
-                page.goto(request.url, wait_until="networkidle")
-            except PlaywrightTimeoutError:
-                page.wait_for_load_state("load", timeout=request.timeout_ms)
+            page.goto(request.url, wait_until="load")
         else:
             page.goto(request.url, wait_until=request.wait_until)
+        t_goto = time.monotonic()
+        # composer.js sets ``window.__tesseraeComposed = true`` after
+        # every cell's mount() promise resolves. That's a far cleaner
+        # "page is ready to screenshot" signal than networkidle. The
+        # poll is best-effort: if it times out (a stuck widget mount)
+        # we screenshot whatever's rendered rather than failing.
+        try:
+            page.wait_for_function(
+                "window.__tesseraeComposed === true",
+                timeout=request.timeout_ms,
+            )
+        except PlaywrightError as err:
+            logger.warning("composer mount wait timed out: %s", err)
         t1 = time.monotonic()
         # Block screenshot until every cell's font is actually loaded.
         # ``document.fonts.ready`` only awaits fonts already pending;
@@ -208,8 +221,9 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         )
         t3 = time.monotonic()
         logger.info(
-            "render phases (s): goto=%.2f evaluate=%.2f screenshot=%.2f (url=%s)",
-            t1 - t0,
+            "render phases (s): goto=%.2f compose=%.2f evaluate=%.2f screenshot=%.2f (url=%s)",
+            t_goto - t0,
+            t1 - t_goto,
             t2 - t1,
             t3 - t2,
             request.url,
