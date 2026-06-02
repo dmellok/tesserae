@@ -17,7 +17,8 @@ how active a typical install is:
   the maintainer see session duration / daily-active counts instead of
   only process-start counts. Props carry **shape, not content**:
   - fleet shape: `n_devices`, `device_kinds` (kinds only, e.g.
-    `pi_bin,esp32_bin`), `n_pages`, `n_user_themes`, `is_docker`
+    `pi_bin,esp32_bin`), `n_pages`, `n_user_themes`, `is_docker`,
+    `is_homeassistant`
   - activity counters since the previous heartbeat:
     `n_pushes_since_last`, `n_push_failures_since_last`,
     `n_widget_errors_since_last`

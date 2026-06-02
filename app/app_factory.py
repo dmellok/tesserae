@@ -78,41 +78,46 @@ def create_app(
     )
     app.testing = testing
 
-    # Home Assistant Add-on / Ingress support. When set, the WSGI app is
-    # wrapped to honour the ``X-Ingress-Path`` header that HA Supervisor
-    # sets on every proxied request (so ``url_for`` emits URLs that
-    # resolve inside the ingress iframe), and the auth gate skips
-    # password-checking — Supervisor authenticated the user upstream and
-    # the X-Ingress-Path header presence is the proof of that.
+    # Home Assistant Add-on / Ingress support is split in two:
+    #
+    # * The URL-prefix middleware always wraps the WSGI app. It only
+    #   acts when ``X-Ingress-Path`` is present on a request — a no-op
+    #   for every non-HA install — so wrapping unconditionally is safe
+    #   and avoids the "I set the env var but URLs still 404" footgun
+    #   when only one of the two knobs is configured.
+    #
+    # * The auth-gate bypass requires the ``TESSERAE_HA_INGRESS=1`` env
+    #   var AS WELL AS the header on the live request. The env var is
+    #   the security knob — a stray header from a misconfigured reverse
+    #   proxy on a non-ingress install can't bypass auth without it.
     app.config["HA_INGRESS_MODE"] = os.environ.get("TESSERAE_HA_INGRESS", "").strip() in {
         "1",
         "true",
         "yes",
         "on",
     }
-    if app.config["HA_INGRESS_MODE"]:
 
-        class _IngressPrefixMiddleware:
-            """Read the public path HA Supervisor proxied this request
-            from and patch the WSGI environ so Flask's ``url_for`` emits
-            URLs the iframe can follow. The header looks like
-            ``X-Ingress-Path: /api/hassio_ingress/<token>`` — we stash
-            that as ``SCRIPT_NAME`` and trim it from ``PATH_INFO`` if it
-            leaked in (some Supervisor versions strip it, some don't)."""
+    class _IngressPrefixMiddleware:
+        """Read the public path HA Supervisor proxied this request from
+        and patch the WSGI environ so Flask's ``url_for`` emits URLs
+        the iframe can follow. Header looks like
+        ``X-Ingress-Path: /api/hassio_ingress/<token>``; some Supervisor
+        versions strip it from PATH_INFO, some don't, so we tolerate
+        both."""
 
-            def __init__(self, inner: Any) -> None:
-                self._inner = inner
+        def __init__(self, inner: Any) -> None:
+            self._inner = inner
 
-            def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
-                prefix = environ.get("HTTP_X_INGRESS_PATH", "").rstrip("/")
-                if prefix:
-                    environ["SCRIPT_NAME"] = prefix
-                    path = environ.get("PATH_INFO", "")
-                    if path.startswith(prefix):
-                        environ["PATH_INFO"] = path[len(prefix) :] or "/"
-                return self._inner(environ, start_response)
+        def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
+            prefix = environ.get("HTTP_X_INGRESS_PATH", "").rstrip("/")
+            if prefix:
+                environ["SCRIPT_NAME"] = prefix
+                path = environ.get("PATH_INFO", "")
+                if path.startswith(prefix):
+                    environ["PATH_INFO"] = path[len(prefix) :] or "/"
+            return self._inner(environ, start_response)
 
-        app.wsgi_app = _IngressPrefixMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+    app.wsgi_app = _IngressPrefixMiddleware(app.wsgi_app)  # type: ignore[method-assign]
 
     # Resolve the running package version. Prefer pyproject.toml on disk
     # (so a source checkout reflects post-pip-install bumps) and fall
@@ -168,7 +173,13 @@ def create_app(
     # (reddish-orange accent) and the mDNS advertiser picks tesserae-dev.local.
     app.config["DEV_MODE"] = dev
 
-    data_root = data_root or REPO_ROOT / "data"
+    # Data root resolution order: explicit ``data_root=`` kwarg (tests),
+    # then the ``TESSERAE_DATA_ROOT`` env var (HA Add-on sets this to
+    # ``/data`` so Supervisor's per-add-on persistent volume holds
+    # Tesserae's state across upgrades), then the in-repo default.
+    if data_root is None:
+        env_root = os.environ.get("TESSERAE_DATA_ROOT", "").strip()
+        data_root = Path(env_root) if env_root else REPO_ROOT / "data"
     plugins_dir = plugins_dir or REPO_ROOT / "plugins"
     renderers_dir = renderers_dir or REPO_ROOT / "renderers"
     devices_dir = devices_dir or REPO_ROOT / "devices"
@@ -283,12 +294,18 @@ def create_app(
         )
         # ``is_docker`` lets the maintainer see what proportion of installs
         # run via the official Docker image vs install.sh / from source.
-        # Set by the Dockerfile; safe-to-trust as long as nobody's
-        # spoofing it on a native install (and if they did, they're just
-        # mis-labelling their own data point).
+        # ``is_homeassistant`` flags the subset of those that run as the
+        # companion HA Add-on (the add-on's run.sh exports
+        # ``TESSERAE_HA_INGRESS=1``). Both are set by the deployment
+        # wrapper; safe-to-trust as long as nobody's spoofing them on a
+        # native install (and if they did, they're just mis-labelling
+        # their own data point).
         telemetry.send(
             "app.started",
-            {"is_docker": "true" if os.environ.get("TESSERAE_IN_DOCKER") == "1" else "false"},
+            {
+                "is_docker": "true" if os.environ.get("TESSERAE_IN_DOCKER") == "1" else "false",
+                "is_homeassistant": "true" if app.config.get("HA_INGRESS_MODE") else "false",
+            },
         )
     app.config["TELEMETRY"] = telemetry
 
@@ -471,6 +488,7 @@ def create_app(
                 # Static across heartbeats but cheap and lets the maintainer
                 # slice Aptabase views by deployment without joining tables.
                 "is_docker": "true" if os.environ.get("TESSERAE_IN_DOCKER") == "1" else "false",
+                "is_homeassistant": "true" if app.config.get("HA_INGRESS_MODE") else "false",
                 "n_devices": str(len(instances)),
                 "device_kinds": ",".join(kinds),
                 "n_pages": str(n_pages),

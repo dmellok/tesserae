@@ -304,9 +304,10 @@ posts four anonymous events to the project's
 
 - `app.started` — per process start (version, Python, platform).
 - `app.heartbeat` — hourly. Fleet shape (number of devices / pages /
-  user themes, device kinds, `is_docker`) + activity counters since
-  the previous heartbeat (pushes, push failures, widget errors). Shape
-  and counts only — never push content, never settings values.
+  user themes, device kinds, `is_docker`, `is_homeassistant`) +
+  activity counters since the previous heartbeat (pushes, push
+  failures, widget errors). Shape and counts only — never push
+  content, never settings values.
 - `update.applied` — the in-app updater applied a new revision (from /
   to short SHAs + channel).
 - `theme.user_created` — fired the first time a user persists a custom

@@ -8,6 +8,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.13] — 2026-06-02
+
+### Added
+
+- **`is_homeassistant` flag in telemetry.** Sits alongside `is_docker`
+  on both `app.started` and `app.heartbeat`. True when the
+  `TESSERAE_HA_INGRESS=1` env var is set (the companion HA Add-on
+  exports it via its `config.yaml` `environment:` section). Lets the
+  maintainer see the HA-Add-on subset of the installed fleet as it
+  grows. No content sent — just a single `true` / `false` deployment
+  flag, same shape as `is_docker`.
+- **`TESSERAE_DATA_ROOT` env var** to override the data directory. The
+  HA Add-on sets this to `/data` so Tesserae's settings, dashboards,
+  schedules and event log land on HA Supervisor's per-add-on
+  persistent volume — which Supervisor automatically backs up across
+  add-on upgrades.
+
+### Fixed
+
+- **HA Ingress 404 on first install.** The URL-prefix middleware
+  (added in 0.11.11) was only wrapping the WSGI app when
+  `TESSERAE_HA_INGRESS=1` was set, AND the add-on's `image:` field
+  was bypassing the custom Dockerfile that set that env var. Net
+  result: Tesserae's `/` redirected to `/setup` with a bare
+  `Location: /setup`, the iframe followed it to HA's root, and HA
+  itself 404'd. The middleware now always wraps (it's a no-op when
+  there's no `X-Ingress-Path` header), and the add-on's `config.yaml`
+  uses `environment:` to set the env var directly. The auth-gate
+  bypass still requires both env var + header — that part stays
+  belt-and-braces.
+
 ## [0.11.12] — 2026-06-02
 
 ### Added
