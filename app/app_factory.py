@@ -78,6 +78,42 @@ def create_app(
     )
     app.testing = testing
 
+    # Home Assistant Add-on / Ingress support. When set, the WSGI app is
+    # wrapped to honour the ``X-Ingress-Path`` header that HA Supervisor
+    # sets on every proxied request (so ``url_for`` emits URLs that
+    # resolve inside the ingress iframe), and the auth gate skips
+    # password-checking — Supervisor authenticated the user upstream and
+    # the X-Ingress-Path header presence is the proof of that.
+    app.config["HA_INGRESS_MODE"] = os.environ.get("TESSERAE_HA_INGRESS", "").strip() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if app.config["HA_INGRESS_MODE"]:
+
+        class _IngressPrefixMiddleware:
+            """Read the public path HA Supervisor proxied this request
+            from and patch the WSGI environ so Flask's ``url_for`` emits
+            URLs the iframe can follow. The header looks like
+            ``X-Ingress-Path: /api/hassio_ingress/<token>`` — we stash
+            that as ``SCRIPT_NAME`` and trim it from ``PATH_INFO`` if it
+            leaked in (some Supervisor versions strip it, some don't)."""
+
+            def __init__(self, inner: Any) -> None:
+                self._inner = inner
+
+            def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
+                prefix = environ.get("HTTP_X_INGRESS_PATH", "").rstrip("/")
+                if prefix:
+                    environ["SCRIPT_NAME"] = prefix
+                    path = environ.get("PATH_INFO", "")
+                    if path.startswith(prefix):
+                        environ["PATH_INFO"] = path[len(prefix) :] or "/"
+                return self._inner(environ, start_response)
+
+        app.wsgi_app = _IngressPrefixMiddleware(app.wsgi_app)  # type: ignore[method-assign]
+
     # Resolve the running package version. Prefer pyproject.toml on disk
     # (so a source checkout reflects post-pip-install bumps) and fall
     # back to importlib.metadata for installed wheels. Used by both

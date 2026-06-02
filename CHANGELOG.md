@@ -8,6 +8,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.11] — 2026-06-02
+
+### Added
+
+- **Home Assistant Add-on / Ingress support.** Opt in by setting the
+  `TESSERAE_HA_INGRESS=1` env var (the companion HA Add-on does this
+  automatically). When set:
+  - A WSGI middleware reads the `X-Ingress-Path` header HA Supervisor
+    sets on every proxied request and patches `SCRIPT_NAME` so
+    Flask's `url_for` emits URLs that resolve inside the iframe.
+  - The auth gate bypasses Tesserae's own password gate when the
+    `X-Ingress-Path` header is present (HA Supervisor authenticated
+    upstream).
+  - Both checks are belt-and-braces: env var alone won't bypass auth
+    without the header, header alone won't bypass without the env
+    var. A stray header from a misconfigured reverse proxy on a
+    non-ingress install can't sneak past.
+
+  The companion add-on lives at
+  [dmellok/homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
+
 ## [0.11.10] — 2026-06-02
 
 ### Added

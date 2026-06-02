@@ -24,7 +24,7 @@ import secrets
 from dataclasses import dataclass
 from typing import Any, Final
 
-from flask import Flask, redirect, request, session, url_for
+from flask import Flask, current_app, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app.state.settings_store import SettingsStore
@@ -223,6 +223,15 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         path = request.path
         # Open paths and static assets are always reachable.
         if _path_is_open(path):
+            return None
+        # Home Assistant Ingress: HA Supervisor reverse-proxies this
+        # request and the ``X-Ingress-Path`` header is its proof that
+        # the user is already authenticated upstream. Trust it and
+        # bypass our own password gate entirely. We require BOTH the
+        # env-var opt-in AND the header so a stray header from a
+        # misconfigured reverse proxy on a non-ingress install can't
+        # bypass auth.
+        if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
             return None
         # Compose is loopback-only (the in-process Playwright renderer)
         # OR authed (the editor's preview iframe loads it over the LAN).
