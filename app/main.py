@@ -69,6 +69,14 @@ def _serve(argv: list[str] | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
     )
+    # Honour HA's log_level option before create_app so its own startup
+    # log lines respect it. apply_log_level is a no-op when there's no
+    # options.json (i.e. not running as an HA Add-on).
+    from app.ha_options import apply_log_level, load_options
+
+    _ha_options = load_options()
+    if _ha_options is not None:
+        apply_log_level(_ha_options)
     app = create_app(dev=args.dev)
 
     if args.dev:

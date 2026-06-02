@@ -8,6 +8,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.3] — 2026-06-02
+
+### Added
+
+- **HA Add-on Configuration tab now actually wires through.** The
+  `log_level`, `mqtt_host`, `mqtt_port`, `mqtt_username`, and
+  `mqtt_password` options were declared in `config.yaml` but went
+  nowhere — users had to set the same values twice (once in HA's
+  form, once in Tesserae's Settings → MQTT broker page). A new
+  `app/ha_options.py` reads `/data/options.json` on every container
+  start (HA mode only) and applies log level to the root logger and
+  MQTT details to the broker settings section. HA Configuration is
+  now the canonical source for these fields; Tesserae's Settings →
+  MQTT broker card hides `host`/`port`/`username`/`password` under HA
+  and shows a "managed in the add-on's Configuration tab" blurb. The
+  card keeps `keepalive` and `client_id` editable since they have no
+  HA equivalent. Telemetry / mDNS / HA discovery / browser warmup
+  intentionally stay Tesserae-side — those are user-tunable consent
+  or runtime knobs, not connection config.
+
 ## [0.12.2] — 2026-06-02
 
 ### Fixed

@@ -198,6 +198,15 @@ def create_app(
 
     settings = SettingsStore(data_root / "core" / "settings.json")
     app.config["SETTINGS_STORE"] = settings
+    # When running as an HA Add-on, Supervisor's options.json is the
+    # canonical place for MQTT connection + log level. Apply it before
+    # auth.secret_key / the transport wiring read the broker section,
+    # so they see the HA-supplied values on every restart. No-op
+    # outside HA (no options.json present).
+    if app.config.get("HA_INGRESS_MODE"):
+        from app.ha_options import apply_ha_options
+
+        apply_ha_options(settings)
     app.secret_key = auth.secret_key(settings)
 
     plugins = plugin_loader.discover(

@@ -191,12 +191,20 @@ def _build_sections() -> list[dict[str, Any]]:
     )
 
     broker_raw = store.get_section("broker")
+    broker_blurb = "Tesserae publishes frames here; devices subscribe."
+    if current_app.config.get("HA_INGRESS_MODE"):
+        broker_blurb = (
+            "Tesserae publishes frames here; devices subscribe. "
+            "Host, port, and credentials are managed in the Tesserae "
+            "add-on's Configuration tab — changes there apply on the "
+            "next add-on restart."
+        )
     sections.append(
         {
             "id": "broker",
             "kind": "broker",
             "title": "MQTT broker",
-            "blurb": "Tesserae publishes frames here; devices subscribe.",
+            "blurb": broker_blurb,
             "fields": _broker_fields_with_client_id_hint(),
             "state": _values_for_core("broker", BROKER_FIELDS, broker_raw),
             "endpoint": url_for("auth.settings_update", section_kind="broker"),
@@ -528,18 +536,28 @@ _EMBEDDED_BROKER_FIELD_NAMES = frozenset(
     }
 )
 
+# Connection fields HA's Configuration tab owns — see ``app.ha_options``.
+# Hidden from the Settings card so the user has one place to manage
+# them; the card's ``MQTT URL`` meta line still shows the effective
+# host:port so they can verify what's resolved.
+_HA_MANAGED_BROKER_FIELD_NAMES = frozenset({"host", "port", "username", "password"})
+
 
 def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:
     """BROKER_FIELDS with the client_id field's placeholder set to the live
     (auto) client id, so a blank field shows what it actually connects as
     (e.g. ``tesserae-<hostname>`` / ``…-dev``) rather than looking unset.
 
-    Under HA Ingress the embedded broker fields are stripped — the bundled
-    Mosquitto add-on is already on 1883 and offering a second broker on
-    the same host is a footgun (see transport_wiring._rebuild_transport)."""
+    Under HA Ingress two groups of fields are stripped:
+      * embedded broker fields (the bundled Mosquitto add-on already owns
+        1883 — see ``transport_wiring._rebuild_transport``).
+      * host / port / username / password — managed by HA's Configuration
+        tab and applied at every container start by ``app.ha_options``.
+    """
     fields = BROKER_FIELDS
     if current_app.config.get("HA_INGRESS_MODE"):
-        fields = [f for f in fields if f.get("name") not in _EMBEDDED_BROKER_FIELD_NAMES]
+        hidden = _EMBEDDED_BROKER_FIELD_NAMES | _HA_MANAGED_BROKER_FIELD_NAMES
+        fields = [f for f in fields if f.get("name") not in hidden]
     transport_obj = current_app.config.get("MQTT_TRANSPORT")
     auto = getattr(transport_obj, "client_id", "") or ""
     if not auto:

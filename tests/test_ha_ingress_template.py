@@ -71,7 +71,7 @@ def test_broker_settings_card_hides_embedded_fields_under_ha(app: Flask) -> None
     app.config["HA_INGRESS_MODE"] = True
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/settings").get_data(as_text=True)
+    body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
     for name in (
         "embedded_enabled",
         "embedded_port",
@@ -79,7 +79,26 @@ def test_broker_settings_card_hides_embedded_fields_under_ha(app: Flask) -> None
         "embedded_username",
         "embedded_password",
     ):
-        assert f'name="broker[{name}]"' not in body, name
+        # Fields are rendered with id="broker-<name>"; their absence means
+        # the field was stripped from the section's field list.
+        assert f'id="broker-{name}"' not in body, name
+
+
+def test_broker_settings_card_hides_ha_managed_connection_fields(app: Flask) -> None:
+    """host/port/username/password come from the HA add-on Configuration
+    tab under HA. The Settings card hides them so there's one source of
+    truth, but keeps fields that don't have an HA option (keepalive,
+    client_id)."""
+    app.config["HA_INGRESS_MODE"] = True
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/settings", follow_redirects=True).get_data(as_text=True)
+    for name in ("host", "port", "username", "password"):
+        assert f'id="broker-{name}"' not in body, name
+    assert 'id="broker-keepalive"' in body
+    assert 'id="broker-client_id"' in body
+    # Blurb explains where these moved.
+    assert "Configuration tab" in body
 
 
 def test_transport_rebuild_logs_when_ignoring_embedded_under_ha(
