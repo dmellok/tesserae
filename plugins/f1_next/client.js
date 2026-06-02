@@ -7,7 +7,7 @@
 //
 // Tall cells stack the hero vertically (text on top, circuit below).
 
-import { getCircuit } from "/plugins/f1_core/static/circuits.js";
+import { getCircuit } from "../f1_core/static/circuits.js";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

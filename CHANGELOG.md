@@ -8,6 +8,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.1] — 2026-06-02
+
+### Fixed
+
+- **"Importing a module script failed." on every widget under HA
+  Ingress.** `composer.js` did `import("/plugins/<id>/client.js")`
+  with an absolute path — inside the ingress iframe that resolves to
+  the HA host root and 404s with an HTML response, which the browser
+  reports as a module-import failure. The compose page now exposes
+  `window.TESSERAE_URL_PREFIX` the same way `_base.html` does, and the
+  dynamic import prepends it. The three F1 widgets (`f1_next`,
+  `f1_last_race`, `f1_weekend`) that absolute-imported the shared
+  `f1_core/static/circuits.js` helper now use a relative import so
+  they're prefix-independent.
+
 ## [0.12.0] — 2026-06-02
 
 ### Breaking

@@ -6,7 +6,7 @@
 //      Race row gets the accent block; others alternate surface tones.
 //   3. Circuit silhouette band (accent2 backdrop) on md/lg
 
-import { getCircuit } from "/plugins/f1_core/static/circuits.js";
+import { getCircuit } from "../f1_core/static/circuits.js";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

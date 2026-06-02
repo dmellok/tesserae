@@ -8,7 +8,7 @@
 // Each podium row: big position number, driver family name, team,
 // time/gap, optional "FL" fastest-lap badge.
 
-import { getCircuit } from "/plugins/f1_core/static/circuits.js";
+import { getCircuit } from "../f1_core/static/circuits.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({

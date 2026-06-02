@@ -111,7 +111,8 @@ async function mountCell(cell) {
   const ctx = buildCtx(cell, options, pluginData, palette, fontFamily);
 
   try {
-    const mod = await import(`/plugins/${pluginId}/client.js`);
+    const prefix = window.TESSERAE_URL_PREFIX || "";
+    const mod = await import(`${prefix}/plugins/${pluginId}/client.js`);
     if (typeof mod.default !== "function") {
       throw new Error("plugin module has no default export");
     }

@@ -9,6 +9,13 @@
        (fill, discouraged). The weight class + icon-name class form a compound
        selector — both classes carry the bare icon name. Vendored locally so the
        renderer paints without network access. -->
+  <script>
+    // SCRIPT_NAME under HA Ingress (e.g. /api/hassio_ingress/<token>), empty
+    // otherwise. composer.js's dynamic ``import("/plugins/<id>/client.js")``
+    // prepends this so widget modules resolve to the add-on, not the HA
+    // host root. Mirrors the same injection in _base.html.
+    window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
+  </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
