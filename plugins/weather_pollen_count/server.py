@@ -47,6 +47,25 @@ MPC_LEVEL_TO_COUNT = {
     "Extreme": 400,
 }
 
+# Overall-band thresholds — applied to the max of (tree, grass, weed) so
+# the headline level word matches whichever species is worst. Aligned
+# with the per-species bands the legacy widget already paints.
+OVERALL_BANDS: list[tuple[float, str]] = [
+    (30.0, "Low"),
+    (100.0, "Moderate"),
+    (300.0, "High"),
+    (float("inf"), "Very High"),
+]
+
+# Per-species presentation metadata used by the variant renderers. The
+# icon names map through wx-common.PH so they render as Phosphor glyphs.
+# Accents follow the design handoff: tree=green, grass=yellow, weed=red.
+SPECIES_PRESENTATION = [
+    {"key": "tree", "label": "Tree", "icon": "tree", "accent": "green"},
+    {"key": "grass", "label": "Grass", "icon": "grass", "accent": "yellow"},
+    {"key": "weed", "label": "Weed", "icon": "weed", "accent": "red"},
+]
+
 
 def _cached(path: Path) -> dict[str, Any] | None:
     if not path.exists():
@@ -132,6 +151,72 @@ def _is_australia(lat: float, lon: float) -> bool:
     return AU_LAT[0] <= lat <= AU_LAT[1] and AU_LON[0] <= lon <= AU_LON[1]
 
 
+def _overall_level(values: list[float | None]) -> str:
+    """Pick the overall headline level from the worst species reading.
+    Returns "—" when nothing numeric is available so the variant
+    renderers can still print something legible."""
+    nums = [v for v in values if isinstance(v, (int, float))]
+    if not nums:
+        return "—"
+    worst = max(nums)
+    for ceiling, name in OVERALL_BANDS:
+        if worst <= ceiling:
+            return name
+    return "Very High"
+
+
+def _dominant_type(values: dict[str, float | None]) -> str:
+    """The species driving the headline level — used by Refined/Geometric
+    variants as the sub-title under the level word."""
+    nums = {k: v for k, v in values.items() if isinstance(v, (int, float))}
+    if not nums:
+        return "Mixed"
+    top_key = max(nums, key=lambda k: nums[k])
+    return {"tree": "Tree", "grass": "Grass", "weed": "Weed"}.get(top_key, "Mixed")
+
+
+def _hhmm_now() -> str:
+    """Local wall-clock HH:MM — matches the headers on weather_now."""
+    from datetime import datetime as _dt
+
+    return _dt.now().strftime("%H:%M")
+
+
+def _scale_max(values: list[float | None]) -> float:
+    """Scale ceiling for the species bars. Anchor at 300 (High) so a
+    typical day's bar fills meaningfully without an outlier flattening
+    everything else; bump higher when we genuinely exceed it."""
+    nums = [v for v in values if isinstance(v, (int, float))]
+    if not nums:
+        return 300.0
+    return max(300.0, max(nums))
+
+
+def _build_breakdown(values: dict[str, float | None], scale_max: float) -> list[dict[str, Any]]:
+    """Per-species rows for the variant grid / bars / chips. ``level``
+    is a 0-100 normalised position on the bar, ``value`` is the raw
+    count (or em-dash when missing)."""
+    rows: list[dict[str, Any]] = []
+    for spec in SPECIES_PRESENTATION:
+        raw = values.get(spec["key"])
+        if isinstance(raw, (int, float)):
+            display = round(raw)
+            level = max(0.0, min(100.0, (raw / scale_max) * 100.0)) if scale_max else 0.0
+        else:
+            display = "—"
+            level = 0
+        rows.append(
+            {
+                "label": spec["label"],
+                "value": display,
+                "level": level,
+                "accent": spec["accent"],
+                "icon": spec["icon"],
+            }
+        )
+    return rows
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -160,9 +245,36 @@ def fetch(
             "source": "",
         }
 
+    # Structured fields for the variant renderers (Refined / Geometric /
+    # Swiss / Data). When the scraper supplied a `grass_label` (text-only
+    # MPC band), prefer that as the headline level word.
+    species_vals = {
+        "tree": primary.get("tree"),
+        "grass": primary.get("grass"),
+        "weed": primary.get("weed"),
+    }
+    overall = _overall_level(list(species_vals.values()))
+    if primary.get("grass_label"):
+        # MPC text levels normalise to title-case; "Extreme" → "Very High"
+        # so the colour band matches the four-band design system.
+        raw = str(primary["grass_label"]).strip()
+        norm = {"Extreme": "Very High", "Off Season": "Low"}.get(raw, raw)
+        if norm in {"Low", "Moderate", "High", "Very High"}:
+            overall = norm
+    scale_max = _scale_max(list(species_vals.values()))
+    breakdown = _build_breakdown(species_vals, scale_max)
+
+    label = options.get("label", "")
     result: dict[str, Any] = {
-        "label": options.get("label", ""),
+        "label": label,
         **primary,
+        # New structured fields the variant renderers paint from.
+        "place": label,
+        "time": _hhmm_now(),
+        "level": overall,
+        "type": _dominant_type(species_vals),
+        "breakdown": breakdown,
+        "scaleMax": scale_max,
     }
     with contextlib.suppress(OSError):
         cache_path.write_text(json.dumps(result), encoding="utf-8")

@@ -1,25 +1,84 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather — Now",
+  "name": "Weather \u2014 Now",
   "version": "0.1.0",
   "kind": "widget",
   "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",
   "icon": "ph-cloud-sun",
-  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "latitude", "type": "number", "label": "Latitude", "default": "" },
-    { "name": "longitude", "type": "number", "label": "Longitude", "default": "" },
-    { "name": "label", "type": "string", "label": "Place label", "default": "Melbourne" },
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude",
+      "default": ""
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude",
+      "default": ""
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Place label",
+      "default": "Melbourne"
+    },
     {
       "name": "units",
       "type": "select",
       "label": "Units",
       "default": "metric",
       "choices": [
-        { "value": "metric", "label": "Metric (°C, km/h)" },
-        { "value": "imperial", "label": "Imperial (°F, mph)" }
+        {
+          "value": "metric",
+          "label": "Metric (\u00b0C, km/h)"
+        },
+        {
+          "value": "imperial",
+          "label": "Imperial (\u00b0F, mph)"
+        }
+      ]
+    },
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "legacy",
+      "choices": [
+        {
+          "value": "legacy",
+          "label": "Legacy"
+        },
+        {
+          "value": "r1",
+          "label": "1 \u00b7 Refined"
+        },
+        {
+          "value": "g2",
+          "label": "2 \u00b7 Geometric"
+        },
+        {
+          "value": "s3",
+          "label": "3 \u00b7 Swiss"
+        },
+        {
+          "value": "d4",
+          "label": "4 \u00b7 Data"
+        }
       ]
     }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

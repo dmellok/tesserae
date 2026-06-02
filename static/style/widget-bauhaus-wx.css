@@ -1,0 +1,95 @@
+/* widget-bauhaus-wx.css — design tokens for the weather widget family.
+ *
+ * Loaded alongside ``widget-bauhaus.css`` by each weather/sky widget's
+ * ``client.js`` (it injects a <link> into the cell's shadow root).
+ *
+ * Hex values come from the Spectra 6 design handoff — they're the
+ * desaturated targets that actually render on a 6-colour panel. Users
+ * who want a different look pick a different Tesserae theme; the
+ * widget body still uses these tokens internally, but a theme can
+ * override them by setting the matching ``--c-…`` value at :host
+ * higher in the cascade.
+ *
+ * Variants the weather widgets ship:
+ *   r1 — Refined           charcoal header, hairline grid
+ *   g2 — Geometric         De Stijl colour blocks
+ *   s3 — Swiss             hairline header, light numerals
+ *   d4 — Data              charts foregrounded
+ *   legacy                 the original render path (kept for back-compat)
+ */
+
+:host {
+  /* --- paper / ink --- */
+  --wx-paper:    #f1ece0;
+  --wx-paper-2:  #e7dfcd;
+  --wx-paper-3:  #ded4bd;
+  --wx-ink:      #1b1a16;
+  --wx-ink-60:   #6b675c;
+  --wx-hair:     #1b1a16;
+
+  /* --- Spectra 6 chromatics (desaturated, e-ink-validated) --- */
+  --wx-red:      #b23a2e;
+  --wx-red-fg:   #ffffff;
+  --wx-red-t:    #e8cbc4;
+  --wx-blue:     #2f5d8a;
+  --wx-blue-fg:  #ffffff;
+  --wx-blue-t:   #c8d6e3;
+  --wx-yellow:   #d8a82a;
+  --wx-yellow-fg:#1b1a16;
+  --wx-yellow-t: #efdfb0;
+  --wx-green:    #45744c;
+  --wx-green-fg: #ffffff;
+  --wx-green-t:  #cddccd;
+
+  /* --- type stack ---
+   * The named font families are loaded by the fonts_core plugin. If a
+   * specific stack isn't installed the browser falls through to the
+   * generic fallback rather than a system-font-soup. */
+  --wx-grotesk:  "Archivo", system-ui, sans-serif;
+  --wx-black:    "Archivo Black", "Archivo", sans-serif;
+  --wx-geo:      "Space Grotesk", "Archivo", sans-serif;
+  --wx-mono:     "Space Mono", "IBM Plex Mono", monospace;
+  --wx-swiss:    "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+}
+
+/* The "artboard" wrapper every wx widget variant uses. Fills the cell
+ * with the paper colour and sets sensible defaults. */
+.wx-art {
+  width: 100%;
+  height: 100%;
+  background: var(--wx-paper);
+  color: var(--wx-ink);
+  overflow: hidden;
+  position: relative;
+  font-family: var(--wx-grotesk);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures wherever numbers matter — keeps stat blocks aligned. */
+.wx-tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* The dark header strip most variants lead with: [colour chip] PLACE …
+ * left, time/meta right. Override font sizes per-variant via the
+ * inline style attribute. */
+.wx-header-dark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--wx-ink);
+  color: var(--wx-paper);
+  padding: 8px 16px;
+  font-family: var(--wx-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.wx-header-chip {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+.wx-header-title { flex: 1; }
+.wx-header-meta { font-weight: 400; opacity: 0.85; }

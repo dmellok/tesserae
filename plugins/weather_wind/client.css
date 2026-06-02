@@ -1,0 +1,20 @@
+/* weather_wind — minimal client.css.
+ *
+ * The four direction variants live entirely in client.js via inline
+ * styles + the shared widget-bauhaus-wx.css tokens, so this file only
+ * needs the bare ``.root.error`` fallback in case the widget renders
+ * an error state.
+ */
+
+.root.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--c-danger, #c44a3a);
+  background: var(--c-bg, #fff);
+  height: 100%;
+  box-sizing: border-box;
+}
