@@ -39,6 +39,21 @@ def test_url_prefix_empty_without_ingress_header(app: Flask) -> None:
     assert 'window.TESSERAE_URL_PREFIX = "";' in body
 
 
+def test_ingress_request_does_not_capture_ha_frontend_port(app: Flask) -> None:
+    """Under HA Ingress the request comes through HA's frontend
+    (homeassistant.local:8123). The before-request port capture must
+    skip those — otherwise every panel payload pings :8123, where HA
+    serves its own UI and 404s on /renders/."""
+    client = app.test_client()
+    _sign_in(client)
+    client.get(
+        "/events",
+        base_url="http://homeassistant.local:8123",
+        headers={"X-Ingress-Path": "/api/hassio_ingress/abc123"},
+    )
+    assert app.config.get("DETECTED_HTTP_PORT") != 8123
+
+
 def test_url_prefix_reflects_ingress_header(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

@@ -510,6 +510,13 @@ def create_app(
         configs so HA's stored URLs pick up the new port."""
         from flask import request
 
+        # Inside HA Ingress, ``request.host`` is the HA host's address
+        # (e.g. ``homeassistant.local:8123``) — that's HA's port, not
+        # Tesserae's. Capturing it would emit panel URLs pointing at
+        # ``http://<lan-ip>:8123/renders/…`` which 404s at HA. Fall
+        # back to TESSERAE_HTTP_PORT / the default instead.
+        if request.headers.get("X-Ingress-Path"):
+            return
         previous = app.config.get("DETECTED_HTTP_PORT")
         port = request.host.split(":", 1)[1] if ":" in request.host else None
         if not port or not port.isdigit():

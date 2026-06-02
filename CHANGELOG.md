@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.2] — 2026-06-02
+
+### Fixed
+
+- **Panel URLs under HA Ingress pointed at HA's port (8123), not
+  Tesserae's.** `_capture_http_port` read `request.host` on every
+  request and stashed the port. Inside Ingress that host is the HA
+  frontend (`homeassistant.local:8123`), so every MQTT push payload
+  ended up with `http://<lan-ip>:8123/renders/…` — devices 404'd at
+  HA. The before-request hook now short-circuits when
+  `X-Ingress-Path` is present; under Ingress we fall back to
+  `TESSERAE_HTTP_PORT` / the default 8765 instead, matching the
+  add-on's actual host port mapping.
+
 ## [0.12.1] — 2026-06-02
 
 ### Fixed
