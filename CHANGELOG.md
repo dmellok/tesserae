@@ -8,6 +8,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.14] — 2026-06-02
+
+### Fixed
+
+- **`github_repo` widget showed "No commit activity" on active
+  repos.** GitHub's `/stats/commit_activity` endpoint is async — the
+  first request returns HTTP 202 with an empty body while GitHub
+  builds the stats; subsequent requests get the real data. Our
+  `request_json` was crashing on the empty body
+  (`json.loads("")` → `JSONDecodeError`), the widget caught the
+  exception, set `activity = []`, and **cached that empty result for
+  10 minutes** — so even after GitHub finished computing, the widget
+  kept rendering empty until the cache expired.
+  - `github_core.request_json` now raises a dedicated
+    `GithubAcceptedError` on 202 responses instead of choking on an
+    empty body.
+  - `github_repo` catches that error explicitly and **skips writing
+    the cache** when stats are still computing, so the next render
+    picks up the real data.
+  - For already-cached empty results (the ones currently sticking
+    around for users hit by this), the widget now ignores a cached
+    entry whose `commit_weeks` is empty and refetches — self-heals
+    without waiting for the 10-minute TTL.
+
 ## [0.12.13] — 2026-06-02
 
 ### Fixed

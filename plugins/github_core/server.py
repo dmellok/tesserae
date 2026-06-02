@@ -49,12 +49,34 @@ def headers(*, accept: str = ACCEPT) -> dict[str, str]:
     return h
 
 
+class GithubAcceptedError(Exception):
+    """GitHub returned 202 Accepted — endpoint is async and the stats
+    are still being computed (typical for ``/stats/commit_activity``,
+    ``/stats/contributors``, etc.). Widgets should treat this as a
+    "no data yet, try again" signal and avoid caching the empty
+    result so the next render picks up the computed data."""
+
+
 def request_json(url: str, *, timeout: int = 12) -> Any:
     """GET a JSON endpoint, return the parsed body. Raises on HTTP
-    errors so each widget can decide how to surface them."""
+    errors so each widget can decide how to surface them.
+
+    Special case: GitHub's stats endpoints return 202 with an empty
+    body the first time you hit them (the answer is being computed
+    async). We raise ``GithubAcceptedError`` for those so the caller
+    can keep its widget state empty WITHOUT caching the empty result —
+    the next render will get the real data."""
     req = urllib.request.Request(url, headers=headers(), method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        if resp.status == 202:
+            raise GithubAcceptedError(f"GitHub still computing stats for {url}")
+        body = resp.read().decode("utf-8")
+        if not body.strip():
+            # Some stats endpoints return 200 with an empty body when
+            # there's genuinely nothing to report — treat like a normal
+            # empty list rather than blowing up on JSONDecodeError.
+            return []
+        return json.loads(body)
 
 
 def request_graphql(query: str, variables: dict[str, Any], *, timeout: int = 12) -> Any:

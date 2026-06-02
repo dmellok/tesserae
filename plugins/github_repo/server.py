@@ -33,9 +33,20 @@ def fetch(
     cache = data_dir / f"repo_{safe}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text(encoding="utf-8"))
+            cached = json.loads(cache.read_text(encoding="utf-8"))
+            # Self-heal a previously cached "stats computing" result so
+            # the user doesn't have to wait out the full 10-minute TTL
+            # once GitHub's done. An active repo with zero commit_weeks
+            # is unrealistic, so refetch in that case.
+            if cached.get("commit_weeks"):
+                return cached
         except (json.JSONDecodeError, OSError):
             pass
+    # Tracks whether commit_activity came back from GitHub's async stats
+    # endpoint as a "still computing" 202. If so, we skip writing the
+    # cache so the next render picks up the real data instead of
+    # serving "No commit activity" for 10 minutes.
+    activity_pending = False
     try:
         info = core.request_json(f"https://api.github.com/repos/{repo}")
         try:
@@ -49,10 +60,13 @@ def fetch(
         try:
             # 52-week commit activity — list of {"week", "total", "days"}.
             # First request often returns 202 (computing); the next hit
-            # is cached. Accept whatever shape comes back.
+            # has the data.
             activity = core.request_json(
                 f"https://api.github.com/repos/{repo}/stats/commit_activity"
             )
+        except core.GithubAcceptedError:
+            activity = []
+            activity_pending = True
         except Exception:
             activity = []
     except Exception as err:
@@ -92,6 +106,10 @@ def fetch(
         "commits_year": sum(commit_weeks),
         "busiest_week": max(commit_weeks) if commit_weeks else 0,
     }
-    with contextlib.suppress(OSError):
-        cache.write_text(json.dumps(result), encoding="utf-8")
+    # Don't cache while the commit_activity stats are still being
+    # computed by GitHub — that'd lock in an empty bars chart for
+    # 10 minutes when the answer is on its way.
+    if not activity_pending:
+        with contextlib.suppress(OSError):
+            cache.write_text(json.dumps(result), encoding="utf-8")
     return result
