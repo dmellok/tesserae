@@ -10,12 +10,13 @@ from __future__ import annotations
 import contextlib
 import json
 import time
-import urllib.request
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import fetch_json
+
 CACHE_TTL_S = 12 * 3600
-HTTP_TIMEOUT_S = 10
+HTTP_TIMEOUT_S = 15
 USER_AGENT = "tesserae/0.1 (+f1_last_race)"
 ENDPOINT = "https://api.jolpi.ca/ergast/f1/current/last/results.json"
 
@@ -62,9 +63,7 @@ def fetch(
         return cached
 
     try:
-        req = urllib.request.Request(ENDPOINT, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(ENDPOINT, headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT_S)
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 

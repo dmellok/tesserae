@@ -8,6 +8,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.10] — 2026-06-02
+
+### Fixed
+
+- **F1 widgets surface `TimeoutError` when the Jolpica F1 API blips.**
+  The four F1 plugins (`f1_next`, `f1_last_race`, `f1_weekend`,
+  `f1_standings_drivers`) still used bare `urllib.request.urlopen`
+  with a 10s timeout — same fragile pattern v0.12.5 fixed in the
+  weather widgets but never propagated to F1. Switched them to
+  `app.plugin_http.fetch_json` (15s timeout, one retry, 1s backoff),
+  so a transient SSL handshake hang on jolpi.ca no longer paints
+  "TimeoutError: the read operation timed out" into the cell.
+
 ## [0.12.9] — 2026-06-02
 
 ### Fixed
