@@ -21,8 +21,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+from app.plugin_http import fetch_json
+
 CACHE_TTL_S = 1800
-HTTP_TIMEOUT_S = 10
+HTTP_TIMEOUT_S = 15
 USER_AGENT = "tesserae/0.1 (+weather_pollen_count)"
 
 # Australia bounding box — used to decide whether the MPC fallback is
@@ -66,9 +68,7 @@ def _open_meteo(lat: float, lon: float) -> dict[str, Any] | None:
         "olive_pollen,ragweed_pollen"
     )
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
-            payload = json.loads(resp.read().decode("utf-8"))
+        payload = fetch_json(url, headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT_S)
     except Exception:
         return None
     current = payload.get("current") or {}

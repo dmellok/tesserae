@@ -8,6 +8,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.5] — 2026-06-02
+
+### Fixed
+
+- **Chart.js 404'd under HA Ingress on the four chart-using widgets.**
+  `finance_currency`, `finance_crypto`, `finance_stock`, and
+  `weather_hourly` all loaded Chart.js by creating a `<script>` and
+  setting `src = "/static/vendor/chart.umd.min.js"` — and because
+  that script lives in `document.head`, not in the widget's shadow
+  root, v0.12.4's shadow-DOM URL sweep didn't touch it. Patched the
+  four widgets to prepend `window.TESSERAE_URL_PREFIX` themselves.
+- **Weather widgets occasionally flashed an SSL handshake / URL
+  timeout error.** A flaky LAN or a slow upstream (Open-Meteo / pollen
+  sites) caused a single hung request to fail the whole render. New
+  `app/plugin_http.py` adds a tiny `fetch_json` helper with one retry
+  + 1s backoff and a bumped 15s timeout; the five weather plugins
+  (`now`, `forecast`, `hourly`, `air_quality`, `pollen_count`) use it
+  instead of bare `urllib.request.urlopen`. A blip on the first try
+  no longer surfaces an error in the cell.
+
 ## [0.12.4] — 2026-06-02
 
 ### Fixed

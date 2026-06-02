@@ -16,7 +16,7 @@ function loadChart() {
   if (window.__tesseraeChartJs) return window.__tesseraeChartJs;
   window.__tesseraeChartJs = new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "/static/vendor/chart.umd.min.js";
+    s.src = (window.TESSERAE_URL_PREFIX || "") + "/static/vendor/chart.umd.min.js";
     s.async = true;
     s.onload = () => resolve(window.Chart);
     s.onerror = () => reject(new Error("failed to load chart.js"));
