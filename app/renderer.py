@@ -29,6 +29,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, Literal, cast
@@ -163,6 +164,16 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
     try:
         page = context.new_page()
         page.set_default_timeout(request.timeout_ms)
+        # ``set_default_timeout`` covers actions (evaluate, click, …) but
+        # NOT navigation — ``goto`` uses Playwright's 30s default unless
+        # we override it. Without this, ``goto + fallback + evaluate +
+        # screenshot`` can sum to ~75s, which races the BrowserPool's
+        # outer 75s deadline and surfaces as an empty-message TimeoutError.
+        page.set_default_navigation_timeout(request.timeout_ms)
+        # Per-phase timing — surfaces in the add-on log so a future
+        # "render took 70s" investigation can point at the specific
+        # Playwright stage that timed out instead of guessing.
+        t0 = time.monotonic()
         # Best-effort ``networkidle``: a single widget holding a long-poll
         # open shouldn't block the whole render. On timeout, fall back to
         # ``load`` — DOM is laid out, the font wait below gives one more
@@ -174,6 +185,7 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
                 page.wait_for_load_state("load", timeout=request.timeout_ms)
         else:
             page.goto(request.url, wait_until=request.wait_until)
+        t1 = time.monotonic()
         # Block screenshot until every cell's font is actually loaded.
         # ``document.fonts.ready`` only awaits fonts already pending;
         # ``document.fonts.load()`` triggers the request and waits.
@@ -187,11 +199,20 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
             page.evaluate(_FONT_WAIT_JS)
         except PlaywrightError as err:
             logger.warning("font wait skipped: %s", err)
+        t2 = time.monotonic()
         png: bytes = page.screenshot(
             full_page=False,
             type="png",
             animations="disabled",
             omit_background=False,
+        )
+        t3 = time.monotonic()
+        logger.info(
+            "render phases (s): goto=%.2f evaluate=%.2f screenshot=%.2f (url=%s)",
+            t1 - t0,
+            t2 - t1,
+            t3 - t2,
+            request.url,
         )
         return png
     finally:

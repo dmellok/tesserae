@@ -8,6 +8,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.12.8] — 2026-06-02
+
+### Fixed
+
+- **Renders capped at exactly the 75s BrowserPool deadline, surfacing
+  as a bare "render:" error in History.** `page.set_default_timeout`
+  governs Playwright actions (evaluate, click) but not navigation, so
+  `page.goto` was using the upstream 30s default rather than our 15s.
+  `goto + fallback + evaluate + screenshot` could sum to ~75s and
+  race the pool's outer 75s future deadline; the resulting
+  `concurrent.futures.TimeoutError` stringifies to an empty string,
+  which is why the History row showed `render:` with no detail.
+  Renderer now sets `set_default_navigation_timeout` too, and
+  `push.py` falls back to the exception type name when the message is
+  empty so future failures self-explain.
+
+### Added
+
+- **Per-phase render timing in the add-on log.** Each headless render
+  now logs `goto / evaluate / screenshot` durations next to the
+  composed URL. "Why is this push taking 70s?" investigations get a
+  concrete breadcrumb instead of guesswork.
+
 ## [0.12.7] — 2026-06-02
 
 ### Fixed

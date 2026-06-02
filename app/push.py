@@ -515,11 +515,17 @@ class PushManager:
                     pool=self._browser_pool_fn(),
                 )
             except Exception as err:
+                # Some exceptions stringify to an empty message (notably
+                # ``concurrent.futures.TimeoutError`` from the BrowserPool's
+                # outer deadline), which surfaces in the History row as a
+                # bare "render:" with no detail. Fall through to the type
+                # name so the user has at least one breadcrumb.
+                err_msg = str(err) or type(err).__name__
                 group_results.append(
                     self._log_failure(
                         source="page",
                         target=page_id,
-                        error=f"render: {err}",
+                        error=f"render: {err_msg}",
                         duration_s=time.monotonic() - started,
                     )
                 )
