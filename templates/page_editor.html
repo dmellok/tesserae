@@ -328,6 +328,32 @@
             <i class="ph ph-info" aria-hidden="true"></i>
             Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.
           </p>
+          {# Optional snap-to-grid editing aid. The dashed N×M overlay
+             on the board makes it easy to size cells consistently —
+             every drag rounds to the nearest gridline. Persisted to
+             sessionStorage per page so different dashboards can have
+             different grids without stepping on each other. #}
+          <div class="layout-snap">
+            <div class="field field--switch">
+              <label class="switch" for="layout-snap-toggle">
+                <input type="checkbox" id="layout-snap-toggle" data-snap-toggle>
+                <span class="switch-track"><span class="switch-thumb"></span></span>
+                <span class="switch-label">Snap to grid</span>
+              </label>
+            </div>
+            <div class="field-grid layout-snap-dims" data-snap-dims hidden>
+              <div class="field">
+                <label for="layout-snap-cols">Columns</label>
+                <input type="number" id="layout-snap-cols"
+                       min="2" max="48" step="1" value="12" data-snap-cols>
+              </div>
+              <div class="field">
+                <label for="layout-snap-rows">Rows</label>
+                <input type="number" id="layout-snap-rows"
+                       min="2" max="48" step="1" value="8" data-snap-rows>
+              </div>
+            </div>
+          </div>
         </div>
       </details>
     </section>

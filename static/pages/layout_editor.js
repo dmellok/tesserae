@@ -52,7 +52,26 @@
   // ---------------------------------------------------------------
   // Geometry helpers
   // ---------------------------------------------------------------
-  const SNAP = 8; // px on panel scale — keeps drags from going subpixel
+  const FREEFORM_SNAP = 8; // px on panel scale — keeps drags from going subpixel
+
+  // Snap-to-grid editing aid. The dashed N×M overlay on the board
+  // makes it easy to size cells consistently — every drag rounds to
+  // the nearest gridline. State lives in the toggle/inputs at the
+  // bottom of the editor; reading it lazily on each drag lets the
+  // user retune the grid without picking up the cell first.
+  const snapState = {
+    enabled: false,
+    cols: 12,
+    rows: 8,
+    storageKey: `tesserae:layout-snap:${pageId}`,
+  };
+
+  function snapStep(axis) {
+    if (!snapState.enabled) return FREEFORM_SNAP;
+    const n = axis === "x" ? snapState.cols : snapState.rows;
+    const total = axis === "x" ? panelW : panelH;
+    return Math.max(1, Math.round(total / Math.max(2, n)));
+  }
 
   function clamp(v, lo, hi) {
     return Math.max(lo, Math.min(hi, v));
@@ -109,15 +128,19 @@
     return edges;
   }
 
-  // For drag, work out the min / max valid edge coord so cells stay >= SNAP.
+  // For drag, work out the min / max valid edge coord so cells stay at
+  // least one freeform step wide. The grid-snap step would be too
+  // coarse a floor — a 12-col grid on a 600px panel would refuse to
+  // resize below 50px, which is fine in most cases but blocks 8px
+  // freeform nudges when the user toggles snap off later.
   function edgeLimits(edge) {
     if (edge.axis === "h") {
-      const minY = Math.max(...edge.above.map((c) => c.y)) + SNAP;
-      const maxY = Math.min(...edge.below.map((c) => c.y + c.h)) - SNAP;
+      const minY = Math.max(...edge.above.map((c) => c.y)) + FREEFORM_SNAP;
+      const maxY = Math.min(...edge.below.map((c) => c.y + c.h)) - FREEFORM_SNAP;
       return [minY, maxY];
     } else {
-      const minX = Math.max(...edge.left.map((c) => c.x)) + SNAP;
-      const maxX = Math.min(...edge.right.map((c) => c.x + c.w)) - SNAP;
+      const minX = Math.max(...edge.left.map((c) => c.x)) + FREEFORM_SNAP;
+      const maxX = Math.min(...edge.right.map((c) => c.x + c.w)) - FREEFORM_SNAP;
       return [minX, maxX];
     }
   }
@@ -241,8 +264,9 @@
         const xPx = ev.clientX - rect.left;
         newCoord = Math.round((xPx / rect.width) * panelW);
       }
-      // Snap to SNAP px and clamp to limits.
-      newCoord = clamp(Math.round(newCoord / SNAP) * SNAP, lo, hi);
+      // Snap to the active grid (or 8px freeform) and clamp to limits.
+      const step = snapStep(edge.axis === "h" ? "y" : "x");
+      newCoord = clamp(Math.round(newCoord / step) * step, lo, hi);
       applyEdgeAt(edge, newCoord);
       render();
     }
@@ -314,8 +338,8 @@
   function insertOnCell(cell, direction) {
     const updates = [];
     const creates = [];
-    const halfW = Math.max(SNAP, Math.floor(cell.w / 2));
-    const halfH = Math.max(SNAP, Math.floor(cell.h / 2));
+    const halfW = Math.max(FREEFORM_SNAP, Math.floor(cell.w / 2));
+    const halfH = Math.max(FREEFORM_SNAP, Math.floor(cell.h / 2));
 
     if (direction === "left") {
       creates.push({ x: cell.x, y: cell.y, w: halfW, h: cell.h });
@@ -488,5 +512,79 @@
   board.addEventListener("pointercancel", cancelLongPress);
   board.addEventListener("pointerleave", cancelLongPress);
 
+  // ---------------------------------------------------------------
+  // Snap-to-grid toggle + grid overlay
+  // ---------------------------------------------------------------
+  const snapToggle = root.querySelector("[data-snap-toggle]");
+  const snapDims = root.querySelector("[data-snap-dims]");
+  const snapColsInput = root.querySelector("[data-snap-cols]");
+  const snapRowsInput = root.querySelector("[data-snap-rows]");
+
+  function applyGridOverlay() {
+    if (!snapState.enabled) {
+      board.style.removeProperty("background-image");
+      board.style.removeProperty("background-size");
+      return;
+    }
+    const cols = Math.max(2, snapState.cols);
+    const rows = Math.max(2, snapState.rows);
+    board.style.backgroundImage =
+      "linear-gradient(to right, var(--t-border-strong, #c8c8c8) 1px, transparent 1px), " +
+      "linear-gradient(to bottom, var(--t-border-strong, #c8c8c8) 1px, transparent 1px)";
+    board.style.backgroundSize = `${100 / cols}% ${100 / rows}%`;
+  }
+
+  function persistSnap() {
+    try {
+      sessionStorage.setItem(
+        snapState.storageKey,
+        JSON.stringify({
+          enabled: snapState.enabled,
+          cols: snapState.cols,
+          rows: snapState.rows,
+        }),
+      );
+    } catch {}
+  }
+
+  function restoreSnap() {
+    try {
+      const raw = sessionStorage.getItem(snapState.storageKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (typeof saved.enabled === "boolean") snapState.enabled = saved.enabled;
+      if (Number.isFinite(saved.cols)) snapState.cols = saved.cols;
+      if (Number.isFinite(saved.rows)) snapState.rows = saved.rows;
+    } catch {}
+  }
+
+  restoreSnap();
+  if (snapToggle) snapToggle.checked = snapState.enabled;
+  if (snapColsInput) snapColsInput.value = String(snapState.cols);
+  if (snapRowsInput) snapRowsInput.value = String(snapState.rows);
+  if (snapDims) snapDims.hidden = !snapState.enabled;
+
+  if (snapToggle) {
+    snapToggle.addEventListener("change", () => {
+      snapState.enabled = snapToggle.checked;
+      if (snapDims) snapDims.hidden = !snapState.enabled;
+      applyGridOverlay();
+      persistSnap();
+    });
+  }
+  for (const [el, key] of [
+    [snapColsInput, "cols"],
+    [snapRowsInput, "rows"],
+  ]) {
+    if (!el) continue;
+    el.addEventListener("input", () => {
+      const n = Math.max(2, Math.min(48, Math.round(Number(el.value) || 0)));
+      snapState[key] = n;
+      applyGridOverlay();
+      persistSnap();
+    });
+  }
+
+  applyGridOverlay();
   render();
 })();

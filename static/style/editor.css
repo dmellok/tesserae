@@ -609,6 +609,19 @@
 }
 .layout-editor-hint .ph { font-size: 14px; color: var(--t-accent); }
 
+/* Snap-to-grid controls live below the board + hint. The dashed
+   gridline overlay is painted by the JS directly on
+   .layout-editor-board via repeating linear gradients. The inputs
+   themselves reuse the standard ``.field`` styling — they should look
+   identical to every other form input in the editor. */
+.layout-snap {
+  margin-top: var(--t-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.layout-snap-dims[hidden] { display: none; }
+
 .le-cell {
   position: absolute;
   box-sizing: border-box;
