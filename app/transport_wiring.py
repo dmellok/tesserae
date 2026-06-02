@@ -13,9 +13,11 @@ External imports (tests, settings_routes diagnostics) still reference
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import re
+import secrets
 import socket
 from pathlib import Path
 from typing import Any
@@ -86,20 +88,65 @@ def _is_reloader_watcher(dev: bool) -> bool:
     return dev and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 
 
-def _resolve_client_id(configured: Any, *, dev: bool) -> str:
+def _persisted_random_suffix(data_root: Path) -> str:
+    """A 6-character hex suffix, generated once on first run and
+    persisted under ``data/core/.mqtt_client_id_suffix``.
+
+    Two installs sharing a broker (typical: HA core-mosquitto reached
+    by both a bare-metal Tesserae and the HA Add-on Tesserae) need
+    distinct client ids — the broker evicts duplicates the moment a
+    second connects, causing the endless reconnect loop. Hostname
+    alone isn't enough: HA Add-on containers and bare-metal hosts can
+    have hostnames that match by accident. A persisted random suffix
+    breaks the tie without forcing the user to coordinate.
+
+    Persistent so MQTT subscriptions stay attached to a stable client
+    id; if we picked a fresh suffix every restart the broker would
+    treat each session as a new subscriber and we'd miss retained
+    messages. Persistent so existing event logs / topics keep pointing
+    at the same client.
+
+    Random because hostname-shaped derivations (uuid based on hostname,
+    hash of the data dir) end up coordinating between identical hosts
+    again."""
+    path = data_root / "core" / ".mqtt_client_id_suffix"
+    if path.exists():
+        try:
+            existing = path.read_text(encoding="utf-8").strip()
+            if re.fullmatch(r"[a-f0-9]{4,16}", existing):
+                return existing
+        except OSError:
+            pass
+    new_suffix = secrets.token_hex(3)  # 6 hex chars = 16M combinations
+    with contextlib.suppress(OSError):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(new_suffix, encoding="utf-8")
+    return new_suffix
+
+
+def _resolve_client_id(configured: Any, *, dev: bool, data_root: Path | None = None) -> str:
     """MQTT client id for this instance.
 
-    A configured value (Settings → Broker → MQTT client id) wins. Otherwise
-    default to ``tesserae-<hostname>`` so two machines sharing one broker
-    don't collide — MQTT brokers evict a duplicate client id the moment
-    another connects with it, which causes the endless reconnect loop
-    ("disconnected unexpectedly" every couple of seconds). The ``--dev``
-    server appends ``-dev`` so it never fights its own prod instance."""
+    A configured value (Settings → Broker → MQTT client id) wins.
+    Otherwise default to ``tesserae-<hostname>-<random6>`` so two
+    machines sharing one broker don't collide. The random suffix is
+    persisted under ``data/core/.mqtt_client_id_suffix`` so it survives
+    restarts (broker subscriptions stay attached to a stable id) but
+    differs between installs even when their hostnames match.
+
+    The ``--dev`` server appends ``-dev`` so it never fights its own
+    prod instance on the same machine."""
     base = str(configured or "").strip()
     if not base:
         host = socket.gethostname().split(".", 1)[0].strip().lower()
         host = re.sub(r"[^a-z0-9_-]+", "-", host).strip("-") or "host"
-        base = f"tesserae-{host}"
+        # data_root is optional for back-compat with tests that called
+        # this without it; when missing, fall back to hostname-only
+        # (matches the old behaviour exactly).
+        if data_root is not None:
+            base = f"tesserae-{host}-{_persisted_random_suffix(data_root)}"
+        else:
+            base = f"tesserae-{host}"
     return f"{base}-dev" if dev else base
 
 
@@ -365,7 +412,15 @@ def _rebuild_transport(
         username=transport_user,
         password=transport_pass,
         keepalive=int(broker_raw.get("keepalive") or 60),
-        client_id=_resolve_client_id(broker_raw.get("client_id"), dev=dev),
+        client_id=_resolve_client_id(
+            broker_raw.get("client_id"),
+            dev=dev,
+            # ``data_root`` here is the same ``data_root`` create_app
+            # passed in via ``app.config["DATA_ROOT"]``. We use it to
+            # persist the random suffix that breaks broker-side client
+            # id collisions when two installs share a broker.
+            data_root=app.config.get("DATA_ROOT"),
+        ),
     )
     transport = MqttTransport(config, client_factory=factory)
     if host:

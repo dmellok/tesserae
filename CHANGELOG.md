@@ -8,6 +8,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.17] — 2026-06-02
+
+### Fixed
+
+- **MQTT client-id collisions between two installs sharing one
+  broker.** A bare-metal Tesserae and the HA Add-on Tesserae both
+  pointing at HA's bundled `core-mosquitto` saw "MQTT disconnected:
+  Unspecified error" every couple of seconds — the broker evicted
+  whichever client connected second the moment its duplicate
+  client-id was already in use. The default client-id resolver now
+  appends a 6-character hex suffix persisted to
+  `data/core/.mqtt_client_id_suffix`. Random so it doesn't
+  coordinate between hosts; persistent so MQTT subscriptions stay
+  attached to a stable id across restarts; one-shot so existing
+  installs don't get a new id and lose their retained-message
+  bindings on upgrade — they'll generate one on first restart and
+  hold it from then on. Settings → Broker → MQTT client id still
+  overrides everything.
+
 ## [0.11.16] — 2026-06-02
 
 ### Fixed
