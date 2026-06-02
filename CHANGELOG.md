@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.11.14] — 2026-06-02
+
+### Fixed
+
+- **HA Add-on: `PermissionError` on `/data/plugins` on first boot.**
+  The Docker entrypoint chowns `/app/data` to `pwuser` so the
+  un-privileged worker can write to it after gosu-drops; it didn't
+  know about `TESSERAE_DATA_ROOT` (added in 0.11.13), so when HA
+  Supervisor mounted `/data` root-owned the gosu-dropped Tesserae
+  process EPERM'd on the first `mkdir`. Entrypoint now also chowns
+  `TESSERAE_DATA_ROOT` when set and different from `/app/data`.
+
 ## [0.11.13] — 2026-06-02
 
 ### Added

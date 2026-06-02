@@ -28,6 +28,16 @@ if [ "$(id -u)" = "0" ]; then
     # wrote). Errors suppressed because read-only mounts will fail
     # here harmlessly.
     chown -R pwuser:pwuser /app/data 2>/dev/null || true
+    # HA Add-on path: TESSERAE_DATA_ROOT redirects Tesserae's data
+    # directory away from /app/data (typically to /data, HA Supervisor's
+    # per-add-on persistent volume which is mounted root-owned). Same
+    # UID-mismatch fix applies — chown so pwuser can write inside it.
+    if [ -n "${TESSERAE_DATA_ROOT:-}" ] \
+       && [ -d "${TESSERAE_DATA_ROOT}" ] \
+       && [ "${TESSERAE_DATA_ROOT}" != "/app/data" ]; then
+        chown pwuser:pwuser "${TESSERAE_DATA_ROOT}"
+        chown -R pwuser:pwuser "${TESSERAE_DATA_ROOT}" 2>/dev/null || true
+    fi
     exec gosu pwuser "$@"
 fi
 
