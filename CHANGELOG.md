@@ -8,6 +8,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.7] — 2026-06-04
+
+### Fixed
+
+- **Settings → System no longer flashes "Update state unavailable:
+  not a git repository" on installs without a `.git` directory.** The
+  in-app updater shells out to `git` for state / check / apply /
+  rollback, which works for `git clone`-based installs but fails for
+  pip wheels, unpacked release tarballs, or any other install method
+  that doesn't carry git history. New `Updater.has_git_repo()` lets
+  the Settings → System controller route those installs through the
+  same GitHub release-API view it already used for Docker installs;
+  the template gained a third-arm message ("upgrade via your install
+  method — `pip install --upgrade tesserae` for venv installs,
+  re-download the tarball otherwise") for the bare case. Docker
+  installs and git checkouts are unchanged.
+
 ## [0.16.6] — 2026-06-04
 
 ### Fixed
@@ -1501,7 +1518,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.6...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.7...HEAD
+[0.16.7]: https://github.com/dmellok/tesserae/releases/tag/v0.16.7
 [0.16.6]: https://github.com/dmellok/tesserae/releases/tag/v0.16.6
 [0.16.5]: https://github.com/dmellok/tesserae/releases/tag/v0.16.5
 [0.16.4]: https://github.com/dmellok/tesserae/releases/tag/v0.16.4
