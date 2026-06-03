@@ -28,8 +28,7 @@ restarts.
 The endpoint and app key are **baked into this module** — users cannot
 re-aim Tesserae's telemetry at a different server. That's deliberate:
 the whole point is so the maintainer can count installs, which only
-works if every opted-in instance reports to the same place. Users
-control whether to send (the toggle) but not where it goes.
+works if every opted-in instance reports to the same place.
 
 Default: **off**. Users opt in via Settings → Server → App, or
 configuration. ``TESSERAE_TELEMETRY=0`` disables hard regardless of

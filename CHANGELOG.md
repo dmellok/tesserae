@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.14.2] — 2026-06-03
+
+### Changed
+
+- **Telemetry copy: drop the finger-wag.** `docs/privacy.md` had a
+  bolded "You control whether to send; you don't control where it
+  goes." line right after the explanation of why the endpoint is
+  hard-coded; the preceding sentence already makes that point, so
+  the restatement read as a lecture without adding substance.
+  Removed. Matching line in `app/telemetry.py`'s module docstring
+  removed too for consistency.
+
 ## [0.14.1] — 2026-06-03
 
 ### Added
@@ -1177,7 +1189,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.1...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.2...HEAD
+[0.14.2]: https://github.com/dmellok/tesserae/releases/tag/v0.14.2
 [0.14.1]: https://github.com/dmellok/tesserae/releases/tag/v0.14.1
 [0.14.0]: https://github.com/dmellok/tesserae/releases/tag/v0.14.0
 [0.13.2]: https://github.com/dmellok/tesserae/releases/tag/v0.13.2

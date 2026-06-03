@@ -52,8 +52,6 @@ it's the maintainer's analytics deployment, not user-configurable. That
 keeps opted-in counts adding up to a real total instead of being
 scattered across whoever set up their own backend.
 
-**You control whether to send; you don't control where it goes.**
-
 ## How to disable
 
 Untick *Send anonymous usage telemetry* in **Settings → Server → App**,
