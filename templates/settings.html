@@ -536,9 +536,9 @@
 docker compose up -d</code></pre>
     <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the recreate. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps. The container restarts on the new image — expect a ~1s blip.</p>
     {% else %}
-    <p class="field-help">Upgrade with whichever install method you used. For a pip / venv install, that's typically:</p>
-    <pre class="code-snippet"><code>pip install --upgrade tesserae</code></pre>
-    <p class="field-help">For an unpacked release tarball, download the latest from <a href="https://github.com/dmellok/tesserae/releases" target="_blank" rel="noopener">Releases</a> and replace the install dir, preserving <code>data/</code>. For the full in-app pull-and-restart flow, install from a <code>git clone</code> of the repo instead.</p>
+    <p class="field-help">The in-app pull-and-restart flow needs a git checkout of the repo as the source dir Tesserae is running from. To enable it, re-run the installer from the install guide — it does <code>git clone</code> + <code>pip install -e</code> under one venv, which keeps the running code pointed at the source tree (and the <code>.git</code> directory that lets this card pull + apply updates).</p>
+    <pre class="code-snippet"><code>curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash</code></pre>
+    <p class="field-help">Or by hand: <code>git clone https://github.com/dmellok/tesserae.git ~/tesserae</code> &middot; <code>cd ~/tesserae</code> &middot; <code>python -m venv .venv</code> &middot; <code>.venv/bin/pip install -e ".[dev]"</code>. Either way, copy <code>data/</code> across if you want to preserve your existing pages, settings, and history. There's no <code>pip install --upgrade tesserae</code> path — the package isn't on PyPI yet.</p>
     {% endif %}
   </section>
   {% else %}

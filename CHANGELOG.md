@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.10] — 2026-06-04
+
+### Fixed
+
+- **The "bare install" upgrade hint in Settings → System no longer
+  suggests `pip install --upgrade tesserae`** — Tesserae isn't on
+  PyPI yet, so that command does nothing useful. Replaced with the
+  canonical install path (the `install.sh` curl one-liner, or a
+  manual `git clone` + `pip install -e ".[dev]"`) and a note that
+  the in-app pull-and-restart flow specifically needs a git
+  checkout as the source dir. Canonical installs (which keep `.git`
+  via install.sh's `git clone` + editable pip install) are
+  unchanged — they still see the full Check / Apply / Rollback UI.
+
 ## [0.16.9] — 2026-06-04
 
 ### Fixed
@@ -1554,7 +1568,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.9...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.10...HEAD
+[0.16.10]: https://github.com/dmellok/tesserae/releases/tag/v0.16.10
 [0.16.9]: https://github.com/dmellok/tesserae/releases/tag/v0.16.9
 [0.16.8]: https://github.com/dmellok/tesserae/releases/tag/v0.16.8
 [0.16.7]: https://github.com/dmellok/tesserae/releases/tag/v0.16.7
