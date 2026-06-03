@@ -23,6 +23,13 @@
     },
     { "name": "title", "type": "string", "label": "Title (blank = entity name / \"Sensors\")", "default": "" },
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
+    {
+      "name": "overrides",
+      "type": "textarea",
+      "label": "Per-entity name / icon overrides",
+      "default": "",
+      "help": "One entity per line, pipe-separated: ``entity_id | name | icon``. Either the name or the icon can be left empty to keep the auto value. Icon is a Phosphor name (see phosphoricons.com), without the ``ph-`` prefix. Lines starting with ``#`` are comments.\n\nExample:\nsensor.living_room_temperature | Living Room | thermometer-simple\nsensor.bedroom_temperature | Bedroom |\nsensor.solar_power | | sun"
+    },
     { "name": "show_unit", "type": "boolean", "label": "Show units", "default": true }
   ],
   "render": { "dither": "none", "needs_network": true }

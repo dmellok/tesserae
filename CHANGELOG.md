@@ -8,6 +8,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.8] — 2026-06-04
+
+### Added
+
+- **Per-entity name + icon overrides on `ha_sensor` and `ha_entities`.**
+  New `overrides` textarea on each widget's cell-options form lets you
+  rename and reicon any entity in the picker without renaming it in
+  Home Assistant. Format is one entity per line:
+  `entity_id | name | icon` — either name or icon can be left empty
+  to keep the auto value (HA's friendly_name and the device-class /
+  domain icon respectively). Icon is a Phosphor name (see
+  phosphoricons.com) without the `ph-` prefix. Lines starting with
+  `#` are comments.
+
+  Example:
+  ```
+  sensor.living_room_temperature | Living Room | thermometer-simple
+  sensor.bedroom_temperature | Bedroom |
+  sensor.solar_power | | sun
+  ```
+
+  Both widget plugins bumped to 0.4.0 to reflect the new manifest
+  field. Existing saved dashboards continue to work — the default is
+  empty and falls through to auto.
+
 ## [0.16.7] — 2026-06-04
 
 ### Fixed
@@ -1518,7 +1543,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.7...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.8...HEAD
+[0.16.8]: https://github.com/dmellok/tesserae/releases/tag/v0.16.8
 [0.16.7]: https://github.com/dmellok/tesserae/releases/tag/v0.16.7
 [0.16.6]: https://github.com/dmellok/tesserae/releases/tag/v0.16.6
 [0.16.5]: https://github.com/dmellok/tesserae/releases/tag/v0.16.5

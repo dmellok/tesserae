@@ -111,3 +111,47 @@ def test_composer_mounts_widget(client: FlaskClient) -> None:
     resp = client.get("/_test/render?plugin=ha_sensor&size=md")
     assert resp.status_code == 200
     assert 'data-plugin="ha_sensor"' in resp.get_data(as_text=True)
+
+
+def test_overrides_replace_name_and_icon(app: Flask, monkeypatch) -> None:
+    """Pipe-separated ``overrides`` textarea overrides the auto-derived
+    friendly_name + icon per entity. Missing fields fall back to auto."""
+    sensor, core = _mods(app)
+    overrides = "\n".join(
+        [
+            "sensor.lounge_temp | Living Room | sun",  # both
+            "sensor.humidity | | wind",  # icon only
+            "sensor.ghost | Custom Only |",  # name only (entity missing)
+            "# comment line",
+            "",  # blank line
+        ]
+    )
+    with app.app_context():
+        monkeypatch.setattr(core, "get_states", lambda: _STATES)
+        out = sensor.fetch(
+            {
+                "entities": ["sensor.lounge_temp", "sensor.humidity", "sensor.ghost"],
+                "overrides": overrides,
+            },
+            {},
+            ctx={},
+        )
+    items = out["items"]
+    assert items[0]["name"] == "Living Room"  # overridden
+    assert items[0]["icon"] == "sun"
+    assert items[1]["name"] == "Humidity"  # auto (no override)
+    assert items[1]["icon"] == "wind"  # overridden
+    assert items[2]["name"] == "Custom Only"  # override even for missing entity
+    assert items[2]["unavailable"] is True
+
+
+def test_overrides_parser_tolerates_garbage() -> None:
+    """Empty overrides + malformed lines don't break the parser."""
+    from plugins.ha_sensor.server import _parse_overrides
+
+    assert _parse_overrides("") == {}
+    assert _parse_overrides(None) == {}
+    # No pipes — just an entity id, no override fields. Skipped.
+    assert _parse_overrides("sensor.bare") == {}
+    # Empty entity id (leading pipe) — skipped.
+    assert _parse_overrides("| Name | icon") == {}

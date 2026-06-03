@@ -80,6 +80,33 @@ def _entity_list(raw: Any) -> list[str]:
     return [tok for tok in re.split(r"[\s,]+", str(raw or "").strip()) if tok]
 
 
+def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
+    """Parse the ``overrides`` textarea into ``{entity_id: {name?, icon?}}``.
+
+    Format: one entity per line, pipe-separated ``entity_id | name | icon``.
+    Either field may be empty (just leave nothing between the pipes) to keep
+    the auto value. Lines starting with ``#`` are comments; blank lines
+    are skipped. Tolerant of trailing whitespace and a missing third field.
+    """
+    out: dict[str, dict[str, str]] = {}
+    text = str(raw or "")
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = [p.strip() for p in line.split("|")]
+        if not parts or not parts[0]:
+            continue
+        entry: dict[str, str] = {}
+        if len(parts) > 1 and parts[1]:
+            entry["name"] = parts[1]
+        if len(parts) > 2 and parts[2]:
+            entry["icon"] = parts[2]
+        if entry:
+            out[parts[0]] = entry
+    return out
+
+
 def _icon_for(entity_id: str, attrs: dict[str, Any]) -> str:
     device_class = str(attrs.get("device_class") or "")
     if device_class in _DEVICE_CLASS_ICONS:
@@ -108,22 +135,30 @@ def fetch(
 
     by_id = {str(s.get("entity_id")): s for s in states}
     show_unit = options.get("show_unit", True)
+    overrides = _parse_overrides(options.get("overrides"))
     items: list[dict[str, Any]] = []
     for eid in wanted:
+        ov = overrides.get(eid) or {}
         st = by_id.get(eid)
         if st is None:
             items.append(
-                {"name": eid, "value": "—", "unit": "", "icon": "question", "unavailable": True}
+                {
+                    "name": ov.get("name") or eid,
+                    "value": "—",
+                    "unit": "",
+                    "icon": ov.get("icon") or "question",
+                    "unavailable": True,
+                }
             )
             continue
         attrs = st.get("attributes") or {}
         raw = str(st.get("state") or "")
         items.append(
             {
-                "name": core.friendly_name(st),
+                "name": ov.get("name") or core.friendly_name(st),
                 "value": _format_value(raw),
                 "unit": str(attrs.get("unit_of_measurement") or "") if show_unit else "",
-                "icon": _icon_for(eid, attrs),
+                "icon": ov.get("icon") or _icon_for(eid, attrs),
                 "unavailable": raw.lower() in _UNAVAILABLE,
             }
         )
