@@ -108,20 +108,23 @@ def _ha_energy() -> dict[str, Any]:
 
 def _ha_battery() -> dict[str, Any]:
     low_t, crit_t = 30, 15
-    raw = [
-        {"name": "Front Door Lock", "level": 87},
-        {"name": "Living Room Sensor", "level": 64},
-        {"name": "Kitchen Motion", "level": 42},
-        {"name": "Back Door Sensor", "level": 28},  # should flag low
-        {"name": "Garage Tilt", "level": 91},
-        {"name": "Mailbox Sensor", "level": 55},
+    raw: list[tuple[str, int]] = [
+        ("Front Door Lock", 87),
+        ("Living Room Sensor", 64),
+        ("Kitchen Motion", 42),
+        ("Back Door Sensor", 28),  # should flag low
+        ("Garage Tilt", 91),
+        ("Mailbox Sensor", 55),
     ]
     # The client reads ``low`` / ``critical`` as booleans (statusAccent
     # returns red/yellow/green from them), so the sample has to compute
     # them against the thresholds the same way the real server does —
     # otherwise every tile renders as "ok" green.
-    items = [{**r, "low": r["level"] < low_t, "critical": r["level"] < crit_t} for r in raw]
-    levels = [it["level"] for it in items]
+    items: list[dict[str, Any]] = [
+        {"name": name, "level": level, "low": level < low_t, "critical": level < crit_t}
+        for name, level in raw
+    ]
+    levels: list[int] = [level for _name, level in raw]
     # 10 buckets of 10 % each — that's what the d4 Data view paints
     # as its histogram. Without it the chart area stays blank.
     histogram = [0] * 10
@@ -484,4 +487,5 @@ def get_sample(plugin_id: str) -> dict[str, Any] | None:
     builder = SAMPLES.get(plugin_id)
     if builder is None:
         return None
-    return copy.deepcopy(builder())
+    payload: dict[str, Any] = copy.deepcopy(builder())
+    return payload
