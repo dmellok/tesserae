@@ -50,7 +50,7 @@
     {
       "name": "variant",
       "type": "select",
-      "label": "Direction",
+      "label": "Style",
       "default": "r1",
       "choices": [
         {

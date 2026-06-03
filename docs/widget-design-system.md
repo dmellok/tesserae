@@ -64,6 +64,26 @@ widgets**. The four-direction family covers the visual archetypes
 that matter; six directions invariably ends up with two or three
 "barely different" ones that pad the picker.
 
+### Grandfathered: 4 directions with widget-specific prefix
+
+The github family follows the four-direction shape but with
+widget-keyed prefixes: `github_repo` uses `re1-re4`, `github_actions`
+uses `ci1-ci4`, `github_activity` uses `a1-a4`, `github_pr_queue`
+uses `pr1-pr4`, `github_contributions` uses `co1-co4`. These map
+position-for-position to canonical `r1/g2/s3/d4` (Refined / Geometric
+/ Swiss / Data) — the prefix is the only difference. Grandfathered;
+new widgets should prefer the canonical prefix.
+
+### Per-widget layout pickers
+
+Some widgets (e.g. `spotify_now_playing`) use layout-shape names
+(`split / cover / minimal / vinyl / stack`) instead of design-direction
+ids. That's fine when the variants describe **layout shapes** rather
+than a design language family — they're not pretending to be the
+same direction set as the HA / weather widgets. The dropdown label
+("Style") stays the same so users get a consistent picker name across
+the catalogue; the choice labels carry the per-widget specifics.
+
 ### Single-variant widgets are fine
 
 Not every widget needs four directions. `clock_analog`, `picture_*`,

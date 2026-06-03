@@ -10,7 +10,7 @@
     {
       "name": "variant",
       "type": "select",
-      "label": "Direction",
+      "label": "Style",
       "default": "w1",
       "choices": [
         { "value": "w1", "label": "1 · Bauhaus Refined" },

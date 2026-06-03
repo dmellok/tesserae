@@ -376,6 +376,7 @@ function emptyState(h, size, variant) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/calendar_day/client.css">
     <div class="root size-${size} variant-host variant-host--${variant}">
       <div class="cd-empty">
@@ -392,6 +393,7 @@ export default async function render(shadow, ctx) {
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+      <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
       <link rel="stylesheet" href="/plugins/calendar_day/client.css">
       <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
     `;
@@ -412,6 +414,7 @@ export default async function render(shadow, ctx) {
   const renderer = VARIANTS[variant] || renderD1;
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
+    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
     <link rel="stylesheet" href="/plugins/calendar_day/client.css">
     <div class="root size-${size} variant-host variant-host--${variant}">
       ${renderer(data, h, evs, live)}

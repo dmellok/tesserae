@@ -10,7 +10,7 @@
     {
       "name": "variant",
       "type": "select",
-      "label": "Direction",
+      "label": "Style",
       "default": "pr1",
       "choices": [
         { "value": "pr1", "label": "1 · Refined" },

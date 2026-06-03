@@ -8,6 +8,64 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.2] — 2026-06-04
+
+### Changed
+
+- **Variant-picker label renamed "Direction" / "Layout" → "Style"**
+  across 29 widget manifests. Same picker, friendlier name.
+- **Picture widget caption strips no longer invert on dark themes.**
+  `picture_apod`, `picture_apple_album`, `picture_gallery`, and
+  `picture_unsplash` painted their Bauhaus caption strip with
+  `var(--c-text)` background + `var(--c-bg)` foreground, which
+  flipped to "dark on dark" the moment a dark theme was active.
+  Swapped to the pinned `--wb-bar-bg` / `--wb-bar-fg` tokens
+  (same fix as v0.14.3's github bars). Also added a `--theme-font`
+  cascade at `:host` for the three widgets that were missing it,
+  and replaced `picture_gallery`'s hard-coded `ui-monospace`
+  filename font with `var(--theme-font-mono)`.
+- **Calendar family links `widget-bauhaus.css`** in every `client.js`
+  render path (calendar_day, calendar_month, calendar_week). Divider
+  lines (`.d3-rule`, `.d5-rule`, `.w3-rule`, `.w5-rule`, `.m3-rule`,
+  plus the `.m2-weekhead` / `.m2-grid` grid-gap backgrounds) now
+  paint from `--c-line` instead of `--c-text` so dividers stay quiet
+  rather than asserting as primary text. Fixed the
+  `.w6-card-head` body inversion. All 6 variants per calendar widget
+  retained.
+- **`spotify_now_playing` dropdown label** "Layout" → "Style"
+  (the five variant ids `split/cover/minimal/vinyl/stack` retained
+  as a per-widget layout picker — see rulebook).
+
+### Fixed
+
+- **`ha_history` trend colour is now categorical, not status.** A
+  rising temperature isn't a hazard and a dropping battery isn't
+  "good"; the previous `--c-danger` / `--c-ok` mapping read as an
+  alarm on themes where danger was loud red. Swapped to
+  `--c-data-3` / `--c-data-2` so the trend reads as direction, not
+  judgement.
+- **`sky_aurora` spark bars now actually paint per-Kp colour.** The
+  forecast bars rendered with `class="wb-bar"`, which (a) inherited
+  the title-bar dark styling from `widget-bauhaus.css` and (b) made
+  the colour rules in `client.css` (`.ar-bar.kp-quiet` etc.) match
+  no elements. Renamed the class to `.ar-spark-bar`, fixed the CSS
+  selectors to match, and added the missing flex/min-width baseline
+  styling. Visible bug; all spark bars previously rendered
+  identical dark grey instead of categorical Kp colours.
+
+### Documentation
+
+- **Rulebook ([`docs/widget-design-system.md`](https://github.com/dmellok/tesserae/blob/main/docs/widget-design-system.md))**
+  extended with grandfathered variant-id patterns: widget-keyed
+  4-variant prefixes (the github family's `re1-re4`, `ci1-ci4`,
+  `a1-a4`, `pr1-pr4`, `co1-co4`) are accepted as canonical-pattern
+  variants; per-widget layout pickers (spotify_now_playing's
+  `split/cover/minimal/vinyl/stack`) are accepted when variants
+  describe layout shapes rather than design directions.
+- **Audit notes** (`notes/widget-audit.md`, gitignored) updated with
+  remediation status and the user-preference overrides applied
+  during the v0.16.2 pass.
+
 ## [0.16.1] — 2026-06-03
 
 ### Added
@@ -1341,7 +1399,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.2...HEAD
+[0.16.2]: https://github.com/dmellok/tesserae/releases/tag/v0.16.2
 [0.16.1]: https://github.com/dmellok/tesserae/releases/tag/v0.16.1
 [0.16.0]: https://github.com/dmellok/tesserae/releases/tag/v0.16.0
 [0.15.1]: https://github.com/dmellok/tesserae/releases/tag/v0.15.1

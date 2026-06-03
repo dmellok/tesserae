@@ -46,9 +46,7 @@ def _patch_core(monkeypatch, core):
 
 @pytest.mark.parametrize("variant", ["r1", "g2", "s3", "d4"])
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])
-def test_todo_renders_items_per_variant(
-    client: FlaskClient, variant: str, size: str
-) -> None:
+def test_todo_renders_items_per_variant(client: FlaskClient, variant: str, size: str) -> None:
     """Use ``?sample=1`` to short-circuit the widget's fetch() and let
     the gallery's widget_samples fixture provide the data. That's the
     same path /_test/widgets uses — exercises the full render shell
@@ -57,8 +55,7 @@ def test_todo_renders_items_per_variant(
     The cell payload JSON (data-data attribute) carries each item's
     summary, so a substring grep proves the data reached the cell."""
     resp = client.get(
-        f"/_test/render?plugin=ha_todo&size={size}&variant={variant}"
-        f"&theme=default&sample=1"
+        f"/_test/render?plugin=ha_todo&size={size}&variant={variant}&theme=default&sample=1"
     )
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)

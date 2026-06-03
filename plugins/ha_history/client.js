@@ -16,12 +16,15 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// Single trend → accent. The widget reads as one signal (rising / falling)
-// even when feeds carry semantic state elsewhere.
+// Single trend → categorical accent. Up vs down vs flat is decorative
+// (a temperature going up isn't a hazard, a battery going down isn't
+// "good") so reach for the categorical --c-data-* ramp, not the
+// --c-ok/warn/danger status tokens. Themes where danger is loud red
+// would otherwise paint a rising weather sensor as an alarm.
 function trendColour(trend) {
-  if (trend === "up") return "var(--c-danger)";
-  if (trend === "down") return "var(--c-ok)";
-  return "var(--c-info)";
+  if (trend === "up") return "var(--c-data-3)";
+  if (trend === "down") return "var(--c-data-2)";
+  return "var(--c-text-soft)";
 }
 
 // Build the line + area paths for the SVG sparkline. The view-box matches

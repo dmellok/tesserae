@@ -67,10 +67,21 @@
   gap: 2px;
   height: clamp(36px, 8cqh, 80px);
 }
-.ar-bar.kp-quiet   { background: var(--c-surface); }
-.ar-bar.kp-active  { background: var(--c-accent); }
-.ar-bar.kp-storm   { background: var(--c-data-3); }
-.ar-bar.kp-extreme { background: var(--c-text); }
+/* Spark-bar sizing — flex:1 so the 24 forecast bars fill the row.
+   Previously these were rendered with class="wb-bar" which inherited
+   the title-bar styling from widget-bauhaus.css (background: dark,
+   height: --wb-bar-h) and the colour rules below (originally written
+   as ``.ar-bar.kp-*``) never matched their elements. Net result: all
+   spark bars rendered identically dark. */
+.ar-spark-bar {
+  flex: 1;
+  min-width: 0;
+  display: block;
+}
+.ar-spark-bar.kp-quiet   { background: var(--c-surface); }
+.ar-spark-bar.kp-active  { background: var(--c-accent); }
+.ar-spark-bar.kp-storm   { background: var(--c-data-3); }
+.ar-spark-bar.kp-extreme { background: var(--c-text); }
 
 .root.error { display: grid; place-items: center; text-align: center; color: var(--c-danger); padding: 16px; gap: 8px; }
 .root.error .ph { font-size: 28px; }

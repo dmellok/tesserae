@@ -206,7 +206,7 @@
   text-transform: uppercase;
 }
 .w3-range { font: 700 clamp(9px, 1.6cqw, 13px)/1 var(--theme-font, system-ui); letter-spacing: 0.06em; }
-.w3-rule { height: 2px; background: var(--c-text); }
+.w3-rule { height: 2px; background: var(--c-line); }
 .w3-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -330,7 +330,7 @@
   color: var(--c-text-soft);
 }
 .w5-rules { margin: clamp(8px, 1.4cqh, 10px) 0 6px; }
-.w5-rule { background: var(--c-text); }
+.w5-rule { background: var(--c-line); }
 .w5-rule--thick { height: 2px; }
 .w5-rule--thin { height: 1px; margin-top: 1px; }
 .w5-grid { display: grid; grid-template-columns: repeat(7, 1fr); min-height: 0; }
@@ -399,8 +399,8 @@
   color: var(--c-text);
 }
 .w6-card-head {
-  background: var(--c-text);
-  color: var(--c-bg);
+  background: var(--wb-bar-bg, #1b1a16);
+  color: var(--wb-bar-fg, #f1ece0);
   padding: clamp(3px, 0.6cqh, 5px) clamp(4px, 0.8cqw, 7px);
   display: flex;
   align-items: center;

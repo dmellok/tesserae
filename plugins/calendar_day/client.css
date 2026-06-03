@@ -295,7 +295,7 @@
   letter-spacing: 0.16em;
   color: var(--c-text-soft);
 }
-.d3-rule { height: 2px; background: var(--c-text); margin: clamp(8px, 1.8cqh, 14px) 0 0; }
+.d3-rule { height: 2px; background: var(--c-line); margin: clamp(8px, 1.8cqh, 14px) 0 0; }
 .d3-list { display: grid; grid-auto-rows: 1fr; min-height: 0; align-content: stretch; }
 .d3-row {
   display: grid;
@@ -483,7 +483,7 @@
   padding-top: 8px;
 }
 .d5-rules { margin: clamp(10px, 2.4cqh, 16px) 0 6px; }
-.d5-rule { background: var(--c-text); }
+.d5-rule { background: var(--c-line); }
 .d5-rule--thick { height: 3px; }
 .d5-rule--thin { height: 1px; margin-top: 1px; }
 .d5-list { display: grid; grid-auto-rows: 1fr; min-height: 0; }

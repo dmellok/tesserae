@@ -10,7 +10,7 @@
     {
       "name": "variant",
       "type": "select",
-      "label": "Layout",
+      "label": "Style",
       "default": "split",
       "choices": [
         { "value": "split", "label": "Split — art + text" },

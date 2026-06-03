@@ -17,7 +17,7 @@ function sparkBars(forecast) {
   if (!forecast || !forecast.length) return "";
   return forecast.slice(0, 24).map((f) => {
     const h = Math.max(8, Math.min(100, (f.kp / 9) * 100));
-    return `<span class="wb-bar ${kpClass(f.kp)}" style="height:${h}%" title="${escapeHtml(f.time)}: Kp ${f.kp}"></span>`;
+    return `<span class="ar-spark-bar ${kpClass(f.kp)}" style="height:${h}%" title="${escapeHtml(f.time)}: Kp ${f.kp}"></span>`;
   }).join("");
 }
 

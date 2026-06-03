@@ -177,7 +177,7 @@
 .m2-weekhead {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--c-text);
+  background: var(--c-line);
   gap: clamp(1px, 0.3cqw, 3px);
   padding: 0 0 clamp(1px, 0.3cqh, 3px);
 }
@@ -192,7 +192,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: 1fr;
-  background: var(--c-text);
+  background: var(--c-line);
   gap: clamp(1px, 0.3cqw, 3px);
   min-height: 0;
 }
@@ -253,7 +253,7 @@
   letter-spacing: 0.1em;
   color: var(--c-text-soft);
 }
-.m3-rule { height: 2px; background: var(--c-text); }
+.m3-rule { height: 2px; background: var(--c-line); }
 .m3-weekhead {
   display: grid;
   grid-template-columns: repeat(7, 1fr);

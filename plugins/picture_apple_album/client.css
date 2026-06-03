@@ -7,6 +7,7 @@
   height: 100%;
   color: var(--c-text);
   background: var(--c-bg);
+  font-family: var(--theme-font, system-ui, sans-serif);
 }
 
 .root {
@@ -48,8 +49,8 @@
   grid-template-columns: auto auto 1fr;
   align-items: center;
   gap: clamp(6px, 1.2cqw, 10px);
-  background: var(--c-text);
-  color: var(--c-bg);
+  background: var(--wb-bar-bg, #1b1a16);
+  color: var(--wb-bar-fg, #f1ece0);
   padding: clamp(4px, 0.9cqw, 8px) clamp(8px, 1.6cqw, 14px);
   font-size: clamp(10px, 1.7cqw, 14px);
   font-weight: 800;

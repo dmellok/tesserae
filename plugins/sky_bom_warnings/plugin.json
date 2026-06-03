@@ -74,7 +74,7 @@
     {
       "name": "variant",
       "type": "select",
-      "label": "Direction",
+      "label": "Style",
       "default": "legacy",
       "choices": [
         {
