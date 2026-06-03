@@ -84,7 +84,8 @@ nav:
   - Plugin development:
       - Architecture: dev/architecture.md
       - Build a widget with AI: dev/writing-a-plugin.md
-      - Widget contract & design system: widgets.md
+      - Widget contract: widgets.md
+      - Cross-widget design system: widget-design-system.md
       - Design brief template: widget-design-brief.md
   - Privacy & telemetry: privacy.md
   - Credits: credits.md

@@ -8,6 +8,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.1] — 2026-06-03
+
+### Added
+
+- **`docs/widget-design-system.md`** — the cross-widget rulebook.
+  Codifies variant naming (`r1/g2/s3/d4` canonical), title-bar
+  discipline (`--wb-bar-h` mandatory for refined bars), font cascade
+  (`--theme-font` wins), colour discipline (semantic vs categorical
+  vs decorative), CSS class naming, and when to link
+  `widget-bauhaus.css` / `widget-bauhaus-wx.css`. Sits alongside
+  `widgets.md` (single-widget contract) and `widget-design-brief.md`
+  (per-widget template) as the "across all widgets" reference;
+  wired into the mkdocs nav.
+- Quick-lint checklist at the end so a widget author can score their
+  finished widget in 30 seconds against the rulebook.
+
+No widget code changed — the rulebook describes what the best
+current widgets already do. A separate audit (gitignored at
+`notes/widget-audit.md`) catalogues per-widget deviations for a
+post-launch cleanup pass.
+
 ## [0.16.0] — 2026-06-03
 
 ### Added
@@ -1320,7 +1341,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/dmellok/tesserae/releases/tag/v0.16.1
 [0.16.0]: https://github.com/dmellok/tesserae/releases/tag/v0.16.0
 [0.15.1]: https://github.com/dmellok/tesserae/releases/tag/v0.15.1
 [0.15.0]: https://github.com/dmellok/tesserae/releases/tag/v0.15.0
