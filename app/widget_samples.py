@@ -389,6 +389,60 @@ def _ha_zones() -> dict[str, Any]:
     }
 
 
+def _ha_todo() -> dict[str, Any]:
+    # Mix of needs-action and completed items + a couple of due dates
+    # so all four variants have something to render in the gallery.
+    # Dates are seeded relative to a fixed near-term so OVERDUE / TODAY /
+    # TOMORROW labels render in the sample even though the gallery
+    # snapshot is taken at one moment in time.
+    items: list[dict[str, Any]] = [
+        {"uid": "1", "summary": "Milk", "status": "needs_action", "due": None, "description": ""},
+        {
+            "uid": "2",
+            "summary": "Pay the electric bill",
+            "status": "needs_action",
+            "due": "2026-06-04",
+            "description": "",
+        },
+        {
+            "uid": "3",
+            "summary": "Vacuum the rug",
+            "status": "needs_action",
+            "due": "2026-06-03",
+            "description": "",
+        },
+        {
+            "uid": "4",
+            "summary": "Refill prescription",
+            "status": "needs_action",
+            "due": "2026-06-10",
+            "description": "",
+        },
+        {
+            "uid": "5",
+            "summary": "Order birthday card",
+            "status": "needs_action",
+            "due": None,
+            "description": "",
+        },
+        {
+            "uid": "6",
+            "summary": "Replace smoke-alarm battery",
+            "status": "completed",
+            "due": None,
+            "description": "",
+        },
+    ]
+    return {
+        "title": "Shopping list",
+        "entity_id": "todo.shopping_list",
+        "items": items,
+        "needs_action_count": sum(1 for it in items if it["status"] != "completed"),
+        "completed_count": sum(1 for it in items if it["status"] == "completed"),
+        "total_count": len(items),
+    }
+
+
 def _spotify_now_playing() -> dict[str, Any]:
     return {
         "track": "Light Years",
@@ -500,6 +554,7 @@ SAMPLES: dict[str, Any] = {
     "ha_locks": _ha_locks,
     "ha_media": _ha_media,
     "ha_sensor": _ha_sensor,
+    "ha_todo": _ha_todo,
     "ha_zones": _ha_zones,
     "spotify_now_playing": _spotify_now_playing,
     "spotify_album_art": _spotify_album_art,

@@ -8,6 +8,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.0] — 2026-06-03
+
+### Added
+
+- **`ha_todo` widget** — items from a Home Assistant todo list
+  (built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV,
+  anything exposed as a `todo.*` entity). Four selectable visual
+  directions matching the HA family convention:
+  - `r1` Bauhaus Refined — dark header + numbered list with due dates
+  - `g2` Bauhaus Geometric — colour-block tiles with status colour band
+  - `s3` Swiss / International — hairline header + tabular rows
+  - `d4` Data forward — big stat block (X open / Y done) + compact list
+  Cell options: `entity_id` (picker filtered to `todo.*` entities),
+  `title`, `max_items` (1–20), `include_completed`. Due-date tone
+  reflects state — OVERDUE renders danger, TODAY warn, future muted.
+  Total widget count: **57**.
+- **`ha_core.call_service_with_response()`** — POST helper for HA's
+  service calls that need a payload back (HA 2024.5+ `return_response`).
+  General-purpose, not just todo: any service that supports
+  `return_response` (e.g. weather forecasts, conversation agent
+  responses) can now be called from widgets.
+
 ## [0.15.1] — 2026-06-03
 
 ### Fixed
@@ -1298,7 +1320,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/dmellok/tesserae/releases/tag/v0.16.0
 [0.15.1]: https://github.com/dmellok/tesserae/releases/tag/v0.15.1
 [0.15.0]: https://github.com/dmellok/tesserae/releases/tag/v0.15.0
 [0.14.4]: https://github.com/dmellok/tesserae/releases/tag/v0.14.4

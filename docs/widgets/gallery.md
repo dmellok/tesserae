@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **56 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
+The **57 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy — convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -508,6 +508,16 @@ The **56 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
+
+-   **Home Assistant — Todo** &middot; `ha_todo`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Items from a Home Assistant todo list — built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Four selectable visual directions: Refined / Geometric / Swiss / Data. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Home Assistant — Zones** &middot; `ha_zones`
 

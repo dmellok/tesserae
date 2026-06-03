@@ -82,6 +82,37 @@ def request_json(path: str, *, timeout: int = 10) -> Any:
         return json.loads(resp.read().decode("utf-8"))
 
 
+def call_service_with_response(
+    domain: str,
+    service: str,
+    *,
+    data: dict[str, Any] | None = None,
+    timeout: int = 10,
+) -> dict[str, Any]:
+    """POST ``/api/services/<domain>/<service>?return_response`` with the
+    given payload, return the parsed JSON body.
+
+    HA 2024.5+ exposes ``return_response`` so a service call can give the
+    caller a payload back (rather than just emitting state changes). Used
+    here by ``ha_todo`` against ``todo.get_items`` — that's the only
+    sensible way to read todo items via REST without WebSocket
+    subscriptions.
+
+    Response shape on success:
+    ``{"changed_states": [...], "service_response": {<entity_id>: {...}}}``
+
+    Raises on missing config or HTTP errors so the caller can decide how
+    to surface them (see ``coerce_error``)."""
+    if not is_configured():
+        raise RuntimeError("Home Assistant is not configured")
+    path = f"/api/services/{quote(domain)}/{quote(service)}?return_response"
+    body = json.dumps(data or {}).encode("utf-8")
+    req = urllib.request.Request(base_url() + path, data=body, headers=_headers(), method="POST")
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    return payload if isinstance(payload, dict) else {}
+
+
 def get_states() -> list[dict[str, Any]]:
     """All entity states: ``[{entity_id, state, attributes, ...}, ...]``."""
     data = request_json("/api/states")

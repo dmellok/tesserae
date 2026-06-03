@@ -1,0 +1,54 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant — Todo",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Items from a Home Assistant todo list — built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Four selectable visual directions: Refined / Geometric / Swiss / Data. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.",
+  "icon": "ph-list-checks",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Direction",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Bauhaus Refined" },
+        { "value": "g2", "label": "2 · Bauhaus Geometric" },
+        { "value": "s3", "label": "3 · Swiss / International" },
+        { "value": "d4", "label": "4 · Data forward" }
+      ]
+    },
+    {
+      "name": "entity_id",
+      "type": "select",
+      "label": "List",
+      "default": "",
+      "choices_from": "entity",
+      "help": "Which HA todo entity to read. Shows every todo.* entity discovered on your HA instance."
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "label": "Title (blank = list's friendly name)",
+      "default": ""
+    },
+    {
+      "name": "max_items",
+      "type": "number",
+      "label": "Items shown",
+      "default": 8,
+      "min": 1,
+      "max": 20,
+      "help": "How many items to display. The full count appears in the header meta."
+    },
+    {
+      "name": "include_completed",
+      "type": "boolean",
+      "label": "Include completed items",
+      "default": false,
+      "help": "Off by default — completed items are listed after the needs-action ones, struck through."
+    }
+  ],
+  "render": { "needs_network": true }
+}
