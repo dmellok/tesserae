@@ -8,6 +8,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.3] — 2026-06-04
+
+### Fixed
+
+- **Dashboard editor preview iframe now auto-resets every 4 hours.**
+  The composer iframe is mounted once when the editor opens, then
+  runs forever — widget setInterval timers (clock, F1 countdown,
+  public-transport refresh) accumulate small allocations every
+  minute, and the webpage widget's auto-refresh swaps a foreign
+  document in repeatedly. Over an overnight idle session those
+  compound into multi-GB tab memory (saw 6.5 GB in the wild). A
+  hard reset every 4 hours discards all accumulated state — the
+  user sees nothing more than the same brief opacity fade as a
+  normal save-driven reload.
+- **`/renders/<digest>.png?w=<width>` thumbnail endpoint** with disk
+  caching. Each row in the Events / Send-history feed previously
+  loaded the full panel-sized PNG (1600×1200) into a `<img>`, which
+  Chromium decoded to ~7.7 MB per element. With many push events
+  retained in the bitmap cache, this also contributed to leaving
+  admin tabs in the GB range. Templates + send.js + events.js now
+  request the `?w=240` cached variant (~0.4 MB decoded per image),
+  add `loading="lazy"` + `decoding="async"` + explicit width/height
+  to defer off-screen decode.
+- **Events page default row limit** dropped from 200 to 100 so an
+  initial page load doesn't pre-load 200 thumbnails (even at the
+  reduced size).
+
+### Added
+
+- **`octoprint_status` widget** — live 3D-print monitor for an
+  OctoPrint instance. Four canonical directions (r1 Refined, g2
+  Geometric, s3 Swiss, d4 Data) pull printer state, job progress
+  with ETA, and hotend/bed temperatures via OctoPrint's REST API.
+  Includes a sample fixture for the dev gallery.
+
 ## [0.16.2] — 2026-06-04
 
 ### Changed
@@ -1399,7 +1434,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.2...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.3...HEAD
+[0.16.3]: https://github.com/dmellok/tesserae/releases/tag/v0.16.3
 [0.16.2]: https://github.com/dmellok/tesserae/releases/tag/v0.16.2
 [0.16.1]: https://github.com/dmellok/tesserae/releases/tag/v0.16.1
 [0.16.0]: https://github.com/dmellok/tesserae/releases/tag/v0.16.0

@@ -67,13 +67,18 @@
   }
 
   function rowHtml(ev) {
+    // Thumbnail SRC uses the ?w= cached-thumbnail variant so each row's
+    // IMG decodes to ~0.4 MB instead of ~7.7 MB (full panel render).
+    // See app/app_factory.py:_serve_render_thumbnail for context. The
+    // <a> href still points at the original so click-through hits full
+    // resolution. loading="lazy" defers off-screen decode.
     const thumb =
       ev.type === "push" && ev.digest
         ? `<a class="event-thumb" href="${prefix}/renders/${encodeURIComponent(
             ev.digest,
           )}.png" target="_blank"><img src="${prefix}/renders/${encodeURIComponent(
             ev.digest,
-          )}.png" alt=""></a>`
+          )}.png?w=240" alt="" width="120" height="90" loading="lazy" decoding="async"></a>`
         : "";
     const extraBlock =
       ev.extra && Object.keys(ev.extra).length > 0 && ev.type !== "push"
@@ -142,8 +147,13 @@
     li.dataset.eventId = String(ev.id);
     li.innerHTML = rowHtml(ev);
     root.insertBefore(li, root.firstChild);
-    // Keep the DOM bounded so a flood doesn't blow up the page.
-    while (root.children.length > 200) root.removeChild(root.lastChild);
+    // Keep the DOM bounded so a flood doesn't blow up the page. Even
+    // with the cap, decoded image bitmaps in the browser cache add up —
+    // the thumbnail variant of /renders/* (see rowHtml above) keeps
+    // per-row decoded size at ~0.4 MB, but 100 rows is plenty for a
+    // human scanning recent events. The full server-rendered list
+    // serves the same cap.
+    while (root.children.length > 100) root.removeChild(root.lastChild);
   }
 
   let backoff = 1000;

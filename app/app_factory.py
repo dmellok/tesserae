@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from flask import Flask, abort, redirect, send_from_directory, url_for
+from flask import Flask, abort, redirect, request, send_from_directory, url_for
 from werkzeug.wrappers import Response
 
 from app import (
@@ -58,6 +58,48 @@ from app.transport_wiring import _is_reloader_watcher, _rebuild_transport
 logger = logging.getLogger(__name__)
 
 REPO_ROOT: Path = Path(__file__).resolve().parent.parent
+
+
+_MAX_THUMB_HEIGHT_MULTIPLIER: int = 8
+
+
+def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Response | None:
+    """Return a downscaled cached variant of ``filename`` at the requested
+    width, or ``None`` if anything goes wrong (caller falls through to the
+    full image).
+
+    Thumbnails live under ``<renders_dir>/.thumbs/<digest>-w<width>.png``
+    so they share filesystem permissions with the originals + get cleaned
+    up alongside them. Naming is content-addressed: the source PNG is
+    immutable (its digest IS its filename), so a thumbnail can be cached
+    forever without invalidation. Aspect ratio is preserved; the only
+    height cap is a safety guard against a maliciously tall input.
+    """
+    src = renders_dir / filename
+    if not src.is_file():
+        return None
+    thumbs_dir = renders_dir / ".thumbs"
+    base = Path(filename).stem
+    suffix = Path(filename).suffix or ".png"
+    thumb_name = f"{base}-w{width}{suffix}"
+    thumb_path = thumbs_dir / thumb_name
+    if not thumb_path.is_file():
+        try:
+            from PIL import Image
+
+            thumbs_dir.mkdir(parents=True, exist_ok=True)
+            with Image.open(src) as im:
+                im.thumbnail(
+                    (width, width * _MAX_THUMB_HEIGHT_MULTIPLIER),
+                    Image.Resampling.LANCZOS,
+                )
+                tmp_path = thumb_path.with_suffix(thumb_path.suffix + ".tmp")
+                im.save(tmp_path, optimize=True)
+                tmp_path.replace(thumb_path)
+        except Exception:
+            logger.warning("thumbnail render failed for %s", filename, exc_info=True)
+            return None
+    return send_from_directory(thumbs_dir, thumb_name)
 
 
 def create_app(
@@ -571,6 +613,18 @@ def create_app(
         # restricts this route to loopback at the network level.
         if "/" in filename or filename.startswith("."):
             abort(404)
+        # Thumbnail mode: ``?w=<width>`` returns a downscaled cached
+        # variant. The admin's History / Events pages display each push
+        # at ~160 px wide, but the source is a 1600x1200 panel render —
+        # that decodes to ~7.7 MB per IMG element in Chromium's bitmap
+        # cache. Leaving an admin tab open overnight with frequent
+        # push events accumulated multi-GB tabs in the wild. Thumbnails
+        # cap each IMG at ~0.4 MB decoded.
+        thumb_w = request.args.get("w", type=int)
+        if thumb_w and 16 <= thumb_w <= 800:
+            response_or_none = _serve_render_thumbnail(renders_dir, filename, thumb_w)
+            if response_or_none is not None:
+                return response_or_none
         return send_from_directory(renders_dir, filename)
 
     # Device ID validation mirrors device_service so a 404 reflects an

@@ -37,6 +37,13 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 
 _KNOWN_TYPES: tuple[str, ...] = ("push", "renderer", "device", "scheduler", "auth", "telemetry")
 _MAX_LIMIT: int = 500
+# Default page size — keep tight so the IMG thumbnails on /events stay
+# in a reasonable bitmap-cache footprint. Each push row's thumbnail
+# decodes to ~0.4 MB even with the ``?w=240`` variant; 100 rows ≈ 40 MB
+# of decoded images, which is fine. A flood of pushes would otherwise
+# trail off into the panel-PNG bitmap pile in Chromium's cache and
+# eat multi-GB of an idle admin tab — that was the v0.16.3 fix.
+_DEFAULT_LIMIT: int = 100
 
 
 def _events() -> EventLog:
@@ -48,9 +55,9 @@ def index() -> str:
     log = _events()
     selected = (request.args.get("type") or "all").strip().lower()
     try:
-        limit = min(int(request.args.get("limit") or 200), _MAX_LIMIT)
+        limit = min(int(request.args.get("limit") or _DEFAULT_LIMIT), _MAX_LIMIT)
     except ValueError:
-        limit = 200
+        limit = _DEFAULT_LIMIT
     if selected == "all" or selected not in _KNOWN_TYPES:
         rows = log.list(limit=limit)
         type_filter = None

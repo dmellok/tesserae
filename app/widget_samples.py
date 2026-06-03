@@ -389,6 +389,25 @@ def _ha_zones() -> dict[str, Any]:
     }
 
 
+def _octoprint_status() -> dict[str, Any]:
+    return {
+        "label": "OctoPrint",
+        "time": "14:32",
+        "state": {"text": "Printing", "tone": "printing"},
+        "job": {
+            "name": "benchy.gcode",
+            "completion": 47.3,
+            "elapsed": 3600,
+            "remaining": 5400,
+            "eta": "15:32",
+        },
+        "temps": {
+            "tool": {"actual": 208.4, "target": 210.0},
+            "bed": {"actual": 60.1, "target": 60.0},
+        },
+    }
+
+
 def _ha_todo() -> dict[str, Any]:
     # Mix of needs-action and completed items + a couple of due dates
     # so all four variants have something to render in the gallery.
@@ -556,6 +575,7 @@ SAMPLES: dict[str, Any] = {
     "ha_sensor": _ha_sensor,
     "ha_todo": _ha_todo,
     "ha_zones": _ha_zones,
+    "octoprint_status": _octoprint_status,
     "spotify_now_playing": _spotify_now_playing,
     "spotify_album_art": _spotify_album_art,
     "spotify_queue": _spotify_queue,

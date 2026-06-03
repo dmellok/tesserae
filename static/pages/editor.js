@@ -78,6 +78,28 @@
     });
   }
 
+  // Bounded-lifetime preview iframes.
+  //
+  // The composer iframe is mounted once when the editor opens, then
+  // runs forever — each widget's setInterval ticks (clock, F1
+  // countdown, public-transport refresh) accumulate small allocations
+  // every minute, and the webpage widget's auto-refresh swaps a
+  // foreign document in repeatedly. Over an overnight idle session
+  // those compound into multi-GB tab memory (saw 6.5 GB in the wild).
+  // A hard reset every 4 hours discards all accumulated state — the
+  // user sees nothing more than the same brief opacity fade as a
+  // normal save-driven reload.
+  const _PREVIEW_RESET_MS = 4 * 60 * 60 * 1000;
+  let _previewResetTimer = null;
+  function schedulePreviewReset() {
+    if (_previewResetTimer) clearTimeout(_previewResetTimer);
+    _previewResetTimer = setTimeout(() => {
+      reloadPreview();
+      schedulePreviewReset();
+    }, _PREVIEW_RESET_MS);
+  }
+  schedulePreviewReset();
+
   // Parse "WxH" out of an iframe's src so each frame can be matched up
   // with the matching group in the /preview response.
   function frameSize(iframe) {

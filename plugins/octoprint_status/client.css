@@ -1,0 +1,23 @@
+/* octoprint_status — all four variants render inline in client.js via
+ * the shared widget-bauhaus + widget-bauhaus-wx tokens. This file only
+ * carries the error shell selector. */
+
+/* Progressive disclosure: drop secondary rows on the smallest cells so
+ * the hero (state + progress) keeps breathing room. The root carries
+ * .size-xs / .size-sm (stamped from ctx.cell.size in client.js). */
+.size-xs .size-hide-xs,
+.size-sm .size-hide-sm,
+.size-xs .size-hide-sm { display: none !important; }
+
+.root.error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--c-danger);
+  background: var(--c-bg);
+  height: 100%;
+  box-sizing: border-box;
+}

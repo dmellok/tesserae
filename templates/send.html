@@ -312,7 +312,12 @@
     <li class="history-row">
       <a class="history-thumb" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
         {% if ev.digest %}
-        <img src="{{ url_for('renders', filename=ev.digest ~ '.png') }}" alt="">
+        {# ``?w=`` thumbnail variant so the history feed doesn't decode the
+           full panel PNG into a ~7.7 MB bitmap per row (see events.html
+           for the rationale). Lightbox click target stays the original. #}
+        <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
+             alt="" width="120" height="90"
+             loading="lazy" decoding="async">
         {% else %}
         <span class="history-thumb-empty">no preview</span>
         {% endif %}

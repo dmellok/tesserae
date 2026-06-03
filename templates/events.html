@@ -64,8 +64,15 @@
       {% endif %}
     </div>
     {% if ev.type == 'push' and ev.digest %}
+    {# Thumbnail src uses the ``?w=`` cached-thumbnail variant so the
+       admin's event list doesn't decode a 1600×1200 panel PNG into a
+       ~7.7 MB bitmap for every row (left a tab open overnight ⇒ multi-GB
+       browser memory). ``href`` still hits the full image so clicking
+       through to the lightbox shows the original resolution. #}
     <a class="event-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Event #{{ ev.id }}">
-      <img src="{{ url_for('renders', filename=ev.digest ~ '.png') }}" alt="">
+      <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
+           alt="" width="120" height="90"
+           loading="lazy" decoding="async">
     </a>
     {% endif %}
   </li>
