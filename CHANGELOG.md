@@ -8,6 +8,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.14.4] — 2026-06-03
+
+### Fixed
+
+- **news_reddit no longer deadlocks the renderer during a push.** The
+  widget's fetch used to submit a `FetchRequest` to the same
+  `BrowserPool` that was currently running the screenshot — the
+  pool's single worker was busy with the render, so reddit's fetch
+  blocked behind its own render until the hydration overall cap
+  fired (~12 s). On a dashboard that includes reddit, that ate most
+  of the renderer's 15 s `goto` budget, leaving only ~3 s for the
+  `load` event + post-load image / font wait — enough margin under
+  light load, but the trigger for the intermittent
+  ``Page.goto: Timeout 15000ms exceeded`` errors users hit on
+  HA-driven pushes (cold widget caches at random hours of the day).
+
+  The fetch path is now context-aware:
+
+  * **Editor / dev gallery** (``ctx["preview"]=True``) — urllib
+    against ``old.reddit.com`` first (less aggressively filtered
+    than ``www.reddit.com``), falling through to the BrowserPool
+    only if urllib fails. The pool's Chromium TLS/JA3 fingerprint
+    is still available as a backstop when needed.
+  * **Push render** (``ctx["preview"]=False``) — the pool path is
+    skipped entirely; urllib only. If urllib 403s the composer's
+    last-good fallback ([app/composer.py:163](app/composer.py#L163))
+    serves the prior payload so the cell still renders.
+
+  The urllib path also gained a fuller browser-like header set
+  (Accept-Language, Sec-Fetch-*, ``Cookie: over18=1``) so the
+  Reddit bot filter accepts it more often.
+
 ## [0.14.3] — 2026-06-03
 
 ### Added
@@ -1223,7 +1255,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.3...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.4...HEAD
+[0.14.4]: https://github.com/dmellok/tesserae/releases/tag/v0.14.4
 [0.14.3]: https://github.com/dmellok/tesserae/releases/tag/v0.14.3
 [0.14.2]: https://github.com/dmellok/tesserae/releases/tag/v0.14.2
 [0.14.1]: https://github.com/dmellok/tesserae/releases/tag/v0.14.1

@@ -6,13 +6,24 @@ subreddit RSS feed (``/r/<sub>/<sort>.rss``) is still served, so we parse
 that instead. The trade-off: RSS carries title / author / permalink / time
 but **not** score or comment counts — the client hides those when absent.
 
-Fetch strategy: prefer the warm BrowserPool's ``fetch_text`` (Chromium's
-TLS/JA3 fingerprint slips past the bot-shape filter that catches plain
-``urllib`` requests), falling back to ``urllib`` when the pool isn't
-running or the Playwright fetch raises. Each pool fetch uses a fresh
-incognito context — no cookies carry between widgets, so Reddit can't
-correlate this widget's fetches with anyone else's traffic going through
-the same Chromium.
+Fetch strategy is context-aware:
+
+* **Editor / dev gallery** (``ctx["preview"]=True``) — try the warm
+  BrowserPool's ``fetch_text`` first. Chromium's TLS/JA3 fingerprint slips
+  past the bot-shape filter that catches plain ``urllib``. Fall through
+  to ``urllib`` if the pool isn't running.
+
+* **Push render** (``ctx["preview"]=False``) — skip the pool entirely.
+  The pool's single worker is BUSY rendering the page that's currently
+  hydrating us; submitting a fetch would block behind our own render,
+  deadlock against the hydration overall cap, and produce a borderline
+  ``page.goto`` timeout. Go straight to ``urllib`` against ``old.reddit.com``
+  with a richer header set. If urllib 403s, return an error and let the
+  composer's last-good fallback serve the prior successful payload.
+
+Each pool fetch uses a fresh incognito context — no cookies carry between
+widgets, so Reddit can't correlate this widget's fetches with anyone else's
+traffic going through the same Chromium.
 """
 
 from __future__ import annotations
@@ -40,6 +51,24 @@ USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
     "(KHTML, like Gecko) Version/17.4 Safari/605.1.15"
 )
+# Extra browser-like headers for the urllib path. Reddit fingerprints
+# TLS/JA3 first (which we can't fake from Python), but a Safari-shaped
+# request still gets through more often than a bare UA-only request —
+# especially for the RSS endpoint, which is less aggressively gated than
+# ``.json``. ``over18=1`` clears the age-gate interstitial that some
+# subreddits otherwise return as 403.
+URLLIB_HEADERS: dict[str, str] = {
+    "User-Agent": USER_AGENT,
+    "Accept": "application/atom+xml, application/xml;q=0.9, */*;q=0.5",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+    "Pragma": "no-cache",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cookie": "over18=1",
+}
 SUB_RE = re.compile(r"^[A-Za-z0-9_]{1,21}$")
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 
@@ -97,25 +126,42 @@ def _fetch_via_pool(url: str) -> ET.Element | None:
 
 
 def _fetch_via_urllib(url: str) -> ET.Element:
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/atom+xml, application/xml"},
-    )
+    req = urllib.request.Request(url, headers=URLLIB_HEADERS)
     with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_S) as resp:
         return ET.fromstring(resp.read())
 
 
-def _fetch_feed(url: str) -> ET.Element | str:
-    """Try pool → urllib. Returns the parsed feed on success, or an error
-    string with both attempts' details when both fail. We always log
-    the pool failure (DEBUG) so a flaky upstream is visible in the logs
-    without surfacing two errors to the user."""
+def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
+    """Try urllib at ``old.reddit.com`` first (less aggressively filtered
+    than ``www.reddit.com``); if that 403s and the pool is safe to use,
+    fall through to the BrowserPool's Chromium-fingerprint fetch against
+    ``www.reddit.com``. Returns the parsed feed on success, or an error
+    string when every path failed.
+
+    ``allow_pool=False`` means we're inside a push render — the pool
+    worker is currently busy with the screenshot that's hydrating us,
+    so submitting a fetch would deadlock against the hydration overall
+    cap. In that case urllib is the only option; if it 403s the
+    composer's last-good fallback will serve the prior payload."""
+    # Pass 1: urllib against old.reddit.com (RSS endpoint there is more
+    # forgiving of non-browser TLS fingerprints).
+    old_url = url.replace("https://www.reddit.com/", "https://old.reddit.com/", 1)
     try:
-        pooled = _fetch_via_pool(url)
-        if pooled is not None:
-            return pooled
+        return _fetch_via_urllib(old_url)
     except Exception as err:
-        logger.debug("news_reddit: pool fetch failed (%s), falling back to urllib", err)
+        logger.debug("news_reddit: old.reddit.com fetch failed (%s)", err)
+    # Pass 2: BrowserPool (Chromium TLS fingerprint). Skipped during a
+    # push render — see the docstring.
+    if allow_pool:
+        try:
+            pooled = _fetch_via_pool(url)
+            if pooled is not None:
+                return pooled
+        except Exception as err:
+            logger.debug("news_reddit: pool fetch failed (%s)", err)
+    # Pass 3: urllib against www.reddit.com. Last-resort symmetry with
+    # the URL the pool would have used, so if the bot filter relaxes
+    # between requests we still get something.
     try:
         return _fetch_via_urllib(url)
     except Exception as err:
@@ -153,9 +199,13 @@ def fetch(
     if sort == "top":
         url += f"&t={window}"
 
-    feed = _fetch_feed(url)
+    # ``ctx["preview"]`` is True for the editor / dev gallery and False
+    # for a push render. Pool fetches are only safe in the preview case;
+    # see ``_fetch_feed``'s docstring.
+    allow_pool = bool(ctx.get("preview"))
+    feed = _fetch_feed(url, allow_pool=allow_pool)
     if isinstance(feed, str):
-        # _fetch_feed returns the error string when both paths failed.
+        # _fetch_feed returns the error string when every path failed.
         return {"error": feed, "posts": []}
 
     posts = []
