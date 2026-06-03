@@ -207,7 +207,7 @@ function renderS3(data) {
         ${items.length === 0 ? emptyState(data.label) : items.map((it, i) => {
           const accent = stateAccent(it.state);
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:7px 0;${i < items.length - 1 ? "border-bottom:1px solid rgba(27,26,22,.10);" : ""}">
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 0;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}">
               <span style="width:8px;height:8px;border-radius:50%;background:${WX.col(accent)};display:inline-block;flex-shrink:0"></span>
               <span style="font-size:13px;color:var(--wx-ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
               <span class="wx-tnum" style="font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--wx-ink-60);font-weight:600">${escapeHtml(stateLabel(it.state))}</span>
@@ -306,7 +306,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

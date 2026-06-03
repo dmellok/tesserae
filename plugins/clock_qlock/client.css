@@ -26,7 +26,17 @@
 .qk-stage {
   position: relative;
   aspect-ratio: 1 / 1;
-  width: min(100%, 100cqh);
+  /* Pick the largest square that fits inside the root's padded inner
+     box. Width follows height via aspect-ratio; height fills the
+     parent; max-width caps width to the parent and re-computes height
+     when the cell is portrait or zoomed. The earlier
+     ``width: min(100%, 100cqh)`` used the full cell-content height
+     (cqh) which didn't subtract the root's padding — the stage came
+     out taller than its parent and the bottom row of the letter grid
+     clipped. */
+  width: auto;
+  height: 100%;
+  max-width: 100%;
   max-height: 100%;
 }
 

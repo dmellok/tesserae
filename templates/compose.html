@@ -71,10 +71,16 @@
       --c-data-2:      var(--theme-accent2);
       --c-data-3:      var(--theme-accent3);
       --c-data-4:      var(--theme-surface2);
+      /* Semantic status tokens — each theme picks its own complementary
+         tone of red/yellow/green/blue so the colour still reads as
+         "alarm-red" or "fine-green" but tracks the theme's saturation
+         + lightness profile (cocoa gets a brick red, neon-themes get
+         a vivid alarm red, mono themes get a nearly-grey tint, etc.).
+         wx-red/yellow/green/blue resolve through these too. */
       --c-ok:          var(--theme-ok);
       --c-warn:        var(--theme-warn);
       --c-danger:      var(--theme-danger);
-      --c-info:        var(--theme-accent);
+      --c-info:        var(--theme-info, var(--theme-accent));
     }
     /* Per-cell zoom — the inner box paints into a 1/zoom virtual area
        then transform-scales back up to fill the cell, so widgets see a

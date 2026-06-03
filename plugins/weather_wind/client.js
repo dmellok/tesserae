@@ -67,8 +67,8 @@ function windRose({ data, size = 156, color = "var(--wx-blue)" } = {}) {
   }).join("");
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
-      <circle cx="${cx}" cy="${cx}" r="${(R * 0.5).toFixed(1)}" fill="none" stroke="rgba(27,26,22,.14)" stroke-width="1" stroke-dasharray="2 4" />
-      <circle cx="${cx}" cy="${cx}" r="${R}" fill="none" stroke="rgba(27,26,22,.14)" stroke-width="1" stroke-dasharray="2 4" />
+      <circle cx="${cx}" cy="${cx}" r="${(R * 0.5).toFixed(1)}" fill="none" stroke="var(--c-line)" stroke-width="1" stroke-dasharray="2 4" />
+      <circle cx="${cx}" cy="${cx}" r="${R}" fill="none" stroke="var(--c-line)" stroke-width="1" stroke-dasharray="2 4" />
       ${spokes}
       <circle cx="${cx}" cy="${cx}" r="3.5" fill="var(--wx-ink)" />
       ${cardinals}
@@ -136,7 +136,7 @@ function renderR1(data) {
       </div>
       <div style="display:flex;border-top:2px solid var(--wx-ink)">
         ${hours.map((h, i) => `
-          <div style="flex:1;border-right:${i < hours.length - 1 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:4px">
+          <div style="flex:1;border-right:${i < hours.length - 1 ? "1px solid var(--c-line)" : "none"};padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:4px">
             <span style="font-family:var(--wx-mono);font-size:11.5px;color:var(--wx-ink-60)">${escapeHtml(h.t || "")}</span>
             <span style="display:inline-flex;transform:rotate(${(h.dir || 0) + 180}deg)">${WX.icon("arrow", { size: 20, color: "var(--wx-ink)", weight: "fill" })}</span>
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:15px">${escapeHtml(String(h.s))}</span>
@@ -155,7 +155,7 @@ function renderG2(data) {
     ${styleBlock()}
     <div class="wx-art" style="font-family:var(--wx-geo);display:flex;flex-direction:column;background:var(--wx-ink);gap:4px">
       <div style="flex:1;display:flex;gap:4px">
-        <div style="flex:1;background:${WX.col("blue")};color:#fff;padding:20px 26px;display:flex;flex-direction:column;justify-content:center">
+        <div style="flex:1;background:${WX.col("blue")};color:${WX.inkOn("blue")};padding:20px 26px;display:flex;flex-direction:column;justify-content:center">
           <span style="font-family:var(--wx-mono);font-size:12px;font-weight:700;opacity:.85">FROM ${escapeHtml(data.dir || "")}</span>
           <div style="display:flex;align-items:flex-end;gap:6px">
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:78px;line-height:.8">${escapeHtml(String(data.speed))}</span>
@@ -238,7 +238,7 @@ function renderD4(data) {
           ${windRose({ data: rose, size: 156, color: WX.col("blue") })}
           <span style="font-family:var(--wx-mono);font-size:11.5px;color:var(--wx-ink-60);letter-spacing:.06em">PREVAILING ${escapeHtml(data.dir || "")}</span>
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid rgba(27,26,22,.18);padding-left:22px">
+        <div style="flex:1;display:flex;flex-direction:column;border-left:1px solid var(--c-line);padding-left:22px">
           <div style="display:flex;align-items:flex-end;gap:8px">
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:58px;line-height:.82">${escapeHtml(String(data.speed))}</span>
             <span style="font-family:var(--wx-mono);font-size:13px;color:var(--wx-ink-60);margin-bottom:8px">${escapeHtml(data.unit || "")} · GUST ${escapeHtml(String(data.gust))}</span>
@@ -270,7 +270,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger)">
       <span>${escapeHtml(msg)}</span>
     </div>
   `;

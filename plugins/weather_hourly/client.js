@@ -330,7 +330,7 @@ function rainStrip({ rain, color = "var(--wx-red)", height = 16, threshold = 25 
     .map((p) => {
       const pct = Number.isFinite(p) ? Math.max(0, Math.min(100, p)) : 0;
       const fillH = Math.max(pct, 6);
-      const bg = pct >= threshold ? color : "rgba(27,26,22,.16)";
+      const bg = pct >= threshold ? color : "var(--c-line)";
       return `<div style="flex:1;height:${fillH}%;min-height:3px;background:${bg}"></div>`;
     })
     .join("");
@@ -418,7 +418,7 @@ function renderR1(data) {
       </div>
       <div style="display:flex;border-top:2px solid var(--wx-ink)">
         ${[["HIGH", data.hi, "ink"], ["LOW", data.lo, "blue"], ["NOW", data.now, "red"]].map(([l, v, a], i) => `
-          <div style="flex:1;padding:9px 18px;border-right:${i < 2 ? "1px solid rgba(27,26,22,.16)" : "none"};display:flex;align-items:baseline;gap:10px">
+          <div style="flex:1;padding:9px 18px;border-right:${i < 2 ? "1px solid var(--c-line)" : "none"};display:flex;align-items:baseline;gap:10px">
             <span style="font-family:var(--wx-mono);font-size:11px;letter-spacing:.08em;color:var(--wx-ink-60)">${l}</span>
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:24px;color:${WX.col(a)}">${fmtTemp(v)}</span>
           </div>
@@ -448,7 +448,7 @@ function renderG2(data) {
         </div>
       </div>
       <div style="background:${WX.col("red")};padding:8px 18px;display:flex;align-items:center;gap:12px">
-        <span style="font-family:var(--wx-black);font-size:13px;color:#fff">RAIN</span>
+        <span style="font-family:var(--wx-black);font-size:13px;color:${WX.inkOn("blue")}">RAIN</span>
         <div style="flex:1">${rainStrip({ rain: data.rain, color: "var(--wx-ink)", threshold: 25 })}</div>
       </div>
       <div style="display:flex;gap:4px">
@@ -482,7 +482,7 @@ function renderS3(data) {
           ${areaChart({ series: data.temps, min: data.tMin, max: data.tMax, w: 620, h: 200, color: "var(--wx-ink)" })}
         </div>
       </div>
-      <div style="border-top:1px solid rgba(27,26,22,.18);padding-top:6px;margin-top:6px">${axisRow(data)}</div>
+      <div style="border-top:1px solid var(--c-line);padding-top:6px;margin-top:6px">${axisRow(data)}</div>
       <div style="display:flex;gap:36px;margin-top:12px">
         ${[["High", data.hi], ["Low", data.lo], ["Now", data.now]].map(([l, v]) => `
           <div style="display:flex;align-items:baseline;gap:8px">
@@ -514,8 +514,8 @@ function renderD4(data) {
         ${yAxisLabels(data)}
         <div style="flex:1;position:relative">
           <svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="position:absolute;inset:0">
-            <line x1="0" y1="${(h * 0.33).toFixed(1)}" x2="${w}" y2="${(h * 0.33).toFixed(1)}" stroke="rgba(27,26,22,.12)" stroke-width="1" vector-effect="non-scaling-stroke" />
-            <line x1="0" y1="${(h * 0.66).toFixed(1)}" x2="${w}" y2="${(h * 0.66).toFixed(1)}" stroke="rgba(27,26,22,.12)" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <line x1="0" y1="${(h * 0.33).toFixed(1)}" x2="${w}" y2="${(h * 0.33).toFixed(1)}" stroke="var(--c-line)" stroke-width="1" vector-effect="non-scaling-stroke" />
+            <line x1="0" y1="${(h * 0.66).toFixed(1)}" x2="${w}" y2="${(h * 0.66).toFixed(1)}" stroke="var(--c-line)" stroke-width="1" vector-effect="non-scaling-stroke" />
           </svg>
           ${areaChart({ series: data.temps, min: data.tMin, max: data.tMax, w, h, color: WX.col("red"), fill: "var(--wx-red-t)" })}
         </div>

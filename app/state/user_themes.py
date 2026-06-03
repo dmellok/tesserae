@@ -37,6 +37,7 @@ PALETTE_TOKENS: tuple[str, ...] = (
     "danger",
     "warn",
     "ok",
+    "info",
 )
 
 VALID_MODES: frozenset[str] = frozenset({"light", "dark"})

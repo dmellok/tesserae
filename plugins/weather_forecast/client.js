@@ -210,10 +210,10 @@ function renderR1(data) {
       <div style="flex:1;display:grid;grid-template-columns:repeat(${days.length},1fr)">
         ${days.map((d, i) => {
           const isToday = d.today;
-          const colorOn = isToday ? "#fff" : "var(--wx-ink)";
+          const colorOn = isToday ? WX.inkOn("blue") : "var(--wx-ink)";
           const bg = isToday ? WX.col("blue") : "transparent";
-          const track = isToday ? "rgba(255,255,255,.3)" : "rgba(27,26,22,.14)";
-          const fill = isToday ? "#fff" : "var(--wx-ink)";
+          const track = isToday ? "rgba(255,255,255,.3)" : "var(--c-line)";
+          const fill = isToday ? WX.inkOn("blue") : "var(--wx-ink)";
           const segL = segLeftPct(d, lo, hi);
           const segW = segWidthPct(d, lo, hi);
           return `
@@ -229,7 +229,7 @@ function renderR1(data) {
                 <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:14px;opacity:.7">${fmtInt(d.lo)}°</span>
               </div>
               <span style="display:flex;align-items:center;gap:5px;font-family:var(--wx-mono);font-size:12px;opacity:.85">
-                ${WX.icon("drop", { size: 12, color: isToday ? "#fff" : WX.col("blue") })}
+                ${WX.icon("drop", { size: 12, color: isToday ? WX.inkOn("blue") : WX.col("blue") })}
                 ${d.rain == null ? "—" : d.rain + "%"}
               </span>
             </div>
@@ -260,7 +260,7 @@ function renderG2(data) {
         ${days.map((d) => {
           const solid = d.today;
           const bg = solid ? WX.col("blue") : "var(--wx-paper)";
-          const fg = solid ? "#fff" : "var(--wx-ink)";
+          const fg = solid ? WX.inkOn("blue") : "var(--wx-ink)";
           return `
             <div style="background:${bg};color:${fg};display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 10px;gap:10px">
               <span style="font-family:var(--wx-black);font-size:16px">${escapeHtml(d.day)}</span>
@@ -292,7 +292,7 @@ function renderS3(data) {
       <div style="height:2px;background:var(--wx-ink);margin:12px 0 0"></div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(${days.length},1fr)">
         ${days.map((d, i) => `
-          <div style="border-right:${i < days.length - 1 ? "1px solid rgba(27,26,22,.16)" : "none"};display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 10px;gap:10px">
+          <div style="border-right:${i < days.length - 1 ? "1px solid var(--c-line)" : "none"};display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 10px;gap:10px">
             <span style="font-size:11px;letter-spacing:.12em;color:${d.today ? "var(--wx-ink)" : "var(--wx-ink-60)"};font-weight:${d.today ? 700 : 400}">${escapeHtml((d.day || "").toUpperCase())}</span>
             ${WX.icon(d.icon, { size: 42, color: "var(--wx-ink)" })}
             <div style="display:flex;align-items:baseline;gap:7px">
@@ -329,11 +329,11 @@ function renderD4(data) {
           const dayColor = d.today ? WX.col("blue") : "var(--wx-ink)";
           const barColor = d.today ? WX.col("blue") : WX.col("ink");
           return `
-            <div style="flex:1;display:flex;align-items:center;gap:14px;border-top:1px solid rgba(27,26,22,.14);padding:0 2px">
+            <div style="flex:1;display:flex;align-items:center;gap:14px;border-top:1px solid var(--c-line);padding:0 2px">
               <span style="width:56px;font-family:var(--wx-black);font-size:14px;color:${dayColor}">${escapeHtml((d.day || "").toUpperCase())}</span>
               ${WX.icon(d.icon, { size: 22, color: "var(--wx-ink)" })}
               <span class="wx-tnum" style="width:40px;text-align:right;font-family:var(--wx-mono);font-size:13px;color:var(--wx-ink-60)">${fmtInt(d.lo)}°</span>
-              <div style="flex:1;height:8px;background:rgba(27,26,22,.1);position:relative">
+              <div style="flex:1;height:8px;background:var(--c-line);position:relative">
                 <div style="position:absolute;left:${segL.toFixed(1)}%;width:${segW.toFixed(1)}%;height:100%;background:${barColor}"></div>
               </div>
               <span class="wx-tnum" style="width:40px;font-family:var(--wx-black);font-size:16px">${fmtInt(d.hi)}°</span>

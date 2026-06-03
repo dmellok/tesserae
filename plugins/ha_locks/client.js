@@ -116,12 +116,12 @@ function renderR1(data) {
       <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
         ${entries.map((e, i) => {
           const unsecured = !e.secured;
-          const accentCol = unsecured ? WX.col("red") : "var(--wx-ink-60)";
-          const rowBg = unsecured ? WX.tint("red") : "var(--wx-paper)";
-          const stateBg = unsecured ? WX.col("red") : "rgba(27,26,22,.08)";
-          const stateFg = unsecured ? WX.inkOn("red") : "var(--wx-ink-60)";
+          const accentCol = unsecured ? "var(--c-danger)" : "var(--wx-ink-60)";
+          const rowBg = unsecured ? "color-mix(in oklab, var(--c-danger) 22%, var(--c-bg))" : "var(--wx-paper)";
+          const stateBg = unsecured ? "var(--c-danger)" : "var(--c-line)";
+          const stateFg = unsecured ? "var(--c-bg)" : "var(--wx-ink-60)";
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:${rowBg};${i > 0 ? "border-top:1px solid rgba(27,26,22,.12);" : ""}min-width:0">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:${rowBg};${i > 0 ? "border-top:1px solid var(--c-line);" : ""}min-width:0">
               ${WX.icon(iconFor(e), { size: 20, color: accentCol, weight: unsecured ? "fill" : "bold" })}
               <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${unsecured ? "" : "color:var(--wx-ink)"}">${escapeHtml(e.name || e.entity_id)}</span>
               <span style="display:inline-block;background:${stateBg};color:${stateFg};font-family:var(--wx-mono);font-weight:700;font-size:11px;padding:3px 8px;letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
@@ -185,13 +185,13 @@ function renderS3(data) {
       <div style="height:2px;background:var(--wx-ink);margin:12px 0"></div>
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
         <span style="font-size:11px;letter-spacing:.14em;color:var(--wx-ink-60);text-transform:uppercase">${summary.secured} of ${summary.total} secured</span>
-        ${summary.unsecured > 0 ? `<span style="font-size:11px;letter-spacing:.14em;color:${WX.col("red")};text-transform:uppercase;font-weight:700">${summary.unsecured} unsecured</span>` : ""}
+        ${summary.unsecured > 0 ? `<span style="font-size:11px;letter-spacing:.14em;color:${"var(--c-danger)"};text-transform:uppercase;font-weight:700">${summary.unsecured} unsecured</span>` : ""}
       </div>
       <div style="flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden">
         ${entries.map((e) => {
-          const dotCol = e.secured ? WX.col("green") : WX.col("red");
-          const nameCol = e.secured ? "" : `color:${WX.col("red")};font-weight:700`;
-          const stateCol = e.secured ? "color:var(--wx-ink-60)" : `color:${WX.col("red")};font-weight:700`;
+          const dotCol = e.secured ? "var(--c-ok)" : "var(--c-danger)";
+          const nameCol = e.secured ? "" : `color:${"var(--c-danger)"};font-weight:700`;
+          const stateCol = e.secured ? "color:var(--wx-ink-60)" : `color:${"var(--c-danger)"};font-weight:700`;
           return `
             <div style="display:flex;align-items:baseline;gap:12px">
               <span style="width:8px;height:8px;border-radius:50%;background:${dotCol};flex-shrink:0;align-self:center"></span>
@@ -216,13 +216,13 @@ function renderD4(data) {
   if (summary.unsecured === 0 && summary.total > 0) {
     return `
       ${styleBlock()}
-      <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:${WX.col("green")};color:${WX.inkOn("green")}">
+      <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:${"var(--c-ok)"};color:${"var(--c-bg)"}">
         <div style="display:flex;justify-content:space-between;align-items:baseline;padding:12px 20px 0;font-family:var(--wx-mono);font-size:11px;letter-spacing:.06em;font-weight:700;opacity:.9">
           <span>${escapeHtml((data.place || "").toUpperCase())}</span>
           <span>${escapeHtml(data.time || nowTime())}</span>
         </div>
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:18px">
-          ${WX.icon("check-circle", { size: 56, color: WX.inkOn("green"), weight: "fill" })}
+          ${WX.icon("check-circle", { size: 56, color: "var(--c-bg)", weight: "fill" })}
           <span style="font-family:var(--wx-black);font-size:34px;line-height:.9;letter-spacing:.03em">ALL SECURED</span>
           <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.08em;opacity:.85">${summary.total} ENTR${summary.total === 1 ? "Y" : "IES"} · ${summary.secured} LOCKED / CLOSED</span>
         </div>
@@ -237,8 +237,8 @@ function renderD4(data) {
     ${styleBlock()}
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
       ${summary.unsecured > 0
-        ? `<div style="background:${WX.col("red")};color:${WX.inkOn("red")};padding:10px 18px;display:flex;align-items:center;gap:10px;font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;font-weight:700">
-            ${WX.icon("warning", { size: 18, color: WX.inkOn("red"), weight: "fill" })}
+        ? `<div style="background:${"var(--c-danger)"};color:${"var(--c-bg)"};padding:10px 18px;display:flex;align-items:center;gap:10px;font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;font-weight:700">
+            ${WX.icon("warning", { size: 18, color: "var(--c-bg)", weight: "fill" })}
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:18px;line-height:.9">${summary.unsecured}</span>
             <span>UNSECURED</span>
             <span style="margin-left:auto;opacity:.85">${escapeHtml(data.time || nowTime())}</span>
@@ -251,10 +251,10 @@ function renderD4(data) {
         ${unsecured.length > 0 ? `
           <div style="font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.08em;color:var(--wx-ink-60);padding:8px 18px 4px">NEEDS ATTENTION</div>
           ${unsecured.map((e) => `
-            <div style="display:flex;align-items:center;gap:10px;padding:6px 18px;background:${WX.tint("red")};border-top:1px solid rgba(27,26,22,.08);min-width:0">
-              ${WX.icon(iconFor(e), { size: 18, color: WX.col("red"), weight: "fill" })}
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 18px;background:${"color-mix(in oklab, var(--c-danger) 22%, var(--c-bg))"};border-top:1px solid var(--c-line);min-width:0">
+              ${WX.icon(iconFor(e), { size: 18, color: "var(--c-danger)", weight: "fill" })}
               <span style="font-family:var(--wx-mono);font-size:11.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700">${escapeHtml(e.name || e.entity_id)}</span>
-              <span class="wx-tnum" style="font-family:var(--wx-mono);font-weight:700;font-size:11px;color:${WX.col("red")};letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
+              <span class="wx-tnum" style="font-family:var(--wx-mono);font-weight:700;font-size:11px;color:${"var(--c-danger)"};letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
               <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:10.5px;color:var(--wx-ink-60);min-width:54px;text-align:right">${escapeHtml(fmtLastChanged(e.last_changed))}</span>
             </div>
           `).join("")}
@@ -262,8 +262,8 @@ function renderD4(data) {
         ${secured.length > 0 ? `
           <div style="font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.08em;color:var(--wx-ink-60);padding:8px 18px 4px">SECURED · ${secured.length}</div>
           ${secured.map((e) => `
-            <div style="display:flex;align-items:center;gap:10px;padding:5px 18px;border-top:1px solid rgba(27,26,22,.08);min-width:0">
-              ${WX.icon(iconFor(e), { size: 16, color: WX.col("green"), weight: "bold" })}
+            <div style="display:flex;align-items:center;gap:10px;padding:5px 18px;border-top:1px solid var(--c-line);min-width:0">
+              ${WX.icon(iconFor(e), { size: 16, color: "var(--c-ok)", weight: "bold" })}
               <span style="font-family:var(--wx-mono);font-size:11px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wx-ink-60)">${escapeHtml(e.name || e.entity_id)}</span>
               <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:10.5px;color:var(--wx-ink-60);letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
               <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:10.5px;color:var(--wx-ink-60);min-width:54px;text-align:right">${escapeHtml(fmtLastChanged(e.last_changed))}</span>

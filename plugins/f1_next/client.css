@@ -145,7 +145,14 @@
 
 /* --- tall-cell layout switch ---
    Stack the hero so the circuit becomes a wide horizontal band under
-   the text. Same trick as weather_forecast / weather_hourly use. */
+   the text. Same trick as weather_forecast / weather_hourly use.
+
+   HTML order is circuit then text (it's the landscape default), so
+   explicit grid-row swaps the visual order: text goes in row 1
+   (auto = content height), circuit goes in row 2 (1fr = fills the
+   remaining band). Without the swap the circuit landed first, ate
+   whatever vertical space its intrinsic SVG asked for, and squeezed
+   the race name down into / behind the countdown chip strip. */
 
 @container (max-aspect-ratio: 1) {
   .fn-hero {
@@ -153,9 +160,11 @@
     grid-template-rows: auto 1fr;
   }
   .fn-text {
+    grid-row: 1;
     padding: clamp(10px, 2.4cqw, 24px) clamp(12px, 2.8cqw, 28px);
   }
   .fn-circuit {
+    grid-row: 2;
     border-top: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
   }
 }

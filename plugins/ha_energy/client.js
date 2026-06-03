@@ -97,7 +97,7 @@ function socRing({ soc, size = 110, color = "var(--wx-green)" }) {
   const dash = `${(c * f).toFixed(2)} ${(c * (1 - f)).toFixed(2)}`;
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
-      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(27,26,22,.14)" stroke-width="6" />
+      <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--c-line)" stroke-width="6" />
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="6" stroke-linecap="round" stroke-dasharray="${dash}" transform="rotate(-90 ${size / 2} ${size / 2})" />
       <text x="50%" y="50%" text-anchor="middle" dy="0.36em" style="font-family:var(--wx-black);font-size:${(size * 0.24).toFixed(1)}px;fill:var(--wx-ink)">${Math.round(soc)}%</text>
       <text x="50%" y="${size * 0.72}" text-anchor="middle" style="font-family:var(--wx-mono);font-size:${(size * 0.085).toFixed(1)}px;fill:var(--wx-ink-60);letter-spacing:.06em">BATTERY</text>
@@ -160,7 +160,7 @@ function renderR1(data) {
       ${WX.darkHeader({ title: `${data.place || ""} · ENERGY`, accent: "yellow", right: data.time || nowTime() })}
       <div style="flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
         ${tiles.map((t, i) => `
-          <div style="border-right:${i % 2 === 0 ? "1px solid rgba(27,26,22,.16)" : "none"};border-bottom:${i < 2 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px">
+          <div style="border-right:${i % 2 === 0 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 2 ? "1px solid var(--c-line)" : "none"};padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px">
             <div style="display:flex;align-items:center;gap:8px">
               ${WX.icon(t.icon, { size: 22, color: WX.col(t.accent) })}
               <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(t.label)}</span>
@@ -291,7 +291,7 @@ function renderD4(data) {
           </div>
         </div>
         ${hasSoc ? `
-          <div style="width:140px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-left:1px solid rgba(27,26,22,.18);padding-left:18px">
+          <div style="width:140px;flex-shrink:0;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--c-line);padding-left:18px">
             ${socRing({ soc: data.battery_soc, size: 116, color: WX.col("green") })}
           </div>
         ` : ""}
@@ -314,7 +314,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

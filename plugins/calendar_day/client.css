@@ -31,6 +31,12 @@
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* Variants add horizontal padding (clamp(...) on each side). Without
+     border-box that padding ADDS to the 100% width and pushes the
+     variant past .root's right edge, clipping anything pinned to the
+     right side — the D4 NOW tag, the D5 month/year stack, the rightmost
+     D6 card. Border-box keeps the variant flush. */
+  box-sizing: border-box;
 }
 
 /* -- Shared error / empty states ----------------------------------- */
@@ -127,7 +133,7 @@
 }
 .d1-row:last-child { border-bottom: 0; }
 .d1-row--live {
-  background: var(--c-accent-soft, color-mix(in oklab, var(--c-accent) 14%, transparent));
+  background: color-mix(in oklab, var(--chip) 18%, transparent);
 }
 .d1-stripe { align-self: stretch; background: var(--chip); }
 .d1-time {
@@ -226,7 +232,7 @@
 }
 .d2-row:last-child { border-bottom: 0; }
 .d2-row--live {
-  background: var(--c-accent-soft, color-mix(in oklab, var(--c-accent) 14%, transparent));
+  background: color-mix(in oklab, var(--chip) 18%, transparent);
 }
 .d2-mark {
   display: inline-block;
@@ -391,7 +397,11 @@
   position: absolute;
   left: 46px;
   right: 4px;
-  background: var(--c-accent-soft, color-mix(in oklab, var(--chip) 18%, transparent));
+  /* Derive the soft event background from the feed's own ``--chip``
+     colour rather than ``--c-accent-soft`` — the latter always
+     resolves to the theme's accent so every event lit up in the same
+     coral / theme-accent tint regardless of which feed it came from. */
+  background: color-mix(in oklab, var(--chip) 18%, transparent);
   border-left: 5px solid var(--chip);
   padding: clamp(2px, 0.4cqh, 4px) clamp(6px, 1.2cqw, 10px);
   display: flex;

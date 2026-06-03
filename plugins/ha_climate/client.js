@@ -53,6 +53,16 @@ function targetText(it) {
   return "";
 }
 
+// Just the value portion — used by c2..c6 which want to compose
+// their own "SET …" / "TARGET …" prefix. Returns "21°" for a
+// single setpoint or "18°–22°" for a range. Falls back to ``—`` so
+// the row doesn't render as a bare "SET °".
+function targetValue(it) {
+  if (it.target) return `${it.target}°`;
+  if (it.target_low && it.target_high) return `${it.target_low}°–${it.target_high}°`;
+  return "—";
+}
+
 function modeChip(it) {
   return (it.mode_label || it.action || "").toUpperCase();
 }
@@ -107,7 +117,7 @@ function renderC2(data, items) {
         </div>
         <div class="c2-tile-cur">${escapeHtml(cur)}<span class="c2-deg">°</span></div>
         <div class="c2-tile-foot">
-          <span>SET ${escapeHtml(String(it.target || ""))}°</span>
+          <span>SET ${escapeHtml(targetValue(it))}</span>
           <span class="c2-chip">${escapeHtml(modeChip(it))}</span>
         </div>
       </article>
@@ -132,7 +142,7 @@ function renderC3(data, items) {
         </div>
         <div class="c3-col-foot">
           <span class="c3-dot" style="background:${stateColor(s)}"></span>
-          <span>SET ${escapeHtml(String(it.target || ""))}° · ${escapeHtml(modeChip(it))}</span>
+          <span>SET ${escapeHtml(targetValue(it))} · ${escapeHtml(modeChip(it))}</span>
         </div>
       </div>
     `;
@@ -194,7 +204,7 @@ function renderC4(data, items) {
             <i class="ph ph-${escapeHtml(it.icon)}" aria-hidden="true" style="color:${colour}"></i>
             <span>${escapeHtml(it.name)}</span>
           </div>
-          <div class="c4-tile-set">SET ${escapeHtml(String(it.target || ""))}° · ${escapeHtml(modeChip(it))}</div>
+          <div class="c4-tile-set">SET ${escapeHtml(targetValue(it))} · ${escapeHtml(modeChip(it))}</div>
         </div>
       </div>
     `;
@@ -219,7 +229,7 @@ function renderC5(data, items) {
         <div class="c5-col-name">${escapeHtml(it.name.toUpperCase())}</div>
         <div class="c5-col-cur">${escapeHtml(cur)}<span class="c5-deg">°</span></div>
         <div class="c5-col-foot">
-          set to ${escapeHtml(String(it.target || "—"))}°
+          set to ${escapeHtml(targetValue(it))}
           · <span class="c5-mode" style="color:${stateColor(s)}">${escapeHtml(modeChip(it))}</span>
         </div>
       </div>
@@ -254,7 +264,7 @@ function renderC6(data, items) {
         <div class="c6-tile-cur">${escapeHtml(cur)}<span class="c6-deg">°</span></div>
         <div class="c6-tile-foot">
           <div class="c6-tile-name">${escapeHtml(it.name.toUpperCase())}</div>
-          <div class="c6-tile-set">TARGET ${escapeHtml(String(it.target || ""))}°</div>
+          <div class="c6-tile-set">TARGET ${escapeHtml(targetValue(it))}</div>
         </div>
       </article>
     `;

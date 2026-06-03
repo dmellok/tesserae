@@ -106,7 +106,7 @@ function renderR1(data) {
               <div style="flex:1;min-height:0;overflow:hidden">
                 ${imageOrPlaceholder(it.image_url, it.name)}
               </div>
-              <div style="padding:4px 8px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60);display:flex;justify-content:space-between;gap:8px;border-top:1px solid rgba(27,26,22,.12)">
+              <div style="padding:4px 8px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60);display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--c-line)">
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((it.name || "").toUpperCase())}</span>
                 <span>${escapeHtml(fmtTime(it.last_updated))}</span>
               </div>
@@ -167,7 +167,7 @@ function renderS3(data) {
         <span style="font-size:10.5px;letter-spacing:.16em;color:var(--wx-ink-60)">${escapeHtml((it.name || "").toUpperCase())}</span>
       </div>
       <div style="height:1px;background:var(--wx-ink)"></div>
-      <div style="flex:1;min-height:0;border:1px solid rgba(27,26,22,.6);overflow:hidden">
+      <div style="flex:1;min-height:0;border:1px solid var(--c-line);overflow:hidden">
         ${imageOrPlaceholder(it.image_url, it.name)}
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--wx-ink-60)">
@@ -210,7 +210,7 @@ function renderD4(data) {
         <span style="font-family:var(--wx-black);font-size:16px;letter-spacing:.03em">${escapeHtml((data.label || "CAMERA").toUpperCase())} · ${escapeHtml((it.name || "").toUpperCase())}</span>
         <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">${escapeHtml(fmtTime(it.last_updated) || nowTime())}</span>
       </div>
-      <div style="flex:1;min-height:0;overflow:hidden;border:1px solid rgba(27,26,22,.16)">
+      <div style="flex:1;min-height:0;overflow:hidden;border:1px solid var(--c-line)">
         ${imageOrPlaceholder(it.image_url, it.name)}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -240,7 +240,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

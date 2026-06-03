@@ -143,7 +143,16 @@
 .root.size-xs .cw-meta { display: none; }
 .root.size-xs .cw-row-icon { display: none; }
 
-/* sm: same layout, slightly smaller text + meta on one line. */
-.root.size-sm .cw-time { font-size: clamp(24px, 8cqw, 48px); }
+/* sm: row is only ~50 px tall (4 rows in 240 px minus the header) and
+   the default ``padding: 10px`` top+bottom + city + time + meta stack
+   was overflowing — the meta line clipped under the time and the
+   remaining city+time pair anchored to the top of the row instead of
+   centering. Tighten the row padding, hide the date/GMT meta (xs
+   already does this), and let align-items: center on the row balance
+   the city+time pair against the icon column. */
+.root.size-sm .cw-row {
+  padding: clamp(4px, 0.8cqh, 8px) clamp(10px, 1.6cqw, 18px);
+}
+.root.size-sm .cw-time { font-size: clamp(22px, 7cqw, 40px); }
 .root.size-sm .cw-row-icon .ph-bold { font-size: clamp(20px, 4cqw, 36px); }
-.root.size-sm .cw-meta { font-size: clamp(8px, 1.4cqw, 11px); }
+.root.size-sm .cw-meta { display: none; }

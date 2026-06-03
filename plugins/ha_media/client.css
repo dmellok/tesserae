@@ -10,8 +10,8 @@
   padding: 16px;
   font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
-  color: var(--c-danger, #c44a3a);
-  background: var(--c-bg, #fff);
+  color: var(--c-danger);
+  background: var(--c-bg);
   height: 100%;
   box-sizing: border-box;
 }

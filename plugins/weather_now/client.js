@@ -170,14 +170,14 @@ function renderR1(data) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
           ${data.rainChance != null ? `
-            <span style="font-family:var(--wx-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff;background:${WX.col("blue")};padding:3px 9px">${Math.round(data.rainChance)}% RAIN</span>
+            <span style="font-family:var(--wx-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:${WX.inkOn("blue")};background:${WX.col("blue")};padding:3px 9px">${Math.round(data.rainChance)}% RAIN</span>
           ` : ""}
           ${WX.icon(data.icon || "cloud", { size: 96, color: "var(--wx-ink)" })}
         </div>
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
         ${metrics.map((m, i) => `
-          <div style="border-right:${(i % 4) < 3 ? "1px solid rgba(27,26,22,.16)" : "none"};border-bottom:${i < 4 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:11px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px">
+          <div style="border-right:${(i % 4) < 3 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 4 ? "1px solid var(--c-line)" : "none"};padding:11px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px">
             <div style="display:flex;align-items:center;gap:8px">
               ${WX.icon(m.icon, { size: 22, color: WX.col(m.accent) })}
               <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(m.label.toUpperCase())}</span>
@@ -190,7 +190,7 @@ function renderR1(data) {
         `).join("")}
       </div>
       <div style="display:flex;border-top:2px solid var(--wx-ink)">
-        <div style="flex:1;display:flex;align-items:center;gap:9px;padding:8px 16px;border-right:1px solid rgba(27,26,22,.16)">
+        <div style="flex:1;display:flex;align-items:center;gap:9px;padding:8px 16px;border-right:1px solid var(--c-line)">
           ${WX.icon("sunrise", { size: 18, color: WX.col("yellow") })}
           <span style="font-family:var(--wx-mono);font-size:13px;letter-spacing:.04em">SUNRISE</span>
           <span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:14px">${escapeHtml(data.sun?.rise || "")}</span>
@@ -219,11 +219,11 @@ function renderG2(data) {
           <span style="font-weight:700;font-size:18px;margin-top:4px">${escapeHtml((data.cond || "").toUpperCase())}</span>
           <div style="margin-top:6px">${hiLoFeels(data)}</div>
         </div>
-        <div style="width:42%;flex-shrink:0;background:${WX.col("blue")};color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
+        <div style="width:42%;flex-shrink:0;background:${WX.col("blue")};color:${WX.inkOn("blue")};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px">
           ${data.rainChance != null ? `
             <span style="font-family:var(--wx-mono);font-size:12px;font-weight:700">${Math.round(data.rainChance)}% RAIN</span>
           ` : ""}
-          ${WX.icon(data.icon || "cloud", { size: 92, color: "#fff" })}
+          ${WX.icon(data.icon || "cloud", { size: 92, color: WX.inkOn("blue") })}
         </div>
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
@@ -272,7 +272,7 @@ function renderS3(data) {
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;margin-top:12px">
         ${metrics.map((m, i) => `
-          <div style="border-top:1px solid rgba(27,26,22,.16);border-right:${(i % 4) < 3 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:10px 12px 0;display:flex;flex-direction:column;gap:4px">
+          <div style="border-top:1px solid var(--c-line);border-right:${(i % 4) < 3 ? "1px solid var(--c-line)" : "none"};padding:10px 12px 0;display:flex;flex-direction:column;gap:4px">
             <span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--wx-ink-60);display:flex;align-items:center;gap:6px">
               <span style="width:6px;height:6px;background:${WX.col(m.accent)};display:inline-block"></span>
               ${escapeHtml(m.label)}
@@ -314,7 +314,7 @@ function renderD4(data) {
           </div>
           ${sunHas ? `<div style="flex:1;display:flex;align-items:center;justify-content:center">${WX.sunArc({ rise: data.sun.riseMin, set: data.sun.setMin, now: data.sun.nowMin, color: WX.col("yellow"), width: 230, height: 120 })}</div>` : ""}
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;border-left:1px solid rgba(27,26,22,.18);padding-left:22px">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;border-left:1px solid var(--c-line);padding-left:22px">
           ${bars.map((m) => `
             <div>
               <div style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:12.5px;margin-bottom:5px">

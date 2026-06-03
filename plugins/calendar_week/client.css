@@ -18,7 +18,7 @@
   overflow: hidden;
   background: var(--c-bg);
 }
-.variant { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.variant { width: 100%; height: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
 .root.error {
   display: grid;
   place-items: center;

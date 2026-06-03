@@ -38,3 +38,5 @@ blog.md
 
 # MkDocs build output (published via GitHub Actions, never committed)
 /site/
+/screenshots/
+.claude/

@@ -46,7 +46,10 @@
   height: 100%;
   max-height: clamp(72px, 22cqh, 280px);
   display: block;
-  margin: 0 auto;
+  /* Center the SVG vertically in its grid row — the row can be taller
+     than ``max-height`` at md/lg sizes; without ``auto`` margins the SVG
+     anchors to the top and leaves a big white band beneath it. */
+  margin: auto;
 }
 .ss-arc-track {
   fill: none;

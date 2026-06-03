@@ -162,7 +162,7 @@ function renderR1(data) {
       </div>
       <div style="display:flex;border-top:2px solid var(--wx-ink)">
         ${rows.map((b, i) => `
-          <div style="flex:1;padding:11px 16px;border-right:${i < rows.length - 1 ? "1px solid rgba(27,26,22,.16)" : "none"};display:flex;flex-direction:column;gap:6px">
+          <div style="flex:1;padding:11px 16px;border-right:${i < rows.length - 1 ? "1px solid var(--c-line)" : "none"};display:flex;flex-direction:column;gap:6px">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <span style="display:flex;align-items:center;gap:8px;font-family:var(--wx-mono);font-size:11px;letter-spacing:.08em;color:var(--wx-ink-60)">
                 ${WX.icon(b.icon, { size: 14, color: WX.col(b.accent) })}
@@ -170,7 +170,7 @@ function renderR1(data) {
               </span>
               <span class="wx-tnum" style="font-family:var(--wx-black);font-size:20px">${escapeHtml(String(b.value))}</span>
             </div>
-            <div style="height:5px;background:rgba(27,26,22,.12)">
+            <div style="height:5px;background:var(--c-line)">
               <div style="width:${Number(b.level || 0).toFixed(1)}%;height:100%;background:${WX.col(b.accent)}"></div>
             </div>
           </div>
@@ -189,7 +189,7 @@ function renderG2(data) {
     ${styleBlock()}
     <div class="wx-art" style="font-family:var(--wx-geo);display:flex;flex-direction:column;background:var(--wx-ink);gap:4px">
       <div style="flex:1;display:flex;gap:4px">
-        <div style="flex:1;background:${WX.col("green")};color:#fff;padding:20px 24px;display:flex;flex-direction:column;justify-content:center">
+        <div style="flex:1;background:${WX.col("green")};color:${WX.inkOn("green")};padding:20px 24px;display:flex;flex-direction:column;justify-content:center">
           <span class="wx-tnum" style="font-family:var(--wx-black);font-size:68px;line-height:.8">${escapeHtml(data.level || "—")}</span>
           <span style="font-weight:700;font-size:17px;margin-top:8px">${escapeHtml((data.type || "Mixed").toUpperCase())}</span>
           <span style="font-family:var(--wx-mono);font-size:11px;opacity:.85;margin-top:6px">${escapeHtml(sourceText(data))}</span>
@@ -290,7 +290,7 @@ function renderD4(data) {
               </span>
               <div style="flex:1;display:flex;gap:4px">
                 ${Array.from({ length: segs }).map((_, k) => `
-                  <div style="flex:1;height:14px;background:${k < active ? WX.col(b.accent) : "rgba(27,26,22,.1)"}"></div>
+                  <div style="flex:1;height:14px;background:${k < active ? WX.col(b.accent) : "var(--c-line)"}"></div>
                 `).join("")}
               </div>
               <span style="width:96px;text-align:right;font-family:var(--wx-black);font-size:17px" class="wx-tnum">${escapeHtml(String(b.value))}<span style="font-family:var(--wx-mono);font-size:10px;color:var(--wx-ink-60);font-weight:400"> ${escapeHtml(SCALE[active])}</span></span>

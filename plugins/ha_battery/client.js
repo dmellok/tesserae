@@ -39,7 +39,22 @@ function batteryIcon(level) {
   return "battery-full";
 }
 
-// Status → accent token. Critical takes priority over low.
+// Status → CSS colour and matching text colour. Battery level is a
+// genuine status signal (warn / danger / ok), so we reach for the
+// semantic ``--c-*`` tokens directly instead of the decorative wx
+// accent ramp. ``ink`` is the readable text colour on top of the
+// fill — warn is bright enough that dark ink reads best; the others
+// take the paper colour. Critical takes priority over low.
+function statusFill(item) {
+  if (item.critical) return { bg: "var(--c-danger)", ink: "var(--c-bg)" };
+  if (item.low)      return { bg: "var(--c-warn)",   ink: "var(--c-text)" };
+  return                    { bg: "var(--c-ok)",     ink: "var(--c-bg)" };
+}
+// Back-compat shim: a couple of sites pass the legacy accent name into
+// WX helpers (icon colours, bar charts) that expect ``red`` / ``yellow``
+// / ``green``. Until those are converted to the semantic helpers
+// natively, keep emitting the legacy name so the icon stroke still
+// tracks the row's status.
 function statusAccent(item) {
   if (item.critical) return "red";
   if (item.low) return "yellow";
@@ -94,13 +109,13 @@ function renderR1(data) {
       ${WX.darkHeader({ title: data.label || "BATTERIES", accent: "green", right: headerRight })}
       <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
         ${items.length === 0 ? emptyState(data.label) : items.map((it, i) => {
-          const accent = statusAccent(it);
+          const fill = statusFill(it);
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;${i < items.length - 1 ? "border-bottom:1px solid rgba(27,26,22,.10);" : ""}">
-              ${WX.icon(batteryIcon(it.level), { size: 18, color: WX.col(accent) })}
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}">
+              ${WX.icon(batteryIcon(it.level), { size: 18, color: fill.bg })}
               <span style="flex:0 0 32%;min-width:0;font-family:var(--wx-grotesk);font-size:12.5px;font-weight:600;color:var(--wx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</span>
               <div style="flex:1;min-width:24px">
-                ${WX.barChart({ value: it.level, max: 100, color: WX.col(accent), height: 8 })}
+                ${WX.barChart({ value: it.level, max: 100, color: fill.bg, height: 8 })}
               </div>
               <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:44px;text-align:right">${escapeHtml(fmtPct(it.level))}</span>
             </div>
@@ -129,12 +144,12 @@ function renderG2(data) {
       ${items.length === 0 ? `<div style="flex:1;background:var(--wx-paper);display:flex">${emptyState(data.label)}</div>` : `
         <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);grid-auto-rows:1fr;gap:3px">
           ${items.map((it) => {
-            const accent = statusAccent(it);
+            const fill = statusFill(it);
             return `
-              <div style="background:${WX.col(accent)};color:${WX.inkOn(accent)};padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;min-width:0">
+              <div style="background:${fill.bg};color:${fill.ink};padding:10px 12px;display:flex;flex-direction:column;justify-content:space-between;min-width:0">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
                   <span style="font-family:var(--wx-mono);font-size:10.5px;font-weight:700;letter-spacing:.04em;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0">${escapeHtml(it.name)}</span>
-                  ${WX.icon(batteryIcon(it.level), { size: 16, color: WX.inkOn(accent) })}
+                  ${WX.icon(batteryIcon(it.level), { size: 16, color: fill.ink })}
                 </div>
                 <div>
                   <span class="wx-tnum" style="font-family:var(--wx-black);font-size:36px;line-height:.85;display:block">${escapeHtml(fmtPct(it.level))}</span>
@@ -168,10 +183,10 @@ function renderS3(data) {
       ${items.length === 0 ? emptyState(data.label) : `
         <div style="flex:1;display:flex;flex-direction:column">
           ${items.map((it, i) => {
-            const accent = statusAccent(it);
+            const fill = statusFill(it);
             return `
-              <div style="display:flex;align-items:baseline;gap:10px;padding:5px 0;${i < items.length - 1 ? "border-bottom:1px solid rgba(27,26,22,.10);" : ""}">
-                <span style="width:7px;height:7px;background:${WX.col(accent)};display:inline-block;flex-shrink:0;align-self:center"></span>
+              <div style="display:flex;align-items:baseline;gap:10px;padding:5px 0;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}">
+                <span style="width:7px;height:7px;background:${fill.bg};display:inline-block;flex-shrink:0;align-self:center"></span>
                 <span style="flex:1;min-width:0;font-size:12.5px;font-weight:400;color:var(--wx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</span>
                 <span style="font-size:10px;letter-spacing:.12em;color:var(--wx-ink-60);text-transform:uppercase">${escapeHtml(statusLabel(it))}</span>
                 <span class="wx-tnum" style="font-size:18px;font-weight:300;min-width:48px;text-align:right">${escapeHtml(fmtPct(it.level))}</span>
@@ -233,13 +248,13 @@ function renderD4(data) {
             }).join("")}
           </div>
         </div>
-        <div style="width:38%;max-width:200px;flex-shrink:0;border-left:1px solid rgba(27,26,22,.18);padding-left:14px;display:flex;flex-direction:column;gap:6px">
+        <div style="box-sizing:border-box;width:38%;max-width:200px;flex-shrink:0;border-left:1px solid var(--c-line);padding-left:14px;display:flex;flex-direction:column;gap:6px">
           <span style="font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.08em;color:var(--wx-ink-60)">LOWEST</span>
           ${lowest3.length === 0 ? `<span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">—</span>` : lowest3.map((it) => {
-            const accent = statusAccent(it);
+            const fill = statusFill(it);
             return `
               <div style="display:flex;align-items:center;gap:8px">
-                ${WX.icon(batteryIcon(it.level), { size: 16, color: WX.col(accent) })}
+                ${WX.icon(batteryIcon(it.level), { size: 16, color: fill.bg })}
                 <span style="flex:1;min-width:0;font-family:var(--wx-grotesk);font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</span>
                 <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px">${escapeHtml(fmtPct(it.level))}</span>
               </div>
@@ -265,7 +280,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

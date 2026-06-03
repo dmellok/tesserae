@@ -3,7 +3,7 @@
   "name": "Core themes",
   "version": "0.8.3",
   "kind": "theme",
-  "description": "Curated theme set in four families. Ten light + ten dark variants share the Ramen design DNA — warm undertones, dusty muted accents, papery flat surfaces (surface == bg). Five neon dark themes break the rules deliberately for synthwave/cyberpunk dashboards. Six monochrome themes drop colour entirely for greyscale or 1-bit panels — Kindle BYOS, native TRMNL hardware — so widgets read cleanly after the renderer quantises: Paper / Ash (light, flat) for sharp text, Newsprint / Halftone (warm, halftone-friendly) for printed-page texture, Carbon / Graphite (dark) for night-mode panels. Each theme picks three coherent decorative tokens — accent / accent2 / accent3 — that the widgets paint with for colour-blocked layouts. warn / danger / ok stay reserved for actual semantic states (errors, warnings, success badges) and never appear in regular UI. User themes save under data/plugins/themes_core/user.json.",
+  "description": "Curated theme set in four families. Ten light + ten dark variants share the Ramen design DNA \u2014 warm undertones, dusty muted accents, papery flat surfaces (surface == bg). Five neon dark themes break the rules deliberately for synthwave/cyberpunk dashboards. Six monochrome themes drop colour entirely for greyscale or 1-bit panels \u2014 Kindle BYOS, native TRMNL hardware \u2014 so widgets read cleanly after the renderer quantises: Paper / Ash (light, flat) for sharp text, Newsprint / Halftone (warm, halftone-friendly) for printed-page texture, Carbon / Graphite (dark) for night-mode panels. Each theme picks three coherent decorative tokens \u2014 accent / accent2 / accent3 \u2014 that the widgets paint with for colour-blocked layouts. warn / danger / ok stay reserved for actual semantic states (errors, warnings, success badges) and never appear in regular UI. User themes save under data/plugins/themes_core/user.json.",
   "supports": {
     "sizes": [
       "xs",
@@ -29,9 +29,10 @@
         "accent3": "#a0876c",
         "accentSoft": "#f1d6cf",
         "divider": "#dcd3ca",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#b45f52",
+        "warn": "#c4b076",
+        "ok": "#4aad53",
+        "info": "#5283b4"
       }
     },
     {
@@ -50,9 +51,10 @@
         "accent3": "#b89478",
         "accentSoft": "#f0d4dd",
         "divider": "#e0d2cf",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#b46f64",
+        "warn": "#c5b587",
+        "ok": "#5aaf61",
+        "info": "#648cb4"
       }
     },
     {
@@ -71,9 +73,10 @@
         "accent3": "#9c8156",
         "accentSoft": "#d0dbc8",
         "divider": "#d6d4c8",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#a85d51",
+        "warn": "#bba871",
+        "ok": "#4c9e53",
+        "info": "#517da8"
       }
     },
     {
@@ -92,9 +95,10 @@
         "accent3": "#6d8088",
         "accentSoft": "#f1d9b4",
         "divider": "#ddd0b6",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#9f574c",
+        "warn": "#b7a367",
+        "ok": "#47954d",
+        "info": "#4c769f"
       }
     },
     {
@@ -113,9 +117,10 @@
         "accent3": "#6f8088",
         "accentSoft": "#e0d2e3",
         "divider": "#d6cdd5",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#ac695e",
+        "warn": "#beae80",
+        "ok": "#55a65c",
+        "info": "#5e85ac"
       }
     },
     {
@@ -134,9 +139,10 @@
         "accent3": "#b08068",
         "accentSoft": "#d6dde3",
         "divider": "#d8d2c5",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#a45f55",
+        "warn": "#b8a774",
+        "ok": "#4f9a56",
+        "info": "#557ca4"
       }
     },
     {
@@ -155,9 +161,10 @@
         "accent3": "#a48055",
         "accentSoft": "#f2d5bf",
         "divider": "#e0cebb",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#a6584c",
+        "warn": "#bba76b",
+        "ok": "#489b4f",
+        "info": "#4c79a6"
       }
     },
     {
@@ -176,9 +183,10 @@
         "accent3": "#9d8060",
         "accentSoft": "#e6d4d7",
         "divider": "#d8d0c0",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#aa645a",
+        "warn": "#bbab7b",
+        "ok": "#53a15a",
+        "info": "#5a82aa"
       }
     },
     {
@@ -197,9 +205,10 @@
         "accent3": "#a98f6a",
         "accentSoft": "#c8d8d2",
         "divider": "#d0d4cd",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#a66055",
+        "warn": "#b8a876",
+        "ok": "#509b56",
+        "info": "#557da6"
       }
     },
     {
@@ -218,9 +227,10 @@
         "accent3": "#957055",
         "accentSoft": "#f1cdbc",
         "divider": "#dcc4b3",
-        "danger": "#dc2626",
-        "warn": "#facc15",
-        "ok": "#16a34a"
+        "danger": "#9d5b50",
+        "warn": "#b4a26d",
+        "ok": "#4b9351",
+        "info": "#50779d"
       }
     },
     {
@@ -239,14 +249,15 @@
         "accent3": "#b89878",
         "accentSoft": "#4a2a2c",
         "divider": "#3a322c",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#c4867c",
+        "warn": "#d4c79f",
+        "ok": "#72c078",
+        "info": "#7ca0c4"
       }
     },
     {
       "id": "sake",
-      "name": "Saké",
+      "name": "Sak\u00e9",
       "mode": "dark",
       "palette": {
         "bg": "#161210",
@@ -260,9 +271,10 @@
         "accent3": "#9a8a6e",
         "accentSoft": "#3d2a18",
         "divider": "#36302a",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#ba776c",
+        "warn": "#cabb8f",
+        "ok": "#62b569",
+        "info": "#6c93ba"
       }
     },
     {
@@ -281,9 +293,10 @@
         "accent3": "#8a9d8a",
         "accentSoft": "#1f3322",
         "divider": "#2a3328",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#bc857c",
+        "warn": "#cdc19e",
+        "ok": "#72b778",
+        "info": "#7c9cbc"
       }
     },
     {
@@ -302,9 +315,10 @@
         "accent3": "#7e8090",
         "accentSoft": "#38202c",
         "divider": "#36292f",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#ba827a",
+        "warn": "#ccc09b",
+        "ok": "#70b575",
+        "info": "#7a9aba"
       }
     },
     {
@@ -323,9 +337,10 @@
         "accent3": "#8a9978",
         "accentSoft": "#3d2a1c",
         "divider": "#3a2e26",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#bf8279",
+        "warn": "#d0c39b",
+        "ok": "#6fba75",
+        "info": "#799cbf"
       }
     },
     {
@@ -344,9 +359,10 @@
         "accent3": "#8da06b",
         "accentSoft": "#1f3138",
         "divider": "#2d343c",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#b98078",
+        "warn": "#cbbe99",
+        "ok": "#6db473",
+        "info": "#7898b9"
       }
     },
     {
@@ -365,9 +381,10 @@
         "accent3": "#9d9a8a",
         "accentSoft": "#3d2418",
         "divider": "#36302a",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#bb776d",
+        "warn": "#cbbc8f",
+        "ok": "#62b669",
+        "info": "#6d94bb"
       }
     },
     {
@@ -386,9 +403,10 @@
         "accent3": "#8a8a8a",
         "accentSoft": "#3d1f28",
         "divider": "#361e26",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#c29088",
+        "warn": "#d3c9aa",
+        "ok": "#7ebd83",
+        "info": "#88a5c2"
       }
     },
     {
@@ -407,9 +425,10 @@
         "accent3": "#7d9a8a",
         "accentSoft": "#1f1f2e",
         "divider": "#292932",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#c08c85",
+        "warn": "#d1c7a6",
+        "ok": "#7abb80",
+        "info": "#85a2c0"
       }
     },
     {
@@ -428,9 +447,10 @@
         "accent3": "#9c8a78",
         "accentSoft": "#3a281c",
         "divider": "#382d24",
-        "danger": "#f87171",
-        "warn": "#facc15",
-        "ok": "#4ade80"
+        "danger": "#b87f76",
+        "warn": "#cabd98",
+        "ok": "#6cb372",
+        "info": "#7697b8"
       }
     },
     {
@@ -452,9 +472,10 @@
         "accent3": "#c8ff00",
         "accentSoft": "#4d0a30",
         "divider": "#25253a",
-        "danger": "#ff4d4d",
-        "warn": "#ffdd00",
-        "ok": "#00ff8a"
+        "danger": "#df5e4a",
+        "warn": "#e7cb76",
+        "ok": "#3ddd4b",
+        "info": "#4a95df"
       }
     },
     {
@@ -476,9 +497,10 @@
         "accent3": "#ffd700",
         "accentSoft": "#3d0a2e",
         "divider": "#2a2245",
-        "danger": "#ff4d6d",
-        "warn": "#ffd700",
-        "ok": "#34ffba"
+        "danger": "#e16956",
+        "warn": "#e9cf81",
+        "ok": "#49df55",
+        "info": "#569ce1"
       }
     },
     {
@@ -500,9 +522,10 @@
         "accent3": "#00ffff",
         "accentSoft": "#3d3500",
         "divider": "#25252e",
-        "danger": "#ff4d4d",
-        "warn": "#ffeb1c",
-        "ok": "#00ff8a"
+        "danger": "#df5d4a",
+        "warn": "#e7ca75",
+        "ok": "#3ddd4a",
+        "info": "#4a94df"
       }
     },
     {
@@ -524,9 +547,10 @@
         "accent3": "#c080ff",
         "accentSoft": "#3d1a40",
         "divider": "#2a1d40",
-        "danger": "#ff5e9c",
-        "warn": "#ffd97f",
-        "ok": "#80ffd5"
+        "danger": "#ea9386",
+        "warn": "#f1e1b1",
+        "ok": "#79e782",
+        "info": "#86b8ea"
       }
     },
     {
@@ -548,9 +572,10 @@
         "accent3": "#00ff95",
         "accentSoft": "#003319",
         "divider": "#0a2a14",
-        "danger": "#ff4d4d",
-        "warn": "#ffeb1c",
-        "ok": "#00ff66"
+        "danger": "#dd513c",
+        "warn": "#e4c567",
+        "ok": "#2fda3d",
+        "info": "#3c8cdd"
       }
     },
     {
@@ -572,9 +597,10 @@
         "accent3": "#9a9a9a",
         "accentSoft": "#e6e6e6",
         "divider": "#d0d0d0",
-        "danger": "#0a0a0a",
-        "warn": "#5a5a5a",
-        "ok": "#2c2c2c"
+        "danger": "#8c7673",
+        "warn": "#989281",
+        "ok": "#677e69",
+        "info": "#67737e"
       }
     },
     {
@@ -596,9 +622,10 @@
         "accent3": "#707070",
         "accentSoft": "#252525",
         "divider": "#2e2e2e",
-        "danger": "#f5f5f5",
-        "warn": "#b0b0b0",
-        "ok": "#d0d0d0"
+        "danger": "#a3928f",
+        "warn": "#afaa9d",
+        "ok": "#819883",
+        "info": "#8f99a3"
       }
     },
     {
@@ -620,9 +647,10 @@
         "accent3": "#968a72",
         "accentSoft": "#e2dac3",
         "divider": "#b8af96",
-        "danger": "#1c1812",
-        "warn": "#5c5444",
-        "ok": "#423d32"
+        "danger": "#8d5249",
+        "warn": "#ac985d",
+        "ok": "#448349",
+        "info": "#496b8d"
       }
     },
     {
@@ -644,9 +672,10 @@
         "accent3": "#707058",
         "accentSoft": "#3a3225",
         "divider": "#3a3225",
-        "danger": "#f0e6d2",
-        "warn": "#b0a583",
-        "ok": "#c0b598"
+        "danger": "#c89891",
+        "warn": "#d9cfb3",
+        "ok": "#87c28c",
+        "info": "#91acc8"
       }
     },
     {
@@ -668,9 +697,10 @@
         "accent3": "#9a9a9a",
         "accentSoft": "#d4d4d4",
         "divider": "#c4c4c4",
-        "danger": "#1a1a1a",
-        "warn": "#5a5a5a",
-        "ok": "#2e2e2e"
+        "danger": "#8c7673",
+        "warn": "#989281",
+        "ok": "#677e69",
+        "info": "#67737e"
       }
     },
     {
@@ -692,9 +722,10 @@
         "accent3": "#6e6e6e",
         "accentSoft": "#2c2c2c",
         "divider": "#383838",
-        "danger": "#e8e8e8",
-        "warn": "#9a9a9a",
-        "ok": "#b0b0b0"
+        "danger": "#a3928f",
+        "warn": "#afaa9d",
+        "ok": "#819883",
+        "info": "#8f99a3"
       }
     }
   ]

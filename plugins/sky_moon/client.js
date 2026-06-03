@@ -202,12 +202,12 @@ function renderR1(data) {
     ${styleBlock()}
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
       ${WX.darkHeader({ title: (data.place || data.label || "—") + " · SUN & MOON", accent: "yellow", right: data.time || nowTime() })}
-      <div style="flex:1;display:flex;align-items:center;padding:14px 24px;gap:20px">
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px">
-          ${sunHas(data) ? sunArc(data, WX.col("yellow"), 320, 130) : ""}
+      <div style="flex:1;display:flex;align-items:center;padding:14px 24px;gap:20px;min-height:0">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px">
+          ${sunHas(data) ? sunArc(data, WX.col("yellow"), 320, 130).replace("<svg ", '<svg style="max-width:100%;height:auto" ') : ""}
           <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">DAY LENGTH ${escapeHtml(sun.dayLength || "—")} · NOON ${escapeHtml(sun.solarNoon || "—")}</span>
         </div>
-        <div style="width:220px;flex-shrink:0;display:flex;align-items:center;gap:14px;border-left:1px solid rgba(27,26,22,.18);padding-left:22px">
+        <div style="box-sizing:border-box;width:220px;flex-shrink:0;display:flex;align-items:center;gap:14px;border-left:1px solid var(--c-line);padding-left:22px">
           ${moonDiscSvg({ size: 92, illum: moon.illum })}
           <div>
             <div style="font-weight:800;font-size:16px;line-height:1.1">${escapeHtml(moon.phase || "—")}</div>
@@ -218,7 +218,7 @@ function renderR1(data) {
       </div>
       <div style="display:flex;border-top:2px solid var(--wx-ink)">
         ${cells.map(([ic, l, v, a], i) => `
-          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:11px 16px;border-right:${i < 3 ? "1px solid rgba(27,26,22,.16)" : "none"}">
+          <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:11px 16px;border-right:${i < 3 ? "1px solid var(--c-line)" : "none"}">
             <span style="display:flex;align-items:center;gap:7px;font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.08em;color:var(--wx-ink-60)">
               ${WX.icon(ic, { size: 14, color: WX.col(a) })}${escapeHtml(l)}
             </span>
@@ -260,10 +260,10 @@ function renderG2(data) {
           </div>
           <span class="wx-tnum" style="font-family:var(--wx-black);font-size:46px;line-height:.85">${escapeHtml(sun.set || "—")}</span>
         </div>
-        <div style="width:38%;flex-shrink:0;background:${WX.col("blue")};color:#fff;padding:16px 22px;display:flex;flex-direction:column;justify-content:space-between">
+        <div style="width:38%;flex-shrink:0;background:${WX.col("blue")};color:${WX.inkOn("blue")};padding:16px 22px;display:flex;flex-direction:column;justify-content:space-between">
           <span style="font-family:var(--wx-mono);font-size:11px;font-weight:700">${escapeHtml((moon.phase || "MOON").toUpperCase())}</span>
           <div style="display:flex;align-items:center;gap:14px">
-            ${moonDiscSvg({ size: 72, illum: moon.illum, rim: "#fff" })}
+            ${moonDiscSvg({ size: 72, illum: moon.illum, rim: WX.inkOn("blue") })}
             <span class="wx-tnum" style="font-family:var(--wx-black);font-size:40px;line-height:.85">${moon.illum ?? "—"}<span style="font-size:16px">%</span></span>
           </div>
         </div>
@@ -301,7 +301,7 @@ function renderS3(data) {
       <div style="height:2px;background:var(--wx-ink);margin:12px 0"></div>
       <div style="flex:1;display:flex;align-items:center;gap:24px">
         <div style="flex:1;display:flex;justify-content:center">${sunHas(data) ? sunArc(data, "var(--wx-ink)", 380, 140) : ""}</div>
-        <div style="display:flex;align-items:center;gap:14px;border-left:1px solid rgba(27,26,22,.18);padding-left:22px">
+        <div style="display:flex;align-items:center;gap:14px;border-left:1px solid var(--c-line);padding-left:22px">
           ${moonDiscSvg({ size: 84, illum: moon.illum })}
           <div>
             <div style="font-size:15px;font-weight:500">${escapeHtml(moon.phase || "—")}</div>
@@ -340,9 +340,9 @@ function renderD4(data) {
         <span style="font-family:var(--wx-black);font-size:17px;letter-spacing:.03em">SUN &amp; MOON · ${escapeHtml((data.place || data.label || "").toUpperCase())}</span>
         <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">${escapeHtml(data.time || nowTime())}</span>
       </div>
-      <div style="display:flex;gap:24px;flex:1">
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
-          ${sunHas(data) ? `<div style="display:flex;justify-content:center">${sunArc(data, WX.col("yellow"), 420, 150)}</div>` : ""}
+      <div style="display:flex;gap:24px;flex:1;min-height:0">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center">
+          ${sunHas(data) ? `<div style="display:flex;justify-content:center;max-width:100%;overflow:hidden">${sunArc(data, WX.col("yellow"), 420, 150).replace("<svg ", '<svg style="max-width:100%;height:auto" ')}</div>` : ""}
           <div style="display:flex;justify-content:space-around;margin-top:6px">
             ${stats.map(([ic, l, v]) => `
               <div style="display:flex;flex-direction:column;align-items:center;gap:3px">
@@ -353,7 +353,7 @@ function renderD4(data) {
             `).join("")}
           </div>
         </div>
-        <div style="width:230px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-left:1px solid rgba(27,26,22,.18);padding-left:22px">
+        <div style="box-sizing:border-box;width:230px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-left:1px solid var(--c-line);padding-left:22px">
           ${moonDiscSvg({ size: 120, illum: moon.illum })}
           <span style="font-family:var(--wx-black);font-size:17px">${escapeHtml(moon.phase || "—")}</span>
           <div style="display:flex;gap:14px;font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">

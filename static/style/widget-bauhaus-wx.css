@@ -27,19 +27,33 @@
   --wx-ink-60:   #6b675c;
   --wx-hair:     #1b1a16;
 
-  /* --- Spectra 6 chromatics (desaturated, e-ink-validated) --- */
-  --wx-red:      #b23a2e;
+  /* --- Spectra 6 chromatics ---
+   *
+   * The four wx hues are decorative palette slots — widgets pick them
+   * to colour-block tiles, NOT to convey status meaning. Each one
+   * flows through the cell's categorical accent ramp so themes retint
+   * every decorative wx surface; widgets that actually need to convey
+   * "this is alarming" / "this is fine" reach for ``--c-danger`` /
+   * ``--c-warn`` / ``--c-ok`` / ``--c-info`` directly instead.
+   *
+   * Yellow stays at the Spectra hex — only three accents in the
+   * theme palette and yellow rarely matches a theme's accent ramp
+   * cleanly, so we keep it pinned for visual distinction. Tints
+   * (`-t`) derive via color-mix so they follow the source accent
+   * rather than freezing on the static Spectra value.
+   */
+  --wx-red:      var(--c-accent,  #b23a2e);
   --wx-red-fg:   #ffffff;
-  --wx-red-t:    #e8cbc4;
-  --wx-blue:     #2f5d8a;
+  --wx-red-t:    color-mix(in oklab, var(--c-accent,  #b23a2e) 22%, var(--wx-paper));
+  --wx-blue:     var(--c-data-2,  #2f5d8a);
   --wx-blue-fg:  #ffffff;
-  --wx-blue-t:   #c8d6e3;
+  --wx-blue-t:   color-mix(in oklab, var(--c-data-2,  #2f5d8a) 22%, var(--wx-paper));
   --wx-yellow:   #d8a82a;
   --wx-yellow-fg:#1b1a16;
   --wx-yellow-t: #efdfb0;
-  --wx-green:    #45744c;
+  --wx-green:    var(--c-data-3,  #45744c);
   --wx-green-fg: #ffffff;
-  --wx-green-t:  #cddccd;
+  --wx-green-t:  color-mix(in oklab, var(--c-data-3,  #45744c) 22%, var(--wx-paper));
 
   /* --- type stack ---
    * The named font families are loaded by the fonts_core plugin. If a
@@ -63,6 +77,11 @@
   position: relative;
   font-family: var(--wx-grotesk);
   -webkit-font-smoothing: antialiased;
+  /* Variants set their own padding inline (``padding:14px 18px`` etc).
+     Without border-box that padding adds to the 100% width and the
+     artboard overflows the cell — anything pinned to the right edge
+     (data view sidebars, sparkline charts) gets clipped. */
+  box-sizing: border-box;
 }
 
 /* Tabular figures wherever numbers matter — keeps stat blocks aligned. */

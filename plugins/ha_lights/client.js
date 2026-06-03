@@ -89,7 +89,7 @@ function renderR1(data) {
         accent: "yellow",
         right: `${data.on_count || 0}/${data.total || 0} ON · ${data.time || nowTime()}`,
       })}
-      <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:1px;background:rgba(27,26,22,.16);border-top:2px solid var(--wx-ink)">
+      <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:1px;background:var(--c-line);border-top:2px solid var(--wx-ink)">
         ${lights.map((l) => `
           <div style="background:var(--wx-paper);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0">
             <div style="display:flex;align-items:center;gap:8px;min-width:0">
@@ -99,7 +99,7 @@ function renderR1(data) {
             <div>
               ${l.on
                 ? `<span style="display:inline-block;background:${WX.col("yellow")};color:${WX.inkOn("yellow")};font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">ON · <span class="wx-tnum">${escapeHtml(pct(l.brightness_pct))}</span></span>`
-                : `<span style="display:inline-block;background:rgba(27,26,22,.08);color:var(--wx-ink-60);font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">${l.missing ? "MISSING" : "OFF"}</span>`}
+                : `<span style="display:inline-block;background:var(--c-line);color:var(--wx-ink-60);font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">${l.missing ? "MISSING" : "OFF"}</span>`}
             </div>
           </div>
         `).join("")}
@@ -167,7 +167,7 @@ function renderS3(data) {
       <div style="flex:1;display:flex;flex-direction:column;gap:10px;overflow:hidden">
         ${lights.map((l) => `
           <div style="display:flex;align-items:baseline;gap:12px">
-            <span style="width:8px;height:8px;border-radius:50%;background:${l.on ? WX.col("yellow") : "rgba(27,26,22,.18)"};flex-shrink:0;align-self:center"></span>
+            <span style="width:8px;height:8px;border-radius:50%;background:${l.on ? WX.col("yellow") : "var(--c-line)"};flex-shrink:0;align-self:center"></span>
             <span style="font-size:14px;font-weight:400;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${l.on ? "" : "color:var(--wx-ink-60)"}">${escapeHtml(l.name || l.entity_id)}</span>
             <span class="wx-tnum" style="font-size:18px;font-weight:300;${l.on ? "" : "color:var(--wx-ink-60)"}">${l.on ? escapeHtml(pct(l.brightness_pct)) : (l.missing ? "—" : "off")}</span>
           </div>
@@ -235,7 +235,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

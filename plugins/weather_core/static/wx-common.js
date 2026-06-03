@@ -110,11 +110,14 @@ function icon(name, { size = 18, color = "var(--wx-ink)", weight = "bold" } = {}
 }
 
 function darkHeader({ title, accent = "blue", right = "" }) {
+  // ``right`` is treated as HTML so callers can drop in an icon
+  // followed by a time/label (e.g. ``WX.icon("play") · PLAYING``).
+  // Title remains escaped since it's the variable user-supplied piece.
   return `
     <div class="wx-header-dark">
       <span class="wx-header-chip" style="background:${col(accent)}"></span>
       <span class="wx-header-title">${escapeHtml(title || "").toUpperCase()}</span>
-      ${right ? `<span class="wx-header-meta">${escapeHtml(right)}</span>` : ""}
+      ${right ? `<span class="wx-header-meta">${right}</span>` : ""}
     </div>
   `;
 }

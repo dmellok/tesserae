@@ -177,6 +177,8 @@ def _parallel_fetch_plugin_data(
     panel_w: int,
     panel_h: int,
     preview: bool,
+    *,
+    sample: bool = False,
 ) -> dict[int, Any]:
     """Run each cell's ``server.py`` fetch() in a worker thread.
 
@@ -190,10 +192,22 @@ def _parallel_fetch_plugin_data(
     import concurrent.futures
 
     indexed: list[tuple[int, str, dict[str, Any]]] = []
+    sample_results: dict[int, Any] = {}
     for idx, meta in enumerate(cells_meta):
         plugin_id = meta["plugin_id"]
         if not plugin_id:
             continue
+        # Sample mode (dev gallery): short-circuit fetch with a hand-
+        # written fixture so widgets that need backends (HA, Spotify)
+        # still render in /_test/widgets. Widgets without a sample
+        # fall through to their real fetch.
+        if sample:
+            from app.widget_samples import get_sample
+
+            sample_data = get_sample(plugin_id)
+            if sample_data is not None:
+                sample_results[idx] = sample_data
+                continue
         plugin = _registry().get(plugin_id)
         if plugin is None or plugin.server_module is None:
             continue
@@ -202,7 +216,7 @@ def _parallel_fetch_plugin_data(
         indexed.append((idx, plugin_id, meta["resolved_options"]))
 
     if not indexed:
-        return {}
+        return sample_results
 
     # Capture the live Flask app object so worker threads can push
     # ``app.app_context()`` themselves — ``current_app`` is a thread-
@@ -277,6 +291,7 @@ def _parallel_fetch_plugin_data(
         if fallback is not None:
             logger.info("widget hydration fallback to last-good for cell #%d (%s)", idx, plugin_id)
             results[idx] = fallback
+    results.update(sample_results)
     return results
 
 
@@ -317,7 +332,9 @@ def _fetch_plugin_data(
         return {"error": f"{type(err).__name__}: {err}"}
 
 
-def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[str, Any]:
+def _hydrate_page(
+    page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False
+) -> dict[str, Any]:
     """Resolve options, themes, fonts, server-side data, and visual layout."""
     registry = _registry()
     page_palette = _resolve_palette(page_dict.get("theme"), registry)
@@ -398,7 +415,7 @@ def _hydrate_page(page_dict: dict[str, Any], *, preview: bool = False) -> dict[s
     # app context the caller holds so each fetch can still read
     # SETTINGS_STORE / plugin registry from current_app.
     data_by_cell_index: dict[int, Any] = _parallel_fetch_plugin_data(
-        cells_meta, panel_w, panel_h, preview
+        cells_meta, panel_w, panel_h, preview, sample=sample
     )
 
     cells_out: list[dict[str, Any]] = []
@@ -502,6 +519,25 @@ def test_render() -> str:
     if theme_id not in theme_registry.themes:
         theme_id = "default"
 
+    sample_mode = request.args.get("sample") == "1"
+
+    # Direction picker on the gallery passes ?variant=<key> so the
+    # reviewer can flip between a widget's visual variants without
+    # opening the editor. Empty / missing ⇒ widget's own default.
+    test_options: dict[str, Any] = {}
+    variant = (request.args.get("variant") or "").strip()
+    if variant:
+        test_options["variant"] = variant
+
+    # Per-widget content zoom from the gallery's zoom picker. Same
+    # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
+    # values silently fall back to 1.0.
+    try:
+        zoom_val = float(request.args.get("zoom") or "1")
+    except ValueError:
+        zoom_val = 1.0
+    zoom_val = max(0.5, min(3.0, zoom_val))
+
     cell_w, cell_h = SIZE_DIMENSIONS[size]
     page = {
         "id": "_test",
@@ -517,13 +553,20 @@ def test_render() -> str:
                 "w": cell_w,
                 "h": cell_h,
                 "plugin": plugin_id,
-                "options": {},
+                "options": test_options,
+                # Pydantic Cell defaults to 1.0; this scaffolded page
+                # skips the model entirely, so we have to seed the
+                # field explicitly. Without it the template renders
+                # ``--c-zoom: None`` and ``calc(100% / None)`` makes
+                # the cell-content shrink-to-fit, squashing every
+                # widget into a narrow strip on the left of the iframe.
+                "zoom": zoom_val,
             }
         ],
     }
     return render_template(
         "compose.html",
-        page=_hydrate_page(page, preview=True),
+        page=_hydrate_page(page, preview=True, sample=sample_mode),
         for_push=False,
         preview_mode=False,
     )
@@ -545,6 +588,20 @@ def test_widget_gallery() -> str:
     for plugin in widgets:
         supported = plugin.manifest.get("supports", {}).get("sizes") or ["md"]
         sizes = [s for s in ("xs", "sm", "md", "lg") if s in supported]
+        # Direction picker — many widgets ship 4-6 visual variants under
+        # a ``variant`` cell_option. Surfacing the choices in the gallery
+        # lets the reviewer flip between them without opening the editor.
+        variants: list[dict[str, str]] = []
+        variant_default = ""
+        for opt in plugin.manifest.get("cell_options") or []:
+            if opt.get("name") == "variant" and opt.get("type") == "select":
+                variants = [
+                    {"value": str(c.get("value", "")), "label": str(c.get("label", ""))}
+                    for c in (opt.get("choices") or [])
+                    if c.get("value") is not None
+                ]
+                variant_default = str(opt.get("default") or "")
+                break
         rows.append(
             {
                 "id": plugin.id,
@@ -553,6 +610,8 @@ def test_widget_gallery() -> str:
                 "icon": plugin.manifest.get("icon"),
                 "version": plugin.manifest.get("version") or "",
                 "sizes": sizes,
+                "variants": variants,
+                "variant_default": variant_default,
             }
         )
     # Theme picker lets a reviewer scan every widget against any

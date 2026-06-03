@@ -87,7 +87,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       .orient-toggle button { padding: 5px 10px; font-size: 11px; }
     }
 
-    /* --- left rail with jump-to nav --- */
+    /* --- left rail with widget select + jump-to nav --- */
     .toc {
       position: sticky;
       top: 0;
@@ -104,7 +104,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--fgSoft);
-      margin: 0 0 12px;
+      margin: 0 0 8px;
     }
     .toc-count {
       display: inline-block;
@@ -115,6 +115,34 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       color: var(--accent);
       margin-left: 6px;
     }
+    .toc-loaded {
+      display: inline-block;
+      font: 600 11px/1 ui-monospace, monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--panel2);
+      color: var(--accent2);
+      margin-left: 4px;
+    }
+    /* Bulk-action row above the checkbox list. */
+    .toc-bulk {
+      display: flex;
+      gap: 6px;
+      margin: 0 0 10px;
+    }
+    .toc-bulk button {
+      flex: 1;
+      padding: 6px 8px;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .toc-bulk button:hover { background: var(--border); }
     .toc-list {
       list-style: none;
       margin: 0;
@@ -122,22 +150,40 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       display: grid;
       gap: 1px;
     }
-    .toc-list a {
-      display: block;
+    .toc-list li { display: block; }
+    /* Whole row clickable: label spans the row, the checkbox tucks
+       left, the reviewed-dot sits between checkbox and name. */
+    .toc-list label {
+      display: grid;
+      grid-template-columns: 16px 8px 1fr auto;
+      align-items: center;
+      gap: 8px;
       padding: 6px 8px;
       border-radius: 4px;
-      color: var(--fg);
+      cursor: pointer;
       font-size: 13px;
+      color: var(--fg);
+    }
+    .toc-list label:hover { background: var(--panel2); }
+    .toc-list label.is-loaded { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+    .toc-list input[type="checkbox"] {
+      margin: 0;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .toc-list .toc-name {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .toc-list a:hover { background: var(--panel2); text-decoration: none; }
-    .toc-list .toc-id {
-      font: 500 11px/1 ui-monospace, monospace;
+    .toc-list .toc-jump {
+      font: 600 11px/1 ui-monospace, monospace;
       color: var(--fgSoft);
-      margin-left: 6px;
+      text-decoration: none;
+      padding: 2px 4px;
+      border-radius: 3px;
     }
+    .toc-list .toc-jump:hover { color: var(--accent); background: var(--panel); }
 
     /* --- main column --- */
     .main { padding: 24px 32px 64px; }
@@ -270,6 +316,43 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       margin-bottom: 24px;
       scroll-margin-top: 16px;
     }
+    /* Hidden until the sidebar checkbox is ticked. JS toggles .is-loaded
+       and sets each iframe's src so we only fetch widgets the reviewer
+       actually wants to look at. */
+    .widget[hidden] { display: none; }
+    /* Empty-state hint when nothing's selected — keeps the main column
+       from looking broken on first visit. */
+    .gallery-empty {
+      padding: 48px 24px;
+      text-align: center;
+      background: var(--panel);
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      color: var(--fgSoft);
+      font-size: 14px;
+    }
+    .gallery-empty[hidden] { display: none; }
+    .gallery-empty strong { color: var(--fg); }
+    .sample-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--panel2);
+      color: var(--fgSoft);
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .sample-badge.is-on {
+      color: var(--bg);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .sample-badge .ph { font-size: 13px; }
     .widget-head {
       display: flex;
       align-items: baseline;
@@ -281,6 +364,88 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       font-size: 18px;
       font-weight: 700;
       margin: 0;
+    }
+    /* Right-aligned cluster on the widget head: zoom, direction,
+       reviewed toggle. Same visual language as the global theme
+       picker (rounded pill, mono caps) so the gallery's "viewing
+       controls" all read as a family. */
+    .widget-controls {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .widget-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      color: var(--fgSoft);
+    }
+    .widget-pill .ph { font-size: 13px; }
+    .widget-pill select {
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      border: 0;
+      padding: 2px 16px 2px 0;
+      color: var(--fg);
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position: calc(100% - 8px) center, calc(100% - 4px) center;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    /* Reviewed toggle — a pill button that turns green when on. The
+       card itself picks up a matching green outline via .is-reviewed
+       so the reviewer can see at-a-glance which widgets they've
+       already gone through. */
+    .widget-review {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      color: var(--fgSoft);
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .widget-review:hover { background: var(--border); }
+    .widget-review.is-on {
+      color: #062a1e;
+      background: #4ec9b0;
+      border-color: #4ec9b0;
+    }
+    .widget-review .ph { font-size: 13px; }
+    /* Green ring around the whole card when reviewed. Inset so it
+       doesn't add to layout dims. */
+    .widget.is-reviewed {
+      border-color: #4ec9b0;
+      box-shadow: inset 0 0 0 1px #4ec9b0;
+    }
+    /* Sidebar reviewed indicator — green dot beside the widget name
+       on its TOC row, so a sidebar scan shows progress without
+       expanding the card. */
+    .toc-list .toc-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: transparent;
+      flex-shrink: 0;
+    }
+    .toc-list label.is-reviewed .toc-dot {
+      background: #4ec9b0;
     }
     .widget-head .icon {
       color: var(--accent);
@@ -371,14 +536,28 @@ Not linked from the main nav — visit /_test/widgets directly. #}
 <body>
 <div class="shell">
 
-  {# ---- Left rail: jump-to nav ---- #}
-  <nav class="toc" aria-label="Widget jump list">
-    <h1>Widgets <span class="toc-count">{{ widgets | length }}</span></h1>
-    <ul class="toc-list">
+  {# ---- Left rail: per-widget checkboxes drive lazy load ---- #}
+  <nav class="toc" aria-label="Widget selector">
+    <h1>
+      Widgets
+      <span class="toc-count" title="Total widgets">{{ widgets | length }}</span>
+      <span class="toc-loaded" data-loaded-count title="Currently loaded">0</span>
+    </h1>
+    <div class="toc-bulk">
+      <button type="button" data-bulk="all">All</button>
+      <button type="button" data-bulk="none">None</button>
+      <button type="button" data-bulk="invert">Invert</button>
+    </div>
+    <ul class="toc-list" data-widget-list>
       {% for w in widgets %}
-      <li><a href="#w-{{ w.id }}">
-        {{ w.name }}<span class="toc-id">{{ w.id }}</span>
-      </a></li>
+      <li>
+        <label data-toc-row data-widget-id="{{ w.id }}">
+          <input type="checkbox" data-widget-toggle value="{{ w.id }}">
+          <span class="toc-dot" aria-hidden="true"></span>
+          <span class="toc-name">{{ w.name }}</span>
+          <a class="toc-jump" href="#w-{{ w.id }}" title="Jump to {{ w.id }}">{{ w.id }}</a>
+        </label>
+      </li>
       {% endfor %}
     </ul>
   </nav>
@@ -391,6 +570,15 @@ Not linked from the main nav — visit /_test/widgets directly. #}
         <p>Every loaded widget at every supported render size. Iframed via <code>/_test/render</code>; what you see here is what the composer paints into a cell.</p>
       </div>
       <div class="gallery-controls">
+        {# Sample-data toggle: when on, every iframe loads ?sample=1 so
+           widgets with hand-written fixtures (HA, Spotify) render
+           with dummy data instead of error-stating. Persisted to
+           localStorage and on by default for the gallery's purpose. #}
+        <button type="button" class="sample-badge is-on" data-sample-toggle aria-pressed="true"
+                title="Toggle sample / live data">
+          <i class="ph ph-database" aria-hidden="true"></i>
+          <span data-sample-label>Sample data</span>
+        </button>
         {% if themes %}
         {# Theme picker — passes ?theme=<id> through to /_test/render so
            every iframe in the gallery re-renders against the chosen
@@ -437,13 +625,56 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       {% endfor %}
     </dl>
 
+    {# Empty state — visible until at least one widget is ticked. #}
+    <div class="gallery-empty" data-gallery-empty>
+      <p><strong>Pick widgets to load from the sidebar.</strong></p>
+      <p>Nothing is fetched until you tick a box — keeps the page snappy when you only care about one or two widgets.</p>
+    </div>
+
     {% for w in widgets %}
-    <section class="widget" id="w-{{ w.id }}">
+    <section class="widget" id="w-{{ w.id }}" data-widget-card data-widget-id="{{ w.id }}" hidden>
       <div class="widget-head">
         {% if w.icon %}<i class="ph ph-{{ w.icon.removeprefix('ph-') }} icon" aria-hidden="true"></i>{% endif %}
         <h2>{{ w.name }}</h2>
         <span class="widget-id">{{ w.id }}</span>
         {% if w.version %}<span class="widget-version">v{{ w.version }}</span>{% endif %}
+        <div class="widget-controls">
+          {# Per-widget zoom — same 0.5–3.0 clamp the Cell model enforces.
+             Server reads ?zoom=N and stuffs it into cell.zoom so the
+             cell-content scales without re-rendering at a different size. #}
+          <label class="widget-pill" title="Content zoom">
+            <i class="ph ph-magnifying-glass-plus" aria-hidden="true"></i>
+            <span class="visually-hidden">Zoom</span>
+            <select data-widget-zoom data-widget-id="{{ w.id }}">
+              <option value="0.5">50%</option>
+              <option value="0.75">75%</option>
+              <option value="1" selected>100%</option>
+              <option value="1.25">125%</option>
+              <option value="1.5">150%</option>
+              <option value="2">200%</option>
+              <option value="3">300%</option>
+            </select>
+          </label>
+          {% if w.variants %}
+          <label class="widget-pill" title="Direction">
+            <i class="ph ph-shapes" aria-hidden="true"></i>
+            <span class="visually-hidden">Direction</span>
+            <select data-widget-variant data-widget-id="{{ w.id }}">
+              {% for v in w.variants %}
+              <option value="{{ v.value }}"{% if v.value == w.variant_default %} selected{% endif %}>{{ v.label }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          {% endif %}
+          {# Reviewed toggle — flips the card + sidebar to green so the
+             reviewer can mark widgets as triaged. Persisted across
+             reloads so progress survives a refresh. #}
+          <button type="button" class="widget-review" data-widget-review data-widget-id="{{ w.id }}"
+                  aria-pressed="false" title="Mark as reviewed">
+            <i class="ph ph-check" aria-hidden="true"></i>
+            <span data-review-label>Mark reviewed</span>
+          </button>
+        </div>
       </div>
       {% if w.description %}
       <p class="widget-desc">{{ w.description }}</p>
@@ -457,14 +688,19 @@ Not linked from the main nav — visit /_test/widgets directly. #}
               <span class="widget-size-tag">{{ size }}</span>
               <span data-dim-label>{{ dims[0] }} × {{ dims[1] }}</span>
               <a class="open-link"
-                 href="{{ url_for('composer.test_render', plugin=w.id, size=size) }}"
+                 href="{{ url_for('composer.test_render', plugin=w.id, size=size) }}?sample=1"
+                 data-open-link
+                 data-base-href="{{ url_for('composer.test_render', plugin=w.id, size=size) }}"
                  target="_blank"
                  rel="noopener"
                  title="Open in new tab">↗</a>
             </div>
             <div class="widget-frame" data-frame style="--tw: {{ dims[0] }}; --th: {{ dims[1] }}; --s: 1;">
+              {# src is intentionally empty — JS sets it from data-base-src
+                 only when the widget's sidebar checkbox is ticked, so
+                 the gallery doesn't fire 100+ fetches on first paint. #}
               <iframe
-                  src="{{ url_for('composer.test_render', plugin=w.id, size=size) }}"
+                  data-base-src="{{ url_for('composer.test_render', plugin=w.id, size=size) }}"
                   loading="lazy"
                   sandbox="allow-scripts allow-same-origin"
                   title="{{ w.name }} at {{ size }}">
@@ -479,20 +715,54 @@ Not linked from the main nav — visit /_test/widgets directly. #}
 </div>
 
 <script>
-  // Orientation toggle — swap width/height on every widget iframe in
-  // place, then reload the iframe so the widget's CSS (and any
-  // dimension-aware mount JS) re-runs against the new aspect.
-  // Choice is persisted in localStorage so revisiting the gallery
-  // remembers it.
+  // Single source of truth for what's selected, what orientation,
+  // what theme, sample-mode on/off. Every UI control mutates this
+  // object and then calls applyAll() — a single function that walks
+  // each widget card and reconciles its iframe state. This is much
+  // easier to reason about than the previous "each control reaches
+  // into every iframe" pattern, and it makes lazy loading natural:
+  // unselected widgets just never get a src set.
   (function () {
-    const STORAGE_KEY = "tesserae:gallery-orientation";
-    const toggle = document.querySelector(".orient-toggle");
-    if (!toggle) return;
+    const ORIENT_KEY   = "tesserae:gallery-orientation";
+    const THEME_KEY    = "tesserae:gallery-theme";
+    const SELECT_KEY   = "tesserae:gallery-selected";
+    const SAMPLE_KEY   = "tesserae:gallery-sample";
+    const VARIANT_KEY  = "tesserae:gallery-variants";
+    const ZOOM_KEY     = "tesserae:gallery-zooms";
+    const REVIEWED_KEY = "tesserae:gallery-reviewed";
 
-    // Target on-screen frame width — anything wider is scaled down
-     // via CSS transform so the iframe's painted output fits the
-     // gallery column without horizontal scroll. Read once from CSS
-     // so the design system controls the value.
+    const state = {
+      orient: "landscape",
+      theme:  null,
+      sample: true,
+      selected: new Set(),
+      // Per-widget variant selection. {widget_id: variant_value}.
+      // Seeded from each <select>'s default on init; persists to
+      // localStorage so revisits remember the picked direction.
+      variants: {},
+      // Per-widget content zoom. {widget_id: "1" | "1.5" | …}.
+      zooms: {},
+      // Widgets the user has marked as reviewed — green-outlined card
+      // + green sidebar dot. Persists across reloads.
+      reviewed: new Set(),
+    };
+
+    // -------- DOM lookups (cached at init) --------
+    const toggle         = document.querySelector(".orient-toggle");
+    const themePicker    = document.querySelector("[data-theme-picker]");
+    const sampleBtn      = document.querySelector("[data-sample-toggle]");
+    const sampleLabel    = document.querySelector("[data-sample-label]");
+    const emptyState     = document.querySelector("[data-gallery-empty]");
+    const loadedCount    = document.querySelector("[data-loaded-count]");
+    const checkboxes     = Array.from(document.querySelectorAll("[data-widget-toggle]"));
+    const tocRows        = Array.from(document.querySelectorAll("[data-toc-row]"));
+    const widgetCards    = Array.from(document.querySelectorAll("[data-widget-card]"));
+    const variantPickers = Array.from(document.querySelectorAll("[data-widget-variant]"));
+    const zoomPickers    = Array.from(document.querySelectorAll("[data-widget-zoom]"));
+    const reviewBtns     = Array.from(document.querySelectorAll("[data-widget-review]"));
+
+    // Read the gallery's target tile width from CSS so the design
+    // system stays in charge of the scale ceiling.
     function targetWidth() {
       const sizes = document.querySelector(".widget-sizes");
       if (!sizes) return 320;
@@ -500,100 +770,336 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       return parseFloat(raw) || 320;
     }
 
-    function apply(orient) {
-      const portrait = orient === "portrait";
-      const tw = targetWidth();
-      // Pill button states.
-      toggle.querySelectorAll("button").forEach((b) => {
-        const active = (b.dataset.orient === orient);
-        b.classList.toggle("is-active", active);
-        b.setAttribute("aria-pressed", active ? "true" : "false");
-      });
-      // Size key — swap the dimension labels.
+    // Build the iframe URL for a tile given the current state. We
+    // start from data-base-src (the bare /_test/render?plugin=…&size=…
+    // URL emitted server-side) and layer query params on top so the
+    // backend can pick them up. ``widgetId`` is the card's widget id,
+    // used to look up that widget's selected variant (if any).
+    function srcFor(iframe, widgetId) {
+      const url = new URL(iframe.dataset.baseSrc, location.origin);
+      url.searchParams.set("_o", state.orient === "portrait" ? "p" : "l");
+      if (state.theme)   url.searchParams.set("theme", state.theme);
+      if (state.sample)  url.searchParams.set("sample", "1");
+      const variant = state.variants[widgetId];
+      if (variant)       url.searchParams.set("variant", variant);
+      const zoom = state.zooms[widgetId];
+      if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
+      return url.pathname + url.search;
+    }
+
+    // Mirror state.orient onto the size-key labels at the top.
+    function paintSizeKey() {
+      const portrait = state.orient === "portrait";
       document.querySelectorAll("[data-key-dims]").forEach((dd) => {
         const w = Number(dd.dataset.w);
         const h = Number(dd.dataset.h);
         const [dw, dh] = portrait ? [h, w] : [w, h];
         dd.textContent = `${dw} × ${dh}`;
       });
-      // Each widget tile: swap frame + iframe dims, reload iframe.
-      document.querySelectorAll("[data-widget-size]").forEach((tile) => {
-        const nw = Number(tile.dataset.nativeW);
-        const nh = Number(tile.dataset.nativeH);
-        const [w, h] = portrait ? [nh, nw] : [nw, nh];
-        const frame = tile.querySelector("[data-frame]");
-        if (frame) {
-          // CSS computes box size = native * scale; iframe stays at
-          // native so widgets render at real resolution.
-          const scale = Math.min(1, tw / w);
-          frame.style.setProperty("--tw", String(w));
-          frame.style.setProperty("--th", String(h));
-          frame.style.setProperty("--s", String(scale));
-        }
-        const iframe = tile.querySelector("iframe");
-        if (iframe) {
-          // Bump src so the iframe re-renders against the new dims —
-          // widgets that read panel.w/h in JS at mount time need this.
-          const url = new URL(iframe.src, location.origin);
-          url.searchParams.set("_o", portrait ? "p" : "l");
-          iframe.src = url.pathname + url.search;
-        }
-        const dimLabel = tile.querySelector("[data-dim-label]");
-        if (dimLabel) dimLabel.textContent = `${w} × ${h}`;
+    }
+
+    function paintOrientToggle() {
+      if (!toggle) return;
+      toggle.querySelectorAll("button").forEach((b) => {
+        const active = (b.dataset.orient === state.orient);
+        b.classList.toggle("is-active", active);
+        b.setAttribute("aria-pressed", active ? "true" : "false");
       });
     }
 
-    toggle.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-orient]");
-      if (!btn) return;
-      apply(btn.dataset.orient);
-      try { localStorage.setItem(STORAGE_KEY, btn.dataset.orient); } catch {}
+    function paintSampleBtn() {
+      if (!sampleBtn) return;
+      sampleBtn.classList.toggle("is-on", state.sample);
+      sampleBtn.setAttribute("aria-pressed", state.sample ? "true" : "false");
+      if (sampleLabel) sampleLabel.textContent = state.sample ? "Sample data" : "Live data";
+    }
+
+    // Walk every widget card and reconcile its visibility + iframes
+    // against state. Unselected cards stay hidden with empty iframe
+    // src (no fetch). Selected cards get shown + their iframes (re)set
+    // to the URL computed for the current state. The src is rewritten
+    // every time so theme/orient/sample changes propagate to already-
+    // loaded widgets too.
+    function applyAll() {
+      const portrait = state.orient === "portrait";
+      const tw = targetWidth();
+      let loadedN = 0;
+
+      widgetCards.forEach((card) => {
+        const id = card.dataset.widgetId;
+        const on = state.selected.has(id);
+        card.hidden = !on;
+        card.classList.toggle("is-reviewed", state.reviewed.has(id));
+        if (on) loadedN += 1;
+
+        card.querySelectorAll("[data-widget-size]").forEach((tile) => {
+          const nw = Number(tile.dataset.nativeW);
+          const nh = Number(tile.dataset.nativeH);
+          const [w, h] = portrait ? [nh, nw] : [nw, nh];
+
+          const frame = tile.querySelector("[data-frame]");
+          if (frame) {
+            const scale = Math.min(1, tw / w);
+            frame.style.setProperty("--tw", String(w));
+            frame.style.setProperty("--th", String(h));
+            frame.style.setProperty("--s", String(scale));
+          }
+
+          const dimLabel = tile.querySelector("[data-dim-label]");
+          if (dimLabel) dimLabel.textContent = `${w} × ${h}`;
+
+          const iframe = tile.querySelector("iframe");
+          if (iframe) {
+            if (on) {
+              const target = srcFor(iframe, id);
+              // Avoid pointless reloads when nothing changed (e.g. a
+              // sibling widget got toggled but this one's URL is the
+              // same). Browsers will reload an iframe whose src is
+              // re-set to the same string.
+              const current = iframe.getAttribute("src") || "";
+              if (current !== target) {
+                iframe.src = target;
+              }
+            } else if (iframe.getAttribute("src")) {
+              // Drop the src so the iframe stops holding onto the
+              // widget's resources when the user unticks it.
+              iframe.removeAttribute("src");
+            }
+          }
+
+          const openLink = tile.querySelector("[data-open-link]");
+          if (openLink) {
+            const url = new URL(openLink.dataset.baseHref, location.origin);
+            if (state.theme)  url.searchParams.set("theme", state.theme);
+            if (state.sample) url.searchParams.set("sample", "1");
+            const variant = state.variants[id];
+            if (variant)      url.searchParams.set("variant", variant);
+            const zoom = state.zooms[id];
+            if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
+            openLink.href = url.pathname + url.search;
+          }
+        });
+      });
+
+      tocRows.forEach((row) => {
+        const id = row.dataset.widgetId;
+        row.classList.toggle("is-loaded", state.selected.has(id));
+        row.classList.toggle("is-reviewed", state.reviewed.has(id));
+      });
+
+      // Paint each review button's pressed-state + label so it tracks
+      // the card's outline.
+      reviewBtns.forEach((btn) => {
+        const id = btn.dataset.widgetId;
+        const on = state.reviewed.has(id);
+        btn.classList.toggle("is-on", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+        const label = btn.querySelector("[data-review-label]");
+        if (label) label.textContent = on ? "Reviewed" : "Mark reviewed";
+      });
+
+      if (loadedCount) loadedCount.textContent = String(loadedN);
+      if (emptyState) emptyState.hidden = loadedN > 0;
+    }
+
+    // -------- Persistence helpers --------
+    function saveSelected() {
+      try {
+        localStorage.setItem(SELECT_KEY, JSON.stringify([...state.selected]));
+      } catch {}
+    }
+
+    function loadSelected() {
+      try {
+        const raw = localStorage.getItem(SELECT_KEY);
+        if (!raw) return;
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) state.selected = new Set(arr.filter((x) => typeof x === "string"));
+      } catch {}
+    }
+
+    // -------- Event wiring --------
+
+    // Per-row checkboxes. Listen via delegation so the bulk buttons
+    // can call check.click() to fire the same path.
+    checkboxes.forEach((cb) => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) state.selected.add(cb.value);
+        else state.selected.delete(cb.value);
+        saveSelected();
+        applyAll();
+      });
     });
 
-    // Always run apply() on init — even in the landscape default —
-    // so the scale gets computed and lg frames don't blow out the
-    // column on first paint.
-    let initial = "landscape";
+    // Bulk select / clear / invert.
+    document.querySelectorAll(".toc-bulk button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.bulk;
+        checkboxes.forEach((cb) => {
+          if (mode === "all")    cb.checked = true;
+          if (mode === "none")   cb.checked = false;
+          if (mode === "invert") cb.checked = !cb.checked;
+          if (cb.checked) state.selected.add(cb.value);
+          else            state.selected.delete(cb.value);
+        });
+        saveSelected();
+        applyAll();
+      });
+    });
+
+    // Don't let the jump-link inside the label toggle the checkbox.
+    document.querySelectorAll(".toc-jump").forEach((a) => {
+      a.addEventListener("click", (e) => e.stopPropagation());
+    });
+
+    if (toggle) {
+      toggle.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-orient]");
+        if (!btn) return;
+        state.orient = btn.dataset.orient;
+        try { localStorage.setItem(ORIENT_KEY, state.orient); } catch {}
+        paintOrientToggle();
+        paintSizeKey();
+        applyAll();
+      });
+    }
+
+    if (themePicker) {
+      themePicker.addEventListener("change", () => {
+        state.theme = themePicker.value || null;
+        try { localStorage.setItem(THEME_KEY, themePicker.value); } catch {}
+        applyAll();
+      });
+    }
+
+    if (sampleBtn) {
+      sampleBtn.addEventListener("click", () => {
+        state.sample = !state.sample;
+        try { localStorage.setItem(SAMPLE_KEY, state.sample ? "1" : "0"); } catch {}
+        paintSampleBtn();
+        applyAll();
+      });
+    }
+
+    // Per-widget direction pickers. Update state, persist, re-render
+    // the affected card's iframes (and only those — applyAll's reload
+    // guard short-circuits the others).
+    variantPickers.forEach((picker) => {
+      picker.addEventListener("change", () => {
+        const id = picker.dataset.widgetId;
+        state.variants[id] = picker.value;
+        try { localStorage.setItem(VARIANT_KEY, JSON.stringify(state.variants)); } catch {}
+        applyAll();
+      });
+    });
+
+    // Per-widget zoom pickers. Server clamps 0.5–3.0; iframe rewrites
+    // when the value changes.
+    zoomPickers.forEach((picker) => {
+      picker.addEventListener("change", () => {
+        const id = picker.dataset.widgetId;
+        state.zooms[id] = picker.value;
+        try { localStorage.setItem(ZOOM_KEY, JSON.stringify(state.zooms)); } catch {}
+        applyAll();
+      });
+    });
+
+    // Reviewed toggle. Flips state, repaints affected button + card
+    // outline + sidebar dot via applyAll.
+    reviewBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.widgetId;
+        if (state.reviewed.has(id)) state.reviewed.delete(id);
+        else state.reviewed.add(id);
+        try { localStorage.setItem(REVIEWED_KEY, JSON.stringify([...state.reviewed])); } catch {}
+        applyAll();
+      });
+    });
+
+    // -------- Init --------
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "portrait") initial = "portrait";
+      const o = localStorage.getItem(ORIENT_KEY);
+      if (o === "portrait") state.orient = "portrait";
     } catch {}
-    apply(initial);
-  })();
 
-  // Theme picker — set ?theme=<id> on every iframe so /_test/render
-  // re-renders against the chosen theme. Persisted to localStorage
-  // (and applied on init) so revisiting the gallery keeps the same
-  // theme without re-picking.
-  (function () {
-    const STORAGE_KEY = "tesserae:gallery-theme";
-    const picker = document.querySelector("[data-theme-picker]");
-    if (!picker) return;
+    try {
+      const s = localStorage.getItem(SAMPLE_KEY);
+      if (s === "0") state.sample = false;
+    } catch {}
 
-    function apply(themeId) {
-      document.querySelectorAll("iframe").forEach((iframe) => {
-        const url = new URL(iframe.src, location.origin);
-        url.searchParams.set("theme", themeId);
-        iframe.src = url.pathname + url.search;
-      });
+    if (themePicker) {
+      try {
+        const saved = localStorage.getItem(THEME_KEY);
+        if (saved && [...themePicker.options].some((o) => o.value === saved)) {
+          themePicker.value = saved;
+          state.theme = saved;
+        } else {
+          state.theme = themePicker.value || null;
+        }
+      } catch {
+        state.theme = themePicker.value || null;
+      }
     }
 
-    picker.addEventListener("change", () => {
-      const v = picker.value;
-      try { localStorage.setItem(STORAGE_KEY, v); } catch {}
-      apply(v);
-    });
+    loadSelected();
+    checkboxes.forEach((cb) => { cb.checked = state.selected.has(cb.value); });
 
-    // Restore on init only if the saved value is a real option —
-    // a theme that's been removed mid-session shouldn't pin the
-    // dropdown to a ghost id.
+    // Seed variants from each <select>'s default (the manifest's
+    // ``default`` field, already selected server-side).
+    variantPickers.forEach((picker) => {
+      state.variants[picker.dataset.widgetId] = picker.value;
+    });
+    // Restore any persisted overrides — but only ones whose value is
+    // still a valid option for that widget (a manifest could have
+    // renamed/removed a variant between visits).
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && [...picker.options].some((o) => o.value === saved)) {
-        picker.value = saved;
-        apply(saved);
+      const raw = localStorage.getItem(VARIANT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) || {};
+        variantPickers.forEach((picker) => {
+          const id = picker.dataset.widgetId;
+          const v = saved[id];
+          if (v && [...picker.options].some((o) => o.value === v)) {
+            picker.value = v;
+            state.variants[id] = v;
+          }
+        });
       }
     } catch {}
+
+    // Same dance for zooms — seed from defaults (every picker starts
+    // at 100%), then restore overrides if any survive.
+    zoomPickers.forEach((picker) => {
+      state.zooms[picker.dataset.widgetId] = picker.value;
+    });
+    try {
+      const raw = localStorage.getItem(ZOOM_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) || {};
+        zoomPickers.forEach((picker) => {
+          const id = picker.dataset.widgetId;
+          const v = saved[id];
+          if (v && [...picker.options].some((o) => o.value === v)) {
+            picker.value = v;
+            state.zooms[id] = v;
+          }
+        });
+      }
+    } catch {}
+
+    // Restore reviewed set.
+    try {
+      const raw = localStorage.getItem(REVIEWED_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) state.reviewed = new Set(arr.filter((x) => typeof x === "string"));
+      }
+    } catch {}
+
+    paintOrientToggle();
+    paintSampleBtn();
+    paintSizeKey();
+    applyAll();
   })();
 </script>
 </body>

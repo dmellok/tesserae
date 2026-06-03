@@ -98,16 +98,20 @@ function artBlock(d, { size = "100%", radius = 0, accent = null } = {}) {
   const seed = d.album || d.title || d.name || "";
   const a = accent || fallbackAccent(seed);
   const sizeStyle = typeof size === "number" ? `${size}px` : size;
+  // Aspect-ratio: 1/1 forces the frame square even when ``size`` is a
+  // percentage — ``height:30%`` of a wide cell ≠ ``width:30%`` so the
+  // pre-aspect-ratio version came out 130×120 in a 640×400 cell. Now
+  // width drives, height follows.
   if (d.art_url) {
     return `
-      <div class="hm-art" style="width:${sizeStyle};height:${sizeStyle};border-radius:${radius}px;background:var(--wx-paper-3);overflow:hidden;flex-shrink:0">
+      <div class="hm-art" style="width:${sizeStyle};aspect-ratio:1/1;border-radius:${radius}px;background:var(--wx-paper-3);overflow:hidden;flex-shrink:0">
         <img src="${escapeHtml(d.art_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block" />
       </div>
     `;
   }
   const initial = (seed.trim()[0] || "?").toUpperCase();
   return `
-    <div class="hm-art hm-art--placeholder" style="width:${sizeStyle};height:${sizeStyle};border-radius:${radius}px;background:${WX.col(a)};color:${WX.inkOn(a)};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
+    <div class="hm-art hm-art--placeholder" style="width:${sizeStyle};aspect-ratio:1/1;border-radius:${radius}px;background:${WX.col(a)};color:${WX.inkOn(a)};display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative">
       <span style="font-family:var(--wx-black);font-size:clamp(28px, 30%, 96px);line-height:1">${escapeHtml(initial)}</span>
       <i class="ph-bold ph-music-notes" style="position:absolute;bottom:8px;right:10px;font-size:18px;opacity:.7" aria-hidden="true"></i>
     </div>
@@ -120,7 +124,7 @@ function progressBar(d, { accent = "blue", showTimes = true } = {}) {
   const pct = d.position_pct == null ? 0 : Math.max(0, Math.min(100, d.position_pct));
   return `
     <div style="display:flex;flex-direction:column;gap:4px">
-      <div style="height:4px;background:rgba(27,26,22,.14);position:relative">
+      <div style="height:4px;background:var(--c-line);position:relative">
         <div style="height:100%;width:${pct.toFixed(1)}%;background:${WX.col(accent)}"></div>
       </div>
       ${showTimes ? `
@@ -162,7 +166,7 @@ function renderR1(data) {
         </div>
       </div>
       ${showProgress ? `
-        <div style="padding:8px 16px 12px;border-top:1px solid rgba(27,26,22,.16)">
+        <div style="padding:8px 16px 12px;border-top:1px solid var(--c-line)">
           ${progressBar(data, { accent: "blue" })}
         </div>
       ` : ""}
@@ -232,7 +236,7 @@ function renderS3(data) {
       </div>
       ${showProgress ? `
         <div style="margin-top:14px;display:flex;flex-direction:column;gap:6px">
-          <div style="position:relative;height:1px;background:rgba(27,26,22,.3)">
+          <div style="position:relative;height:1px;background:var(--c-line)">
             <div style="position:absolute;left:0;top:-1px;height:3px;width:${pct.toFixed(1)}%;background:var(--wx-ink)"></div>
           </div>
           <div class="wx-tnum" style="display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.1em;color:var(--wx-ink-60)">
@@ -312,7 +316,7 @@ function renderD4(data) {
       </div>
       ${showProgress ? `
         <div style="display:flex;flex-direction:column;gap:4px">
-          <div style="height:6px;background:rgba(27,26,22,.14);position:relative">
+          <div style="height:6px;background:var(--c-line);position:relative">
             <div style="height:100%;width:${pct.toFixed(1)}%;background:var(--wx-blue)"></div>
           </div>
           <div class="wx-tnum" style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">
@@ -323,7 +327,7 @@ function renderD4(data) {
       ` : ""}
       <div style="display:flex;align-items:center;gap:10px">
         ${WX.icon("speaker-high", { size: 14, color: "var(--wx-ink-60)" })}
-        <div style="flex:1;height:4px;background:rgba(27,26,22,.14);position:relative">
+        <div style="flex:1;height:4px;background:var(--c-line);position:relative">
           <div style="height:100%;width:${(vol == null ? 0 : vol).toFixed(1)}%;background:var(--wx-ink)"></div>
         </div>
         <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60);min-width:30px;text-align:right">${vol == null ? "—" : Math.round(vol) + "%"}</span>
@@ -379,7 +383,7 @@ function renderError(msg) {
   return `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
     <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:#c44a3a;display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
+    <div class="root error" style="padding:12px;font-family:system-ui,sans-serif;color:var(--c-danger);display:flex;align-items:center;gap:8px;height:100%;box-sizing:border-box">
       <i class="ph ph-warning-circle" aria-hidden="true"></i>
       <span>${escapeHtml(msg)}</span>
     </div>

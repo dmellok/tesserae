@@ -149,7 +149,7 @@ function bandScale(data, { height = 8, gap = 3 } = {}) {
   return `
     <div style="display:flex;gap:${gap}px;width:100%">
       ${bands.map((b, i) => `
-        <div style="flex:1;height:${height}px;background:${i === active ? WX.col(BAND_ACCENT[b]) : "rgba(27,26,22,.14)"}"></div>
+        <div style="flex:1;height:${height}px;background:${i === active ? WX.col(BAND_ACCENT[b]) : "var(--c-line)"}"></div>
       `).join("")}
     </div>
   `;
@@ -177,7 +177,7 @@ function renderR1(data) {
           </div>
           <div style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60);margin-top:4px">EUROPEAN AQI · DOMINANT ${escapeHtml((data.dominant || "—").toUpperCase())}</div>
         </div>
-        <div style="width:300px;flex-shrink:0">
+        <div style="flex:1;min-width:0;max-width:300px">
           <div style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:11px;letter-spacing:.04em;color:var(--wx-ink-60);margin-bottom:6px">
             <span>${escapeHtml(String(firstEdge))}</span><span>${escapeHtml(String(lastEdge))}</span>
           </div>
@@ -186,7 +186,7 @@ function renderR1(data) {
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
         ${pollutants.map((p, i) => `
-          <div style="border-right:${(i % 3) < 2 ? "1px solid rgba(27,26,22,.16)" : "none"};border-bottom:${i < 3 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:10px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px">
+          <div style="border-right:${(i % 3) < 2 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 3 ? "1px solid var(--c-line)" : "none"};padding:10px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px">
             <div style="display:flex;align-items:center;gap:8px">
               ${WX.icon(p.icon, { size: 15, color: WX.col(p.accent) })}
               <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.08em;color:var(--wx-ink-60)">${escapeHtml(p.label.toUpperCase())}</span>
@@ -261,7 +261,7 @@ function renderS3(data) {
       </div>
       <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;margin-top:14px">
         ${pollutants.map((p, i) => `
-          <div style="border-top:1px solid rgba(27,26,22,.16);border-right:${(i % 3) < 2 ? "1px solid rgba(27,26,22,.16)" : "none"};padding:9px 14px 0;display:flex;flex-direction:column;gap:4px">
+          <div style="border-top:1px solid var(--c-line);border-right:${(i % 3) < 2 ? "1px solid var(--c-line)" : "none"};padding:9px 14px 0;display:flex;flex-direction:column;gap:4px">
             <span style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--wx-ink-60);display:flex;align-items:center;gap:6px">
               <span style="width:6px;height:6px;background:${WX.col(p.accent)};display:inline-block"></span>
               ${escapeHtml(p.label)}
@@ -288,7 +288,7 @@ function aqGauge({ value, max = 100, color, size = 150 }) {
   const display = value == null ? "—" : String(Math.round(safe));
   return `
     <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true">
-      <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="rgba(27,26,22,.12)" stroke-width="${sw}"></circle>
+      <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="var(--c-line)" stroke-width="${sw}"></circle>
       <circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="butt"
               stroke-dasharray="${(C * f).toFixed(1)} ${C.toFixed(1)}"
               transform="rotate(-90 ${cx} ${cx})"></circle>
@@ -316,7 +316,7 @@ function renderD4(data) {
             <span style="font-family:var(--wx-black);font-size:18px;color:${WX.col(bandAccent)}">${escapeHtml((data.band || "—").toUpperCase())}</span>
           </div>
         </div>
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:11px;border-left:1px solid rgba(27,26,22,.18);padding-left:24px">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:11px;border-left:1px solid var(--c-line);padding-left:24px">
           ${pollutants.map((p) => `
             <div>
               <div style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:11px;margin-bottom:3px">

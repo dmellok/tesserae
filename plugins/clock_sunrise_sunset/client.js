@@ -87,8 +87,11 @@ export default async function render(shadow, ctx) {
   const sunX = cx + R * Math.cos(angle);
   const sunY = cy - R * Math.sin(angle);
   // Past arc (already happened) = traced from left horizon to sun position.
-  // Use SVG path with a single arc command up to the current position.
-  const sweep = t > 0.5 ? 1 : 0;
+  // Must use sweep-flag = 1 (same as the track) so the past arc bows
+  // UP along the upper semicircle. With sweep-flag = 0 the arc would
+  // bow the opposite way (below the horizon) — the old ``t > 0.5`` switch
+  // drew the morning past arc upside-down for that reason.
+  const sweep = 1;
 
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">

@@ -199,7 +199,7 @@ function renderR1(data) {
           const icon = w.icon || "warning";
           const bg = w.highlight ? WX.tint(sev) : "transparent";
           return `
-            <div style="flex:1;display:flex;gap:14px;align-items:flex-start;padding:12px 18px;min-height:0;background:${bg};border-top:${i ? "1px solid rgba(27,26,22,.16)" : "none"}">
+            <div style="flex:1;display:flex;gap:14px;align-items:flex-start;padding:12px 18px;min-height:0;background:${bg};border-top:${i ? "1px solid var(--c-line)" : "none"}">
               <div style="display:flex;align-items:flex-start;gap:10px;flex-shrink:0">
                 <span style="width:4px;align-self:stretch;background:${WX.col(sev)};flex-shrink:0"></span>
                 <div style="display:flex;justify-content:center;padding-top:2px">
@@ -292,7 +292,7 @@ function renderS3(data) {
           const sev = w.severity || "yellow";
           const icon = w.icon || "warning";
           return `
-            <div style="flex:1;display:flex;align-items:center;gap:14px;padding:6px 0;border-top:${i ? "1px solid rgba(27,26,22,.16)" : "none"};min-height:0">
+            <div style="flex:1;display:flex;align-items:center;gap:14px;padding:6px 0;border-top:${i ? "1px solid var(--c-line)" : "none"};min-height:0">
               <span style="width:9px;height:9px;background:${WX.col(sev)};flex-shrink:0"></span>
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:baseline;gap:10px">
@@ -345,7 +345,7 @@ function renderD4(data) {
           const sev = w.severity || "yellow";
           const icon = w.icon || "warning";
           return `
-            <div style="flex:1;display:flex;align-items:center;gap:12px;padding:0 2px;border-top:${i ? "1px solid rgba(27,26,22,.14)" : "1px solid rgba(27,26,22,.14)"};min-height:0">
+            <div style="flex:1;display:flex;align-items:center;gap:12px;padding:0 2px;border-top:${i ? "1px solid var(--c-line)" : "1px solid var(--c-line)"};min-height:0">
               <span style="width:4px;align-self:stretch;background:${WX.col(sev)};flex-shrink:0;margin:6px 0"></span>
               ${WX.icon(icon, { size: 20, color: WX.col(sev) })}
               <div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:9px;overflow:hidden">

@@ -62,8 +62,14 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: var(--wb-bar-gap, clamp(6px, 1.2cqw, 10px));
-  background: var(--wb-bar-bg, var(--c-text));
-  color: var(--wb-bar-fg, var(--c-bg));
+  /* The Bauhaus design spec calls for a fixed dark paper bar — the
+     theme-cohesive ``var(--c-text)`` made it flip to "dark on dark"
+     in dark themes and lose the original look. Pinning to the wx
+     ink/paper tokens (with hex fallback if a widget doesn't load
+     widget-bauhaus-wx.css) keeps every "refined" header consistent
+     with the original Bauhaus spec across every theme. */
+  background: var(--wb-bar-bg, var(--wx-ink, #1b1a16));
+  color: var(--wb-bar-fg, var(--wx-paper, #f1ece0));
   padding: var(--wb-bar-pad-y, clamp(4px, 0.9cqw, 8px))
            var(--wb-bar-pad-x, clamp(8px, 1.6cqw, 14px));
   font-size: var(--wb-bar-fs, clamp(10px, 1.7cqw, 14px));
