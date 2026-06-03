@@ -19,7 +19,7 @@ should read it too.
 ## Why this works well
 
 - **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the `--c-*` colour layer, container queries, the e-ink rules. A model that reads it has everything it needs.
-- **There are 47 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
+- **There are 55 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
 - **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
 - **Every widget ships a smoke test.** The model can write it and you can run it — objective "did it work" rather than vibes.
 
@@ -137,10 +137,11 @@ These are the things AI most often gets wrong on e-ink. Call them out explicitly
 - [ ] **No drawn borders.** Card shapes come from `bg` vs `surface` contrast and spacing, not `border:` rules. They dither into invisibility on Spectra 6 anyway.
 - [ ] **Bold, not fill, for big icons.** `ph-bold` reads clean at size; `ph-fill` quantises into blobs.
 - [ ] **No animations / transitions / `requestAnimationFrame`.** The frame is screenshotted; anything mid-flight gets caught half-rendered. `animation: false` on Chart.js too.
-- [ ] **No client-side `fetch`.** Use `server.py` — the renderer waits for `networkidle` and a client fetch stretches the screenshot. Don't assume internet on the panel side either.
+- [ ] **No client-side `fetch`.** Use `server.py` — the renderer waits only for declared `<img>` loads + fonts, not arbitrary fetches, so a client fetch will screenshot before its data arrives. Don't assume internet on the panel side either.
 - [ ] **Idempotent render.** Overwrite `shadow.innerHTML`; don't append (the renderer may call you twice).
 - [ ] **Don't load fonts.** `font-family: inherit` on `:host`; the page font arrives as `ctx.font.family`.
-- [ ] **`danger` / `warn` / `ok` are semantic only.** Use `accent` / `accent2` / `accent3` for decorative colour blocks.
+- [ ] **`danger` / `warn` / `ok` are semantic only.** Use `accent` / `accent2` / `accent3` (i.e. the `--c-data-*` family) for decorative colour blocks.
+- [ ] **Multiple visual directions go in a `variant` cell option.** When a widget ships Refined / Geometric / Swiss / Data variants, expose them via a single `select` option named `variant` and dispatch to per-variant render functions in `client.js`. 28 shipped widgets follow this pattern — copy `weather_now/client.js` or `ha_climate/client.js`.
 
 ## Structured design first (optional)
 
@@ -159,3 +160,7 @@ and makes the build pass cleaner.
 Once it's merged and you've captured a screenshot
 (`python scripts/capture_widget_shots.py` against your `--dev` instance), it
 shows up automatically in the [widget gallery](../widgets/gallery.md).
+
+For ongoing design work, `python scripts/widget_contact_sheet.py` builds a
+single PNG showing your widget at all four sizes side-by-side — the easiest
+"did anything regress?" loop while iterating on a variant or polish pass.

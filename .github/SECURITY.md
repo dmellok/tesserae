@@ -13,8 +13,8 @@ When 1.0 ships, this policy moves to "current + previous minor".
 
 | Version | Supported |
 |---|---|
-| 0.8.x (current) | ✅ |
-| < 0.8 | ❌ |
+| 0.14.x (current) | ✅ |
+| < 0.14 | ❌ |
 
 ## Reporting a vulnerability
 
@@ -47,10 +47,13 @@ Please include:
 ### In scope
 
 - The Tesserae server in this repository.
-- The three official client repos:
+- The four official client repos:
   [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client),
   [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client),
-  [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client).
+  [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client),
+  [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client).
+- The HA Add-on companion repo:
+  [homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
 
 ### Out of scope
 

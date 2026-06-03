@@ -15,6 +15,11 @@
       "status": "Tested",
       "hardware": "Pimoroni Inky Impression (via inky set_image)",
       "notes": "Works on every inky-supported panel; quantises on the Pi each frame."
+    },
+    "trmnl_png": {
+      "status": "Tested",
+      "hardware": "Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin",
+      "notes": "1-bit greyscale PNG fitted to the panel + dithered server-side. Native TRMNL hardware is supported but not yet confirmed here."
     }
   }
 }

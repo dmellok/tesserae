@@ -7,8 +7,9 @@ here is wrong or someone's missing, please [open an issue](https://github.com/dm
 
 | Project | Used for | Version | Licence |
 |---|---|---|---|
-| [Phosphor Icons](https://phosphoricons.com/) | Admin UI iconography (4 weights — regular, bold, fill, duotone) | 2.x | MIT |
+| [Phosphor Icons](https://phosphoricons.com/) | Admin UI iconography (6 weights — regular, bold, fill, duotone, light, thin) | 2.x | MIT |
 | [Chart.js](https://chartjs.org/) | Finance / weather / forecast / stats charts | 4.4.0 | MIT |
+| [`widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css) + [`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css) | Shared widget design system: refined title bars, `--c-*` semantic tokens, `--wx-*` decorative tokens for the weather/sky family | — | MIT (this repo) |
 
 ## Bundled fonts
 
@@ -18,6 +19,7 @@ live in `plugins/fonts_core/static/`.
 | Font | Designer | Licence |
 |---|---|---|
 | [Anton](https://fonts.google.com/specimen/Anton) | Vernon Adams | OFL |
+| [Archivo](https://fonts.google.com/specimen/Archivo) | Omnibus-Type | OFL |
 | [Archivo Black](https://fonts.google.com/specimen/Archivo+Black) | Omnibus-Type | OFL |
 | [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont) | Braille Institute | OFL |
 | [Bebas Neue](https://fonts.google.com/specimen/Bebas+Neue) | Ryoichi Tsunekawa | OFL |
@@ -30,6 +32,7 @@ live in `plugins/fonts_core/static/`.
 | [Manrope](https://manropefont.com/) | Mikhail Sharanda | OFL |
 | [Outfit](https://fonts.google.com/specimen/Outfit) | Smith | OFL |
 | [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk) | Florian Karsten | OFL |
+| [Space Mono](https://fonts.google.com/specimen/Space+Mono) | Colophon Foundry | OFL |
 
 ## Upstream protocols and reference clients
 

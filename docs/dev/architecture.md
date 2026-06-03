@@ -17,18 +17,20 @@ or a new widget is a contained change.
 │  Render         Renderers (drop-a-folder)                           │
 │                    ├─ pi_png     (orientation: landscape)           │
 │                    ├─ pi_bin     (orientation: composition)         │
-│                    └─ esp32_bin  (orientation: composition)         │
+│                    ├─ esp32_bin  (orientation: composition)         │
+│                    └─ trmnl_png  (orientation: composition, 1-bit)  │
 │                            ▼                                        │
 │                  (artifact bytes, payload, mime, topic, retain)     │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Transport      MqttTransport (one job: publish)                    │
-│                            ▼                                        │
-│                  Broker                                             │
+│  Transport      MqttTransport ──┐    │    HTTP-pull API ──┐         │
+│  (one job: publish)             ▼    │    (one job: serve) ▼        │
+│                                 Broker        /api/display          │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Devices        Device kinds (drop-a-folder) + user instances       │
-│                    ├─ pi_bin_client  (tesserae/pi_bin/status)       │
-│                    ├─ pi_png_client  (tesserae/pi_png/status)       │
-│                    └─ esp32_client   (status + pub/sub config)      │
+│                    ├─ pi_bin_client   (tesserae/pi_bin/status)      │
+│                    ├─ pi_png_client   (tesserae/pi_png/status)      │
+│                    ├─ esp32_client    (status + pub/sub config)     │
+│                    └─ trmnl_client    (HTTP poll, no broker needed) │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -39,6 +41,12 @@ panel size. Multi-head fan-out is just "more instances".
 One canonical internal orientation: **composition** (the panel's
 mounted orientation). Renderers transform out of it via their declared
 `orientation` field — no orientation muddle.
+
+Two transports run side-by-side: **MQTT push** for Pi / ESP32 clients
+(the broker fans frames out to any number of subscribers) and
+**HTTP pull** for TRMNL hardware + KOReader-on-Kindle (the device
+polls `/api/display` on a schedule and pulls the latest 1-bit PNG).
+A Tesserae install can mix both — pick whichever fits each panel.
 
 ## MQTT topic scheme
 
@@ -56,11 +64,54 @@ id (e.g. `pi_kitchen`, `esp32_hallway`).
 | `tesserae/esp32/frame/bin` | `{url}` | yes | publish |
 | `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip, kind, panel_w, panel_h, fw_version}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
+| `tesserae/<id>/frame/trmnl` | `{url}` — only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | yes | publish |
 | `tesserae/+/status` | (wildcard) — any unregistered id surfaces for one-click registration in Settings → Devices | — | subscribe |
 
 The `kind` / `panel_w` / `panel_h` / `fw_version` keys in a heartbeat
 are the **discovery hint**: a client that includes them gets pre-filled
 in the Discovered strip so registering it is one click.
+
+## HTTP-pull API (TRMNL / KOReader)
+
+TRMNL-style devices don't subscribe to MQTT — they poll the Tesserae
+server on a schedule. A handful of HTTP endpoints (served by
+`app/trmnl_api.py`) cover the protocol:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/setup` | Initial pairing — client sends MAC, server returns a 5-char access token + assigned device id. |
+| `GET /api/display` | Latest frame URL + next-poll interval for the calling device. Authenticated via the device's access token. |
+| `POST /api/log` | Client log messages (battery state, RSSI, errors). Surfaces in the device card. |
+
+Pairing uses a short token printed at the top of Settings → Devices →
+Add device → TRMNL. The device reads its MAC from EEPROM, calls
+`/api/setup`, and the server pre-fills a Discovered entry on the
+admin's Devices page for one-click registration.
+
+## Webhook push
+
+A single bearer-token endpoint lets any external system trigger an
+on-demand re-render and push:
+
+| Route | Purpose |
+|---|---|
+| `POST /api/v1/push` | Re-render every device assigned to the named page and publish. Body: `{"page": "<id>"}`. Auth: `Authorization: Bearer <token>`. |
+
+The token is generated / rotated / cleared from Settings → System →
+Webhook and stored under `data/core/settings.json`. Use it from
+Home Assistant automations, cron, GitHub Actions, etc. See
+`docs/install/server.md` → **Webhook push** for the request shape
+and rate-limit behaviour.
+
+## Home Assistant MQTT discovery
+
+When the broker is shared with Home Assistant, Tesserae can publish
+HA's MQTT discovery messages so every device + every assigned page
+shows up automatically as HA entities (a hub device per Tesserae
+install, plus a button + select + image + diagnostic entities per
+display). See `docs/install/home-assistant.md`. The publisher lives
+in `app/ha_discovery.py`; it's opt-in via Settings → Integrations →
+Home Assistant.
 
 ## Tech stack
 
@@ -68,7 +119,7 @@ in the Discovered strip so registering it is one click.
 - Pillow + numpy for image ops
 - Playwright + Chromium for headless render
 - paho-mqtt for the broker bridge
-- Lit 3.x web components (no React), vanilla JS (no TypeScript)
+- Vanilla JavaScript on the admin (no React, no Lit, no TypeScript)
 - esbuild bundles one entry per admin page
   (`static/pages/*.js` → `static/dist/`)
 - waitress as the production WSGI server
@@ -79,7 +130,7 @@ in the Discovered strip so registering it is one click.
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
   plugins/<id>/    widget / theme / font / data / admin plugins
-                   (drop-a-folder) — 47 widgets ship bundled
+                   (drop-a-folder) — 55 widgets ship bundled
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
@@ -98,7 +149,8 @@ manifest the loader validates against the matching JSON Schema. The
 manifest declares the plugin's id, name, settings, and any optional
 hooks; the loader catches mistakes at boot rather than mid-push.
 
-* **Widgets** export a Lit web component and (optionally) a server
+* **Widgets** export a default `render(shadow, ctx)` function (vanilla
+  JS, mounted into a per-cell Shadow DOM) and (optionally) a server
   module. See [Build a widget with AI](writing-a-plugin.md) for the
   full authoring walkthrough.
 * **Renderers** export `transform(png_bytes, *, panel, settings) ->

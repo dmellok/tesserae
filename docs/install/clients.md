@@ -1,10 +1,17 @@
 # Install a client
 
 The Tesserae server publishes frames; a **client** on the other end paints your
-panel. Three reference clients live in their own repos — pick whichever matches
-your hardware. Each takes a `device_id` (the MQTT topic prefix; defaults shown
-below) and announces itself on `tesserae/<device_id>/status` so the server can
-[auto-discover it](devices.md).
+panel. Four reference clients live in their own repos — pick whichever matches
+your hardware. Three of them subscribe to MQTT (Pi + ESP32); the fourth (TRMNL
+/ KOReader-on-Kindle) polls the server over HTTP. All four use the same
+device-registration flow described in [Set up a device](devices.md).
+
+| Client | Transport | Default id | Best for |
+|---|---|---|---|
+| `tesserae-esp32-bin-client` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
+| `tesserae-pi-bin-client` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
+| `tesserae-pi-png-client` | MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
+| `tesserae-trmnl-client` | HTTP-pull | `trmnl` | TRMNL hardware + KOReader-on-Kindle |
 
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
 client and what's been tested on real hardware.
@@ -51,11 +58,38 @@ pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", in 2/3/6/7 colour. Quantising on the
 Pi every frame makes it the slower of the two Pi paths, but it stays
 wire-compatible with the inky-dash v3/v4 listener protocol.
 
-## After flashing
+## TRMNL / KOReader (HTTP-pull)
 
-On first run, a client publishes a heartbeat on `tesserae/<device-id>/status`.
-Head to [Set up a device](devices.md) to register it, calibrate the panel
-orientation, and bind a dashboard.
+[:material-github: dmellok/tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client)
+· pairs with the `trmnl_png` renderer · default id `trmnl`
 
-Running more than one panel? Flash each with a distinct `device-id` — every
-client gets its own topics, panel size, and orientation.
+For TRMNL hardware and Kindle e-readers running KOReader's
+`trmnl-display` plugin. Instead of subscribing to MQTT, the device polls
+`GET /api/display` on a schedule (the response carries the next frame
+URL and the next-poll interval). No broker required — handy when you
+want a panel that "just talks to the internet".
+
+Pairing flow: the device reads its MAC, hits `/api/setup`, and the
+server prints a short 5-character access token on the admin's
+**Settings → Devices → Add device → TRMNL** card. Type the token into
+the device once and it's paired; from there it polls `/api/display`
+authenticated via the token. Errors / battery / RSSI heartbeat back
+via `POST /api/log` and surface on the device card.
+
+The `trmnl_png` renderer fits your composition PNG to the device's
+panel size and quantises to **1-bit black/white** with the dither of
+your choice (Floyd-Steinberg, Atkinson, Jarvis, Stucki, Bayer 8×8,
+halftone, crosshatch, or none). Dither + contrast live on the device
+card so you can tune for the specific panel (Kindle Paperwhite 2,
+native TRMNL panel, etc.).
+
+## After flashing / pairing
+
+On first run, a client publishes a heartbeat on `tesserae/<device-id>/status`
+(MQTT clients) or calls `/api/setup` then `/api/display` (TRMNL).
+Head to [Set up a device](devices.md) to register it, calibrate the
+panel orientation, and bind a dashboard.
+
+Running more than one panel? Flash / pair each with a distinct
+`device-id` — every client gets its own topics or HTTP token, panel
+size, and orientation.

@@ -191,42 +191,48 @@ stylesheets get `<link>`-ed inside the shadow root.
 
 | name                  | weight   | where                  |
 |-----------------------|----------|------------------------|
-| `cloud-sun`           | fill     | hero condition icon    |
+| `cloud-sun`           | bold     | hero condition icon    |
 | `map-pin`             | regular  | place label            |
-| `thermometer-simple`  | fill     | feels-like stat        |
-| `drop-half`           | fill     | humidity stat          |
-| `wind`                | fill     | wind stat              |
-| `sun-dim`             | fill     | UV stat                |
+| `thermometer-simple`  | bold     | feels-like stat        |
+| `drop-half`           | bold     | humidity stat          |
+| `wind`                | bold     | wind stat              |
+| `sun-dim`             | bold     | UV stat                |
 | `sun-horizon`         | duotone  | sunrise row            |
 | `moon-stars`          | duotone  | sunset row             |
-| `arrow-up`/`arrow-down` | fill   | range high/low         |
+| `arrow-up`/`arrow-down` | bold   | range high/low         |
 | `warning-circle`      | regular  | error state            |
 
-Weights needed: `regular`, `fill`, `duotone`. (Each weight adds one
-`<link>` and ~250 KB font — only ship what you use.)
+Weights needed: `regular`, `bold`, `duotone`. (Each weight adds one
+`<link>` and ~250 KB font — only ship what you use.) **Default to
+`bold` for prominent / hero icons** — `fill` quantises into solid
+blobs on Spectra 6 and reads heavier than intended; `bold` is the
+outline-with-presence the design language calls for.
 
 ---
 
 ## 9. Tone rules (semantic colour)
 
 If element colour depends on data, table it. Output is **always** a
-theme token name (`accent` / `warn` / `danger` / `ok` / `fgSoft` /
-`muted` / etc.) — never a hex.
+semantic token (`--c-data-*` for categorical, `--c-ok` / `--c-warn` /
+`--c-danger` / `--c-info` for status only). Reach for status tokens
+only when the value is a genuine advisory, hazard, or error — never
+because you want a particular hue. See `docs/widgets.md` →
+**Categorical vs status — the rule**.
 
-| element         | data value             | tone     |
-|-----------------|------------------------|----------|
-| hero icon       | code 0–1 (clear)       | `warn`   |
-| hero icon       | code 2 (partly cloudy) | `accent` |
-| hero icon       | code 3/45/48 (overcast)| `muted`  |
-| hero icon       | code 51–82 (rain)      | `accent` |
-| hero icon       | code 71–86 (snow)      | `fgSoft` |
-| hero icon       | code 95–99 (storm)     | `danger` |
-| UV value        | uv < 3                 | `ok`     |
-| UV value        | uv 3–7.9               | `warn`   |
-| UV value        | uv ≥ 8                 | `danger` |
-| range high arrow| —                      | `warn`   |
-| range low arrow | —                      | `fgSoft` |
-| rain pill       | rain ≥ 30%             | `accent` |
+| element         | data value             | semantic token | rationale |
+|-----------------|------------------------|----------------|-----------|
+| hero icon       | code 0–1 (clear)       | `--c-data-1`   | decorative — sunny day, not a "warning" |
+| hero icon       | code 2 (partly cloudy) | `--c-data-2`   | decorative |
+| hero icon       | code 3/45/48 (overcast)| `--c-text-mute`| decorative — drained colour reads as overcast |
+| hero icon       | code 51–82 (rain)      | `--c-data-3`   | decorative |
+| hero icon       | code 71–86 (snow)      | `--c-text-soft`| decorative |
+| hero icon       | code 95–99 (storm)     | `--c-danger`   | **status** — severe storm IS a hazard advisory |
+| UV value        | uv < 3                 | `--c-ok`       | status — safe band |
+| UV value        | uv 3–7.9               | `--c-warn`     | status — caution band |
+| UV value        | uv ≥ 8                 | `--c-danger`   | status — burn risk |
+| range high arrow| —                      | `--c-data-1`   | decorative |
+| range low arrow | —                      | `--c-text-soft`| decorative |
+| rain pill       | rain ≥ 30%             | `--c-data-2`   | decorative |
 
 ---
 
@@ -346,11 +352,11 @@ Weights: `regular` only.
 
 ## 9. Tone rules
 
-| element | data value | tone   |
-|---------|------------|--------|
-| bar fill | <50%      | accent |
-| bar fill | 50–80%    | accent |
-| bar fill | >80%      | warn   |
+| element | data value | semantic token | rationale |
+|---------|------------|----------------|-----------|
+| bar fill | <50%      | `--c-accent`   | decorative — progress, not a status |
+| bar fill | 50–80%    | `--c-accent`   | decorative |
+| bar fill | >80%      | `--c-warn`     | status — running out of year IS the advisory |
 
 ## 10. Size adaptations
 

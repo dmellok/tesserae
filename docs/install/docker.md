@@ -6,13 +6,14 @@ so the webpage / dashboard renderer works out of the box.
 
 The image is hosted on GitHub Container Registry as
 [`ghcr.io/dmellok/tesserae`](https://github.com/dmellok/tesserae/pkgs/container/tesserae).
-Tags follow Tesserae versions: `:0.7.4`, `:0.7`, plus a `:latest`
-pointing at the most recent release tag.
+Tags follow Tesserae versions (e.g. `:0.14.0`, `:0.14`), plus a
+`:latest` pointing at the most recent release tag.
 
 !!! tip "Pin the tag in setups you care about"
     `:latest` is convenient for kicking the tyres but moves whenever
-    a new release is published. Pin to a specific version (`:0.7.4`)
-    so `docker compose pull && up -d` is the deliberate upgrade step.
+    a new release is published. Pin to a specific version (e.g.
+    `:0.14.0`) so `docker compose pull && up -d` is the deliberate
+    upgrade step.
 
 ## Quick start
 

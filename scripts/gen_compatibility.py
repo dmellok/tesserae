@@ -33,6 +33,10 @@ CLIENT_REPOS: dict[str, tuple[str, str]] = {
         "tesserae-esp32-bin-client",
         "https://github.com/dmellok/tesserae-esp32-bin-client",
     ),
+    "trmnl_png": (
+        "tesserae-trmnl-client",
+        "https://github.com/dmellok/tesserae-trmnl-client",
+    ),
 }
 
 

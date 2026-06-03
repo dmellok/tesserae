@@ -12,15 +12,16 @@
 </p>
 
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
-render headless, push the resulting frame to one or more devices (Pi,
-ESP32) over MQTT.
+render headless, push the resulting frame to one or more devices — Pi
+and ESP32 over MQTT, TRMNL / KOReader over HTTP-pull.
 
-Renderers and devices are drop-a-folder plugins — adding new hardware
-is a contained change.
+Every layer — widgets, themes, fonts, renderers, and device kinds — is
+a drop-a-folder plugin. Adding new hardware (or a new widget) is a
+contained change.
 
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** —
 install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-(47 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
+(55 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plugin/) (with AI).
 
 > **Self-hosted hobby project.** Tesserae installs with `docker compose up`
@@ -59,12 +60,13 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 ## Status
 
 A working hobbyist build. Composer → renderers → transport → devices
-pipeline, scheduler, Home Assistant discovery, theme builder, form-driven
-page editor, and the modern admin UI are all in. Multi-head is
-first-class — register multiple panels, bind a dashboard to a specific
-display, auto-discover clients that announce themselves on the broker.
+pipeline, scheduler, Home Assistant MQTT auto-discovery, webhook push,
+data export / import, theme builder, form-driven page editor, and the
+modern admin UI are all in. Multi-head is built in throughout —
+register multiple panels, bind a dashboard to a specific display,
+auto-discover clients that announce themselves on the broker.
 
-47 widgets bundled across weather, F1, calendar, news, finance, GitHub,
+55 widgets bundled across weather, F1, calendar, news, finance, GitHub,
 clocks, sky, pictures, todo, and Melbourne public transport. See
 [widget stability tiers](https://dmellok.github.io/tesserae/widgets/tiers/)
 for an upfront read on which depend on undocumented upstreams.
@@ -80,10 +82,10 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 ### Composition
 
 - **Browser-based page editor** with form-driven cell options, live preview, and per-cell content-zoom slider.
-- **17 layout presets** (1-cell → 3×2 → sidebar → hero+strip) — fraction-based so the same layout works at any panel size.
-- **Per-cell overrides**: theme, font, content zoom, any of the 14 palette tokens.
-- **47 widgets bundled** across 11 categories — weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
-- **Drop-a-folder widget plugins** — `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The four calendar / Home-Assistant / GitHub widget families each ship 4–6 selectable visual directions per widget.
+- **10 layout presets** (1-cell, 2/3 column, 2/3 row, 2×2 grid, hero top/bottom/left/right, hero sandwich) — fraction-based so the same layout works at any panel size; "Custom layout" snaps to a grid you set.
+- **Per-cell overrides**: theme, font, content zoom, any of the 15 palette tokens.
+- **55 widgets bundled** across 11 categories — weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
+- **Drop-a-folder widget plugins** — `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. 28 widgets ship multiple selectable visual directions through a single `variant` cell option (Refined / Geometric / Swiss / Data / etc.).
 
 ### Rendering
 
@@ -123,18 +125,19 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Themes & typography
 
-- **21 bundled themes** in 4 families: 10 light + 10 dark (warm-undertone, dusty-accent Ramen DNA), 5 neon dark (synthwave/cyberpunk), 6 monochrome (Paper, Carbon, Newsprint, Halftone, Ash, Graphite) for 1-bit Kindle / TRMNL panels.
+- **31 bundled themes** in 4 families: 10 light + 10 dark (warm-undertone, dusty-accent Ramen DNA), 5 neon dark (synthwave/cyberpunk), 6 monochrome (Paper, Carbon, Newsprint, Halftone, Ash, Graphite) for 1-bit Kindle / TRMNL panels.
 - **Theme builder** in the admin UI with **palette extraction** from any uploaded image.
 - **User-saved themes** persist under `data/plugins/themes_core/user.json`.
-- **15 bundled typefaces** (SIL OFL / Apache 2.0) — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, etc.
-- **Semantic token layer** (`--c-*`) — widgets paint from semantic tokens, never raw palette primitives. CI test enforces it so a theme retune touches every widget cleanly.
+- **17 bundled typefaces** (SIL OFL / Apache 2.0) — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
+- **Semantic token layer** (`--c-*`) — widgets paint from 15 semantic tokens, never raw palette primitives. Decorative `--wx-*` layer (paper / ink / chromatic chips) drives the weather + sky widget family. CI test enforces semantic-only painting so a theme retune touches every widget cleanly.
 
 ### Administration & ops
 
 - **First-run onboarding wizard** — welcome → broker → device → dashboard. Every step skippable.
 - **Settings UI**: server, broker, telemetry, auth, devices, themes, fonts, diagnostics.
 - **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts).
-- **Backup** the `data/` directory as a tarball; restore on a fresh install.
+- **Data export / import** — pack the entire install (pages, themes, devices, plugin settings, secrets) into a single ZIP; restore on a fresh install. Validated against JSON Schemas before writing.
+- **Webhook push** — `POST /api/v1/push` with a bearer token. Re-renders a named page and fans the frame out to every device bound to it. Generate / rotate the token from Settings → System → Webhook. Useful from HA automations, cron, GitHub Actions.
 - **Event log** captures every push, schedule fire, and discovery event for the History view.
 - **Auth**: password setup on first request, persistent session, logout.
 
@@ -142,8 +145,8 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 - **MQTT** transport (default `tesserae/<device>/frame/...`).
 - **Embedded Mosquitto-compatible broker** as a fallback when no external broker is configured.
-- **mDNS** — `tesserae-<host>.local` on port 8765.
-- **HTTP API** for the TRMNL BYOS protocol (`/api/display`, `/api/setup`, `/api/log`) authed by per-device tokens.
+- **mDNS** — opt-in broadcast of `tesserae.local` on port 8765 (Settings → Server → mDNS). ESP32 captive portals use a per-device `tesserae-<id>.local` of their own.
+- **HTTP API** for the TRMNL BYOS protocol (`/api/display`, `/api/setup`, `/api/log`) authed by per-device tokens, plus the webhook push (`POST /api/v1/push`) for external triggers.
 
 ### Cross-platform
 
@@ -158,7 +161,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Quality
 
-- **596 tests** (pytest) green; CI runs every push.
+- **~600 tests** (pytest) green; CI runs every push.
 - **`ruff check` + `ruff format --check`** in CI.
 - **`mypy --strict`** on contract modules (plugin loader, scheduler, push, onboarding).
 - **Semantic-token enforcement test** fails CI if any widget references raw `--theme-*` primitives instead of the `--c-*` layer.
@@ -332,9 +335,9 @@ mark verified panels in
 
 Tesserae stands on generously-licensed open source:
 
-- **[Phosphor Icons](https://phosphoricons.com/)** — every icon in the admin UI + widgets (4 weights, MIT).
+- **[Phosphor Icons](https://phosphoricons.com/)** — every icon in the admin UI + widgets (6 weights, MIT).
 - **[Chart.js](https://chartjs.org/)** v4.4.0 — the line / bar / radar / pie / horizon plots across finance, weather, and stats widgets (MIT).
-- **15 typefaces** under SIL OFL or Apache 2.0 — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, and a dozen more in the `fonts_core` plugin.
+- **17 typefaces** under SIL OFL or Apache 2.0 — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
 - **[KOReader](https://github.com/koreader/koreader)** trmnl-display plugin — the upstream Lua client that turns a jailbroken Kindle into a TRMNL-compatible panel.
 
 Full list in [docs/credits](https://dmellok.github.io/tesserae/credits/).

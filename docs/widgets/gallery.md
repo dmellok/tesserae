@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
+The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy — convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -60,6 +60,16 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS — Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
+
+-   **Weather — Wind** &middot; `weather_wind`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
@@ -383,13 +393,13 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
--   **Sky — Moon Phase** &middot; `sky_moon`
+-   **Sky — Sun & Moon** &middot; `sky_moon`
 
     ---
 
     ![sky_moon](../screenshots/widgets/sky_moon.png)
 
-    Current moon phase + illumination, age (days since new moon), upcoming new / first-quarter / full / last-quarter dates, and (optionally) tonight's moonrise + moonset. Phase + age are computed locally from the synodic month; moonrise/moonset comes from Open-Meteo when latitude/longitude are set.
+    Sun arc + moon phase disc. Sunrise / sunset / day length / solar noon, plus moon phase, illumination, age, moonrise / moonset and upcoming new / first-quarter / full / last-quarter dates. Sun + moon times come from Open-Meteo when latitude / longitude are set; phase + age are computed locally from the synodic month.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -398,6 +408,26 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 ## Home Assistant
 
 <div class="grid cards" markdown>
+
+-   **Home Assistant — Batteries** &middot; `ha_battery`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Auto-discovered battery levels across every Home Assistant entity with device_class=battery, sorted lowest-first. Picks up phones, sensors, vacuums, remotes — anything HA already exposes as a battery — and flags low/critical against per-cell thresholds.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
+
+-   **Home Assistant — Camera** &middot; `ha_camera`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Snapshot from one or more Home Assistant camera.* entities, with four visual directions. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Home Assistant — Climate** &middot; `ha_climate`
 
@@ -408,6 +438,16 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     One or more Home Assistant climate / thermostat entities — six Bauhaus / Swiss visual directions to choose from. Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
+
+-   **Home Assistant — Energy** &middot; `ha_energy`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
 -   **Home Assistant — Entities** &middot; `ha_entities`
 
@@ -429,6 +469,36 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
+-   **Home Assistant — Lights** &middot; `ha_lights`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
+
+-   **Home Assistant — Locks & Doors** &middot; `ha_locks`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
+
+-   **Home Assistant — Media** &middot; `ha_media`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Four selectable visual directions. Requires the Home Assistant Core plugin.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
+
 -   **Home Assistant — Sensor** &middot; `ha_sensor`
 
     ---
@@ -438,6 +508,16 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
+
+-   **Home Assistant — Zones** &middot; `ha_zones`
+
+    ---
+
+    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+
+    Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
 </div>
 

@@ -107,8 +107,10 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   cells that exceed them.
 * **`cell_options`** — per-cell knobs. The editor renders one form
   field per option. Types: `string`, `textarea`, `number`, `select`
-  (needs `choices`), `boolean`, `color`. The user's values land in
-  `ctx.cell.options` at render time.
+  (needs `choices`), `multiselect` (needs `choices`), `boolean`,
+  `color`. The user's values land in `ctx.cell.options` at render
+  time. For widgets that ship multiple visual directions, see the
+  **per-cell `variant`** pattern below.
 * **`settings`** — plugin-wide knobs (one set across all cells using
   this widget). Surfaces in `/settings/plugins/<id>`. `secret: true`
   stores under `<name>_secret` in `settings.json` so an on-disk grep
@@ -151,7 +153,7 @@ export default async function render(shadow, ctx) {
   theme: {                  // resolved primitive palette as hex strings —
     bg: "#ffffff",          // for canvas/Chart.js only; style DOM with --c-*
     surface: "#e2d4b8",
-    // ...all 14 primitives
+    // ...all 15 primitives
   },
   font: {
     family: "Inter",       // resolved page font
@@ -207,9 +209,9 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
 
 ---
 
-## Colour — primitives and the semantic layer
+## Theme tokens — primitives and the semantic layer
 
-Colour has two layers. **Themes define 14 primitive tokens.** Widgets
+Colour has two layers. **Themes define 15 primitive tokens.** Widgets
 **never reference those primitives directly** — they paint from the `--c-*`
 **semantic layer** the composer derives on every cell host. The split keeps
 two ideas apart that are easy to conflate: *categorical* colour ("I need N
@@ -219,7 +221,7 @@ is status.
 
 ### Primitives — what a theme defines
 
-14 tokens, validated by
+15 tokens, validated by
 [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json)
 → `themes.palette`. Theme authors pick these; **widgets don't touch them.**
 
@@ -235,6 +237,7 @@ is status.
 | `accentSoft` | low-contrast accent fill |
 | `divider` | chart axes / grid lines only |
 | `ok` / `warn` / `danger` | status hues |
+| `info` | informational status (optional; falls back to `accent` if a theme omits it) |
 
 ### Semantic tokens — what widgets paint with
 
@@ -255,7 +258,7 @@ fails the build otherwise.
 | `--c-accent` | accent | brand highlight |
 | `--c-accent-soft` | accentSoft | soft tonal fills (dithers — large fills only) |
 | `--c-data-1` … `--c-data-4` | accent / accent2 / accent3 / surface2 | **categorical** — N distinguishable colours, no meaning |
-| `--c-ok` / `--c-warn` / `--c-danger` / `--c-info` | ok / warn / danger / accent | **status** — advisory / hazard / error ONLY |
+| `--c-ok` / `--c-warn` / `--c-danger` / `--c-info` | ok / warn / danger / info | **status** — advisory / hazard / error / informational ONLY |
 
 ### Categorical vs status — the rule
 
@@ -420,7 +423,8 @@ Conventions:
 * **Bake brand colours into the SVG** when the data IS the colour
   (team logo, flag).
 * **Keep files small** — under 10 KB each ideally. The renderer waits
-  for `networkidle`; large images stretch the screenshot.
+  for every cell's `<img>` to load (with a 5 s cap), so large remote
+  images stretch the screenshot phase.
 * **Phosphor first** — if there's a Phosphor icon for what you want,
   use that. Custom SVG is for things Phosphor doesn't have: circuit
   outlines, team logos, country flags.
@@ -459,7 +463,7 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 
 ---
 
-## Shared baseline — `widget-bauhaus.css`
+## Shared baseline — `widget-bauhaus.css` (+ `widget-bauhaus-wx.css`)
 
 Most widgets link
 [`static/style/widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css)
@@ -474,7 +478,11 @@ available whether or not a widget links this file.
 * `.wb-root.is-error` / `.wb-error` — error state (paints `--c-danger`)
 
 Tune proportions per widget via `--wb-*` custom properties on `:host`
-(e.g. `--wb-bar-fs`, `--wb-bar-fw`) instead of redeclaring the bar.
+(e.g. `--wb-bar-fs`, `--wb-bar-fw`) instead of redeclaring the bar. The
+title-bar dimensions (height, padding, icon size, mark size, font size)
+are pinned to physical pixels via `--wb-bar-h` / `--wb-bar-px` /
+`--wb-bar-fs` / `--wb-bar-icon-sz` / `--wb-mark-sz` so every refined
+header looks identical across zoom levels and across widgets.
 
 Link it before your own `client.css`:
 
@@ -485,8 +493,139 @@ shadow.innerHTML = `
   ...`;
 ```
 
-The weather suite (`weather_now`, `weather_hourly`, `weather_forecast`)
-and ~40 others build on this baseline — read any of them for the pattern.
+The weather suite and ~40 other widgets build on this baseline — read
+any of them for the pattern.
+
+### Decorative layer — `widget-bauhaus-wx.css`
+
+The weather and sky suites layer a second stylesheet,
+[`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css),
+which adds a **decorative** token family on top of the `--c-*` semantic
+layer. Use it when a widget belongs to a colour-blocked design family
+with a specific paper / ink / chromatic feel (the original Bauhaus
+spec), and you want every widget in the family to retint together when
+the user changes themes.
+
+| token | role |
+|---|---|
+| `--wx-paper` / `--wx-paper-2` / `--wx-paper-3` | body backgrounds (flow through `--c-bg` + `--c-text` via `color-mix`) |
+| `--wx-ink` / `--wx-ink-60` | body text (flow through `--c-text` / `--c-text-soft`) |
+| `--wx-hair` | hairline rules (flows through `--c-line`) |
+| `--wx-red` / `--wx-blue` / `--wx-yellow` / `--wx-green` | decorative colour chips (flow through `--c-accent` / `--c-data-*` — yellow stays pinned to a Spectra hex) |
+| `--wx-red-fg` / `-blue-fg` / etc. | text colour for use ON each chip |
+| `--wx-red-t` / `-blue-t` / etc. | tinted variants (chip-fill at 22% over paper) |
+| `--wx-grotesk` / `--wx-black` / `--wx-geo` / `--wx-mono` / `--wx-swiss` | type role tokens — all lead with the active theme font |
+| `--wb-bar-bg` / `--wb-bar-fg` | refined title bar (locked dark; doesn't follow theme) |
+
+The refined title bar (`.wb-bar`, `.wx-header-dark`, every `*-header`
+in the HA family) stays at the original Bauhaus dark via `--wb-bar-bg`
+/ `--wb-bar-fg` regardless of theme — so a refined widget on a dark
+theme doesn't flip to "light bar on dark body".
+
+Link both stylesheets when you want the decorative layer:
+
+```js
+shadow.innerHTML = `
+  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus-wx.css">
+  <link rel="stylesheet" href="/plugins/<id>/client.css">
+  ...`;
+```
+
+---
+
+## Per-cell variants — the `variant` cell option
+
+When a widget ships multiple visual directions (Refined / Geometric /
+Swiss / Data / Editorial / etc.) the convention is a single `select`
+cell option named `variant`. The composer renders a per-cell dropdown
+in the page editor and the widget picks the matching layout in
+`client.js`. 28 widgets currently follow this pattern — calendar,
+HA, GitHub, weather, sky.
+
+```json
+{
+  "name": "variant",
+  "type": "select",
+  "label": "Style",
+  "default": "r1",
+  "choices": [
+    { "value": "r1", "label": "Refined" },
+    { "value": "g2", "label": "Geometric" },
+    { "value": "s3", "label": "Swiss" },
+    { "value": "d4", "label": "Data" }
+  ]
+}
+```
+
+```js
+const VARIANTS = { r1: renderRefined, g2: renderGeometric, ... };
+const variant = ctx.cell.options.variant || "r1";
+(VARIANTS[variant] || VARIANTS.r1)(shadow, ctx);
+```
+
+Reference: [`plugins/weather_now/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/weather_now/client.js),
+[`plugins/ha_climate/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/ha_climate/client.js),
+[`plugins/calendar_week/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/calendar_week/client.js).
+
+---
+
+## Per-cell content zoom — `--c-zoom`
+
+Every cell host exposes a `--c-zoom` CSS variable (default `1`) that
+the user can adjust via the page-editor zoom slider on each cell.
+The composer applies it by shrinking `.cell-content` to `1/zoom` and
+counter-scaling back up with `transform: scale(zoom)`. CSS units
+inside the widget (`px`, `cqw`) are measured against the smaller
+virtual viewport, so a `36px` height ends up rendering as `36 * zoom`
+physical pixels.
+
+For anything that must stay at a **fixed physical size** regardless of
+the slider (title bars, hairlines, icon strips), counter-scale by
+`var(--c-zoom, 1)`:
+
+```css
+.my-header { height: calc(36px / var(--c-zoom, 1)); }
+.my-rule   { height: calc(1px  / var(--c-zoom, 1)); }
+```
+
+This is what `widget-bauhaus.css` does for the refined title bar
+(`--wb-bar-h: calc(36px / var(--c-zoom, 1))`) so every refined header
+lands at 36 physical pixels at every zoom level. Everything else
+(body text, hero icons, charts) should scale with the slider — that's
+the whole point of the zoom.
+
+`ctx.cell.size` does NOT change when zoom changes; the size token
+reflects the cell's true dimensions on the panel. Zoom is a viewing
+adjustment, not a layout one.
+
+---
+
+## Font cascade — `--theme-font` / `--theme-font-mono`
+
+The composer sets both font tokens on every cell host from the
+active theme's font picker (Settings → Themes → Font):
+
+```css
+--theme-font:      'Inter', system-ui, -apple-system, sans-serif;
+--theme-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+```
+
+Widgets should `font-family: inherit` on `:host` (or just leave it —
+the `widget-bauhaus.css` `:host` block already does) so the user's
+font pick wins. Widgets that need a specific monospace for tabular
+columns should reach for `var(--theme-font-mono, monospace)` rather
+than naming a family directly. The decorative `--wx-*` role tokens
+also lead with `var(--theme-font, ...)` so weather / sky widgets
+retint their type with the picker.
+
+If a widget needs an exact display weight (e.g. Archivo Black for
+heavy headers), name the family first and use `--theme-font` as the
+fallback:
+
+```css
+.hero-stat { font-family: "Archivo Black", var(--theme-font, "Archivo"), sans-serif; }
+```
 
 ---
 
@@ -513,17 +652,38 @@ yellow, red, blue, green.
 
 ## Reference: shipped widgets
 
-* [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now) — hero icon + stats
-  grid + sun row. Adapts xs→lg. Open-Meteo + 10-min disk cache.
-* [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly) — Chart.js
-  line of next 12/24/48 hours + rain-probability strip. Vendored
-  Chart.js loaded lazily from `/static/vendor/chart.umd.min.js`.
-* [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast) — 5
-  day-columns with today-highlighted via `surface2`.
+Pattern reference for new widgets — read these `client.js` /
+`server.py` files to see how the conventions land in practice.
 
-Read the `client.js` of any of these for the canonical patterns:
-WMO-code → Phosphor icon lookup, condition tone mapping, Chart.js
-loader memoisation, server.py disk-cache pattern.
+**Weather + sky** — hero icons, decorative `--wx-*` palette,
+multi-variant pattern:
+
+* [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now) — hero icon + stats grid + sun row, 4 variants
+* [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly) — Chart.js line + rain-probability strip, lazy vendored Chart.js
+* [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast) — 5 day-columns with today-highlighted via `surface2`
+* [`plugins/weather_air_quality`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_air_quality), [`weather_pollen_count`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_pollen_count), [`weather_wind`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_wind) — categorical bands with `--c-data-*`
+* [`plugins/sky_moon`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_moon), [`sky_bom_warnings`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_bom_warnings) — SVG-driven, status colour use
+
+**Home Assistant** — refined title-bar pattern, real-time entity
+data, `variant` cell option:
+
+* [`plugins/ha_sensor`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_sensor), [`ha_climate`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_climate), [`ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history), [`ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities) — refined Bauhaus header (`--wb-bar-*`)
+* [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery), [`ha_locks`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_locks) — status-token use (`--c-ok` / `--c-warn` / `--c-danger`)
+* [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera), [`ha_media`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_media) — remote image loading (the renderer waits on these)
+
+**Calendar** — multi-day grid layouts, `variant` cell option for
+day / week / month directions:
+
+* [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day), [`calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week), [`calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)
+
+**GitHub** — sparse data + dense chart pattern, async stats handling:
+
+* [`plugins/github_repo`](https://github.com/dmellok/tesserae/tree/main/plugins/github_repo), [`github_pr_queue`](https://github.com/dmellok/tesserae/tree/main/plugins/github_pr_queue), [`github_activity`](https://github.com/dmellok/tesserae/tree/main/plugins/github_activity), [`github_contributions`](https://github.com/dmellok/tesserae/tree/main/plugins/github_contributions), [`github_actions`](https://github.com/dmellok/tesserae/tree/main/plugins/github_actions)
+
+Canonical patterns to lift: WMO-code → Phosphor icon lookup,
+condition tone mapping, Chart.js loader memoisation, server.py
+disk-cache pattern, `variant` dispatcher, `--c-zoom`-aware fixed-size
+elements.
 
 ---
 
@@ -595,8 +755,10 @@ changes; refresh the page to see updates.
   `document.fonts.ready` and the page-level font is propagated as
   `ctx.font.family`. Setting `font-family: inherit` in `:host` is the
   right move.
-* Don't fetch from your client.js. Use server.py — Playwright
-  enforces `networkidle` and your fetch will stretch the screenshot.
+* Don't fetch from your client.js. Use server.py — the renderer
+  doesn't wait for arbitrary in-page fetches (only for declared
+  `<img>` loads + fonts), so a client-side fetch will screenshot
+  before its data arrives.
 * Don't assume internet from server.py either, on the panel side —
   it's the Tesserae host that runs `fetch()`, and the panel may be
   reading the rendered .bin offline.

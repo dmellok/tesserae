@@ -8,6 +8,202 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.14.1] — 2026-06-03
+
+### Added
+
+- **Home Assistant integration doc** (`docs/install/home-assistant.md`)
+  covering both the HA Add-on / Ingress install path and the MQTT
+  auto-discovery surface, plus a webhook-from-HA RESTful-command
+  example.
+- **Webhook push, backup / export-import, and mDNS docs** added as
+  sections in `docs/install/server.md` (the endpoints have been in
+  the code for releases but were not user-documented).
+- **Theme tokens section** in `docs/widgets.md` covers the full
+  `--c-*` semantic layer (now 15 tokens with the `info` primitive),
+  the decorative `--wx-*` layer (paper / ink / chromatic chips,
+  type roles) used by the weather + sky widget family, the
+  per-cell `--c-zoom` counter-scaling math, and the
+  `--theme-font` / `--theme-font-mono` cascade so widgets respect
+  the font picker.
+- **`variant` cell-option pattern** documented in both
+  `docs/widgets.md` and `docs/dev/writing-a-plugin.md` — the
+  convention 28 shipped widgets use to ship multiple visual
+  directions (Refined / Geometric / Swiss / Data / etc.) through a
+  single dropdown.
+- **TRMNL HTTP-pull pipeline** documented across
+  `docs/install/clients.md`, `docs/install/devices.md`,
+  `docs/install/server.md`, `docs/dev/architecture.md`, and
+  `docs/compatibility.md` — pairing flow, the `/api/setup`,
+  `/api/display`, `/api/log` endpoints, and the `trmnl_png`
+  renderer's dither options.
+- **Composition workflow walkthrough** in
+  `docs/install/devices.md` — pick a layout preset, assign widgets
+  per cell, tune via the per-cell zoom slider, bind devices.
+
+### Changed
+
+- **Documentation counts corrected throughout.** Widget count
+  47 → 55, palette tokens 14 → 15, layout presets 17 → 10,
+  themes 21 → 31, fonts 15 → 17, Phosphor weights 4 → 6,
+  renderers 3 → 4, device kinds 3 → 4. mDNS hostname corrected
+  to plain `tesserae.local` (the `tesserae-<id>.local` form is
+  ESP32 captive-portal only).
+- **Architecture pipeline diagram** in `docs/dev/architecture.md`
+  now shows the TRMNL `trmnl_png` renderer + `trmnl_client` device,
+  the HTTP-pull transport side-by-side with MQTT, and adds sections
+  for the HTTP-pull API, the webhook push endpoint, and HA MQTT
+  discovery.
+- **Widget design brief** (`docs/widget-design-brief.md`) icon
+  manifest flipped from `fill` weights to `bold` (fill was
+  contradicting `docs/widgets.md` which calls out fill as the
+  Spectra-6-quantises-into-blobs weight). Tone-rules example
+  reworked so it uses semantic tokens explicitly (`--c-data-*` for
+  decorative, `--c-ok/warn/danger` for genuine status).
+- **`scripts/capture_widget_shots.py`** gained a login flow
+  matching `scripts/widget_contact_sheet.py` (POST `/login`,
+  forward the session cookie into the Playwright context) so
+  rerunning the screenshot capture doesn't trip the auth gate.
+  Drives via `TESSERAE_PASSWORD` env or `--password`.
+- **`scripts/gen_compatibility.py` + `docs/_data/tested.json`**
+  taught about the `trmnl_png` renderer and the `tesserae-trmnl-client`
+  reference repo so the compatibility table includes the Kindle
+  Paperwhite 2 / KOReader row.
+- **README + index** copy refreshed: `first-class` framing
+  dropped (banned per project voice), "Tesserae is young"
+  softened to match the v0.14 feature surface, TRMNL transport
+  surfaced alongside Pi/ESP32, four-client landscape made
+  explicit.
+- **CHANGELOG backfilled** with 0.13.0 / 0.13.1 / 0.13.2 / 0.14.0
+  entries and the `[Unreleased]` compare link / version refs that
+  had been silently stale since v0.8.x.
+- **SECURITY.md** supported-versions table bumped to 0.14.x;
+  scope expanded to include the TRMNL client repo and the HA
+  Add-on companion repo.
+- **55 per-widget screenshots regenerated** against the current
+  styling, with the 8 new HA / weather widgets that landed in 0.13 /
+  0.14 captured for the first time.
+
+## [0.14.0] — 2026-06-03
+
+### Added
+
+- **Two new bundled fonts.** `fonts_core` now ships **Archivo**
+  (400 / 700 / 800) and **Space Mono** (400 / 700), bringing the
+  total to 17 typefaces. Archivo is the Bauhaus widget family's
+  default sans; Space Mono lands as the matched monospace.
+- **Image-wait render phase.** The headless renderer now blocks the
+  screenshot on every cell's `<img>` finishing its load (5 s cap,
+  walks every shadow root). Fixes HA camera snapshots, Spotify album
+  art, Unsplash CDN images, and any other widget that fetches via a
+  plain `<img src>` — previously the screenshot fired during the
+  download and captured a half-loaded / broken-image frame. New
+  `images=N.NN` phase appears in the render-timing log.
+
+### Changed
+
+- **wx widget palette flows through theme tokens.** The decorative
+  `--wx-paper` / `--wx-ink` / `--wx-paper-2/3` / `--wx-ink-60` /
+  `--wx-hair` tokens (used across the weather + sky widget family)
+  now resolve from the cell host's `--c-bg` / `--c-text` /
+  `--c-text-soft` / `--c-line` so the widget body retints with the
+  active theme. The Bauhaus title bar stays pinned dark via the new
+  dedicated `--wb-bar-bg` / `--wb-bar-fg` tokens so refined widgets
+  don't flip to "light bar on dark body" under dark themes.
+- **Decorative `--wx-*` font role tokens lead with the theme font.**
+  `--wx-grotesk`, `--wx-black`, `--wx-geo`, `--wx-mono`, `--wx-swiss`
+  now reference `var(--theme-font, ...)` first so the user's font
+  picker actually wins over the Bauhaus default; the Bauhaus family
+  stays as the fallback.
+- **HA refined widgets cascade `widget-bauhaus.css` +
+  `widget-bauhaus-wx.css`.** `ha_sensor`, `ha_climate`, `ha_history`,
+  and `ha_entities` now link both shared stylesheets so the
+  `--wb-bar-*` and `--wx-*` tokens resolve consistently with the
+  weather widgets — refined title bars across the whole family land
+  at the same physical pixel size at every zoom level.
+
+### Fixed
+
+- **Multiselect option click yanked the page to the top.** The hidden
+  checkbox inside `.multiselect-opt` was clipped to a 1×1 footprint
+  via `clip-path: inset(50%)`, which made the browser's auto-focus
+  `scrollIntoView` think the focused element was at the parent
+  label's position — clicking an option further down the scrollable
+  list bubbled up to the document and scrolled the whole page. Now
+  the checkbox is `opacity: 0` and sized to fill the option label
+  (which is `position: relative`), so the auto-focus scroll target is
+  already in view and the page stays put.
+
+## [0.13.2] — 2026-06-03
+
+### Added
+
+- **Refined title bars pinned to physical pixels.** Shared
+  `--wb-bar-h` / `--wb-bar-px` / `--wb-bar-fs` / `--wb-bar-icon-sz` /
+  `--wb-mark-sz` CSS vars on `:host` in `widget-bauhaus.css`
+  counter-scale by `var(--c-zoom, 1)` so every refined title bar
+  lands at the same 36 physical pixels at every zoom level —
+  consistent across `.wb-bar`, `.wx-header-dark`, and every
+  per-widget header in the HA family.
+- **Dev-mode data import.** `Settings → System → Data → Import`
+  is callable in `--dev` mode — previously it refused; now it
+  flashes a "stop and restart manually" hint instead of trying to
+  `os.execv` the dev process.
+
+## [0.13.1] — 2026-06-03
+
+### Fixed
+
+- **CI mypy failure on `widget_samples.py`.** The `_ha_battery`
+  sample builder mixed-typed dict made mypy infer `level` as
+  `object`; rebound through a typed `list[tuple[str, int]]` staging
+  list and a `copy.deepcopy` result captured in a typed local before
+  return.
+
+## [0.13.0] — 2026-06-03
+
+### Added
+
+- **Data export / import.** `Settings → System → Data` exports your
+  entire Tesserae install (pages, themes, devices, plugin settings,
+  secrets) as a single ZIP, and imports a ZIP from another install.
+  Every file is validated against the matching JSON Schema before
+  writing; Docker / HA Add-on installs restart in place, venv
+  installs flash a "stop and restart" hint so nothing is left
+  mid-flight.
+- **`info` palette primitive + `--c-info` semantic token.** Themes
+  can now define an `info` colour for informational status
+  (in addition to `ok` / `warn` / `danger`); `--c-info` falls back
+  to `--theme-accent` when a theme omits it.
+- **Snap-to-grid layout editor.** The "Custom layout" disclosure on
+  the page editor gains a snap-to-grid toggle with adjustable cols /
+  rows — useful when a preset doesn't quite fit but you don't want
+  fractional drag-resize.
+- **8 new weather + sky widget variants.** Each of the existing 8
+  weather widgets gains 4 visual directions (Refined / Geometric /
+  Swiss / Data) selectable via a `variant` cell option, plus a
+  brand-new `weather_wind` widget.
+- **7 new Home Assistant widgets.** `ha_battery`, `ha_camera`,
+  `ha_energy`, `ha_lights`, `ha_locks`, `ha_media`, `ha_zones`. The
+  existing 5 HA widgets also get a polish pass (refined Bauhaus
+  title bar, decorative-vs-status tone clean-up).
+- **Dev widget gallery.** `/_test/widgets` (dev-only) renders every
+  widget at every size on one page for a "did anything regress?"
+  scan during a polish pass.
+
+### Changed
+
+- **Decorative vs status colour discipline.** Audit pass across every
+  bundled widget — every decorative use of `--c-ok` / `--c-warn` /
+  `--c-danger` got rerouted through `--c-data-*` (categorical) so the
+  status hues are reserved for genuine advisories / hazards / errors
+  only. Themes can now retune status colours without warping weather
+  / calendar / news colour blocking.
+- **Dark Bauhaus title bar on remaining refined HA widgets.** Final
+  refined widgets that were still using their own header styling
+  switched over to the shared `--wb-bar-*` tokens; every refined
+  header in the bundle now reads identically.
+
 ## [0.12.14] — 2026-06-02
 
 ### Fixed
@@ -897,8 +1093,8 @@ wiki scaffold.
 
 ## [0.2.0] — 2026-05-28
 
-First release aimed at fellow hobbyists: multi-panel support is now
-first-class, the widget catalogue is broad, and a fresh clone of each
+First release aimed at fellow hobbyists: multi-panel support is built
+in throughout, the widget catalogue is broad, and a fresh clone of each
 reference client works against the server defaults with no manual topic
 editing.
 
@@ -981,7 +1177,16 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/dmellok/tesserae/releases/tag/v0.14.1
+[0.14.0]: https://github.com/dmellok/tesserae/releases/tag/v0.14.0
+[0.13.2]: https://github.com/dmellok/tesserae/releases/tag/v0.13.2
+[0.13.1]: https://github.com/dmellok/tesserae/releases/tag/v0.13.1
+[0.13.0]: https://github.com/dmellok/tesserae/releases/tag/v0.13.0
+[0.12.0]: https://github.com/dmellok/tesserae/releases/tag/v0.12.0
+[0.11.0]: https://github.com/dmellok/tesserae/releases/tag/v0.11.0
+[0.10.0]: https://github.com/dmellok/tesserae/releases/tag/v0.10.0
+[0.9.0]: https://github.com/dmellok/tesserae/releases/tag/v0.9.0
 [0.8.3]: https://github.com/dmellok/tesserae/releases/tag/v0.8.3
 [0.8.2]: https://github.com/dmellok/tesserae/releases/tag/v0.8.2
 [0.8.1]: https://github.com/dmellok/tesserae/releases/tag/v0.8.1
