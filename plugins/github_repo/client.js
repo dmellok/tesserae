@@ -269,6 +269,7 @@ const VARIANTS = { re1: renderRE1, re2: renderRE2, re3: renderRE3, re4: renderRE
 const HEAD = `
   <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
   <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
   <link rel="stylesheet" href="/plugins/github_repo/client.css">`;
 
 export default async function render(shadow, ctx) {

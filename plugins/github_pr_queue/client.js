@@ -203,6 +203,7 @@ const VARIANTS = { pr1: renderPR1, pr2: renderPR2, pr3: renderPR3, pr4: renderPR
 const HEAD = `
   <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
   <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
   <link rel="stylesheet" href="/plugins/github_pr_queue/client.css">`;
 
 export default async function render(shadow, ctx) {

@@ -39,20 +39,26 @@
   word-break: break-word;
 }
 
-/* Shared dark header */
+/* Shared dark header — pinned to the refined Bauhaus bar via
+ * widget-bauhaus.css' --wb-bar-* tokens so every github bar lands
+ * at the same physical size as reddit / weather / HA bars across
+ * every zoom level. Background + colour are locked to the Bauhaus
+ * dark via --wb-bar-bg/fg so dark themes don't flip the bar to
+ * "dark on dark". */
 .gh-dark {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.4cqw, 12px);
-  background: var(--c-text);
-  color: var(--c-bg);
-  padding: clamp(6px, 1.4cqh, 11px) clamp(10px, 2cqw, 16px);
+  gap: var(--wb-bar-gap, 10px);
+  background: var(--wb-bar-bg, #1b1a16);
+  color: var(--wb-bar-fg, #f1ece0);
+  height: var(--wb-bar-h);
+  padding: 0 var(--wb-bar-px);
   flex-shrink: 0;
 }
-.gh-dark-chip { width: clamp(9px, 1.6cqw, 14px); height: clamp(9px, 1.6cqw, 14px); flex-shrink: 0; }
+.gh-dark-chip { width: var(--wb-mark-sz); height: var(--wb-mark-sz); flex-shrink: 0; }
 .gh-dark-title {
   flex: 1;
-  font: 900 clamp(11px, 2cqw, 16px)/1 var(--theme-font, system-ui);
+  font: 900 var(--wb-bar-fs)/1 var(--theme-font, system-ui);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   overflow: hidden;

@@ -8,6 +8,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.14.3] — 2026-06-03
+
+### Added
+
+- **Renderer retries `Page.goto` on transient Playwright
+  `TimeoutError`.** ``RenderRequest.max_attempts`` (default 3)
+  controls how many fresh-context attempts each render gets. Each
+  retry tears down the half-loaded page + context so the next try
+  starts clean. Only timeouts retry — other Playwright errors
+  (invalid URL, browser-side crash, frame detached) surface
+  immediately so we don't burn the deadline on something that
+  won't recover. The browser pool's outer deadline scales with
+  ``max_attempts`` so the worst-case 3×15s retry fits. The
+  intermittent failure mode this fixes: HA-driven pushes that
+  surfaced as ``Page.goto: Timeout 15000ms exceeded`` under no
+  obvious cause — usually a brief loopback contention or a
+  background-thread GC pause that ate the navigation window.
+
+### Fixed
+
+- **github widget title bars now match every other refined widget.**
+  The five github widgets (`github_repo`, `github_actions`,
+  `github_activity`, `github_contributions`, `github_pr_queue`) had
+  hard-coded `clamp(...)` bar dimensions and didn't link
+  `widget-bauhaus.css`, so their bars shrank with cell size instead
+  of pinning to the shared `--wb-bar-h` / `--wb-bar-px` /
+  `--wb-bar-fs` tokens. Each widget now `<link>`s
+  `widget-bauhaus.css` and the `.gh-dark` / `.re1-dark` selectors
+  read from the shared `--wb-bar-*` vars, so every github bar lands
+  at the same physical pixel height as reddit / HA / weather bars
+  across every zoom level. Background + colour also flipped to
+  `--wb-bar-bg` / `--wb-bar-fg` so dark themes don't render the
+  bar as "dark on dark".
+
 ## [0.14.2] — 2026-06-03
 
 ### Changed
@@ -1189,7 +1223,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.2...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.3...HEAD
+[0.14.3]: https://github.com/dmellok/tesserae/releases/tag/v0.14.3
 [0.14.2]: https://github.com/dmellok/tesserae/releases/tag/v0.14.2
 [0.14.1]: https://github.com/dmellok/tesserae/releases/tag/v0.14.1
 [0.14.0]: https://github.com/dmellok/tesserae/releases/tag/v0.14.0
