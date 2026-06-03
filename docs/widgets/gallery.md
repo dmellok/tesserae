@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
+The **56 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy — convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -65,7 +65,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![weather_wind](../screenshots/widgets/weather_wind.png)
 
     Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).
 
@@ -413,7 +413,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_battery](../screenshots/widgets/ha_battery.png)
 
     Auto-discovered battery levels across every Home Assistant entity with device_class=battery, sorted lowest-first. Picks up phones, sensors, vacuums, remotes — anything HA already exposes as a battery — and flags low/critical against per-cell thresholds.
 
@@ -423,7 +423,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_camera](../screenshots/widgets/ha_camera.png)
 
     Snapshot from one or more Home Assistant camera.* entities, with four visual directions. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.
 
@@ -443,7 +443,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_energy](../screenshots/widgets/ha_energy.png)
 
     Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
@@ -473,7 +473,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_lights](../screenshots/widgets/ha_lights.png)
 
     An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.
 
@@ -483,7 +483,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_locks](../screenshots/widgets/ha_locks.png)
 
     A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.
 
@@ -493,7 +493,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_media](../screenshots/widgets/ha_media.png)
 
     Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Four selectable visual directions. Requires the Home Assistant Core plugin.
 
@@ -513,7 +513,7 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ---
 
-    _Screenshot pending — run `python scripts/capture_widget_shots.py`._
+    ![ha_zones](../screenshots/widgets/ha_zones.png)
 
     Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.
 
@@ -542,6 +542,16 @@ The **55 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ![spotify_now_playing](../screenshots/widgets/spotify_now_playing.png)
 
     Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
+
+-   **Spotify — Queue** &middot; `spotify_queue`
+
+    ---
+
+    ![spotify_queue](../screenshots/widgets/spotify_queue.png)
+
+    Currently-playing Spotify track + the next few items in your queue. Pulls from /v1/me/player/queue via the shared spotify_core OAuth. Requires Spotify Premium — the queue endpoint is gated to paid accounts.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 

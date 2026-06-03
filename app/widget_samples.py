@@ -412,6 +412,35 @@ def _spotify_album_art() -> dict[str, Any]:
     }
 
 
+def _spotify_queue() -> dict[str, Any]:
+    def _track(name: str, artist: str, album: str, duration_ms: int) -> dict[str, Any]:
+        return {
+            "track": name,
+            "artist": artist,
+            "album": album,
+            "album_art": _SPOTIFY_ART_DATA_URL,
+            "album_art_thumb": _SPOTIFY_ART_DATA_URL,
+            "duration_ms": duration_ms,
+        }
+
+    return {
+        "currently_playing": _track("Light Years", "The National", "Sleep Well Beast", 248_000),
+        "queue": [
+            _track("Day I Die", "The National", "Sleep Well Beast", 245_000),
+            _track("Walk It Back", "The National", "Sleep Well Beast", 220_000),
+            _track(
+                "The System Only Dreams in Total Darkness",
+                "The National",
+                "Sleep Well Beast",
+                264_000,
+            ),
+            _track("Born to Beg", "The National", "Trouble Will Find Me", 254_000),
+            _track("Pink Rabbits", "The National", "Trouble Will Find Me", 273_000),
+            _track("I Need My Girl", "The National", "Trouble Will Find Me", 246_000),
+        ],
+    }
+
+
 def _sky_moon() -> dict[str, Any]:
     return {
         "label": "Melbourne",
@@ -474,6 +503,7 @@ SAMPLES: dict[str, Any] = {
     "ha_zones": _ha_zones,
     "spotify_now_playing": _spotify_now_playing,
     "spotify_album_art": _spotify_album_art,
+    "spotify_queue": _spotify_queue,
     "sky_moon": _sky_moon,
 }
 

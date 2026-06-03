@@ -8,6 +8,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.15.0] — 2026-06-03
+
+### Added
+
+- **`spotify_queue` widget** — current track + next few items from
+  your Spotify queue. Refined Bauhaus shell with the standard
+  `--wb-bar-h` header, accent-band lede showing now-playing + album
+  art, and a numbered list of upcoming tracks (title / artist /
+  duration). Two cell options: `max_items` (1–12, default 6) and
+  `show_now_playing` (drop the lede for a queue-only feed).
+  Total widget count: **56**.
+- **`spotify_core.queue()`** wraps `GET /v1/me/player/queue` with the
+  same OAuth + token-refresh dance as `now_playing()`. The endpoint
+  is Premium-only — a 403 surfaces as a clear *"Spotify Premium is
+  required to read the queue."* error, not a bare HTTP code. No
+  re-auth needed: the existing `user-read-playback-state` scope
+  already covers the queue endpoint.
+
 ## [0.14.4] — 2026-06-03
 
 ### Fixed
@@ -1255,7 +1273,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.14.4...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/dmellok/tesserae/releases/tag/v0.15.0
 [0.14.4]: https://github.com/dmellok/tesserae/releases/tag/v0.14.4
 [0.14.3]: https://github.com/dmellok/tesserae/releases/tag/v0.14.3
 [0.14.2]: https://github.com/dmellok/tesserae/releases/tag/v0.14.2

@@ -44,6 +44,7 @@ from werkzeug.wrappers import Response
 AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
+QUEUE_URL = "https://api.spotify.com/v1/me/player/queue"
 SCOPE = "user-read-currently-playing user-read-playback-state"
 USER_AGENT = "tesserae/0.1 (+spotify_core)"
 TOKENS_FILE = ".tokens.json"
@@ -281,6 +282,95 @@ def now_playing() -> dict[str, Any]:
         is_playing=bool(body.get("is_playing")),
         progress_ms=int(body.get("progress_ms") or 0),
     )
+
+
+def _track_summary(item: dict[str, Any]) -> dict[str, Any]:
+    """Compact normalised representation of a Spotify track object —
+    enough for a list row (title, artist, album, art) without the
+    audio-features / external-url ballast."""
+    album = item.get("album") or {}
+    images = album.get("images") or []
+    # Spotify orders images largest-first; the smallest is plenty for a
+    # list row, the largest is needed for a hero / cover slot.
+    art_large = images[0]["url"] if images else None
+    art_small = images[-1]["url"] if images else None
+    artists = ", ".join(a.get("name", "") for a in (item.get("artists") or []) if a.get("name"))
+    return {
+        "track": item.get("name") or "",
+        "artist": artists,
+        "album": album.get("name") or "",
+        "album_art": art_large,
+        "album_art_thumb": art_small,
+        "duration_ms": int(item.get("duration_ms") or 0),
+    }
+
+
+def queue() -> dict[str, Any]:
+    """Return the currently-playing track + the next N items in the
+    user's Spotify queue.
+
+    Shapes mirror ``now_playing()`` so widgets handle them the same way:
+
+    * not connected / config missing → ``{"connected": False, "error": ...}``
+    * Premium-required (HTTP 403)    → ``{"connected": True, "error":
+      "Spotify Premium is required to read the queue."}``
+    * nothing playing                → ``{"connected": True, "idle": True}``
+    * a queue                        → ``{"connected": True, "ok": True,
+      "currently_playing": <track>, "queue": [<track>, ...]}``
+
+    Each track in ``currently_playing`` / ``queue`` is a ``_track_summary``
+    dict. The queue Spotify returns blends user-queued tracks with the
+    auto-mix "up next" set; there's no API-level distinction, so widgets
+    treat them flat.
+    """
+    if not has_credentials():
+        return {"connected": False, "error": "Add your Spotify Client ID + Secret in Settings."}
+    if not connected():
+        return {
+            "connected": False,
+            "error": "Spotify not connected — connect at Plugins → Spotify.",
+        }
+    try:
+        token = _valid_access_token()
+    except Exception as err:
+        return {"connected": False, "error": _coerce_error(err)}
+    try:
+        status, body = _api_get(QUEUE_URL, token)
+    except urllib.error.HTTPError as err:
+        if err.code == 401:
+            try:
+                with _lock:
+                    _refresh_locked(_load_tokens())
+                status, body = _api_get(QUEUE_URL, _valid_access_token())
+            except Exception as err2:
+                return {"connected": True, "error": _coerce_error(err2)}
+        elif err.code == 403:
+            # Free Spotify accounts can't read the queue; surface that
+            # specifically so the widget shows a useful message rather
+            # than a bare "403".
+            return {
+                "connected": True,
+                "error": "Spotify Premium is required to read the queue.",
+            }
+        else:
+            return {"connected": True, "error": _coerce_error(err)}
+    except Exception as err:
+        return {"connected": True, "error": _coerce_error(err)}
+
+    if status == 204 or not body:
+        return {"connected": True, "idle": True}
+    current = body.get("currently_playing")
+    queue_items = body.get("queue") or []
+    if not isinstance(current, dict):
+        # Ads, podcasts with no track item, or a private session — same
+        # treatment as ``now_playing``.
+        return {"connected": True, "idle": True}
+    return {
+        "connected": True,
+        "ok": True,
+        "currently_playing": _track_summary(current),
+        "queue": [_track_summary(item) for item in queue_items if isinstance(item, dict)],
+    }
 
 
 def _coerce_error(err: Exception) -> str:

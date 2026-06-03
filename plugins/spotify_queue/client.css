@@ -1,0 +1,198 @@
+/* spotify_queue — Bauhaus shape: refined dark header, accent lede with
+ * album art + now-playing track, neutral surface list of upcoming
+ * tracks. Mirrors news_reddit's lede+list rhythm so it sits cleanly
+ * alongside on a multi-cell dashboard. */
+
+:host {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--c-text);
+  background: var(--c-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+.root {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* --- lede: now playing --- */
+
+.sq-lede {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: clamp(12px, 2.2cqw, 24px);
+  padding: clamp(12px, 2.4cqw, 28px) clamp(14px, 2.6cqw, 30px);
+  background: var(--c-accent);
+  color: var(--c-bg);
+  min-width: 0;
+  overflow: hidden;
+  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
+}
+
+.sq-lede-art {
+  width: clamp(56px, 14cqw, 132px);
+  height: clamp(56px, 14cqw, 132px);
+  background: var(--c-bg);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sq-lede-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sq-lede-art.sq-art--placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--c-accent);
+  background: var(--c-bg);
+}
+.sq-lede-art.sq-art--placeholder .ph-bold {
+  font-size: clamp(28px, 7cqw, 64px);
+}
+
+.sq-lede-body {
+  display: grid;
+  gap: clamp(2px, 0.4cqw, 6px);
+  min-width: 0;
+}
+.sq-lede-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: clamp(4px, 0.8cqw, 8px);
+  font: 800 clamp(9px, 1.5cqw, 12px)/1 var(--theme-font-mono, ui-monospace);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+.sq-lede-icon { font-size: clamp(10px, 1.6cqw, 14px); }
+.sq-lede-title {
+  margin: 0;
+  font-size: clamp(15px, 2.8cqw, 28px);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sq-lede-artist {
+  font-size: clamp(12px, 2cqw, 18px);
+  font-weight: 700;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-lede-album {
+  font-size: clamp(10px, 1.6cqw, 14px);
+  font-weight: 500;
+  opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- queue list --- */
+
+.sq-list {
+  display: grid;
+  grid-auto-rows: min-content;
+  align-content: start;
+  background: var(--c-surface);
+  min-height: 0;
+  overflow: hidden;
+}
+.sq-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: clamp(8px, 1.4cqw, 16px);
+  padding: clamp(6px, 1.2cqh, 14px) clamp(12px, 2cqw, 22px);
+  min-width: 0;
+  overflow: hidden;
+  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
+}
+.sq-row:first-of-type { border-top: 0; }
+.sq-num {
+  font: 800 clamp(11px, 1.8cqw, 16px)/1 var(--theme-font-mono, ui-monospace);
+  color: var(--c-text-soft);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.sq-row-art {
+  width: clamp(28px, 6cqw, 54px);
+  height: clamp(28px, 6cqw, 54px);
+  background: var(--c-raised);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.sq-row-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sq-row-art.sq-art--placeholder {
+  display: grid;
+  place-items: center;
+  color: var(--c-text-soft);
+}
+.sq-row-art.sq-art--placeholder .ph-bold {
+  font-size: clamp(14px, 3cqw, 24px);
+}
+.sq-row-body {
+  display: grid;
+  gap: clamp(2px, 0.3cqh, 4px);
+  min-width: 0;
+}
+.sq-row-title {
+  font-size: clamp(12px, 1.9cqw, 17px);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-row-meta {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(6px, 1.2cqw, 14px);
+  font-size: clamp(10px, 1.5cqw, 13px);
+  color: var(--c-text-soft);
+  min-width: 0;
+}
+.sq-row-artist {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sq-row-dur {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sq-empty {
+  padding: clamp(16px, 3cqw, 32px);
+  text-align: center;
+  color: var(--c-text-soft);
+  font-size: clamp(11px, 1.8cqw, 14px);
+}
+
+/* --- size adaptations --- */
+
+/* sm: drop the album line in the lede, single-line artist, smaller art. */
+.size-sm .sq-lede-album { display: none; }
+.size-sm .sq-lede-title { -webkit-line-clamp: 1; }
+/* xs cell size isn't supported (declared in plugin.json); the list
+   doesn't read at <200px wide. */
