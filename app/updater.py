@@ -235,6 +235,17 @@ class Updater:
         self._latest_release = check
         return check
 
+    def has_git_repo(self) -> bool:
+        """Whether the install is a git checkout (the in-app updater
+        needs one — ``current_state`` / ``check_remote`` / ``apply`` all
+        shell out to git). False for pip-installed wheels, release
+        tarballs, and any other install method that doesn't carry a
+        ``.git`` directory. The controller branches on this so the
+        Settings → System card can render the GitHub release-API view
+        (same as Docker installs) instead of flashing a git error every
+        page load."""
+        return (self._repo / ".git").exists()
+
     def current_state(self) -> UpdateState:
         sha = self._git("rev-parse", "HEAD")
         short = self._git("rev-parse", "--short", "HEAD")

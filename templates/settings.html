@@ -498,13 +498,18 @@
 {% if active_area == 'system' %}
 <div class="settings-stack">
 
-  {% if system_in_container %}
-  {# Running under the official Docker image — the git-based self-update
-     flow can't run (no .git in the image, layered filesystem loses
-     edits on the next rebuild). Show the running version, ask GitHub
-     for the latest release, surface the docker compose command. #}
+  {% if system_in_container or not system_git_available %}
+  {# Running under the official Docker image OR a bare install method
+     (pip wheel, release tarball, etc.) — either way there's no .git
+     directory, so the in-app updater's git-based check / apply /
+     rollback flows can't run. Show the running version, ask GitHub
+     for the latest release, surface the appropriate upgrade hint. #}
   <section class="card">
+    {% if system_in_container %}
     {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull — but we still check GitHub for newer releases so you know when one is out.') }}
+    {% else %}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="This install isn't a git checkout, so the in-app pull-and-restart flow can't run — but we still check GitHub for newer releases so you know when one is out.") }}
+    {% endif %}
 
     {% if system_release_check %}
     <p>
@@ -525,10 +530,16 @@
     {% endif %}
     {% endif %}
 
+    {% if system_in_container %}
     <p class="field-help">To upgrade, run this on the host the container is running on:</p>
     <pre class="code-snippet"><code>docker compose pull
 docker compose up -d</code></pre>
     <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the recreate. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps. The container restarts on the new image — expect a ~1s blip.</p>
+    {% else %}
+    <p class="field-help">Upgrade with whichever install method you used. For a pip / venv install, that's typically:</p>
+    <pre class="code-snippet"><code>pip install --upgrade tesserae</code></pre>
+    <p class="field-help">For an unpacked release tarball, download the latest from <a href="https://github.com/dmellok/tesserae/releases" target="_blank" rel="noopener">Releases</a> and replace the install dir, preserving <code>data/</code>. For the full in-app pull-and-restart flow, install from a <code>git clone</code> of the repo instead.</p>
+    {% endif %}
   </section>
   {% else %}
   <section class="card">

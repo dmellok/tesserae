@@ -99,17 +99,22 @@ def settings_area(area: str) -> str | Response:
     )
     in_container = bool(os.environ.get("TESSERAE_IN_DOCKER"))
     system_release_check = None
+    system_git_available = True
     if area == "system":
         upd = current_app.config["UPDATER"]
-        if in_container:
-            # No ``.git`` in the Docker image, so the git-based state +
-            # check_remote can't run. Use the GitHub release API instead
-            # and skip the history/rollback machinery (rollback is also
-            # git-based). The Settings card renders a docker-compose
-            # hint when ``system_release_check.behind`` is True.
+        # Three install shapes:
+        #  - Docker (``TESSERAE_IN_DOCKER`` set): no .git in the image,
+        #    use release API.
+        #  - Bare non-git (pip wheel, release tarball, etc.): also no
+        #    .git, same release-API view. Without this branch the page
+        #    flashed "Update state unavailable: not a git repository"
+        #    on every load.
+        #  - Git checkout: full in-app updater (check / apply / rollback).
+        system_git_available = upd.has_git_repo()
+        if in_container or not system_git_available:
             # Skip the live API call under ``app.testing`` so tests
-            # don't depend on network reachability — the docker hint
-            # still renders from the rest of the branch.
+            # don't depend on network reachability — the rest of the
+            # branch (the docker / bare-install hint) still renders.
             if not current_app.testing:
                 system_release_check = upd.latest_release_via_api(
                     current_app.config.get("APP_VERSION", "0.0.0")
@@ -160,6 +165,7 @@ def settings_area(area: str) -> str | Response:
         # (a layered filesystem would lose changes on the next image
         # rebuild) and show a "docker pull" hint instead.
         system_in_container=in_container,
+        system_git_available=system_git_available,
         system_release_check=system_release_check,
         system_telemetry_enabled=system_telemetry_enabled,
         system_telemetry_host=system_telemetry_host,
