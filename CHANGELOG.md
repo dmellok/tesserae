@@ -8,6 +8,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.6] — 2026-06-04
+
+### Fixed
+
+- **Pushing from the dashboards list or the editor no longer yanks
+  you to Send → History.** The send_page endpoint was hard-redirecting
+  to `/send?tab=history` regardless of where the user came from, which
+  was helpful when initiating a push from the Send page itself but
+  jarring when the user was triaging dashboards or actively editing a
+  page. Forms on `/pages` and `/pages/<id>` now post a hidden
+  `return_to` field (`dashboards` / `editor`) the route honours via a
+  safelist — the Send-page Saved tab and any other caller without a
+  `return_to` keep the legacy redirect-to-History behaviour. Flash
+  message also shortened when the user isn't about to see the History
+  tab (no point telling them to watch a tab they're not on).
+
 ## [0.16.5] — 2026-06-04
 
 ### Fixed
@@ -1485,7 +1501,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.5...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.6...HEAD
+[0.16.6]: https://github.com/dmellok/tesserae/releases/tag/v0.16.6
 [0.16.5]: https://github.com/dmellok/tesserae/releases/tag/v0.16.5
 [0.16.4]: https://github.com/dmellok/tesserae/releases/tag/v0.16.4
 [0.16.3]: https://github.com/dmellok/tesserae/releases/tag/v0.16.3

@@ -163,6 +163,10 @@
     {% set _push_disabled = device_options and not _bound_count %}
     <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
       <input type="hidden" name="page_id" value="{{ page.id }}">
+      {# Stay in the editor after pushing — the default lands on Send →
+         History, which yanks the user out of the page they're actively
+         working on. #}
+      <input type="hidden" name="return_to" value="editor">
       <button type="submit" class="ghost"
               {% if _push_disabled %}disabled{% endif %}
               title="{% if _push_disabled %}Bind this dashboard to at least one device (below) before pushing.{% else %}Push this dashboard to every bound device{% endif %}">

@@ -49,6 +49,10 @@
       </a>
       <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
         <input type="hidden" name="page_id" value="{{ page.id }}">
+        {# Stay on the dashboards list after pushing — the default lands
+           on Send → History, which is jarring when the user is just
+           triaging dashboards rather than composing a send. #}
+        <input type="hidden" name="return_to" value="dashboards">
         <button type="submit" class="page-action" title="Push this dashboard to its panel">
           <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
         </button>

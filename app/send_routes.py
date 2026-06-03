@@ -370,13 +370,38 @@ def send_page() -> Response:
     page_id = (request.form.get("page_id") or "").strip()
     if not page_id:
         flash("Pick a saved dashboard first.", "error")
-        return redirect(url_for("send.index", tab="saved"))
+        return _redirect_after_page_push(page_id, on_error=True)
     page_name = next((p.name for p in _pages().list() if p.id == page_id), page_id)
     _run_in_background(lambda: _push().push(page_id), label=f"page:{page_id}")
-    flash(
-        f"Sending {page_name!r}. The History tab will update when the render lands.",
-        "ok",
-    )
+    return_to = (request.form.get("return_to") or "").strip()
+    # Tailor the flash message to where the user is about to land.
+    # "History tab" was helpful from the Send page; from the dashboards
+    # list / editor it just confuses since they don't see History next.
+    if return_to in ("dashboards", "editor"):
+        flash(f"Sending {page_name!r}.", "ok")
+    else:
+        flash(
+            f"Sending {page_name!r}. The History tab will update when the render lands.",
+            "ok",
+        )
+    return _redirect_after_page_push(page_id)
+
+
+def _redirect_after_page_push(page_id: str, *, on_error: bool = False) -> Response:
+    """Honour the form's ``return_to`` hint so a Push from the dashboards
+    list or the editor doesn't yank the user into Send → History.
+
+    Values are safelisted (``dashboards`` / ``editor``); anything else
+    falls back to the default Send-page-History landing — no open-redirect
+    risk from a user-supplied path. ``page_id`` is needed to build the
+    editor URL when ``return_to=editor``."""
+    return_to = (request.form.get("return_to") or "").strip()
+    if return_to == "dashboards":
+        return redirect(url_for("pages.index"))
+    if return_to == "editor" and page_id:
+        return redirect(url_for("pages.edit", page_id=page_id))
+    if on_error:
+        return redirect(url_for("send.index", tab="saved"))
     return redirect(url_for("send.index", tab="history"))
 
 
