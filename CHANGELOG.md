@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.9] — 2026-06-04
+
+### Fixed
+
+- **Version-metadata hotfix for v0.16.8.** A parallel-edit race in the
+  v0.16.8 commit landed without bumping `pyproject.toml` or
+  `plugins/ha_sensor/plugin.json`, so the v0.16.8 tag points at a
+  commit where the on-disk files still say `0.16.7` / `0.3.0`. This
+  release bumps both to the correct values; functionally identical
+  to v0.16.8.
+
 ## [0.16.8] — 2026-06-04
 
 ### Added
@@ -1543,7 +1554,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.8...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.9...HEAD
+[0.16.9]: https://github.com/dmellok/tesserae/releases/tag/v0.16.9
 [0.16.8]: https://github.com/dmellok/tesserae/releases/tag/v0.16.8
 [0.16.7]: https://github.com/dmellok/tesserae/releases/tag/v0.16.7
 [0.16.6]: https://github.com/dmellok/tesserae/releases/tag/v0.16.6
