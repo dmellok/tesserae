@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Entities",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "widget",
   "description": "A status grid of several Home Assistant entities — six Bauhaus / Swiss visual directions to choose from. Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.",
   "icon": "ph-squares-four",
@@ -25,10 +25,10 @@
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
     {
       "name": "overrides",
-      "type": "textarea",
-      "label": "Per-entity name / icon overrides",
+      "type": "entity_overrides",
+      "label": "Custom names + icons",
       "default": "",
-      "help": "One entity per line, pipe-separated: ``entity_id | name | icon``. Either the name or the icon can be left empty to keep the auto value. Icon is a Phosphor name (see phosphoricons.com), without the ``ph-`` prefix. Lines starting with ``#`` are comments.\n\nExample:\nlight.kitchen | Kitchen Lights | lightbulb\nlock.front_door | Front Door | lock-key\nsensor.outdoor_temp | Outdoor | thermometer-simple"
+      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon."
     }
   ],
   "render": { "dither": "none", "needs_network": true }

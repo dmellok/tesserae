@@ -152,6 +152,26 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{#- Per-entity name + icon override list. Pairs with a multiselect in
+   the same fieldset: ``static/entity-overrides.js`` reads which entities
+   are ticked there and renders one row (name field + icon picker) per
+   ticked entity. The hidden textarea is the source of truth — JS keeps
+   it in the legacy pipe-separated format so the server-side parser
+   (`_parse_overrides`) stays unchanged. -#}
+{%- macro entity_overrides_field(field_id, name, label, value='', help=None) -%}
+<div class="field field--entity-overrides" data-entity-overrides>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
+  <textarea id="{{ field_id }}" name="{{ name }}" rows="1"
+            class="entity-overrides-storage" data-overrides-storage
+            aria-hidden="true" tabindex="-1">{{ value|default('', true) }}</textarea>
+  <div class="entity-overrides-list" data-overrides-list>
+    <p class="entity-overrides-empty" data-overrides-empty>
+      Tick an entity above to customise its name or icon.
+    </p>
+  </div>
+</div>
+{%- endmacro -%}
+
 {#- Multi-select: a searchable checklist. ``value`` is the selected list
    (tolerates a bare string / None); ``options`` is [{value,label}], as
    produced by a plugin's choices(). An option with an empty value is
@@ -360,6 +380,8 @@ macro here instead.
     {{ multiselect_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
   {% elif ftype == 'textarea' %}
     {{ textarea_field(field_id, name, label, value=value, help=help_text) }}
+  {% elif ftype == 'entity_overrides' %}
+    {{ entity_overrides_field(field_id, name, label, value=value, help=help_text) }}
   {% elif ftype == 'slider' %}
     {{ slider(field_id, name, label,
               value=value if value is not none else spec.get('default', 0),

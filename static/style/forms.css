@@ -427,6 +427,94 @@ code {
   color: var(--t-muted);
 }
 
+/* ----- Per-entity name + icon overrides -----------------------------
+   Rendered by static/entity-overrides.js for HA sensor + entities
+   widgets. The hidden textarea is the source of truth; the rows render
+   from the linked multiselect's ticked entities. */
+
+.entity-overrides-storage {
+  /* Off-screen but still focusable as a form field — the JS bumps
+     'input' on it for the editor's dirty/preview watcher. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  border: 0;
+}
+.entity-overrides-list {
+  display: grid;
+  gap: var(--t-space-2);
+}
+.entity-overrides-empty {
+  margin: 0;
+  padding: var(--t-space-3);
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
+  background: var(--t-surface-soft);
+  border: 1px dashed var(--t-border);
+  border-radius: var(--t-radius-sm);
+  text-align: center;
+}
+.entity-override-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(120px, 0.7fr);
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2);
+  background: var(--t-surface-soft);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-sm);
+}
+@media (max-width: 640px) {
+  /* Stack on narrow screens — the inline icon picker needs full row
+     width for its popover not to clip out of the cell card. */
+  .entity-override-row {
+    grid-template-columns: 1fr;
+  }
+}
+.entity-override-id {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.entity-override-label {
+  font-weight: 600;
+  color: var(--t-fg);
+  font-size: var(--t-size-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-override-eid {
+  font-family: var(--t-font-mono, ui-monospace, monospace);
+  font-size: var(--t-size-xs);
+  color: var(--t-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-override-row .entity-override-name {
+  width: 100%;
+}
+.entity-override-row .icon-picker--inline .icon-picker-trigger {
+  padding: 6px 8px;
+  justify-content: center;
+}
+.entity-override-row .icon-picker--inline .icon-picker-label {
+  display: none;
+}
+/* The icon-picker column is narrow; let the popover expand leftwards
+   over the rest of the row so its grid has enough room for the icon
+   tiles. ``right: 0`` anchors it to the trigger's right edge. */
+.entity-override-row .icon-picker--inline .icon-picker-popover {
+  left: auto;
+  right: 0;
+  min-width: 320px;
+}
+
 /* ----- File dropzone -------------------------------------------------
    Flat dashed-border drop target. Border colour shifts to accent on
    hover; on drag-over the border solidifies and the background tints

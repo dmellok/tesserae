@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Sensor",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "widget",
   "description": "One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
@@ -25,10 +25,10 @@
     { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
     {
       "name": "overrides",
-      "type": "textarea",
-      "label": "Per-entity name / icon overrides",
+      "type": "entity_overrides",
+      "label": "Custom names + icons",
       "default": "",
-      "help": "One entity per line, pipe-separated: ``entity_id | name | icon``. Either the name or the icon can be left empty to keep the auto value. Icon is a Phosphor name (see phosphoricons.com), without the ``ph-`` prefix. Lines starting with ``#`` are comments.\n\nExample:\nsensor.living_room_temperature | Living Room | thermometer-simple\nsensor.bedroom_temperature | Bedroom |\nsensor.solar_power | | sun"
+      "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon."
     },
     { "name": "show_unit", "type": "boolean", "label": "Show units", "default": true }
   ],

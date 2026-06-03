@@ -171,6 +171,12 @@
     document.querySelectorAll("[data-icon-picker]").forEach(bindOne);
   }
 
+  // Exposed so modules that inject pickers after page load (e.g.
+  // entity-overrides.js, which renders one per ticked HA entity) can
+  // bind the new nodes. bindOne is idempotent so calling bindAll again
+  // is cheap — already-bound pickers short-circuit.
+  window.tesseraeIconPickerBindAll = bindAll;
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", bindAll);
   } else {
