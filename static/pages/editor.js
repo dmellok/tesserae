@@ -84,17 +84,51 @@
   // runs forever — each widget's setInterval ticks (clock, F1
   // countdown, public-transport refresh) accumulate small allocations
   // every minute, and the webpage widget's auto-refresh swaps a
-  // foreign document in repeatedly. Over an overnight idle session
-  // those compound into multi-GB tab memory (saw 6.5 GB in the wild).
-  // A hard reset every 4 hours discards all accumulated state — the
-  // user sees nothing more than the same brief opacity fade as a
-  // normal save-driven reload.
-  const _PREVIEW_RESET_MS = 4 * 60 * 60 * 1000;
+  // foreign document in repeatedly. Over a long idle session those
+  // compound into multi-GB tab memory (saw 6.5 GB in the wild, then
+  // a "page was reloaded because it was using significant memory"
+  // warning even after the 4-hour reset was added). A hard reset
+  // every hour discards all accumulated state — the user sees the
+  // same brief opacity fade as a normal save-driven reload, but
+  // about:blank in between forces the browser to fully release the
+  // previous document instead of cache-keeping it.
+  const _PREVIEW_RESET_MS = 60 * 60 * 1000;
   let _previewResetTimer = null;
+  function hardResetPreview() {
+    previewFrames().forEach((iframe) => {
+      const finalUrl = (() => {
+        const url = new URL(iframe.src, location.origin);
+        url.searchParams.set("_t", String(Date.now()));
+        return url.pathname + url.search;
+      })();
+      iframe.style.transition = "opacity 140ms ease";
+      iframe.style.opacity = "0.35";
+      // about:blank first → the browser unmounts the document, dropping
+      // every interval/listener/ResizeObserver/embedded-iframe that
+      // belonged to it. Then the real URL loads a fresh composition.
+      iframe.addEventListener(
+        "load",
+        function onBlank() {
+          iframe.removeEventListener("load", onBlank);
+          iframe.addEventListener(
+            "load",
+            () => {
+              iframe.style.opacity = "1";
+              lastStateByFrame.delete(iframe);
+            },
+            { once: true },
+          );
+          iframe.src = finalUrl;
+        },
+        { once: true },
+      );
+      iframe.src = "about:blank";
+    });
+  }
   function schedulePreviewReset() {
     if (_previewResetTimer) clearTimeout(_previewResetTimer);
     _previewResetTimer = setTimeout(() => {
-      reloadPreview();
+      hardResetPreview();
       schedulePreviewReset();
     }, _PREVIEW_RESET_MS);
   }

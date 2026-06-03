@@ -2,20 +2,28 @@
 //
 // Pairs with a [data-multiselect] in the same fieldset (used by the HA
 // sensor + entities widgets). Reads which entities are ticked there
-// and renders one row per ticked entity: a "display name" text input
-// plus an inline icon picker (powered by static/icon-picker.js). The
-// hidden textarea inside [data-entity-overrides] is the source of
-// truth — JS keeps it in the legacy pipe-separated format
+// and renders one row per ticked entity: a "display name" text input,
+// an inline icon picker (powered by static/icon-picker.js), and a
+// drag handle. The hidden textarea inside [data-entity-overrides] is
+// the source of truth for the name/icon — JS keeps it in the legacy
+// pipe-separated format
 //
 //     entity_id | name | icon
 //
 // so the server-side parser (_parse_overrides in ha_sensor/server.py
 // + ha_entities/server.py) stays unchanged.
 //
-// State persists across tick changes: unticking an entity removes its
-// row from the UI but the override stays in the textarea. Re-ticking
-// restores the values. Stale entries are harmless because the server
-// only applies overrides for entities currently in the wanted list.
+// Drag-to-reorder: rows are HTML5-draggable. On drop, the matching
+// .multiselect-opt elements in the linked multiselect are reordered
+// too — that's how the entities[] form submission ends up in the new
+// order (FormData encodes inputs in DOM order, and the widget's
+// fetch() iterates the wanted list in order).
+//
+// State persists across tick changes: unticking an entity removes
+// its row from the UI but the override stays in the textarea.
+// Re-ticking restores the values. Stale entries are harmless because
+// the server only applies overrides for entities currently in the
+// wanted list.
 
 (function () {
   function parseOverrides(text) {
@@ -65,11 +73,9 @@
     if (!multiselect || !textarea || !list) return;
 
     const state = parseOverrides(textarea.value);
+    let draggedEid = null;
 
     function pickerId(eid) {
-      // CSS.escape lets the picker's own querySelector survive entity ids
-      // with dots in them. The id itself doesn't need to be CSS-safe; it
-      // just needs to be unique within the page.
       return field.id + "-row-" + eid.replace(/[^a-z0-9_]/gi, "-") + "-picker";
     }
 
@@ -77,10 +83,17 @@
       const next = serialiseOverrides(state);
       if (next === textarea.value) return;
       textarea.value = next;
-      // Bubbles so the editor's form-watcher catches it as a dirty signal
-      // and schedules a preview re-render.
       textarea.dispatchEvent(new Event("input", { bubbles: true }));
       textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function markFormDirty() {
+      // The reorder doesn't change the textarea value, but it does
+      // change the order entities submit in (FormData reads form
+      // inputs in DOM order, and we've just reordered the
+      // multiselect's .multiselect-opt). Bump the form watcher so the
+      // preview re-renders with the new order.
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
     function updateState(eid, patch) {
@@ -89,6 +102,82 @@
       if (!e.name && !e.icon) state.delete(eid);
       else state.set(eid, e);
       writeStorage();
+    }
+
+    function tickedEntities() {
+      const out = [];
+      multiselect.querySelectorAll(".multiselect-opt").forEach((opt) => {
+        const cb = opt.querySelector("input[type=checkbox]");
+        if (!cb || !cb.checked) return;
+        const lbl = opt.querySelector(".multiselect-label");
+        out.push({
+          value: cb.value,
+          label: lbl ? lbl.textContent.trim() : cb.value,
+        });
+      });
+      return out;
+    }
+
+    function bindRowDrag(row, eid) {
+      row.draggable = true;
+      const dragHandle = row.querySelector(".entity-override-drag");
+      if (dragHandle) {
+        // Pointer-cursor while hovering the handle — the handle is
+        // the only place the row is intended to be grabbed, but the
+        // whole row is draggable so the keyboard-fallback flow works.
+        dragHandle.addEventListener("mousedown", () => {
+          row.style.cursor = "grabbing";
+        });
+        row.addEventListener("mouseup", () => {
+          row.style.cursor = "";
+        });
+      }
+
+      row.addEventListener("dragstart", (e) => {
+        draggedEid = eid;
+        row.classList.add("is-dragging");
+        if (e.dataTransfer) {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", eid);
+        }
+      });
+      row.addEventListener("dragend", () => {
+        row.classList.remove("is-dragging");
+        list.querySelectorAll(".is-drop-above, .is-drop-below").forEach((r) => {
+          r.classList.remove("is-drop-above", "is-drop-below");
+        });
+        draggedEid = null;
+      });
+      row.addEventListener("dragover", (e) => {
+        if (!draggedEid || row.dataset.entityId === draggedEid) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+        const rect = row.getBoundingClientRect();
+        const above = e.clientY - rect.top < rect.height / 2;
+        row.classList.toggle("is-drop-above", above);
+        row.classList.toggle("is-drop-below", !above);
+      });
+      row.addEventListener("dragleave", () => {
+        row.classList.remove("is-drop-above", "is-drop-below");
+      });
+      row.addEventListener("drop", (e) => {
+        e.preventDefault();
+        row.classList.remove("is-drop-above", "is-drop-below");
+        if (!draggedEid || row.dataset.entityId === draggedEid) return;
+        const draggedRow = list.querySelector(
+          `.entity-override-row[data-entity-id="${CSS.escape(draggedEid)}"]`,
+        );
+        if (!draggedRow) return;
+        const rect = row.getBoundingClientRect();
+        const above = e.clientY - rect.top < rect.height / 2;
+        if (above) {
+          list.insertBefore(draggedRow, row);
+        } else {
+          list.insertBefore(draggedRow, row.nextSibling);
+        }
+        syncMultiselectOrder();
+        markFormDirty();
+      });
     }
 
     function renderRow(eid, label) {
@@ -106,6 +195,10 @@
       div.className = "entity-override-row";
       div.dataset.entityId = eid;
       div.innerHTML = `
+        <button type="button" class="entity-override-drag"
+                title="Drag to reorder" aria-label="Drag to reorder ${safeLabel}">
+          <i class="ph ph-dots-six-vertical" aria-hidden="true"></i>
+        </button>
         <div class="entity-override-id">
           <span class="entity-override-label" title="${safeLabel}">${safeLabel}</span>
           <span class="entity-override-eid" title="${safeEid}">${safeEid}</span>
@@ -139,34 +232,68 @@
       iconHidden.addEventListener("input", () => {
         updateState(eid, { icon: iconHidden.value.trim() });
       });
+      bindRowDrag(div, eid);
 
       return div;
     }
 
-    function tickedEntities() {
-      const out = [];
-      multiselect.querySelectorAll(".multiselect-opt").forEach((opt) => {
-        const cb = opt.querySelector("input[type=checkbox]");
-        if (!cb || !cb.checked) return;
-        const lbl = opt.querySelector(".multiselect-label");
-        out.push({
-          value: cb.value,
-          label: lbl ? lbl.textContent.trim() : cb.value,
+    function syncMultiselectOrder() {
+      // Mirror the override list's new order onto the multiselect's
+      // .multiselect-opt children. FormData reads the resulting
+      // checkbox values in DOM order, so submitting the form sends
+      // the entities in the user-defined order.
+      const newOrder = Array.from(list.querySelectorAll(".entity-override-row")).map(
+        (r) => r.dataset.entityId,
+      );
+      const msList = multiselect.querySelector("[data-ms-list]");
+      if (!msList) return;
+      // Walk in reverse and insert each at the top — that ends with
+      // them in user order, ahead of any unticked options.
+      newOrder
+        .slice()
+        .reverse()
+        .forEach((eid) => {
+          const cb = msList.querySelector(
+            `input[type=checkbox][value="${CSS.escape(eid)}"]`,
+          );
+          const opt = cb ? cb.closest(".multiselect-opt") : null;
+          if (opt) msList.insertBefore(opt, msList.firstChild);
         });
-      });
-      return out;
     }
 
     function render() {
-      const entities = tickedEntities();
-      list.innerHTML = "";
-      if (!entities.length) {
-        if (emptyTpl) list.appendChild(emptyTpl.cloneNode(true));
-        return;
-      }
-      entities.forEach(({ value, label }) => {
-        list.appendChild(renderRow(value, label));
+      // Smart render: add rows for newly-ticked entities, remove rows
+      // for newly-unticked ones, leave the rest in their current
+      // (possibly user-dragged) order. A naive innerHTML="" rebuild
+      // would clobber any drag-reorder the user has performed.
+      const ticked = tickedEntities();
+      const tickedIds = new Set(ticked.map((e) => e.value));
+      const labelById = new Map(ticked.map((e) => [e.value, e.label]));
+
+      // Drop the empty placeholder if it's the only child.
+      list.querySelectorAll(".entity-overrides-empty").forEach((p) => p.remove());
+
+      // Remove rows whose entity is no longer ticked.
+      Array.from(list.querySelectorAll(".entity-override-row")).forEach((r) => {
+        if (!tickedIds.has(r.dataset.entityId)) r.remove();
       });
+
+      // Append rows for newly-ticked entities (in multiselect order).
+      const present = new Set(
+        Array.from(list.querySelectorAll(".entity-override-row")).map(
+          (r) => r.dataset.entityId,
+        ),
+      );
+      ticked.forEach(({ value, label }) => {
+        if (!present.has(value)) {
+          list.appendChild(renderRow(value, labelById.get(value) || label));
+        }
+      });
+
+      if (!list.querySelector(".entity-override-row")) {
+        if (emptyTpl) list.appendChild(emptyTpl.cloneNode(true));
+      }
+
       if (typeof window.tesseraeIconPickerBindAll === "function") {
         window.tesseraeIconPickerBindAll();
       }

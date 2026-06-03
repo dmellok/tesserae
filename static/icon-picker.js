@@ -41,6 +41,33 @@
     return iconsPromise;
   }
 
+  // Single document-level click/keydown handlers, bound once for the
+  // whole page. Per-picker handlers would closure-capture the picker
+  // DOM node — and if the picker is later removed (e.g. the HA entity
+  // overrides list re-renders when a user toggles entities), document
+  // would still hold the closure, pinning the detached subtree and
+  // leaking memory. The delegated form keeps no references to any
+  // individual picker — it queries the live DOM each time.
+  let docHandlersBound = false;
+  function bindDocumentHandlers() {
+    if (docHandlersBound) return;
+    docHandlersBound = true;
+    function closeAllExcept(targetEl) {
+      document.querySelectorAll(".icon-picker.is-open").forEach((p) => {
+        if (targetEl && p.contains(targetEl)) return;
+        p.classList.remove("is-open");
+        const pop = p.querySelector("[data-icon-popover]");
+        if (pop) pop.hidden = true;
+      });
+    }
+    document.addEventListener("click", (e) => {
+      closeAllExcept(e.target);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAllExcept(null);
+    });
+  }
+
   function findHiddenInput(picker) {
     const id = picker.dataset.iconPickerId;
     if (id) {
@@ -159,15 +186,13 @@
       pick(btn.dataset.icon || "");
       close();
     });
-    document.addEventListener("click", (e) => {
-      if (!picker.contains(e.target)) close();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && !popover.hidden) close();
-    });
+    // Close-on-outside-click and Escape are handled by a single
+    // document-level pair of listeners (bindDocumentHandlers). Per-
+    // picker document listeners would leak when the picker is replaced.
   }
 
   function bindAll() {
+    bindDocumentHandlers();
     document.querySelectorAll("[data-icon-picker]").forEach(bindOne);
   }
 

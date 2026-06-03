@@ -460,19 +460,60 @@ code {
 }
 .entity-override-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(120px, 0.7fr);
+  grid-template-columns: auto minmax(0, 1.3fr) minmax(0, 1.4fr) minmax(120px, 0.7fr);
   align-items: center;
   gap: var(--t-space-2);
   padding: var(--t-space-2);
   background: var(--t-surface-soft);
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
+  /* Drop indicator slot: a 2px border that lights up on the right
+     side when the row is the drag target. */
+  box-shadow: 0 0 0 0 transparent inset;
+  transition: box-shadow 80ms ease, background 80ms ease;
+}
+.entity-override-row.is-dragging {
+  opacity: 0.4;
+}
+.entity-override-row.is-drop-above {
+  box-shadow: 0 -2px 0 0 var(--t-accent) inset, 0 2px 0 -1px var(--t-accent);
+}
+.entity-override-row.is-drop-below {
+  box-shadow: 0 2px 0 0 var(--t-accent) inset, 0 -2px 0 -1px var(--t-accent);
+}
+.entity-override-drag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--t-radius-sm);
+  color: var(--t-fg-soft);
+  cursor: grab;
+  touch-action: none;
+}
+.entity-override-drag:hover {
+  background: var(--t-surface);
+  color: var(--t-fg);
+}
+.entity-override-drag:active {
+  cursor: grabbing;
+}
+.entity-override-drag .ph {
+  font-size: 16px;
 }
 @media (max-width: 640px) {
   /* Stack on narrow screens — the inline icon picker needs full row
      width for its popover not to clip out of the cell card. */
   .entity-override-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto 1fr;
+  }
+  .entity-override-row .entity-override-name,
+  .entity-override-row .icon-picker--inline {
+    grid-column: 1 / -1;
   }
 }
 .entity-override-id {

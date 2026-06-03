@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Sensor",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "kind": "widget",
   "description": "One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
