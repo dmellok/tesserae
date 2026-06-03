@@ -250,6 +250,58 @@
       try { handleEl.setPointerCapture(evDown.pointerId); } catch {}
     }
     const rect = board.getBoundingClientRect();
+
+    // Per-row / per-column resize.
+    //
+    // A shared edge between two columns in a 2-row layout was previously
+    // resized in lock-step across both rows — dragging the col1↔col2
+    // edge in the top row also widened/narrowed the cells in the bottom
+    // row, even though the user only meant to resize the row they
+    // clicked in. Restrict the drag to the cells whose y-range (for
+    // vertical edges) or x-range (for horizontal edges) contains the
+    // pointer at pointerdown — the row / column the user is actually
+    // grabbing. After the drag the edge is no longer "shared" across
+    // both rows, so findSharedEdges will detect two separate per-row
+    // boundaries on the next render — each draggable independently.
+    if (edge.axis === "v") {
+      const yPx = ((evDown.clientY - rect.top) / rect.height) * panelH;
+      const containsY = (c) => c.y <= yPx && c.y + c.h > yPx;
+      const newLeft = edge.left.filter(containsY);
+      const newRight = edge.right.filter(containsY);
+      if (newLeft.length && newRight.length) {
+        edge = {
+          ...edge,
+          left: newLeft,
+          right: newRight,
+          a0: Math.max(...newLeft.map((c) => c.y), ...newRight.map((c) => c.y)),
+          a1: Math.min(
+            ...newLeft.map((c) => c.y + c.h),
+            ...newRight.map((c) => c.y + c.h),
+          ),
+        };
+      }
+    } else {
+      // Horizontal edge — mirror the logic with x. Less common than the
+      // vertical case (rows aren't typically split across columns in our
+      // dashboard layouts) but the same principle applies.
+      const xPx = ((evDown.clientX - rect.left) / rect.width) * panelW;
+      const containsX = (c) => c.x <= xPx && c.x + c.w > xPx;
+      const newAbove = edge.above.filter(containsX);
+      const newBelow = edge.below.filter(containsX);
+      if (newAbove.length && newBelow.length) {
+        edge = {
+          ...edge,
+          above: newAbove,
+          below: newBelow,
+          a0: Math.max(...newAbove.map((c) => c.x), ...newBelow.map((c) => c.x)),
+          a1: Math.min(
+            ...newAbove.map((c) => c.x + c.w),
+            ...newBelow.map((c) => c.x + c.w),
+          ),
+        };
+      }
+    }
+
     const [lo, hi] = edgeLimits(edge);
 
     document.body.style.cursor = edge.axis === "h" ? "ns-resize" : "ew-resize";

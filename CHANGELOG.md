@@ -8,6 +8,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.4] — 2026-06-04
+
+### Fixed
+
+- **Layout editor resize handles work per-row instead of per-column.**
+  In a multi-row layout where a vertical edge spanned multiple rows
+  (e.g. 2×2 grid), dragging that edge resized the cells in **every**
+  row, not just the row the user clicked in. The fix: at pointerdown,
+  filter `edge.left` / `edge.right` (or `above` / `below`) to only
+  the cells whose y-range (or x-range) contains the pointer. Other
+  rows stay put. After the drag the layout has a per-row column
+  boundary; `findSharedEdges` detects each as a separate
+  independently-draggable handle on the next render. The user can
+  realign rows by dragging each independently.
+- **`weather_now` no longer clips the sun row at narrow cell heights.**
+  The grid was `auto 1fr auto auto` (header, hero, stats, sun); on
+  wide-but-short cells (e.g. 1200×420) the auto rows + minimum hero
+  exceeded the cell height and `overflow: hidden` clipped the bottom.
+  Added a container query (`max-height: 420px`) that drops the sun
+  row in that case — the size class was deciding on the longer side
+  so a 1200×420 cell stayed `lg` and kept the sun row even when there
+  wasn't room.
+
+  Also explains why the bug was invisible in the editor preview: the
+  preview iframe is `transform: scale(...)`'d down to fit the editor
+  column (often ~0.4×), so 25 px of clipping at panel-native renders
+  as a ~10 px sliver that reads as "the next section is just below
+  the fold." The renderer screenshots at panel-native and the clip
+  is obvious. Same auto-row-stack pattern lives in 9 other widgets;
+  the same container-query fix can be applied per-widget if the bug
+  reappears there too.
+
 ## [0.16.3] — 2026-06-04
 
 ### Fixed
@@ -1434,7 +1466,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.3...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.4...HEAD
+[0.16.4]: https://github.com/dmellok/tesserae/releases/tag/v0.16.4
 [0.16.3]: https://github.com/dmellok/tesserae/releases/tag/v0.16.3
 [0.16.2]: https://github.com/dmellok/tesserae/releases/tag/v0.16.2
 [0.16.1]: https://github.com/dmellok/tesserae/releases/tag/v0.16.1

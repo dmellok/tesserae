@@ -176,6 +176,29 @@
 .wn-sun-cell--accent { background: var(--c-accent); color: var(--c-bg); }
 .wn-sun-cell--inverse { background: var(--c-text); color: var(--c-bg); }
 
+/* --- height-aware row trimming ---
+ *
+ * The grid is ``auto 1fr auto auto`` — header / hero / stats / sun. At
+ * panel resolutions where the cell happens to be wide but not very
+ * tall (e.g. 1200×420), the auto rows + a minimum hero exceed the
+ * cell's height, and ``.root``'s ``overflow: hidden`` clips the sun
+ * row. The size-class breakpoints decide on the longer side, so a
+ * 1200×420 cell is still ``lg`` and would keep the sun row.
+ *
+ * Container query against the cell-content's own height: drop the
+ * sun row when there isn't enough vertical room. Same threshold the
+ * legacy sm class used (auto 1fr auto). The editor preview previously
+ * masked this — the iframe is transform-scaled to fit the column, so
+ * 25 px of clipping at panel-native becomes ~10 px and reads as a
+ * thin sliver; the renderer screenshots at native and the clip is
+ * obvious. */
+@container (max-height: 420px) {
+  .wn-sun { display: none; }
+  .root,
+  .root.size-md,
+  .root.size-lg { grid-template-rows: auto 1fr auto; }
+}
+
 /* --- size adaptations --- */
 
 /* xs: trim everything that doesn't fit — drop the rain tag, drop the
