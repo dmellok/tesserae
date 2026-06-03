@@ -3,6 +3,13 @@
 {% block title %}Send — Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
+{# Defaults so the template stays safe whether render came from a GET
+   (empty form) or a POST that hit ``_render_send_with_form`` after a
+   validation failure (typed URL / viewport / fit / device ticks
+   round-trip via ``form_values`` + ``form_device_ids``). #}
+{% set form_values = form_values | default({}, true) %}
+{% set form_device_ids = form_device_ids | default([], true) %}
+
 {% set CORE_TABS = [
   ('file','File','upload-simple'),
   ('saved','Saved','squares-four'),
@@ -45,14 +52,24 @@
 {# Auto-tick when there's only one registered device: the user's intent
    is unambiguous and ticking it manually every time is just a tax. With
    two or more devices we leave them all untouched so the user has to
-   pick deliberately. #}
+   pick deliberately.
+
+   Validation-failure re-render preserves prior ticks via
+   ``form_device_ids``; that takes precedence over the sole-device
+   auto-tick so a user who consciously unticked the only device on a
+   previous submit doesn't get it re-ticked behind their back. #}
 {% set sole_device = device_options[0].id if device_options|length == 1 else None %}
 <div class="field">
   <label>Target devices <span class="required-marker" aria-hidden="true">*</span></label>
-  <div class="device-checklist">
+  {# data-send-device-checklist — picked up by send.js to enable/
+     disable the form's Send button as checkboxes toggle, so the user
+     gets the "no device picked" feedback upfront instead of after a
+     POST round-trip. #}
+  <div class="device-checklist" data-send-device-checklist>
     {% for d in device_options %}
     <label class="device-check">
-      <input type="checkbox" name="device_id" value="{{ d.id }}" {% if d.id == sole_device %}checked{% endif %}>
+      <input type="checkbox" name="device_id" value="{{ d.id }}"
+             {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
       <span class="device-check-icon"><i class="ph ph-{{ d.icon }}" aria-hidden="true"></i></span>
       <span class="device-check-body">
         <span class="device-check-name">{{ d.label }}</span>
@@ -75,14 +92,15 @@
 {# Image fit mode — how a non-panel-sized image maps onto the panel.
    Shared by File / URL / Webpage / Gallery. #}
 {% macro fit_picker(field_id) %}
+{% set _selected_fit = form_values.get('fit', 'fit') %}
 <div class="field">
   <label for="{{ field_id }}">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
   <select id="{{ field_id }}" name="fit">
-    <option value="fit">Fit — letterbox (keep aspect)</option>
-    <option value="fill">Fill — crop to cover</option>
-    <option value="stretch">Stretch — squash to exact dims</option>
-    <option value="center">Center — no scaling</option>
-    <option value="blur">Center + blurred background</option>
+    <option value="fit"     {% if _selected_fit == 'fit' %}selected{% endif %}>Fit — letterbox (keep aspect)</option>
+    <option value="fill"    {% if _selected_fit == 'fill' %}selected{% endif %}>Fill — crop to cover</option>
+    <option value="stretch" {% if _selected_fit == 'stretch' %}selected{% endif %}>Stretch — squash to exact dims</option>
+    <option value="center"  {% if _selected_fit == 'center' %}selected{% endif %}>Center — no scaling</option>
+    <option value="blur"    {% if _selected_fit == 'blur' %}selected{% endif %}>Center + blurred background</option>
   </select>
 </div>
 {% endmacro %}
@@ -117,7 +135,11 @@
       <p class="field-help">Sending <strong>{{ gallery.file }}</strong> from <strong>{{ gallery.folder }}</strong>. Pick the displays + fit below.</p>
       {{ device_picker('gallery-device') }}
       {{ fit_picker('gallery-fit') }}
-      <div class="actions">{{ button('Push image', icon='paper-plane-tilt') }}</div>
+      <div class="actions">
+        <button type="submit" class="primary" data-requires-device-pick>
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push image</span>
+        </button>
+      </div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='What the panel will show after fitting.') %}
@@ -154,7 +176,9 @@
       {{ device_picker('file-device') }}
       {{ fit_picker('file-fit') }}
       <div class="actions">
-        {{ button('Push file', icon='paper-plane-tilt') }}
+        <button type="submit" class="primary" data-requires-device-pick>
+          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push file</span>
+        </button>
         {{ info_pop('The renderers fit the upload to the configured ' ~ panel.w ~ ' × ' ~ panel.h ~ ' panel.') }}
       </div>
     </form>
@@ -208,11 +232,17 @@
     <form method="post" action="{{ url_for('send.send_url') }}" class="form">
       <div class="field">
         <label for="url-input">URL{{ info_pop('Downloaded server-side (16 MiB max). Same fit/push path as file upload.') }}</label>
-        <input type="url" id="url-input" name="url" placeholder="https://..." required data-url-preview-target>
+        <input type="url" id="url-input" name="url" placeholder="https://..." required
+               value="{{ form_values.get('url', '') if tab == 'url' else '' }}"
+               data-url-preview-target>
       </div>
       {{ device_picker('url-device') }}
       {{ fit_picker('url-fit') }}
-      <div class="actions">{{ button('Fetch & push', icon='download-simple') }}</div>
+      <div class="actions">
+        <button type="submit" class="primary" data-requires-device-pick>
+          <i class="ph ph-download-simple" aria-hidden="true"></i><span>Fetch &amp; push</span>
+        </button>
+      </div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='Loaded directly in your browser — final fit happens server-side.') %}
@@ -232,21 +262,29 @@
     <form method="post" action="{{ url_for('send.send_webpage') }}" class="form" target="webpage-preview-iframe">
       <div class="field">
         <label for="webpage-url">URL{{ info_pop('Rendered headlessly with Chromium at the viewport below, then fit + pushed.') }}</label>
-        <input type="url" id="webpage-url" name="url" placeholder="https://..." required data-webpage-preview-target>
+        <input type="url" id="webpage-url" name="url" placeholder="https://..." required
+               value="{{ form_values.get('url', '') if tab == 'webpage' else '' }}"
+               data-webpage-preview-target>
       </div>
       <div class="field-grid">
         <div class="field">
           <label for="webpage-w">Viewport width{{ info_pop('Defaults match your panel (' ~ panel.w ~ ' × ' ~ panel.h ~ '). Override for higher-DPI captures.') }}</label>
-          <input type="number" id="webpage-w" name="viewport_w" value="{{ panel.w }}" min="200" step="1">
+          <input type="number" id="webpage-w" name="viewport_w"
+                 value="{{ form_values.get('viewport_w', panel.w) if tab == 'webpage' else panel.w }}" min="200" step="1">
         </div>
         <div class="field">
           <label for="webpage-h">Viewport height</label>
-          <input type="number" id="webpage-h" name="viewport_h" value="{{ panel.h }}" min="200" step="1">
+          <input type="number" id="webpage-h" name="viewport_h"
+                 value="{{ form_values.get('viewport_h', panel.h) if tab == 'webpage' else panel.h }}" min="200" step="1">
         </div>
       </div>
       {{ device_picker('webpage-device') }}
       {{ fit_picker('webpage-fit') }}
-      <div class="actions">{{ button('Render & push', icon='browser') }}</div>
+      <div class="actions">
+        <button type="submit" class="primary" data-requires-device-pick>
+          <i class="ph ph-browser" aria-hidden="true"></i><span>Render &amp; push</span>
+        </button>
+      </div>
     </form>
   </section>
   {% call preview_card('Live preview', blurb='Loaded in an iframe at your browser — the panel render uses headless Chromium server-side.') %}

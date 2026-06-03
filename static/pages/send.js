@@ -61,3 +61,41 @@
   // ``onmessage`` would silently miss every push.
   es.addEventListener("log", scheduleSwap);
 })();
+
+// Device-pick guard.
+//
+// Each tab's Send button is marked ``data-requires-device-pick``; each
+// device-checklist is marked ``data-send-device-checklist``. We keep
+// the button disabled until at least one checkbox in the matching form
+// is ticked. The server-side ``_require_target_devices`` still catches
+// a missed pick (and re-renders with state preserved), but this gives
+// the user a clear "I forgot something" cue before they hit the
+// button — no round-trip, no flash banner, just a disabled control.
+(function () {
+  function syncFormButtons(form) {
+    const checklist = form.querySelector("[data-send-device-checklist]");
+    const buttons = form.querySelectorAll("[data-requires-device-pick]");
+    if (!buttons.length) return;
+    // No checklist in the form (e.g. Saved tab — that route picks the
+    // device through page bindings, not a checklist). Leave the
+    // buttons as the server rendered them.
+    if (!checklist) return;
+    const hasPick = !!checklist.querySelector('input[type="checkbox"]:checked');
+    buttons.forEach((btn) => {
+      btn.disabled = !hasPick;
+      btn.title = hasPick
+        ? ""
+        : "Pick at least one target device above before sending.";
+    });
+  }
+
+  document.querySelectorAll("form").forEach((form) => {
+    if (!form.querySelector("[data-send-device-checklist]")) return;
+    syncFormButtons(form);
+    form.addEventListener("change", (ev) => {
+      if (ev.target && ev.target.matches('input[name="device_id"]')) {
+        syncFormButtons(form);
+      }
+    });
+  });
+})();

@@ -8,7 +8,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
-## [0.15.0] — 2026-06-03
+## [0.15.1] — 2026-06-03
+
+### Fixed
+
+- **Page editor's Push button can't fire an unbound push anymore.**
+  When devices are registered but none are bound to the current
+  dashboard, the underlying ``send_page`` endpoint would render at
+  the virtual-panel size and silently miss every device. The button
+  is now disabled with a title explaining how to fix it; the device
+  checklist auto-saves + reloads on change, so ticking a device
+  re-enables Push without an extra save step. Pages with no devices
+  registered at all (legacy single-head install) keep the enabled
+  button — the virtual-panel fan-out is intentional there.
+- **Send page Send buttons mirror the same guard.** Each tab's Send
+  button (File / URL / Webpage / Gallery) is disabled until at least
+  one target device is ticked — surfaces the missing pick before the
+  user clicks instead of after a POST round-trip. The Saved-page tab
+  is unaffected since it inherits the picked-page's bindings.
+- **Send page validation failure preserves form input.** Posting
+  with no device ticked, a missing URL, or invalid viewport dims
+  used to redirect to ``/send`` and destroy everything the user had
+  typed — paste the URL again, re-pick fit, re-pick gallery file.
+  The Send routes now re-render in place via a new
+  ``_render_send_with_form`` helper that round-trips the form
+  values + the picked device IDs through the template, so a fix is
+  one corrected field and one resubmit.
 
 ### Added
 
@@ -1273,7 +1298,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/dmellok/tesserae/releases/tag/v0.15.1
 [0.15.0]: https://github.com/dmellok/tesserae/releases/tag/v0.15.0
 [0.14.4]: https://github.com/dmellok/tesserae/releases/tag/v0.14.4
 [0.14.3]: https://github.com/dmellok/tesserae/releases/tag/v0.14.3

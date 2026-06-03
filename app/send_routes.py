@@ -26,6 +26,7 @@ from flask import (
     Flask,
     current_app,
     flash,
+    make_response,
     redirect,
     render_template,
     request,
@@ -104,9 +105,43 @@ def _form_device_ids() -> list[str]:
     ]
 
 
+def _render_send_with_form(tab: str) -> Response:
+    """Re-render the Send page on the current tab with the user's typed
+    form values preserved.
+
+    The Send routes used to ``redirect`` back to ``send.index`` on
+    validation failure (no device ticked, blank URL, etc.), which
+    silently destroyed everything the user had typed — pasting the
+    URL again, re-selecting the fit, re-picking gallery folder/file
+    was a frustration tax. Re-rendering instead surfaces the flash
+    message AND keeps the form populated so the user can fix the one
+    missing field and resubmit. The file-upload field can't be
+    preserved (browser security), but every other input round-trips.
+    """
+    history = _history_view(_events().list(type="push", limit=100))
+    pages = _pages().list()
+    return make_response(
+        render_template(
+            "send.html",
+            pages=pages,
+            history=history,
+            panel=resolve_settings_panel(_settings()),
+            device_options=_device_options(),
+            tab=tab,
+            gallery=_gallery_ref(),
+            form_values=request.form.to_dict(flat=True),
+            # ``device_id`` is the only multi-value picker — flat
+            # ``to_dict`` loses every value except the last. Pass the
+            # full list separately so the checklist re-ticks every
+            # device the user picked, not just the last one.
+            form_device_ids=request.form.getlist("device_id"),
+        )
+    )
+
+
 def _require_target_devices(tab: str) -> list[str] | Response:
     """Read the form's target-device picks, or short-circuit with a
-    flash + redirect if the user didn't tick any.
+    flash + re-render if the user didn't tick any.
 
     The Send page's File / URL / Webpage / Gallery flows used to
     silently fall through to a "virtual panel" fan-out when no device
@@ -114,7 +149,11 @@ def _require_target_devices(tab: str) -> list[str] | Response:
     blasted the same frame to every renderer in the registry. Devices
     with a different actual panel rejected the frame with a noisy
     ``ValueError: frame size X != expected Y`` in their heartbeat.
-    Better to refuse to send and tell the user to pick a target."""
+    Better to refuse to send and tell the user to pick a target.
+
+    Failed validation re-renders the Send page rather than redirecting
+    so the user's URL / viewport / fit / gallery selection survives
+    (``_render_send_with_form``)."""
     ids = _form_device_ids()
     if ids:
         return ids
@@ -126,7 +165,7 @@ def _require_target_devices(tab: str) -> list[str] | Response:
         else "No devices registered yet — add one in Settings → Devices."
     )
     flash(msg, "error")
-    return redirect(url_for("send.index", tab=tab))
+    return _render_send_with_form(tab)
 
 
 def _run_in_background(work: Callable[[], object], *, label: str) -> None:

@@ -153,9 +153,19 @@
     <button type="button" class="primary" data-save-all>
       <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save</span>
     </button>
+    {# Push refuses unbound pushes: if devices exist but none are bound
+       to this dashboard, the underlying send_page endpoint would render
+       at the virtual-panel size and silently miss every device. Disable
+       the button to surface the missing-bind upfront. The device
+       checklist below auto-saves + reloads on change, so this state
+       reflects the persisted bind correctly. #}
+    {% set _bound_count = device_options|selectattr('checked')|list|length %}
+    {% set _push_disabled = device_options and not _bound_count %}
     <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
       <input type="hidden" name="page_id" value="{{ page.id }}">
-      <button type="submit" class="ghost" title="Push this dashboard to every loaded renderer">
+      <button type="submit" class="ghost"
+              {% if _push_disabled %}disabled{% endif %}
+              title="{% if _push_disabled %}Bind this dashboard to at least one device (below) before pushing.{% else %}Push this dashboard to every bound device{% endif %}">
         <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
       </button>
     </form>
