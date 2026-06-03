@@ -37,6 +37,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from playwright.sync_api import Browser, Playwright, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +109,13 @@ class RenderRequest:
     viewport_h: int = DEFAULT_PANEL_H
     timeout_ms: int = 15_000
     wait_until: WaitUntil = "networkidle"
+    # Total attempts (1 = no retry). Each attempt gets a fresh context, so
+    # a transient slow goto / Chromium hiccup doesn't sink the whole push.
+    # The intermittent failure mode this exists for is HA-driven pushes
+    # where a Playwright ``Page.goto: Timeout 15000ms exceeded`` surfaces
+    # under no obvious cause — most commonly a brief loopback contention
+    # or a background-thread GC pause that ate the navigation window.
+    max_attempts: int = 3
 
 
 @dataclass(frozen=True)
@@ -184,10 +192,50 @@ _FONT_WAIT_JS: Final[str] = """async () => {
 
 
 def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
-    """The actual render — opens a fresh context on ``browser``, navigates,
-    screenshots, and disposes. Reused by both cold and warm paths so the
-    ``networkidle`` timeout / font-load / pixel-exact viewport behaviour
-    stays identical regardless of which path the caller took."""
+    """Retry shell around ``_screenshot_attempt``.
+
+    Each attempt opens a fresh ``new_context`` + ``new_page``, so a
+    half-loaded page from the previous timeout doesn't carry into the
+    retry. Only Playwright ``TimeoutError`` triggers a retry (the
+    typical mode: ``Page.goto: Timeout 15000ms exceeded``). Other
+    Playwright errors (invalid URL, browser-side crash, etc.) surface
+    immediately — retrying them just wastes the deadline."""
+    last_err: PlaywrightTimeoutError | None = None
+    for attempt in range(1, request.max_attempts + 1):
+        try:
+            return _screenshot_attempt(browser, request, attempt)
+        except PlaywrightTimeoutError as err:
+            last_err = err
+            if attempt >= request.max_attempts:
+                logger.error(
+                    "render failed after %d attempts: %s (url=%s)",
+                    attempt,
+                    err,
+                    request.url,
+                )
+                raise
+            logger.warning(
+                "render attempt %d/%d hit a timeout (will retry): %s (url=%s)",
+                attempt,
+                request.max_attempts,
+                err,
+                request.url,
+            )
+    # Unreachable — the loop either returns on success or raises on the
+    # last attempt. The assert keeps mypy honest about the bound.
+    assert last_err is not None
+    raise last_err
+
+
+def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) -> bytes:
+    """A single render pass — opens a fresh context on ``browser``,
+    navigates, screenshots, and disposes. Reused by both cold and warm
+    paths so the ``networkidle`` timeout / font-load / pixel-exact viewport
+    behaviour stays identical regardless of which path the caller took.
+
+    ``attempt`` is the 1-indexed retry counter, surfaced in the phase log
+    so a "render took 30s" investigation can spot when a goto failure
+    burned the first attempt + 15s before the second one succeeded."""
     context = browser.new_context(
         viewport={"width": request.viewport_w, "height": request.viewport_h},
         device_scale_factor=1,
@@ -265,7 +313,8 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         )
         t3 = time.monotonic()
         logger.info(
-            "render phases (s): goto=%.2f compose=%.2f images=%.2f fonts=%.2f screenshot=%.2f (url=%s)",
+            "render phases (s): attempt=%d goto=%.2f compose=%.2f images=%.2f fonts=%.2f screenshot=%.2f (url=%s)",
+            attempt,
             t_goto - t0,
             t1 - t_goto,
             t_img - t1,
@@ -403,9 +452,10 @@ class BrowserPool:
             raise RuntimeError("browser pool has been stopped")
         fut: concurrent.futures.Future[bytes] = concurrent.futures.Future()
         self._q.put((request, fut))
-        # Allow the request's own timeout plus generous slack for launch +
-        # context setup; the pool isn't meant to be a hard timeout layer.
-        return fut.result(timeout=request.timeout_ms / 1000 + 60)
+        # Allow the request's own timeout × max_attempts (so retries fit)
+        # plus generous slack for launch + context setup; the pool isn't
+        # meant to be a hard timeout layer.
+        return fut.result(timeout=(request.timeout_ms * request.max_attempts) / 1000 + 60)
 
     def fetch_text(self, request: FetchRequest) -> str:
         """Fetch a URL through the pooled Chromium's network stack.
