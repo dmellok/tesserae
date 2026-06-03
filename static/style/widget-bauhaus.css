@@ -45,6 +45,24 @@
   background: var(--c-bg);
   font-family: var(--theme-font, system-ui, sans-serif);
   font-variant-numeric: tabular-nums;
+
+  /* Refined title-bar dimensions, in PHYSICAL pixels.
+   *
+   * The cell-content area is shrunk to ``1/zoom`` and then transform-
+   * scaled back up by the per-cell content zoom. CSS units like ``px``
+   * are measured against that smaller virtual viewport, so a fixed
+   * ``36px`` height ends up rendering as ``36*zoom`` physical pixels —
+   * the bar grows with zoom. Counter-scaling by ``1/zoom`` cancels
+   * the outer scale so the bar always lands at the target physical
+   * size regardless of zoom level.
+   *
+   * Set once on :host so every refined title bar (.wb-bar,
+   * .wx-header-dark, .s1/e1/c1/h1-header) reads the same values. */
+  --wb-bar-h:       calc(36px / var(--c-zoom, 1));
+  --wb-bar-px:      calc(14px / var(--c-zoom, 1));
+  --wb-bar-fs:      calc(13px / var(--c-zoom, 1));
+  --wb-bar-icon-sz: calc(16px / var(--c-zoom, 1));
+  --wb-mark-sz:     calc(10px / var(--c-zoom, 1));
 }
 
 .wb-root {
@@ -61,28 +79,33 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: var(--wb-bar-gap, clamp(6px, 1.2cqw, 10px));
+  gap: var(--wb-bar-gap, 10px);
   /* The Bauhaus design spec calls for a fixed dark paper bar — the
      theme-cohesive ``var(--c-text)`` made it flip to "dark on dark"
      in dark themes and lose the original look. Pinning to the wx
-     ink/paper tokens (with hex fallback if a widget doesn't load
-     widget-bauhaus-wx.css) keeps every "refined" header consistent
-     with the original Bauhaus spec across every theme. */
+     ink/paper tokens keeps every "refined" header consistent with
+     the original Bauhaus spec across every theme. */
   background: var(--wb-bar-bg, var(--wx-ink, #1b1a16));
   color: var(--wb-bar-fg, var(--wx-paper, #f1ece0));
-  padding: var(--wb-bar-pad-y, clamp(4px, 0.9cqw, 8px))
-           var(--wb-bar-pad-x, clamp(8px, 1.6cqw, 14px));
-  font-size: var(--wb-bar-fs, clamp(10px, 1.7cqw, 14px));
+  /* Fixed physical height + horizontal padding via the shared
+     ``--wb-bar-*`` vars (counter-scaled against --c-zoom). The
+     bar stays the same physical size at every zoom level and
+     matches across every refined widget. */
+  height: var(--wb-bar-h);
+  padding: 0 var(--wb-bar-px);
+  font-size: var(--wb-bar-fs);
   font-weight: var(--wb-bar-fw, 800);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  flex-shrink: 0;
 }
 
 .wb-mark {
   display: inline-block;
-  width: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
-  height: var(--wb-mark-size, clamp(10px, 1.6cqw, 14px));
+  width: var(--wb-mark-size, var(--wb-mark-sz));
+  height: var(--wb-mark-size, var(--wb-mark-sz));
   background: var(--wb-mark-bg, var(--c-data-2));
+  flex-shrink: 0;
 }
 
 .wb-title {
@@ -93,8 +116,13 @@
 }
 
 .wb-bar-icon {
-  font-size: var(--wb-bar-icon-size, clamp(14px, 2.4cqw, 22px));
+  font-size: var(--wb-bar-icon-size, var(--wb-bar-icon-sz));
   line-height: 1;
+  /* Refined-bar icons sit at paper @ 70% so they read as accent
+     glyphs without competing with the title text. Same treatment
+     applies to wx-header-meta and the HA refined header icons. */
+  color: var(--wx-paper, #f1ece0);
+  opacity: 0.7;
 }
 
 /* Optional right-aligned label slot inside the header bar (used for

@@ -95,7 +95,6 @@ function renderC1(data, items) {
         <span class="c1-title">${escapeHtml((data.title || "CLIMATE").toUpperCase())}</span>
         <i class="ph ph-thermometer-simple c1-header-icon" aria-hidden="true"></i>
       </header>
-      <div class="c1-accent" aria-hidden="true"></div>
       <section class="c1-grid">${tiles}</section>
     </div>
   `;

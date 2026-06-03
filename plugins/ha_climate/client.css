@@ -72,31 +72,39 @@
 /* =================================================================
  * C1 — BAUHAUS REFINED
  * ================================================================= */
-.variant-c1 { display: grid; grid-template-rows: auto auto 1fr; }
+.variant-c1 { display: grid; grid-template-rows: auto 1fr; }
 .c1-header {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.6cqw, 12px);
-  padding: clamp(8px, 1.8cqh, 16px) clamp(10px, 2.2cqw, 20px);
-  /* Refined direction wears the fixed Bauhaus dark bar. */
+  gap: 10px;
+  height: var(--wb-bar-h);
+  padding: 0 var(--wb-bar-px);
   background: var(--wx-ink, #1b1a16);
   color: var(--wx-paper, #f1ece0);
-}
-.c1-title { color: var(--wx-paper, #f1ece0); }
-.c1-header-icon { color: var(--wx-paper, #f1ece0); opacity: 0.7; }
-.c1-mark {
-  width: clamp(8px, 1.6cqw, 14px);
-  height: clamp(8px, 1.6cqw, 14px);
-  background: var(--c-danger);
   flex-shrink: 0;
 }
 .c1-title {
   flex: 1;
-  font: 900 clamp(13px, 2.4cqw, 18px)/1 var(--theme-font, system-ui);
-  letter-spacing: 0.02em;
+  font-size: var(--wb-bar-fs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--wx-paper, #f1ece0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.c1-header-icon { color: var(--c-text-soft); font-size: clamp(13px, 2.4cqw, 20px); }
-.c1-accent { height: clamp(3px, 0.7cqh, 5px); background: var(--c-danger); }
+.c1-header-icon {
+  font-size: var(--wb-bar-icon-sz);
+  color: var(--wx-paper, #f1ece0);
+  opacity: 0.7;
+  line-height: 1;
+}
+.c1-mark {
+  width: var(--wb-mark-sz);
+  height: var(--wb-mark-sz);
+  background: var(--c-danger);
+  flex-shrink: 0;
+}
 .c1-grid {
   display: grid;
   grid-auto-flow: column;

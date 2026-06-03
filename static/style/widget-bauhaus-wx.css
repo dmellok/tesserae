@@ -99,16 +99,27 @@
   gap: 10px;
   background: var(--wx-ink);
   color: var(--wx-paper);
-  padding: 8px 16px;
+  /* Pinned physical height + horizontal padding shared with the legacy
+     ``.wb-bar`` via ``--wb-bar-*`` (see widget-bauhaus.css). Hex
+     fallbacks cover the rare case where a widget loads only the wx
+     stylesheet without widget-bauhaus.css. */
+  height: var(--wb-bar-h, calc(36px / var(--c-zoom, 1)));
+  padding: 0 var(--wb-bar-px, calc(14px / var(--c-zoom, 1)));
   font-family: var(--wx-mono);
-  font-size: 12px;
+  font-size: var(--wb-bar-fs, calc(13px / var(--c-zoom, 1)));
   font-weight: 700;
   letter-spacing: 0.06em;
+  flex-shrink: 0;
 }
 .wx-header-chip {
-  width: 10px;
-  height: 10px;
+  width: var(--wb-mark-sz, calc(10px / var(--c-zoom, 1)));
+  height: var(--wb-mark-sz, calc(10px / var(--c-zoom, 1)));
   flex-shrink: 0;
 }
 .wx-header-title { flex: 1; }
-.wx-header-meta { font-weight: 400; opacity: 0.85; }
+/* Icons + meta text in the right slot share the paper @ 70% treatment
+   so legacy ``wb-bar-icon`` and wx-header-meta look identical. */
+.wx-header-meta { font-weight: 400; opacity: 0.7; }
+.wx-header-meta i.ph,
+.wx-header-meta i.ph-bold,
+.wx-header-meta i.ph-fill { font-size: var(--wb-bar-icon-sz, calc(16px / var(--c-zoom, 1))); }

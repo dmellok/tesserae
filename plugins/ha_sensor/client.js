@@ -82,7 +82,6 @@ function renderS1(data, items) {
         <span class="s1-title">${escapeHtml((data.title || "SENSORS").toUpperCase())}</span>
         <i class="ph ph-gauge s1-header-icon" aria-hidden="true"></i>
       </header>
-      <div class="s1-accent" aria-hidden="true"></div>
       <section class="s1-grid">${tiles}</section>
     </div>
   `;

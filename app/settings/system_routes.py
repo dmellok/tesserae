@@ -206,8 +206,10 @@ def system_data_import() -> Response:
     """Accept a zip uploaded from another Tesserae install and apply it
     in place of the current ``data/``. Same exclusions as restore
     (the current gallery photos + cached renders stay put). Restarts
-    the server afterwards."""
-    refused = refuse_in_dev() or refuse_in_container()
+    the server afterwards on production; in --dev mode the os.execv
+    restart fights the werkzeug reloader, so we extract the zip and
+    leave it to the user to stop + start the dev server manually."""
+    refused = refuse_in_container()
     if refused is not None:
         return refused
 
@@ -273,8 +275,15 @@ def system_data_import() -> Response:
     # of the backups dir during the rebuild). Drop it now so it doesn't
     # show up in the Backups list as a confusing one-time entry.
     staged.unlink(missing_ok=True)
-    flash("Data imported. Restarting…", "ok")
-    updater().restart(delay_s=1.5)
+    if current_app.debug:
+        flash(
+            "Data imported. Stop and restart the --dev server (Ctrl-C, then "
+            "``.venv/bin/python -m app.main --dev``) to load the new state.",
+            "ok",
+        )
+    else:
+        flash("Data imported. Restarting…", "ok")
+        updater().restart(delay_s=1.5)
     return system_redirect()
 
 

@@ -644,7 +644,7 @@ docker compose up -d</code></pre>
                  aria-label="Tesserae export zip"
                  onchange="this.parentNode.querySelector('[data-migrate-file-label]').textContent = (this.files[0] || {name:'Choose zip…'}).name">
         </label>
-        {{ button('Import zip', icon='upload-simple', variant='ghost', disabled=system_dev_mode) }}
+        {{ button('Import zip', icon='upload-simple', variant='ghost') }}
       </form>
     </div>
 

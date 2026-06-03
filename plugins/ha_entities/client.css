@@ -70,35 +70,45 @@
 /* =================================================================
  * E1 — BAUHAUS REFINED
  * ================================================================= */
-.variant-e1 { display: grid; grid-template-rows: auto auto 1fr; }
+.variant-e1 { display: grid; grid-template-rows: auto 1fr; }
 .e1-header {
   display: flex;
   align-items: center;
-  gap: clamp(6px, 1.6cqw, 12px);
-  padding: clamp(8px, 1.6cqh, 14px) clamp(10px, 2.2cqw, 18px);
-  /* Pin to the fixed Bauhaus dark bar so the refined direction matches
-     the wx-header-dark / wb-bar treatment used by every other refined
-     widget. */
+  gap: 10px;
+  height: var(--wb-bar-h);
+  padding: 0 var(--wb-bar-px);
   background: var(--wx-ink, #1b1a16);
   color: var(--wx-paper, #f1ece0);
-}
-.e1-title { color: var(--wx-paper, #f1ece0); }
-.e1-meta { color: var(--wx-paper, #f1ece0); opacity: 0.7; }
-.e1-mark {
-  width: clamp(8px, 1.6cqw, 14px);
-  height: clamp(8px, 1.6cqw, 14px);
-  background: var(--c-info);
   flex-shrink: 0;
 }
 .e1-title {
   flex: 1;
-  font: 900 clamp(13px, 2.4cqw, 18px)/1 var(--theme-font, system-ui);
+  font-size: var(--wb-bar-fs);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--wx-paper, #f1ece0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .e1-meta {
-  font: 700 clamp(8px, 1.4cqw, 11px)/1 var(--theme-font-mono, ui-monospace);
-  color: var(--c-text-soft);
+  font: 700 var(--wb-bar-fs) var(--theme-font-mono, ui-monospace);
+  color: var(--wx-paper, #f1ece0);
+  opacity: 0.7;
+  white-space: nowrap;
 }
-.e1-accent { height: clamp(3px, 0.7cqh, 5px); background: var(--c-info); }
+.e1-mark {
+  width: var(--wb-mark-sz);
+  height: var(--wb-mark-sz);
+  background: var(--c-info);
+  flex-shrink: 0;
+}
+.e1-meta {
+  font: 700 var(--wb-bar-fs) var(--theme-font-mono, ui-monospace);
+  color: var(--wx-paper, #f1ece0);
+  opacity: 0.7;
+  white-space: nowrap;
+}
 .e1-list {
   display: grid;
   grid-auto-rows: 1fr;

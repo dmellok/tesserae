@@ -78,7 +78,6 @@ function renderE1(data, items) {
         <span class="e1-title">${escapeHtml((data.title || "ENTITIES").toUpperCase())}</span>
         <span class="e1-meta">${items.length} ITEMS</span>
       </header>
-      <div class="e1-accent" aria-hidden="true"></div>
       <section class="e1-list">${rows}</section>
     </div>
   `;
