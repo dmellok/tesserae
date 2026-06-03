@@ -35,6 +35,7 @@ static/dist/
 notes/
 PROMPTS/
 blog.md
+launch-plan-*.md
 
 # MkDocs build output (published via GitHub Actions, never committed)
 /site/
