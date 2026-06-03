@@ -125,6 +125,39 @@ class FetchRequest:
     accept: str | None = None
 
 
+_IMAGE_WAIT_JS: Final[str] = """async () => {
+    // Walk every <img> across the page AND every shadow root (each
+    // widget lives in its own shadow tree), then resolve once they've
+    // all either loaded or errored. Without this, widgets that fetch
+    // remote images via a normal <img src> tag (HA camera snapshots,
+    // Spotify album art, Unsplash pictures) often hadn't finished
+    // their download by the time the composer signals "mounted",
+    // and the screenshot captured an empty / broken-image frame.
+    // Capped at 5 s so a single hung CDN doesn't block the whole
+    // render — we ship the best frame we have.
+    function* allImages(root) {
+        for (const img of root.querySelectorAll('img')) yield img;
+        for (const el of root.querySelectorAll('*')) {
+            if (el.shadowRoot) yield* allImages(el.shadowRoot);
+        }
+    }
+    const pending = [];
+    for (const img of allImages(document)) {
+        if (img.complete && img.naturalWidth > 0) continue;
+        pending.push(new Promise((resolve) => {
+            const done = () => resolve();
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+        }));
+    }
+    if (!pending.length) return;
+    await Promise.race([
+        Promise.all(pending),
+        new Promise((r) => setTimeout(r, 5000)),
+    ]);
+}"""
+
+
 _FONT_WAIT_JS: Final[str] = """async () => {
     if (!document.fonts || !document.fonts.load) return;
     const families = new Set();
@@ -199,6 +232,17 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         except PlaywrightError as err:
             logger.warning("composer mount wait timed out: %s", err)
         t1 = time.monotonic()
+        # Block on every <img> the page (including shadow roots) has
+        # already issued a request for, capped at 5 s. The compose-
+        # done signal only proves widget JS finished writing markup
+        # — slow remote images (HA cameras, Spotify art, Unsplash
+        # CDN) keep downloading after that, and the screenshot would
+        # otherwise capture a half-loaded / broken-image frame.
+        try:
+            page.evaluate(_IMAGE_WAIT_JS)
+        except PlaywrightError as err:
+            logger.warning("image wait skipped: %s", err)
+        t_img = time.monotonic()
         # Block screenshot until every cell's font is actually loaded.
         # ``document.fonts.ready`` only awaits fonts already pending;
         # ``document.fonts.load()`` triggers the request and waits.
@@ -221,10 +265,11 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
         )
         t3 = time.monotonic()
         logger.info(
-            "render phases (s): goto=%.2f compose=%.2f evaluate=%.2f screenshot=%.2f (url=%s)",
+            "render phases (s): goto=%.2f compose=%.2f images=%.2f fonts=%.2f screenshot=%.2f (url=%s)",
             t_goto - t0,
             t1 - t_goto,
-            t2 - t1,
+            t_img - t1,
+            t2 - t_img,
             t3 - t2,
             request.url,
         )

@@ -19,13 +19,31 @@
  */
 
 :host {
-  /* --- paper / ink --- */
-  --wx-paper:    #f1ece0;
-  --wx-paper-2:  #e7dfcd;
-  --wx-paper-3:  #ded4bd;
-  --wx-ink:      #1b1a16;
-  --wx-ink-60:   #6b675c;
-  --wx-hair:     #1b1a16;
+  /* --- paper / ink ---
+   *
+   * These were hard-coded to Spectra 6 cream + ink so every wx
+   * widget kept the same Bauhaus look in every theme. They now flow
+   * through the cell host's ``--c-*`` tokens so the artboard body +
+   * inline text retint with the active theme. The Spectra hex stays
+   * as the var() fallback for render paths that bypass the cell host.
+   *
+   * The refined TITLE BAR stays at the original Bauhaus dark — see
+   * ``--wb-bar-bg`` / ``--wb-bar-fg`` below — so it doesn't flip to
+   * "light bar on dark body" when the body theme is dark. */
+  --wx-paper:    var(--c-bg, #f1ece0);
+  --wx-paper-2:  color-mix(in oklab, var(--c-bg, #f1ece0) 92%, var(--c-text, #1b1a16));
+  --wx-paper-3:  color-mix(in oklab, var(--c-bg, #f1ece0) 85%, var(--c-text, #1b1a16));
+  --wx-ink:      var(--c-text, #1b1a16);
+  --wx-ink-60:   var(--c-text-soft, #6b675c);
+  --wx-hair:     var(--c-line, #1b1a16);
+
+  /* --- refined title bar (pinned Bauhaus) ---
+   * Locked to the original Spectra colours regardless of theme so
+   * every refined widget wears the same dark strip with paper text.
+   * Title bar CSS in widget-bauhaus.css + each refined widget reads
+   * these instead of wx-ink / wx-paper. */
+  --wb-bar-bg:   #1b1a16;
+  --wb-bar-fg:   #f1ece0;
 
   /* --- Spectra 6 chromatics ---
    *
@@ -56,14 +74,24 @@
   --wx-green-t:  color-mix(in oklab, var(--c-data-3,  #45744c) 22%, var(--wx-paper));
 
   /* --- type stack ---
-   * The named font families are loaded by the fonts_core plugin. If a
-   * specific stack isn't installed the browser falls through to the
-   * generic fallback rather than a system-font-soup. */
-  --wx-grotesk:  "Archivo", system-ui, sans-serif;
-  --wx-black:    "Archivo Black", "Archivo", sans-serif;
-  --wx-geo:      "Space Grotesk", "Archivo", sans-serif;
-  --wx-mono:     "Space Mono", "IBM Plex Mono", monospace;
-  --wx-swiss:    "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+   *
+   * The named families are loaded by the fonts_core plugin (Archivo,
+   * Archivo Black, Space Grotesk, Space Mono, Helvetica via system).
+   * Each role-token leads with the active theme font (set on the cell
+   * host as ``--theme-font`` / ``--theme-font-mono`` by the composer)
+   * so the user's font picker actually wins over the Bauhaus default.
+   * The Bauhaus family stays as the fallback for when the picker is
+   * on "default" — the widget still reads as designed.
+   *
+   * ``--wx-black`` keeps "Archivo Black" first because it's a
+   * distinct display weight typeface; user fonts at weight 900 don't
+   * land in the same place visually, but they'll still kick in if
+   * Archivo Black isn't loaded for the theme. */
+  --wx-grotesk: var(--theme-font, "Archivo"), system-ui, sans-serif;
+  --wx-black:   "Archivo Black", var(--theme-font, "Archivo"), sans-serif;
+  --wx-geo:     var(--theme-font, "Space Grotesk"), "Archivo", sans-serif;
+  --wx-mono:    var(--theme-font-mono, "Space Mono"), "IBM Plex Mono", monospace;
+  --wx-swiss:   var(--theme-font, "Helvetica Neue"), Helvetica, Arial, sans-serif;
 }
 
 /* The "artboard" wrapper every wx widget variant uses. Fills the cell
@@ -97,8 +125,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--wx-ink);
-  color: var(--wx-paper);
+  background: var(--wb-bar-bg, #1b1a16);
+  color: var(--wb-bar-fg, #f1ece0);
   /* Pinned physical height + horizontal padding shared with the legacy
      ``.wb-bar`` via ``--wb-bar-*`` (see widget-bauhaus.css). Hex
      fallbacks cover the rare case where a widget loads only the wx

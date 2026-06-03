@@ -832,27 +832,34 @@ input[type="range"].slider:focus::-moz-range-thumb {
   cursor: pointer;
   font-size: var(--t-size-sm);
   border-top: 1px solid var(--t-border);
+  /* The hidden ``<input>`` inside uses ``position: absolute`` so the
+     checkbox doesn't take up space in the row layout. Anchoring its
+     containing block to the option label means the auto-focus
+     ``scrollIntoView`` the browser fires on click stays bounded to
+     the option's own bounding rect — the click target is already in
+     view, so no jump occurs. Without this the input's nearest
+     positioned ancestor is the document, and Chrome computes the
+     "scroll to make visible" against (0, 0) of the page. */
+  position: relative;
 }
 .multiselect-opt:first-of-type { border-top: 0; }
-/* Canonical "visually hidden" idiom — clipped to a 1px footprint so the
- * browser's "scroll focused element into view" treats the checkbox as
- * an in-flow element with negligible bounds. The previous
- * ``position: absolute; opacity: 0`` made the hidden checkbox occupy
- * its parent label's full size, and clicking an option further down a
- * scrollable .multiselect-list propagated the auto-focus scroll up
- * to the document and yanked the whole page back to the top. */
+/* The checkbox fills the whole option row but is fully transparent.
+ * Clicking anywhere on the label hits the input directly, the input's
+ * bounding box matches the option row's, and the browser's auto-
+ * focus scroll lands on a target that's already at the click point
+ * — so the page doesn't jump. ``pointer-events: none`` would defeat
+ * this (clicks would skip the input) — we WANT the click to land on
+ * the input here, unlike older visually-hidden patterns. */
 .multiselect-opt input {
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  clip-path: inset(50%);
   border: 0;
-  white-space: nowrap;
-  pointer-events: none;
+  opacity: 0;
+  cursor: pointer;
 }
 .multiselect-opt:hover { background: var(--t-surface-soft); }
 .multiselect-tick {

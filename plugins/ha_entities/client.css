@@ -77,8 +77,8 @@
   gap: 10px;
   height: var(--wb-bar-h);
   padding: 0 var(--wb-bar-px);
-  background: var(--wx-ink, #1b1a16);
-  color: var(--wx-paper, #f1ece0);
+  background: var(--wb-bar-bg, #1b1a16);
+  color: var(--wb-bar-fg, #f1ece0);
   flex-shrink: 0;
 }
 .e1-title {
@@ -86,14 +86,14 @@
   font-size: var(--wb-bar-fs);
   font-weight: 800;
   letter-spacing: 0.06em;
-  color: var(--wx-paper, #f1ece0);
+  color: var(--wb-bar-fg, #f1ece0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .e1-meta {
   font: 700 var(--wb-bar-fs) var(--theme-font-mono, ui-monospace);
-  color: var(--wx-paper, #f1ece0);
+  color: var(--wb-bar-fg, #f1ece0);
   opacity: 0.7;
   white-space: nowrap;
 }
@@ -105,7 +105,7 @@
 }
 .e1-meta {
   font: 700 var(--wb-bar-fs) var(--theme-font-mono, ui-monospace);
-  color: var(--wx-paper, #f1ece0);
+  color: var(--wb-bar-fg, #f1ece0);
   opacity: 0.7;
   white-space: nowrap;
 }

@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core fonts",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "font",
   "description": "Curated open-source font set vendored locally. 15 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible — designed for low-vision and works great on e-ink), geometric (Space Grotesk), heavy display (Archivo Black, Anton, Bebas Neue), monospace (JetBrains Mono, IBM Plex Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora). All Latin subset, woff2.",
   "supports": {
@@ -154,6 +154,27 @@
       "files": {
         "400": "static/lora/400.woff2",
         "700": "static/lora/700.woff2"
+      }
+    },
+    {
+      "id": "archivo",
+      "name": "Archivo",
+      "category": "sans",
+      "weights": [400, 700, 800],
+      "files": {
+        "400": "static/archivo/400.woff2",
+        "700": "static/archivo/700.woff2",
+        "800": "static/archivo/800.woff2"
+      }
+    },
+    {
+      "id": "space_mono",
+      "name": "Space Mono",
+      "category": "mono",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/space-mono/400.woff2",
+        "700": "static/space-mono/700.woff2"
       }
     }
   ]

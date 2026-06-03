@@ -252,7 +252,9 @@ const VARIANTS = {
 const HEAD = `
   <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
   <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
-  <link rel="stylesheet" href="/plugins/ha_history/client.css">`;
+  <link rel="stylesheet" href="/plugins/ha_history/client.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
+  <link rel="stylesheet" href="/static/style/widget-bauhaus-wx.css">`;
 
 export default async function render(shadow, ctx) {
   const data = ctx.data || {};
