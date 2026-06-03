@@ -8,6 +8,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.16.5] — 2026-06-04
+
+### Fixed
+
+- **Layout editor: every cell is now resizable, even when its
+  neighbours don't share a full edge.** The previous shared-edge
+  detection required exact y-range / x-range alignment across the
+  full edge length, so as soon as one row's cells were resized to
+  a different width than the row above or below, the cells with
+  the misaligned edge lost their resize handles entirely. Replaced
+  `findSharedEdges` with per-cell edge handles that detect aligned
+  neighbours at pointerdown via exact perpendicular-range matching
+  — aligned grid cases still resize the matched pair together
+  (e.g. dragging a column edge that spans one row affects both
+  cells in that row), but cells whose neighbours don't line up
+  resize independently into the void (gap or overlap allowed).
+  Dedup by edge-position key so shared edges aren't double-rendered
+  in the aligned case.
+
 ## [0.16.4] — 2026-06-04
 
 ### Fixed
@@ -1466,7 +1485,8 @@ MQTT transport + push pipeline, manifest-driven settings with an auth
 gate, scheduler, Send page, generalised event log, and Home Assistant
 MQTT discovery.
 
-[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.4...HEAD
+[Unreleased]: https://github.com/dmellok/tesserae/compare/v0.16.5...HEAD
+[0.16.5]: https://github.com/dmellok/tesserae/releases/tag/v0.16.5
 [0.16.4]: https://github.com/dmellok/tesserae/releases/tag/v0.16.4
 [0.16.3]: https://github.com/dmellok/tesserae/releases/tag/v0.16.3
 [0.16.2]: https://github.com/dmellok/tesserae/releases/tag/v0.16.2

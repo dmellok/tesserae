@@ -81,68 +81,78 @@
     return a0 < b1 && b0 < a1;
   }
 
-  // For a horizontal edge at y, find groups of cells above + below that
-  // share a contiguous x range. Returns array of {axis, coord, above, below, x0, x1}.
-  function findSharedEdges() {
-    const edges = [];
-
-    // Horizontal edges (cell tops / bottoms)
-    const ys = new Set();
-    cells.forEach((c) => {
-      ys.add(c.y);
-      ys.add(c.y + c.h);
-    });
-    for (const y of ys) {
-      if (y === 0 || y === panelH) continue;
-      const above = cells.filter((c) => c.y + c.h === y);
-      const below = cells.filter((c) => c.y === y);
-      if (above.length === 0 || below.length === 0) continue;
-      // Both sides must collectively cover the SAME contiguous x range.
-      const ax0 = Math.min(...above.map((c) => c.x));
-      const ax1 = Math.max(...above.map((c) => c.x + c.w));
-      const bx0 = Math.min(...below.map((c) => c.x));
-      const bx1 = Math.max(...below.map((c) => c.x + c.w));
-      if (ax0 !== bx0 || ax1 !== bx1) continue;
-      edges.push({ axis: "h", coord: y, above, below, a0: ax0, a1: ax1 });
+  // Per-cell edge drag. Each cell renders its own 4 edge handles (top
+  // / right / bottom / left, minus any on the panel boundary). At
+  // pointerdown, find the cells touching the dragged edge whose
+  // perpendicular range overlaps the dragged cell's perpendicular
+  // range — those are the "neighbors" that move with the edge so the
+  // layout stays tight where it lines up. Cells in OTHER rows / columns
+  // that don't touch the dragged cell are unaffected. If there's no
+  // neighbor on the other side, the cell simply grows / shrinks into
+  // the void (gap appears) — which is what the user wants when cells
+  // aren't aligned.
+  //
+  // Returns an ``edge`` object compatible with the rest of the drag
+  // pipeline (applyEdgeAt / edgeLimits / collectChanges).
+  function buildEdgeFor(cell, side) {
+    const isVertical = side === "left" || side === "right";
+    const coord =
+      side === "top" ? cell.y :
+      side === "right" ? cell.x + cell.w :
+      side === "bottom" ? cell.y + cell.h :
+      cell.x;
+    // The dragged cell's perpendicular range — neighbours must match
+    // it EXACTLY to be moved by the drag. Loose "any overlap" caught
+    // too many cells in irregular layouts: a cell that extends a bit
+    // past the dragged cell on one side would get its full height
+    // changed by a drag of its partial neighbour, which surprised
+    // users. Exact-match keeps drag effects local to actual aligned
+    // neighbours and means isolated cells (or cells whose neighbour
+    // is shaped differently) just resize themselves into the void.
+    const pStart = isVertical ? cell.y : cell.x;
+    const pEnd = isVertical ? cell.y + cell.h : cell.x + cell.w;
+    const matchesPerp = (other) => {
+      const oStart = isVertical ? other.y : other.x;
+      const oEnd = isVertical ? other.y + other.h : other.x + other.w;
+      return oStart === pStart && oEnd === pEnd;
+    };
+    let touchSide;
+    if (side === "right") {
+      touchSide = cells.filter((c) => c.id !== cell.id && c.x === coord && matchesPerp(c));
+    } else if (side === "left") {
+      touchSide = cells.filter((c) => c.id !== cell.id && c.x + c.w === coord && matchesPerp(c));
+    } else if (side === "bottom") {
+      touchSide = cells.filter((c) => c.id !== cell.id && c.y === coord && matchesPerp(c));
+    } else { // top
+      touchSide = cells.filter((c) => c.id !== cell.id && c.y + c.h === coord && matchesPerp(c));
     }
-
-    // Vertical edges (cell lefts / rights)
-    const xs = new Set();
-    cells.forEach((c) => {
-      xs.add(c.x);
-      xs.add(c.x + c.w);
-    });
-    for (const x of xs) {
-      if (x === 0 || x === panelW) continue;
-      const left = cells.filter((c) => c.x + c.w === x);
-      const right = cells.filter((c) => c.x === x);
-      if (left.length === 0 || right.length === 0) continue;
-      const ly0 = Math.min(...left.map((c) => c.y));
-      const ly1 = Math.max(...left.map((c) => c.y + c.h));
-      const ry0 = Math.min(...right.map((c) => c.y));
-      const ry1 = Math.max(...right.map((c) => c.y + c.h));
-      if (ly0 !== ry0 || ly1 !== ry1) continue;
-      edges.push({ axis: "v", coord: x, left, right, a0: ly0, a1: ly1 });
+    // Assemble into the edge.axis === "v" {left, right} / "h" {above,
+    // below} shape applyEdgeAt expects. ``cell`` is on the "current"
+    // side, the neighbors are on the "other" side.
+    if (isVertical) {
+      return side === "right"
+        ? { axis: "v", coord, left: [cell], right: touchSide, side }
+        : { axis: "v", coord, left: touchSide, right: [cell], side };
     }
-
-    return edges;
+    return side === "bottom"
+      ? { axis: "h", coord, above: [cell], below: touchSide, side }
+      : { axis: "h", coord, above: touchSide, below: [cell], side };
   }
 
-  // For drag, work out the min / max valid edge coord so cells stay at
-  // least one freeform step wide. The grid-snap step would be too
-  // coarse a floor — a 12-col grid on a 600px panel would refuse to
-  // resize below 50px, which is fine in most cases but blocks 8px
-  // freeform nudges when the user toggles snap off later.
+  // Per-edge drag limits. Each side is clamped against the cells that
+  // contribute to it; if a side is empty (the cell has no neighbor on
+  // that side and is just growing / shrinking into the void), fall
+  // back to the panel boundary so the cell can fill the full available
+  // space without the drag refusing to engage.
   function edgeLimits(edge) {
     if (edge.axis === "h") {
-      const minY = Math.max(...edge.above.map((c) => c.y)) + FREEFORM_SNAP;
-      const maxY = Math.min(...edge.below.map((c) => c.y + c.h)) - FREEFORM_SNAP;
-      return [minY, maxY];
-    } else {
-      const minX = Math.max(...edge.left.map((c) => c.x)) + FREEFORM_SNAP;
-      const maxX = Math.min(...edge.right.map((c) => c.x + c.w)) - FREEFORM_SNAP;
-      return [minX, maxX];
+      const aboveStops = edge.above.length ? edge.above.map((c) => c.y) : [0];
+      const belowStops = edge.below.length ? edge.below.map((c) => c.y + c.h) : [panelH];
+      return [Math.max(...aboveStops) + FREEFORM_SNAP, Math.min(...belowStops) - FREEFORM_SNAP];
     }
+    const leftStops = edge.left.length ? edge.left.map((c) => c.x) : [0];
+    const rightStops = edge.right.length ? edge.right.map((c) => c.x + c.w) : [panelW];
+    return [Math.max(...leftStops) + FREEFORM_SNAP, Math.min(...rightStops) - FREEFORM_SNAP];
   }
 
   // ---------------------------------------------------------------
@@ -179,22 +189,68 @@
       board.appendChild(el);
     });
 
-    // Shared-edge resize handles
-    const edges = findSharedEdges();
-    edges.forEach((edge) => {
-      const handle = document.createElement("div");
-      handle.className = "le-edge le-edge--" + edge.axis;
-      if (edge.axis === "h") {
-        handle.style.top = pxToPct(edge.coord, panelH) + "%";
-        handle.style.left = pxToPct(edge.a0, panelW) + "%";
-        handle.style.width = pxToPct(edge.a1 - edge.a0, panelW) + "%";
-      } else {
-        handle.style.left = pxToPct(edge.coord, panelW) + "%";
-        handle.style.top = pxToPct(edge.a0, panelH) + "%";
-        handle.style.height = pxToPct(edge.a1 - edge.a0, panelH) + "%";
-      }
-      handle.addEventListener("pointerdown", (e) => beginEdgeDrag(e, edge));
-      board.appendChild(handle);
+    // Per-cell resize handles — one per non-panel-boundary edge of
+    // each cell. Each handle is independent so a cell stays resizable
+    // even when its neighbours don't line up edge-to-edge (the previous
+    // findSharedEdges-only model required exact alignment across the
+    // full edge length, which left cells stranded as soon as rows /
+    // columns were resized to different widths). Neighbour detection
+    // happens in ``buildEdgeFor`` at pointerdown — cells that actually
+    // touch the dragged edge come along; everything else stays put.
+    //
+    // Dedup: when two cells share an edge with matching perpendicular
+    // range (the common grid case, e.g. cell A's right at x=600 y=[0,400]
+    // and cell B's left at x=600 y=[0,400]), both cells' loops would
+    // want to render a handle at the exact same spot. ``seen`` skips
+    // the second one — whichever cell iterates first owns the handle,
+    // and buildEdgeFor at drag time picks up the other side as a
+    // neighbour. Cells whose edges only partially overlap still each
+    // render their own handle (with the overlap visually doubled);
+    // accept the minor visual stack as the cost of fully-independent
+    // resize in irregular layouts.
+    const seen = new Set();
+    cells.forEach((c) => {
+      const sides = [];
+      if (c.y > 0) sides.push("top");
+      if (c.x + c.w < panelW) sides.push("right");
+      if (c.y + c.h < panelH) sides.push("bottom");
+      if (c.x > 0) sides.push("left");
+      sides.forEach((side) => {
+        const isV = side === "left" || side === "right";
+        const coord =
+          side === "top" ? c.y :
+          side === "right" ? c.x + c.w :
+          side === "bottom" ? c.y + c.h :
+          c.x;
+        const pStart = isV ? c.y : c.x;
+        const pEnd = isV ? c.y + c.h : c.x + c.w;
+        const key = `${isV ? "v" : "h"}:${coord}:${pStart}:${pEnd}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const handle = document.createElement("div");
+        handle.className = `le-edge le-edge--${isV ? "v" : "h"} le-edge--${side}`;
+        if (side === "top") {
+          handle.style.top = pxToPct(c.y, panelH) + "%";
+          handle.style.left = pxToPct(c.x, panelW) + "%";
+          handle.style.width = pxToPct(c.w, panelW) + "%";
+        } else if (side === "bottom") {
+          handle.style.top = pxToPct(c.y + c.h, panelH) + "%";
+          handle.style.left = pxToPct(c.x, panelW) + "%";
+          handle.style.width = pxToPct(c.w, panelW) + "%";
+        } else if (side === "left") {
+          handle.style.left = pxToPct(c.x, panelW) + "%";
+          handle.style.top = pxToPct(c.y, panelH) + "%";
+          handle.style.height = pxToPct(c.h, panelH) + "%";
+        } else { // right
+          handle.style.left = pxToPct(c.x + c.w, panelW) + "%";
+          handle.style.top = pxToPct(c.y, panelH) + "%";
+          handle.style.height = pxToPct(c.h, panelH) + "%";
+        }
+        handle.addEventListener("pointerdown", (e) =>
+          beginEdgeDrag(e, buildEdgeFor(c, side)),
+        );
+        board.appendChild(handle);
+      });
     });
   }
 
@@ -250,58 +306,6 @@
       try { handleEl.setPointerCapture(evDown.pointerId); } catch {}
     }
     const rect = board.getBoundingClientRect();
-
-    // Per-row / per-column resize.
-    //
-    // A shared edge between two columns in a 2-row layout was previously
-    // resized in lock-step across both rows — dragging the col1↔col2
-    // edge in the top row also widened/narrowed the cells in the bottom
-    // row, even though the user only meant to resize the row they
-    // clicked in. Restrict the drag to the cells whose y-range (for
-    // vertical edges) or x-range (for horizontal edges) contains the
-    // pointer at pointerdown — the row / column the user is actually
-    // grabbing. After the drag the edge is no longer "shared" across
-    // both rows, so findSharedEdges will detect two separate per-row
-    // boundaries on the next render — each draggable independently.
-    if (edge.axis === "v") {
-      const yPx = ((evDown.clientY - rect.top) / rect.height) * panelH;
-      const containsY = (c) => c.y <= yPx && c.y + c.h > yPx;
-      const newLeft = edge.left.filter(containsY);
-      const newRight = edge.right.filter(containsY);
-      if (newLeft.length && newRight.length) {
-        edge = {
-          ...edge,
-          left: newLeft,
-          right: newRight,
-          a0: Math.max(...newLeft.map((c) => c.y), ...newRight.map((c) => c.y)),
-          a1: Math.min(
-            ...newLeft.map((c) => c.y + c.h),
-            ...newRight.map((c) => c.y + c.h),
-          ),
-        };
-      }
-    } else {
-      // Horizontal edge — mirror the logic with x. Less common than the
-      // vertical case (rows aren't typically split across columns in our
-      // dashboard layouts) but the same principle applies.
-      const xPx = ((evDown.clientX - rect.left) / rect.width) * panelW;
-      const containsX = (c) => c.x <= xPx && c.x + c.w > xPx;
-      const newAbove = edge.above.filter(containsX);
-      const newBelow = edge.below.filter(containsX);
-      if (newAbove.length && newBelow.length) {
-        edge = {
-          ...edge,
-          above: newAbove,
-          below: newBelow,
-          a0: Math.max(...newAbove.map((c) => c.x), ...newBelow.map((c) => c.x)),
-          a1: Math.min(
-            ...newAbove.map((c) => c.x + c.w),
-            ...newBelow.map((c) => c.x + c.w),
-          ),
-        };
-      }
-    }
-
     const [lo, hi] = edgeLimits(edge);
 
     document.body.style.cursor = edge.axis === "h" ? "ns-resize" : "ew-resize";
