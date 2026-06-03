@@ -619,6 +619,80 @@ docker compose up -d</code></pre>
       <div class="actions">{{ button('Create backup', icon='download-simple') }}</div>
     </form>
 
+    {# Migrate-to-another-Tesserae flow: one-shot zip download + zip
+       upload, sharing the backup machinery (same exclusions) but
+       bypassing the Backups list. Useful when moving an install to a
+       new host or replicating a setup. #}
+    <p class="device-subhead" style="margin-top:22px;">Migrate to another install</p>
+    <p class="field-help">Export the current data folder as a zip, or import a zip from another Tesserae install. Gallery photos and the render cache are skipped either way.</p>
+
+    <div class="migrate-row">
+      <a class="button ghost" href="{{ url_for('auth.system_data_export') }}">
+        <i class="ph ph-download-simple" aria-hidden="true"></i>
+        <span>Export data zip</span>
+      </a>
+
+      <form method="post"
+            action="{{ url_for('auth.system_data_import') }}"
+            class="migrate-import"
+            enctype="multipart/form-data"
+            onsubmit="return confirm('Import this zip and restart? Current data/ will be replaced (gallery photos + cached renders stay put).');">
+        <label class="migrate-file">
+          <i class="ph ph-paperclip" aria-hidden="true"></i>
+          <span data-migrate-file-label>Choose zip…</span>
+          <input type="file" name="archive" accept=".zip,application/zip" required
+                 aria-label="Tesserae export zip"
+                 onchange="this.parentNode.querySelector('[data-migrate-file-label]').textContent = (this.files[0] || {name:'Choose zip…'}).name">
+        </label>
+        {{ button('Import zip', icon='upload-simple', variant='ghost', disabled=system_dev_mode) }}
+      </form>
+    </div>
+
+    <style>
+      .migrate-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin-top: 10px;
+      }
+      .migrate-import {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      /* Custom file picker — hides the browser default, exposes a
+         pill that matches the ghost-button visual language with the
+         selected filename inline. */
+      .migrate-file {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 12px;
+        border: 1px dashed var(--border, #d6dbe1);
+        border-radius: 8px;
+        font-size: 13px;
+        color: var(--fgSoft, #5b6470);
+        cursor: pointer;
+        max-width: 280px;
+      }
+      .migrate-file:hover { border-color: var(--accent, #0d8c7e); }
+      .migrate-file input[type="file"] {
+        position: absolute;
+        width: 1px; height: 1px;
+        padding: 0; margin: -1px;
+        overflow: hidden; clip: rect(0, 0, 0, 0);
+        border: 0;
+      }
+      .migrate-file [data-migrate-file-label] {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    </style>
+
     {% if system_backups %}
     <details class="backups-disclosure">
       <summary>

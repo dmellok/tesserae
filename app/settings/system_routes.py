@@ -171,6 +171,113 @@ def system_backup_delete(backup_id: str) -> Response:
     return system_redirect()
 
 
+# -- one-shot export / import (migrate to a fresh Tesserae) -------------
+
+
+@bp.get("/settings/system/data/export")
+def system_data_export() -> Response:
+    """Generate a fresh data ``.zip`` and stream it to the user. Reuses
+    the backup machinery (same exclusions: gallery photos + the render
+    cache stay out) but deletes the staged file afterwards so this
+    doesn't pollute the Backups list. For moving data between Tesserae
+    installs — restore-from-existing-backup is the in-place flow."""
+    try:
+        backup = _backup_mod.create(data_root(), label=_backup_mod.LABEL_MANUAL, note="export")
+    except OSError as err:
+        flash(f"Export failed: {err}", "error")
+        return system_redirect()
+    try:
+        data = backup.path.read_bytes()
+    finally:
+        backup.path.unlink(missing_ok=True)
+    import time as _time
+
+    fname = f"tesserae-data-{_time.strftime('%Y%m%d-%H%M%S')}.zip"
+    return send_file(
+        io.BytesIO(data),
+        as_attachment=True,
+        download_name=fname,
+        mimetype="application/zip",
+    )
+
+
+@bp.post("/settings/system/data/import")
+def system_data_import() -> Response:
+    """Accept a zip uploaded from another Tesserae install and apply it
+    in place of the current ``data/``. Same exclusions as restore
+    (the current gallery photos + cached renders stay put). Restarts
+    the server afterwards."""
+    refused = refuse_in_dev() or refuse_in_container()
+    if refused is not None:
+        return refused
+
+    upload = request.files.get("archive")
+    if upload is None or not upload.filename:
+        flash("Pick a Tesserae export zip to import.", "error")
+        return system_redirect()
+
+    raw = upload.read()
+    if not raw:
+        flash("Uploaded file was empty.", "error")
+        return system_redirect()
+
+    # Validate it's a real Tesserae export before we let it touch
+    # data/. Also guard against zip-slip — backup.restore writes each
+    # member to ``td_path / member`` without sanitisation, so a member
+    # like ``../../etc/x`` would land outside the temp stage.
+    import zipfile as _zipfile
+    from pathlib import PurePosixPath
+
+    try:
+        with _zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            names = zf.namelist()
+    except _zipfile.BadZipFile:
+        flash("That file isn't a valid zip.", "error")
+        return system_redirect()
+    if _backup_mod.META_NAME not in names:
+        flash(
+            f"That zip doesn't look like a Tesserae export (missing {_backup_mod.META_NAME}).",
+            "error",
+        )
+        return system_redirect()
+    for n in names:
+        parts = PurePosixPath(n).parts
+        if not parts or any(p in ("..", "") for p in parts) or parts[0].startswith("/"):
+            flash(f"Refusing import: zip member path looks unsafe ({n!r}).", "error")
+            return system_redirect()
+
+    # Stage the upload into the backups dir under a synthetic id so the
+    # existing restore() pipeline can pick it up — keeps the restore
+    # path consistent with the in-place restore flow.
+    push_mgr = push_manager()
+    if not push_mgr._lock.acquire(blocking=True, timeout=10):
+        flash("Another push is in flight — try again in a moment.", "error")
+        return system_redirect()
+    import time as _time
+
+    ts = _time.strftime("%Y%m%d-%H%M%S")
+    backups_dir = data_root() / _backup_mod.BACKUPS_SUBDIR
+    backups_dir.mkdir(parents=True, exist_ok=True)
+    staged = backups_dir / f"{ts}-import.zip"
+    staged.write_bytes(raw)
+    try:
+        try:
+            _backup_mod.restore(data_root(), staged.stem)
+        except (FileNotFoundError, ValueError, OSError) as err:
+            flash(f"Import failed: {err}", "error")
+            staged.unlink(missing_ok=True)
+            return system_redirect()
+    finally:
+        push_mgr._lock.release()
+    # restore() leaves the staged file in place (it's preserved as part
+    # of the backups dir during the rebuild). Drop it now so it doesn't
+    # show up in the Backups list as a confusing one-time entry.
+    staged.unlink(missing_ok=True)
+    flash("Data imported. Restarting…", "ok")
+    updater().restart(delay_s=1.5)
+    return system_redirect()
+
+
 # -- webhook ------------------------------------------------------------
 
 

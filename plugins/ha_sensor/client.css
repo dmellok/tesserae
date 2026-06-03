@@ -76,7 +76,15 @@
   align-items: center;
   gap: clamp(6px, 1.6cqw, 12px);
   padding: clamp(8px, 1.6cqh, 14px) clamp(10px, 2.2cqw, 18px);
+  /* Pin to the fixed Bauhaus dark bar so the refined direction matches
+     the wx-header-dark / wb-bar treatment used by every other refined
+     widget. Without this the header rendered on the cell's paper and
+     looked like a missing element. */
+  background: var(--wx-ink, #1b1a16);
+  color: var(--wx-paper, #f1ece0);
 }
+.s1-title { color: var(--wx-paper, #f1ece0); }
+.s1-header-icon { color: var(--wx-paper, #f1ece0); opacity: 0.7; }
 .s1-mark {
   width: clamp(8px, 1.6cqw, 14px);
   height: clamp(8px, 1.6cqw, 14px);

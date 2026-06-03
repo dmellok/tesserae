@@ -78,7 +78,12 @@
   align-items: center;
   gap: clamp(6px, 1.6cqw, 12px);
   padding: clamp(8px, 1.8cqh, 16px) clamp(10px, 2.2cqw, 20px);
+  /* Refined direction wears the fixed Bauhaus dark bar. */
+  background: var(--wx-ink, #1b1a16);
+  color: var(--wx-paper, #f1ece0);
 }
+.c1-title { color: var(--wx-paper, #f1ece0); }
+.c1-header-icon { color: var(--wx-paper, #f1ece0); opacity: 0.7; }
 .c1-mark {
   width: clamp(8px, 1.6cqw, 14px);
   height: clamp(8px, 1.6cqw, 14px);
