@@ -141,10 +141,10 @@ def test_plugin_asset_loopback_bypass(app_with_gate: Flask) -> None:
     with 'failed to fetch dynamically imported module'."""
     client = app_with_gate.test_client()
     resp = client.get(
-        "/plugins/themes_core/client.js",
+        "/plugins/fonts_core/client.js",
         environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
-    # themes_core has no client.js, so the asset route should 404. The
+    # fonts_core has no client.js, so the asset route should 404. The
     # important thing is we hit the route — not a 302 to /login or /setup.
     assert resp.status_code in (200, 404)
 
@@ -152,7 +152,7 @@ def test_plugin_asset_loopback_bypass(app_with_gate: Flask) -> None:
 def test_plugin_asset_blocked_from_non_loopback(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     resp = client.get(
-        "/plugins/themes_core/client.js",
+        "/plugins/fonts_core/client.js",
         environ_overrides={"REMOTE_ADDR": "10.0.0.5"},
     )
     assert resp.status_code == 403

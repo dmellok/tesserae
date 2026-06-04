@@ -5,21 +5,23 @@
   "kind": "widget",
   "description": "The familiar 53-week contributions heatmap for a user — four Bauhaus / Swiss visual directions to choose from. Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).",
   "icon": "ph-grid-four",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "co1",
-      "choices": [
-        { "value": "co1", "label": "1 · Refined" },
-        { "value": "co2", "label": "2 · Geometric" },
-        { "value": "co3", "label": "3 · Swiss" },
-        { "value": "co4", "label": "4 · Data" }
-      ]
-    },
-    { "name": "user", "type": "string", "label": "Username (blank = github_core default)", "default": "" }
+      "name": "user",
+      "type": "string",
+      "label": "Username (blank = github_core default)",
+      "default": ""
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

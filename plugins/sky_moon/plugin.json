@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Sky \u2014 Sun & Moon",
+  "name": "Sky — Sun & Moon",
   "version": "0.2.0",
   "kind": "widget",
   "description": "Sun arc + moon phase disc. Sunrise / sunset / day length / solar noon, plus moon phase, illumination, age, moonrise / moonset and upcoming new / first-quarter / full / last-quarter dates. Sun + moon times come from Open-Meteo when latitude / longitude are set; phase + age are computed locally from the synodic month.",
@@ -32,34 +32,6 @@
       "type": "string",
       "label": "Place label",
       "default": "Melbourne"
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
-        }
-      ]
     }
   ],
   "render": {

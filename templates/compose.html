@@ -28,7 +28,7 @@
     body {
       font-family: '{{ page.font_family }}', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       background: {{ page.bleed_color|default('#ffffff') }};
-      color: {{ page.palette.fg }};
+      color: #1a1a1a;
     }
     .panel {
       position: relative;
@@ -42,45 +42,11 @@
       box-sizing: border-box;
       overflow: hidden;
       border-radius: {{ page.corner_radius }}px;
-      /* Theme-aware widget boundary. On the Spectra 6 panel, near-white
-         surfaces quantise to white — without this border widgets would
-         visually merge into the panel. Outline lives inside the cell so it
-         doesn't shrink the plugin's render area. */
-      outline: 1px solid var(--theme-divider);
+      /* Cell boundary — kept so widgets stay visually separable while the
+         new design system is being built. Dotted so it reads as a
+         placeholder rather than an intentional border. */
+      outline: 1px dotted #c8c8c8;
       outline-offset: -1px;
-
-      /* Semantic token layer. Widgets paint from these --c-* tokens, NEVER
-         the raw --theme-* primitives. Defined on the cell host so every
-         widget's shadow inherits them regardless of which stylesheets it
-         links. Two ideas kept apart that used to be conflated:
-           - categorical (--c-data-*): "N distinguishable colours, no meaning"
-           - status (--c-ok/warn/danger): "good / caution / bad"
-         The categorical ramp tops out at ~4 hues on a 6-ink E6 panel;
-         --c-accent-soft is the tonal lane (dithers — large fills only).
-         See docs/widgets.md → "Theme tokens". */
-      --c-bg:          var(--theme-bg);
-      --c-surface:     var(--theme-surface);
-      --c-raised:      var(--theme-surface2);
-      --c-text:        var(--theme-fg);
-      --c-text-soft:   var(--theme-fgSoft);
-      --c-text-mute:   var(--theme-muted);
-      --c-line:        var(--theme-divider);
-      --c-accent:      var(--theme-accent);
-      --c-accent-soft: var(--theme-accentSoft);
-      --c-data-1:      var(--theme-accent);
-      --c-data-2:      var(--theme-accent2);
-      --c-data-3:      var(--theme-accent3);
-      --c-data-4:      var(--theme-surface2);
-      /* Semantic status tokens — each theme picks its own complementary
-         tone of red/yellow/green/blue so the colour still reads as
-         "alarm-red" or "fine-green" but tracks the theme's saturation
-         + lightness profile (cocoa gets a brick red, neon-themes get
-         a vivid alarm red, mono themes get a nearly-grey tint, etc.).
-         wx-red/yellow/green/blue resolve through these too. */
-      --c-ok:          var(--theme-ok);
-      --c-warn:        var(--theme-warn);
-      --c-danger:      var(--theme-danger);
-      --c-info:        var(--theme-info, var(--theme-accent));
     }
     /* Per-cell zoom — the inner box paints into a 1/zoom virtual area
        then transform-scales back up to fill the cell, so widgets see a
@@ -105,7 +71,7 @@
       container-type: size;
     }
     .cell.full-bleed { outline: 0; }
-    .cell.error { outline: 2px solid {{ page.palette.danger }}; }
+    .cell.error { outline: 2px solid #c44a3a; }
     .cell--empty {
       background: repeating-linear-gradient(
         45deg,
@@ -139,15 +105,11 @@
          data-cell-h="{{ cell.h }}"
          data-panel-w="{{ page.panel.w }}"
          data-panel-h="{{ page.panel.h }}"
-         data-theme-palette='{{ cell.palette|tojson }}'
          data-font-family="{{ cell.font_family }}"
          data-cell-zoom="{{ cell.zoom }}"
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;
                 font-family: '{{ cell.font_family }}', system-ui, sans-serif;
-                --theme-font: '{{ cell.font_family }}', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-                --theme-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-                --c-zoom: {{ cell.zoom }};
-                {% for key, val in cell.palette.items() %}--theme-{{ key }}: {{ val }};{% endfor %}">
+                --c-zoom: {{ cell.zoom }};">
       <div class="cell-content">
         {% if not cell.plugin %}
         <div class="cell-empty-placeholder">

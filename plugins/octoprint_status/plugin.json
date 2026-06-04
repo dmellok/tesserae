@@ -5,23 +5,37 @@
   "kind": "widget",
   "description": "Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures. Four visual directions per cell.",
   "icon": "ph-printer",
-  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "label", "type": "string", "label": "Title", "default": "OctoPrint" },
     {
-      "name": "variant", "type": "select", "label": "Style", "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "Refined" },
-        { "value": "g2", "label": "Geometric" },
-        { "value": "s3", "label": "Swiss" },
-        { "value": "d4", "label": "Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "name": "label",
+      "type": "string",
+      "label": "Title",
+      "default": "OctoPrint"
     }
   ],
   "settings": [
-    { "name": "base_url", "type": "string", "label": "OctoPrint URL", "default": "http://octopi.local" },
-    { "name": "api_key", "type": "string", "label": "API key", "secret": true }
+    {
+      "name": "base_url",
+      "type": "string",
+      "label": "OctoPrint URL",
+      "default": "http://octopi.local"
+    },
+    {
+      "name": "api_key",
+      "type": "string",
+      "label": "API key",
+      "secret": true
+    }
   ],
-  "render": { "needs_network": true }
+  "render": {
+    "needs_network": true
+  }
 }

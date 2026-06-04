@@ -2,10 +2,6 @@
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
 {% block title %}{{ page.name }} — Dashboard editor — Tesserae{% endblock %}
 
-{# PALETTE_TOKENS comes from app/state/user_themes.py via the editor
-   context so the editor can't drift from the theme schema. #}
-{% set PALETTE_TOKENS = palette_tokens %}
-
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
 <section class="card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
@@ -64,16 +60,8 @@
     </div>
 
     {% if plugin %}
-    {# Theme picker groups by family so the mono variants (sharp on 1-bit
-       panels) cluster together rather than scattering through 20 colour
-       themes. ``themes`` is pre-sorted family-first by _editor_context. #}
-    {% set _theme_groups = {'mono': 'Monochrome', 'neon': 'Neon'} %}
-    {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name, 'group': _theme_groups.get(t.tags[0] if t.tags else '', '')}) %}{% endfor %}
     {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
     <div class="field-grid">
-      {{ select_field('cell-' ~ cell.id ~ '-theme', 'theme', 'Theme override',
-                      value=cell.theme or '', options=theme_options,
-                      blank_label='Inherit page') }}
       {{ select_field('cell-' ~ cell.id ~ '-font', 'font', 'Font override',
                       value=cell.font or '', options=font_options,
                       blank_label='Inherit page') }}
@@ -103,26 +91,6 @@
     </fieldset>
     {% endif %}
 
-    <details class="form-group">
-      <summary>Per-cell colour overrides ({{ (cell.palette_overrides or {})|length }} of {{ PALETTE_TOKENS|length }} overridden)</summary>
-      <div class="palette-grid">
-        {% set overrides = cell.palette_overrides or {} %}
-        {% set palette = cell_palettes.get(cell.id, {}) %}
-        {% for token in PALETTE_TOKENS %}
-        {# Pre-fill from the effective theme so each swatch shows what
-           it actually controls — without this every picker would show
-           black and you'd have to guess which token is which. #}
-        {% set current = overrides.get(token, palette.get(token, '#000000')) %}
-        <div class="palette-field">
-          <label>
-            <input type="checkbox" name="override_{{ token }}_enabled" {% if token in overrides %}checked{% endif %}>
-            {{ token }}
-          </label>
-          <input type="color" name="override_{{ token }}" value="{{ current }}">
-        </div>
-        {% endfor %}
-      </div>
-    </details>
     {% else %}
     <p class="lede"><em>Pick a widget above to configure this cell.</em></p>
     {% endif %}
@@ -219,7 +187,7 @@
 
   <div class="editor-column">
     <section class="card">
-      {{ card_head('Dashboard', icon_name='note-pencil', blurb='Theme + font + matting + spacing applied to every cell.') }}
+      {{ card_head('Dashboard', icon_name='note-pencil', blurb='Font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-editor-form>
         {# No `name` here — the header rename form owns it. A stale hidden
            name would clobber a rename on save (both forms POST here). #}
@@ -227,11 +195,6 @@
         {# Sentinel so update() knows this form owns device_ids even when
            every checkbox is unticked (unchecked boxes send nothing). #}
         <input type="hidden" name="device_ids_present" value="1">
-        {# Theme picker groups by family so the mono variants (sharp on 1-bit
-       panels) cluster together rather than scattering through 20 colour
-       themes. ``themes`` is pre-sorted family-first by _editor_context. #}
-    {% set _theme_groups = {'mono': 'Monochrome', 'neon': 'Neon'} %}
-    {% set theme_options = [] %}{% for t in themes %}{% set _ = theme_options.append({'value': t.id, 'label': t.name, 'group': _theme_groups.get(t.tags[0] if t.tags else '', '')}) %}{% endfor %}
         {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
 
         <div class="field">
@@ -293,7 +256,6 @@
         </div>
 
         <div class="field-grid">
-          {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or '', options=theme_options, blank_label='(default)') }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
           {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color) }}
         </div>

@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 Wind",
+  "name": "Weather — Wind",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).",
@@ -44,30 +44,6 @@
         {
           "value": "imperial",
           "label": "Imperial (mph)"
-        }
-      ]
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
         }
       ]
     }

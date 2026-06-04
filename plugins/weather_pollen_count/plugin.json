@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 Pollen Count",
+  "name": "Weather — Pollen Count",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS \u2014 Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.",
+  "description": "Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS — Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.",
   "icon": "ph-flower-tulip",
   "supports": {
     "sizes": [
@@ -31,34 +31,6 @@
       "type": "string",
       "label": "Place label",
       "default": "Melbourne"
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
-        }
-      ]
     }
   ],
   "render": {

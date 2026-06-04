@@ -5,26 +5,48 @@
   "kind": "widget",
   "description": "Auto-discovered battery levels across every Home Assistant entity with device_class=battery, sorted lowest-first. Picks up phones, sensors, vacuums, remotes — anything HA already exposes as a battery — and flags low/critical against per-cell thresholds.",
   "icon": "ph-battery-low",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "label", "type": "string", "label": "Label", "default": "Batteries" },
-    { "name": "entities", "type": "multiselect", "label": "Batteries to show (blank = auto-discover all)", "default": [], "choices_from": "entity" },
-    { "name": "low_threshold", "type": "number", "label": "Low threshold (%)", "default": 20 },
-    { "name": "critical_threshold", "type": "number", "label": "Critical threshold (%)", "default": 10 },
-    { "name": "limit", "type": "number", "label": "Max items to show", "default": 12 },
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "name": "label",
+      "type": "string",
+      "label": "Label",
+      "default": "Batteries"
+    },
+    {
+      "name": "entities",
+      "type": "multiselect",
+      "label": "Batteries to show (blank = auto-discover all)",
+      "default": [],
+      "choices_from": "entity"
+    },
+    {
+      "name": "low_threshold",
+      "type": "number",
+      "label": "Low threshold (%)",
+      "default": 20
+    },
+    {
+      "name": "critical_threshold",
+      "type": "number",
+      "label": "Critical threshold (%)",
+      "default": 10
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "label": "Max items to show",
+      "default": 12
     }
   ],
-  "render": { "dither": "none", "needs_network": false }
+  "render": {
+    "dither": "none",
+    "needs_network": false
+  }
 }

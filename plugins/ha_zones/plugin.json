@@ -5,24 +5,36 @@
   "kind": "widget",
   "description": "Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.",
   "icon": "ph-house",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "label", "type": "string", "label": "Label", "default": "Home" },
-    { "name": "entities", "type": "multiselect", "label": "People to show (blank = every person.*)", "default": [], "choices_from": "entity" },
-    { "name": "limit", "type": "number", "label": "Max persons to show", "default": 8 },
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "name": "label",
+      "type": "string",
+      "label": "Label",
+      "default": "Home"
+    },
+    {
+      "name": "entities",
+      "type": "multiselect",
+      "label": "People to show (blank = every person.*)",
+      "default": [],
+      "choices_from": "entity"
+    },
+    {
+      "name": "limit",
+      "type": "number",
+      "label": "Max persons to show",
+      "default": 8
     }
   ],
-  "render": { "dither": "none", "needs_network": false }
+  "render": {
+    "dither": "none",
+    "needs_network": false
+  }
 }

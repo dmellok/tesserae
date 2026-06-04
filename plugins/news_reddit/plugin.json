@@ -5,31 +5,38 @@
   "kind": "widget",
   "description": "Top posts from a subreddit using the free .json endpoint (no API key, no OAuth). Pick the subreddit and time window per cell.",
   "icon": "ph-reddit-logo",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "name": "subreddit",
+      "type": "string",
+      "label": "Subreddit (without /r/)",
+      "default": "programming"
     },
-    { "name": "subreddit",  "type": "string", "label": "Subreddit (without /r/)", "default": "programming" },
     {
       "name": "sort",
       "type": "select",
       "label": "Sort",
       "default": "top",
       "choices": [
-        { "value": "top", "label": "Top" },
-        { "value": "hot", "label": "Hot" },
-        { "value": "new", "label": "New" }
+        {
+          "value": "top",
+          "label": "Top"
+        },
+        {
+          "value": "hot",
+          "label": "Hot"
+        },
+        {
+          "value": "new",
+          "label": "New"
+        }
       ]
     },
     {
@@ -38,15 +45,41 @@
       "label": "Window (top only)",
       "default": "day",
       "choices": [
-        { "value": "hour",  "label": "Hour" },
-        { "value": "day",   "label": "Day" },
-        { "value": "week",  "label": "Week" },
-        { "value": "month", "label": "Month" },
-        { "value": "year",  "label": "Year" },
-        { "value": "all",   "label": "All time" }
+        {
+          "value": "hour",
+          "label": "Hour"
+        },
+        {
+          "value": "day",
+          "label": "Day"
+        },
+        {
+          "value": "week",
+          "label": "Week"
+        },
+        {
+          "value": "month",
+          "label": "Month"
+        },
+        {
+          "value": "year",
+          "label": "Year"
+        },
+        {
+          "value": "all",
+          "label": "All time"
+        }
       ]
     },
-    { "name": "max_items", "type": "number", "label": "Max posts", "default": 8 }
+    {
+      "name": "max_items",
+      "type": "number",
+      "label": "Max posts",
+      "default": 8
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

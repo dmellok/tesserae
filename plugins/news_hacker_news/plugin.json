@@ -5,35 +5,51 @@
   "kind": "widget",
   "description": "Top / new / best / show / ask stories from Hacker News. Uses the free Firebase API (no auth, no key). Click-through opens the story; the lightbox doesn't apply.",
   "icon": "ph-flame",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
-    },
     {
       "name": "feed",
       "type": "select",
       "label": "Feed",
       "default": "top",
       "choices": [
-        { "value": "top",  "label": "Top stories" },
-        { "value": "new",  "label": "New stories" },
-        { "value": "best", "label": "Best stories" },
-        { "value": "show", "label": "Show HN" },
-        { "value": "ask",  "label": "Ask HN" }
+        {
+          "value": "top",
+          "label": "Top stories"
+        },
+        {
+          "value": "new",
+          "label": "New stories"
+        },
+        {
+          "value": "best",
+          "label": "Best stories"
+        },
+        {
+          "value": "show",
+          "label": "Show HN"
+        },
+        {
+          "value": "ask",
+          "label": "Ask HN"
+        }
       ]
     },
-    { "name": "max_items", "type": "number", "label": "Max stories", "default": 10 }
+    {
+      "name": "max_items",
+      "type": "number",
+      "label": "Max stories",
+      "default": 10
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

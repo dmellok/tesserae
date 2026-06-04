@@ -42,7 +42,6 @@ from app import (
     schedule_routes,
     send_routes,
     settings_routes,
-    themes_routes,
     trmnl_api,
     webhook_routes,
 )
@@ -455,7 +454,6 @@ def create_app(
     schedule_routes.register(app)
     send_routes.register(app)
     events_routes.register(app)
-    themes_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)
     webhook_routes.register(app)
@@ -471,8 +469,6 @@ def create_app(
     # device names, page names, theme palettes, or user data.
     if telemetry.enabled:
         import time as _time
-
-        from app.state.user_themes import UserThemeStore as _UserThemeStore
 
         # Reset baseline at startup so the first heartbeat counts the
         # work done in the first hour, not since epoch.
@@ -498,11 +494,6 @@ def create_app(
             instances = [d for d in devices.all() if d.kind_of is not None]
             kinds = sorted({str(d.kind_of) for d in instances if d.kind_of})
             n_pages = len(page_store.list())
-            try:
-                user_themes = _UserThemeStore(plugins_dir / "themes_core" / "user.json").load()
-                n_user_themes = len(user_themes)
-            except Exception:
-                n_user_themes = 0
             # Activity counters — events recorded since the previous
             # heartbeat. event_log.list() returns most-recent-first; we
             # paginate by 500 and stop once we cross the baseline so
@@ -543,7 +534,6 @@ def create_app(
                 "n_devices": str(len(instances)),
                 "device_kinds": ",".join(kinds),
                 "n_pages": str(n_pages),
-                "n_user_themes": str(n_user_themes),
                 # Bucketed activity counters since the previous heartbeat.
                 "n_pushes_since_last": _bucket(n_pushes),
                 "n_push_failures_since_last": _bucket(n_push_failures),

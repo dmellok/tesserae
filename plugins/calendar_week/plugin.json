@@ -5,33 +5,39 @@
   "kind": "widget",
   "description": "Seven-day strip — six Bauhaus / Swiss visual directions to choose from. Each event's colour comes from its feed (Plugins → Calendar Feeds).",
   "icon": "ph-calendar",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "w1",
-      "choices": [
-        { "value": "w1", "label": "1 · Bauhaus Refined" },
-        { "value": "w2", "label": "2 · Bauhaus Geometric" },
-        { "value": "w3", "label": "3 · Swiss / International" },
-        { "value": "w4", "label": "4 · Timeline Grid" },
-        { "value": "w5", "label": "5 · Editorial" },
-        { "value": "w6", "label": "6 · Glanceable Cards" }
-      ]
-    },
     {
       "name": "week_start",
       "type": "select",
       "label": "Week starts on",
       "default": "monday",
       "choices": [
-        { "value": "sunday", "label": "Sunday" },
-        { "value": "monday", "label": "Monday" }
+        {
+          "value": "sunday",
+          "label": "Sunday"
+        },
+        {
+          "value": "monday",
+          "label": "Monday"
+        }
       ]
     },
-    { "name": "feeds_filter", "type": "string", "label": "Feed IDs (comma-separated; blank = all enabled)", "default": "" }
+    {
+      "name": "feeds_filter",
+      "type": "string",
+      "label": "Feed IDs (comma-separated; blank = all enabled)",
+      "default": ""
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

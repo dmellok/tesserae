@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 Air Quality",
+  "name": "Weather — Air Quality",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Air Quality Index (European or US scale) plus PM2.5, PM10, O3, NO2 readings. Data from Open-Meteo CAMS (no API key). Colour-coded panel block reflects the AQI band.",
@@ -40,39 +40,11 @@
       "choices": [
         {
           "value": "european",
-          "label": "European EAQI (0\u2013100+)"
+          "label": "European EAQI (0–100+)"
         },
         {
           "value": "us",
-          "label": "US AQI (0\u2013500)"
-        }
-      ]
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
+          "label": "US AQI (0–500)"
         }
       ]
     }

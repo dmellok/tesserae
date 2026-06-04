@@ -1,69 +1,44 @@
-// picture_apod — full-bleed NASA Astronomy Picture of the Day.
-//
-// Image fills the cell. Optional Bauhaus-style caption strip at the
-// bottom (accent2 mark + title + copyright/date) when show_caption is
-// on. Scale modes mirror the gallery widget (fit / fill / stretch /
-// blurred backdrop).
+// Stripped widget render. Theming + design system removed in v0.17
+// to clear the slate for a redesign. Renders the raw ctx.data as
+// semantic HTML so the widget is still visible while the new design
+// system is built.
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? null;
+  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
+  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
+  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
+    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
+  } else if (data == null) {
+    parts.push(`<p>no data</p>`);
+  } else {
+    parts.push(renderValue(data));
+  }
+  shadow.innerHTML = parts.join("");
+}
+
+function renderValue(v) {
+  if (v === null || v === undefined) return `<p>null</p>`;
+  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
+  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
+  if (Array.isArray(v)) {
+    if (!v.length) return `<p>empty list</p>`;
+    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
+  }
+  if (typeof v === "object") {
+    const entries = Object.entries(v);
+    if (!entries.length) return `<p>empty object</p>`;
+    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
+  }
+  return `<p>${escapeHtml(String(v))}</p>`;
+}
 
 function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
   }[c]));
-}
-
-function renderEmpty(msg) {
-  return `
-    <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
-    <link rel="stylesheet" href="/plugins/picture_apod/client.css">
-    <div class="root pa-empty">
-      <i class="ph-duotone ph-planet" aria-hidden="true"></i>
-      <div class="pa-empty-msg">${escapeHtml(msg)}</div>
-    </div>
-  `;
-}
-
-export default async function render(shadow, ctx) {
-  const data = ctx.data || {};
-  const url = data.url;
-  if (!url) {
-    shadow.innerHTML = renderEmpty(data.error || "No APOD image.");
-    return;
-  }
-
-  const size = ctx.cell.size;
-  const showCaption = ctx.cell.options.show_caption !== false;
-  const scale = ctx.cell.options.scale || "fit";
-  const safeUrl = escapeHtml(url);
-  const alt = escapeHtml(data.title || "Astronomy Picture of the Day");
-
-  // Blurred mode layers two images: a zoomed/blurred backdrop and a
-  // fit-contain foreground. Every other mode is a single <img> with
-  // object-fit driven by the CSS scale class.
-  const body =
-    scale === "blurred"
-      ? `<img class="pa-bg" src="${safeUrl}" alt="" aria-hidden="true">
-         <img class="pa-fg" src="${safeUrl}" alt="${alt}">`
-      : `<img class="pa-img" src="${safeUrl}" alt="${alt}">`;
-
-  const tagParts = [];
-  if (data.title)     tagParts.push(escapeHtml(data.title));
-  if (data.copyright) tagParts.push(`© ${escapeHtml(data.copyright)}`);
-  else if (data.date) tagParts.push(escapeHtml(data.date));
-  const caption = showCaption && tagParts.length
-    ? `<div class="pa-caption">
-         <span class="pa-mark" aria-hidden="true"></span>
-         <span class="pa-caption-text">${tagParts.join(" · ")}</span>
-       </div>`
-    : "";
-
-  shadow.innerHTML = `
-    <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
-    <link rel="stylesheet" href="/plugins/picture_apod/client.css">
-    <div class="root size-${size} scale-${scale}">
-      ${body}
-      ${caption}
-    </div>
-  `;
 }

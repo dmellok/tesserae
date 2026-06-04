@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 Hourly",
+  "name": "Weather — Hourly",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.",
@@ -39,11 +39,11 @@
       "choices": [
         {
           "value": "metric",
-          "label": "Metric (\u00b0C)"
+          "label": "Metric (°C)"
         },
         {
           "value": "imperial",
-          "label": "Imperial (\u00b0F)"
+          "label": "Imperial (°F)"
         }
       ]
     },
@@ -64,34 +64,6 @@
         {
           "value": "48",
           "label": "48 hours"
-        }
-      ]
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
         }
       ]
     }

@@ -5,24 +5,35 @@
   "kind": "widget",
   "description": "Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).",
   "icon": "ph-rss",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "name": "url",
+      "type": "string",
+      "label": "Feed URL",
+      "default": "https://news.ycombinator.com/rss"
     },
-    { "name": "url",         "type": "string", "label": "Feed URL",           "default": "https://news.ycombinator.com/rss" },
-    { "name": "max_items",   "type": "number", "label": "Max headlines",      "default": 8 },
-    { "name": "show_source", "type": "boolean","label": "Show feed title in header", "default": true }
+    {
+      "name": "max_items",
+      "type": "number",
+      "label": "Max headlines",
+      "default": 8
+    },
+    {
+      "name": "show_source",
+      "type": "boolean",
+      "label": "Show feed title in header",
+      "default": true
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

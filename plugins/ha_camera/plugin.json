@@ -5,24 +5,37 @@
   "kind": "widget",
   "description": "Snapshot from one or more Home Assistant camera.* entities, with four visual directions. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.",
   "icon": "ph-video-camera",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "entity_id", "type": "select", "label": "Camera entity", "default": "", "choices_from": "entity" },
-    { "name": "entities", "type": "multiselect", "label": "Extra cameras (optional grid)", "default": [], "choices_from": "entity" },
-    { "name": "label", "type": "string", "label": "Label", "default": "Camera" },
     {
-      "name": "variant",
+      "name": "entity_id",
       "type": "select",
-      "label": "Style",
-      "default": "r1",
-      "choices": [
-        { "value": "r1", "label": "1 · Refined" },
-        { "value": "g2", "label": "2 · Geometric" },
-        { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" },
-        { "value": "legacy", "label": "Legacy" }
-      ]
+      "label": "Camera entity",
+      "default": "",
+      "choices_from": "entity"
+    },
+    {
+      "name": "entities",
+      "type": "multiselect",
+      "label": "Extra cameras (optional grid)",
+      "default": [],
+      "choices_from": "entity"
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Label",
+      "default": "Camera"
     }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

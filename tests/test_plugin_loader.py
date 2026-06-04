@@ -33,16 +33,16 @@ def _write_minimal_plugin(root: Path, name: str, manifest_overrides: dict) -> Pa
 
 
 def test_discovers_bundled_plugins(tmp_path: Path, schema_path: Path) -> None:
-    """Smoke test against the real plugins dir: themes_core is the only
-    bundled plugin and it parses cleanly, with at least one theme."""
+    """Smoke test against the real plugins dir: bundled fonts_core parses
+    cleanly with at least one font."""
     registry = plugin_loader.discover(
         REPO_ROOT / "plugins",
         schema_path=schema_path,
         data_root=tmp_path,
     )
-    assert "themes_core" in registry.plugins
+    assert "fonts_core" in registry.plugins
     assert registry.errors == []
-    assert registry.get_theme("default") is not None
+    assert len(registry.fonts) > 0
 
 
 def test_plugin_id_is_folder_name(tmp_path: Path, schema_path: Path) -> None:

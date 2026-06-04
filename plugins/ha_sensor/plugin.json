@@ -5,24 +5,28 @@
   "kind": "widget",
   "description": "One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
-  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "s1",
-      "choices": [
-        { "value": "s1", "label": "1 · Bauhaus Refined" },
-        { "value": "s2", "label": "2 · Bauhaus Geometric" },
-        { "value": "s3", "label": "3 · Swiss / International" },
-        { "value": "s4", "label": "4 · Ring Gauges" },
-        { "value": "s5", "label": "5 · Editorial" },
-        { "value": "s6", "label": "6 · Glanceable" }
-      ]
+      "name": "title",
+      "type": "string",
+      "label": "Title (blank = entity name / \"Sensors\")",
+      "default": ""
     },
-    { "name": "title", "type": "string", "label": "Title (blank = entity name / \"Sensors\")", "default": "" },
-    { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
+    {
+      "name": "entities",
+      "type": "multiselect",
+      "label": "Entities",
+      "default": [],
+      "choices_from": "entity"
+    },
     {
       "name": "overrides",
       "type": "entity_overrides",
@@ -30,7 +34,15 @@
       "default": "",
       "help": "One row per ticked entity. Leave the name blank to keep the auto label; pick \"No icon\" to keep the auto icon."
     },
-    { "name": "show_unit", "type": "boolean", "label": "Show units", "default": true }
+    {
+      "name": "show_unit",
+      "type": "boolean",
+      "label": "Show units",
+      "default": true
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

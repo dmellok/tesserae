@@ -20,7 +20,7 @@
       "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
     },
     "kind": {
-      "enum": ["widget", "theme", "font", "admin", "data"]
+      "enum": ["widget", "font", "admin", "data"]
     },
     "description": {
       "type": "string"
@@ -94,40 +94,6 @@
         "dither": { "enum": ["none", "floyd-steinberg", "ordered"] },
         "full_bleed": { "type": "boolean" },
         "needs_network": { "type": "boolean" }
-      }
-    },
-    "themes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "name", "palette"],
-        "properties": {
-          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
-          "name": { "type": "string", "minLength": 1 },
-          "mode": { "enum": ["light", "dark"] },
-          "tags": {
-            "description": "Optional family / use-case markers. The theme picker groups its dropdown by tag (e.g. monochrome themes for 1-bit panels stay together) so the right options are easy to spot. Themes without a tag fall into the default family.",
-            "type": "array",
-            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" },
-            "uniqueItems": true
-          },
-          "palette": {
-            "type": "object",
-            "required": [
-              "bg", "surface", "surface2",
-              "fg", "fgSoft", "muted",
-              "accent", "accent2", "accent3", "accentSoft",
-              "divider", "danger", "warn", "ok", "info"
-            ],
-            "additionalProperties": false,
-            "patternProperties": {
-              "^(bg|surface|surface2|fg|fgSoft|muted|accent|accent2|accent3|accentSoft|divider|danger|warn|ok|info)$": {
-                "type": "string",
-                "pattern": "^#[0-9a-fA-F]{6}$"
-              }
-            }
-          }
-        }
       }
     },
     "fonts": {

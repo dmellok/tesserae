@@ -5,40 +5,70 @@
   "kind": "widget",
   "description": "A numeric Home Assistant sensor over time — six Bauhaus / Swiss visual directions to choose from. Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "h1",
-      "choices": [
-        { "value": "h1", "label": "1 · Bauhaus Refined" },
-        { "value": "h2", "label": "2 · Bauhaus Geometric" },
-        { "value": "h3", "label": "3 · Swiss / International" },
-        { "value": "h4", "label": "4 · Data Chart" },
-        { "value": "h5", "label": "5 · Editorial" },
-        { "value": "h6", "label": "6 · Glanceable" }
-      ]
+      "name": "title",
+      "type": "string",
+      "label": "Title (blank = entity name / \"History\")",
+      "default": ""
     },
-    { "name": "title", "type": "string", "label": "Title (blank = entity name / \"History\")", "default": "" },
-    { "name": "entities", "type": "multiselect", "label": "Entities", "default": [], "choices_from": "entity" },
+    {
+      "name": "entities",
+      "type": "multiselect",
+      "label": "Entities",
+      "default": [],
+      "choices_from": "entity"
+    },
     {
       "name": "window",
       "type": "select",
       "label": "Time window",
       "default": "24",
       "choices": [
-        { "value": "6", "label": "Last 6 hours" },
-        { "value": "12", "label": "Last 12 hours" },
-        { "value": "24", "label": "Last 24 hours" },
-        { "value": "72", "label": "Last 3 days" },
-        { "value": "168", "label": "Last week" },
-        { "value": "336", "label": "Last 2 weeks" },
-        { "value": "720", "label": "Last month" },
-        { "value": "2160", "label": "Last 3 months" }
+        {
+          "value": "6",
+          "label": "Last 6 hours"
+        },
+        {
+          "value": "12",
+          "label": "Last 12 hours"
+        },
+        {
+          "value": "24",
+          "label": "Last 24 hours"
+        },
+        {
+          "value": "72",
+          "label": "Last 3 days"
+        },
+        {
+          "value": "168",
+          "label": "Last week"
+        },
+        {
+          "value": "336",
+          "label": "Last 2 weeks"
+        },
+        {
+          "value": "720",
+          "label": "Last month"
+        },
+        {
+          "value": "2160",
+          "label": "Last 3 months"
+        }
       ]
     }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

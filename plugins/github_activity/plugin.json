@@ -5,22 +5,29 @@
   "kind": "widget",
   "description": "Recent public activity for a GitHub user — four Bauhaus / Swiss visual directions to choose from. Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.",
   "icon": "ph-git-commit",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "a1",
-      "choices": [
-        { "value": "a1", "label": "1 · Refined" },
-        { "value": "a2", "label": "2 · Geometric" },
-        { "value": "a3", "label": "3 · Swiss" },
-        { "value": "a4", "label": "4 · Data" }
-      ]
+      "name": "user",
+      "type": "string",
+      "label": "Username (blank = github_core default)",
+      "default": ""
     },
-    { "name": "user",        "type": "string", "label": "Username (blank = github_core default)", "default": "" },
-    { "name": "max_events",  "type": "number", "label": "Max events",                              "default": 10 }
+    {
+      "name": "max_events",
+      "type": "number",
+      "label": "Max events",
+      "default": 10
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

@@ -1,76 +1,44 @@
-// sky_aurora — Kp + visibility for the user's location.
+// Stripped widget render. Theming + design system removed in v0.17
+// to clear the slate for a redesign. Renders the raw ctx.data as
+// semantic HTML so the widget is still visible while the new design
+// system is built.
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? null;
+  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
+  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
+  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
+    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
+  } else if (data == null) {
+    parts.push(`<p>no data</p>`);
+  } else {
+    parts.push(renderValue(data));
+  }
+  shadow.innerHTML = parts.join("");
+}
+
+function renderValue(v) {
+  if (v === null || v === undefined) return `<p>null</p>`;
+  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
+  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
+  if (Array.isArray(v)) {
+    if (!v.length) return `<p>empty list</p>`;
+    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
+  }
+  if (typeof v === "object") {
+    const entries = Object.entries(v);
+    if (!entries.length) return `<p>empty object</p>`;
+    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
+  }
+  return `<p>${escapeHtml(String(v))}</p>`;
+}
 
 function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
   }[c]));
-}
-
-function kpClass(kp) {
-  if (kp >= 7) return "kp-extreme";
-  if (kp >= 5) return "kp-storm";
-  if (kp >= 4) return "kp-active";
-  return "kp-quiet";
-}
-
-function sparkBars(forecast) {
-  if (!forecast || !forecast.length) return "";
-  return forecast.slice(0, 24).map((f) => {
-    const h = Math.max(8, Math.min(100, (f.kp / 9) * 100));
-    return `<span class="ar-spark-bar ${kpClass(f.kp)}" style="height:${h}%" title="${escapeHtml(f.time)}: Kp ${f.kp}"></span>`;
-  }).join("");
-}
-
-export default async function render(shadow, ctx) {
-  const data = ctx.data || {};
-  if (data.error) {
-    shadow.innerHTML = `
-      <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-      <link rel="stylesheet" href="/plugins/sky_aurora/client.css">
-      <div class="root error"><i class="ph ph-warning-circle"></i><span>${escapeHtml(data.error)}</span></div>
-    `;
-    return;
-  }
-  const size = ctx.cell.size;
-  const kpNow = data.current_kp;
-  const kpMax = data.max_kp_3d;
-  const visible = data.visible_now;
-  const visibleSoon = data.visible_soon;
-
-  shadow.innerHTML = `
-    <link rel="stylesheet" href="/static/icons/phosphor/regular/style.css">
-    <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/bold/style.css">
-    <link rel="stylesheet" href="/static/icons/phosphor/duotone/style.css">
-    <link rel="stylesheet" href="/plugins/sky_aurora/client.css">
-    <div class="root size-${size}">
-      <header class="wb-bar">
-        <span class="wb-mark" aria-hidden="true"></span>
-        <span class="ar-title">Aurora · Kp index</span>
-        <i class="ph-bold ph-mountains wb-bar-icon"></i>
-      </header>
-      <section class="ar-hero ${kpClass(kpNow)}">
-        <div class="ar-now">
-          <span class="ar-now-lbl">Now</span>
-          <span class="ar-now-v">${kpNow.toFixed(1)}</span>
-        </div>
-        <div class="ar-visible">
-          ${visible
-            ? `<i class="ph-bold ph-check-circle"></i><span>Likely visible</span>`
-            : visibleSoon
-            ? `<i class="ph-bold ph-arrow-up-right"></i><span>Possible later</span>`
-            : `<i class="ph-bold ph-x-circle"></i><span>Not visible from lat ${Math.abs(data.lat).toFixed(1)}°</span>`}
-        </div>
-        <div class="ar-band">${escapeHtml(data.band_label)}</div>
-      </section>
-      <section class="ar-spark">
-        <div class="ar-spark-head">
-          <span>3-day forecast</span>
-          <span class="ar-spark-peak">peak Kp ${kpMax.toFixed(1)}</span>
-        </div>
-        <div class="ar-spark-bars">${sparkBars(data.forecast)}</div>
-      </section>
-    </div>
-  `;
 }

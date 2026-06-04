@@ -1,13 +1,15 @@
 """Composer: builds the page that Playwright screenshots and the editor previews.
 
-Reads pages from the file-backed ``PageStore``, resolves theme + font references
-through the plugin registry, emits ``@font-face`` rules for every loaded font,
-and renders one ``<div class="cell">`` per cell with its resolved palette
-already applied as CSS custom properties (``--theme-*``).
+Reads pages from the file-backed ``PageStore``, resolves font references through
+the plugin registry, emits ``@font-face`` rules for every loaded font, and
+renders one ``<div class="cell">`` per cell.
 
 For plugins that ship a ``server.py``, the composer calls ``fetch()`` and
 embeds the result as ``data-data`` on the cell so client.js receives it via
 ``ctx.data``.
+
+The theme system was stripped in v0.17 to clear the deck for a redesign; cells
+no longer carry palette / --theme-* / --c-* tokens.
 """
 
 from __future__ import annotations
@@ -34,25 +36,6 @@ SIZE_DIMENSIONS: dict[str, tuple[int, int]] = {
     "sm": (380, 240),
     "md": (640, 400),
     "lg": (1200, 800),
-}
-
-
-# Fallback palette used only if no theme plugin is loaded. Kept neutral so a
-# broken / missing themes_core doesn't render as an obvious "default theme"
-# branded look — it should just work and look plain.
-_BUILTIN_DEFAULT_PALETTE: dict[str, str] = {
-    "bg": "#ffffff",
-    "surface": "#f5f5f5",
-    "surface2": "#e8e8e8",
-    "fg": "#1a1a1a",
-    "fgSoft": "#555555",
-    "muted": "#888888",
-    "accent": "#3060c0",
-    "accentSoft": "#2148a0",
-    "divider": "#c8c8c8",
-    "danger": "#c44a3a",
-    "warn": "#c89028",
-    "ok": "#3a8848",
 }
 
 
@@ -100,17 +83,6 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
         if needs_lon:
             merged["longitude"] = glon
     return merged
-
-
-def _resolve_palette(theme_id: str | None, registry: PluginRegistry) -> dict[str, str]:
-    if theme_id:
-        theme = registry.get_theme(theme_id)
-        if theme is not None:
-            return theme.palette
-    fallback = registry.get_theme("default")
-    if fallback is not None:
-        return fallback.palette
-    return dict(_BUILTIN_DEFAULT_PALETTE)
 
 
 def _resolve_font(font_id: str | None, registry: PluginRegistry) -> Font | None:
@@ -335,9 +307,8 @@ def _fetch_plugin_data(
 def _hydrate_page(
     page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False
 ) -> dict[str, Any]:
-    """Resolve options, themes, fonts, server-side data, and visual layout."""
+    """Resolve options, fonts, server-side data, and visual layout."""
     registry = _registry()
-    page_palette = _resolve_palette(page_dict.get("theme"), registry)
     page_font = _resolve_font(page_dict.get("font"), registry)
     page_font_family = page_font.name if page_font else "system-ui"
 
@@ -367,18 +338,12 @@ def _hydrate_page(
         ],
     }
 
-    # First pass: assemble the layout, palette, font, options for each
-    # cell synchronously. These are all in-memory operations (registry
-    # lookups + token resolution); the slow part — server-side widget
-    # data fetches — is split out so it can run in parallel below.
+    # First pass: assemble the layout, font, options for each cell
+    # synchronously. These are all in-memory operations (registry
+    # lookups); the slow part — server-side widget data fetches — is
+    # split out so it can run in parallel below.
     cells_meta: list[dict[str, Any]] = []
     for cell in page_dict["cells"]:
-        cell_palette = dict(
-            _resolve_palette(cell["theme"], registry) if cell.get("theme") else page_palette
-        )
-        for token, hex_value in (cell.get("palette_overrides") or {}).items():
-            if isinstance(hex_value, str) and hex_value:
-                cell_palette[token] = hex_value
         cell_font = _resolve_font(cell["font"], registry) if cell.get("font") else page_font
         cell_font_family = cell_font.name if cell_font else page_font_family
         plugin_id = cell.get("plugin") or None
@@ -402,7 +367,6 @@ def _hydrate_page(
                     "w": max(1, cell["w"] - left_pad - right_pad),
                     "h": max(1, cell["h"] - top_pad - bottom_pad),
                 },
-                "palette": cell_palette,
                 "font_family": cell_font_family,
                 "full_bleed": full_bleed,
             }
@@ -429,7 +393,6 @@ def _hydrate_page(
                 "plugin": plugin_id or "",
                 "options": meta["resolved_options"],
                 "data": data_by_cell_index.get(idx),
-                "palette": meta["palette"],
                 "font_family": meta["font_family"],
                 "full_bleed": meta["full_bleed"],
             }
@@ -438,7 +401,6 @@ def _hydrate_page(
     return {
         **page_dict,
         "cells": cells_out,
-        "palette": page_palette,
         "font_family": page_font_family,
         "font_face_css": _font_face_css(registry.fonts),
         "corner_radius": corner_radius,
@@ -509,25 +471,7 @@ def test_render() -> str:
     if size not in SIZE_DIMENSIONS:
         abort(400)
 
-    # Theme picker on the gallery passes ?theme=<id> so a reviewer can
-    # eyeball every widget against any installed theme without saving
-    # a page. Unknown ids fall back to default rather than 400ing —
-    # keeps the gallery resilient when a theme gets renamed or removed
-    # from the plugin manifest mid-session.
-    theme_id = request.args.get("theme") or "default"
-    theme_registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
-    if theme_id not in theme_registry.themes:
-        theme_id = "default"
-
     sample_mode = request.args.get("sample") == "1"
-
-    # Direction picker on the gallery passes ?variant=<key> so the
-    # reviewer can flip between a widget's visual variants without
-    # opening the editor. Empty / missing ⇒ widget's own default.
-    test_options: dict[str, Any] = {}
-    variant = (request.args.get("variant") or "").strip()
-    if variant:
-        test_options["variant"] = variant
 
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
@@ -543,7 +487,6 @@ def test_render() -> str:
         "id": "_test",
         "name": f"Test: {plugin_id} @ {size}",
         "panel": {"w": cell_w, "h": cell_h},
-        "theme": theme_id,
         "font": "default",
         "cells": [
             {
@@ -553,13 +496,7 @@ def test_render() -> str:
                 "w": cell_w,
                 "h": cell_h,
                 "plugin": plugin_id,
-                "options": test_options,
-                # Pydantic Cell defaults to 1.0; this scaffolded page
-                # skips the model entirely, so we have to seed the
-                # field explicitly. Without it the template renders
-                # ``--c-zoom: None`` and ``calc(100% / None)`` makes
-                # the cell-content shrink-to-fit, squashing every
-                # widget into a narrow strip on the left of the iframe.
+                "options": {},
                 "zoom": zoom_val,
             }
         ],
@@ -588,20 +525,6 @@ def test_widget_gallery() -> str:
     for plugin in widgets:
         supported = plugin.manifest.get("supports", {}).get("sizes") or ["md"]
         sizes = [s for s in ("xs", "sm", "md", "lg") if s in supported]
-        # Direction picker — many widgets ship 4-6 visual variants under
-        # a ``variant`` cell_option. Surfacing the choices in the gallery
-        # lets the reviewer flip between them without opening the editor.
-        variants: list[dict[str, str]] = []
-        variant_default = ""
-        for opt in plugin.manifest.get("cell_options") or []:
-            if opt.get("name") == "variant" and opt.get("type") == "select":
-                variants = [
-                    {"value": str(c.get("value", "")), "label": str(c.get("label", ""))}
-                    for c in (opt.get("choices") or [])
-                    if c.get("value") is not None
-                ]
-                variant_default = str(opt.get("default") or "")
-                break
         rows.append(
             {
                 "id": plugin.id,
@@ -610,22 +533,10 @@ def test_widget_gallery() -> str:
                 "icon": plugin.manifest.get("icon"),
                 "version": plugin.manifest.get("version") or "",
                 "sizes": sizes,
-                "variants": variants,
-                "variant_default": variant_default,
             }
         )
-    # Theme picker lets a reviewer scan every widget against any
-    # installed theme without saving a page. ``default`` always exists
-    # (it's the seed theme themes_core ships with) and leads so the
-    # gallery loads with the same look the composer defaults to.
-    theme_registry: PluginRegistry = current_app.config["PLUGIN_REGISTRY"]
-    themes = sorted(
-        ({"id": t.id, "name": t.name, "mode": t.mode} for t in theme_registry.themes.values()),
-        key=lambda t: (t["id"] != "default", t["mode"], t["name"].lower()),
-    )
     return render_template(
         "widget_gallery.html",
         widgets=rows,
         size_dims=SIZE_DIMENSIONS,
-        themes=themes,
     )

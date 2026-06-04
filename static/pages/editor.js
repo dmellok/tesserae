@@ -172,7 +172,6 @@
     return {
       type: "tesserae-patch",
       page: {
-        palette: next.palette,
         font_family: next.font_family,
         font_face_css: next.font_face_css,
         bleed_color: next.bleed_color,
@@ -187,7 +186,6 @@
         zoom: typeof c.zoom === "number" ? c.zoom : 1,
         options: c.options,
         data: c.data,
-        palette: c.palette,
         font_family: c.font_family,
         full_bleed: Boolean(c.full_bleed),
       })),

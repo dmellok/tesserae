@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
 from flask import Flask
 
-from app.main import REPO_ROOT, create_app
+from app.main import create_app
 from app.state.page_store import PageStore
 
 
@@ -34,8 +33,7 @@ def _write_test_plugin(plugin_dir: Path, *, cell_options: list[dict[str, Any]]) 
 def app(tmp_path: Path) -> Flask:
     # Synthetic plugin sandbox: the editor tests need plugin ids that
     # exist + carry known cell-option defaults, but nothing renders here,
-    # so we don't need the bundled widget set. themes_core is copied in
-    # because the editor's compose route resolves a default theme.
+    # so we don't need the bundled widget set.
     plugins_dir = tmp_path / "plugins"
     plugins_dir.mkdir()
     _write_test_plugin(
@@ -47,14 +45,11 @@ def app(tmp_path: Path) -> Flask:
         ],
     )
     _write_test_plugin(plugins_dir / "widget_b", cell_options=[])
-    shutil.copytree(REPO_ROOT / "plugins" / "themes_core", plugins_dir / "themes_core")
 
     a = create_app(
         testing=False,
         data_root=tmp_path / "data",
         plugins_dir=plugins_dir,
-        renderers_dir=REPO_ROOT / "renderers",
-        devices_dir=REPO_ROOT / "devices",
     )
     a.config["TESTING"] = True
     return a
@@ -98,7 +93,6 @@ def test_preview_returns_hydrated_state_per_panel(app: Flask, tmp_path: Path) ->
             [
                 ("panels[]", "800x600"),
                 ("panels[]", "400x300"),
-                ("theme", "default"),
             ]
         ),
         headers={"X-Requested-With": "fetch"},
@@ -108,11 +102,7 @@ def test_preview_returns_hydrated_state_per_panel(app: Flask, tmp_path: Path) ->
     assert body["ok"] is True
     groups = body["groups"]
     assert {(g["w"], g["h"]) for g in groups} == {(800, 600), (400, 300)}
-    # Each group's state mirrors the shape compose.html renders against —
-    # palette, font_face_css, per-cell context.
     state = next(g["state"] for g in groups if g["w"] == 800)
-    assert "palette" in state and isinstance(state["palette"], dict)
-    assert "fg" in state["palette"]
     assert isinstance(state["cells"], list)
     assert len(state["cells"]) == 1
     assert state["cells"][0]["w"] == 800
@@ -125,7 +115,7 @@ def test_preview_falls_back_to_redirect_for_non_ajax(app: Flask, tmp_path: Path)
     client = app.test_client()
     _sign_in(client)
     pid = _new(client, name="Home", layout="1_cell")
-    resp = client.post(f"/pages/{pid}/preview", data={"theme": "default"})
+    resp = client.post(f"/pages/{pid}/preview", data={"name": "Home"})
     # _flash_save returns either redirect or 200 depending on the helper;
     # the important thing is the body isn't JSON.
     assert resp.content_type != "application/json"
@@ -207,7 +197,6 @@ def test_update_page_metadata_autosave_json(app: Flask, tmp_path: Path) -> None:
         f"/pages/{pid}",
         data={
             "name": "Living room",
-            "theme": "embers",
             "gap": "16",
             "corner_radius": "8",
             "bleed_color": "#202020",
@@ -219,16 +208,15 @@ def test_update_page_metadata_autosave_json(app: Flask, tmp_path: Path) -> None:
     page = _store(tmp_path).get(pid)
     assert page is not None
     assert page.name == "Living room"
-    assert page.theme == "embers"
     assert page.gap == 16
 
 
 def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
     """The editor posts TWO forms to this endpoint: the header rename form
-    (just ``name``) and the dashboard form (theme/font/device_ids/…). Each
-    must touch only the fields it carries, or the rename wipes the theme
-    (which every cell inherits) and the dashboard's stale state reverts the
-    rename. Regression for both reported editor bugs."""
+    (just ``name``) and the dashboard form (icon / device_ids / …). Each
+    must touch only the fields it carries, or the rename wipes the
+    device bindings and the dashboard's stale state reverts the rename.
+    Regression for both reported editor bugs."""
     client = app.test_client()
     _sign_in(client)
     # Bind a device so we can prove device_ids survives a name-only save.
@@ -239,7 +227,6 @@ def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
     client.post(
         f"/pages/{pid}",
         data={
-            "theme": "embers",
             "icon": "music-notes",
             "device_ids": ["esp32_lab"],
             "device_ids_present": "1",
@@ -247,24 +234,21 @@ def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
         headers={"X-Requested-With": "fetch"},
     )
     page = _store(tmp_path).get(pid)
-    assert (
-        page.theme == "embers" and page.device_ids == ["esp32_lab"] and page.icon == "music-notes"
-    )
+    assert page.device_ids == ["esp32_lab"] and page.icon == "music-notes"
 
-    # Name-only save (the header rename form) must NOT wipe theme/icon/device.
+    # Name-only save (the header rename form) must NOT wipe icon/device.
     client.post(
         f"/pages/{pid}", data={"name": "Living room"}, headers={"X-Requested-With": "fetch"}
     )
     page = _store(tmp_path).get(pid)
     assert page.name == "Living room"  # rename applied
-    assert page.theme == "embers"  # bug 1: theme survives a name-only save
     assert page.icon == "music-notes"  # icon survives too
     assert page.device_ids == ["esp32_lab"]  # device binding survives too
 
     # Dashboard save (no name) must NOT revert the rename.
     client.post(
         f"/pages/{pid}",
-        data={"theme": "embers", "device_ids": ["esp32_lab"], "device_ids_present": "1"},
+        data={"device_ids": ["esp32_lab"], "device_ids_present": "1"},
         headers={"X-Requested-With": "fetch"},
     )
     assert _store(tmp_path).get(pid).name == "Living room"  # bug 2: rename sticks
@@ -272,7 +256,7 @@ def test_update_is_a_merge_not_a_replace(app: Flask, tmp_path: Path) -> None:
     # Dashboard form with the sentinel + no checkboxes clears the binding.
     client.post(
         f"/pages/{pid}",
-        data={"theme": "embers", "device_ids_present": "1"},
+        data={"device_ids_present": "1"},
         headers={"X-Requested-With": "fetch"},
     )
     assert _store(tmp_path).get(pid).device_ids == []
@@ -475,31 +459,6 @@ def test_delete_cell(app: Flask, tmp_path: Path) -> None:
     cell_id = _store(tmp_path).get(pid).cells[0].id
     client.post(f"/pages/{pid}/cells/{cell_id}/delete")
     assert len(_store(tmp_path).get(pid).cells) == 1
-
-
-def test_cell_palette_overrides_round_trip(app: Flask, tmp_path: Path) -> None:
-    """Overrides only land when the per-token checkbox is checked. The
-    color input alone (every picker has SOME value) isn't enough."""
-    client = app.test_client()
-    _sign_in(client)
-    pid = _new(client, name="Home", layout="1_cell")
-    cell_id = _store(tmp_path).get(pid).cells[0].id
-    client.post(
-        f"/pages/{pid}/cells/{cell_id}",
-        data={
-            "plugin": "widget_a",
-            "x": "0",
-            "y": "0",
-            "w": "100",
-            "h": "80",
-            "override_accent_enabled": "on",
-            "override_accent": "#112233",
-            # bg picker set but checkbox NOT checked — ignored.
-            "override_bg": "#ffffff",
-        },
-    )
-    cell = _store(tmp_path).get(pid).cells[0]
-    assert cell.palette_overrides == {"accent": "#112233"}
 
 
 # -- /compose iframe access ----------------------------------------

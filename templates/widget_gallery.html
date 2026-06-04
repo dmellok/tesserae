@@ -201,8 +201,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
     }
     .main-head p { margin: 4px 0 0; color: var(--fgSoft); font-size: 13px; }
 
-    /* Wraps the theme picker + orientation toggle on the right of the
-       header so they group as one cluster of viewing controls. */
+    /* Wraps the orientation toggle on the right of the header. */
     .gallery-controls {
       margin-left: auto;
       display: inline-flex;
@@ -210,20 +209,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       gap: 12px;
     }
 
-    /* Theme picker — palette icon + native <select>. Sized to match
-       the orientation toggle so they read as a pair. */
-    .theme-picker {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 0 10px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      color: var(--fgSoft);
-    }
-    .theme-picker .ph { font-size: 14px; }
-    .theme-picker select {
+    .gallery-controls select {
       appearance: none;
       -webkit-appearance: none;
       background: transparent;
@@ -579,29 +565,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
           <i class="ph ph-database" aria-hidden="true"></i>
           <span data-sample-label>Sample data</span>
         </button>
-        {% if themes %}
-        {# Theme picker — passes ?theme=<id> through to /_test/render so
-           every iframe in the gallery re-renders against the chosen
-           theme. Grouped by mode so light/dark themes don't blur
-           together in a long list. Persists to localStorage so the
-           next reload remembers what you were eyeballing. #}
-        <label class="theme-picker">
-          <i class="ph ph-palette" aria-hidden="true"></i>
-          <span class="visually-hidden">Theme</span>
-          <select data-theme-picker>
-            {% set ns = namespace(group=none) %}
-            {% for t in themes %}
-              {% if t.mode != ns.group %}
-                {% if ns.group %}</optgroup>{% endif %}
-                <optgroup label="{{ t.mode|capitalize or 'Other' }}">
-                {% set ns.group = t.mode %}
-              {% endif %}
-              <option value="{{ t.id }}">{{ t.name }}</option>
-            {% endfor %}
-            {% if ns.group %}</optgroup>{% endif %}
-          </select>
-        </label>
-        {% endif %}
         <div class="orient-toggle" role="radiogroup" aria-label="Orientation">
           <button type="button" data-orient="landscape" class="is-active" aria-pressed="true">
             <i class="ph ph-rectangle" aria-hidden="true"></i>Landscape
@@ -655,17 +618,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
               <option value="3">300%</option>
             </select>
           </label>
-          {% if w.variants %}
-          <label class="widget-pill" title="Direction">
-            <i class="ph ph-shapes" aria-hidden="true"></i>
-            <span class="visually-hidden">Direction</span>
-            <select data-widget-variant data-widget-id="{{ w.id }}">
-              {% for v in w.variants %}
-              <option value="{{ v.value }}"{% if v.value == w.variant_default %} selected{% endif %}>{{ v.label }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          {% endif %}
           {# Reviewed toggle — flips the card + sidebar to green so the
              reviewer can mark widgets as triaged. Persisted across
              reloads so progress survives a refresh. #}
@@ -716,30 +668,21 @@ Not linked from the main nav — visit /_test/widgets directly. #}
 
 <script>
   // Single source of truth for what's selected, what orientation,
-  // what theme, sample-mode on/off. Every UI control mutates this
-  // object and then calls applyAll() — a single function that walks
-  // each widget card and reconciles its iframe state. This is much
-  // easier to reason about than the previous "each control reaches
-  // into every iframe" pattern, and it makes lazy loading natural:
-  // unselected widgets just never get a src set.
+  // sample-mode on/off. Every UI control mutates this object and then
+  // calls applyAll() — a single function that walks each widget card
+  // and reconciles its iframe state. Unselected widgets just never get
+  // a src set.
   (function () {
     const ORIENT_KEY   = "tesserae:gallery-orientation";
-    const THEME_KEY    = "tesserae:gallery-theme";
     const SELECT_KEY   = "tesserae:gallery-selected";
     const SAMPLE_KEY   = "tesserae:gallery-sample";
-    const VARIANT_KEY  = "tesserae:gallery-variants";
     const ZOOM_KEY     = "tesserae:gallery-zooms";
     const REVIEWED_KEY = "tesserae:gallery-reviewed";
 
     const state = {
       orient: "landscape",
-      theme:  null,
       sample: true,
       selected: new Set(),
-      // Per-widget variant selection. {widget_id: variant_value}.
-      // Seeded from each <select>'s default on init; persists to
-      // localStorage so revisits remember the picked direction.
-      variants: {},
       // Per-widget content zoom. {widget_id: "1" | "1.5" | …}.
       zooms: {},
       // Widgets the user has marked as reviewed — green-outlined card
@@ -749,7 +692,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
 
     // -------- DOM lookups (cached at init) --------
     const toggle         = document.querySelector(".orient-toggle");
-    const themePicker    = document.querySelector("[data-theme-picker]");
     const sampleBtn      = document.querySelector("[data-sample-toggle]");
     const sampleLabel    = document.querySelector("[data-sample-label]");
     const emptyState     = document.querySelector("[data-gallery-empty]");
@@ -757,7 +699,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
     const checkboxes     = Array.from(document.querySelectorAll("[data-widget-toggle]"));
     const tocRows        = Array.from(document.querySelectorAll("[data-toc-row]"));
     const widgetCards    = Array.from(document.querySelectorAll("[data-widget-card]"));
-    const variantPickers = Array.from(document.querySelectorAll("[data-widget-variant]"));
     const zoomPickers    = Array.from(document.querySelectorAll("[data-widget-zoom]"));
     const reviewBtns     = Array.from(document.querySelectorAll("[data-widget-review]"));
 
@@ -778,10 +719,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
     function srcFor(iframe, widgetId) {
       const url = new URL(iframe.dataset.baseSrc, location.origin);
       url.searchParams.set("_o", state.orient === "portrait" ? "p" : "l");
-      if (state.theme)   url.searchParams.set("theme", state.theme);
       if (state.sample)  url.searchParams.set("sample", "1");
-      const variant = state.variants[widgetId];
-      if (variant)       url.searchParams.set("variant", variant);
       const zoom = state.zooms[widgetId];
       if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
       return url.pathname + url.search;
@@ -870,10 +808,7 @@ Not linked from the main nav — visit /_test/widgets directly. #}
           const openLink = tile.querySelector("[data-open-link]");
           if (openLink) {
             const url = new URL(openLink.dataset.baseHref, location.origin);
-            if (state.theme)  url.searchParams.set("theme", state.theme);
             if (state.sample) url.searchParams.set("sample", "1");
-            const variant = state.variants[id];
-            if (variant)      url.searchParams.set("variant", variant);
             const zoom = state.zooms[id];
             if (zoom && zoom !== "1") url.searchParams.set("zoom", zoom);
             openLink.href = url.pathname + url.search;
@@ -964,14 +899,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       });
     }
 
-    if (themePicker) {
-      themePicker.addEventListener("change", () => {
-        state.theme = themePicker.value || null;
-        try { localStorage.setItem(THEME_KEY, themePicker.value); } catch {}
-        applyAll();
-      });
-    }
-
     if (sampleBtn) {
       sampleBtn.addEventListener("click", () => {
         state.sample = !state.sample;
@@ -980,18 +907,6 @@ Not linked from the main nav — visit /_test/widgets directly. #}
         applyAll();
       });
     }
-
-    // Per-widget direction pickers. Update state, persist, re-render
-    // the affected card's iframes (and only those — applyAll's reload
-    // guard short-circuits the others).
-    variantPickers.forEach((picker) => {
-      picker.addEventListener("change", () => {
-        const id = picker.dataset.widgetId;
-        state.variants[id] = picker.value;
-        try { localStorage.setItem(VARIANT_KEY, JSON.stringify(state.variants)); } catch {}
-        applyAll();
-      });
-    });
 
     // Per-widget zoom pickers. Server clamps 0.5–3.0; iframe rewrites
     // when the value changes.
@@ -1027,45 +942,8 @@ Not linked from the main nav — visit /_test/widgets directly. #}
       if (s === "0") state.sample = false;
     } catch {}
 
-    if (themePicker) {
-      try {
-        const saved = localStorage.getItem(THEME_KEY);
-        if (saved && [...themePicker.options].some((o) => o.value === saved)) {
-          themePicker.value = saved;
-          state.theme = saved;
-        } else {
-          state.theme = themePicker.value || null;
-        }
-      } catch {
-        state.theme = themePicker.value || null;
-      }
-    }
-
     loadSelected();
     checkboxes.forEach((cb) => { cb.checked = state.selected.has(cb.value); });
-
-    // Seed variants from each <select>'s default (the manifest's
-    // ``default`` field, already selected server-side).
-    variantPickers.forEach((picker) => {
-      state.variants[picker.dataset.widgetId] = picker.value;
-    });
-    // Restore any persisted overrides — but only ones whose value is
-    // still a valid option for that widget (a manifest could have
-    // renamed/removed a variant between visits).
-    try {
-      const raw = localStorage.getItem(VARIANT_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) || {};
-        variantPickers.forEach((picker) => {
-          const id = picker.dataset.widgetId;
-          const v = saved[id];
-          if (v && [...picker.options].some((o) => o.value === v)) {
-            picker.value = v;
-            state.variants[id] = v;
-          }
-        });
-      }
-    } catch {}
 
     // Same dance for zooms — seed from defaults (every picker starts
     // at 100%), then restore overrides if any survive.

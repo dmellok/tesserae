@@ -36,7 +36,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/schedules.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/send.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/events.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/editor.css') }}">
   {% block head_extra %}{% endblock %}
 </head>
@@ -62,10 +61,6 @@
       <a href="{{ url_for('schedules.index') }}"
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
          <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Schedules</span>
-      </a>
-      <a href="{{ url_for('themes.index') }}"
-         class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
-         <i class="ph ph-palette" aria-hidden="true"></i><span>Themes</span>
       </a>
       <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
         <summary>

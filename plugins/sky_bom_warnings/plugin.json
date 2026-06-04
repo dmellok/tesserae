@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 BoM Warnings",
+  "name": "Weather — BoM Warnings",
   "version": "0.1.0",
   "kind": "widget",
-  "description": "Current severe weather warnings from the Bureau of Meteorology (Australia). Filter by state \u2014 flood, severe thunderstorm, severe weather, bushfire, etc. Uses api.weather.bom.gov.au (the same backend the BoM website itself uses; no key, treat as private/non-redistribution per BoM's terms).",
+  "description": "Current severe weather warnings from the Bureau of Meteorology (Australia). Filter by state — flood, severe thunderstorm, severe weather, bushfire, etc. Uses api.weather.bom.gov.au (the same backend the BoM website itself uses; no key, treat as private/non-redistribution per BoM's terms).",
   "icon": "ph-warning-octagon",
   "supports": {
     "sizes": [
@@ -70,34 +70,6 @@
       "type": "boolean",
       "label": "Hide cancelled warnings",
       "default": true
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
-        }
-      ]
     }
   ],
   "render": {

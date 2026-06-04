@@ -53,7 +53,12 @@ class Cell(BaseModel):
     ``plugin`` is optional so the editor can apply a layout template
     (which creates positioned-but-unassigned cells) before the user
     picks which widget renders into each slot. The composer skips
-    cells where ``plugin`` is None / empty rather than 500-ing."""
+    cells where ``plugin`` is None / empty rather than 500-ing.
+
+    The theme / palette_overrides fields that used to live here were
+    stripped in v0.17 alongside the theme system. Pydantic silently
+    drops extras on load so old pages.json keep parsing.
+    """
 
     id: str
     plugin: str | None = None
@@ -61,26 +66,14 @@ class Cell(BaseModel):
     y: int = Field(..., ge=0)
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
-    theme: str | None = None
     font: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
-    palette_overrides: dict[str, str] | None = None
     # Per-cell content zoom. Inverse-sized at render time: the widget
     # paints into a 1/zoom virtual container that's transform-scaled back
     # up to the cell box, so text/icons grow without breaking layout. The
     # slider in the editor exposes 0.7–2.0; the wider 0.5–3.0 envelope is
     # the explicit-JSON safety net.
     zoom: float = Field(default=1.0, ge=0.5, le=3.0)
-
-    @field_validator("palette_overrides")
-    @classmethod
-    def _validate_palette_overrides(cls, value: dict[str, str] | None) -> dict[str, str] | None:
-        if value is None:
-            return None
-        for k, v in value.items():
-            if not isinstance(v, str) or not v.startswith("#"):
-                raise ValueError(f"palette override {k!r}={v!r} must be a hex string")
-        return value
 
 
 class Page(BaseModel):
@@ -106,7 +99,6 @@ class Page(BaseModel):
     panel: Panel | None = None
     device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)
-    theme: str | None = None
     font: str | None = None
     gap: int = 0
     corner_radius: int = 0

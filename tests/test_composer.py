@@ -1,4 +1,4 @@
-"""Composer route shape — markup well-formedness + theme variable wiring."""
+"""Composer route shape — markup well-formedness."""
 
 from __future__ import annotations
 
@@ -14,10 +14,6 @@ def test_test_render_route_returns_cell_markup(client: FlaskClient) -> None:
     body = resp.get_data(as_text=True)
     assert 'data-plugin="clock"' in body
     assert 'class="cell' in body
-    # The composer must inject the resolved palette as CSS custom properties
-    # on the cell so plugins can use var(--theme-*) without explicit wiring.
-    assert "--theme-bg:" in body
-    assert "--theme-accent:" in body
 
 
 def test_test_render_unknown_plugin_still_routes(client: FlaskClient) -> None:

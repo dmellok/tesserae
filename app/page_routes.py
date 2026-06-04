@@ -198,20 +198,6 @@ def _cell_options_from_form(plugin: Plugin, form: Any) -> dict[str, Any]:
     return out
 
 
-def _palette_overrides_from_form(form: Any) -> dict[str, str] | None:
-    from app.state.user_themes import PALETTE_TOKENS
-
-    out: dict[str, str] = {}
-    for token in PALETTE_TOKENS:
-        # Override is opt-in via a checkbox so the colour picker's
-        # always-set default doesn't accidentally override every token.
-        if form.get(f"override_{token}_enabled") in ("on", "true", "1"):
-            raw = (form.get(f"override_{token}") or "").strip()
-            if raw and raw.startswith("#"):
-                out[token] = raw
-    return out or None
-
-
 def _flash_save(ok: bool, message: str) -> Response:
     """Return value for autosave endpoints: JSON for fetch callers, a
     redirect for native form submits (e.g. JS-disabled fallback)."""
@@ -297,32 +283,12 @@ def _ensure_cells_fit_panel(page: Page, panel: Any) -> Page:
 
 def _editor_context(page: Page) -> dict[str, Any]:
     """Shared context for the editor."""
-    from app.state.user_themes import PALETTE_TOKENS
-
     panel = resolve_panel_for_page(page, _devices(), _settings_store())
     page = _ensure_cells_fit_panel(page, panel)
     panel_cells = [(c.x, c.y, c.w, c.h) for c in page.cells]
     active_layout = detect_layout(panel_cells, panel.w, panel.h)
     widgets = sorted(_plugins().widgets(), key=lambda p: p.name.lower())
     plugins = _plugins()
-
-    # Effective palette per cell — same resolution chain the composer uses
-    # (cell.theme || page.theme || "default") so the per-cell colour
-    # pickers can pre-fill with the actual swatch the widget will paint
-    # with. Without this the pickers all default to #000000 and there's
-    # no way to tell which token controls which colour.
-    def _palette_for(theme_id: str | None) -> dict[str, str]:
-        if theme_id:
-            theme = plugins.get_theme(theme_id)
-            if theme is not None:
-                return dict(theme.palette)
-        default = plugins.get_theme("default")
-        return dict(default.palette) if default is not None else {}
-
-    page_palette = _palette_for(page.theme)
-    cell_palettes: dict[str, dict[str, str]] = {}
-    for c in page.cells:
-        cell_palettes[c.id] = _palette_for(c.theme) if c.theme else page_palette
 
     # Cells in a JSON-safe shape for the interactive layout editor JS.
     layout_editor_cells = [
@@ -374,24 +340,11 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "panel": panel,
         "plugins": widgets,
         "plugin_cell_options": _materialize_cell_options(widgets),
-        # Sort by family (untagged Ramen first, then mono, then neon) and
-        # within a family by name. The picker renders each family as an
-        # <optgroup> so a user setting up a 1-bit panel can spot the mono
-        # themes without scrolling past 20 colour ones.
-        "themes": sorted(
-            plugins.themes.values(),
-            key=lambda t: (
-                {"": 0, "mono": 1, "neon": 2}.get(t.tags[0] if t.tags else "", 3),
-                t.name.lower(),
-            ),
-        ),
         "fonts": sorted(plugins.fonts.values(), key=lambda f: f.name.lower()),
         "layouts": LAYOUTS,
         "active_layout": active_layout.slug if active_layout else None,
         "preview_scale": _preview_scale(panel.w, panel.h),
         "preview_groups": preview_groups,
-        "palette_tokens": list(PALETTE_TOKENS),
-        "cell_palettes": cell_palettes,
         "layout_editor_cells": layout_editor_cells,
         "device_options": device_options,
     }
@@ -477,7 +430,6 @@ def create() -> Response:
             # panel left None on purpose — derived from settings at render
             # time so changing the panel in settings updates every page.
             cells=initial_cells,
-            theme=(form.get("theme") or None),
             font=(form.get("font") or None),
             gap=_coerce_int(form.get("gap"), 0, lo=0),
             corner_radius=_coerce_int(form.get("corner_radius"), 0, lo=0),
@@ -507,10 +459,10 @@ def update(page_id: str) -> Response:
     Merge, don't replace: only fields actually present in the POST are
     updated; absent fields keep their stored value. The editor posts two
     *separate* forms to this endpoint — the header rename form (just
-    ``name``) and the dashboard form (theme / font / icon / device_ids /
-    …). If absent fields were reset to defaults, the rename form would
-    wipe the theme + device bindings (and vice-versa), so each must touch
-    only what it carries."""
+    ``name``) and the dashboard form (font / icon / device_ids / …). If
+    absent fields were reset to defaults, the rename form would wipe the
+    device bindings (and vice-versa), so each must touch only what it
+    carries."""
     page = _store().get(page_id)
     if page is None:
         abort(404)
@@ -518,8 +470,6 @@ def update(page_id: str) -> Response:
     updates: dict[str, Any] = {}
     if "name" in form:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
-    if "theme" in form:
-        updates["theme"] = form.get("theme") or None
     if "font" in form:
         updates["font"] = form.get("font") or None
     if "gap" in form:
@@ -608,10 +558,8 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=panel.h - 1),
             "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
             "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
-            "theme": (form.get("theme") or None),
             "font": (form.get("font") or None),
             "options": options,
-            "palette_overrides": _palette_overrides_from_form(form),
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
         }
     )
@@ -624,7 +572,7 @@ def preview(page_id: str) -> Response:
     renders the draft instead of the persisted version.
 
     Form field convention (set by editor.js):
-      ``name``, ``theme``, ``font``, ``bleed_color``, ``gap``,
+      ``name``, ``font``, ``bleed_color``, ``gap``,
       ``corner_radius`` — page-level overrides.
       ``cell_<id>__<field>`` — per-cell overrides (double-underscore
       separates the cell id from the field name to disambiguate cell
@@ -667,7 +615,6 @@ def preview(page_id: str) -> Response:
         draft = page.model_copy(
             update={
                 "name": (form.get("name") or page.name).strip() or page.name,
-                "theme": (form.get("theme") or None),
                 "font": (form.get("font") or None),
                 "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
@@ -684,8 +631,8 @@ def preview(page_id: str) -> Response:
 
     # Hydrate the draft for each panel size the editor's iframes care
     # about. The client uses these to compute postMessage patches so a
-    # gentle edit (theme swap, gap nudge, single-cell option) doesn't
-    # require a full iframe reload — see static/pages/editor.js.
+    # gentle edit (gap nudge, single-cell option) doesn't require a full
+    # iframe reload — see static/pages/editor.js.
     # ``panels`` form field carries one or more ``WxH`` strings; missing
     # ⇒ no hydrated state returned and the client falls back to full
     # iframe reload, same behaviour as before this change.

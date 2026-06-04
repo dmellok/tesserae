@@ -56,21 +56,6 @@ class LoaderError:
 
 
 @dataclass(frozen=True)
-class Theme:
-    id: str
-    name: str
-    mode: str  # "light" | "dark" | ""
-    palette: dict[str, str]
-    plugin_id: str
-    is_user: bool = False
-    # Optional family / use-case tags from the manifest. The picker groups
-    # by the first tag so users on a 1-bit panel can spot the ``mono``
-    # family without scrolling past the colour themes. Empty tuple means
-    # the theme falls into the default (un-grouped) bucket.
-    tags: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
 class Font:
     id: str
     name: str
@@ -128,7 +113,6 @@ class Plugin:
 class PluginRegistry:
     plugins: dict[str, Plugin] = field(default_factory=dict)
     errors: list[LoaderError] = field(default_factory=list)
-    themes: dict[str, Theme] = field(default_factory=dict)
     fonts: dict[str, Font] = field(default_factory=dict)
 
     def get(self, plugin_id: str) -> Plugin | None:
@@ -136,9 +120,6 @@ class PluginRegistry:
 
     def widgets(self) -> list[Plugin]:
         return [p for p in self.plugins.values() if p.kind == "widget"]
-
-    def get_theme(self, theme_id: str) -> Theme | None:
-        return self.themes.get(theme_id)
 
     def get_font(self, font_id: str) -> Font | None:
         return self.fonts.get(font_id)
@@ -258,43 +239,6 @@ def discover(
             server_module=server_module,
         )
         registry.plugins[plugin_id] = plugin
-
-        if plugin.kind == "theme":
-            for raw_theme in manifest.get("themes", []):
-                raw_tags = raw_theme.get("tags") or ()
-                tags = tuple(str(t) for t in raw_tags) if isinstance(raw_tags, list) else ()
-                theme = Theme(
-                    id=str(raw_theme["id"]),
-                    name=str(raw_theme["name"]),
-                    mode=str(raw_theme.get("mode", "")),
-                    palette={k: str(v) for k, v in raw_theme["palette"].items()},
-                    plugin_id=plugin_id,
-                    tags=tags,
-                )
-                if theme.id in registry.themes:
-                    registry.errors.append(
-                        LoaderError(plugin_id, child, f"duplicate theme id {theme.id!r}")
-                    )
-                    continue
-                registry.themes[theme.id] = theme
-
-            # Also pick up user-created themes saved via the /themes builder.
-            # They live in the plugin's data_dir so a user can back them
-            # up alongside everything else under data/.
-            from app.state.user_themes import UserThemeStore
-
-            user_store = UserThemeStore(data_dir / "user.json")
-            for ut in user_store.load():
-                # User themes can shadow built-ins by id — that's a feature
-                # (tweak a built-in without forking it).
-                registry.themes[ut.id] = Theme(
-                    id=ut.id,
-                    name=ut.name,
-                    mode=ut.mode,
-                    palette=dict(ut.palette),
-                    plugin_id=plugin_id,
-                    is_user=True,
-                )
 
         if plugin.kind == "font":
             for raw_font in manifest.get("fonts", []):

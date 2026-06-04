@@ -5,22 +5,29 @@
   "kind": "widget",
   "description": "Your open PRs + PRs awaiting your review — four Bauhaus / Swiss visual directions to choose from. Each variant shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.",
   "icon": "ph-git-pull-request",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "pr1",
-      "choices": [
-        { "value": "pr1", "label": "1 · Refined" },
-        { "value": "pr2", "label": "2 · Geometric" },
-        { "value": "pr3", "label": "3 · Swiss" },
-        { "value": "pr4", "label": "4 · Data" }
-      ]
+      "name": "user",
+      "type": "string",
+      "label": "Username (blank = github_core default)",
+      "default": ""
     },
-    { "name": "user",        "type": "string", "label": "Username (blank = github_core default)", "default": "" },
-    { "name": "max_results", "type": "number", "label": "Max PRs per section",                    "default": 6 }
+    {
+      "name": "max_results",
+      "type": "number",
+      "label": "Max PRs per section",
+      "default": 6
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

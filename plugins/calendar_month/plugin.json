@@ -5,34 +5,44 @@
   "kind": "widget",
   "description": "Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
-  "supports": { "sizes": ["md", "lg"] },
+  "supports": {
+    "sizes": [
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "m1",
-      "choices": [
-        { "value": "m1", "label": "1 · Bauhaus Refined" },
-        { "value": "m2", "label": "2 · Bauhaus Geometric" },
-        { "value": "m3", "label": "3 · Swiss / International" },
-        { "value": "m4", "label": "4 · Agenda Split" },
-        { "value": "m5", "label": "5 · Editorial" },
-        { "value": "m6", "label": "6 · Dot Density" }
-      ]
-    },
     {
       "name": "week_start",
       "type": "select",
       "label": "Week starts on",
       "default": "monday",
       "choices": [
-        { "value": "sunday", "label": "Sunday" },
-        { "value": "monday", "label": "Monday" }
+        {
+          "value": "sunday",
+          "label": "Sunday"
+        },
+        {
+          "value": "monday",
+          "label": "Monday"
+        }
       ]
     },
-    { "name": "max_events_per_day", "type": "number", "label": "Max event chips per day", "default": 3 },
-    { "name": "feeds_filter",       "type": "string", "label": "Feed IDs (comma-separated; blank = all enabled)", "default": "" }
+    {
+      "name": "max_events_per_day",
+      "type": "number",
+      "label": "Max event chips per day",
+      "default": 3
+    },
+    {
+      "name": "feeds_filter",
+      "type": "string",
+      "label": "Feed IDs (comma-separated; blank = all enabled)",
+      "default": ""
+    }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
 }

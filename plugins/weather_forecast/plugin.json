@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather \u2014 Forecast",
+  "name": "Weather — Forecast",
   "version": "0.1.1",
   "kind": "widget",
   "description": "5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).",
@@ -39,39 +39,11 @@
       "choices": [
         {
           "value": "metric",
-          "label": "Metric (\u00b0C)"
+          "label": "Metric (°C)"
         },
         {
           "value": "imperial",
-          "label": "Imperial (\u00b0F)"
-        }
-      ]
-    },
-    {
-      "name": "variant",
-      "type": "select",
-      "label": "Style",
-      "default": "legacy",
-      "choices": [
-        {
-          "value": "legacy",
-          "label": "Legacy"
-        },
-        {
-          "value": "r1",
-          "label": "1 \u00b7 Refined"
-        },
-        {
-          "value": "g2",
-          "label": "2 \u00b7 Geometric"
-        },
-        {
-          "value": "s3",
-          "label": "3 \u00b7 Swiss"
-        },
-        {
-          "value": "d4",
-          "label": "4 \u00b7 Data"
+          "label": "Imperial (°F)"
         }
       ]
     }
