@@ -319,6 +319,36 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper avatar grid, no solid accent panels.
+// ===========================================================
+function renderLegacy(data) {
+  const items = data.items || [];
+  const summary = data.summary || {};
+  const headerRight = `${summary.home ?? 0} / ${summary.total ?? items.length} AT HOME`;
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: (data.label || "HOME"), accent: "ink", right: headerRight })}
+      <div style="flex:1;border-top:2px solid var(--wx-ink);padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px 12px;align-content:start;overflow:hidden">
+        ${items.length === 0 ? emptyState(data.label) : items.map((it) => {
+          const accent = stateAccent(it.state);
+          return `
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
+              ${avatar(it, 52)}
+              <span style="font-family:var(--wx-grotesk);font-size:12px;font-weight:600;color:var(--wx-ink);text-align:center;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
+              <span style="display:inline-flex;align-items:center;gap:4px;background:${WX.tint(accent)};color:var(--wx-ink);padding:2px 7px;border-radius:999px;font-family:var(--wx-mono);font-size:10px;letter-spacing:.06em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                <span style="width:5px;height:5px;border-radius:50%;background:${WX.col(accent)};display:inline-block;flex-shrink:0"></span>
+                ${escapeHtml(stateLabel(it.state))}
+              </span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -326,6 +356,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

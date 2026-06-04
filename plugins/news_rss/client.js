@@ -251,7 +251,34 @@ function renderD4(data, items, opts) {
   `;
 }
 
-const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4 };
+// ===========================================================
+// LEGACY — quiet paper list, hairline rules, no solid accent panels.
+// ===========================================================
+function renderLegacy(data, items, opts) {
+  const label = headerLabel(data, opts);
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: label, accent: "ink", right: `${items.length} HEADLINES · ${escapeHtml(nowTime())}` })}
+      <div style="flex:1;overflow:hidden;border-top:2px solid var(--wx-ink)">
+        ${items.length === 0 ? emptyState() : items.map((it, i) => {
+          const n = String(i + 1).padStart(2, "0");
+          return `
+            <article style="display:grid;grid-template-columns:auto 1fr auto;gap:14px;padding:8px 16px;border-bottom:1px solid color-mix(in oklab, var(--wx-ink) 10%, transparent);align-items:center">
+              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:18px;color:var(--wx-ink-60);letter-spacing:-.02em;min-width:1.6em;text-align:right">${n}</span>
+              <div style="font-family:var(--wx-grotesk);font-size:13px;font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:0">${escapeHtml(it.title)}</div>
+              ${it.published
+                ? `<span class="wx-tnum" style="font-family:var(--wx-mono);font-size:10.5px;font-weight:700;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(ago(it.published))}</span>`
+                : `<span></span>`}
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4, legacy: renderLegacy };
 
 export default async function render(shadow, ctx) {
   const data = ctx.data || {};

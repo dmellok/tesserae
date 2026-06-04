@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "News — Wikipedia On This Day",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "widget",
   "description": "Wikipedia 'On this day' — featured historical events for today's date. Uses the free Wikimedia REST API (no key).",
   "icon": "ph-book-open",
@@ -16,7 +16,8 @@
         { "value": "r1", "label": "1 · Refined" },
         { "value": "g2", "label": "2 · Geometric" },
         { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" }
+        { "value": "d4", "label": "4 · Data" },
+        { "value": "legacy", "label": "Legacy" }
       ]
     },
     {

@@ -251,6 +251,39 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper tile grid, no solid accent panels.
+// ===========================================================
+function renderLegacy(data) {
+  const lights = data.lights || [];
+  const cols = lights.length <= 4 ? 2 : lights.length <= 9 ? 3 : 4;
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({
+        title: `${data.place || ""} · LIGHTS`,
+        accent: "ink",
+        right: `${data.on_count || 0}/${data.total || 0} ON · ${data.time || nowTime()}`,
+      })}
+      <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:1px;background:var(--c-line);border-top:2px solid var(--wx-ink)">
+        ${lights.map((l) => `
+          <div style="background:var(--wx-paper);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              ${bulbIcon({ on: l.on, color: l.on ? WX.col("yellow") : "var(--wx-ink-60)", size: 20 })}
+              <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.04em;color:${l.on ? "var(--wx-ink)" : "var(--wx-ink-60)"};text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(l.name || l.entity_id)}</span>
+            </div>
+            <div>
+              ${l.on
+                ? `<span style="display:inline-block;background:${WX.col("yellow")};color:${WX.inkOn("yellow")};font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">ON · <span class="wx-tnum">${escapeHtml(pct(l.brightness_pct))}</span></span>`
+                : `<span style="display:inline-block;background:var(--c-line);color:var(--wx-ink-60);font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">${l.missing ? "MISSING" : "OFF"}</span>`}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -258,6 +291,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

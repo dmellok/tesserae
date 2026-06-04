@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "OctoPrint — Status",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "widget",
   "description": "Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures. Four visual directions per cell.",
   "icon": "ph-printer",
@@ -14,7 +14,8 @@
         { "value": "r1", "label": "Refined" },
         { "value": "g2", "label": "Geometric" },
         { "value": "s3", "label": "Swiss" },
-        { "value": "d4", "label": "Data" }
+        { "value": "d4", "label": "Data" },
+        { "value": "legacy", "label": "Legacy" }
       ]
     }
   ],

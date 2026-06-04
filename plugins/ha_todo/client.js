@@ -261,11 +261,45 @@ function renderD4(data) {
   `;
 }
 
+// ===========================================================
+// LEGACY — quiet paper-and-ink Bauhaus card. Charcoal header, mono
+// numerals, hairline rules, no solid colour panels. The conservative
+// alternative to the colour-heavy R1 for users who prefer the older
+// flat look (or whose theme works better without big accent fills).
+// ===========================================================
+function renderLegacy(data) {
+  const items = data.items || [];
+  const open = data.needs_action_count || 0;
+  const headerRight = `${open} OPEN · ${escapeHtml(data.time || nowTime())}`;
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: data.title || "TODO", accent: "ink", right: headerRight })}
+      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
+        ${items.length === 0 ? emptyState(data.title) : items.map((it, i) => {
+          const done = it.status === "completed";
+          const due = fmtDue(it.due);
+          return `
+            <div style="display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;padding:8px 16px;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}${done ? "opacity:.55;" : ""}">
+              <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:11px;font-weight:700;color:var(--wx-ink-60);letter-spacing:.04em">${String(i + 1).padStart(2, "0")}</span>
+              <span style="font-family:var(--wx-grotesk);font-size:13.5px;font-weight:600;color:var(--wx-ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done ? "text-decoration:line-through;" : ""}">${escapeHtml(it.summary)}</span>
+              ${due
+                ? `<span style="font-family:var(--wx-mono);font-size:10px;font-weight:700;letter-spacing:.06em;color:${dueTone(it.due)}">${escapeHtml(due)}</span>`
+                : `<span></span>`}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
 const VARIANTS = {
   r1: renderR1,
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 export default async function render(shadow, ctx) {

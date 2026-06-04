@@ -298,6 +298,39 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper card, no solid colour panels. The hairline
+// alternative for users who prefer the pre-colour-pass look.
+// ===========================================================
+function renderLegacy(data) {
+  const items = data.items || [];
+  const summary = data.summary || {};
+  const headerRight = summary.count != null
+    ? `${summary.shown ?? items.length}/${summary.count} · ${escapeHtml(data.time || nowTime())}`
+    : escapeHtml(data.time || nowTime());
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: data.label || "BATTERIES", accent: "ink", right: headerRight })}
+      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
+        ${items.length === 0 ? emptyState(data.label) : items.map((it, i) => {
+          const fill = statusFill(it);
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}">
+              ${WX.icon(batteryIcon(it.level), { size: 18, color: fill.bg })}
+              <span style="flex:0 0 32%;min-width:0;font-family:var(--wx-grotesk);font-size:12.5px;font-weight:600;color:var(--wx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</span>
+              <div style="flex:1;min-width:24px">
+                ${WX.barChart({ value: it.level, max: 100, color: fill.bg, height: 8 })}
+              </div>
+              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:44px;text-align:right">${escapeHtml(fmtPct(it.level))}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -305,6 +338,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

@@ -259,7 +259,33 @@ function renderD4(data, items) {
   `;
 }
 
-const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4 };
+// ===========================================================
+// LEGACY — quiet paper list, hairline rules, no solid accent panels.
+// ===========================================================
+function renderLegacy(data, items) {
+  const label = feedLabel(data);
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: label, accent: "ink", right: `${items.length} ENTRIES` })}
+      <div style="flex:1;overflow:hidden;border-top:2px solid var(--wx-ink)">
+        ${items.length === 0 ? emptyState() : items.map((it) => `
+          <article style="display:grid;grid-template-columns:auto 1fr;gap:14px;padding:8px 16px;border-bottom:1px solid color-mix(in oklab, var(--wx-ink) 10%, transparent);align-items:start">
+            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:18px;color:var(--wx-ink-60);letter-spacing:-.02em;min-width:3.6em;text-align:right">${escapeHtml(fmtYear(it.year))}</span>
+            <div style="display:grid;gap:2px;min-width:0">
+              <span style="font-family:var(--wx-grotesk);font-size:12.5px;font-weight:500;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${escapeHtml(it.text)}</span>
+              ${it.page
+                ? `<span style="font-family:var(--wx-mono);font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--wx-ink-60)">${escapeHtml(it.page)}</span>`
+                : ""}
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4, legacy: renderLegacy };
 
 export default async function render(shadow, ctx) {
   const data = ctx.data || {};

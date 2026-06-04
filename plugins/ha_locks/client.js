@@ -303,6 +303,38 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper list, no solid accent panels. Danger
+// semantic preserved for unsecured rows.
+// ===========================================================
+function renderLegacy(data) {
+  const entries = data.entries || [];
+  const summary = data.summary || { secured: 0, unsecured: 0, total: 0 };
+  const headerRight = `${summary.secured} SECURED · ${summary.unsecured} UNLOCKED`;
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: `${data.place || ""} · SECURITY`, accent: "ink", right: `${headerRight} · ${data.time || nowTime()}` })}
+      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
+        ${entries.map((e, i) => {
+          const unsecured = !e.secured;
+          const iconCol = unsecured ? "var(--c-danger)" : "var(--wx-ink-60)";
+          const rowBg = unsecured ? "color-mix(in oklab, var(--c-danger) 22%, var(--c-bg))" : "var(--wx-paper)";
+          const stateBg = unsecured ? "var(--c-danger)" : "var(--c-line)";
+          const stateFg = unsecured ? "var(--c-bg)" : "var(--wx-ink-60)";
+          return `
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:${rowBg};${i > 0 ? "border-top:1px solid var(--c-line);" : ""}min-width:0">
+              ${WX.icon(iconFor(e), { size: 20, color: iconCol, weight: unsecured ? "fill" : "bold" })}
+              <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--wx-ink)">${escapeHtml(e.name || e.entity_id)}</span>
+              <span style="display:inline-block;background:${stateBg};color:${stateFg};font-family:var(--wx-mono);font-weight:700;font-size:11px;padding:3px 8px;letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -310,6 +342,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

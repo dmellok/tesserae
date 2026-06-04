@@ -317,6 +317,45 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper 4-tile grid + sparkline footer. No solid
+// accent panels; just the original Bauhaus hairline pattern.
+// ===========================================================
+function renderLegacy(data) {
+  const tiles = flowTiles(data);
+  const hasSpark = Array.isArray(data.sparkline) && data.sparkline.length > 0;
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: `${data.place || ""} · ENERGY`, accent: "ink", right: data.time || nowTime() })}
+      <div style="flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
+        ${tiles.map((t, i) => `
+          <div style="border-right:${i % 2 === 0 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 2 ? "1px solid var(--c-line)" : "none"};padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              ${WX.icon(t.icon, { size: 22, color: WX.col(t.accent) })}
+              <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(t.label)}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:6px">
+              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:30px;line-height:.85">${escapeHtml(fmtW(t.value))}</span>
+              ${t.sub ? `<span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60);margin-left:auto">${escapeHtml(t.sub)}</span>` : ""}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+      ${hasSpark ? `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:2px solid var(--wx-ink);height:48px;flex-shrink:0">
+          ${WX.icon("sun", { size: 18, color: WX.col("yellow") })}
+          <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--wx-ink-60)">SOLAR · 24H</span>
+          ${data.solar_today_kwh != null ? `<span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:13px">${escapeHtml(data.solar_today_kwh.toFixed(1))} kWh</span>` : ""}
+          <div style="flex:1;height:32px;min-width:60px">
+            ${sparkline({ series: data.sparkline, color: WX.col("yellow"), fill: WX.tint("yellow") })}
+          </div>
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -324,6 +363,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

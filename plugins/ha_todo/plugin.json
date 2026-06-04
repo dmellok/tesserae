@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Todo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "widget",
   "description": "Items from a Home Assistant todo list — built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Four selectable visual directions: Refined / Geometric / Swiss / Data. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.",
   "icon": "ph-list-checks",
@@ -16,7 +16,8 @@
         { "value": "r1", "label": "1 · Bauhaus Refined" },
         { "value": "g2", "label": "2 · Bauhaus Geometric" },
         { "value": "s3", "label": "3 · Swiss / International" },
-        { "value": "d4", "label": "4 · Data forward" }
+        { "value": "d4", "label": "4 · Data forward" },
+        { "value": "legacy", "label": "Legacy" }
       ]
     },
     {

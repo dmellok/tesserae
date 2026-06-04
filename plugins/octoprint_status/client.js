@@ -316,9 +316,70 @@ function renderD4(data, size) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper card: charcoal header, hero progress as
+// hairline bar, temp rows. No solid accent panels.
+// ===========================================================
+function renderLegacy(data, size) {
+  const { meta, text } = stateOf(data);
+  const job = data.job;
+  const temps = data.temps || {};
+  const headerRight = `${WX.icon(meta.icon, { size: 14, color: "var(--wb-bar-fg)" })}
+    <span style="margin-left:6px">${escapeHtml((text || meta.label).toUpperCase())} · ${escapeHtml(data.time || nowTime())}</span>`;
+
+  const tempRow = (label, t, color, icon) => `
+    <div style="display:flex;align-items:center;gap:10px">
+      ${WX.icon(icon, { size: 18, color })}
+      <span style="flex:0 0 30%;font-family:var(--wx-grotesk);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--wx-ink-60)">${label}</span>
+      <div style="flex:1;min-width:24px">
+        ${WX.barChart({ value: (t && t.actual) || 0, max: (t && t.target) || (t && t.actual) || 1, color, height: 7 })}
+      </div>
+      <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:84px;text-align:right">${escapeHtml(tempStr(t))}</span>
+    </div>
+  `;
+
+  const hero = job
+    ? `
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          ${WX.icon("cube", { size: 16, color: "var(--wx-ink)" })}
+          <span style="font-family:var(--wx-grotesk);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(job.name)}</span>
+        </div>
+        <span class="wx-tnum" style="font-family:var(--wx-black);font-size:34px;line-height:.8;color:${meta.c}">${escapeHtml(fmtPct(job.completion))}</span>
+      </div>
+      <div style="height:12px;background:var(--wx-paper-3);margin-top:2px">
+        <div style="width:${Math.max(0, Math.min(100, Number(job.completion) || 0)).toFixed(1)}%;height:100%;background:${meta.c}"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60)">
+        <span>ELAPSED ${escapeHtml(fmtDur(job.elapsed))}</span>
+        <span>LEFT ${escapeHtml(fmtDur(job.remaining))}</span>
+        <span>ETA ${escapeHtml(job.eta || "—")}</span>
+      </div>`
+    : `
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 0">
+        ${WX.icon(meta.icon, { size: 40, color: meta.c })}
+        <span style="font-family:var(--wx-black);font-size:18px;letter-spacing:.04em;color:${meta.c}">${escapeHtml(text || meta.label)}</span>
+        <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">NO ACTIVE JOB</span>
+      </div>`;
+
+  return `
+    ${styleBlock()}
+    <div class="wx-art size-${size}" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: data.label || "OCTOPRINT", accent: "ink", right: headerRight })}
+      <div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-top:2px solid var(--wx-ink);min-height:0">
+        ${hero}
+        <div style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
+          ${tempRow("Hotend", temps.tool, TOOL_COLOR, "thermometer-hot")}
+          ${tempRow("Bed", temps.bed, BED_COLOR, "thermometer-simple")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
-const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4 };
+const VARIANTS = { r1: renderR1, g2: renderG2, s3: renderS3, d4: renderD4, legacy: renderLegacy };
 
 function renderError(msg) {
   return `

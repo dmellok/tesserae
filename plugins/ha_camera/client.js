@@ -227,6 +227,47 @@ function renderD4(data) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper card: image + hairline meta strip.
+// ===========================================================
+function renderLegacy(data) {
+  const items = data.items || [];
+  const multi = items.length > 1;
+  const headerRight = items[0] ? fmtTime(items[0].last_updated) || nowTime() : nowTime();
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: `${data.label || "Camera"}`, accent: "ink", right: headerRight })}
+      ${multi ? `
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;padding:6px;background:var(--wx-ink);min-height:0">
+          ${items.slice(0, 4).map((it) => `
+            <div style="background:var(--wx-paper);display:flex;flex-direction:column;min-height:0">
+              <div style="flex:1;min-height:0;overflow:hidden">
+                ${imageOrPlaceholder(it.image_url, it.name)}
+              </div>
+              <div style="padding:4px 8px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60);display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--c-line)">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((it.name || "").toUpperCase())}</span>
+                <span>${escapeHtml(fmtTime(it.last_updated))}</span>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      ` : `
+        <div style="flex:1;min-height:0;overflow:hidden;border-top:2px solid var(--wx-ink)">
+          ${imageOrPlaceholder((items[0] || {}).image_url, (items[0] || {}).name)}
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;border-top:2px solid var(--wx-ink);height:42px;flex-shrink:0;font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--wx-ink-60)">
+          <span style="display:flex;align-items:center;gap:8px">
+            ${WX.icon("video-camera", { size: 16, color: WX.col("blue") })}
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(((items[0] || {}).name || "").toUpperCase())}</span>
+          </span>
+          <span>${escapeHtml(fmtTime((items[0] || {}).last_updated))}</span>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -234,6 +275,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {

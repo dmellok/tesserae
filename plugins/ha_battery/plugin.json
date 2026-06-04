@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Batteries",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "widget",
   "description": "Auto-discovered battery levels across every Home Assistant entity with device_class=battery, sorted lowest-first. Picks up phones, sensors, vacuums, remotes — anything HA already exposes as a battery — and flags low/critical against per-cell thresholds.",
   "icon": "ph-battery-low",
@@ -21,7 +21,8 @@
         { "value": "r1", "label": "1 · Refined" },
         { "value": "g2", "label": "2 · Geometric" },
         { "value": "s3", "label": "3 · Swiss" },
-        { "value": "d4", "label": "4 · Data" }
+        { "value": "d4", "label": "4 · Data" },
+        { "value": "legacy", "label": "Legacy" }
       ]
     }
   ],

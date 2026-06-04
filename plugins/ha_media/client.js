@@ -385,6 +385,40 @@ function restState(data, variant) {
 }
 
 // ===========================================================
+// LEGACY — quiet paper card: charcoal header, art + meta on plain
+// paper, hairline progress strip. No solid accent panels.
+// ===========================================================
+function renderLegacy(data) {
+  const showProgress = data.show_progress !== false;
+  const headerRight = data.state === "playing" || data.state === "paused"
+    ? `${WX.icon(stateIcon(data.state), { size: 14, color: "var(--wx-paper)" })}  ${stateLabel(data.state)}`
+    : nowTime();
+  const sourceTag = data.source ? ` · ${data.source.toUpperCase()}` : "";
+  if (isResting(data)) {
+    return restState(data, "r1");
+  }
+  return `
+    ${styleBlock()}
+    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;background:var(--wx-paper)">
+      ${WX.darkHeader({ title: `NOW PLAYING${sourceTag}`, accent: "ink", right: headerRight })}
+      <div style="flex:1;display:flex;gap:14px;padding:14px 16px;min-height:0;border-top:2px solid var(--wx-ink)">
+        ${artBlock(data, { size: "clamp(70px, 30%, 130px)" })}
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0">
+          <div style="font-family:var(--wx-black);font-size:clamp(18px, 5vw, 26px);line-height:1.05;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escapeHtml(data.title || "—")}</div>
+          ${data.artist ? `<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--wx-ink-60);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${WX.icon("user", { size: 13, color: "var(--wx-ink-60)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.artist)}</span></div>` : ""}
+          ${data.album ? `<div style="display:flex;align-items:center;gap:6px;font-family:var(--wx-mono);font-size:11px;letter-spacing:.04em;color:var(--wx-ink-60);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${WX.icon("disc", { size: 12, color: "var(--wx-ink-60)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.album)}</span></div>` : ""}
+        </div>
+      </div>
+      ${showProgress ? `
+        <div style="padding:8px 16px 12px;border-top:1px solid var(--c-line)">
+          ${progressBar(data, { accent: "blue" })}
+        </div>
+      ` : ""}
+    </div>
+  `;
+}
+
+// ===========================================================
 // dispatch
 // ===========================================================
 const VARIANTS = {
@@ -392,6 +426,7 @@ const VARIANTS = {
   g2: renderG2,
   s3: renderS3,
   d4: renderD4,
+  legacy: renderLegacy,
 };
 
 function renderError(msg) {
