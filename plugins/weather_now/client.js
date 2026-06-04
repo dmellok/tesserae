@@ -230,7 +230,7 @@ function renderR1(data) {
         </div>
         <div class="wn-r1-hero-art">
           ${data.rainChance != null ? `<span class="wn-r1-rain">${Math.round(data.rainChance)}% RAIN</span>` : ""}
-          <i class="ph-bold ph-${escapeHtml(data.icon || "cloud")} wn-r1-icon" aria-hidden="true"></i>
+          <i class="ph-bold ph-${escapeHtml(WX.phName(data.icon || "cloud"))} wn-r1-icon" aria-hidden="true"></i>
         </div>
       </div>
       <div class="wn-r1-grid">
