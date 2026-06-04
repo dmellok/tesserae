@@ -229,9 +229,33 @@
 .wx-now .ph-bold{ font-size: 2.6em; color: var(--icon); }
 .wx-temp{ font-size: var(--fs-display); font-weight: var(--fw-black); line-height: var(--lh-tight); }
 .wx-cond{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); }
-.wx-forecast{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap: var(--space-3); }
-.wx-cell{ display:flex; flex-direction:column; align-items:center; gap: var(--space-1); }
-.wx-cell .ph-bold{ font-size: var(--icon-md); color: var(--icon); }
+.wx-forecast{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--space-3);
+  /* Fill the remaining body height instead of sitting at the natural
+     stack height — without this the cells crowd to the top of a
+     wide-short widget and leave a beige band underneath. */
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: stretch;
+}
+.wx-cell{
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  gap: var(--space-1);
+  min-height: 0;
+  /* Make each column its own size container so the icon + text can
+     scale against the column's dimensions instead of the body's
+     cqmin. That's how a 5-column forecast strip gets larger icons in
+     a wide cell. */
+  container-type: size;
+  font-size: clamp(14px, 12cqmin, 32px);
+}
+.wx-cell .ph-bold{ font-size: var(--icon-lg); color: var(--icon); }
 .wx-cell .d{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform:uppercase; letter-spacing: var(--ls-label); }
 .wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
 
