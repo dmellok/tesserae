@@ -12,10 +12,11 @@ function escapeHtml(s) {
 const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const DOW_SUN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-const MAX_BARS = 3;
-
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const display = opts.event_display === "text" ? "text" : "bars";
+  const maxPerDay = Math.max(1, Number(opts.max_events_per_day) || 3);
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -41,12 +42,21 @@ export default function render(shadow, ctx) {
     if (d.is_today) classes.push("is-today");
 
     const events = Array.isArray(d.events) ? d.events : [];
-    const visible = events.slice(0, MAX_BARS);
-    const remainder = Math.max(0, events.length - MAX_BARS);
-    const bars = visible.map((ev) => {
-      const colour = ev.colour || "var(--accent-4)";
-      return `<span class="mc-dot" style="background:${colour}" title="${escapeHtml(ev.summary || "")}"></span>`;
-    }).join("");
+    const visible = events.slice(0, maxPerDay);
+    const remainder = Math.max(0, events.length - maxPerDay);
+
+    let body = "";
+    if (display === "text") {
+      body = visible.map((ev) => {
+        const colour = ev.colour || "var(--accent-4)";
+        return `<span class="mc-text" style="border-left-color:${colour}" title="${escapeHtml(ev.summary || "")}">${escapeHtml(ev.summary || "")}</span>`;
+      }).join("");
+    } else {
+      body = visible.map((ev) => {
+        const colour = ev.colour || "var(--accent-4)";
+        return `<span class="mc-dot" style="background:${colour}" title="${escapeHtml(ev.summary || "")}"></span>`;
+      }).join("");
+    }
     const more = remainder > 0
       ? `<span class="mc-more">+${remainder}</span>`
       : "";
@@ -54,7 +64,7 @@ export default function render(shadow, ctx) {
     return `
       <div class="${classes.join(" ")}">
         <span class="mc-num">${escapeHtml(String(d.day))}</span>
-        <div class="mc-dots">${bars}${more}</div>
+        <div class="mc-dots">${body}${more}</div>
       </div>`;
   }).join("");
 

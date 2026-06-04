@@ -35,6 +35,16 @@
       "default": 3
     },
     {
+      "name": "event_display",
+      "type": "select",
+      "label": "Event style",
+      "default": "bars",
+      "choices": [
+        { "value": "bars", "label": "Coloured bars" },
+        { "value": "text", "label": "Title text with feed colour bar" }
+      ]
+    },
+    {
       "name": "feeds_filter",
       "type": "string",
       "label": "Feed IDs (comma-separated; blank = all enabled)",

@@ -240,11 +240,20 @@
   min-width: 0;
 }
 .tt-lane.is-banded{
+  /* Hour-rhythm banding: every odd hour gets a sunken band. Tightened
+     from 50/50 to a slightly heavier stripe so the rows read as a
+     ruled timetable without drawing actual lines. */
   background: linear-gradient(
     to bottom,
-    var(--surface-sunken) 0, var(--surface-sunken) 50%,
-    transparent 50%, transparent 100%);
+    var(--surface-sunken) 0%, var(--surface-sunken) 100%);
   background-size: 100% calc(2 * (100% / var(--tt-hours, 18)));
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(100% / var(--tt-hours, 18)),
+    var(--surface-sunken) calc(100% / var(--tt-hours, 18)),
+    var(--surface-sunken) calc(2 * 100% / var(--tt-hours, 18))
+  );
 }
 .tt-col-head{
   font-size: var(--fs-caption);
@@ -259,20 +268,28 @@
 .tt-event{
   position: absolute;
   left: var(--space-1); right: var(--space-1);
+  /* Each event's feed colour is the left bar; the block body picks
+     up a tinted version of the same colour via --tt-bg (set inline
+     per event) so the event reads as a coloured slot, not a beige
+     card on a beige band. */
   border-left: var(--stroke-3) solid var(--accent-4);
-  background: var(--surface);
+  background: var(--tt-bg, var(--surface));
   padding: var(--space-1) var(--space-2);
   overflow: hidden;
   display: flex; flex-direction: column;
   gap: 0;
-  min-height: 1em;
-}
-.tt-event .tt-time{
-  font-size: var(--fs-caption); font-weight: var(--fw-bold);
-  color: var(--text-muted); letter-spacing: var(--ls-label);
+  min-height: 0.6em;
+  line-height: 1.1;
 }
 .tt-event .tt-name{
   font-size: var(--fs-body); font-weight: var(--fw-bold);
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tt-event .tt-sub{
+  font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  letter-spacing: var(--ls-label);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tt-allday{
@@ -321,10 +338,22 @@
 .mc-dots{
   display: flex; flex-direction: column;
   gap: 0.15em; margin-top: 0.15em;
+  min-width: 0;
 }
 .mc-dot{
   height: 0.35em; min-height: 3px;
   background: var(--accent-4);
+}
+.mc-text{
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  border-left: var(--stroke-2) solid var(--accent-4);
+  padding-left: 0.3em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
 }
 .mc-more{
   font-size: var(--fs-caption); font-weight: var(--fw-bold);

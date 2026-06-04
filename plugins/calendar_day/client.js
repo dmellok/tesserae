@@ -69,7 +69,12 @@ export default function render(shadow, ctx) {
     hourLabels.push(`<span>${String(h).padStart(2, "0")}</span>`);
   }
 
-  // Position each event by % of the visible range.
+  // Position each event by % of the visible range. The title is the
+  // primary content (the y-position already encodes when it happens);
+  // the start time renders as a smaller second line and only shows up
+  // when the block is tall enough to keep it without crowding the
+  // title. Real ranges sit in the ``title`` attribute for the browser
+  // tooltip.
   const eventBlocks = timed.map((ev) => {
     const s = parseTime(ev.start);
     if (s == null) return "";
@@ -77,11 +82,15 @@ export default function render(shadow, ctx) {
     const top = Math.max(0, ((s - range.start) / span) * 100);
     const height = Math.max(2, ((e - s) / span) * 100);
     const colour = ev.colour || "var(--accent-4)";
+    const tint = `color-mix(in oklab, ${colour} 18%, var(--surface))`;
     const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
+    const sub = height > 5
+      ? `<span class="tt-sub">${escapeHtml(time)}</span>`
+      : "";
     return `
-      <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour}">
-        <span class="tt-time">${escapeHtml(time)}</span>
+      <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint}" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}">
         <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
+        ${sub}
       </div>`;
   }).join("");
 

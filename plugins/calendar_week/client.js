@@ -71,7 +71,10 @@ export default function render(shadow, ctx) {
     return `<div class="tt-col-head ${isToday ? "is-today" : ""}">${escapeHtml(name)} ${escapeHtml(String(d.day || ""))}</div>`;
   }).join("");
 
-  // 7 lanes with event blocks
+  // 7 lanes with event blocks. Week view runs at .85em base size so
+  // titles fit a narrow column; the feed-colour tint is applied via
+  // --tt-bg so blocks read as coloured slots rather than blending
+  // into the sunken banding.
   const lanes = days.slice(0, 7).map((d) => {
     const events = (d.events || []).filter((e) => !e.all_day);
     const blocks = events.map((ev) => {
@@ -81,8 +84,10 @@ export default function render(shadow, ctx) {
       const top = Math.max(0, ((s - range.start) / span) * 100);
       const height = Math.max(2, ((e - s) / span) * 100);
       const colour = ev.colour || "var(--accent-4)";
+      const tint = `color-mix(in oklab, ${colour} 18%, var(--surface))`;
+      const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
       return `
-        <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};font-size:.85em">
+        <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint};font-size:.85em" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}">
           <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
         </div>`;
     }).join("");
