@@ -972,6 +972,12 @@ input[type="range"].slider:focus::-moz-range-thumb {
   position: relative;
 }
 .multiselect-opt:first-of-type { border-top: 0; }
+/* The class rule above sets ``display: flex``, which beats the UA
+   ``[hidden] { display: none }`` rule on specificity — so the
+   filter's ``o.hidden = !match`` would visually do nothing without
+   this explicit override. Without it the search box appears to do
+   nothing because the filtered-out rows stay visible. */
+.multiselect-opt[hidden] { display: none; }
 /* The checkbox fills the whole option row but is fully transparent.
  * Clicking anywhere on the label hits the input directly, the input's
  * bounding box matches the option row's, and the browser's auto-
