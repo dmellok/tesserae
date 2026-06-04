@@ -18,30 +18,45 @@ const FALLBACK = {
   fontFamily: "Helvetica Neue, Arial, sans-serif",
 };
 
-// Read the current Spectra tokens. Walks the cascade explicitly —
-// host → body → documentElement — instead of trusting a single
-// getComputedStyle call on the host. The host being temporarily
-// detached during a re-render, or the cell mid-paint, was making
-// chart colours silently drop to the light-theme fallback even on a
-// dark page. ``<body data-theme>`` is the canonical theme anchor
-// (compose.html sets it there), so the body lookup catches any
-// situation where the host's cascade hasn't resolved yet.
-function readToken(host, name) {
-  if (host) {
-    const v = getComputedStyle(host).getPropertyValue(name).trim();
-    if (v) return v;
-  }
-  if (typeof document !== "undefined") {
-    if (document.body) {
-      const v = getComputedStyle(document.body).getPropertyValue(name).trim();
-      if (v) return v;
-    }
-    if (document.documentElement) {
-      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-      if (v) return v;
-    }
-  }
-  return "";
+// Probe the active CSS cascade for a token value. We render an invisible
+// element next to the chart host (so it inherits the same per-cell theme
+// override + page-level data-theme that the chart should be using),
+// apply the token to a real CSS property, then read the resolved style
+// back. ``transparent`` as the var() fallback computes to
+// ``rgba(0, 0, 0, 0)`` — a value no Spectra theme produces — so we can
+// distinguish "the var resolved" from "the var was undefined."
+//
+// Why not `getComputedStyle(host).getPropertyValue('--accent-1')`?
+// That path returns empty for inherited custom properties in some
+// shadow-host scenarios (host attached but cascade not yet flushed,
+// or reading before layout), even when spectra-tokens.css is loaded
+// and the var IS defined upstream. Probing through a real property
+// forces var() substitution through the rendering pipeline, so we
+// get the actual cascaded value every time.
+function probeColor(parent, name) {
+  const probe = document.createElement("span");
+  probe.style.cssText =
+    "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
+  probe.style.color = `var(${name}, transparent)`;
+  parent.appendChild(probe);
+  const v = getComputedStyle(probe).color || "";
+  probe.remove();
+  return v === "rgba(0, 0, 0, 0)" ? "" : v;
+}
+
+// Same trick for --font-family. A made-up family name as the var()
+// fallback is unique enough to detect — no real font ships with that
+// name, so finding it in the resolved string means the var was unset.
+function probeFontFamily(parent, name) {
+  const SENTINEL = "__spectra_missing_family__";
+  const probe = document.createElement("span");
+  probe.style.cssText =
+    "position:absolute;visibility:hidden;width:0;height:0;pointer-events:none;";
+  probe.style.fontFamily = `var(${name}, ${SENTINEL})`;
+  parent.appendChild(probe);
+  const v = getComputedStyle(probe).fontFamily || "";
+  probe.remove();
+  return v.includes(SENTINEL) ? "" : v;
 }
 
 export function tokens(host) {
@@ -50,31 +65,45 @@ export function tokens(host) {
       "[spectra-chart] tokens(host=null) — pass the cell host (shadow.host) so charts inherit the cell's per-cell theme override."
     );
   }
+  // Probe under host.parentElement so per-cell data-theme overrides take
+  // effect (host = .cell-content, host.parentElement = .cell which is
+  // where the per-cell data-theme attribute lives). Fall back to body /
+  // documentElement if no host is available.
+  const parent =
+    (host && host.parentElement) ||
+    (typeof document !== "undefined" ? document.body : null) ||
+    (typeof document !== "undefined" ? document.documentElement : null);
+  if (!parent) return { ...FALLBACK };
+
   const missing = [];
-  const get = (name, fallback) => {
-    const v = readToken(host, name);
+  const cget = (name, fallback) => {
+    const v = probeColor(parent, name);
+    if (!v) missing.push(name);
+    return v || fallback;
+  };
+  const fget = (name, fallback) => {
+    const v = probeFontFamily(parent, name);
     if (!v) missing.push(name);
     return v || fallback;
   };
   const result = {
-    accent1: get("--accent-1", FALLBACK.accent1),
-    accent2: get("--accent-2", FALLBACK.accent2),
-    accent3: get("--accent-3", FALLBACK.accent3),
-    accent4: get("--accent-4", FALLBACK.accent4),
-    accent5: get("--accent-5", FALLBACK.accent5),
-    accent6: get("--accent-6", FALLBACK.accent6),
-    surface: get("--surface", FALLBACK.surface),
-    surfaceSunken: get("--surface-sunken", FALLBACK.surfaceSunken),
-    textPrimary: get("--text-primary", FALLBACK.textPrimary),
-    textSecondary: get("--text-secondary", FALLBACK.textSecondary),
-    textMuted: get("--text-muted", FALLBACK.textMuted),
-    fontFamily: get("--font-family", FALLBACK.fontFamily),
+    accent1: cget("--accent-1", FALLBACK.accent1),
+    accent2: cget("--accent-2", FALLBACK.accent2),
+    accent3: cget("--accent-3", FALLBACK.accent3),
+    accent4: cget("--accent-4", FALLBACK.accent4),
+    accent5: cget("--accent-5", FALLBACK.accent5),
+    accent6: cget("--accent-6", FALLBACK.accent6),
+    surface: cget("--surface", FALLBACK.surface),
+    surfaceSunken: cget("--surface-sunken", FALLBACK.surfaceSunken),
+    textPrimary: cget("--text-primary", FALLBACK.textPrimary),
+    textSecondary: cget("--text-secondary", FALLBACK.textSecondary),
+    textMuted: cget("--text-muted", FALLBACK.textMuted),
+    fontFamily: fget("--font-family", FALLBACK.fontFamily),
   };
   if (missing.length) {
     console.warn(
-      `[spectra-chart] Spectra tokens not resolved on host OR body OR documentElement: ${missing.join(", ")}` +
-      " — falling back to light-theme hex defaults. Charts will look light-theme even on a dark page." +
-      " Check that spectra-tokens.css is linked from compose.html."
+      `[spectra-chart] Spectra tokens didn't resolve via cascade: ${missing.join(", ")}` +
+      " — falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
     );
   }
   return result;
@@ -91,18 +120,29 @@ function ensureChart(canvas) {
   return true;
 }
 
-// Convert ``#RRGGBB`` to ``rgba(r, g, b, alpha)`` so we can build
+// Build ``rgba(r, g, b, alpha)`` from a CSS colour so we can derive
 // translucent area fills under chart lines without touching the
-// caller's source colour. Falls back to the input untouched if it
-// isn't a 6-digit hex (a CSS function form like rgb(...) already
-// renders correctly on canvas).
+// caller's source colour. Accepts both ``#RRGGBB`` (the FALLBACK
+// constants, plus any hex token a caller passes directly) and
+// ``rgb(...)`` / ``rgba(...)`` (the form ``probeColor`` returns,
+// since getComputedStyle resolves to rgba). Returns the input
+// untouched if it's neither — caller falls back to whatever Chart.js
+// makes of it.
 function withAlpha(color, alpha) {
-  if (typeof color !== "string" || !color.startsWith("#") || color.length !== 7) return color;
-  const r = parseInt(color.slice(1, 3), 16);
-  const g = parseInt(color.slice(3, 5), 16);
-  const b = parseInt(color.slice(5, 7), 16);
-  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return color;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  if (typeof color !== "string") return color;
+  if (color.startsWith("#") && color.length === 7) {
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
+    if (!Number.isNaN(r) && !Number.isNaN(g) && !Number.isNaN(b)) {
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+  }
+  const m = color.match(
+    /^\s*rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/
+  );
+  if (m) return `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${alpha})`;
+  return color;
 }
 
 // Minimal sparkline — no axes, no legend, no tooltip. Tension 0.3 so
