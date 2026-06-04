@@ -11,6 +11,8 @@ function escapeHtml(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const showCaption = opts.show_caption !== false;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -38,7 +40,7 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w is-bleed" data-widget="picture_apod">
       <img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.title)}">
-      ${data.title || subBits.length
+      ${showCaption && (data.title || subBits.length)
         ? `<div class="img-overlay">
             ${data.title ? `<span class="title">${escapeHtml(data.title)}</span>` : ""}
             ${subBits.length ? `<span class="sub">${escapeHtml(subBits.join(" · "))}</span>` : ""}

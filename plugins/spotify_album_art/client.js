@@ -11,6 +11,8 @@ function escapeHtml(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const dimWhenPaused = opts.dim_when_paused !== false; // default true
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -33,11 +35,12 @@ export default function render(shadow, ctx) {
   }
 
   const subBits = [data.track, data.artist].filter(Boolean);
+  const dimmed = dimWhenPaused && data.is_playing === false;
 
   shadow.innerHTML = `
     ${css}
     <div class="w is-bleed" data-widget="spotify_album_art">
-      <img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.track || "")}">
+      <img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.track || "")}"${dimmed ? ' style="opacity:0.5"' : ""}>
       ${subBits.length
         ? `<div class="img-overlay">
             ${data.track ? `<span class="title">${escapeHtml(data.track)}</span>` : ""}

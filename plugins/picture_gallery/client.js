@@ -10,6 +10,8 @@ function escapeHtml(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const showFilename = opts.show_filename === true; // default false
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -35,5 +37,8 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w is-bleed" data-widget="picture_gallery">
       <img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.filename || "")}">
+      ${showFilename && data.filename
+        ? `<div class="img-overlay"><span class="sub">${escapeHtml(data.filename)}</span></div>`
+        : ""}
     </div>`;
 }

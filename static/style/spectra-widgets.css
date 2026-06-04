@@ -463,6 +463,27 @@
 .img-meta{ display: flex; flex-direction: column; gap: 0.1em; }
 .img-meta .title{ font-size: var(--fs-lead); font-weight: var(--fw-bold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .img-meta .sub{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.img-progress{
+  display: flex; flex-direction: column; gap: 0.2em;
+  margin-top: var(--space-1);
+}
+.img-progress-track{
+  height: var(--stroke-2);
+  background: var(--surface-sunken);
+  position: relative;
+}
+.img-progress-fill{
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--accent-4);
+}
+.img-progress-times{
+  display: flex; justify-content: space-between;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  letter-spacing: var(--ls-label);
+  font-feature-settings: "tnum";
+}
 
 /* ============================================================================
    WIDGET 7b · FULL-BLEED IMAGE  (picture + spotify album art)

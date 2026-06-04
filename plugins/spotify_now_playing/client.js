@@ -17,6 +17,10 @@ function fmtMmSs(ms) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const showArt = opts.show_art !== false;
+  const showAlbum = opts.show_album !== false;
+  const showProgress = opts.show_progress !== false;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -57,9 +61,30 @@ export default function render(shadow, ctx) {
   const duration = fmtMmSs(data.duration_ms);
   const timeMeta = (progress && duration) ? `${progress} / ${duration}` : (progress || "");
 
-  const heroBody = data.album_art
-    ? `<img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.album || "")}">`
-    : `<i class="ph-bold ph-music-notes"></i>`;
+  const hero = (showArt && data.album_art)
+    ? `<div class="img-hero"><img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.album || "")}"></div>`
+    : (showArt
+        ? `<div class="img-hero"><i class="ph-bold ph-music-notes"></i></div>`
+        : "");
+
+  const subBits = [data.artist];
+  if (showAlbum && data.album) subBits.push(data.album);
+  const sub = subBits.filter(Boolean).join(" · ");
+
+  let progressBar = "";
+  if (showProgress && Number.isFinite(data.progress_ms) && Number.isFinite(data.duration_ms) && data.duration_ms > 0) {
+    const pct = Math.max(0, Math.min(100, (data.progress_ms / data.duration_ms) * 100));
+    progressBar = `
+      <div class="img-progress">
+        <div class="img-progress-track">
+          <div class="img-progress-fill" style="width:${pct.toFixed(1)}%;background:${stateAccent}"></div>
+        </div>
+        <div class="img-progress-times">
+          <span>${escapeHtml(progress || "0:00")}</span>
+          <span>${escapeHtml(duration || "0:00")}</span>
+        </div>
+      </div>`;
+  }
 
   shadow.innerHTML = `
     ${css}
@@ -67,13 +92,14 @@ export default function render(shadow, ctx) {
       <div class="w-title">
         <i class="ph-bold ${stateIcon}" style="color:${stateAccent}"></i>
         <h3>Spotify</h3>
-        <span class="w-title-meta" style="color:${stateAccent}">${stateLabel}${timeMeta ? ` · ${escapeHtml(timeMeta)}` : ""}</span>
+        <span class="w-title-meta" style="color:${stateAccent}">${stateLabel}${!showProgress && timeMeta ? ` · ${escapeHtml(timeMeta)}` : ""}</span>
       </div>
       <div class="w-body img-body">
-        <div class="img-hero">${heroBody}</div>
+        ${hero}
         <div class="img-meta">
           <span class="title">${escapeHtml(data.track)}</span>
-          <span class="sub">${escapeHtml([data.artist, data.album].filter(Boolean).join(" · "))}</span>
+          ${sub ? `<span class="sub">${escapeHtml(sub)}</span>` : ""}
+          ${progressBar}
         </div>
       </div>
     </div>`;

@@ -9,6 +9,8 @@ function escapeHtml(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const showCredit = opts.show_credit !== false; // default true — Unsplash terms
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -36,7 +38,7 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w is-bleed" data-widget="picture_unsplash">
       <img src="${escapeHtml(data.url)}" alt="${escapeHtml(data.alt || "")}">
-      ${credit
+      ${showCredit && credit
         ? `<div class="img-overlay">
             <span class="sub">${escapeHtml(credit)} · UNSPLASH</span>
           </div>`

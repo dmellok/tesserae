@@ -9,13 +9,20 @@ function escapeHtml(s) {
 }
 
 function row(item, idx, isCurrent) {
-  const ph = isCurrent ? "ph-play" : "ph-music-note";
   const accent = isCurrent ? "var(--accent-3)" : "var(--accent-5)";
   const titleStyle = isCurrent ? `color:var(--accent-3);font-weight:var(--fw-black)` : "";
+  // Album art thumbnail replaces the leading icon when available so
+  // the queue reads like a real player list rather than rows of
+  // identical music-note icons. Falls back to ph-music-note / ph-play
+  // when Spotify didn't return an image for the track.
+  const art = item.album_art_thumb || item.album_art;
+  const lead = art
+    ? `<img src="${escapeHtml(art)}" alt="" style="width:1.6em;height:1.6em;object-fit:cover;flex:0 0 auto;border-left:var(--stroke-2) solid ${accent}">`
+    : `<i class="ph-bold ${isCurrent ? "ph-play" : "ph-music-note"}" style="color:${accent}"></i>`;
   return `
     <div class="list-row ${(idx % 2 && !isCurrent) ? "is-zebra" : ""}">
       <div class="list-lead">
-        <i class="ph-bold ${ph}" style="color:${accent}"></i>
+        ${lead}
         <span class="list-title" style="${titleStyle}">${escapeHtml(item.track || item.title || "—")}</span>
       </div>
       <span class="list-meta u-muted" style="font-weight:var(--fw-semi)">${escapeHtml(item.artist || "")}</span>

@@ -32,8 +32,16 @@ function stateAccent(s) {
   return STATE_ACCENT[(s || "").toLowerCase()] || "var(--text-secondary)";
 }
 
+function fmtMmSs(seconds) {
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) return "";
+  const total = Math.floor(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const showProgress = opts.show_progress !== false;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -69,6 +77,23 @@ export default function render(shadow, ctx) {
     : [source || state || "idle"];
   const metaSub = metaSubBits.join(" · ");
 
+  let progressBar = "";
+  if (showProgress && Number.isFinite(data.position_pct)
+      && Number.isFinite(data.media_position) && Number.isFinite(data.media_duration)
+      && data.media_duration > 0) {
+    const pct = Math.max(0, Math.min(100, data.position_pct));
+    progressBar = `
+      <div class="img-progress">
+        <div class="img-progress-track">
+          <div class="img-progress-fill" style="width:${pct.toFixed(1)}%;background:${accent}"></div>
+        </div>
+        <div class="img-progress-times">
+          <span>${escapeHtml(fmtMmSs(data.media_position))}</span>
+          <span>${escapeHtml(fmtMmSs(data.media_duration))}</span>
+        </div>
+      </div>`;
+  }
+
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="ha_media">
@@ -82,6 +107,7 @@ export default function render(shadow, ctx) {
         <div class="img-meta">
           <span class="title">${escapeHtml(metaTitle)}</span>
           <span class="sub">${escapeHtml(metaSub)}</span>
+          ${progressBar}
         </div>
       </div>
     </div>`;
