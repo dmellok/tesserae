@@ -1,44 +1,81 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
+// news_hacker_news — Spectra list archetype.
+//
+// Title bar shows the feed name; body is a zebra-striped grid of stories
+// with a leading newspaper icon, the headline, and a right-aligned
+// upvote count (accent-1 for the leading story).
 
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+const FEED_LABELS = {
+  top: "Top",
+  new: "New",
+  best: "Best",
+  show: "Show",
+  ask: "Ask",
+};
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function fmtScore(n) {
+  const v = Number(n) || 0;
+  if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
+  return String(v);
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="news_hacker_news">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Hacker News</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const stories = Array.isArray(data.stories) ? data.stories : [];
+  const feedLabel = FEED_LABELS[data.feed] || "Top";
+
+  if (stories.length === 0) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="news_hacker_news">
+        <div class="w-title">
+          <i class="ph-bold ph-newspaper-clipping"></i>
+          <h3>Hacker News</h3>
+          <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
+        </div>
+        <div class="w-body"><p class="u-muted">No stories.</p></div>
+      </div>`;
+    return;
+  }
+
+  const rows = stories.map((s, i) => {
+    const isLead = i === 0;
+    const score = fmtScore(s.score);
+    return `
+      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead">
+          <i class="ph-bold ph-newspaper-clipping"></i>
+          <span class="list-title">${escapeHtml(s.title)}</span>
+        </div>
+        <span class="list-meta ${isLead ? "is-accent" : ""}">${escapeHtml(score)}</span>
+      </div>`;
+  }).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="news_hacker_news">
+      <div class="w-title">
+        <i class="ph-bold ph-newspaper-clipping"></i>
+        <h3>Hacker News</h3>
+        <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
+      </div>
+      <div class="w-body list-body">${rows}</div>
+    </div>`;
 }

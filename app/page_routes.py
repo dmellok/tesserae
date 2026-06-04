@@ -431,9 +431,10 @@ def create() -> Response:
             # time so changing the panel in settings updates every page.
             cells=initial_cells,
             font=(form.get("font") or None),
+            theme=(form.get("theme") or "light"),
             gap=_coerce_int(form.get("gap"), 0, lo=0),
             corner_radius=_coerce_int(form.get("corner_radius"), 0, lo=0),
-            bleed_color=(form.get("bleed_color") or "#ffffff"),
+            bleed_color=(form.get("bleed_color") or ""),
         )
     except ValidationError as exc:
         flash(f"Could not create dashboard: {exc.errors()[0]['msg']}", "error")
@@ -470,6 +471,8 @@ def update(page_id: str) -> Response:
     updates: dict[str, Any] = {}
     if "name" in form:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
+    if "theme" in form:
+        updates["theme"] = form.get("theme") or "light"
     if "font" in form:
         updates["font"] = form.get("font") or None
     if "gap" in form:
@@ -616,9 +619,12 @@ def preview(page_id: str) -> Response:
             update={
                 "name": (form.get("name") or page.name).strip() or page.name,
                 "font": (form.get("font") or None),
+                "theme": (form.get("theme") or page.theme),
                 "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
-                "bleed_color": (form.get("bleed_color") or page.bleed_color),
+                "bleed_color": (
+                    form.get("bleed_color") if "bleed_color" in form else page.bleed_color
+                ),
                 "icon": (form.get("icon") or None) or None,
                 "device_ids": _clean_device_ids(form.getlist("device_ids")),
                 "cells": new_cells,

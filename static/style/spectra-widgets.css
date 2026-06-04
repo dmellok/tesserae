@@ -1,0 +1,216 @@
+/* ============================================================================
+   SPECTRA — Widget shell anatomy + the 6 demonstration widgets
+   All color comes from semantic tokens; all size from the fluid base + em.
+   NO internal borders anywhere — hierarchy is spacing + weight + surface tint.
+   ============================================================================ */
+
+/* ---- Generic widget shell ------------------------------------------------- */
+.w{
+  /* the single fluid base every child sizes from (em) */
+  font-size: var(--w-font-base);
+  font-family: var(--font-family);
+  font-weight: var(--fw-medium);
+  line-height: var(--lh-body);
+  color: var(--text-primary);
+
+  background: var(--surface);
+  border: var(--stroke-1) solid var(--edge);   /* ONLY the outer edge is allowed */
+  border-radius: var(--radius-0);               /* sharp by default */
+
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: var(--pad);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow: hidden;
+}
+.w *{ box-sizing: border-box; }
+
+/* ---- Optional title bar --------------------------------------------------
+   On  → leading row: optional icon + tracked uppercase title; NO divider line.
+   Off → omit the element entirely; body flows from the top padding. The flex
+         column + gap make both states reflow cleanly with no leftover space. */
+.w-title{
+  flex: 0 0 auto;
+  min-height: var(--titlebar-min-h);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+.w-title .ph-bold{ font-size: var(--icon-sm); color: var(--icon); line-height: 1; }
+.w-title h3{
+  margin: 0;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-title .w-title-meta{
+  margin-left: auto;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-label);
+  color: var(--text-muted);
+}
+
+/* the body fills remaining height; widgets place their content inside */
+.w-body{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* shared helpers */
+.u-label{
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.u-muted{ color: var(--text-muted); }
+.u-secondary{ color: var(--text-secondary); }
+.u-row{ display: flex; align-items: baseline; gap: var(--space-2); }
+.u-spread{ display:flex; align-items:center; justify-content:space-between; gap: var(--space-2); }
+
+/* swatch chips for accent dots */
+.dot{ width:0.62em; height:0.62em; border-radius:var(--radius-0); flex:0 0 auto; }
+
+/* ============================================================================
+   WIDGET 1 · STAT / BIG-NUMBER TILE
+   ============================================================================ */
+.stat-body{ justify-content: center; gap: var(--space-1); }
+.stat-value{
+  font-size: var(--fs-display);
+  font-weight: var(--fw-black);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  display: flex;
+  align-items: baseline;
+  gap: 0.12em;
+}
+.stat-value .unit{ font-size: 0.4em; font-weight: var(--fw-bold); color: var(--text-secondary); }
+.stat-caption{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); }
+.stat-delta{
+  display:inline-flex; align-items:center; gap:0.2em;
+  font-size: var(--fs-body); font-weight: var(--fw-bold);
+}
+.stat-delta .ph-bold{ font-size: 1em; }
+
+/* ============================================================================
+   WIDGET 2 · LIST  (grouping via alternating sunken rows + spacing, no lines)
+   ============================================================================ */
+.list-body{ gap: var(--space-1); justify-content: flex-start; }
+.list-row{
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-0);
+}
+.list-row.is-zebra{ background: var(--surface-sunken); }
+.list-lead{ display:flex; align-items:center; gap: var(--space-2); min-width:0; }
+.list-lead .ph-bold{ font-size: var(--icon-sm); color: var(--icon); }
+.list-title{ font-weight: var(--fw-semi); font-size: var(--fs-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.list-meta{ font-weight: var(--fw-bold); font-size: var(--fs-body); white-space:nowrap; }
+.list-meta.is-accent{ color: var(--accent-4); }
+
+/* ============================================================================
+   WIDGET 3 · CHART  (bar)  — bars are solid fills, min stroke respected
+   ============================================================================ */
+.chart-body{ justify-content: flex-end; gap: var(--space-3); }
+.chart-figure{
+  flex: 1 1 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.chart-col{ display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap: var(--space-2); min-height:0; }
+.chart-bar{
+  flex: 1 1 auto;
+  width: 100%;
+  background: var(--surface-sunken);   /* track, via surface contrast not a line */
+  display: flex; align-items: flex-end;
+  border-radius: var(--radius-0);
+  min-height: var(--stroke-3);
+}
+.chart-bar > span{
+  display:block; width:100%;
+  border-radius: var(--radius-0);
+  min-height: var(--stroke-3);
+}
+.chart-x{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); }
+.chart-legend{ display:flex; flex-wrap:wrap; gap: var(--space-3) var(--space-4); }
+.chart-key{ display:flex; align-items:center; gap: var(--space-2); font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-secondary); }
+
+/* ============================================================================
+   WIDGET 4 · STATUS  (state pill + rows; color carries meaning)
+   ============================================================================ */
+.status-body{ justify-content: flex-start; gap: var(--space-4); }
+.status-hero{ display:flex; align-items:center; gap: var(--space-3); }
+.status-hero .ph-bold{ font-size: var(--icon-lg); color: var(--icon); }
+.status-hero .lockup{ display:flex; flex-direction:column; gap:0.1em; min-width:0; }
+.status-state{ font-size: var(--fs-jumbo); font-weight: var(--fw-black); line-height: var(--lh-tight); }
+.status-sub{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); }
+.pill{
+  display:inline-flex; align-items:center; gap:0.35em;
+  padding: 0.25em 0.6em;
+  font-size: var(--fs-label); font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-label); text-transform: uppercase;
+  color: var(--on-accent); border-radius: var(--radius-0);
+  align-self: flex-start;
+}
+.status-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-5); }
+.status-cell{ display:flex; flex-direction:column; gap:0.1em; }
+.status-cell .v{ font-size: var(--fs-lead); font-weight: var(--fw-bold); }
+
+/* ============================================================================
+   WIDGET 5 · CALENDAR / DATE
+   ============================================================================ */
+.cal-body{ justify-content: flex-start; gap: var(--space-4); }
+.cal-hero{ display:flex; align-items:baseline; gap: var(--space-3); }
+.cal-day{ font-size: var(--fs-display); font-weight: var(--fw-black); line-height: var(--lh-tight); }
+.cal-lockup{ display:flex; flex-direction:column; }
+.cal-month{ font-size: var(--fs-lead); font-weight: var(--fw-bold); }
+.cal-weekday{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); }
+.cal-events{ display:flex; flex-direction:column; gap: var(--space-2); }
+.cal-event{ display:grid; grid-template-columns:auto 1fr; gap: var(--space-3); align-items:baseline; }
+.cal-time{ font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--text-secondary); white-space:nowrap; }
+.cal-name{ font-size: var(--fs-body); font-weight: var(--fw-semi); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cal-bar{ width: var(--stroke-3); align-self: stretch; border-radius: var(--radius-0); }
+
+/* ============================================================================
+   WIDGET 6 · WEATHER
+   ============================================================================ */
+.wx-body{ justify-content: flex-start; gap: var(--space-4); }
+.wx-now{ display:flex; align-items:center; gap: var(--space-4); }
+.wx-now .ph-bold{ font-size: 2.6em; color: var(--icon); }
+.wx-temp{ font-size: var(--fs-display); font-weight: var(--fw-black); line-height: var(--lh-tight); }
+.wx-cond{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); }
+.wx-forecast{ display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap: var(--space-3); }
+.wx-cell{ display:flex; flex-direction:column; align-items:center; gap: var(--space-1); }
+.wx-cell .ph-bold{ font-size: var(--icon-md); color: var(--icon); }
+.wx-cell .d{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform:uppercase; letter-spacing: var(--ls-label); }
+.wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
+
+/* ---- compact mode for very small tiles: trim secondary content ---------- */
+@container (max-width: 240px){
+  .stat-value{ font-size: 2.4em; }
+  .chart-legend, .status-grid .status-cell:nth-child(n+3),
+  .wx-forecast .wx-cell:nth-child(n+4){ display:none; }
+  .cal-events .cal-event:nth-child(n+3){ display:none; }
+  .list-row:nth-child(n+5){ display:none; }
+}

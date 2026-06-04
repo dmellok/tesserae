@@ -1,44 +1,104 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
+// weather_now — Spectra weather archetype.
+//
+// Renders ``.w`` → optional ``.w-title`` → ``.w-body.wx-body`` with a
+// hero (icon + temp + condition) and a 4-cell metric strip pulled from
+// ctx.data.metrics. Semantic weather icon names map to Phosphor bold
+// glyphs via PH_BY_NAME; metric icons via METRIC_PH.
 
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
+const PH_BY_NAME = {
+  sun: "ph-sun",
+  moon: "ph-moon",
+  cloud: "ph-cloud",
+  partly: "ph-cloud-sun",
+  "partly-night": "ph-cloud-moon",
+  drizzle: "ph-drop",
+  rain: "ph-cloud-rain",
+  "rain-heavy": "ph-cloud-rain",
+  showers: "ph-cloud-rain",
+  snow: "ph-snowflake",
+  storm: "ph-cloud-lightning",
+  fog: "ph-cloud-fog",
+};
 
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+const METRIC_PH = {
+  humidity: "ph-drop",
+  wind: "ph-wind",
+  rainprob: "ph-cloud-rain",
+  uv: "ph-sun",
+  pressure: "ph-gauge",
+  dew: "ph-drop-half",
+  visibility: "ph-eye",
+  cloud: "ph-cloud",
+};
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function fmtTemp(v) {
+  if (v == null) return "—";
+  return Math.round(Number(v)) + "°";
+}
+
+function fmtMetric(m) {
+  if (m == null || m.value == null) return "—";
+  const v = m.value;
+  if (typeof v === "number") {
+    return (v >= 100 ? Math.round(v) : v).toString();
+  }
+  return String(v);
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  if (data.error) {
+    shadow.innerHTML = `
+      <link rel="stylesheet" href="/static/style/spectra-widgets.css">
+      <div class="w">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Weather</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const label = data.label || "";
+  const icon = PH_BY_NAME[data.icon] || "ph-cloud";
+  const temp = fmtTemp(data.temp);
+  const cond = data.cond || "";
+  const feels = data.feels != null ? `feels ${fmtTemp(data.feels)}` : "";
+  const subParts = [cond, feels].filter(Boolean);
+
+  const metrics = Array.isArray(data.metrics) ? data.metrics.slice(0, 4) : [];
+  const cells = metrics.map((m) => {
+    const ph = METRIC_PH[m.icon] || "ph-circle";
+    const unit = m.unit ? `<span class="unit"> ${escapeHtml(m.unit)}</span>` : "";
+    return `
+      <div class="wx-cell">
+        <span class="d">${escapeHtml(m.label || "")}</span>
+        <i class="ph-bold ${ph}"></i>
+        <span class="t">${escapeHtml(fmtMetric(m))}${unit}</span>
+      </div>`;
+  }).join("");
+
+  const titleBar = label
+    ? `<div class="w-title"><i class="ph-bold ph-map-pin"></i><h3>${escapeHtml(label)}</h3></div>`
+    : "";
+
+  shadow.innerHTML = `
+    <link rel="stylesheet" href="/static/style/spectra-widgets.css">
+    <div class="w" data-widget="weather_now">
+      ${titleBar}
+      <div class="w-body wx-body">
+        <div class="wx-now">
+          <i class="ph-bold ${icon}" style="color:var(--accent-4)"></i>
+          <div>
+            <div class="wx-temp">${escapeHtml(temp)}</div>
+            <div class="wx-cond">${escapeHtml(subParts.join(" · "))}</div>
+          </div>
+        </div>
+        ${cells ? `<div class="wx-forecast">${cells}</div>` : ""}
+      </div>
+    </div>`;
 }

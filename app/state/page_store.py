@@ -100,9 +100,14 @@ class Page(BaseModel):
     device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)
     font: str | None = None
+    # Spectra theme id — picks one of the six self-contained semantic blocks
+    # defined in static/style/spectra-tokens.css (light, dark, high-contrast,
+    # sepia, nord, cool-gray). Renders as ``data-theme=<id>`` on the
+    # composer body; unknown ids fall back to the :root defaults (light).
+    theme: str = "light"
     gap: int = 0
     corner_radius: int = 0
-    bleed_color: str = "#ffffff"
+    bleed_color: str = ""
     icon: str | None = None
 
     @model_validator(mode="before")

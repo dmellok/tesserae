@@ -255,7 +255,19 @@
           {% endif %}
         </div>
 
+        {# Spectra themes — six self-contained semantic blocks in
+           static/style/spectra-tokens.css. Adding a theme = duplicate a
+           block in tokens.css and add a row here. #}
+        {% set theme_options = [
+          {'value': 'light', 'label': 'Light · warm paper'},
+          {'value': 'dark', 'label': 'Dark · warm charcoal'},
+          {'value': 'high-contrast', 'label': 'High contrast'},
+          {'value': 'sepia', 'label': 'Sepia · book paper'},
+          {'value': 'nord', 'label': 'Nord · cool blue night'},
+          {'value': 'cool-gray', 'label': 'Cool gray · neutral slate'},
+        ] %}
         <div class="field-grid">
+          {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or 'light', options=theme_options) }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
           {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color) }}
         </div>

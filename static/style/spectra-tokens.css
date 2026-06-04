@@ -1,0 +1,218 @@
+/* ============================================================================
+   SPECTRA — E6 E‑Ink Widget System
+   Token layer: PRIMITIVES → SEMANTIC (per theme) → COMPONENT
+   ----------------------------------------------------------------------------
+   Editing model:
+   • Primitives never change between themes (scales, weights, strokes, radii).
+   • Each named theme is ONE self-contained block: [data-theme="name"]{ ... }.
+     Override colors / accents / font there and nothing else. To add a theme,
+     copy a block, rename it, change values. Widgets never reference primitives
+     for color — only semantic tokens — so a theme swap is total.
+   • Component tokens fall back to semantic/primitive values; override per widget
+     with a [data-widget="..."] block or inline style.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   1 · PRIMITIVES  (theme-independent raw values)
+---------------------------------------------------------------------------- */
+:root{
+  /* Type scale — expressed in em so it rides the fluid container base.
+     Bold/large by default: body is semibold, values & display are heavy. */
+  --fs-display: 3em;     /* hero numbers on stat tiles            */
+  --fs-jumbo:   2.5em;   /* large values                          */
+  --fs-value:   1.9em;   /* secondary values                      */
+  --fs-lead:    1.25em;  /* lead / emphasised body                */
+  --fs-body:    1em;     /* default body                          */
+  --fs-label:   0.8em;   /* uppercase section labels              */
+  --fs-caption: 0.72em;  /* smallest permissible text             */
+
+  /* Weights — heavy baseline */
+  --fw-regular: 500;
+  --fw-medium:  600;
+  --fw-semi:    700;
+  --fw-bold:    800;
+  --fw-black:   900;
+
+  /* Line heights */
+  --lh-tight:   1.02;
+  --lh-snug:    1.16;
+  --lh-body:    1.32;
+
+  /* Letter spacing */
+  --ls-label:   0.08em;   /* tracked uppercase labels */
+  --ls-tight:  -0.01em;
+
+  /* Spacing scale — em-based, rides the fluid base. */
+  --space-1: 0.25em;
+  --space-2: 0.5em;
+  --space-3: 0.75em;
+  --space-4: 1em;
+  --space-5: 1.5em;
+  --space-6: 2em;
+  --space-7: 3em;
+
+  /* Radii — sharp by default for crisp e-ink edges */
+  --radius-0: 0px;     /* default widget shell        */
+  --radius-1: 2px;
+  --radius-2: 4px;
+
+  /* Stroke weights — detail floor. Never below 2px; bars/lines 3px+. */
+  --stroke-1: 2px;     /* outer edge minimum          */
+  --stroke-2: 3px;     /* data strokes, chart lines   */
+  --stroke-3: 4px;     /* heavy emphasis              */
+
+  /* Icon sizes (em) — Phosphor BOLD weight only */
+  --icon-sm: 1.1em;
+  --icon-md: 1.5em;
+  --icon-lg: 2.2em;
+
+  /* Fluid base — every widget element sizes from this single value.
+     Resolves against the widget's container (cell sets container-type:size).
+     Clamped so widgets stay legible when tiny and never look sparse when huge. */
+  --w-font-base: clamp(14px, 7cqmin, 28px);
+
+  /* Component tokens (defaults; override per widget) */
+  --titlebar-min-h: 1.5em;
+  --pad: clamp(0.9em, 9cqmin, 1.4em);  /* widget inner padding, fluid */
+  --row-gap: var(--space-3);
+}
+
+/* ----------------------------------------------------------------------------
+   2 · SEMANTIC TOKENS — one self-contained block per named theme
+   Roles widgets consume: bg / surface / surface-sunken / text-* / icon /
+   edge / accent-1..6 (+ -soft tint) / on-accent / font-family
+   Near-black & near-white used everywhere (true #000/#fff ghost on E6).
+---------------------------------------------------------------------------- */
+
+/* ---- LIGHT (default) — warm paper ---------------------------------------- */
+:root,
+[data-theme="light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #E7E4DC;
+  --surface:        #F7F5F0;
+  --surface-sunken: #E1DDD2;
+  --text-primary:   #1B1A16;
+  --text-secondary: #4D4A42;
+  --text-muted:     #837F73;
+  --icon:           var(--text-primary);
+  --edge:           #B6B1A4;
+
+  --accent-1:#A84B2A; --accent-1-soft:#E9D6CC;  /* terracotta */
+  --accent-2:#9A7414; --accent-2-soft:#EAE0C4;  /* ochre      */
+  --accent-3:#4F6F36; --accent-3-soft:#D9E2C9;  /* moss       */
+  --accent-4:#256E6B; --accent-4-soft:#CCE0DD;  /* teal       */
+  --accent-5:#3F5A88; --accent-5-soft:#D2DCEA;  /* slate-blue */
+  --accent-6:#7E4068; --accent-6-soft:#E5D2DF;  /* plum       */
+  --on-accent:#F7F5F0;
+}
+
+/* ---- DARK — warm charcoal ------------------------------------------------ */
+[data-theme="dark"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #141310;
+  --surface:        #232019;
+  --surface-sunken: #1B1813;
+  --text-primary:   #F1EEE4;
+  --text-secondary: #B9B4A6;
+  --text-muted:     #807C70;
+  --icon:           var(--text-primary);
+  --edge:           #3A362C;
+
+  --accent-1:#DC8C63; --accent-1-soft:#3E2E22;
+  --accent-2:#D7B355; --accent-2-soft:#3A3318;
+  --accent-3:#A0BA76; --accent-3-soft:#2C3420;
+  --accent-4:#69B7B0; --accent-4-soft:#1E332F;
+  --accent-5:#88A2CD; --accent-5-soft:#232C3C;
+  --accent-6:#C389AC; --accent-6-soft:#33222E;
+  --on-accent:#141310;
+}
+
+/* ---- HIGH-CONTRAST — max legibility -------------------------------------- */
+[data-theme="high-contrast"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FBFBFA;
+  --surface:        #FFFFFF;
+  --surface-sunken: #ECECEA;
+  --text-primary:   #0A0A09;
+  --text-secondary: #232320;
+  --text-muted:     #4A4A45;
+  --icon:           var(--text-primary);
+  --edge:           #0A0A09;
+
+  --accent-1:#9A2D12; --accent-1-soft:#F0D5CC;
+  --accent-2:#7C5A00; --accent-2-soft:#EFE3BE;
+  --accent-3:#2E5417; --accent-3-soft:#D2E2C4;
+  --accent-4:#0A5754; --accent-4-soft:#C2E0DD;
+  --accent-5:#1F3D72; --accent-5-soft:#CCD8EC;
+  --accent-6:#5F2049; --accent-6-soft:#E6CEDD;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- SEPIA — warm book paper --------------------------------------------- */
+[data-theme="sepia"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #E3D6BC;
+  --surface:        #F2E9D5;
+  --surface-sunken: #DBCDAF;
+  --text-primary:   #3A2C1A;
+  --text-secondary: #6A5839;
+  --text-muted:     #98855F;
+  --icon:           var(--text-primary);
+  --edge:           #C4B287;
+
+  --accent-1:#9E4423; --accent-1-soft:#E4CBB4;
+  --accent-2:#8A6410; --accent-2-soft:#E3D2A6;
+  --accent-3:#566B2C; --accent-3-soft:#D2D6AE;
+  --accent-4:#2B6862; --accent-4-soft:#C9D8C4;
+  --accent-5:#42567E; --accent-5-soft:#CFD2CE;
+  --accent-6:#7B3D5C; --accent-6-soft:#E0CBBE;
+  --on-accent:#F2E9D5;
+}
+
+/* ---- NORD — cool blue night ---------------------------------------------- */
+[data-theme="nord"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #2E3440;
+  --surface:        #3B4252;
+  --surface-sunken: #343B49;
+  --text-primary:   #ECEFF4;
+  --text-secondary: #C5CDDB;
+  --text-muted:     #8A93A6;
+  --icon:           var(--text-primary);
+  --edge:           #4A5263;
+
+  --accent-1:#BF616A; --accent-1-soft:#3F343C;
+  --accent-2:#EBCB8B; --accent-2-soft:#3E3B30;
+  --accent-3:#A3BE8C; --accent-3-soft:#363F33;
+  --accent-4:#88C0D0; --accent-4-soft:#2C3A40;
+  --accent-5:#81A1C1; --accent-5-soft:#2D3744;
+  --accent-6:#B48EAD; --accent-6-soft:#3A323C;
+  --on-accent:#2E3440;
+}
+
+/* ---- COOL GRAY — neutral slate ------------------------------------------- */
+[data-theme="cool-gray"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #E4E5E8;
+  --surface:        #F5F6F7;
+  --surface-sunken: #DBDDE1;
+  --text-primary:   #191B1E;
+  --text-secondary: #45484D;
+  --text-muted:     #797D84;
+  --icon:           var(--text-primary);
+  --edge:           #B7BAC0;
+
+  --accent-1:#A4492C; --accent-1-soft:#E7D3CC;
+  --accent-2:#8E6C18; --accent-2-soft:#E6DDC6;
+  --accent-3:#4C6B38; --accent-3-soft:#D5DECB;
+  --accent-4:#1F6B68; --accent-4-soft:#C9DEDC;
+  --accent-5:#3C588A; --accent-5-soft:#D1D9E8;
+  --accent-6:#7A3E66; --accent-6-soft:#E3D1DD;
+  --on-accent:#F5F6F7;
+}

@@ -472,6 +472,9 @@ def test_render() -> str:
         abort(400)
 
     sample_mode = request.args.get("sample") == "1"
+    # ?theme=<id> picks one of the Spectra theme blocks
+    # (light / dark / high-contrast / sepia / nord / cool-gray).
+    theme_id = request.args.get("theme") or "light"
 
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
@@ -488,6 +491,7 @@ def test_render() -> str:
         "name": f"Test: {plugin_id} @ {size}",
         "panel": {"w": cell_w, "h": cell_h},
         "font": "default",
+        "theme": theme_id,
         "cells": [
             {
                 "id": "test-cell",

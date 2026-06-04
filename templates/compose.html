@@ -21,32 +21,32 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
+  <!-- Spectra design system. Tokens cascade from the document into every
+       widget's shadow root; widget class rules (.w, .stat-body, …) live
+       in spectra-widgets.css and are relinked per shadow root by each
+       client.js since class selectors don't pierce shadow boundaries. -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
   <style>
     {{ page.font_face_css|safe }}
 
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: '{{ page.font_family }}', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-      background: {{ page.bleed_color|default('#ffffff') }};
-      color: #1a1a1a;
+      font-family: '{{ page.font_family }}', var(--font-family);
+      background: {{ page.bleed_color or 'var(--bg)' }};
+      color: var(--text-primary);
     }
     .panel {
       position: relative;
       width: {{ page.panel.w }}px;
       height: {{ page.panel.h }}px;
       overflow: hidden;
-      background: {{ page.bleed_color|default('#ffffff') }};
+      background: {{ page.bleed_color or 'var(--bg)' }};
     }
     .cell {
       position: absolute;
       box-sizing: border-box;
       overflow: hidden;
       border-radius: {{ page.corner_radius }}px;
-      /* Cell boundary — kept so widgets stay visually separable while the
-         new design system is being built. Dotted so it reads as a
-         placeholder rather than an intentional border. */
-      outline: 1px dotted #c8c8c8;
-      outline-offset: -1px;
     }
     /* Per-cell zoom — the inner box paints into a 1/zoom virtual area
        then transform-scales back up to fill the cell, so widgets see a
@@ -70,8 +70,7 @@
       transform-origin: top left;
       container-type: size;
     }
-    .cell.full-bleed { outline: 0; }
-    .cell.error { outline: 2px solid #c44a3a; }
+    .cell.error { outline: 2px solid var(--accent-1); outline-offset: -2px; }
     .cell--empty {
       background: repeating-linear-gradient(
         45deg,
@@ -92,7 +91,7 @@
     .cell-empty-placeholder strong { color: #555; display: block; }
   </style>
 </head>
-<body data-for-push="{{ '1' if for_push else '0' }}">
+<body data-for-push="{{ '1' if for_push else '0' }}" data-theme="{{ page.theme|default('light') }}">
   <div class="panel">
     {% for cell in page.cells %}
     <div class="cell{% if cell.full_bleed %} full-bleed{% endif %}{% if not cell.plugin %} cell--empty{% endif %}"
