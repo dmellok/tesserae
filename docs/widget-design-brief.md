@@ -4,9 +4,10 @@ Paste this template into your Claude Design conversation and ask it to
 fill out one copy per widget you want built. The output is what gets
 pasted back to Claude Code for the actual build.
 
-Pair this with [`docs/widgets.md`](widgets.md) — that's the wire +
-render contract this brief builds on. Claude Design should read both
-before drafting.
+Pair this with [`docs/widgets.md`](widgets.md) (the wire + render
+contract) and [`docs/widget-design-system.md`](widget-design-system.md)
+(the cross-widget rulebook: archetypes, two axes, token layers). Claude
+Design should read both before drafting.
 
 Every section is required unless marked **(optional)**. Omitting a
 required section forces Claude Code to either guess or stop to ask —
@@ -61,16 +62,16 @@ The form fields the editor will render. Types: `string` · `textarea` ·
 | `longitude` | `number` | `144.9631` | Longitude | — |
 | `label` | `string` | `Melbourne` | Place label | — |
 | `units` | `select` | `metric` | Units | `metric` (Metric °C) · `imperial` (Imperial °F) |
-| `variant` | `select` | `r1`      | Style | `r1` · `g2` · `s3` · `d4` · `legacy` (see note below) |
 
-!!! note "Multi-direction widgets — the `variant` option"
-    If the widget will ship more than one visual direction, **add a
-    `variant` `select`** using the canonical r1/g2/s3/d4 + legacy
-    values (see [widget contract — Per-cell variants](widgets.md#per-cell-variants-the-variant-cell-option)
-    and [design system § 1](widget-design-system.md#1-variant-naming)).
-    The default stays `r1`. Section 7 below should then carry one
-    mockup block per direction (Refined / Geometric / Swiss / Data),
-    not just per size — the direction is the bigger design decision.
+!!! note "No `variant` option for visual direction"
+    Pre-Spectra widgets shipped multiple visual "directions" behind a
+    `variant` select (Refined / Geometric / Swiss / Data). Spectra
+    replaced that with the `data-style` axis at page level — widgets
+    now render **one** shape. Don't add a `variant` option for
+    direction; if your widget legitimately needs a layout shape choice
+    (e.g. spotify_now_playing's `stack` vs `side`), name it
+    `layout` and use shape-describing values, not design-language
+    names.
 
 ---
 
@@ -223,26 +224,38 @@ outline-with-presence the design language calls for.
 ## 9. Tone rules (semantic colour)
 
 If element colour depends on data, table it. Output is **always** a
-semantic token (`--c-data-*` for categorical, `--c-ok` / `--c-warn` /
-`--c-danger` / `--c-info` for status only). Reach for status tokens
-only when the value is a genuine advisory, hazard, or error — never
-because you want a particular hue. See `docs/widgets.md` →
-**Categorical vs status — the rule**.
+Spectra semantic token — paint from `--accent-1..6` (reach by **role**,
+not by hue), `--text-primary` / `--text-secondary` / `--text-muted`,
+`--surface` / `--surface-sunken`. The active theme provides whatever
+colour the role carries.
 
-| element         | data value             | semantic token | rationale |
-|-----------------|------------------------|----------------|-----------|
-| hero icon       | code 0–1 (clear)       | `--c-data-1`   | decorative — sunny day, not a "warning" |
-| hero icon       | code 2 (partly cloudy) | `--c-data-2`   | decorative |
-| hero icon       | code 3/45/48 (overcast)| `--c-text-mute`| decorative — drained colour reads as overcast |
-| hero icon       | code 51–82 (rain)      | `--c-data-3`   | decorative |
-| hero icon       | code 71–86 (snow)      | `--c-text-soft`| decorative |
-| hero icon       | code 95–99 (storm)     | `--c-danger`   | **status** — severe storm IS a hazard advisory |
-| UV value        | uv < 3                 | `--c-ok`       | status — safe band |
-| UV value        | uv 3–7.9               | `--c-warn`     | status — caution band |
-| UV value        | uv ≥ 8                 | `--c-danger`   | status — burn risk |
-| range high arrow| —                      | `--c-data-1`   | decorative |
-| range low arrow | —                      | `--c-text-soft`| decorative |
-| rain pill       | rain ≥ 30%             | `--c-data-2`   | decorative |
+Accent slots by role:
+
+| Slot | Role | Reach when… |
+|---|---|---|
+| `--accent-1` | alerts / peaks / current | error pills, current-hour highlight, "now" markers |
+| `--accent-2` | warnings / capacity / "winner" | yellow-flag warnings, near-full battery, trophy gold |
+| `--accent-3` | positive / "up" | success, uptrend, online, passing |
+| `--accent-4` | primary / today / live | main chart series, today's column, "live" tag |
+| `--accent-5` | secondary series | second chart series, comparison data |
+| `--accent-6` | third category | third series, supplementary tags |
+
+Example (weather_now):
+
+| element         | data value             | token         | role |
+|-----------------|------------------------|---------------|------|
+| hero icon       | code 0–1 (clear)       | `--accent-2`  | warm sunny day — categorical, slot 2 |
+| hero icon       | code 2 (partly cloudy) | `--accent-2`  | categorical |
+| hero icon       | code 3/45/48 (overcast)| `--text-muted`| drained / overcast |
+| hero icon       | code 51–82 (rain)      | `--accent-4`  | cool primary |
+| hero icon       | code 71–86 (snow)      | `--accent-5`  | cool secondary |
+| hero icon       | code 95–99 (storm)     | `--accent-1`  | **alert** — severe storm |
+| UV value        | uv < 3                 | `--accent-3`  | positive / safe band |
+| UV value        | uv 3–7.9               | `--accent-2`  | warning band |
+| UV value        | uv ≥ 8                 | `--accent-1`  | alert — burn risk |
+| range high arrow| —                      | `--accent-1`  | peak |
+| range low arrow | —                      | `--accent-5`  | secondary |
+| rain pill       | rain ≥ 30%             | `--accent-4`  | primary water |
 
 ---
 
@@ -342,11 +355,15 @@ Client-side only. Compute `pct = (today - jan_1) / (dec_31 - jan_1)`.
 └──────────────────────────────────────────────┘
 ```
 
-[1] head — uppercase title (fgSoft), year (accent) on the right.
-[2] bar — full-width, height 14cqh. Fill: `accent`. Track: `surface2`.
-    Rounded corners (`border-radius: 999px`).
-[3] percent — right-aligned, weight 700, fg, clamp(20px, 4cqw, 36px).
-[4] footer — muted, regular weight, single line.
+[1] head — uppercase title (`--text-muted`), year (`--accent-4`) on
+    the right. `.w-title` shell, h3 + `.w-title-meta`.
+[2] bar — full-width, height 14cqh. Fill: `var(--accent-4)`. Track:
+    `var(--surface-sunken)`. Rounded corners: `border-radius: 999px`
+    (stadium pill — for an editorial-only widget you'd use
+    `var(--pill-radius)` instead).
+[3] percent — right-aligned, weight `var(--fw-bold)`, `--text-primary`,
+    clamp(20px, 4cqw, 36px).
+[4] footer — `--text-muted`, regular weight, single line.
 
 ### sm (380×240) — same, smaller type
 ### xs (180×180) — just the bar + percent, drop head + footer
@@ -362,11 +379,11 @@ Weights: `regular` only.
 
 ## 9. Tone rules
 
-| element | data value | semantic token | rationale |
-|---------|------------|----------------|-----------|
-| bar fill | <50%      | `--c-accent`   | decorative — progress, not a status |
-| bar fill | 50–80%    | `--c-accent`   | decorative |
-| bar fill | >80%      | `--c-warn`     | status — running out of year IS the advisory |
+| element | data value | token | role |
+|---------|------------|-------|------|
+| bar fill | <50%      | `--accent-4` | primary — progress, not alert |
+| bar fill | 50–80%    | `--accent-4` | primary |
+| bar fill | >80%      | `--accent-2` | warning — running out of year |
 
 ## 10. Size adaptations
 

@@ -109,8 +109,11 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   field per option. Types: `string`, `textarea`, `number`, `select`
   (needs `choices`), `multiselect` (needs `choices`), `boolean`,
   `color`. The user's values land in `ctx.cell.options` at render
-  time. For widgets that ship multiple visual directions, see the
-  **per-cell `variant`** pattern below.
+  time. Don't ship a `variant` option for visual direction — that
+  model is gone; the `data-style` axis at page level provides
+  cross-widget shape selection. If a widget needs a genuine layout
+  shape choice (e.g. `stack` vs `side`), name the option `layout` and
+  use shape-describing values.
 * **`settings`** — plugin-wide knobs (one set across all cells using
   this widget). Surfaces in `/settings/plugins/<id>`. `secret: true`
   stores under `<name>_secret` in `settings.json` so an on-disk grep
@@ -144,25 +147,28 @@ export default async function render(shadow, ctx) {
     w: 640,                // current cell width in pixels
     h: 400,                // current cell height
     size: "md",            // "xs" | "sm" | "md" | "lg"
+    plugin: "weather_now",
+    plugin_id: "weather_now",
     options: { ... }       // cell_options values, defaults merged in
   },
   panel: {
     w: 1600, h: 1200,      // full panel dims
     portrait: false        // panel.h > panel.w
   },
-  theme: {                  // resolved primitive palette as hex strings —
-    bg: "#ffffff",          // for canvas/Chart.js only; style DOM with --c-*
-    surface: "#e2d4b8",
-    // ...all 15 primitives
-  },
   font: {
-    family: "Inter",       // resolved page font
+    family: "Inter",       // resolved page font (for non-Spectra widgets)
     weight: 400
   },
   data: { ... } | null,    // server.py fetch() result, if present
   preview: false           // true when rendered in the editor iframe
 }
 ```
+
+`ctx` no longer carries a `theme` block of hex strings. Spectra widgets
+paint from CSS custom properties via the cascade; the chart helpers
+resolve the live palette through a hidden probe (`tokens(shadow.host)`)
+so canvas can read `t.accent1` / `t.surface` / `t.fontFamily` as
+resolved colour strings.
 
 * **Be idempotent**: the renderer may invoke you twice on a slow
   reload — overwrite `shadow.innerHTML` rather than appending.
@@ -209,86 +215,87 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
 
 ---
 
-## Theme tokens — primitives and the semantic layer
+## Tokens — the Spectra design system
 
-Colour has two layers. **Themes define 15 primitive tokens.** Widgets
-**never reference those primitives directly** — they paint from the `--c-*`
-**semantic layer** the composer derives on every cell host. The split keeps
-two ideas apart that are easy to conflate: *categorical* colour ("I need N
-distinguishable blocks / chart series") and *status* colour ("this means
-good / caution / bad"). A sunny day is categorical; a very-high UV reading
-is status.
+Spectra has three token layers. Widgets paint from the upper two; never
+from primitives. The full source is in
+[`static/style/spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css);
+this is the cheat sheet.
 
-### Primitives — what a theme defines
+### 1. Primitives — theme-independent raw values on `:root`
 
-15 tokens, validated by
-[`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json)
-→ `themes.palette`. Theme authors pick these; **widgets don't touch them.**
+Scales (don't redefine):
 
-| primitive | role |
+| Token group | Examples |
 |---|---|
-| `bg` | outer cell background |
-| `surface` | card / subpanel background |
-| `surface2` | raised / emphasised card |
-| `fg` | primary text |
-| `fgSoft` | secondary text |
-| `muted` | labels, supporting metadata |
-| `accent` / `accent2` / `accent3` | the theme-coordinated colour triad |
-| `accentSoft` | low-contrast accent fill |
-| `divider` | chart axes / grid lines only |
-| `ok` / `warn` / `danger` | status hues |
-| `info` | informational status (optional; falls back to `accent` if a theme omits it) |
+| Type scale | `--fs-display 3em` · `--fs-jumbo 2.5em` · `--fs-value 1.9em` · `--fs-lead 1.25em` · `--fs-body 1em` · `--fs-label 0.8em` · `--fs-caption 0.72em` |
+| Weights | `--fw-regular 500` · `--fw-medium 600` · `--fw-semi 700` · `--fw-bold 800` · `--fw-black 900` |
+| Spacing | `--space-1 .25em` … `--space-7 3em` |
+| Strokes | `--stroke-1 2px` (edge floor) · `--stroke-2 3px` (data) · `--stroke-3 4px` |
+| Radii | `--radius-0 0` · `--radius-1 2px` · `--radius-2 4px` |
+| Icons | `--icon-sm 1.1em` · `--icon-md 1.5em` · `--icon-lg 2.2em` |
+| Fluid base | `--w-font-base: clamp(14px, 7cqmin, 28px)` (every widget element sizes from this) |
 
-### Semantic tokens — what widgets paint with
+### 2. Semantic — what the active theme provides
 
-Defined on the cell host in
-[`templates/compose.html`](https://github.com/dmellok/tesserae/blob/main/templates/compose.html)
-and inherited into every widget's shadow (whether or not it links
-`widget-bauhaus.css`). **Reference these, never `--theme-*`** — the enforce
-test [`tests/test_semantic_tokens.py`](https://github.com/dmellok/tesserae/blob/main/tests/test_semantic_tokens.py)
-fails the build otherwise.
+Set per-theme on `[data-theme="<id>"]`. These are what widgets read.
 
-| semantic token | maps to | use for |
+| Token | Role |
+|---|---|
+| `--bg` | panel background behind all widgets |
+| `--surface` | widget container fill |
+| `--surface-sunken` | zebra rows, chart tracks, calendar grid lines, chips |
+| `--text-primary` / `--text-secondary` / `--text-muted` | text by emphasis |
+| `--icon` | icon colour (defaults to `--text-primary`) |
+| `--edge` | the single permitted outer container edge |
+| `--accent-1` … `--accent-6` | 6 categorical roles (fixed per slot, hue varies per theme) |
+| `--accent-1-soft` … `--accent-6-soft` | low-saturation tint companion for each accent |
+| `--on-accent` | text/icon colour legible on an accent fill |
+| `--font-family` | active style font (paints `.w` via the shell rule) |
+
+The 6 accents have **fixed roles by position**:
+
+| Slot | Role | Reach for it when… |
 |---|---|---|
-| `--c-bg` | bg | cell background |
-| `--c-surface` | surface | cards |
-| `--c-raised` | surface2 | emphasised cards |
-| `--c-text` / `--c-text-soft` / `--c-text-mute` | fg / fgSoft / muted | text by emphasis |
-| `--c-line` | divider | chart axes / grid only — never card borders |
-| `--c-accent` | accent | brand highlight |
-| `--c-accent-soft` | accentSoft | soft tonal fills (dithers — large fills only) |
-| `--c-data-1` … `--c-data-4` | accent / accent2 / accent3 / surface2 | **categorical** — N distinguishable colours, no meaning |
-| `--c-ok` / `--c-warn` / `--c-danger` / `--c-info` | ok / warn / danger / info | **status** — advisory / hazard / error / informational ONLY |
+| `--accent-1` | alerts / peaks / "now" | error pills, current-hour highlight, urgent state |
+| `--accent-2` | warnings / capacity / "winner" | yellow-flag warnings, near-full battery, trophy gold |
+| `--accent-3` | positive / "up" | success state, uptrend, online |
+| `--accent-4` | primary / today / live | main chart series, today's column, "live" tag |
+| `--accent-5` | secondary series | second chart series, comparison data |
+| `--accent-6` | third category | third series, supplementary tags |
 
-### Categorical vs status — the rule
+In light theme the hues are terracotta / ochre / moss / teal / slate-blue
+/ plum; in dark they shift; in Dracula they're red / peach / mint /
+lavender / cyan / pink. The hexes change; the roles don't. **Reach by
+role, not by hue.** "I want red" is the wrong instinct — pick the slot
+whose meaning matches; the theme provides the colour.
 
-Use `--c-data-*` for anything decorative or "these are different things":
-stat blocks, chart series, language swatches, day columns. Use
-`--c-ok` / `--c-warn` / `--c-danger` **only** when the value is a genuine
-advisory, hazard, or error — a UV/AQI band, an overdue task, a failed
-fetch, a missing entity. Never reach for a status token just because you
-want a particular colour: it breaks on themes where `warn` is a loud alarm,
-and makes a sunny day read as a warning.
+### 3. Style-tunable — what the active style overrides
 
-**E-ink ceiling.** The categorical ramp tops out at **4 distinct hues** on a
-6-ink E6 panel (yellow / red / blue / green; `--c-data-4` is the neutral
-block), 5 on the 7-colour Inky (adds orange). Don't design a 6-way
-categorical split — the panel can't resolve it. For tonal emphasis within
-one hue use `--c-accent-soft`, but it dithers to a stipple on the panel, so
-reserve it for large fills, never small text.
+Defaults on `:root` (the "standard" look); styles override on
+`[data-style="<id>"]`. Consume via `var(--name, fallback)`.
 
-### Chart.js (canvas) needs hex
+| Token | Default | Purpose |
+|---|---|---|
+| `--edge-weight` | `var(--stroke-1)` | outer shell border weight |
+| `--zebra-bg` | `var(--surface-sunken)` | list row alternating fill (`transparent` = whitespace grouping) |
+| `--list-pad-y` / `--list-gap` | `var(--space-2)` / `var(--space-1)` | list density |
+| `--pill-radius` | `var(--radius-0)` | status pill corner (999px = stadium) |
+| `--title-marker` | `none` | `block` shows an accent eyebrow tick before the title |
+| `--title-rule-w` | `0px` | optional accent rule under the title bar |
+| `--row-rule-w` | `0px` | optional divider between list rows |
+| `--label-transform` | `uppercase` | label casing (Editorial uses `none`) |
 
-Canvas can't read CSS custom properties, so charts pull primitive hex from
-`ctx.theme` (e.g. `ctx.theme.accent`) — the one place JS reads a primitive
-directly, and only to feed a value to canvas, not to style DOM:
+Two axes summary:
 
-```js
-new Chart(canvas.getContext("2d"), {
-  type: "line",
-  data: { datasets: [{ borderColor: ctx.theme.accent, ... }] },
-});
 ```
+data-theme  →  colour (semantic + accent tokens)
+data-style  →  type / scale / density / shape (primitives + style-tunable)
+```
+
+Set globally on `<body>`, overridable per cell. Any theme × any style.
+See [`widget-design-system.md`](widget-design-system.md) for the
+cross-widget conventions on how to use them.
 
 ---
 
@@ -341,45 +348,50 @@ Icon name reference: <https://phosphoricons.com/>.
 
 ## Custom colours — escape hatch
 
-The "always use theme tokens" rule has a narrow carve-out: when the
-data you're rendering has an **inherent visual identity that the user
-expects to see**, you can hard-code hex values. Examples:
+The "always paint from semantic tokens" rule has a narrow carve-out:
+when the data you're rendering has an **inherent visual identity that
+the user expects to see**, you can hard-code hex values. Examples:
 
-* **F1 team colours** — Ferrari red `#DC0000`, Mercedes silver/black
-  `#27F4D2`, Red Bull `#1E41FF`. Painting Ferrari in `--theme-accent`
-  reads wrong; the data carries its own colour.
+* **F1 team colours** — Ferrari `#E80020`, Mercedes `#27F4D2`, Red Bull
+  `#3671C6`. Painting Ferrari in `--accent-1` reads wrong; the data
+  carries its own colour. See [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
+  for the canonical implementation (constructor → hex map, fallback to
+  `var(--surface-sunken)` for unknown teams).
 * **Brand logos and indicators** — Spotify green, GitHub black,
   particular calendar-tag colours.
 * **Real-world flag colours** — country flags on race countdowns.
 * **Established conventions** — gold / silver / bronze on podiums
-  (though even those are sometimes better expressed as
-  `warn` / `fgSoft` / `accent`).
+  (though even those usually map cleanly to `--accent-2` / `--text-secondary` /
+  `--accent-1`).
 
 Bar to clear: the colour is **part of the data**, not a design choice.
-"It would look nice in red" doesn't pass; "this is Ferrari's red"
-does.
+"It would look nice in red" doesn't pass; "this is Ferrari's red" does.
 
 Implementation:
 
 ```js
 const TEAM_COLOURS = {
-  ferrari:   "#DC0000",
+  ferrari:   "#E80020",
   mercedes:  "#27F4D2",
-  red_bull:  "#1E41FF",
+  red_bull:  "#3671C6",
   // ...
 };
 
-// Apply via inline style so it slots alongside palette-token elements.
-`<span class="team-chip" style="background: ${TEAM_COLOURS[team] || 'var(--c-raised)'}">...</span>`
+// Apply via inline style so it slots alongside semantic-token elements.
+const team = TEAM_COLOURS[id] || "var(--surface-sunken)";
+return `<span style="background:${team}">…</span>`;
 ```
 
-Fall back to a semantic token (`--c-raised` or `--c-accent`) for unknown
-values so the widget never produces a blank/black square.
+Fall back to a semantic token (`--surface-sunken` for neutral chips,
+`--accent-5` for unknown series) so the widget never produces a
+blank / pure-black square.
 
-For dark mode: many brand colours need a fallback variant. Define
-both in a lookup and switch based on a hint (e.g. is the theme dark?
-inspect `getComputedStyle(host).getPropertyValue('--theme-bg')` and
-choose). Document the choice in the widget's brief.
+Most brand colours read fine on every Spectra theme — the modern F1
+liveries (Mercedes mint, McLaren papaya, Alpine pink) sit comfortably
+on both light and dark surfaces. If a colour genuinely doesn't work
+in dark themes, define both variants in the lookup and switch via the
+body's `data-theme` attribute. Document the choice in the widget's
+brief.
 
 ---
 
@@ -419,7 +431,8 @@ Conventions:
   Spectra 6, no woff2-weight cost.
 * **Monochrome SVGs that pick up `currentColor`** if you want them to
   theme automatically: `<svg fill="currentColor" stroke="currentColor">`
-  in your SVG file, then set `color: var(--c-text)` on the parent.
+  in your SVG file, then set `color: var(--text-primary)` (or any
+  accent) on the parent.
 * **Bake brand colours into the SVG** when the data IS the colour
   (team logo, flag).
 * **Keep files small** — under 10 KB each ideally. The renderer waits
@@ -463,129 +476,49 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 
 ---
 
-## Shared baseline — `widget-bauhaus.css` (+ `widget-bauhaus-wx.css`)
+## Shared baseline — `spectra-widgets.css` (+ `spectra-tokens.css`, `spectra-styles.css`)
 
-Most widgets link
-[`static/style/widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css)
-before their own `client.css`. It carries the shared shell so a header-bar
-tweak is one edit, not 40 — and it sets the `:host` defaults (sizing,
-`color: var(--c-text)`, `background: var(--c-bg)`). The `--c-*` semantic
-tokens themselves come from the cell host (the composer), so they're
-available whether or not a widget links this file.
+Every Spectra widget links
+[`static/style/spectra-widgets.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-widgets.css)
+inside its shadow root. The stylesheet carries:
 
-* `.wb-bar` + `.wb-mark` + `.wb-title` + `.wb-bar-icon` + `.wb-bar-meta` — the inverted header strip
-* `.wb-empty` + `.wb-empty-primary` + `.wb-empty-secondary` — empty state
-* `.wb-root.is-error` / `.wb-error` — error state (paints `--c-danger`)
+* the **shell**: `.w` → `.w-title` (optional) → `.w-body`
+* the **archetype body classes**: `.stat-body`, `.list-body`,
+  `.chart-body`, `.status-body`, `.cal-body`, `.wx-body`, `.img-body`,
+  plus the supporting per-element classes (`.list-row`, `.status-cell`,
+  `.pill`, `.chart-legend`, …)
+* shared **helpers**: `.u-label`, `.u-muted`, `.u-row`, `.u-spread`,
+  `.dot` (accent swatches)
+* @container queries that trim secondary content at compact (`360px`)
+  and tiny (`240px`) breakpoints
 
-Tune proportions per widget via `--wb-*` custom properties on `:host`
-(e.g. `--wb-bar-fs`, `--wb-bar-fw`) instead of redeclaring the bar. The
-title-bar dimensions (height, padding, icon size, mark size, font size)
-are pinned to physical pixels via `--wb-bar-h` / `--wb-bar-px` /
-`--wb-bar-fs` / `--wb-bar-icon-sz` / `--wb-mark-sz` so every refined
-header looks identical across zoom levels and across widgets.
-
-Link it before your own `client.css`:
+The link goes inside `shadow.innerHTML` so the class rules pierce the
+shadow boundary (they don't otherwise):
 
 ```js
 shadow.innerHTML = `
-  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-  <link rel="stylesheet" href="/plugins/<id>/client.css">
-  ...`;
+  <link rel="stylesheet" href="/static/style/spectra-widgets.css">
+  <div class="w" data-widget="<id>">
+    <div class="w-title">...</div>
+    <div class="w-body status-body">...</div>
+  </div>
+`;
 ```
 
-The weather suite and ~40 other widgets build on this baseline — read
-any of them for the pattern.
+The Spectra token system itself lives in three sheets, all loaded at
+the document level by `compose.html` and inherited into every shadow
+root via the cascade:
 
-### Decorative layer — `widget-bauhaus-wx.css`
-
-The weather and sky suites layer a second stylesheet,
-[`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css),
-which adds a **decorative** token family on top of the `--c-*` semantic
-layer. Use it when a widget belongs to a colour-blocked design family
-with a specific paper / ink / chromatic feel (the original Bauhaus
-spec), and you want every widget in the family to retint together when
-the user changes themes.
-
-| token | role |
+| File | What it sets |
 |---|---|
-| `--wx-paper` / `--wx-paper-2` / `--wx-paper-3` | body backgrounds (flow through `--c-bg` + `--c-text` via `color-mix`) |
-| `--wx-ink` / `--wx-ink-60` | body text (flow through `--c-text` / `--c-text-soft`) |
-| `--wx-hair` | hairline rules (flows through `--c-line`) |
-| `--wx-red` / `--wx-blue` / `--wx-yellow` / `--wx-green` | decorative colour chips. **All four are theme-aware** — `red` flows through `--c-accent`, `blue` through `--c-data-2`, `yellow` through `--c-warn`, `green` through `--c-data-3`. None pinned to Spectra hex any more (changed in v0.16.13). |
-| `--wx-red-fg` / `-blue-fg` / etc. | text colour for use ON each chip — flows through `--c-bg` |
-| `--wx-red-t` / `-blue-t` / etc. | tinted variants (chip-fill at 22% over paper) |
-| `--wx-tint` / `--wx-tint-strong` / `--wx-tint-blue` / `--wx-tint-green` / `--wx-tint-yellow` | **section-background washes** (added v0.16.15) — `color-mix` between the underlying chip and paper at 14% (or 26% for `-strong`). Use to paint a whole panel in a soft accent wash without the brightness of `var(--c-accent)` solid. |
-| `--wx-grotesk` / `--wx-black` / `--wx-geo` / `--wx-mono` / `--wx-swiss` | type role tokens — all lead with the active theme font |
-| `--wb-bar-bg` / `--wb-bar-fg` | refined title bar — **inverts against the body** (`var(--c-text)` / `var(--c-bg)`) so it always contrasts in both light and dark themes (changed in v0.16.13) |
+| [`spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css) | primitives + 19 themes (`[data-theme="..."]`) |
+| [`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css) | 9 styles (`[data-style="..."]`) + @font-face for the vendored families |
+| [`spectra-base16.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-base16.css) | 10 base16 colour palettes |
 
-The refined title bar (`.wb-bar`, `.wx-header-dark`, every `*-header`
-in the HA family) reads dark-on-light in light themes (the original
-Bauhaus look) and light-on-dark in dark themes — `--wb-bar-bg` /
-`--wb-bar-fg` invert against the body so the strip always contrasts
-instead of pinning a fixed dark colour that disappears under dark
-themes.
-
-Link both stylesheets when you want the decorative layer:
-
-```js
-shadow.innerHTML = `
-  <link rel="stylesheet" href="/static/style/widget-bauhaus.css">
-  <link rel="stylesheet" href="/static/style/widget-bauhaus-wx.css">
-  <link rel="stylesheet" href="/plugins/<id>/client.css">
-  ...`;
-```
-
----
-
-## Per-cell variants — the `variant` cell option
-
-When a widget ships multiple visual directions (Refined / Geometric /
-Swiss / Data / Editorial / etc.) the convention is a single `select`
-cell option named `variant`. The composer renders a per-cell dropdown
-in the page editor and the widget picks the matching layout in
-`client.js`. 34 widgets currently follow this pattern — weather, HA,
-GitHub, calendar, news, sky, octoprint, spotify.
-
-The canonical four-direction shape:
-
-```json
-{
-  "name": "variant",
-  "type": "select",
-  "label": "Style",
-  "default": "r1",
-  "choices": [
-    { "value": "r1",     "label": "1 · Refined" },
-    { "value": "g2",     "label": "2 · Geometric" },
-    { "value": "s3",     "label": "3 · Swiss" },
-    { "value": "d4",     "label": "4 · Data" },
-    { "value": "legacy", "label": "Legacy" }
-  ]
-}
-```
-
-```js
-const VARIANTS = {
-  r1: renderRefined,
-  g2: renderGeometric,
-  s3: renderSwiss,
-  d4: renderData,
-  legacy: renderLegacy,
-};
-const variant = ctx.cell.options.variant || "r1";
-(VARIANTS[variant] || VARIANTS.r1)(shadow, ctx);
-```
-
-The **`legacy` variant** (added v0.16.21) is the quiet alternative:
-charcoal header, paper body, hairline rules, no solid accent panels.
-It's the conservative fallback for users who prefer the pre-colour-pass
-look or whose theme works better without big accent fills. Every
-widget on the r1/g2/s3/d4 scheme ships a `legacy` option. The default
-stays `r1`.
-
-Reference: [`plugins/weather_now/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/weather_now/client.js),
-[`plugins/ha_climate/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/ha_climate/client.js),
-[`plugins/calendar_week/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/calendar_week/client.js).
+Widgets don't link these — the document does it once. Custom
+properties cascade through the shadow boundary, so widgets just read
+`var(--accent-1)` / `var(--surface)` / etc. as if the tokens were
+defined inside their own shadow.
 
 ---
 
@@ -608,11 +541,11 @@ the slider (title bars, hairlines, icon strips), counter-scale by
 .my-rule   { height: calc(1px  / var(--c-zoom, 1)); }
 ```
 
-This is what `widget-bauhaus.css` does for the refined title bar
-(`--wb-bar-h: calc(36px / var(--c-zoom, 1))`) so every refined header
-lands at 36 physical pixels at every zoom level. Everything else
-(body text, hero icons, charts) should scale with the slider — that's
-the whole point of the zoom.
+This is what `spectra-widgets.css` does for `.w-title`: the title's
+`font-size` is a `calc(clamp(...) / var(--c-zoom, 1))` so the bar
+stays at its natural physical pixel size at every zoom level.
+Everything else (body text, hero icons, charts) should scale with the
+slider — that's the whole point of the zoom.
 
 `ctx.cell.size` does NOT change when zoom changes; the size token
 reflects the cell's true dimensions on the panel. Zoom is a viewing
@@ -620,31 +553,44 @@ adjustment, not a layout one.
 
 ---
 
-## Font cascade — `--theme-font` / `--theme-font-mono`
+## Font cascade — `--font-family`
 
-The composer sets both font tokens on every cell host from the
-active theme's font picker (Settings → Themes → Font):
+The active style sets `--font-family` on `<body>` (see
+[`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css)),
+and that cascades into every shadow root. The `.w` shell already does
+`font-family: var(--font-family)`, so most widgets get the right font
+for free.
+
+Overrides flow top-down:
+
+| Source | What it sets |
+|---|---|
+| Page font picker | inline `--font-family` on body (overrides style font) |
+| Per-cell font picker | inline `--font-family` on the cell (overrides page font) |
+| Active style | `--font-family` via the `[data-style="..."]` rule |
+| `:root` default | Helvetica Neue stack |
+
+If a widget needs an exact display family (e.g. Archivo Black for
+heavy headers that the picker won't provide), name the family first
+and use `--font-family` as the fallback:
 
 ```css
---theme-font:      'Inter', system-ui, -apple-system, sans-serif;
---theme-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+.hero-stat { font-family: "Archivo Black", var(--font-family), sans-serif; }
 ```
 
-Widgets should `font-family: inherit` on `:host` (or just leave it —
-the `widget-bauhaus.css` `:host` block already does) so the user's
-font pick wins. Widgets that need a specific monospace for tabular
-columns should reach for `var(--theme-font-mono, monospace)` rather
-than naming a family directly. The decorative `--wx-*` role tokens
-also lead with `var(--theme-font, ...)` so weather / sky widgets
-retint their type with the picker.
-
-If a widget needs an exact display weight (e.g. Archivo Black for
-heavy headers), name the family first and use `--theme-font` as the
-fallback:
+**Critical anti-pattern.** Do NOT write:
 
 ```css
-.hero-stat { font-family: "Archivo Black", var(--theme-font, "Archivo"), sans-serif; }
+--font-family: 'Inter', var(--font-family, system-ui, sans-serif);
 ```
+
+The RHS references the property being defined; CSS treats this as
+invalid-at-computed-value-time and the property reverts to the
+guaranteed-invalid sentinel. Every descendant `var(--font-family, …)`
+falls through to its fallback — including the chart helpers, so
+charts paint in Helvetica regardless of style. Use a non-recursive
+fallback (`system-ui, sans-serif`) when overriding inline, or leave
+the cascade alone and let the style set the family.
 
 ---
 
@@ -653,56 +599,62 @@ fallback:
 The Spectra 6 / Waveshare E6 panel has **6 colours**: black, white,
 yellow, red, blue, green.
 
-* Use the `--c-*` semantic tokens — themes map their primitives to
-  palette-friendly hex ranges. Don't sample colours outside the palette.
-* **No drawn borders.** Themes are tuned so `--c-bg` vs `--c-surface`
-  contrast defines card shapes — sections rise through colour, not lines.
-  Thin borders dither into invisibility on Spectra 6 anyway, and the
-  no-borders pattern reads cleaner in the admin too. Use spacing,
-  background shifts, and type hierarchy instead of `border:` rules.
-  `--c-line` survives for chart axes and grid lines only.
+* Use the Spectra semantic tokens — every theme's accent palette is
+  tuned to quantise cleanly into the panel's 6-ink range. Don't sample
+  colours outside the token set.
+* **The widget shell carries a single outer edge** (`--edge-weight`
+  solid `var(--edge)`). Beyond that, hierarchy comes from spacing,
+  weight, and `var(--surface-sunken)` contrast, not internal borders.
+  Hairline borders dither into invisibility on E6 anyway. Optional
+  dividers (`--title-rule-w`, `--row-rule-w`) are style-driven and
+  default to 0.
 * Refresh time is ~25 s on the 13.3" panel. Static, dense layouts
   win; busy gradients quantise into noise.
 * Tabular numerics align cleanly: `font-variant-numeric: tabular-nums`.
 * Anti-aliased type works on Spectra 6 but won't survive heavy
   saturation tweaks. Stick to weight ≥ 500 for anything small.
+* **No motion.** No `transition`, no `animation`, no `:hover` effects.
+  E6 ghosts mid-refresh and the renderer screenshots
+  `animations="disabled"` anyway.
 
 ---
 
 ## Reference: shipped widgets
 
-Pattern reference for new widgets — read these `client.js` /
-`server.py` files to see how the conventions land in practice.
+Pattern reference for new widgets. Read each `client.js` to see how
+the conventions land in practice.
 
-**Weather + sky** — hero icons, decorative `--wx-*` palette,
-multi-variant pattern:
+**By archetype** — pick the closest information shape:
 
-* [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now) — hero icon + stats grid + sun row, 4 variants
-* [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly) — Chart.js line + rain-probability strip, lazy vendored Chart.js
-* [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast) — 5 day-columns with today-highlighted via `surface2`
-* [`plugins/weather_air_quality`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_air_quality), [`weather_pollen_count`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_pollen_count), [`weather_wind`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_wind) — categorical bands with `--c-data-*`
-* [`plugins/sky_moon`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_moon), [`sky_bom_warnings`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_bom_warnings) — SVG-driven, status colour use
+* `.stat-body` — [`plugins/finance_stock`](https://github.com/dmellok/tesserae/tree/main/plugins/finance_stock),
+  [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now)
+* `.list-body` — [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
+  [`plugins/ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities),
+  [`plugins/github_pr_queue`](https://github.com/dmellok/tesserae/tree/main/plugins/github_pr_queue),
+  [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
+* `.chart-body` — [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),
+  [`plugins/ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history),
+  [`plugins/ha_energy`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_energy)
+* `.status-body` — [`plugins/f1_next`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_next),
+  [`plugins/f1_last_race`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_last_race),
+  [`plugins/sky_moon`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_moon)
+* `.cal-body` — [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day),
+  [`plugins/calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week),
+  [`plugins/calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)
+* `.wx-body` — [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
+  [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast)
+* `.img-body` — [`plugins/spotify_now_playing`](https://github.com/dmellok/tesserae/tree/main/plugins/spotify_now_playing),
+  [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera),
+  [`plugins/picture_apod`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_apod)
 
-**Home Assistant** — refined title-bar pattern, real-time entity
-data, `variant` cell option:
+Canonical patterns to lift:
 
-* [`plugins/ha_sensor`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_sensor), [`ha_climate`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_climate), [`ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history), [`ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities) — refined Bauhaus header (`--wb-bar-*`)
-* [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery), [`ha_locks`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_locks) — status-token use (`--c-ok` / `--c-warn` / `--c-danger`)
-* [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera), [`ha_media`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_media) — remote image loading (the renderer waits on these)
-
-**Calendar** — multi-day grid layouts, `variant` cell option for
-day / week / month directions:
-
-* [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day), [`calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week), [`calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)
-
-**GitHub** — sparse data + dense chart pattern, async stats handling:
-
-* [`plugins/github_repo`](https://github.com/dmellok/tesserae/tree/main/plugins/github_repo), [`github_pr_queue`](https://github.com/dmellok/tesserae/tree/main/plugins/github_pr_queue), [`github_activity`](https://github.com/dmellok/tesserae/tree/main/plugins/github_activity), [`github_contributions`](https://github.com/dmellok/tesserae/tree/main/plugins/github_contributions), [`github_actions`](https://github.com/dmellok/tesserae/tree/main/plugins/github_actions)
-
-Canonical patterns to lift: WMO-code → Phosphor icon lookup,
-condition tone mapping, Chart.js loader memoisation, server.py
-disk-cache pattern, `variant` dispatcher, `--c-zoom`-aware fixed-size
-elements.
+* WMO-code → Phosphor icon lookup ([`weather_*`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_core))
+* Chart helpers via `tokens()` probe ([`weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly), [`ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history))
+* server.py disk-cache pattern ([any `weather_*`, `f1_*` widget])
+* Family-shared module ([`f1_core`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_core) → `getCircuit()` + `trackSvg()`)
+* `--c-zoom`-aware title bar ([`spectra-widgets.css`'s `.w-title`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-widgets.css))
+* Team-colour stripe via inset box-shadow ([`f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers))
 
 ---
 
@@ -746,15 +698,20 @@ Run: `./.venv/bin/python -m pytest plugins/<id>/ -q`
 
 ## Building the widget — checklist
 
-1. `plugins/<id>/plugin.json` — manifest (start by copying from
-   `plugins/weather_now/plugin.json`).
-2. `plugins/<id>/client.js` — render function. Inject the icon
-   stylesheets you need, then `<link>` your `client.css`, then your
-   DOM. Use `ctx.theme` / `ctx.cell.size` / `ctx.data`.
-3. `plugins/<id>/client.css` — `:host { display: block; ... }` + a
-   `.root` grid with size variants.
-4. `plugins/<id>/server.py` — optional, if you need server-side data.
-5. `plugins/<id>/tests/test_smoke.py` — parametrised over sizes.
+1. `plugins/<id>/plugin.json` — manifest (start by copying from a
+   widget in the same archetype, e.g. `plugins/weather_now/plugin.json`).
+2. `plugins/<id>/client.js` — render function. Link
+   `/static/style/spectra-widgets.css` first, then render the `.w`
+   shell with one archetype body class. Use `ctx.cell.size` /
+   `ctx.cell.options` / `ctx.data`. For charts, `import { tokens, … }
+   from "../../static/spectra-chart.js"`.
+3. `plugins/<id>/server.py` — optional, if you need server-side data.
+4. `plugins/<id>/tests/test_smoke.py` — parametrised over sizes.
+
+No `client.css` needed in most cases — Spectra's archetypes carry the
+shell + body layout. Add a `client.css` only if your widget has rules
+that don't belong in the shared stylesheet (e.g. one-off positioning,
+SVG-specific tweaks).
 
 Then hit `http://127.0.0.1:8765/_test/render?plugin=<id>&size=md` in
 the browser to iterate. The Flask dev server auto-reloads on file
@@ -764,8 +721,12 @@ changes; refresh the page to see updates.
 
 ## What NOT to do
 
-* Don't hard-code hex colours. Style DOM with `var(--c-*)`; use
-  `ctx.theme.*` only to feed canvas / Chart.js.
+* Don't hard-code hex colours for theme-driven elements. Paint from
+  Spectra semantic tokens (`var(--accent-1..6)`, `var(--surface)`,
+  `var(--text-*)`). For canvas / Chart.js, use the `tokens()` probe
+  from [`spectra-chart.js`](https://github.com/dmellok/tesserae/blob/main/static/spectra-chart.js)
+  rather than naming hexes inline. Brand colours (F1 teams, Spotify
+  green, etc.) are the documented carve-out — see "Custom colours" above.
 * Don't reach into the parent document — you're sandboxed in a
   Shadow DOM. The composer expects that.
 * Don't kick off intervals / animations / async work that finishes

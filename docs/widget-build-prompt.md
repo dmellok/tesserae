@@ -1,346 +1,224 @@
-# Widget build prompt — current batch
+# Widget build prompt
 
-Hand this to Claude Design. It outlines the widgets to design and the
-recent design-language change. Output is one filled-in brief per
-widget, using the template in [`widget-design-brief.md`](widget-design-brief.md).
+Hand this to an LLM (Claude Design / GPT / etc.) when you want a new
+widget designed end-to-end against the current Tesserae design system.
+Output is a filled-in brief that
+[`widget-design-brief.md`](widget-design-brief.md) defines.
 
 ---
 
 ## Who you are
 
-You're designing widgets for **Tesserae** — an e-ink dashboard system.
-Each widget is a self-contained plugin: a manifest, a `client.js` that
-renders into a Shadow DOM, a `client.css`, and an optional `server.py`
-for data fetching. The output of your design work goes back to Claude
-Code, which builds the widget files directly from your brief.
+You're designing a widget for **Tesserae** — a self-hosted e-ink
+dashboard system that renders bauhaus-styled "tiles" onto colour
+e-paper panels (Spectra 6, 600×448 → 1600×1200). Each widget is a
+self-contained plugin: a manifest, a `client.js` that renders into a
+Shadow DOM, an optional `server.py` for data fetching, and a `tests/`
+folder.
+
+Tesserae uses **Spectra**, a token-themed design system with two
+orthogonal axes:
+
+- **`data-theme`** — colour only. 19 themes shipped (light, dark,
+  high-contrast, sepia, nord, cool-gray, three movement themes, and
+  ten base16 palettes). Set on `<body>`, cascades into every widget.
+- **`data-style`** — typography, scale, density, shape (never colour).
+  9 styles shipped (standard, display, editorial, mono, elegant,
+  condensed, plus three movement styles).
+
+A widget designed under Spectra renders correctly under any theme ×
+style combination. The user picks the pair per dashboard; your widget
+doesn't need to know which they're using — it paints from semantic
+tokens that the active theme + style flow through.
+
+---
 
 ## Read first
 
 Three docs are the canonical contract. Read each before drafting:
 
 1. [`docs/widgets.md`](widgets.md) — the build contract: plugin folder
-   layout, `client.js` / `server.py` signatures, the 12 theme palette
-   tokens, container queries, Phosphor icon vocabulary, e-ink
-   considerations.
-2. [`docs/widget-design-brief.md`](widget-design-brief.md) — the
+   layout, `client.js` / `server.py` signatures, the Spectra token
+   layers (primitive / semantic / style-tunable), container queries,
+   Phosphor icon vocabulary, e-ink considerations.
+2. [`docs/widget-design-system.md`](widget-design-system.md) — the
+   cross-widget rulebook: archetypes, the two axes, title-bar
+   discipline, colour discipline, chart helpers, anti-patterns.
+3. [`docs/widget-design-brief.md`](widget-design-brief.md) — the
    output template you'll fill in. **One filled brief per widget,
-   sections 0 through 12.**
-3. The three shipped widgets — [`plugins/weather_now`](../plugins/weather_now),
-   [`plugins/weather_hourly`](../plugins/weather_hourly),
-   [`plugins/weather_forecast`](../plugins/weather_forecast) — as
-   reference for the patterns (WMO-code → icon lookup, condition-tone
-   tinting, Chart.js loader memoisation, server-side disk-cache).
+   sections 0 through the end.**
+4. Pick two existing widgets that share your information shape and
+   read their `client.js` as reference. Good examples by archetype:
+
+   - **Status archetype** — [`plugins/f1_next`](../plugins/f1_next),
+     [`plugins/sky_moon`](../plugins/sky_moon)
+   - **List archetype** — [`plugins/news_hacker_news`](../plugins/news_hacker_news),
+     [`plugins/ha_entities`](../plugins/ha_entities)
+   - **Chart archetype** — [`plugins/weather_hourly`](../plugins/weather_hourly),
+     [`plugins/ha_history`](../plugins/ha_history)
+   - **Stat archetype** — [`plugins/finance_stock`](../plugins/finance_stock),
+     [`plugins/weather_now`](../plugins/weather_now)
+   - **Calendar archetype** — [`plugins/calendar_day`](../plugins/calendar_day),
+     [`plugins/calendar_week`](../plugins/calendar_week)
+   - **Image archetype** — [`plugins/spotify_now_playing`](../plugins/spotify_now_playing),
+     [`plugins/ha_camera`](../plugins/ha_camera)
 
 ---
 
-## Critical: icons are big and bold (and not filled)
+## Critical conventions
 
-Use Phosphor at the **`bold`** weight for any icon that should "read
-big" — hero condition icons, day icons, podium markers, race-status
-icons. **Do not use `ph-fill`.** Solid filled icons read as blobs at
-size and quantise badly on Spectra 6. Bold-outline at large sizes
-reads as a confident graphic.
+### 1. Pick an archetype
 
-Inline icons (small, flowing with text) stay at regular weight. The
-distinction:
+Every widget renders one of seven body archetypes (`.stat-body`,
+`.list-body`, `.chart-body`, `.status-body`, `.cal-body`, `.wx-body`,
+`.img-body`). Pick the one whose information shape matches yours. Don't
+roll a custom body layout — the archetypes carry the font-size cascade
+and gap rhythm that make widgets read as a family.
 
-* **Bold, big** (clamp ~32-160 px depending on cell) — the visual
-  anchor of a section. One or two per widget at most.
-* **Regular, small** (~1em) — accompanying inline icons next to
-  labels, stat values, table rows.
+Two metric blocks side by side? Two `.stat-body` widgets, not one
+custom. Six rows of "thing → value"? `.list-body` with `.list-row` for
+each. A trend over time? `.chart-body` with `<canvas>`.
 
-Duotone is fine for special two-tone accent moments (sun-horizon,
-moon-stars). Avoid it for the primary identity icon.
+### 2. Paint from semantic tokens
 
-Browse [phosphoricons.com](https://phosphoricons.com) — every icon
-is available in all six weights.
+Read colour from the Spectra semantic layer; **never hardcode hex**.
+The active theme provides whatever hue means "alerts" / "warnings" /
+"positive" / etc.
 
----
+```html
+<i class="ph-bold ph-flag-checkered" style="color:var(--accent-1)"></i>
+<span class="pill" style="background:var(--accent-3)">PASSING</span>
+<span style="color:var(--text-muted)">caption</span>
+```
 
-## Custom colours — escape hatch
+The six accent slots have fixed **roles by position**:
 
-The default rule "use theme tokens only, no hex" has a carve-out:
-when the data has an **inherent visual identity that the user expects
-to see**, hard-code the hex. Examples:
+| Slot | Role |
+|---|---|
+| `--accent-1` | alerts / peaks / current |
+| `--accent-2` | warnings / capacity / "winner" |
+| `--accent-3` | positive / "up" / passing |
+| `--accent-4` | primary / today / live |
+| `--accent-5` | secondary series |
+| `--accent-6` | third category |
 
-* F1 team colours (Ferrari red, Mercedes teal, Red Bull dark-blue)
-* Brand logos / service indicators
-* Country flag colours on race countdowns
-* Podium gold/silver/bronze (where appropriate — sometimes
-  `warn` / `fgSoft` / `accent` reads better)
+Reach by role, not by colour. "I want red" is the wrong instinct —
+pick the slot whose meaning is right; the theme gives you the hue.
 
-Bar to clear: the colour is **part of the data**, not a design
-choice. Document each custom colour in the brief's notes section
-with the data field it's tied to.
+### 3. Icons are bold Phosphor
 
-Fall back to a theme token (`surface2` or `accent`) for unknown
-values so the widget never produces a blank square. For dark themes,
-plan a fallback variant of each brand colour if the original reads
-poorly against dark surfaces.
+Use Phosphor at the **`bold`** weight for everything. Other weights
+(thin / fill / duotone) dither on E6 or disappear at small sizes.
 
-See `docs/widgets.md` → "Custom colours — escape hatch" for the full
-contract.
+```html
+<i class="ph-bold ph-flag-checkered" style="color:var(--accent-1)"></i>
+```
 
----
+Bold Phosphor is loaded automatically by Spectra widgets that link
+`spectra-widgets.css`. Icon names: [phosphoricons.com](https://phosphoricons.com).
+Sizes via the `--icon-sm/-md/-lg` tokens.
 
-## Plugin static assets
+### 4. Charts via the Spectra Chart.js wrapper
 
-Widgets can ship arbitrary static files (SVGs preferred): drop them
-under `plugins/<id>/static/`, reference at `/plugins/<id>/static/...`.
+Don't talk to Chart.js directly. Use the wrapper:
 
-Useful for:
+```js
+import { tokens, sparkline, barChart, lineChart, hbar } from "../../static/spectra-chart.js";
 
-* **Race circuit outlines** — vector SVG of each F1 track
-* **Country flags** — small SVG flag per ISO code
-* **Service logos** — when no Phosphor equivalent
+const t = tokens(shadow.host);
+barChart(canvas, {
+  tokens: t,
+  labels,
+  values,
+  color: t.accent5,
+  highlightColor: t.accent1,
+  highlightIdx: nowIndex,
+});
+```
 
-Rules:
+`tokens()` resolves the live theme palette + font from the cell's
+cascade. The chart re-renders on theme/style change because the
+composer remounts cells.
 
-* **Phosphor first** — only ship a custom asset if there's no
-  reasonable Phosphor icon. Custom SVGs are for things the icon font
-  can't represent (circuit outlines, flags, team logos).
-* **SVG preferred over raster** — scales, themes via `currentColor`
-  if appropriate.
-* **Keep files small** (< 10 KB each typically).
+### 5. Container queries for compactness
 
-In the brief, list every asset you intend to ship in section 12
-(Notes), with file path + purpose + approximate size.
+Spectra widgets shrink at `@container (max-width: 360px)` (compact)
+and `@container (max-width: 240px)` (tiny tile). Hide secondary
+content at compact, leave only the hero metric + label at tiny.
 
-See `docs/widgets.md` → "Plugin static assets" for examples.
+```css
+@container (max-width: 360px) {
+  .my-secondary { display: none; }
+}
+```
 
----
+### 6. Anti-patterns
 
-## Critical: no-borders design language
-
-The theme system was reworked. **Drawn borders are out.** Card shapes
-come from `bg` vs `surface` contrast only — the way Notion / Linear /
-iOS Notes handle it.
-
-What this means in practice:
-
-- Don't use `border:` / `border-top:` / `border-bottom:` on any element
-  that's part of the visual layout. Browser-default form/input borders
-  are fine.
-- Separate sections with **padding + margin**, not lines.
-- For emphasis (e.g. "today" in a 5-day grid), use `--theme-surface2`
-  background, not an accent border.
-- The `divider` token still exists but its use is restricted to chart
-  axes and grid lines — **not** card borders. If you have a tone-rule
-  that maps anything to `divider`, you're probably trying to draw a
-  line. Stop.
-
-Palette structure (each theme is tuned for this layering):
-
-| token       | role                                                          |
-|-------------|---------------------------------------------------------------|
-| `bg`        | outer page background — slightly tinted, gives theme identity |
-| `surface`   | card background — brighter than bg on light themes, brighter than bg on darks too. Cards "raise" from the page via lightness contrast. |
-| `surface2`  | emphasised card background — darker than surface on lights, brighter than surface on darks. Used for "today" / "current" / "leader" |
-| `fg`        | primary text                                                  |
-| `fgSoft`    | secondary text, sub-values                                    |
-| `muted`     | labels, uppercase metadata                                    |
-| `accent`    | brand highlight — icons, primary fills, chart strokes         |
-| `accentSoft`| accent fill at low contrast — chart areas, pills              |
-| `ok` / `warn` / `danger` | semantic status                                 |
-
-Read the [`plugins/themes_core/plugin.json`](../plugins/themes_core/plugin.json)
-file to see the 9 themes you're designing against.
+- **`text-transform: uppercase` hardcoded.** Use
+  `var(--label-transform, uppercase)` — Editorial style sets it to
+  `none`.
+- **Hardcoded font family.** Inherit via the `.w` shell; widgets get
+  `--font-family` automatically.
+- **`--font-family: 'foo', var(--font-family, …)` inline.**
+  Self-reference; CSS invalidates the cascade. Use a non-recursive
+  fallback (`system-ui, sans-serif`).
+- **Animations / transitions.** No motion on e-ink, ever.
+- **Pure `#000` / `#fff`.** Ghosts on E6. Use `--text-primary` / `--bg`.
+- **A `variant` cell option for "visual directions".** That model is
+  gone. Style is set at the page level via `data-style`; widgets render
+  one shape.
 
 ---
 
-## Widgets to design
+## What to design
 
-### Batch A — rebuild the weather suite under the new design language
+The user will tell you what widget they want. Your job is to fill in
+the brief: archetype choice, information shape, data source (existing
+plugin? new server.py?), the chosen Phosphor icons, the accent slot
+each piece of data binds to, sample data shape, and any edge cases
+(loading state, empty state, error state).
 
-The three weather widgets exist but were designed in the previous
-border-heavy era. Same data sources, same supported sizes, **new
-visual treatment only**. Brief each one as if greenfield — Claude
-Code will replace the existing CSS/client.js wholesale.
+If the user hasn't said which archetype, propose one in section 1 of
+the brief and explain why. If two archetypes could work, name both and
+recommend.
 
-- **`weather_now`** — current conditions: place label, condition icon,
-  big temp, feels-like / humidity / wind / UV, sunrise/sunset.
-- **`weather_hourly`** — Chart.js line of next 12/24/48 hours of
-  temperature, plus a rain-probability strip at md/lg.
-- **`weather_forecast`** — 5-day forecast as columns: day name,
-  condition icon, high/low, rain %.
-
-Reuse the established conventions: WMO-code → Phosphor icon mapping,
-condition-tone tinting (clear→warn, partly cloudy→accent, rain→accent,
-storms→danger), `ctx.theme.accent` for Chart.js stroke colour, lazy
-Chart.js loader from `/static/vendor/chart.umd.min.js`.
-
-### Batch B — new widgets
-
-#### 5. `todo` — checklist
-
-A simple todo list that paints recent items. For v1, back it with a
-local JSON file (`data/plugins/todo/items.json`) — items get added /
-toggled / removed via a small admin sub-page at `/plugins/todo` (the
-plugin manifest's `admin` blueprint, like other admin-equipped
-plugins).
-
-Cell options:
-- List name (string, default "Inbox")
-- Max items shown (int, default 6)
-- Show completed (boolean, default false)
-
-Layout: tile per item — checkbox icon (`ph-square` / `ph-check-square`),
-title text (strikethrough + `fgSoft` when done), optional due-date
-chip on the right (`accent` if today, `warn` if overdue).
-
-Empty state: `ph-list-checks` icon + "No tasks" — centred.
-
-Sizes: xs (just count + next item), sm/md/lg (progressively more items
-visible).
-
-#### 6. `calendar_upcoming` — upcoming events
-
-Vertical list of upcoming events pulled from an ICS feed (any service
-that exposes a public ICS URL — Google, Outlook, Fastmail, etc.).
-
-Cell options:
-- ICS feed URL (string)
-- Days ahead (int, default 7)
-- Show all-day events (boolean, default true)
-- Time format (select: `24h` / `12h`)
-
-Layout: grouped by day. Each day starts with a small uppercase header
-row (`muted`, with a `surface2` background swatch behind today). Event
-rows: time chip on the left (accent bg, bg-coloured text), title in
-the middle (`fg`), optional location on the right (`fgSoft` truncated).
-
-Sizes:
-- xs/sm — just the next 1-3 events, no grouping
-- md — 7-day list with grouping
-- lg — 7-day list, possibly two columns
-
-Use the `ical.events` Python library OR parse minimally with `icalendar`.
-
-#### 7. `f1_next_race` — countdown to next F1 race
-
-Cell options:
-- Time format (select: `24h` / `12h`)
-- Highlight when ≤ 24h (boolean, default true) — flip the hero to
-  `warn` colour when race is imminent.
-
-Backing data: jolpi.ca (the public Ergast successor) at
-`https://api.jolpi.ca/ergast/f1/current/next.json`. No API key.
-
-Layout: hero countdown ("3 days 4 hours") at top, then circuit name +
-country, then a tiny schedule row (FP1 / FP2 / FP3 / Sprint? / Quali /
-Race) with each session's local-time chip. Use `ph-flag-checkered` as
-the hero icon, `ph-map-pin` for the circuit, `ph-clock` for the
-schedule strip.
-
-Sizes:
-- xs/sm — just the countdown + race name
-- md — + circuit + a 2-line schedule
-- lg — full session schedule
-
-#### 8. `f1_last_results` — most recent race podium + top 10
-
-Backing data: `https://api.jolpi.ca/ergast/f1/current/last/results.json`.
-
-Cell options:
-- Show top N (int, default 5)
-
-Layout:
-- Header: race name + date + flag-checkered icon
-- Top 3 podium tiles with position number (gold=`warn`, silver=`fgSoft`,
-  bronze=`accent`-tinted), driver name, team initials, gap
-- Remaining finishers as compact rows with position + driver + gap
-
-Sizes:
-- xs — just the winner (1 line)
-- sm — top 3 podium
-- md/lg — podium + table
-
-#### 9. `f1_standings` — drivers + constructors championship
-
-Backing data:
-- Drivers: `https://api.jolpi.ca/ergast/f1/current/driverStandings.json`
-- Constructors: `https://api.jolpi.ca/ergast/f1/current/constructorStandings.json`
-
-Cell options:
-- Show top N (int, default 5)
-- Show constructors (boolean, default true)
-
-Layout:
-- md/lg: two columns — Drivers left, Constructors right
-- sm: single column, Drivers only (more compact)
-- Each row: position chip, name (driver code or team initials), points
-  (`fg`, tabular-numerics). Leader gets `surface2` background.
-
-### Batch C — propose 3-5 more widgets
-
-After the explicit list above, **propose 3-5 additional widgets** you
-think would be useful for a self-hosted e-ink dashboard. Don't ask
-permission — pick what's interesting and brief them properly.
-
-Ground rules for the proposals:
-
-* Public data source (no required API key OR an obviously-paid model
-  like Spotify is fine if it adds enough value).
-* Different in shape from anything already covered — a second weather
-  widget doesn't count; a different *kind* of widget does.
-* Each one should justify its existence: who's the user, why is this
-  better than just looking at their phone?
-
-A few directions worth considering (not a shopping list — pick or
-invent):
-
-* **Time / date** — analogue clock, year-progress bar, "days until X"
-  countdown, world clocks (multi-timezone strip).
-* **News / feeds** — Hacker News top headlines, RSS reader, Reddit
-  subreddit hottest.
-* **Astronomy / nature** — NASA Astronomy Picture of the Day, moon
-  phase strip, aurora forecast, ISS pass tracker, tide schedule.
-* **Transit** — local train/bus arrivals (any public GTFS feed),
-  flight status by tail number.
-* **Finance** — stock or crypto price strip, your-portfolio summary.
-* **Health / activity** — Strava recent activities, step count.
-* **Smart home** — Home Assistant entity tiles, room temperatures,
-  energy use.
-* **System / dev** — GitHub commit heatmap, CI status, deployment
-  list, server uptime.
-* **Domestic** — laundry done?, bin day reminder, pet feeding log.
-
-Brief each proposed widget with the same 0-12 section template. In
-section 0 (one-line summary) include why it earns a slot.
+If the data source needs an API key or upstream service, name it
+explicitly (e.g. "Open-Meteo, no key required" / "GitHub PAT in
+Plugins → GitHub Core" / "Home Assistant Core plugin"). The user
+configures those out-of-band.
 
 ---
 
 ## Output format
 
-One filled-in brief per widget, using the structure from
-[`widget-design-brief.md`](widget-design-brief.md). Number every
-section 0 through 12. Include:
+One filled-in brief per widget, following
+[`widget-design-brief.md`](widget-design-brief.md) section by section.
+Include sample markup in section 3 (Markup sketch) and a sample data
+payload in section 8 (Server contract). When you finish the brief,
+note any open questions in a "Questions" subsection at the end. Don't
+guess on data structure, API endpoints, or naming if the user's spec
+is ambiguous.
 
-- ASCII mockup per supported size with numbered annotations
-- Icon manifest table (every Phosphor name + weight)
-- Tone-rules table (palette-token-only — never raw hex)
-- Size-adaptations table
-- Sample data shape for `ctx.data`
-
-Hand them all back in one Markdown document. Claude Code will paste
-it back for build.
+If the widget is part of a family (`f1_*`, `weather_*`, `news_*`),
+mention it explicitly in section 0 (Identity) so the build path
+follows the family's existing shared-helper patterns (e.g. `f1_core`
+exposes `getCircuit()` + `trackSvg()` for every F1 widget).
 
 ---
 
-## Hard constraints — things to AVOID
+## Hard constraints
 
-- Drawn borders of any kind. No `border:` rules on layout elements.
-- `ph-fill` weight icons. Use `ph-bold` for prominent icons; regular
-  for small inline ones.
-- Hard-coded hex colours **except for the documented data-identity
-  cases** (team colours, brand colours, flags — documented in section
-  12 of the brief).
-- Per-widget chrome that fights the cell. The cell is the card.
-- Animations / transitions. These get caught mid-frame by the
-  screenshot pipeline. `animation: false` on Chart.js too.
-- Reaching outside the shadow DOM. Widgets must be self-contained.
-- Custom font loading. `font-family: inherit` on `:host`.
-- Tone rules that map to the `divider` token. That token is for chart
-  axes only — if you want a separator, use spacing or a surface shift.
-- Bundling huge custom assets. SVG preferred, <10 KB each, Phosphor
-  first.
+These consistently bite if ignored. Honour them without comment in the
+brief — the user knows them already.
+
+- **Static panels.** No animation, no transitions, no hover effects.
+  E6 refreshes in seconds and ghosts.
+- **No fine gradients.** They dither badly. Use solid fills + soft
+  tints (`--accent-*-soft`) for everything.
+- **No hairlines.** Minimum stroke 2px; data strokes (chart bars, axis
+  rules) 3px+. Use the `--stroke-1/2/3` tokens.
+- **Near-black, never pure.** True `#000` ghosts; use `--text-primary`.
+- **Phosphor bold weight only.** Thin / regular / fill / duotone don't
+  read on E6.
+- **One archetype per widget.** Composability across the panel comes
+  from picking the right archetype, not building a custom shell.
