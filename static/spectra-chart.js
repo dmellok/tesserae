@@ -106,6 +106,29 @@ export function tokens(host) {
       " — falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
     );
   }
+  // Opt-in diagnostic. Two ways to enable:
+  //   1. paste ``window.__TESSERAE_CHART_DEBUG = true`` in DevTools, then
+  //      trigger a re-render (a theme/style flip patches every cell).
+  //   2. append ``?chartdebug=1`` to the page URL — works from a cold
+  //      reload, useful when the page is loaded inside an iframe whose
+  //      window object the parent can't touch.
+  // Prints the resolved palette + the probe's ancestry every time a chart
+  // asks for tokens so we can trace why a chart shows the wrong colour
+  // without having to mess with the helper itself.
+  const debug =
+    (typeof window !== "undefined" && window.__TESSERAE_CHART_DEBUG) ||
+    (typeof location !== "undefined" && /[?&]chartdebug=1\b/.test(location.search));
+  if (debug) {
+    const bodyTheme =
+      (typeof document !== "undefined" && document.body && document.body.getAttribute("data-theme")) || "(none)";
+    const probeParent = parent.tagName + (parent.className ? "." + parent.className.replace(/\s+/g, ".") : "");
+    console.log("[spectra-chart] tokens resolved", {
+      bodyDataTheme: bodyTheme,
+      probedUnder: probeParent,
+      missing,
+      result,
+    });
+  }
   return result;
 }
 
