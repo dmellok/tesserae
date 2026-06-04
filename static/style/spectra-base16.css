@@ -1,0 +1,253 @@
+/* ============================================================================
+   SPECTRA — base16 theme pack
+   ----------------------------------------------------------------------------
+   Ten well-known base16 palettes mapped onto Spectra's semantic tokens.
+   These are colour-only themes; they compose with any data-style.
+
+   base16 → Spectra mapping:
+     base00 → --bg              (panel background)
+     base01 → --surface         (widget container fill)
+     base02 → --surface-sunken  (zebra rows, chart tracks, edge)
+     base03 → --text-muted      (de-emphasised text, captions)
+     base04 → --text-secondary  (subheads, axis labels)
+     base05 → --text-primary    (default foreground)
+     base08 → --accent-1        (red — alerts / peaks)
+     base09 → --accent-2        (orange — warnings / capacity)
+     base0B → --accent-3        (green — positive / up)
+     base0D → --accent-4        (blue — primary / today / live)
+     base0C → --accent-5        (cyan — secondary series)
+     base0E → --accent-6        (purple/magenta — third category)
+   base16 also defines base06 (light fg), base07 (light bg), base0A
+   (yellow), base0F (brown/deprecated). We drop them — Spectra has six
+   accent slots, not eight, and 0A/0F's roles overlap 09/08 closely
+   enough that the mapping above keeps the meaning right (alerts stay
+   red, warnings stay orange, etc.).
+
+   ``--on-accent`` is the text colour drawn on top of an accent-coloured
+   pill. For dark base16 schemes (variant: dark) we use base00 (the
+   bg) so dark text reads on bright accents. For light base16 we use
+   base01 (just off-white) so light text reads on the darker accent
+   fills. -soft tints are computed via color-mix() against --surface
+   so every accent has a matching low-saturation background option
+   without 60 hex columns of hand-tuning.
+   ============================================================================ */
+
+/* ---- Gruvbox dark, medium — warm earth tones on charcoal ----------------- */
+[data-theme="base16-gruvbox-dark"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #282828;
+  --surface:        #3c3836;
+  --surface-sunken: #504945;
+  --text-primary:   #d5c4a1;
+  --text-secondary: #bdae93;
+  --text-muted:     #665c54;
+  --icon:           var(--text-primary);
+  --edge:           #504945;
+
+  --accent-1: #fb4934; --accent-1-soft: color-mix(in oklab, #fb4934 22%, var(--surface));
+  --accent-2: #fe8019; --accent-2-soft: color-mix(in oklab, #fe8019 22%, var(--surface));
+  --accent-3: #b8bb26; --accent-3-soft: color-mix(in oklab, #b8bb26 22%, var(--surface));
+  --accent-4: #83a598; --accent-4-soft: color-mix(in oklab, #83a598 22%, var(--surface));
+  --accent-5: #8ec07c; --accent-5-soft: color-mix(in oklab, #8ec07c 22%, var(--surface));
+  --accent-6: #d3869b; --accent-6-soft: color-mix(in oklab, #d3869b 22%, var(--surface));
+  --on-accent: #282828;
+}
+
+/* ---- Gruvbox light, medium — same palette, paper background -------------- */
+[data-theme="base16-gruvbox-light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #fbf1c7;
+  --surface:        #ebdbb2;
+  --surface-sunken: #d5c4a1;
+  --text-primary:   #504945;
+  --text-secondary: #665c54;
+  --text-muted:     #bdae93;
+  --icon:           var(--text-primary);
+  --edge:           #d5c4a1;
+
+  --accent-1: #9d0006; --accent-1-soft: color-mix(in oklab, #9d0006 22%, var(--surface));
+  --accent-2: #af3a03; --accent-2-soft: color-mix(in oklab, #af3a03 22%, var(--surface));
+  --accent-3: #79740e; --accent-3-soft: color-mix(in oklab, #79740e 22%, var(--surface));
+  --accent-4: #076678; --accent-4-soft: color-mix(in oklab, #076678 22%, var(--surface));
+  --accent-5: #427b58; --accent-5-soft: color-mix(in oklab, #427b58 22%, var(--surface));
+  --accent-6: #8f3f71; --accent-6-soft: color-mix(in oklab, #8f3f71 22%, var(--surface));
+  --on-accent: #fbf1c7;
+}
+
+/* ---- Solarized dark — Schoonover's selective-contrast classic ------------ */
+[data-theme="base16-solarized-dark"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #002b36;
+  --surface:        #073642;
+  --surface-sunken: #586e75;
+  --text-primary:   #93a1a1;
+  --text-secondary: #839496;
+  --text-muted:     #657b83;
+  --icon:           var(--text-primary);
+  --edge:           #586e75;
+
+  --accent-1: #dc322f; --accent-1-soft: color-mix(in oklab, #dc322f 22%, var(--surface));
+  --accent-2: #cb4b16; --accent-2-soft: color-mix(in oklab, #cb4b16 22%, var(--surface));
+  --accent-3: #859900; --accent-3-soft: color-mix(in oklab, #859900 22%, var(--surface));
+  --accent-4: #268bd2; --accent-4-soft: color-mix(in oklab, #268bd2 22%, var(--surface));
+  --accent-5: #2aa198; --accent-5-soft: color-mix(in oklab, #2aa198 22%, var(--surface));
+  --accent-6: #6c71c4; --accent-6-soft: color-mix(in oklab, #6c71c4 22%, var(--surface));
+  --on-accent: #002b36;
+}
+
+/* ---- Solarized light — same accents, paper background -------------------- */
+[data-theme="base16-solarized-light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #fdf6e3;
+  --surface:        #eee8d5;
+  --surface-sunken: #93a1a1;
+  --text-primary:   #586e75;
+  --text-secondary: #657b83;
+  --text-muted:     #839496;
+  --icon:           var(--text-primary);
+  --edge:           #93a1a1;
+
+  --accent-1: #dc322f; --accent-1-soft: color-mix(in oklab, #dc322f 22%, var(--surface));
+  --accent-2: #cb4b16; --accent-2-soft: color-mix(in oklab, #cb4b16 22%, var(--surface));
+  --accent-3: #859900; --accent-3-soft: color-mix(in oklab, #859900 22%, var(--surface));
+  --accent-4: #268bd2; --accent-4-soft: color-mix(in oklab, #268bd2 22%, var(--surface));
+  --accent-5: #2aa198; --accent-5-soft: color-mix(in oklab, #2aa198 22%, var(--surface));
+  --accent-6: #6c71c4; --accent-6-soft: color-mix(in oklab, #6c71c4 22%, var(--surface));
+  --on-accent: #eee8d5;
+}
+
+/* ---- Dracula — purple/cyan on near-black ---------------------------------- */
+[data-theme="base16-dracula"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #282a36;
+  --surface:        #21222c;
+  --surface-sunken: #44475a;
+  --text-primary:   #f8f8f2;
+  --text-secondary: #9ea8c7;
+  --text-muted:     #6272a4;
+  --icon:           var(--text-primary);
+  --edge:           #44475a;
+
+  --accent-1: #ff5555; --accent-1-soft: color-mix(in oklab, #ff5555 22%, var(--surface));
+  --accent-2: #ffb86c; --accent-2-soft: color-mix(in oklab, #ffb86c 22%, var(--surface));
+  --accent-3: #50fa7b; --accent-3-soft: color-mix(in oklab, #50fa7b 22%, var(--surface));
+  --accent-4: #bd93f9; --accent-4-soft: color-mix(in oklab, #bd93f9 22%, var(--surface));
+  --accent-5: #8be9fd; --accent-5-soft: color-mix(in oklab, #8be9fd 22%, var(--surface));
+  --accent-6: #ff79c6; --accent-6-soft: color-mix(in oklab, #ff79c6 22%, var(--surface));
+  --on-accent: #282a36;
+}
+
+/* ---- Catppuccin Mocha — pastel-on-dark, modern -------------------------- */
+[data-theme="base16-catppuccin-mocha"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #1e1e2e;
+  --surface:        #181825;
+  --surface-sunken: #313244;
+  --text-primary:   #cdd6f4;
+  --text-secondary: #585b70;
+  --text-muted:     #45475a;
+  --icon:           var(--text-primary);
+  --edge:           #313244;
+
+  --accent-1: #f38ba8; --accent-1-soft: color-mix(in oklab, #f38ba8 22%, var(--surface));
+  --accent-2: #fab387; --accent-2-soft: color-mix(in oklab, #fab387 22%, var(--surface));
+  --accent-3: #a6e3a1; --accent-3-soft: color-mix(in oklab, #a6e3a1 22%, var(--surface));
+  --accent-4: #89b4fa; --accent-4-soft: color-mix(in oklab, #89b4fa 22%, var(--surface));
+  --accent-5: #94e2d5; --accent-5-soft: color-mix(in oklab, #94e2d5 22%, var(--surface));
+  --accent-6: #cba6f7; --accent-6-soft: color-mix(in oklab, #cba6f7 22%, var(--surface));
+  --on-accent: #1e1e2e;
+}
+
+/* ---- Monokai — Hazenberg's high-saturation original --------------------- */
+[data-theme="base16-monokai"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #272822;
+  --surface:        #383830;
+  --surface-sunken: #49483e;
+  --text-primary:   #f8f8f2;
+  --text-secondary: #a59f85;
+  --text-muted:     #75715e;
+  --icon:           var(--text-primary);
+  --edge:           #49483e;
+
+  --accent-1: #f92672; --accent-1-soft: color-mix(in oklab, #f92672 22%, var(--surface));
+  --accent-2: #fd971f; --accent-2-soft: color-mix(in oklab, #fd971f 22%, var(--surface));
+  --accent-3: #a6e22e; --accent-3-soft: color-mix(in oklab, #a6e22e 22%, var(--surface));
+  --accent-4: #66d9ef; --accent-4-soft: color-mix(in oklab, #66d9ef 22%, var(--surface));
+  --accent-5: #a1efe4; --accent-5-soft: color-mix(in oklab, #a1efe4 22%, var(--surface));
+  --accent-6: #ae81ff; --accent-6-soft: color-mix(in oklab, #ae81ff 22%, var(--surface));
+  --on-accent: #272822;
+}
+
+/* ---- Tomorrow Night — Chris Kempson's editor classic, dark variant ------ */
+[data-theme="base16-tomorrow-night"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #1d1f21;
+  --surface:        #282a2e;
+  --surface-sunken: #373b41;
+  --text-primary:   #c5c8c6;
+  --text-secondary: #b4b7b4;
+  --text-muted:     #969896;
+  --icon:           var(--text-primary);
+  --edge:           #373b41;
+
+  --accent-1: #cc6666; --accent-1-soft: color-mix(in oklab, #cc6666 22%, var(--surface));
+  --accent-2: #de935f; --accent-2-soft: color-mix(in oklab, #de935f 22%, var(--surface));
+  --accent-3: #b5bd68; --accent-3-soft: color-mix(in oklab, #b5bd68 22%, var(--surface));
+  --accent-4: #81a2be; --accent-4-soft: color-mix(in oklab, #81a2be 22%, var(--surface));
+  --accent-5: #8abeb7; --accent-5-soft: color-mix(in oklab, #8abeb7 22%, var(--surface));
+  --accent-6: #b294bb; --accent-6-soft: color-mix(in oklab, #b294bb 22%, var(--surface));
+  --on-accent: #1d1f21;
+}
+
+/* ---- Tomorrow — same palette, light variant ----------------------------- */
+[data-theme="base16-tomorrow"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #ffffff;
+  --surface:        #e0e0e0;
+  --surface-sunken: #c5c8c6;
+  --text-primary:   #373b41;
+  --text-secondary: #969896;
+  --text-muted:     #b4b7b4;
+  --icon:           var(--text-primary);
+  --edge:           #c5c8c6;
+
+  --accent-1: #c82829; --accent-1-soft: color-mix(in oklab, #c82829 22%, var(--surface));
+  --accent-2: #f5871f; --accent-2-soft: color-mix(in oklab, #f5871f 22%, var(--surface));
+  --accent-3: #718c00; --accent-3-soft: color-mix(in oklab, #718c00 22%, var(--surface));
+  --accent-4: #4271ae; --accent-4-soft: color-mix(in oklab, #4271ae 22%, var(--surface));
+  --accent-5: #3e999f; --accent-5-soft: color-mix(in oklab, #3e999f 22%, var(--surface));
+  --accent-6: #8959a8; --accent-6-soft: color-mix(in oklab, #8959a8 22%, var(--surface));
+  --on-accent: #e0e0e0;
+}
+
+/* ---- One Dark — Atom's flagship palette --------------------------------- */
+[data-theme="base16-one-dark"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #282c34;
+  --surface:        #353b45;
+  --surface-sunken: #3e4451;
+  --text-primary:   #abb2bf;
+  --text-secondary: #565c64;
+  --text-muted:     #545862;
+  --icon:           var(--text-primary);
+  --edge:           #3e4451;
+
+  --accent-1: #e06c75; --accent-1-soft: color-mix(in oklab, #e06c75 22%, var(--surface));
+  --accent-2: #d19a66; --accent-2-soft: color-mix(in oklab, #d19a66 22%, var(--surface));
+  --accent-3: #98c379; --accent-3-soft: color-mix(in oklab, #98c379 22%, var(--surface));
+  --accent-4: #61afef; --accent-4-soft: color-mix(in oklab, #61afef 22%, var(--surface));
+  --accent-5: #56b6c2; --accent-5-soft: color-mix(in oklab, #56b6c2 22%, var(--surface));
+  --accent-6: #c678dd; --accent-6-soft: color-mix(in oklab, #c678dd 22%, var(--surface));
+  --on-accent: #282c34;
+}

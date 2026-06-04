@@ -29,6 +29,7 @@
        (data-style) — its rules set custom properties on the body/cell,
        which then cascade into the shadow root via inheritance. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   <!-- Chart.js UMD. Loaded once at the document level so every widget
        that imports static/spectra-chart.js can read window.Chart. The
