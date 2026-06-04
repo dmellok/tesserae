@@ -1,44 +1,85 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// finance_stock — Spectra stat archetype with a sparkline rail.
+// Hero is the latest price; delta carries the change vs previous
+// close (accent-3 up, accent-1 down). Title bar shows the ticker
+// with the exchange + range as meta.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function fmtPrice(n, ccy) {
+  if (n == null) return "—";
+  const v = Number(n);
+  if (Number.isNaN(v)) return "—";
+  const sym = (ccy === "USD" ? "$" : ccy === "EUR" ? "€" : ccy === "GBP" ? "£" : ccy === "JPY" ? "¥" : "");
+  if (v >= 1000) return `${sym}${v.toFixed(2)}`;
+  if (v >= 1) return `${sym}${v.toFixed(2)}`;
+  return `${sym}${v.toFixed(4)}`;
+}
+
+function sparkline(values, accent) {
+  if (!Array.isArray(values) || values.length < 2) return "";
+  const lo = Math.min(...values);
+  const hi = Math.max(...values);
+  const range = Math.max(0.0001, hi - lo);
+  const w = 100, h = 30;
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - ((v - lo) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  return `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>`;
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="finance_stock">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Stock</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const symbol = data.symbol || "—";
+  const name = data.name || "";
+  const ccy = (data.currency || "USD").toUpperCase();
+  const exchange = data.exchange || "";
+  const rng = data.range || "";
+  const price = fmtPrice(data.price, ccy);
+  const change = data.change_pct;
+
+  const up = change != null && change >= 0;
+  const deltaAccent = up ? "var(--accent-3)" : "var(--accent-1)";
+  const deltaPh = up ? "ph-trend-up" : "ph-trend-down";
+  const deltaText = change == null ? "—" : `${Math.abs(change).toFixed(2)}%`;
+
+  const metaBits = [exchange, rng].filter(Boolean).join(" · ");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="finance_stock">
+      <div class="w-title">
+        <i class="ph-bold ph-chart-line" style="color:var(--accent-5)"></i>
+        <h3>${escapeHtml(symbol)}</h3>
+        ${metaBits ? `<span class="w-title-meta">${escapeHtml(metaBits)}</span>` : ""}
+      </div>
+      <div class="w-body stat-body">
+        <div class="stat-value">${escapeHtml(price)}<span class="unit">${escapeHtml(ccy)}</span></div>
+        <div class="stat-caption u-row">
+          <span class="stat-delta" style="color:${deltaAccent}"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
+          <span class="u-muted">${escapeHtml(name)}</span>
+        </div>
+        <div class="stat-sparkline">${sparkline(data.series, deltaAccent)}</div>
+      </div>
+    </div>`;
 }

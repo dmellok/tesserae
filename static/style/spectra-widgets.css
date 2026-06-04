@@ -113,6 +113,16 @@
 }
 .stat-delta .ph-bold{ font-size: 1em; }
 
+/* Sparkline rail below the stat hero. Sized as a flex item so it
+   takes whatever vertical room is left after the big number + caption
+   without compressing them. Stroke widths come from --stroke-2 so the
+   line respects the e-ink detail floor. */
+.stat-sparkline{
+  flex: 1 1 auto;
+  min-height: 1.5em;
+}
+.stat-sparkline svg{ display: block; width: 100%; height: 100%; }
+
 /* ============================================================================
    WIDGET 2 · LIST  (grouping via alternating sunken rows + spacing, no lines)
    ============================================================================ */

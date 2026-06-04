@@ -1,44 +1,79 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
+// news_wikipedia_otd — Spectra list archetype. Wikipedia "On This Day"
+// events. Each row leads with the YEAR (right-aligned-meta-style),
+// followed by the historical text; the title bar shows the date.
 
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
+const KIND_LABEL = {
+  events: "EVENTS",
+  births: "BIRTHS",
+  deaths: "DEATHS",
+  holidays: "HOLIDAYS",
+  selected: "SELECTED",
+  all: "ALL",
+};
 
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+const KIND_ACCENT = {
+  events: "var(--accent-5)",
+  births: "var(--accent-3)",
+  deaths: "var(--accent-1)",
+  holidays: "var(--accent-2)",
+  selected: "var(--accent-4)",
+};
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="news_wikipedia_otd">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>On This Day</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const kind = data.kind || "events";
+  const dateLabel = data.date || "";
+  const kindLabel = KIND_LABEL[kind] || String(kind).toUpperCase();
+  const accent = KIND_ACCENT[kind] || "var(--accent-5)";
+
+  if (items.length === 0) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="news_wikipedia_otd">
+        <div class="w-title">
+          <i class="ph-bold ph-clock-counter-clockwise" style="color:${accent}"></i>
+          <h3>On ${escapeHtml(dateLabel)}</h3>
+        </div>
+        <div class="w-body"><p class="u-muted">Nothing recorded.</p></div>
+      </div>`;
+    return;
+  }
+
+  const rows = items.map((it, i) => `
+    <div class="list-row ${i % 2 ? "is-zebra" : ""}">
+      <div class="list-lead">
+        <span class="list-title">${escapeHtml(it.text)}</span>
+      </div>
+      <span class="list-meta" style="color:${accent}">${escapeHtml(String(it.year || "—"))}</span>
+    </div>`).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="news_wikipedia_otd">
+      <div class="w-title">
+        <i class="ph-bold ph-clock-counter-clockwise" style="color:${accent}"></i>
+        <h3>On ${escapeHtml(dateLabel)}</h3>
+        <span class="w-title-meta">${escapeHtml(kindLabel)}</span>
+      </div>
+      <div class="w-body list-body">${rows}</div>
+    </div>`;
 }
