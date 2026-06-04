@@ -15,6 +15,15 @@ const SESSION_LABEL = {
   fp1: "FP1", fp2: "FP2", fp3: "FP3",
   sprint: "Sprint", qualifying: "Quali",
 };
+// Phosphor icon per session type so the status grid reads like an
+// F1 timing board rather than five identical text cells. Practice
+// = stopwatch (timing laps), sprint = lightning (short flat-out
+// race), qualifying = target (chasing pole), race = checkered flag
+// (used elsewhere, not in this grid).
+const SESSION_ICON = {
+  fp1: "ph-stopwatch", fp2: "ph-stopwatch", fp3: "ph-stopwatch",
+  sprint: "ph-lightning", qualifying: "ph-target",
+};
 
 function combineDt(date, time) {
   if (!date) return null;
@@ -76,9 +85,13 @@ export default async function render(shadow, ctx) {
   const sessionCells = ["fp1", "fp2", "fp3", "sprint", "qualifying"].map((key) => {
     const s = sessions[key];
     if (!s) return "";
+    const icon = SESSION_ICON[key] || "ph-clock";
     return `
       <div class="status-cell">
-        <span class="u-label">${SESSION_LABEL[key]}</span>
+        <span class="u-label" style="display:inline-flex;align-items:center;gap:0.3em">
+          <i class="ph-bold ${icon}" style="color:var(--text-muted);font-size:1.1em;line-height:1"></i>
+          ${SESSION_LABEL[key]}
+        </span>
         <span class="v" style="font-size:var(--fs-body);font-weight:var(--fw-bold)">${escapeHtml(fmtSessionTime(s.date, s.time))}</span>
       </div>`;
   }).filter(Boolean).join("");
@@ -94,10 +107,10 @@ export default async function render(shadow, ctx) {
       <div class="w-body f1-body">
         <div class="f1-data">
           <div class="status-hero">
-            <i class="ph-bold ph-clock" style="color:var(--accent-1)"></i>
+            <i class="ph-bold ph-clock-countdown" style="color:var(--accent-1)"></i>
             <div class="lockup">
               <span class="status-state">${escapeHtml(countdownLabel)}</span>
-              <span class="status-sub">${escapeHtml(subBits)}</span>
+              <span class="status-sub">${data.locality ? `<i class="ph-bold ph-map-pin" style="font-size:.85em;color:var(--text-muted);margin-right:.25em;vertical-align:-.05em"></i>` : ""}${escapeHtml(subBits)}</span>
             </div>
           </div>
           ${data.country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(data.country)}</span>` : ""}

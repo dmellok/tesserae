@@ -35,15 +35,25 @@ export default function render(shadow, ctx) {
     return;
   }
 
+  // Trophy / medal icons mark the top three: gold trophy for the
+  // championship leader, silver + bronze medals for second and third.
+  // Positions four and down keep just the number so the icon
+  // vocabulary stays a podium signal instead of decoration.
+  const PODIUM_ICON = ["ph-trophy", "ph-medal", "ph-medal"];
+  const PODIUM_ACCENT = ["var(--accent-2)", "var(--text-secondary)", "var(--accent-1)"];
   const rows = standings.map((s, i) => {
     const isLeader = i === 0;
     const accent = isLeader ? "var(--accent-2)" : "var(--text-secondary)";
+    const posIcon = PODIUM_ICON[i];
+    const posIconColor = PODIUM_ACCENT[i];
     const posStyle = `width:1.4em;text-align:center;font-weight:var(--fw-black);color:${accent}`;
     return `
       <div class="list-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead">
-          <span style="${posStyle}">${escapeHtml(String(s.position || i + 1))}</span>
-          <span class="list-title">${escapeHtml(s.code || s.family || "—")}<small class="u-muted" style="font-weight:var(--fw-semi);font-size:.7em;margin-left:.4em">${escapeHtml(s.constructor || "")}</small></span>
+          ${posIcon
+            ? `<i class="ph-bold ${posIcon}" style="font-size:1.1em;color:${posIconColor};line-height:1"></i>`
+            : `<span style="${posStyle}">${escapeHtml(String(s.position || i + 1))}</span>`}
+          <span class="list-title">${escapeHtml(s.code || s.family || "—")}${s.constructor ? `<small class="u-muted" style="font-weight:var(--fw-semi);font-size:.7em;margin-left:.4em"><i class="ph-bold ph-wrench" style="font-size:.85em;margin-right:.2em;vertical-align:-.05em"></i>${escapeHtml(s.constructor)}</small>` : ""}</span>
         </div>
         <span class="list-meta" style="color:${accent}">${escapeHtml(s.points || "0")}<small style="font-size:.6em;color:var(--text-muted);font-weight:var(--fw-bold);margin-left:.2em">PTS</small></span>
       </div>`;

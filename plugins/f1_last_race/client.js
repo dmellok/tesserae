@@ -13,6 +13,10 @@ function escapeHtml(s) {
 }
 
 const PODIUM_ACCENT = ["var(--accent-2)", "var(--text-secondary)", "var(--accent-1)"];
+// Trophy for the winner, generic medal for second + third. Phosphor
+// doesn't ship a different medal mark per place, so the colour swap
+// from PODIUM_ACCENT (gold / silver / bronze) carries the meaning.
+const PODIUM_ICON = ["ph-trophy", "ph-medal", "ph-medal"];
 
 export default async function render(shadow, ctx) {
   const data = ctx?.data ?? {};
@@ -41,10 +45,14 @@ export default async function render(shadow, ctx) {
 
   const cells = podium.map((p, i) => {
     const accent = PODIUM_ACCENT[i] || "var(--text-muted)";
+    const icon = PODIUM_ICON[i] || "ph-medal";
     const code = p.code || `${(p.given || "")[0] || ""}${(p.family || "")[0] || ""}`;
     return `
       <div class="status-cell">
-        <span class="u-label" style="color:${accent}">P${p.position || i + 1}</span>
+        <span class="u-label" style="color:${accent};display:inline-flex;align-items:center;gap:0.3em">
+          <i class="ph-bold ${icon}" style="font-size:1.15em;line-height:1"></i>
+          P${p.position || i + 1}
+        </span>
         <span class="v" style="color:${accent}">${escapeHtml(code)}<small style="font-size:.55em;color:var(--text-muted);font-weight:var(--fw-bold);margin-left:.3em">${escapeHtml(p.time || "")}</small></span>
       </div>`;
   }).join("");
@@ -63,7 +71,7 @@ export default async function render(shadow, ctx) {
             <i class="ph-bold ph-trophy" style="color:var(--accent-2)"></i>
             <div class="lockup">
               <span class="status-state">${escapeHtml(podium[0]?.code || "—")}</span>
-              <span class="status-sub">${escapeHtml(subBits)}</span>
+              <span class="status-sub">${locality ? `<i class="ph-bold ph-map-pin" style="font-size:.85em;color:var(--text-muted);margin-right:.25em;vertical-align:-.05em"></i>` : ""}${escapeHtml(subBits)}</span>
             </div>
           </div>
           ${country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(country)}</span>` : ""}

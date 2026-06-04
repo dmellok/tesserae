@@ -27,6 +27,21 @@ function fmtTime(time) {
   return time.slice(0, 5);
 }
 
+// Map the server's label string to a Phosphor icon so the row list
+// reads like an F1 timing board. Practice = stopwatch (timing laps),
+// sprint = lightning (short flat-out race), qualifying = target
+// (chasing pole), race = checkered flag. Anything we don't recognise
+// falls back to the generic clock so an unfamiliar session label
+// still gets an icon rather than a bare line.
+function sessionIcon(label) {
+  const norm = String(label || "").toLowerCase();
+  if (norm.startsWith("race")) return "ph-flag-checkered";
+  if (norm.startsWith("qual")) return "ph-target";
+  if (norm.startsWith("sprint")) return "ph-lightning";
+  if (norm.startsWith("fp") || norm.startsWith("practice")) return "ph-stopwatch";
+  return "ph-clock";
+}
+
 export default async function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
@@ -50,7 +65,7 @@ export default async function render(shadow, ctx) {
   const rows = sessions.map((s, i) => {
     const isRace = (s.label || "").toLowerCase() === "race";
     const accent = isRace ? "var(--accent-1)" : "var(--text-secondary)";
-    const ph = isRace ? "ph-flag-checkered" : "ph-clock";
+    const ph = sessionIcon(s.label);
     return `
       <div class="list-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead">
