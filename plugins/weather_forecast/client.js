@@ -20,6 +20,23 @@ const PH_BY_NAME = {
   fog: "ph-cloud-fog",
 };
 
+// Same condition palette as weather_now so a single dashboard reads
+// consistently across both widgets.
+const COND_ACCENT = {
+  sun: "var(--accent-2)",
+  moon: "var(--text-secondary)",
+  cloud: "var(--accent-5)",
+  partly: "var(--accent-2)",
+  "partly-night": "var(--text-secondary)",
+  drizzle: "var(--accent-4)",
+  rain: "var(--accent-4)",
+  "rain-heavy": "var(--accent-4)",
+  showers: "var(--accent-4)",
+  snow: "var(--accent-5)",
+  storm: "var(--accent-1)",
+  fog: "var(--text-muted)",
+};
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -50,19 +67,23 @@ export default function render(shadow, ctx) {
 
   const cells = days.map((d) => {
     const ph = PH_BY_NAME[d.icon] || "ph-cloud";
+    const accent = COND_ACCENT[d.icon] || "var(--accent-5)";
     const isToday = d.today;
+    // Today gets the day label tinted accent-4 so the column stands out
+    // without taking the condition accent away from the icon itself.
+    const dayStyle = isToday ? ' style="color:var(--accent-4);font-weight:var(--fw-black)"' : "";
     const dayText = d.weekday || d.day || "";
     return `
-      <div class="wx-cell"${isToday ? ' style="color:var(--accent-4)"' : ""}>
-        <span class="d">${escapeHtml(dayText)}</span>
-        <i class="ph-bold ${ph}"${isToday ? ' style="color:var(--accent-4)"' : ""}></i>
+      <div class="wx-cell">
+        <span class="d"${dayStyle}>${escapeHtml(dayText)}</span>
+        <i class="ph-bold ${ph}" style="color:${accent}"></i>
         <span class="t">${escapeHtml(fmtTemp(d.hi ?? d.high))}<span class="u-muted" style="font-weight:var(--fw-semi)"> ${escapeHtml(fmtTemp(d.lo ?? d.low))}</span></span>
       </div>`;
   }).join("");
 
   const titleBar = `
     <div class="w-title">
-      <i class="ph-bold ph-calendar"></i>
+      <i class="ph-bold ph-calendar" style="color:var(--accent-4)"></i>
       <h3>${escapeHtml(label || "Forecast")}</h3>
       ${data.rangeHi != null && data.rangeLo != null
         ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.rangeHi))} / ${escapeHtml(fmtTemp(data.rangeLo))}</span>`

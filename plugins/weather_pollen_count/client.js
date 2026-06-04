@@ -64,7 +64,7 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w" data-widget="weather_pollen_count">
       <div class="w-title">
-        <i class="ph-bold ph-flower"></i>
+        <i class="ph-bold ph-flower" style="color:var(--accent-3)"></i>
         <h3>${escapeHtml(label || "Pollen")}</h3>
         ${overall ? `<span class="w-title-meta" style="color:${levelAccent(overall)}">${escapeHtml(overall)}</span>` : ""}
       </div>

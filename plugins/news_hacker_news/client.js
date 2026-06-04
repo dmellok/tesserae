@@ -46,7 +46,7 @@ export default function render(shadow, ctx) {
       ${css}
       <div class="w" data-widget="news_hacker_news">
         <div class="w-title">
-          <i class="ph-bold ph-newspaper-clipping"></i>
+          <i class="ph-bold ph-newspaper-clipping" style="color:var(--accent-5)"></i>
           <h3>Hacker News</h3>
           <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
         </div>
@@ -61,7 +61,7 @@ export default function render(shadow, ctx) {
     return `
       <div class="list-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead">
-          <i class="ph-bold ph-newspaper-clipping"></i>
+          <i class="ph-bold ph-newspaper-clipping" style="color:var(--accent-5)"></i>
           <span class="list-title">${escapeHtml(s.title)}</span>
         </div>
         <span class="list-meta ${isLead ? "is-accent" : ""}">${escapeHtml(score)}</span>

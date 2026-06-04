@@ -54,7 +54,7 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w" data-widget="weather_wind">
       <div class="w-title">
-        <i class="ph-bold ph-wind"></i>
+        <i class="ph-bold ph-wind" style="color:var(--accent-4)"></i>
         <h3>${escapeHtml(label || "Wind")}</h3>
         <span class="w-title-meta">${escapeHtml(data.time || "")}</span>
       </div>

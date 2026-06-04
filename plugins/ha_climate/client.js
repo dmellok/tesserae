@@ -132,7 +132,7 @@ export default function render(shadow, ctx) {
     ${css}
     <div class="w" data-widget="ha_climate">
       <div class="w-title">
-        <i class="ph-bold ph-thermometer-simple"></i>
+        <i class="ph-bold ph-thermometer-simple" style="color:var(--accent-3)"></i>
         <h3>${escapeHtml(title)}</h3>
         ${items.length > 1 ? `<span class="w-title-meta">${items.length} ZONES</span>` : ""}
       </div>

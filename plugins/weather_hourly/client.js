@@ -55,7 +55,7 @@ export default function render(shadow, ctx) {
 
   const titleBar = `
     <div class="w-title">
-      <i class="ph-bold ph-clock"></i>
+      <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
       <h3>${escapeHtml(label || "Hourly")}</h3>
       ${data.now != null ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.now))} now</span>` : ""}
     </div>`;
