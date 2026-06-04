@@ -398,12 +398,22 @@ a:hover { color: var(--t-accent-hover); }
    demands attention. Only the version text is the link; no surrounding
    chrome. */
 .app-footer {
-  padding: 24px 16px 32px;
+  padding: var(--t-space-6) var(--t-space-4) var(--t-space-7);
   text-align: center;
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   color: var(--t-fg-soft, var(--t-fg));
   opacity: 0.6;
   transition: opacity 140ms ease-out;
+}
+
+/* Small caret used inside <summary>/<details> toggles for dropdown
+   navs, plugin pickers, and disclosure panels. Replaces a handful of
+   inline ``style="font-size:12px; opacity:.6"`` attrs that drifted
+   between templates. Use as a modifier on a Phosphor caret-down icon:
+   ``<i class="ph ph-caret-down caret-soft">``. */
+.caret-soft {
+  font-size: var(--t-size-sm);
+  opacity: 0.6;
 }
 .app-footer:hover { opacity: 0.95; }
 .app-footer a {

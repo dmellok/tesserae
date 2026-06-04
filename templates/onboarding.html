@@ -187,7 +187,7 @@
     <p class="lede">Tesserae is a solo project. If you opt in to anonymous usage stats, I get a real picture of how many people are running it and what versions they're on — which helps me decide what to prioritise and when it's safe to break old behaviour. It's a small honest signal, not a vanity dashboard.</p>
 
     <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
-      <div class="card card--compact" style="margin: var(--t-space-4) 0;">
+      <div class="card card--compact card--wizard-info">
         <p><strong>What gets sent (only when ticked):</strong></p>
         <ul>
           <li><code>app.started</code> — once per process start, with the Tesserae version, Python version, and platform name.</li>
@@ -195,14 +195,14 @@
           <li><code>update.applied</code> — when the in-app updater applies a new revision, with the from/to short SHAs, channel, and whether deps were reinstalled.</li>
         </ul>
         <p><strong>What it doesn't send:</strong> IP addresses, hostnames, paths, settings, secrets, push contents, dashboard layouts, or anything tied to a real-world identity. The only stable identifier is a random UUID generated on this install and stored in <code>data/core/.instance_id</code>.</p>
-        <p class="muted" style="font-size: 12px;">Events go to my self-hosted Aptabase at <code>aptabase.dmello.io</code>.</p>
+        <p class="muted card--wizard-info-footnote">Events go to my self-hosted Aptabase at <code>aptabase.dmello.io</code>.</p>
       </div>
 
-      <label class="field" style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-        <input type="checkbox" name="telemetry_enabled" value="1" checked style="margin-top:4px;">
+      <label class="check-row">
+        <input type="checkbox" name="telemetry_enabled" value="1" checked>
         <span>
           <strong>Send anonymous usage stats to the maintainer.</strong>
-          <span class="muted" style="display:block;font-size:13px;margin-top:2px;">You can flip this off any time in Settings → Server → App, or set <code>TESSERAE_TELEMETRY=0</code>.</span>
+          <span class="muted">You can flip this off any time in Settings → Server → App, or set <code>TESSERAE_TELEMETRY=0</code>.</span>
         </span>
       </label>
 

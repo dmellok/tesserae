@@ -39,27 +39,6 @@
   margin: 0;
 }
 
-/* Force checkbox row above the Update & restart button. Putting the
-   checkbox after the button in .actions hid it as a trailing modifier;
-   surfacing it as a full-width row makes "discard local changes" a
-   deliberate opt-in. */
-.check-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--t-space-2);
-  padding: var(--t-space-2) 0;
-  font-size: var(--t-size-sm);
-  color: var(--t-fg-soft);
-  cursor: pointer;
-}
-.check-row > input[type="checkbox"] {
-  margin-top: 3px;
-  flex: 0 0 auto;
-}
-.check-row > span {
-  line-height: 1.5;
-}
-
 /* Recent-updates block: heading + roll-back button on the same line,
    so the button visually belongs to its section instead of floating at
    the card footer. */
@@ -301,6 +280,11 @@
   letter-spacing: 0.08em;
   color: var(--t-muted);
 }
+/* When this heading isn't the first element of its section it stands
+   for a new sub-section — give it room from whatever came above so
+   the heading actually reads as a break rather than crowding the
+   preceding paragraph. */
+* + .device-subhead { margin-top: var(--t-space-5); }
 
 /* Curated device-icon picker — a row of selectable glyph tiles. */
 .device-icon-grid {

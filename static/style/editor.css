@@ -560,18 +560,9 @@
     var(--t-shadow-inset),
     0 0 0 8px color-mix(in oklab, var(--t-accent) 8%, transparent);
 }
-.cell-card .card-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--t-space-3);
-}
-.cell-card .card-head h2 {
-  display: flex;
-  align-items: center;
-  gap: var(--t-space-2);
-  font-size: var(--t-size-lg);
-}
+/* Cell cards inherit .card-head + .card-head h2 verbatim from
+   shell.css — no overrides needed. The plugin tag inside the title
+   reads as secondary. */
 .cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
 
 /* ----- Layout editor (interactive grid) --------------------------- */

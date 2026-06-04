@@ -1145,3 +1145,39 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .wizard-broker-builtin[hidden], .wizard-broker-external[hidden] { display: none; }
 .wizard-broker-url { margin: 0.2rem 0 0.4rem; }
 .wizard-broker-url code { font-size: 1.05em; padding: 0.3rem 0.5rem; }
+
+/* ----- Check row -----------------------------------------------------
+   Full-width checkbox + label pair for "deliberate opt-in" choices —
+   originally lived in settings.css for the "discard local changes"
+   toggle; promoted here so the onboarding flow and other forms can
+   reuse it instead of inlining the same flex/gap pattern. */
+
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+}
+.check-row > input[type="checkbox"] {
+  margin-top: 3px;
+  flex: 0 0 auto;
+}
+.check-row > span {
+  line-height: 1.5;
+}
+.check-row > span > .muted {
+  display: block;
+  font-size: var(--t-size-md);
+  margin-top: 2px;
+}
+
+/* ----- Wizard info card ----------------------------------------------
+   Used by the onboarding flow's telemetry consent step (and any
+   other wizard that wants an inline explanatory card between the
+   form fields). card--compact pads the block; --wizard-info gives
+   it the vertical breathing room the inline ``margin: var(--t-space-4) 0`` was supplying. */
+.card--wizard-info { margin: var(--t-space-4) 0; }
+.card--wizard-info-footnote { font-size: var(--t-size-sm); }
