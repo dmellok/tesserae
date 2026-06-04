@@ -214,6 +214,124 @@
 .wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
 
 /* ============================================================================
+   WIDGET 6b · TIMETABLE  (calendar day / week — vertical hour axis +
+   positioned event blocks). No drawn dividers: the hour rhythm shows
+   through a repeating-linear-gradient of --surface-sunken bands.
+   ============================================================================ */
+.tt-body{ padding: 0; gap: 0; }
+.tt{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+}
+.tt.is-week{ grid-template-columns: auto repeat(7, 1fr); }
+.tt-hours{
+  display: flex; flex-direction: column;
+  justify-content: space-between;
+  padding: 0 var(--space-2) 0 0;
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  letter-spacing: var(--ls-label);
+}
+.tt-lane{
+  position: relative;
+  min-width: 0;
+}
+.tt-lane.is-banded{
+  background: linear-gradient(
+    to bottom,
+    var(--surface-sunken) 0, var(--surface-sunken) 50%,
+    transparent 50%, transparent 100%);
+  background-size: 100% calc(2 * (100% / var(--tt-hours, 18)));
+}
+.tt-col-head{
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-black);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+  padding-bottom: var(--space-1);
+}
+.tt-col-head.is-today{ color: var(--accent-4); }
+.tt-event{
+  position: absolute;
+  left: var(--space-1); right: var(--space-1);
+  border-left: var(--stroke-3) solid var(--accent-4);
+  background: var(--surface);
+  padding: var(--space-1) var(--space-2);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  gap: 0;
+  min-height: 1em;
+}
+.tt-event .tt-time{
+  font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  color: var(--text-muted); letter-spacing: var(--ls-label);
+}
+.tt-event .tt-name{
+  font-size: var(--fs-body); font-weight: var(--fw-bold);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tt-allday{
+  display: flex; flex-wrap: wrap; gap: var(--space-1);
+  padding: 0 0 var(--space-2);
+}
+.tt-allday-pill{
+  font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface-sunken);
+  border-left: var(--stroke-3) solid var(--accent-4);
+}
+
+/* ============================================================================
+   WIDGET 6c · MONTH GRID  (calendar month). 7 col × 5-6 row matrix.
+   In-month cells stay on --surface; out-of-month dim down. Today gets
+   an accent-4 day number; events surface as up to 3 small bars.
+   ============================================================================ */
+.mc-body{ padding: 0; gap: var(--space-2); }
+.mc-dow{
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  font-size: var(--fs-caption); font-weight: var(--fw-black);
+  letter-spacing: var(--ls-label); color: var(--text-muted);
+  text-align: center;
+}
+.mc-grid{
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: var(--stroke-1);
+  background: var(--surface-sunken);
+}
+.mc-cell{
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  padding: var(--space-1) var(--space-2);
+  min-width: 0; min-height: 0;
+}
+.mc-cell.is-out{ background: var(--surface-sunken); opacity: 0.55; }
+.mc-num{
+  font-size: var(--fs-body); font-weight: var(--fw-bold);
+  color: var(--text-primary); line-height: 1;
+}
+.mc-cell.is-today .mc-num{ color: var(--accent-4); font-weight: var(--fw-black); }
+.mc-dots{
+  display: flex; flex-direction: column;
+  gap: 0.15em; margin-top: 0.15em;
+}
+.mc-dot{
+  height: 0.35em; min-height: 3px;
+  background: var(--accent-4);
+}
+.mc-more{
+  font-size: var(--fs-caption); font-weight: var(--fw-bold);
+  color: var(--text-muted); margin-top: 0.1em;
+}
+
+/* ============================================================================
    WIDGET 7 · IMAGE  (hero picture + optional meta strip)
    Used by media players (album art) + cameras. Image fills the body and
    meta sits below as a small lockup; the .w-title stays in its normal
