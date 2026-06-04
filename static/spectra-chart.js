@@ -18,24 +18,41 @@ const FALLBACK = {
   fontFamily: "Helvetica Neue, Arial, sans-serif",
 };
 
-// Read the current Spectra tokens off the host element. Falls back
-// to the light-theme values when a property is empty, so a chart
-// always renders even if the cascade hasn't resolved yet — but in
-// that case we also log a console warning so a silent
-// "charts always look light-theme on a dark page" bug shows up in
-// DevTools instead of being invisible.
+// Read the current Spectra tokens. Walks the cascade explicitly —
+// host → body → documentElement — instead of trusting a single
+// getComputedStyle call on the host. The host being temporarily
+// detached during a re-render, or the cell mid-paint, was making
+// chart colours silently drop to the light-theme fallback even on a
+// dark page. ``<body data-theme>`` is the canonical theme anchor
+// (compose.html sets it there), so the body lookup catches any
+// situation where the host's cascade hasn't resolved yet.
+function readToken(host, name) {
+  if (host) {
+    const v = getComputedStyle(host).getPropertyValue(name).trim();
+    if (v) return v;
+  }
+  if (typeof document !== "undefined") {
+    if (document.body) {
+      const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+      if (v) return v;
+    }
+    if (document.documentElement) {
+      const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      if (v) return v;
+    }
+  }
+  return "";
+}
+
 export function tokens(host) {
   if (!host) {
     console.warn(
-      "[spectra-chart] tokens(host=null) — using light-theme fallbacks. " +
-      "Pass the cell host (shadow.host) so charts inherit the cell's theme."
+      "[spectra-chart] tokens(host=null) — pass the cell host (shadow.host) so charts inherit the cell's per-cell theme override."
     );
-    return { ...FALLBACK };
   }
-  const s = getComputedStyle(host);
   const missing = [];
   const get = (name, fallback) => {
-    const v = s.getPropertyValue(name).trim();
+    const v = readToken(host, name);
     if (!v) missing.push(name);
     return v || fallback;
   };
@@ -55,9 +72,9 @@ export function tokens(host) {
   };
   if (missing.length) {
     console.warn(
-      `[spectra-chart] Spectra tokens not resolved on cell host: ${missing.join(", ")}` +
-      " — falling back to light-theme defaults. Charts will look light-theme even on a dark page." +
-      " Check that spectra-tokens.css is loaded and the cell's data-theme cascade reaches the host."
+      `[spectra-chart] Spectra tokens not resolved on host OR body OR documentElement: ${missing.join(", ")}` +
+      " — falling back to light-theme hex defaults. Charts will look light-theme even on a dark page." +
+      " Check that spectra-tokens.css is linked from compose.html."
     );
   }
   return result;
