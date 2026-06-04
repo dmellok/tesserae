@@ -315,6 +315,10 @@ def _hydrate_page(
     # template can render ``page.theme`` unconditionally.
     if not page_dict.get("theme"):
         page_dict = {**page_dict, "theme": "light"}
+    # Same for the orthogonal style axis — fall back to ``standard``
+    # so the template can render ``page.style`` unconditionally.
+    if not page_dict.get("style"):
+        page_dict = {**page_dict, "style": "standard"}
 
     gap = int(page_dict.get("gap", 0) or 0)
     # ``gap`` is the visible matting strip the user sees. Make it look
@@ -477,8 +481,13 @@ def test_render() -> str:
 
     sample_mode = request.args.get("sample") == "1"
     # ?theme=<id> picks one of the Spectra theme blocks
-    # (light / dark / high-contrast / sepia / nord / cool-gray).
+    # (light / dark / high-contrast / sepia / nord / cool-gray, plus the
+    # three movement themes bauhaus / destijl / brutalist).
     theme_id = request.args.get("theme") or "light"
+    # ?style=<id> picks one of the orthogonal Spectra style blocks
+    # (standard / display / editorial / mono / elegant / condensed, plus
+    # the three movement styles bauhaus / destijl / brutalist).
+    style_id = request.args.get("style") or "standard"
 
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
@@ -496,6 +505,7 @@ def test_render() -> str:
         "panel": {"w": cell_w, "h": cell_h},
         "font": "default",
         "theme": theme_id,
+        "style": style_id,
         "cells": [
             {
                 "id": "test-cell",

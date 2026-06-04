@@ -432,6 +432,7 @@ def create() -> Response:
             cells=initial_cells,
             font=(form.get("font") or None),
             theme=(form.get("theme") or "light"),
+            style=(form.get("style") or "standard"),
             gap=_coerce_int(form.get("gap"), 0, lo=0),
             corner_radius=_coerce_int(form.get("corner_radius"), 0, lo=0),
             bleed_color=(form.get("bleed_color") or ""),
@@ -473,6 +474,8 @@ def update(page_id: str) -> Response:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
     if "theme" in form:
         updates["theme"] = form.get("theme") or "light"
+    if "style" in form:
+        updates["style"] = form.get("style") or "standard"
     if "font" in form:
         updates["font"] = form.get("font") or None
     if "gap" in form:
@@ -562,6 +565,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
             "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
             "theme": (form.get("theme") or None),
+            "style": (form.get("style") or None),
             "font": (form.get("font") or None),
             "options": options,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
@@ -621,6 +625,7 @@ def preview(page_id: str) -> Response:
                 "name": (form.get("name") or page.name).strip() or page.name,
                 "font": (form.get("font") or None),
                 "theme": (form.get("theme") or page.theme),
+                "style": (form.get("style") or page.style),
                 "gap": _coerce_int(form.get("gap"), page.gap, lo=0),
                 "corner_radius": _coerce_int(form.get("corner_radius"), page.corner_radius, lo=0),
                 "bleed_color": (

@@ -61,10 +61,11 @@
 
     {% if plugin %}
     {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
-    {# Same six Spectra themes as the page picker; ``''`` (inherit) is
-       the default so a cell falls through to the page theme unless the
-       user picks a deliberate override. Setting data-theme on the cell
-       rebinds the semantic tokens for that subtree only. #}
+    {# Per-cell overrides for the two orthogonal Spectra axes. ``''``
+       (inherit) is the default so a cell falls through to the page
+       value unless the user picks something deliberate. Setting
+       data-theme / data-style on the cell rebinds the relevant tokens
+       for that subtree only. #}
     {% set cell_theme_options = [
       {'value': 'light', 'label': 'Light · warm paper'},
       {'value': 'dark', 'label': 'Dark · warm charcoal'},
@@ -72,10 +73,27 @@
       {'value': 'sepia', 'label': 'Sepia · book paper'},
       {'value': 'nord', 'label': 'Nord · cool blue night'},
       {'value': 'cool-gray', 'label': 'Cool gray · neutral slate'},
+      {'value': 'bauhaus', 'label': 'Bauhaus palette'},
+      {'value': 'destijl', 'label': 'De Stijl palette'},
+      {'value': 'brutalist', 'label': 'Brutalist palette'},
+    ] %}
+    {% set cell_style_options = [
+      {'value': 'standard', 'label': 'Standard'},
+      {'value': 'display', 'label': 'Display'},
+      {'value': 'editorial', 'label': 'Editorial'},
+      {'value': 'mono', 'label': 'Mono'},
+      {'value': 'elegant', 'label': 'Elegant'},
+      {'value': 'condensed', 'label': 'Condensed'},
+      {'value': 'bauhaus', 'label': 'Bauhaus forms'},
+      {'value': 'destijl', 'label': 'De Stijl forms'},
+      {'value': 'brutalist', 'label': 'Brutalist forms'},
     ] %}
     <div class="field-grid">
       {{ select_field('cell-' ~ cell.id ~ '-theme', 'theme', 'Theme override',
                       value=cell.theme or '', options=cell_theme_options,
+                      blank_label='Inherit page') }}
+      {{ select_field('cell-' ~ cell.id ~ '-style', 'style', 'Style override',
+                      value=cell.style or '', options=cell_style_options,
                       blank_label='Inherit page') }}
       {{ select_field('cell-' ~ cell.id ~ '-font', 'font', 'Font override',
                       value=cell.font or '', options=font_options,
@@ -270,9 +288,12 @@
           {% endif %}
         </div>
 
-        {# Spectra themes — six self-contained semantic blocks in
+        {# Spectra themes — self-contained semantic blocks in
            static/style/spectra-tokens.css. Adding a theme = duplicate a
-           block in tokens.css and add a row here. #}
+           block in tokens.css and add a row here. The three movement
+           themes (bauhaus / destijl / brutalist) ship palettes that
+           pair with the matching movement *style* — pair them via the
+           Style picker for the full design-movement look. #}
         {% set theme_options = [
           {'value': 'light', 'label': 'Light · warm paper'},
           {'value': 'dark', 'label': 'Dark · warm charcoal'},
@@ -280,9 +301,28 @@
           {'value': 'sepia', 'label': 'Sepia · book paper'},
           {'value': 'nord', 'label': 'Nord · cool blue night'},
           {'value': 'cool-gray', 'label': 'Cool gray · neutral slate'},
+          {'value': 'bauhaus', 'label': 'Bauhaus palette · primaries on cream'},
+          {'value': 'destijl', 'label': 'De Stijl palette · primaries + ink'},
+          {'value': 'brutalist', 'label': 'Brutalist palette · concrete & hazard'},
+        ] %}
+        {# Spectra styles — orthogonal typographic / scale / shape axis in
+           static/style/spectra-styles.css. Styles never set colour; they
+           compose with any theme. The three movement styles pair with the
+           matching movement themes above for the full look. #}
+        {% set style_options = [
+          {'value': 'standard', 'label': 'Standard · Helvetica baseline'},
+          {'value': 'display', 'label': 'Display · Space Grotesk poster'},
+          {'value': 'editorial', 'label': 'Editorial · IBM Plex, soft + airy'},
+          {'value': 'mono', 'label': 'Mono · JetBrains console'},
+          {'value': 'elegant', 'label': 'Elegant · Bodoni masthead'},
+          {'value': 'condensed', 'label': 'Condensed · Archivo Narrow board'},
+          {'value': 'bauhaus', 'label': 'Bauhaus forms · Jost + circle marker'},
+          {'value': 'destijl', 'label': 'De Stijl forms · thick frame + grid'},
+          {'value': 'brutalist', 'label': 'Brutalist forms · Space Mono + rules'},
         ] %}
         <div class="field-grid">
           {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or 'light', options=theme_options) }}
+          {{ select_field('page-style', 'style', 'Style', value=page.style or 'standard', options=style_options) }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
           {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color) }}
         </div>

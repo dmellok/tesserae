@@ -75,6 +75,33 @@
   --titlebar-min-h: 1.5em;
   --pad: clamp(0.9em, 9cqmin, 1.4em);  /* widget inner padding, fluid */
   --row-gap: var(--space-3);
+
+  /* Style-tunable shape/structure tokens — styles (spectra-styles.css)
+     reshape these. Defaults below = the "standard" look, so an unstyled
+     widget renders unchanged. A style block flips these; the widget shell
+     consumes them via var(--name, fallback) so we never need a style-aware
+     fork in any widget rule. */
+  --edge-weight: var(--stroke-1);       /* outer shell border width            */
+  --zebra-bg: var(--surface-sunken);    /* list zebra fill (transparent = whitespace grouping) */
+  --list-pad-y: var(--space-2);         /* list row vertical padding (density) */
+  --list-gap: var(--space-1);           /* gap between list rows               */
+  --pill-radius: var(--radius-0);       /* status pill corner (stadium = 999px)*/
+  --title-marker: none;                 /* 'block' shows an accent eyebrow tick */
+  /* Title-marker shape (used when --title-marker: block). Defaults to a
+     small rectangle in accent-4; movement styles like Bauhaus switch to
+     a circle in accent-1. */
+  --marker-w: 0.46em;
+  --marker-h: 1.05em;
+  --marker-radius: var(--radius-0);
+  --marker-color: var(--accent-4);
+  /* Optional dividers — OFF by default. A style may switch these on when
+     a rule is core to its identity (Mono console, Display masthead,
+     Condensed timetable, De Stijl grid). */
+  --title-rule-w: 0px;                  /* divider under the title bar         */
+  --title-rule-c: var(--edge);
+  --title-rule-pad: 0px;
+  --row-rule-w: 0px;                    /* divider between list rows           */
+  --label-transform: uppercase;         /* labels (Editorial uses 'none') */
 }
 
 /* ----------------------------------------------------------------------------
@@ -215,4 +242,77 @@
   --accent-5:#3C588A; --accent-5-soft:#D1D9E8;
   --accent-6:#7A3E66; --accent-6-soft:#E3D1DD;
   --on-accent:#F5F6F7;
+}
+
+/* ============================================================================
+   MOVEMENT THEMES — palettes for the matching movement styles. Pair
+   data-theme="X" with data-style="X" for the full look (palette + forms);
+   either half mixes with any other theme/style. These are ordinary themes
+   (color only) — the *style* sets type/shape independently.
+   ============================================================================ */
+
+/* ---- BAUHAUS — primary red / blue / yellow on warm cream ----------------- */
+[data-theme="bauhaus"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #E7E1D2;
+  --surface:        #F4EFE3;
+  --surface-sunken: #E1D9C6;
+  --text-primary:   #1A1714;
+  --text-secondary: #494339;
+  --text-muted:     #857C6B;
+  --icon:           var(--text-primary);
+  --edge:           #1A1714;
+
+  --accent-1:#C81E2C; --accent-1-soft:#EAD0C9;  /* red    */
+  --accent-2:#E7AE07; --accent-2-soft:#F0E3BC;  /* yellow */
+  --accent-3:#1F4E9B; --accent-3-soft:#CFD8E8;  /* blue (pill-safe) */
+  --accent-4:#1F4E9B; --accent-4-soft:#CFD8E8;  /* blue   */
+  --accent-5:#1A1714; --accent-5-soft:#D9D2C4;  /* black  */
+  --accent-6:#C81E2C; --accent-6-soft:#EAD0C9;  /* red    */
+  --on-accent:#F4EFE3;
+}
+
+/* ---- DE STIJL — primaries + ink on white (Mondrian) ---------------------- */
+[data-theme="destijl"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #F3F2EC;
+  --surface:        #FBFBF8;
+  --surface-sunken: #E3E2DC;
+  --text-primary:   #111111;
+  --text-secondary: #2E2E2E;
+  --text-muted:     #565656;
+  --icon:           var(--text-primary);
+  --edge:           #111111;
+
+  --accent-1:#D42B1E; --accent-1-soft:#F1D2CD;  /* red    */
+  --accent-2:#F2C200; --accent-2-soft:#F5E6AE;  /* yellow */
+  --accent-3:#15469F; --accent-3-soft:#CCD7EC;  /* blue   */
+  --accent-4:#15469F; --accent-4-soft:#CCD7EC;
+  --accent-5:#111111; --accent-5-soft:#DBDBD3;  /* ink    */
+  --accent-6:#D42B1E; --accent-6-soft:#F1D2CD;
+  --on-accent:#FBFBF8;
+}
+
+/* ---- BRUTALIST — concrete, ink, hazard orange --------------------------- */
+[data-theme="brutalist"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #C6C4BC;
+  --surface:        #D9D7CE;
+  --surface-sunken: #B3B1A9;
+  --text-primary:   #16160E;
+  --text-secondary: #39392F;
+  --text-muted:     #5E5E51;
+  --icon:           var(--text-primary);
+  --edge:           #16160E;
+
+  --accent-1:#D8431A; --accent-1-soft:#E6C8B9;  /* hazard orange   */
+  --accent-2:#9E6A12; --accent-2-soft:#D7C6A6;
+  --accent-3:#3A6B2E; --accent-3-soft:#C7D5BD;  /* pill-safe green */
+  --accent-4:#2C5D5A; --accent-4-soft:#BFD1CE;
+  --accent-5:#16160E; --accent-5-soft:#CECCC1;  /* ink             */
+  --accent-6:#7A3A2A; --accent-6-soft:#DBC7BD;
+  --on-accent:#D9D7CE;
 }

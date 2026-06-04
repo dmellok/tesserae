@@ -118,6 +118,12 @@ function applyPagePatch(page) {
   if (typeof page.theme === "string" && page.theme) {
     document.body.setAttribute("data-theme", page.theme);
   }
+  // Page-level style (the orthogonal typographic axis). Same shape as
+  // theme: a string flips data-style on body and every non-overridden
+  // cell picks up the style-tunable tokens (font / scale / edges).
+  if (typeof page.style === "string" && page.style) {
+    document.body.setAttribute("data-style", page.style);
+  }
   if (page.panel && Number(page.panel.w) > 0 && Number(page.panel.h) > 0) {
     const panelEl = document.querySelector(".panel");
     if (panelEl) {
@@ -171,6 +177,13 @@ async function applyCellPatch(patch) {
   if (Object.prototype.hasOwnProperty.call(patch, "theme")) {
     if (patch.theme) cell.setAttribute("data-theme", patch.theme);
     else cell.removeAttribute("data-theme");
+  }
+  // Per-cell style override — mirrors the theme behaviour exactly. A
+  // missing/empty value clears the override and the cell inherits the
+  // page-level data-style from body.
+  if (Object.prototype.hasOwnProperty.call(patch, "style")) {
+    if (patch.style) cell.setAttribute("data-style", patch.style);
+    else cell.removeAttribute("data-style");
   }
 
   cell.dataset.options = JSON.stringify(patch.options ?? {});

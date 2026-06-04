@@ -24,8 +24,12 @@
   <!-- Spectra design system. Tokens cascade from the document into every
        widget's shadow root; widget class rules (.w, .stat-body, …) live
        in spectra-widgets.css and are relinked per shadow root by each
-       client.js since class selectors don't pierce shadow boundaries. -->
+       client.js since class selectors don't pierce shadow boundaries.
+       spectra-styles.css adds the orthogonal typographic style axis
+       (data-style) — its rules set custom properties on the body/cell,
+       which then cascade into the shadow root via inheritance. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   <!-- Chart.js UMD. Loaded once at the document level so every widget
        that imports static/spectra-chart.js can read window.Chart. The
        script must be a regular non-module so composer.js's dynamic
@@ -96,7 +100,7 @@
     .cell-empty-placeholder strong { color: #555; display: block; }
   </style>
 </head>
-<body data-for-push="{{ '1' if for_push else '0' }}" data-theme="{{ page.theme|default('light') }}">
+<body data-for-push="{{ '1' if for_push else '0' }}" data-theme="{{ page.theme|default('light') }}" data-style="{{ page.style|default('standard') }}">
   <div class="panel">
     {% for cell in page.cells %}
     <div class="cell{% if cell.full_bleed %} full-bleed{% endif %}{% if not cell.plugin %} cell--empty{% endif %}"
@@ -112,6 +116,7 @@
          data-font-family="{{ cell.font_family }}"
          data-cell-zoom="{{ cell.zoom }}"
          {% if cell.theme %}data-theme="{{ cell.theme }}"{% endif %}
+         {% if cell.style %}data-style="{{ cell.style }}"{% endif %}
          style="left: {{ cell.x }}px; top: {{ cell.y }}px; width: {{ cell.w }}px; height: {{ cell.h }}px;
                 font-family: '{{ cell.font_family }}', system-ui, sans-serif;
                 /* Spectra widgets read font-family from var(--font-family), so

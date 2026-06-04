@@ -21,7 +21,10 @@
   color: var(--text-primary);
 
   background: var(--surface);
-  border: var(--stroke-1) solid var(--edge);   /* ONLY the outer edge is allowed */
+  /* ONLY the outer edge is allowed; weight is a style-tunable token so
+     ``display`` / ``mono`` / movement styles can thicken the frame
+     without forking every widget rule. */
+  border: var(--edge-weight, var(--stroke-1)) solid var(--edge);
   border-radius: var(--radius-0);               /* sharp by default */
 
   box-sizing: border-box;
@@ -47,6 +50,12 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--text-secondary);
+  /* Optional rule under the title (Display masthead / Mono terminal /
+     Elegant fashion / De Stijl Mondrian). 0 by default; styles flip the
+     weight via --title-rule-w. The --title-rule-pad token adds breathing
+     room between the title text and the rule. */
+  border-bottom: var(--title-rule-w, 0px) solid var(--title-rule-c, var(--edge));
+  padding-bottom: var(--title-rule-pad, 0px);
   /* Lock the title-bar size against per-cell content zoom. The body
      uses ``--w-font-base`` which floors at 14px, so zoom > 1 grows the
      visible content (intended). For the title we want the size you'd
@@ -58,13 +67,27 @@
      min-height) all stay locked off the title's font-size. */
   font-size: calc(clamp(14px, calc(7cqmin * var(--c-zoom, 1)), 28px) / var(--c-zoom, 1));
 }
+/* Accent eyebrow tick — toggled by style. ``--title-marker: none`` (the
+   default) hides it; ``block`` shows it. Movement styles like Bauhaus
+   switch to a circle via --marker-radius: 999px and a coloured accent
+   via --marker-color. Sits inline at the start of the title row so its
+   colour cues the widget category at a glance. */
+.w-title::before{
+  content: "";
+  display: var(--title-marker, none);
+  width: var(--marker-w, 0.46em);
+  height: var(--marker-h, 1.05em);
+  background: var(--marker-color, var(--accent-4));
+  border-radius: var(--marker-radius, var(--radius-0));
+  flex: 0 0 auto;
+}
 .w-title .ph-bold{ font-size: var(--icon-sm); color: var(--icon); line-height: 1; }
 .w-title h3{
   margin: 0;
   font-size: var(--fs-label);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,7 +114,7 @@
   font-size: var(--fs-label);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   color: var(--text-muted);
 }
 .u-muted{ color: var(--text-muted); }
@@ -138,16 +161,20 @@
 /* ============================================================================
    WIDGET 2 · LIST  (grouping via alternating sunken rows + spacing, no lines)
    ============================================================================ */
-.list-body{ gap: var(--space-1); justify-content: flex-start; }
+.list-body{ gap: var(--list-gap, var(--space-1)); justify-content: flex-start; }
 .list-row{
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--list-pad-y, var(--space-2)) var(--space-3);
   border-radius: var(--radius-0);
 }
-.list-row.is-zebra{ background: var(--surface-sunken); }
+.list-row.is-zebra{ background: var(--zebra-bg, var(--surface-sunken)); }
+/* Optional divider between rows — styles like ``mono`` / ``condensed`` /
+   ``destijl`` / ``brutalist`` switch this on; default 0 preserves the
+   zebra-only look of standard. */
+.list-row + .list-row{ border-top: var(--row-rule-w, 0px) solid var(--edge); }
 .list-lead{ display:flex; align-items:center; gap: var(--space-2); min-width:0; }
 .list-lead .ph-bold{ font-size: var(--icon-sm); color: var(--icon); }
 .list-title{ font-weight: var(--fw-semi); font-size: var(--fs-body); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -198,8 +225,10 @@
   display:inline-flex; align-items:center; gap:0.35em;
   padding: 0.25em 0.6em;
   font-size: var(--fs-label); font-weight: var(--fw-bold);
-  letter-spacing: var(--ls-label); text-transform: uppercase;
-  color: var(--on-accent); border-radius: var(--radius-0);
+  letter-spacing: var(--ls-label);
+  text-transform: var(--label-transform, uppercase);
+  color: var(--on-accent);
+  border-radius: var(--pill-radius, var(--radius-0));
   align-self: flex-start;
 }
 .status-grid{ display:grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) var(--space-5); }
@@ -260,7 +289,7 @@
   font-size: var(--fs-caption);
   font-weight: var(--fw-bold);
   color: var(--text-muted);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   letter-spacing: var(--ls-label);
   /* Don't let a two-word label like "UV INDEX" wrap and make one
      column taller than its neighbours. Falls back to ellipsis when
@@ -349,7 +378,7 @@
   font-size: var(--fs-label);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   color: var(--text-muted);
   white-space: nowrap;
 }
@@ -406,7 +435,7 @@
   font-size: var(--fs-caption);
   font-weight: var(--fw-black);
   letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   color: var(--text-muted);
   text-align: center;
   padding-bottom: var(--space-2);
@@ -694,7 +723,7 @@
   font-size: var(--fs-caption);
   font-weight: var(--fw-bold);
   letter-spacing: var(--ls-label);
-  text-transform: uppercase;
+  text-transform: var(--label-transform, uppercase);
   opacity: 0.85;
   white-space: nowrap;
   overflow: hidden;

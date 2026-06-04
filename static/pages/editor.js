@@ -173,6 +173,7 @@
       type: "tesserae-patch",
       page: {
         theme: next.theme,
+        style: next.style,
         font_family: next.font_family,
         font_face_css: next.font_face_css,
         bleed_color: next.bleed_color,
@@ -188,6 +189,7 @@
         options: c.options,
         data: c.data,
         theme: c.theme || "",
+        style: c.style || "",
         font_family: c.font_family,
         full_bleed: Boolean(c.full_bleed),
       })),

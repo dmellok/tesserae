@@ -60,6 +60,10 @@ class Cell(BaseModel):
     element so the Spectra semantic tokens (--bg / --surface / accents)
     rebind for just that subtree. ``None`` (the default) inherits from
     the page.
+
+    ``style`` is the equivalent per-cell override for the typographic
+    style axis (``data-style``). Themes and styles are orthogonal: a
+    cell may override one without touching the other.
     """
 
     id: str
@@ -69,6 +73,7 @@ class Cell(BaseModel):
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
     theme: str | None = None
+    style: str | None = None
     font: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
     # Per-cell content zoom. Inverse-sized at render time: the widget
@@ -103,11 +108,19 @@ class Page(BaseModel):
     device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)
     font: str | None = None
-    # Spectra theme id — picks one of the six self-contained semantic blocks
+    # Spectra theme id — picks one of the self-contained semantic blocks
     # defined in static/style/spectra-tokens.css (light, dark, high-contrast,
-    # sepia, nord, cool-gray). Renders as ``data-theme=<id>`` on the
-    # composer body; unknown ids fall back to the :root defaults (light).
+    # sepia, nord, cool-gray, bauhaus, destijl, brutalist). Renders as
+    # ``data-theme=<id>`` on the composer body; unknown ids fall back to
+    # the :root defaults (light).
     theme: str = "light"
+    # Spectra style id — the orthogonal typography/density/shape axis defined
+    # in static/style/spectra-styles.css (standard, display, editorial, mono,
+    # elegant, condensed, bauhaus, destijl, brutalist). Renders as
+    # ``data-style=<id>`` on the composer body; unknown ids fall back to
+    # ``standard``. The style controls font + scale + edges; the theme controls
+    # colour — any pair composes.
+    style: str = "standard"
     gap: int = 0
     corner_radius: int = 0
     bleed_color: str = ""
