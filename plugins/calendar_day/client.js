@@ -82,7 +82,10 @@ export default function render(shadow, ctx) {
     const top = Math.max(0, ((s - range.start) / span) * 100);
     const height = Math.max(2, ((e - s) / span) * 100);
     const colour = ev.colour || "var(--accent-4)";
-    const tint = `color-mix(in oklab, ${colour} 18%, var(--surface))`;
+    // Solid tint with a stronger weight than the original 18% so the
+    // event reads as a coloured slot, not an off-white card. Still
+    // light enough that --text-primary stays legible on top.
+    const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
     const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
     const sub = height > 5
       ? `<span class="tt-sub">${escapeHtml(time)}</span>`

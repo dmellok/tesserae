@@ -84,7 +84,7 @@ export default function render(shadow, ctx) {
       const top = Math.max(0, ((s - range.start) / span) * 100);
       const height = Math.max(2, ((e - s) / span) * 100);
       const colour = ev.colour || "var(--accent-4)";
-      const tint = `color-mix(in oklab, ${colour} 18%, var(--surface))`;
+      const tint = `color-mix(in oklab, ${colour} 28%, var(--surface))`;
       const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
       return `
         <div class="tt-event" style="top:${top.toFixed(2)}%;height:${height.toFixed(2)}%;border-left-color:${colour};--tt-bg:${tint};font-size:.85em" title="${escapeHtml(time)} ${escapeHtml(ev.summary || "")}">

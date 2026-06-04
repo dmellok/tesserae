@@ -240,13 +240,11 @@
   min-width: 0;
 }
 .tt-lane.is-banded{
-  /* Hour-rhythm banding: every odd hour gets a sunken band. Tightened
-     from 50/50 to a slightly heavier stripe so the rows read as a
-     ruled timetable without drawing actual lines. */
-  background: linear-gradient(
-    to bottom,
-    var(--surface-sunken) 0%, var(--surface-sunken) 100%);
-  background-size: 100% calc(2 * (100% / var(--tt-hours, 18)));
+  /* Hour-rhythm banding: every other hour gets a sunken band so the
+     rows read as a ruled timetable without drawing actual lines. The
+     gradient stops are percentages of the lane height — NO
+     background-size, or the gradient image tiles too small and the
+     stops calculate against the tile instead of the lane. */
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
