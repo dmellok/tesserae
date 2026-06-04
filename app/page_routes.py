@@ -335,6 +335,12 @@ def _editor_context(page: Page) -> dict[str, Any]:
         for g in preview_groups_for_page(page, device_registry, _settings_store())
     ]
 
+    # App-level Spectra default surfaced into the editor so the
+    # "Inherit app default" blank option in the theme picker can show
+    # *which* theme it falls through to (e.g. "Inherit app default —
+    # dark") rather than a generic hint.
+    app_theme = str(_settings_store().get_section("app").get("theme") or "light").strip() or "light"
+
     return {
         "page": page,
         "panel": panel,
@@ -347,6 +353,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "preview_groups": preview_groups,
         "layout_editor_cells": layout_editor_cells,
         "device_options": device_options,
+        "app_theme": app_theme,
     }
 
 
@@ -431,7 +438,7 @@ def create() -> Response:
             # time so changing the panel in settings updates every page.
             cells=initial_cells,
             font=(form.get("font") or None),
-            theme=(form.get("theme") or "light"),
+            theme=(form.get("theme") or None),
             gap=_coerce_int(form.get("gap"), 0, lo=0),
             corner_radius=_coerce_int(form.get("corner_radius"), 0, lo=0),
             bleed_color=(form.get("bleed_color") or ""),
@@ -472,7 +479,7 @@ def update(page_id: str) -> Response:
     if "name" in form:
         updates["name"] = (form.get("name") or page.name).strip() or page.name
     if "theme" in form:
-        updates["theme"] = form.get("theme") or "light"
+        updates["theme"] = form.get("theme") or None
     if "font" in form:
         updates["font"] = form.get("font") or None
     if "gap" in form:

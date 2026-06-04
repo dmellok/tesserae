@@ -36,7 +36,31 @@ _TZ_CHOICES: list[dict[str, str]] = [
 ]
 
 
+# Default Spectra theme for the whole install. Per-page Theme can
+# override; "inherit" on a page falls back through to this value.
+_THEME_CHOICES: list[dict[str, str]] = [
+    {"value": "light", "label": "Light · warm paper"},
+    {"value": "dark", "label": "Dark · warm charcoal"},
+    {"value": "high-contrast", "label": "High contrast"},
+    {"value": "sepia", "label": "Sepia · book paper"},
+    {"value": "nord", "label": "Nord · cool blue night"},
+    {"value": "cool-gray", "label": "Cool gray · neutral slate"},
+]
+
+
 APP_FIELDS: list[dict[str, Any]] = [
+    {
+        "name": "theme",
+        "type": "select",
+        "label": "Default theme",
+        "default": "light",
+        "choices": _THEME_CHOICES,
+        "help": (
+            "The Spectra theme every dashboard inherits unless it picks its "
+            "own override. Each cell can still pin a theme too — that always "
+            "wins. Used for both the headless render and live previews."
+        ),
+    },
     {
         "name": "timezone",
         "type": "select",

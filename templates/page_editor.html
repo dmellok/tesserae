@@ -282,7 +282,8 @@
           {'value': 'cool-gray', 'label': 'Cool gray · neutral slate'},
         ] %}
         <div class="field-grid">
-          {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or 'light', options=theme_options) }}
+          {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or '', options=theme_options,
+                          blank_label='Inherit app default (' ~ app_theme ~ ')') }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
           {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color) }}
         </div>
