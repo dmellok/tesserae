@@ -174,6 +174,11 @@
       page: {
         theme: next.theme,
         style: next.style,
+        // Carry both the raw picker value (`font`) and the resolved
+        // family name (`font_family`). The iframe needs `font` to decide
+        // whether to write an inline --font-family override on body —
+        // see composer.js applyPagePatch for the rationale.
+        font: next.font || "",
         font_family: next.font_family,
         font_face_css: next.font_face_css,
         bleed_color: next.bleed_color,
@@ -190,6 +195,7 @@
         data: c.data,
         theme: c.theme || "",
         style: c.style || "",
+        font: c.font || "",
         font_family: c.font_family,
         full_bleed: Boolean(c.full_bleed),
       })),

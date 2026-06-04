@@ -124,6 +124,20 @@ function applyPagePatch(page) {
   if (typeof page.style === "string" && page.style) {
     document.body.setAttribute("data-style", page.style);
   }
+  // Page-level font picker. Set --font-family on body inline ONLY when
+  // the page has its own font pick — same reasoning as the cell-level
+  // path. When the page is inheriting (data-style controls the font),
+  // we must NOT set the inline custom property, otherwise we'd override
+  // the style's font with the page default and the style picker would
+  // stop affecting widget typography.
+  if (typeof page.font === "string" && page.font && page.font_family) {
+    document.body.style.setProperty(
+      "--font-family",
+      `'${page.font_family}', system-ui, sans-serif`,
+    );
+  } else if (page && Object.prototype.hasOwnProperty.call(page, "font")) {
+    document.body.style.removeProperty("--font-family");
+  }
   if (page.panel && Number(page.panel.w) > 0 && Number(page.panel.h) > 0) {
     const panelEl = document.querySelector(".panel");
     if (panelEl) {
@@ -162,15 +176,23 @@ async function applyCellPatch(patch) {
   }
   if (patch.font_family) {
     cell.style.fontFamily = `'${patch.font_family}', system-ui, sans-serif`;
-    // Spectra widgets read font-family from var(--font-family) inside
-    // their shadow root, so the inline cell font-family alone gets
-    // overridden by the .w rule. Setting --font-family on the cell host
-    // lets the custom-property cascade win.
-    cell.style.setProperty(
-      "--font-family",
-      `'${patch.font_family}', var(--font-family, system-ui, sans-serif)`,
-    );
     cell.dataset.fontFamily = patch.font_family;
+    // Spectra widgets read font-family from var(--font-family) inside
+    // their shadow root. Override the custom property ONLY when the
+    // cell has its own font pick (patch.font is the raw picker value,
+    // empty when inheriting from the page). The "always set" form with
+    // a `var(--font-family, …)` fallback self-references and CSS
+    // invalidates the whole declaration, breaking every chart probe
+    // inside the shadow — so we either set a real override or leave
+    // the inherited cascade intact.
+    if (patch.font) {
+      cell.style.setProperty(
+        "--font-family",
+        `'${patch.font_family}', system-ui, sans-serif`,
+      );
+    } else {
+      cell.style.removeProperty("--font-family");
+    }
   }
   // Per-cell theme override — empty / null clears it so the cell falls
   // back to the page theme on body.
