@@ -17,6 +17,7 @@
         { "value": "contain", "label": "Fit (letterbox)" }
       ]
     },
+    { "name": "show_track_info", "type": "boolean", "label": "Show track + artist overlay", "default": true },
     { "name": "dim_when_paused", "type": "boolean", "label": "Dim when paused", "default": true }
   ],
   "render": { "dither": "floyd-steinberg", "full_bleed": true, "needs_network": true }

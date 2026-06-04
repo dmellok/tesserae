@@ -13,6 +13,11 @@ export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
   const dimWhenPaused = opts.dim_when_paused !== false; // default true
+  const showInfo = opts.show_track_info !== false;      // default true
+  // ``scale`` flips the img between object-fit:cover (default — fills
+  // the cell, crops to aspect) and contain (letterbox — keeps the
+  // album art square). Anything else falls back to cover.
+  const fit = opts.scale === "contain" ? "contain" : "cover";
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -36,12 +41,17 @@ export default function render(shadow, ctx) {
 
   const subBits = [data.track, data.artist].filter(Boolean);
   const dimmed = dimWhenPaused && data.is_playing === false;
+  const imgStyle = [
+    `object-fit:${fit}`,
+    fit === "contain" ? "background:var(--surface-sunken)" : "",
+    dimmed ? "opacity:0.5" : "",
+  ].filter(Boolean).join(";");
 
   shadow.innerHTML = `
     ${css}
     <div class="w is-bleed" data-widget="spotify_album_art">
-      <img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.track || "")}"${dimmed ? ' style="opacity:0.5"' : ""}>
-      ${subBits.length
+      <img src="${escapeHtml(data.album_art)}" alt="${escapeHtml(data.track || "")}" style="${imgStyle}">
+      ${showInfo && subBits.length
         ? `<div class="img-overlay">
             ${data.track ? `<span class="title">${escapeHtml(data.track)}</span>` : ""}
             ${data.artist ? `<span class="sub">${escapeHtml(data.artist)}</span>` : ""}
