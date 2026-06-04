@@ -256,8 +256,37 @@
   font-size: clamp(14px, 12cqmin, 32px);
 }
 .wx-cell .ph-bold{ font-size: var(--icon-lg); color: var(--icon); }
-.wx-cell .d{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform:uppercase; letter-spacing: var(--ls-label); }
-.wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
+.wx-cell .d{
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-label);
+  /* Don't let a two-word label like "UV INDEX" wrap and make one
+     column taller than its neighbours. Falls back to ellipsis when
+     the cell is genuinely too narrow rather than stacking. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.wx-cell .t{
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+  /* Same nowrap pattern — and the unit beside the value goes to a
+     smaller weight so a long pair like "16.8 km/h" doesn't push the
+     unit onto a new line. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.wx-cell .t .unit{
+  font-size: 0.6em;
+  font-weight: var(--fw-bold);
+  color: var(--text-secondary);
+  margin-left: 0.15em;
+}
 
 /* Per-day temperature range bar. Track spans the column's full width;
    the fill sits at the day's slice of the week's overall low→high
