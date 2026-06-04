@@ -86,27 +86,57 @@ function emptyState(title) {
 }
 
 // ===========================================================
-// R1 — REFINED (numbered list, due dates right-aligned)
+// R1 — REFINED (hero count panel + numbered list)
 // ===========================================================
 function renderR1(data) {
   const items = data.items || [];
-  const headerRight = data.needs_action_count != null
-    ? `${data.needs_action_count} OPEN · ${escapeHtml(data.time || nowTime())}`
-    : escapeHtml(data.time || nowTime());
+  const open = data.needs_action_count || 0;
+  const done = data.completed_count || 0;
+  const headerRight = `${open} OPEN · ${escapeHtml(data.time || nowTime())}`;
   return `
     ${styleBlock()}
+    <style>
+      .ht-r1-hero { display:grid; grid-template-columns:1fr 1fr; border-top:3px solid var(--c-accent); }
+      .ht-r1-stat { padding:clamp(8px, 1.6cqh, 14px) clamp(12px, 2.4cqw, 20px); display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .ht-r1-stat--open { background:var(--c-accent); color:var(--wx-red-fg); }
+      .ht-r1-stat--done { background:var(--wx-tint); color:var(--c-text); }
+      .ht-r1-stat-label { font-family:var(--wx-mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+      .ht-r1-stat-num { font-family:var(--wx-black); font-size:clamp(28px, 6cqw, 44px); line-height:1; }
+      .ht-r1-list { flex:1; display:flex; flex-direction:column; border-top:3px solid var(--c-accent); overflow:hidden; background:var(--wx-paper); }
+      .ht-r1-row { display:grid; grid-template-columns:32px 1fr auto; align-items:center; gap:10px; padding:8px 16px; }
+      .ht-r1-row + .ht-r1-row { border-top:1px solid var(--c-line); }
+      .ht-r1-row.is-done { opacity:.55; }
+      .ht-r1-row.is-done .ht-r1-summary { text-decoration:line-through; }
+      .ht-r1-num { font-family:var(--wx-mono); font-size:11px; font-weight:700; color:var(--c-accent); letter-spacing:.04em; }
+      .ht-r1-summary { font-family:var(--wx-grotesk); font-size:13.5px; font-weight:600; color:var(--c-text); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .ht-r1-due { font-family:var(--wx-mono); font-size:10px; font-weight:700; letter-spacing:.06em; }
+
+      @container (max-height: 240px) {
+        .ht-r1-hero { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: data.title || "TODO", accent: "blue", right: headerRight })}
-      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
+      ${WX.darkHeader({ title: data.title || "TODO", accent: "red", right: headerRight })}
+      <div class="ht-r1-hero">
+        <div class="ht-r1-stat ht-r1-stat--open">
+          <span class="ht-r1-stat-label">Open</span>
+          <span class="wx-tnum ht-r1-stat-num">${open}</span>
+        </div>
+        <div class="ht-r1-stat ht-r1-stat--done">
+          <span class="ht-r1-stat-label" style="color:var(--wx-ink-60)">Done</span>
+          <span class="wx-tnum ht-r1-stat-num" style="color:var(--c-accent)">${done}</span>
+        </div>
+      </div>
+      <div class="ht-r1-list">
         ${items.length === 0 ? emptyState(data.title) : items.map((it, i) => {
-          const done = it.status === "completed";
+          const isDone = it.status === "completed";
           const due = fmtDue(it.due);
           return `
-            <div style="display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:10px;padding:8px 16px;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}${done ? "opacity:.55;" : ""}">
-              <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:11px;font-weight:700;color:var(--wx-ink-60);letter-spacing:.04em">${String(i + 1).padStart(2, "0")}</span>
-              <span style="font-family:var(--wx-grotesk);font-size:13.5px;font-weight:600;color:var(--wx-ink);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${done ? "text-decoration:line-through;" : ""}">${escapeHtml(it.summary)}</span>
+            <div class="ht-r1-row${isDone ? " is-done" : ""}">
+              <span class="wx-tnum ht-r1-num">${String(i + 1).padStart(2, "0")}</span>
+              <span class="ht-r1-summary">${escapeHtml(it.summary)}</span>
               ${due
-                ? `<span style="font-family:var(--wx-mono);font-size:10px;font-weight:700;letter-spacing:.06em;color:${dueTone(it.due)}">${escapeHtml(due)}</span>`
+                ? `<span class="ht-r1-due" style="color:${dueTone(it.due)}">${escapeHtml(due)}</span>`
                 : `<span></span>`}
             </div>
           `;

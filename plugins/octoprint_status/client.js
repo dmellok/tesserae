@@ -87,7 +87,7 @@ function styleBlock() {
 }
 
 // ===========================================================
-// R1 — REFINED (charcoal header, hero progress, temp rows)
+// R1 — REFINED (charcoal header → accent hero panel → temp rows)
 // ===========================================================
 function renderR1(data, size) {
   const { meta, text } = stateOf(data);
@@ -103,44 +103,61 @@ function renderR1(data, size) {
       <div style="flex:1;min-width:24px">
         ${WX.barChart({ value: (t && t.actual) || 0, max: (t && t.target) || (t && t.actual) || 1, color, height: 7 })}
       </div>
-      <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:84px;text-align:right">${escapeHtml(tempStr(t))}</span>
+      <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:84px;text-align:right;color:var(--c-text)">${escapeHtml(tempStr(t))}</span>
     </div>
   `;
 
   const hero = job
     ? `
-      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
-        <div style="display:flex;align-items:center;gap:8px;min-width:0">
-          ${WX.icon("cube", { size: 16, color: "var(--wx-ink)" })}
-          <span style="font-family:var(--wx-grotesk);font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(job.name)}</span>
+      <div class="op-r1-hero">
+        <div class="op-r1-hero-text">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            ${WX.icon("cube", { size: 16, color: "var(--c-accent)" })}
+            <span style="font-family:var(--wx-grotesk);font-size:clamp(11px, 2.4cqw, 14px);font-weight:600;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${escapeHtml(job.name)}</span>
+          </div>
+          <div style="height:10px;background:color-mix(in oklab, var(--c-text) 12%, transparent);margin-top:8px">
+            <div style="width:${Math.max(0, Math.min(100, Number(job.completion) || 0)).toFixed(1)}%;height:100%;background:var(--c-accent)"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:6px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60)">
+            <span>ELAPSED ${escapeHtml(fmtDur(job.elapsed))}</span>
+            <span>LEFT ${escapeHtml(fmtDur(job.remaining))}</span>
+            <span>ETA ${escapeHtml(job.eta || "—")}</span>
+          </div>
         </div>
-        <span class="wx-tnum" style="font-family:var(--wx-black);font-size:34px;line-height:.8;color:${meta.c}">${escapeHtml(fmtPct(job.completion))}</span>
-      </div>
-      <div style="height:12px;background:var(--wx-paper-3);margin-top:2px">
-        <div style="width:${Math.max(0, Math.min(100, Number(job.completion) || 0)).toFixed(1)}%;height:100%;background:${meta.c}"></div>
-      </div>
-      <div class="size-hide-sm" style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60)">
-        <span>ELAPSED ${escapeHtml(fmtDur(job.elapsed))}</span>
-        <span>LEFT ${escapeHtml(fmtDur(job.remaining))}</span>
-        <span>ETA ${escapeHtml(job.eta || "—")}</span>
+        <div class="op-r1-hero-pct">
+          <span class="wx-tnum" style="font-family:var(--wx-black);font-size:clamp(28px, 8cqw, 56px);line-height:.85">${escapeHtml(fmtPct(job.completion))}</span>
+        </div>
       </div>`
     : `
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px 0">
-        ${WX.icon(meta.icon, { size: 40, color: meta.c })}
-        <span style="font-family:var(--wx-black);font-size:18px;letter-spacing:.04em;color:${meta.c}">${escapeHtml(text || meta.label)}</span>
-        <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">NO ACTIVE JOB</span>
+      <div class="op-r1-idle">
+        <div class="op-r1-idle-icon">${WX.icon(meta.icon, { size: 48, color: "var(--wx-red-fg)" })}</div>
+        <div class="op-r1-idle-text">
+          <span style="font-family:var(--wx-black);font-size:clamp(14px, 3cqw, 20px);letter-spacing:.04em;color:var(--c-text)">${escapeHtml(text || meta.label)}</span>
+          <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60)">NO ACTIVE JOB</span>
+        </div>
       </div>`;
 
   return `
     ${styleBlock()}
-    <div class="wx-art size-${size}" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: data.label || "OCTOPRINT", accent: meta.wx, right: headerRight })}
-      <div style="flex:1;display:flex;flex-direction:column;gap:12px;padding:14px 16px;border-top:2px solid var(--wx-ink);min-height:0">
-        ${hero}
-        <div style="margin-top:auto;display:flex;flex-direction:column;gap:9px">
-          ${tempRow("Hotend", temps.tool, TOOL_COLOR, "thermometer-hot")}
-          ${tempRow("Bed", temps.bed, BED_COLOR, "thermometer-simple")}
-        </div>
+    <style>
+      .op-r1-hero { display:grid; grid-template-columns:1.4fr 1fr; min-height:0; border-top:3px solid var(--c-accent); }
+      .op-r1-hero-text { background:var(--wx-tint); padding:clamp(10px, 2cqw, 16px) clamp(12px, 2.4cqw, 18px); display:flex; flex-direction:column; justify-content:center; min-width:0; }
+      .op-r1-hero-pct { background:var(--c-accent); color:var(--wx-red-fg); display:flex; align-items:center; justify-content:center; padding:clamp(10px, 2cqw, 16px); }
+      .op-r1-idle { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:14px; padding:clamp(12px, 2.6cqw, 22px); border-top:3px solid var(--c-accent); background:var(--wx-tint); }
+      .op-r1-idle-icon { background:var(--c-accent); color:var(--wx-red-fg); width:clamp(48px, 12cqw, 72px); height:clamp(48px, 12cqw, 72px); display:flex; align-items:center; justify-content:center; }
+      .op-r1-idle-text { display:flex; flex-direction:column; gap:4px; }
+      .op-r1-temps { margin-top:auto; display:flex; flex-direction:column; gap:9px; padding:14px 16px; border-top:3px solid var(--c-accent); background:var(--wx-paper); }
+
+      @container (max-width: 360px) {
+        .op-r1-hero { grid-template-columns:1fr; }
+      }
+    </style>
+    <div class="wx-art size-${size}" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column;min-height:0">
+      ${WX.darkHeader({ title: data.label || "OCTOPRINT", accent: "red", right: headerRight })}
+      ${hero}
+      <div class="op-r1-temps">
+        ${tempRow("Hotend", temps.tool, TOOL_COLOR, "thermometer-hot")}
+        ${tempRow("Bed", temps.bed, BED_COLOR, "thermometer-simple")}
       </div>
     </div>
   `;

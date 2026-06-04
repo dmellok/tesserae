@@ -95,7 +95,7 @@ function emptyState(label, accent = "muted") {
 }
 
 // ===========================================================
-// R1 — REFINED (header + sorted list of horizontal bars)
+// R1 — REFINED (lowest-battery hero panel + sorted list)
 // ===========================================================
 function renderR1(data) {
   const items = data.items || [];
@@ -103,21 +103,52 @@ function renderR1(data) {
   const headerRight = summary.count != null
     ? `${summary.shown ?? items.length}/${summary.count} · ${escapeHtml(data.time || nowTime())}`
     : escapeHtml(data.time || nowTime());
+  const lowest = items[0] || null;
+  const avg = summary.avg != null ? Math.round(Number(summary.avg)) : null;
   return `
     ${styleBlock()}
+    <style>
+      .hb-r1-hero { display:grid; grid-template-columns:1.4fr 1fr; border-top:3px solid var(--c-accent); }
+      .hb-r1-stat { padding:clamp(8px, 1.6cqh, 14px) clamp(12px, 2.4cqw, 20px); display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .hb-r1-stat--low { background:var(--c-accent); color:var(--wx-red-fg); }
+      .hb-r1-stat--avg { background:var(--wx-tint); color:var(--c-text); }
+      .hb-r1-stat-label { font-family:var(--wx-mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+      .hb-r1-stat-num { font-family:var(--wx-black); font-size:clamp(28px, 6cqw, 44px); line-height:1; }
+      .hb-r1-stat-name { font-family:var(--wx-mono); font-size:11px; letter-spacing:.04em; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .hb-r1-list { flex:1; display:flex; flex-direction:column; border-top:3px solid var(--c-accent); overflow:hidden; background:var(--wx-paper); }
+      .hb-r1-row { display:flex; align-items:center; gap:10px; padding:7px 14px; }
+      .hb-r1-row + .hb-r1-row { border-top:1px solid var(--c-line); }
+      .hb-r1-name { flex:0 0 32%; min-width:0; font-family:var(--wx-grotesk); font-size:12.5px; font-weight:600; color:var(--c-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .hb-r1-pct { font-family:var(--wx-black); font-size:14px; min-width:44px; text-align:right; color:var(--c-text); }
+
+      @container (max-height: 240px) {
+        .hb-r1-hero { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: data.label || "BATTERIES", accent: "green", right: headerRight })}
-      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
-        ${items.length === 0 ? emptyState(data.label) : items.map((it, i) => {
+      ${WX.darkHeader({ title: data.label || "BATTERIES", accent: "red", right: headerRight })}
+      <div class="hb-r1-hero">
+        <div class="hb-r1-stat hb-r1-stat--low">
+          <span class="hb-r1-stat-label">Lowest</span>
+          <span class="wx-tnum hb-r1-stat-num">${lowest ? escapeHtml(fmtPct(lowest.level)) : "—"}</span>
+          <span class="hb-r1-stat-name">${lowest ? escapeHtml(lowest.name) : "no devices"}</span>
+        </div>
+        <div class="hb-r1-stat hb-r1-stat--avg">
+          <span class="hb-r1-stat-label" style="color:var(--wx-ink-60)">Average</span>
+          <span class="wx-tnum hb-r1-stat-num" style="color:var(--c-accent)">${avg != null ? avg + "%" : "—"}</span>
+        </div>
+      </div>
+      <div class="hb-r1-list">
+        ${items.length === 0 ? emptyState(data.label) : items.map((it) => {
           const fill = statusFill(it);
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:7px 14px;${i < items.length - 1 ? "border-bottom:1px solid var(--c-line);" : ""}">
+            <div class="hb-r1-row">
               ${WX.icon(batteryIcon(it.level), { size: 18, color: fill.bg })}
-              <span style="flex:0 0 32%;min-width:0;font-family:var(--wx-grotesk);font-size:12.5px;font-weight:600;color:var(--wx-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</span>
+              <span class="hb-r1-name">${escapeHtml(it.name)}</span>
               <div style="flex:1;min-width:24px">
                 ${WX.barChart({ value: it.level, max: 100, color: fill.bg, height: 8 })}
               </div>
-              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:14px;min-width:44px;text-align:right">${escapeHtml(fmtPct(it.level))}</span>
+              <span class="wx-tnum hb-r1-pct">${escapeHtml(fmtPct(it.level))}</span>
             </div>
           `;
         }).join("")}
