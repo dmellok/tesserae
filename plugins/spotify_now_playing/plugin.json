@@ -14,6 +14,16 @@
   },
   "cell_options": [
     {
+      "name": "layout",
+      "type": "select",
+      "label": "Layout",
+      "default": "stack",
+      "choices": [
+        { "value": "stack", "label": "Stack — art above info" },
+        { "value": "side",  "label": "Side — art square on the left" }
+      ]
+    },
+    {
       "name": "show_art",
       "type": "boolean",
       "label": "Show album art",

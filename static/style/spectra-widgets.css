@@ -524,6 +524,39 @@
   overflow: hidden;
   border-radius: var(--radius-0);
 }
+
+/* Side-by-side variant — album art / camera frame as a square on the
+   left, the meta lockup on the right. Lets a now-playing tile read
+   like a player chrome rather than a stacked card. */
+.img-body.is-side{
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+.img-body.is-side .img-hero{
+  flex: 0 0 auto;
+  align-self: stretch;
+  aspect-ratio: 1;
+  height: 100%;
+  width: auto;
+}
+.img-body.is-side .img-meta{
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: center;
+  gap: var(--space-2);
+}
+.img-body.is-side .img-meta .title{
+  /* The title can run two lines in side mode — there's room. */
+  white-space: normal;
+  line-height: var(--lh-snug);
+  font-size: var(--fs-lead);
+  max-height: 2.4em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .img-hero img{ width: 100%; height: 100%; object-fit: cover; display: block; }
 .img-hero .ph-bold{ font-size: var(--icon-lg); color: var(--text-muted); }
 .img-meta{ display: flex; flex-direction: column; gap: 0.1em; }
@@ -534,7 +567,10 @@
   margin-top: var(--space-1);
 }
 .img-progress-track{
-  height: var(--stroke-2);
+  /* Thicker bar so the fill reads as a chunky data stroke rather than
+     a hairline. Per Spectra "data strokes 3px+" — going to 0.4em
+     keeps it proportional to the surrounding type. */
+  height: 0.4em;
   background: var(--surface-sunken);
   position: relative;
 }

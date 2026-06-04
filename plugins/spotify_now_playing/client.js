@@ -21,6 +21,10 @@ export default function render(shadow, ctx) {
   const showArt = opts.show_art !== false;
   const showAlbum = opts.show_album !== false;
   const showProgress = opts.show_progress !== false;
+  // Layout: ``stack`` (default — album art hero, info below) or
+  // ``side`` (album art as a square on the left, info on the right).
+  const layout = opts.layout === "side" ? "side" : "stack";
+  const bodyClass = layout === "side" ? "img-body is-side" : "img-body";
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -94,7 +98,7 @@ export default function render(shadow, ctx) {
         <h3>Spotify</h3>
         <span class="w-title-meta" style="color:${stateAccent}">${stateLabel}${!showProgress && timeMeta ? ` · ${escapeHtml(timeMeta)}` : ""}</span>
       </div>
-      <div class="w-body img-body">
+      <div class="w-body ${bodyClass}">
         ${hero}
         <div class="img-meta">
           <span class="title">${escapeHtml(data.track)}</span>
