@@ -47,6 +47,16 @@
   align-items: center;
   gap: var(--space-2);
   color: var(--text-secondary);
+  /* Lock the title-bar size against per-cell content zoom. The body
+     uses ``--w-font-base`` which floors at 14px, so zoom > 1 grows the
+     visible content (intended). For the title we want the size you'd
+     get at zoom=1 regardless — small chrome should stay small chrome
+     when the body is dialled up. Trick: multiply the cqmin term by
+     --c-zoom (cancels cell-content's inverse-sized container query)
+     then divide the clamped result by --c-zoom (counters the
+     transform). Children inherit; em-based sizes (h3, icon, gap,
+     min-height) all stay locked off the title's font-size. */
+  font-size: calc(clamp(14px, calc(7cqmin * var(--c-zoom, 1)), 28px) / var(--c-zoom, 1));
 }
 .w-title .ph-bold{ font-size: var(--icon-sm); color: var(--icon); line-height: 1; }
 .w-title h3{
