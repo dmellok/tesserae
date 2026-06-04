@@ -1,44 +1,83 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// ha_zones — Spectra list archetype. One row per person/device tracker
+// with their zone state as right-aligned meta (home = accent-3 live,
+// away = text-secondary, named zone = accent-5 categorical). Profile
+// picture replaces the leading icon when HA exposes one.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function stateAccent(state) {
+  if (!state) return "var(--text-secondary)";
+  const s = String(state).toLowerCase();
+  if (s === "home") return "var(--accent-3)";
+  if (s === "not_home" || s === "away") return "var(--text-muted)";
+  return "var(--accent-5)";
+}
+
+function stateLabel(state) {
+  if (!state) return "—";
+  if (state === "not_home") return "Away";
+  if (state === "home") return "Home";
+  return state;
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="ha_zones">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Zones</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const place = data.label || "Zones";
+  const summary = data.summary || {};
+  const home = summary.home ?? items.filter((i) => i.state === "home").length;
+  const total = summary.total ?? items.length;
+
+  if (items.length === 0) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="ha_zones">
+        <div class="w-title"><i class="ph-bold ph-users-three"></i><h3>${escapeHtml(place)}</h3></div>
+        <div class="w-body"><p class="u-muted">No people tracked.</p></div>
+      </div>`;
+    return;
+  }
+
+  const rows = items.map((it, i) => {
+    const accent = stateAccent(it.state);
+    // Profile picture replaces the icon when HA exposes one.
+    const lead = it.entity_picture
+      ? `<img src="${escapeHtml(it.entity_picture)}" alt="" style="width:1.4em;height:1.4em;border-radius:999px;object-fit:cover;flex:0 0 auto" />`
+      : `<i class="ph-bold ph-user" style="color:${accent}"></i>`;
+    return `
+      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead">
+          ${lead}
+          <span class="list-title">${escapeHtml(it.name)}</span>
+        </div>
+        <span class="list-meta" style="color:${accent}">${escapeHtml(stateLabel(it.state))}</span>
+      </div>`;
+  }).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="ha_zones">
+      <div class="w-title">
+        <i class="ph-bold ph-users-three" style="color:var(--accent-3)"></i>
+        <h3>${escapeHtml(place)}</h3>
+        <span class="w-title-meta">${home}/${total} HOME</span>
+      </div>
+      <div class="w-body list-body">${rows}</div>
+    </div>`;
 }

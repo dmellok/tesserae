@@ -213,6 +213,27 @@
 .wx-cell .d{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform:uppercase; letter-spacing: var(--ls-label); }
 .wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
 
+/* ============================================================================
+   WIDGET 7 · IMAGE  (hero picture + optional meta strip)
+   Used by media players (album art) + cameras. Image fills the body and
+   meta sits below as a small lockup; the .w-title stays in its normal
+   slot above. No internal divider line.
+   ============================================================================ */
+.img-body{ gap: var(--space-3); }
+.img-hero{
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--surface-sunken);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius-0);
+}
+.img-hero img{ width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-hero .ph-bold{ font-size: var(--icon-lg); color: var(--text-muted); }
+.img-meta{ display: flex; flex-direction: column; gap: 0.1em; }
+.img-meta .title{ font-size: var(--fs-lead); font-weight: var(--fw-bold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.img-meta .sub{ font-size: var(--fs-body); font-weight: var(--fw-semi); color: var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
 /* ---- compact mode for very small tiles: trim secondary content ---------- */
 @container (max-width: 240px){
   .stat-value{ font-size: 2.4em; }
@@ -220,4 +241,5 @@
   .wx-forecast .wx-cell:nth-child(n+4){ display:none; }
   .cal-events .cal-event:nth-child(n+3){ display:none; }
   .list-row:nth-child(n+5){ display:none; }
+  .img-meta .sub{ display:none; }
 }

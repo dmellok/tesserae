@@ -1,44 +1,100 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// ha_energy — Spectra status archetype. Hero = current power flow's
+// signature value (solar generation if generating, else house load).
+// Pill names the flow (solar / grid / battery / mixed) with the
+// matching accent. Status grid breaks out the four wattage channels +
+// battery SOC if present.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+const FLOW_ACCENT = {
+  solar: "var(--accent-2)",   // ochre — sun energy
+  grid: "var(--accent-5)",    // slate blue — utility
+  battery: "var(--accent-3)", // moss — stored
+  mixed: "var(--accent-4)",   // teal — neutral fallback
+};
+
+const FLOW_ICON = {
+  solar: "ph-sun",
+  grid: "ph-lightning",
+  battery: "ph-battery-charging",
+  mixed: "ph-shuffle",
+};
+
+function fmtW(v) {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)} kW`;
+  return `${Math.round(n)} W`;
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="ha_energy">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Energy</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const place = data.place || data.label || "Energy";
+  const flow = data.flow || "mixed";
+  const accent = FLOW_ACCENT[flow] || FLOW_ACCENT.mixed;
+  const flowIcon = FLOW_ICON[flow] || FLOW_ICON.mixed;
+
+  const solar = data.solar_w;
+  const grid = data.grid_w;
+  const battery = data.battery_w;
+  const house = data.house_w;
+  const soc = data.battery_soc;
+
+  // Hero value: prefer solar generation when there's any; otherwise
+  // surface the house load so the widget always shows something
+  // meaningful.
+  const heroValue = (Number.isFinite(solar) && solar > 0) ? fmtW(solar) : fmtW(house);
+  const heroLabel = (Number.isFinite(solar) && solar > 0) ? "Solar now" : "House load";
+
+  const cells = [
+    ["Solar", fmtW(solar), FLOW_ACCENT.solar],
+    ["Grid", fmtW(grid), FLOW_ACCENT.grid],
+    ["Battery", fmtW(battery), FLOW_ACCENT.battery],
+    ["House", fmtW(house), "var(--text-secondary)"],
+  ];
+  if (soc != null) cells.push(["SOC", `${Math.round(Number(soc))}%`, FLOW_ACCENT.battery]);
+
+  const grid_html = cells.map(([label, value, c]) => `
+    <div class="status-cell">
+      <span class="u-label">${escapeHtml(label)}</span>
+      <span class="v" style="color:${c}">${escapeHtml(value)}</span>
+    </div>`).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="ha_energy">
+      <div class="w-title">
+        <i class="ph-bold ph-lightning" style="color:${accent}"></i>
+        <h3>${escapeHtml(place)}</h3>
+        <span class="w-title-meta">${escapeHtml(data.time || "")}</span>
+      </div>
+      <div class="w-body status-body">
+        <div class="status-hero">
+          <i class="ph-bold ${flowIcon}" style="color:${accent}"></i>
+          <div class="lockup">
+            <span class="status-state">${escapeHtml(heroValue)}</span>
+            <span class="status-sub">${escapeHtml(heroLabel)}</span>
+          </div>
+        </div>
+        <span class="pill" style="background:${accent}">${escapeHtml(flow)}</span>
+        <div class="status-grid">${grid_html}</div>
+      </div>
+    </div>`;
 }

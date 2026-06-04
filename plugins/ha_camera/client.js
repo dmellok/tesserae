@@ -1,44 +1,66 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// ha_camera — Spectra image archetype. Camera snapshot as the hero
+// image, meta strip below carries state (idle/recording/streaming) +
+// motion when HA exposes it.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+const STATE_ACCENT = {
+  recording: "var(--accent-1)",
+  streaming: "var(--accent-4)",
+  idle: "var(--text-muted)",
+};
+
+function stateAccent(s) {
+  return STATE_ACCENT[(s || "").toLowerCase()] || "var(--text-secondary)";
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="ha_camera">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Camera</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const name = data.name || "Camera";
+  const url = data.image_url || "";
+  const state = data.state || "";
+  const motion = data.motion === true;
+
+  const accent = stateAccent(state);
+
+  const heroBody = url
+    ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`
+    : `<i class="ph-bold ph-video-camera-slash"></i>`;
+
+  const stateBits = [];
+  if (state) stateBits.push(state);
+  if (motion) stateBits.push("motion");
+  const sub = stateBits.length ? stateBits.join(" · ") : "no signal";
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="ha_camera">
+      <div class="w-title">
+        <i class="ph-bold ph-video-camera" style="color:${accent}"></i>
+        <h3>${escapeHtml(name)}</h3>
+        ${motion ? `<span class="w-title-meta" style="color:var(--accent-1)">MOTION</span>` : ""}
+      </div>
+      <div class="w-body img-body">
+        <div class="img-hero">${heroBody}</div>
+        <div class="img-meta">
+          <span class="sub" style="color:${accent}">${escapeHtml(sub)}</span>
+        </div>
+      </div>
+    </div>`;
 }
