@@ -169,12 +169,31 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
 _FONT_WAIT_JS: Final[str] = """async () => {
     if (!document.fonts || !document.fonts.load) return;
     const families = new Set();
+    // Take both the cell's inline font-family (the page/per-cell font
+    // picker) AND the cell's cascaded --font-family (the active Spectra
+    // style, which paints inside the shadow root). Reading the property
+    // direct via getPropertyValue is unreliable for inherited custom
+    // properties in some shadow-host edge cases (same gotcha that drove
+    // the spectra-chart.js probe), so we probe via a real CSS property:
+    // a hidden child with font-family: var(--font-family) inherits the
+    // cell's cascade and getComputedStyle resolves the actual family.
     document.querySelectorAll('.cell').forEach((cell) => {
-        const ff = getComputedStyle(cell).fontFamily;
-        if (!ff) return;
-        const first = ff.split(',')[0].trim()
-            .replace(/^['\"]|['\"]$/g, '');
-        if (first) families.add(first);
+        const inline = getComputedStyle(cell).fontFamily;
+        if (inline) {
+            const first = inline.split(',')[0].trim()
+                .replace(/^['\"]|['\"]$/g, '');
+            if (first) families.add(first);
+        }
+        const probe = document.createElement('span');
+        probe.style.cssText = 'position:absolute;visibility:hidden;width:0;height:0;font-family:var(--font-family)';
+        cell.appendChild(probe);
+        const cascaded = getComputedStyle(probe).fontFamily;
+        probe.remove();
+        if (cascaded) {
+            const first = cascaded.split(',')[0].trim()
+                .replace(/^['\"]|['\"]$/g, '');
+            if (first) families.add(first);
+        }
     });
     const loads = [];
     for (const family of families) {

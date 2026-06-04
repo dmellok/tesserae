@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Final
 
 from flask import Blueprint, abort, current_app, render_template, request
 
@@ -524,6 +524,85 @@ def test_render() -> str:
         page=_hydrate_page(page, preview=True, sample=sample_mode),
         for_push=False,
         preview_mode=False,
+    )
+
+
+_MATRIX_THEMES: Final[list[dict[str, str]]] = [
+    {"id": "light", "label": "Light", "group": "Spectra"},
+    {"id": "dark", "label": "Dark", "group": "Spectra"},
+    {"id": "high-contrast", "label": "High contrast", "group": "Spectra"},
+    {"id": "sepia", "label": "Sepia", "group": "Spectra"},
+    {"id": "nord", "label": "Nord", "group": "Spectra"},
+    {"id": "cool-gray", "label": "Cool gray", "group": "Spectra"},
+    {"id": "bauhaus", "label": "Bauhaus", "group": "Movement"},
+    {"id": "destijl", "label": "De Stijl", "group": "Movement"},
+    {"id": "brutalist", "label": "Brutalist", "group": "Movement"},
+    {"id": "base16-gruvbox-dark", "label": "Gruvbox dark", "group": "base16"},
+    {"id": "base16-gruvbox-light", "label": "Gruvbox light", "group": "base16"},
+    {"id": "base16-solarized-dark", "label": "Solarized dark", "group": "base16"},
+    {"id": "base16-solarized-light", "label": "Solarized light", "group": "base16"},
+    {"id": "base16-dracula", "label": "Dracula", "group": "base16"},
+    {"id": "base16-catppuccin-mocha", "label": "Catppuccin Mocha", "group": "base16"},
+    {"id": "base16-monokai", "label": "Monokai", "group": "base16"},
+    {"id": "base16-tomorrow-night", "label": "Tomorrow Night", "group": "base16"},
+    {"id": "base16-tomorrow", "label": "Tomorrow", "group": "base16"},
+    {"id": "base16-one-dark", "label": "One Dark", "group": "base16"},
+]
+_MATRIX_STYLES: Final[list[dict[str, str]]] = [
+    {"id": "standard", "label": "Standard"},
+    {"id": "display", "label": "Display"},
+    {"id": "editorial", "label": "Editorial"},
+    {"id": "mono", "label": "Mono"},
+    {"id": "elegant", "label": "Elegant"},
+    {"id": "condensed", "label": "Condensed"},
+    {"id": "bauhaus", "label": "Bauhaus"},
+    {"id": "destijl", "label": "De Stijl"},
+    {"id": "brutalist", "label": "Brutalist"},
+]
+
+
+@bp.get("/_test/matrix")
+def test_theme_style_matrix() -> str:
+    """Theme × style coverage matrix for one widget at a time.
+
+    19 themes × 9 styles = 171 iframes, lazy-loaded, so opening this page
+    doesn't fire 171 fetches up front. Each iframe drives ``/_test/render``
+    with one ``(theme, style)`` pair so the combinations get eyeballed
+    instead of trusted on faith. Dev-only — guarded behind debug/testing
+    the same way ``/_test/widgets`` is.
+
+    Query params:
+      ?widget=<plugin_id>   widget to use as the test cell (default: first
+                            registered widget alphabetically)
+      ?size=xs|sm|md|lg     cell size (default md)
+      ?sample=1             pass ``sample=1`` through to /_test/render so
+                            widgets with hand-written fixtures don't
+                            error-state
+    """
+    if not (current_app.debug or current_app.testing):
+        abort(404)
+    widgets = sorted(_registry().widgets(), key=lambda p: p.name.lower())
+    if not widgets:
+        abort(404)
+    widget_id = request.args.get("widget") or widgets[0].id
+    plugin = next((p for p in widgets if p.id == widget_id), None)
+    if plugin is None:
+        abort(400)
+    size = request.args.get("size", "md")
+    if size not in SIZE_DIMENSIONS:
+        abort(400)
+    sample = request.args.get("sample") == "1"
+    cell_w, cell_h = SIZE_DIMENSIONS[size]
+    return render_template(
+        "theme_style_matrix.html",
+        widget=plugin,
+        widgets=widgets,
+        size=size,
+        cell_w=cell_w,
+        cell_h=cell_h,
+        themes=_MATRIX_THEMES,
+        styles=_MATRIX_STYLES,
+        sample=sample,
     )
 
 

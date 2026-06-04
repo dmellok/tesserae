@@ -1,0 +1,278 @@
+{# Dev-only theme × style coverage matrix.
+
+   One widget rendered into 171 cells (19 themes × 9 styles). Iframes are
+   lazy-loaded so the page stays light until you scroll a row into view —
+   browsers won't issue the request for an off-screen iframe with
+   loading="lazy". Sticky header row + sticky left column let you scroll
+   either axis without losing the labels.
+
+   Reach this page directly at /compose/_test/matrix?widget=<plugin_id>.
+   Not linked from the main nav. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Theme × style matrix — {{ widget.name }} — Tesserae</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel2: #1e242c;
+      --fg: #e6edf3;
+      --fgSoft: #9aa6b3;
+      --border: #2a313a;
+      --accent: #4ec9b0;
+      --accent2: #f0b020;
+      /* Cell scale: the widget renders at its native panel size
+         (e.g. 360×240 for md), then transform-scales down to this
+         display target so the grid fits the page. */
+      --cell-w: 220px;
+      --tw: {{ cell_w }};
+      --th: {{ cell_h }};
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fafbfc;
+        --panel: #ffffff;
+        --panel2: #f3f5f8;
+        --fg: #14181d;
+        --fgSoft: #5b6470;
+        --border: #d6dbe1;
+        --accent: #0d8c7e;
+        --accent2: #b87a00;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+                 font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+    /* ---- top bar ---- */
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      padding: 12px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+    .topbar h1 {
+      font-size: 16px; font-weight: 700; margin: 0;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .topbar h1 .icon { color: var(--accent); font-size: 18px; }
+    .topbar .lede { margin: 0; color: var(--fgSoft); font-size: 13px; }
+    .topbar form { display: inline-flex; align-items: center; gap: 8px; margin: 0; }
+    .topbar label {
+      font: 600 11px/1 ui-monospace, monospace;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--fgSoft);
+    }
+    .topbar select, .topbar input[type="checkbox"] {
+      accent-color: var(--accent);
+    }
+    .topbar select {
+      background: var(--panel2); color: var(--fg);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 5px 28px 5px 10px;
+      font: 500 13px/1.2 system-ui, sans-serif;
+      cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position: calc(100% - 14px) center, calc(100% - 10px) center;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+    }
+    .topbar .spacer { flex: 1 1 auto; }
+    .topbar .open-link {
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
+      color: var(--fgSoft);
+    }
+    .topbar .open-link:hover { color: var(--accent); }
+
+    /* ---- matrix ---- */
+    .matrix-wrap {
+      padding: 20px;
+      overflow-x: auto;
+    }
+    .matrix {
+      display: grid;
+      /* one label col + one column per style */
+      grid-template-columns: 160px repeat({{ styles|length }}, var(--cell-w));
+      gap: 0;
+      border-collapse: separate;
+    }
+    /* Column headers — sticky to the top so scrolling down keeps the
+       style names in view. Sits below the topbar (which is also sticky)
+       via a calculated top offset. */
+    .matrix .col-head, .matrix .corner {
+      position: sticky; top: 0; z-index: 10;
+      background: var(--panel);
+      border-bottom: 2px solid var(--border);
+    }
+    .matrix .col-head {
+      padding: 12px 8px;
+      font: 700 12px/1.2 ui-monospace, monospace;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--fg);
+      text-align: center;
+    }
+    .matrix .col-head .sub {
+      display: block;
+      font: 500 10px/1 system-ui, sans-serif;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--fgSoft);
+      margin-top: 4px;
+    }
+    /* Row labels — sticky to the left edge. */
+    .matrix .row-head {
+      position: sticky; left: 0; z-index: 5;
+      background: var(--panel);
+      border-right: 2px solid var(--border);
+      padding: 10px 12px;
+      font: 700 12px/1.2 ui-monospace, monospace;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--fg);
+    }
+    .matrix .row-head .sub {
+      display: block;
+      font: 500 10px/1 system-ui, sans-serif;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      color: var(--fgSoft);
+      margin-top: 4px;
+    }
+    .matrix .row-head.is-group {
+      border-top: 1px solid var(--border);
+    }
+
+    /* Frame holds the iframe; iframe renders at native widget dims and
+       transform-scales down. Background = the page bg so e-ink white
+       frames don't look like a missing image. */
+    .matrix .frame {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-right: 0;
+      border-bottom: 0;
+      overflow: hidden;
+      position: relative;
+      /* scale derived from --cell-w / --tw so the frame snaps to the
+         column width but the iframe paints at native res. */
+      --s: calc(var(--cell-w) / (var(--tw) * 1px));
+      height: calc(var(--th) * 1px * var(--s));
+    }
+    /* Bottom border on every frame so each row reads as a complete strip
+       even without a per-row last-child computation; the group dividers
+       above/below provide the section breaks. */
+    .matrix .frame { border-bottom: 1px solid var(--border); }
+    .matrix .frame iframe {
+      display: block;
+      border: 0;
+      background: white;
+      position: absolute;
+      top: 0; left: 0;
+      width: calc(var(--tw) * 1px);
+      height: calc(var(--th) * 1px);
+      transform: scale(var(--s));
+      transform-origin: 0 0;
+    }
+    /* Hover halo — call out a single cell when you're studying it. */
+    .matrix .frame:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 4; }
+
+    /* Group divider rows between Spectra / Movement / base16. */
+    .matrix .group-divider {
+      grid-column: 1 / -1;
+      padding: 14px 12px 6px;
+      background: var(--bg);
+      font: 700 11px/1 ui-monospace, monospace;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--fgSoft);
+      border-top: 1px solid var(--border);
+      position: sticky; left: 0;
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1>
+    <i class="ph-bold ph-grid-four icon" aria-hidden="true"></i>
+    <span>Theme × style matrix</span>
+  </h1>
+
+  {# Pick a different widget without typing the URL by hand. #}
+  <form method="get" action="{{ url_for('composer.test_theme_style_matrix') }}">
+    <label for="widget">Widget</label>
+    <select id="widget" name="widget" onchange="this.form.submit()">
+      {% for w in widgets %}
+      <option value="{{ w.id }}" {% if w.id == widget.id %}selected{% endif %}>{{ w.name }} ({{ w.id }})</option>
+      {% endfor %}
+    </select>
+    <label for="size">Size</label>
+    <select id="size" name="size" onchange="this.form.submit()">
+      {% for s in ['xs', 'sm', 'md', 'lg'] %}
+      <option value="{{ s }}" {% if s == size %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <label for="sample">
+      <input type="checkbox" id="sample" name="sample" value="1" {% if sample %}checked{% endif %} onchange="this.form.submit()">
+      sample data
+    </label>
+  </form>
+
+  <div class="spacer"></div>
+  <p class="lede">19 themes × 9 styles = <strong>171 combos</strong> · {{ cell_w }} × {{ cell_h }} per cell · lazy-loaded</p>
+  <a class="open-link" href="{{ url_for('composer.test_widget_gallery') }}">↗ Widget gallery</a>
+</header>
+
+<div class="matrix-wrap">
+  <div class="matrix">
+
+    {# Header row: corner + one column per style. #}
+    <div class="corner row-head" aria-hidden="true"></div>
+    {% for style in styles %}
+    <div class="col-head">
+      {{ style.label }}
+      <span class="sub"><code>{{ style.id }}</code></span>
+    </div>
+    {% endfor %}
+
+    {# Theme rows, grouped by category. Each group boundary emits a
+       divider row first to visually separate Spectra / Movement / base16.
+       The render URL is built via url_for so query params (including the
+       optional sample flag) compose correctly — manually appending
+       ?sample=1 here would collide with the existing query string url_for
+       emits for size / theme / style. #}
+    {% set ns = namespace(prev_group='') %}
+    {% for theme in themes %}
+      {% if theme.group != ns.prev_group %}
+      <div class="group-divider">{{ theme.group }}</div>
+      {% set ns.prev_group = theme.group %}
+      {% endif %}
+      <div class="row-head">
+        {{ theme.label }}
+        <span class="sub"><code>{{ theme.id }}</code></span>
+      </div>
+      {% for style in styles %}
+      <div class="frame">
+        <iframe
+            src="{% if sample %}{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme.id, style=style.id, sample='1') }}{% else %}{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme.id, style=style.id) }}{% endif %}"
+            loading="lazy"
+            sandbox="allow-scripts allow-same-origin"
+            title="{{ widget.name }} · {{ theme.label }} · {{ style.label }}"></iframe>
+      </div>
+      {% endfor %}
+    {% endfor %}
+
+  </div>
+</div>
+
+</body>
+</html>
