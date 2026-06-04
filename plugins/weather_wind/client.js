@@ -112,34 +112,53 @@ function styleBlock() {
 }
 
 // ===========================================================
-// R1 — REFINED (charcoal header + compass + hour strip)
+// R1 — REFINED (charcoal header + accent compass panel + hour strip)
 // ===========================================================
 function renderR1(data) {
   const hours = Array.isArray(data.hours) ? data.hours : [];
   return `
     ${styleBlock()}
+    <style>
+      .ww-r1-hero { flex:1; display:grid; grid-template-columns:1fr 1.4fr; min-width:0; min-height:0; border-top:3px solid var(--c-accent); }
+      .ww-r1-compass { background:var(--c-accent); display:flex; align-items:center; justify-content:center; padding:clamp(10px, 2cqw, 18px); color:var(--wx-red-fg); }
+      .ww-r1-stats { background:var(--wx-tint); padding:clamp(10px, 2.4cqw, 18px) clamp(14px, 3cqw, 24px); display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; }
+      .ww-r1-speed { display:flex; align-items:flex-end; gap:6px; }
+      .ww-r1-speed-num { font-family:var(--wx-black); font-size:clamp(40px, 14cqw, 80px); line-height:.8; color:var(--c-accent); }
+      .ww-r1-speed-unit { font-family:var(--wx-mono); font-size:clamp(12px, 2.4cqw, 18px); color:var(--wx-ink-60); margin-bottom:clamp(4px, 1.4cqw, 12px); }
+      .ww-r1-dir { font-weight:800; font-size:clamp(13px, 2.6cqw, 19px); letter-spacing:.02em; color:var(--c-text); }
+      .ww-r1-meta { display:flex; gap:20px; font-family:var(--wx-mono); font-size:clamp(10px, 1.8cqw, 12px); color:var(--wx-ink-60); flex-wrap:wrap; }
+      .ww-r1-hours { display:flex; border-top:3px solid var(--c-accent); background:var(--wx-paper); }
+      .ww-r1-hour { flex:1; padding:9px 0; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:0; }
+      .ww-r1-hour + .ww-r1-hour { border-left:1px solid var(--c-line); }
+
+      @container (max-width: 460px) {
+        .ww-r1-hero { grid-template-columns:1fr; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: `${data.place || ""} · WIND`, accent: "blue", right: data.time || "" })}
-      <div style="flex:1;display:flex;align-items:center;padding:14px 24px;gap:24px">
-        ${compass({ bearing: data.bearing || 0, size: 150, color: WX.col("blue") })}
-        <div style="flex:1">
-          <div style="display:flex;align-items:flex-end;gap:6px">
-            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:80px;line-height:.8">${escapeHtml(String(data.speed))}</span>
-            <span style="font-family:var(--wx-mono);font-size:18px;color:var(--wx-ink-60);margin-bottom:12px">${escapeHtml(data.unit || "")}</span>
+      ${WX.darkHeader({ title: `${data.place || ""} · WIND`, accent: "red", right: data.time || "" })}
+      <div class="ww-r1-hero">
+        <div class="ww-r1-compass">
+          ${compass({ bearing: data.bearing || 0, size: 150, color: "var(--wx-red-fg)" })}
+        </div>
+        <div class="ww-r1-stats">
+          <div class="ww-r1-speed">
+            <span class="wx-tnum ww-r1-speed-num">${escapeHtml(String(data.speed))}</span>
+            <span class="ww-r1-speed-unit">${escapeHtml(data.unit || "")}</span>
           </div>
-          <div style="font-weight:800;font-size:19px;letter-spacing:.02em;margin-top:2px">FROM ${escapeHtml(data.dir || "")} · ${escapeHtml((data.beaufortLabel || "").toUpperCase())}</div>
-          <div style="display:flex;gap:20px;margin-top:10px;font-family:var(--wx-mono);font-size:12px;color:var(--wx-ink-60)">
-            <span style="display:flex;align-items:center;gap:6px">${WX.icon("wind", { size: 15, color: WX.col("blue") })}GUST <b style="color:var(--wx-ink)">${escapeHtml(String(data.gust))} ${escapeHtml(data.unit || "")}</b></span>
-            <span style="display:flex;align-items:center;gap:6px">${WX.icon("gauge", { size: 15, color: "var(--wx-ink)" })}BEAUFORT <b style="color:var(--wx-ink)">${escapeHtml(String(data.beaufort))}</b></span>
+          <div class="ww-r1-dir">FROM ${escapeHtml(data.dir || "")} · ${escapeHtml((data.beaufortLabel || "").toUpperCase())}</div>
+          <div class="ww-r1-meta">
+            <span style="display:flex;align-items:center;gap:6px">${WX.icon("wind", { size: 15, color: "var(--c-accent)" })}GUST <b style="color:var(--c-text)">${escapeHtml(String(data.gust))} ${escapeHtml(data.unit || "")}</b></span>
+            <span style="display:flex;align-items:center;gap:6px">${WX.icon("gauge", { size: 15, color: "var(--c-accent)" })}BEAUFORT <b style="color:var(--c-text)">${escapeHtml(String(data.beaufort))}</b></span>
           </div>
         </div>
       </div>
-      <div style="display:flex;border-top:2px solid var(--wx-ink)">
-        ${hours.map((h, i) => `
-          <div style="flex:1;border-right:${i < hours.length - 1 ? "1px solid var(--c-line)" : "none"};padding:9px 0;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div class="ww-r1-hours">
+        ${hours.map((h) => `
+          <div class="ww-r1-hour">
             <span style="font-family:var(--wx-mono);font-size:11.5px;color:var(--wx-ink-60)">${escapeHtml(h.t || "")}</span>
-            <span style="display:inline-flex;transform:rotate(${(h.dir || 0) + 180}deg)">${WX.icon("arrow", { size: 20, color: "var(--wx-ink)", weight: "fill" })}</span>
-            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:15px">${escapeHtml(String(h.s))}</span>
+            <span style="display:inline-flex;transform:rotate(${(h.dir || 0) + 180}deg)">${WX.icon("arrow", { size: 20, color: "var(--c-accent)", weight: "fill" })}</span>
+            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:15px;color:var(--c-text)">${escapeHtml(String(h.s))}</span>
           </div>
         `).join("")}
       </div>

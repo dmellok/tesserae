@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather \u2014 Wind",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).",
   "icon": "ph-wind",

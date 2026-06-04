@@ -395,34 +395,53 @@ function axisRow(data, { font = "var(--wx-mono)", size = 10 } = {}) {
 
 // ===========================================================
 // R1 — REFINED
-// Charcoal header + hour-icon strip + area chart + rain strip +
-// high/low/now chip row.
+// Charcoal header → accent rule → chart in a soft accent wash →
+// rain strip → 3-up stat row where NOW claims a solid --c-accent
+// block as the hero stat.
 // ===========================================================
 function renderR1(data) {
   const place = data.place || data.label || "—";
   return `
     ${styleBlock()}
+    <style>
+      .wh-r1-chart-stage { flex:1; display:flex; padding:10px 20px 6px; gap:10px; min-height:0; background:var(--wx-tint); border-top:3px solid var(--c-accent); }
+      .wh-r1-rain { display:flex; align-items:center; gap:12px; padding:10px 20px 8px; background:var(--wx-tint-blue); border-top:1px solid var(--c-line); }
+      .wh-r1-stats { display:flex; border-top:3px solid var(--c-accent); }
+      .wh-r1-stat { flex:1; padding:10px 18px; display:flex; align-items:baseline; gap:10px; min-width:0; }
+      .wh-r1-stat--hi { background:var(--wx-tint); }
+      .wh-r1-stat--lo { background:var(--wx-tint-blue); }
+      .wh-r1-stat--now { background:var(--c-accent); color:var(--wx-red-fg); }
+      .wh-r1-stat-label { font-family:var(--wx-mono); font-size:11px; letter-spacing:.08em; opacity:.85; }
+      .wh-r1-stat--now .wh-r1-stat-label { color:var(--wx-red-fg); opacity:1; }
+      .wh-r1-stat-num { font-family:var(--wx-black); font-size:clamp(20px, 4cqw, 28px); }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: `${place} · NEXT 24 HR`, accent: "blue", right: data.time || nowTime() })}
-      <div style="padding:12px 20px 0">${hourRow(data)}</div>
-      <div style="flex:1;display:flex;padding:10px 20px 6px;gap:10px;min-height:0">
+      ${WX.darkHeader({ title: `${place} · NEXT 24 HR`, accent: "red", right: data.time || nowTime() })}
+      <div style="padding:12px 20px 0;background:var(--wx-tint)">${hourRow(data)}</div>
+      <div class="wh-r1-chart-stage">
         ${yAxisLabels(data)}
         <div style="flex:1;position:relative">
-          ${areaChart({ series: data.temps, min: data.tMin, max: data.tMax, w: 620, h: 170, color: WX.col("red"), fill: "var(--wx-red-t)" })}
+          ${areaChart({ series: data.temps, min: data.tMin, max: data.tMax, w: 620, h: 170, color: "var(--c-accent)", fill: "var(--wx-tint-strong)" })}
         </div>
       </div>
-      <div style="padding:0 20px">${axisRow(data)}</div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 20px 6px">
+      <div style="padding:4px 20px;background:var(--wx-tint)">${axisRow(data)}</div>
+      <div class="wh-r1-rain">
         <span style="font-family:var(--wx-mono);font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--wx-ink-60);width:40px">RAIN</span>
-        <div style="flex:1">${rainStrip({ rain: data.rain, color: WX.col("red") })}</div>
+        <div style="flex:1">${rainStrip({ rain: data.rain, color: "var(--c-data-2)" })}</div>
       </div>
-      <div style="display:flex;border-top:2px solid var(--wx-ink)">
-        ${[["HIGH", data.hi, "ink"], ["LOW", data.lo, "blue"], ["NOW", data.now, "red"]].map(([l, v, a], i) => `
-          <div style="flex:1;padding:9px 18px;border-right:${i < 2 ? "1px solid var(--c-line)" : "none"};display:flex;align-items:baseline;gap:10px">
-            <span style="font-family:var(--wx-mono);font-size:11px;letter-spacing:.08em;color:var(--wx-ink-60)">${l}</span>
-            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:24px;color:${WX.col(a)}">${fmtTemp(v)}</span>
-          </div>
-        `).join("")}
+      <div class="wh-r1-stats">
+        <div class="wh-r1-stat wh-r1-stat--hi">
+          <span class="wh-r1-stat-label">HIGH</span>
+          <span class="wx-tnum wh-r1-stat-num" style="color:var(--c-accent)">${fmtTemp(data.hi)}</span>
+        </div>
+        <div class="wh-r1-stat wh-r1-stat--lo">
+          <span class="wh-r1-stat-label">LOW</span>
+          <span class="wx-tnum wh-r1-stat-num" style="color:var(--c-data-2)">${fmtTemp(data.lo)}</span>
+        </div>
+        <div class="wh-r1-stat wh-r1-stat--now">
+          <span class="wh-r1-stat-label">NOW</span>
+          <span class="wx-tnum wh-r1-stat-num">${fmtTemp(data.now)}</span>
+        </div>
       </div>
     </div>
   `;

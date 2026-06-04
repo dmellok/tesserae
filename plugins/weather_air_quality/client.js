@@ -157,7 +157,8 @@ function bandScale(data, { height = 8, gap = 3 } = {}) {
 
 // ===========================================================
 // R1 — REFINED
-// Charcoal header + leaf + EAQI + band scale + 6-pollutant grid.
+// Charcoal header → accent rule → hero split (tinted EAQI text +
+// solid accent leaf panel) → plain paper pollutant grid.
 // ===========================================================
 function renderR1(data) {
   const pollutants = pollutantsAvailable(data);
@@ -166,34 +167,55 @@ function renderR1(data) {
   const lastEdge  = Array.isArray(data.bands) ? data.bands[data.bands.length - 1] : "";
   return `
     ${styleBlock()}
+    <style>
+      .wa-r1-hero { display:grid; grid-template-columns:1.6fr 1fr; min-width:0; min-height:0; border-top:3px solid var(--c-accent); }
+      .wa-r1-hero-text { background:var(--wx-tint); padding:clamp(10px, 2.4cqw, 18px) clamp(12px, 2.6cqw, 22px); display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; }
+      .wa-r1-eaqi { font-family:var(--wx-black); font-size:clamp(40px, 13cqw, 72px); line-height:.82; color:var(--c-accent); }
+      .wa-r1-band { font-family:var(--wx-black); font-size:clamp(16px, 5cqw, 30px); letter-spacing:.01em; }
+      .wa-r1-scale-label { font-family:var(--wx-mono); font-size:11px; letter-spacing:.04em; color:var(--wx-ink-60); margin-top:8px; }
+      .wa-r1-hero-icon { background:var(--c-accent); color:var(--wx-red-fg); display:flex; align-items:center; justify-content:center; padding:clamp(8px, 2cqw, 16px); }
+      .wa-r1-hero-icon .ph-bold { font-size:clamp(48px, 16cqw, 110px); }
+      .wa-r1-grid { flex:1; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:1fr 1fr; gap:1px; background:var(--c-line); border-top:3px solid var(--c-accent); min-height:0; }
+      .wa-r1-cell { background:var(--wx-paper); padding:10px 16px; display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; overflow:hidden; }
+      .wa-r1-cell-head { display:flex; align-items:center; gap:8px; }
+      .wa-r1-cell-num { font-family:var(--wx-black); font-size:clamp(16px, 3cqw, 22px); color:var(--c-text); }
+
+      @container (max-width: 460px) {
+        .wa-r1-hero { grid-template-columns:1fr; }
+        .wa-r1-grid { grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(${Math.max(2, Math.ceil(pollutants.length / 2))},1fr); }
+      }
+      @container (max-width: 280px) {
+        .wa-r1-grid { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: (data.label || "—") + " · AIR QUALITY", accent: "green", right: nowTime() })}
-      <div style="display:flex;align-items:center;padding:16px 24px;gap:22px">
-        ${WX.icon("leaf", { size: 74, color: WX.col("green") })}
-        <div style="flex:1">
-          <div style="display:flex;align-items:baseline;gap:14px">
-            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:72px;line-height:.82">${fmtInt(data.eaqi)}</span>
-            <span style="font-family:var(--wx-black);font-size:30px;color:${WX.col(bandAccent)};letter-spacing:.01em">${escapeHtml((data.band || "").toUpperCase())}</span>
+      ${WX.darkHeader({ title: (data.label || "—") + " · AIR QUALITY", accent: "red", right: nowTime() })}
+      <div class="wa-r1-hero">
+        <div class="wa-r1-hero-text">
+          <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap">
+            <span class="wx-tnum wa-r1-eaqi">${fmtInt(data.eaqi)}</span>
+            <span class="wa-r1-band" style="color:${WX.col(bandAccent)}">${escapeHtml((data.band || "").toUpperCase())}</span>
           </div>
-          <div style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60);margin-top:4px">EUROPEAN AQI · DOMINANT ${escapeHtml((data.dominant || "—").toUpperCase())}</div>
-        </div>
-        <div style="flex:1;min-width:0;max-width:300px">
-          <div style="display:flex;justify-content:space-between;font-family:var(--wx-mono);font-size:11px;letter-spacing:.04em;color:var(--wx-ink-60);margin-bottom:6px">
+          <div style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--wx-ink-60)">EUROPEAN AQI · DOMINANT ${escapeHtml((data.dominant || "—").toUpperCase())}</div>
+          <div style="display:flex;justify-content:space-between" class="wa-r1-scale-label">
             <span>${escapeHtml(String(firstEdge))}</span><span>${escapeHtml(String(lastEdge))}</span>
           </div>
           ${bandScale(data, { height: 10 })}
         </div>
+        <div class="wa-r1-hero-icon">
+          <i class="ph-bold ph-leaf" aria-hidden="true"></i>
+        </div>
       </div>
-      <div style="flex:1;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
-        ${pollutants.map((p, i) => `
-          <div style="border-right:${(i % 3) < 2 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 3 ? "1px solid var(--c-line)" : "none"};padding:10px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px">
-            <div style="display:flex;align-items:center;gap:8px">
-              ${WX.icon(p.icon, { size: 15, color: WX.col(p.accent) })}
+      <div class="wa-r1-grid">
+        ${pollutants.map((p) => `
+          <div class="wa-r1-cell">
+            <div class="wa-r1-cell-head">
+              ${WX.icon(p.icon, { size: 15, color: "var(--c-accent)" })}
               <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.08em;color:var(--wx-ink-60)">${escapeHtml(p.label.toUpperCase())}</span>
               <span style="margin-left:auto;font-family:var(--wx-mono);font-size:11px;color:${WX.col(p.accent)};letter-spacing:.04em">${escapeHtml((p.band || "").toUpperCase())}</span>
             </div>
             <div style="display:flex;align-items:baseline;gap:4px">
-              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:22px">${fmtPollutant(p.value)}</span>
+              <span class="wx-tnum wa-r1-cell-num">${fmtPollutant(p.value)}</span>
               <span style="font-family:var(--wx-mono);font-size:11.5px;color:var(--wx-ink-60)">${escapeHtml(p.unit || "")}</span>
             </div>
           </div>

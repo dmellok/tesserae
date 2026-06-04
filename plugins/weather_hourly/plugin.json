@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather \u2014 Hourly",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.",
   "icon": "ph-chart-line",

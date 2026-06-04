@@ -141,37 +141,59 @@ function sourceText(data) {
 
 // ===========================================================
 // R1 — REFINED
-// Charcoal header + level word + flower hero + species bars.
+// Charcoal header → accent rule → hero split (tinted level text +
+// solid accent flower panel) → species bars row in plain paper.
 // ===========================================================
 function renderR1(data) {
   const rows = breakdownRows(data);
   const accent = levelAccent(data.level);
   return `
     ${styleBlock()}
+    <style>
+      .wp-r1-hero { display:grid; grid-template-columns:1.6fr 1fr; min-width:0; min-height:0; border-top:3px solid var(--c-accent); }
+      .wp-r1-hero-text { background:var(--wx-tint); padding:clamp(12px, 2.6cqw, 22px) clamp(14px, 3cqw, 26px); display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; }
+      .wp-r1-level { font-family:var(--wx-black); font-size:clamp(36px, 12cqw, 64px); line-height:.82; }
+      .wp-r1-type { font-weight:800; font-size:clamp(13px, 2.6cqw, 18px); letter-spacing:.03em; color:var(--c-text); }
+      .wp-r1-src { font-family:var(--wx-mono); font-size:11px; color:var(--wx-ink-60); letter-spacing:.04em; }
+      .wp-r1-hero-icon { background:var(--c-accent); color:var(--wx-red-fg); display:flex; align-items:center; justify-content:center; padding:clamp(8px, 2cqw, 14px); }
+      .wp-r1-hero-icon .ph-bold { font-size:clamp(56px, 18cqw, 130px); }
+      .wp-r1-bars { display:flex; border-top:3px solid var(--c-accent); background:var(--wx-paper); }
+      .wp-r1-bar { flex:1; padding:11px 16px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+      .wp-r1-bar + .wp-r1-bar { border-left:1px solid var(--c-line); }
+      .wp-r1-bar-head { display:flex; align-items:center; justify-content:space-between; gap:6px; min-width:0; }
+      .wp-r1-bar-label { display:flex; align-items:center; gap:8px; font-family:var(--wx-mono); font-size:11px; letter-spacing:.08em; color:var(--wx-ink-60); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .wp-r1-bar-value { font-family:var(--wx-black); font-size:20px; color:var(--c-text); }
+      .wp-r1-bar-track { height:5px; background:color-mix(in oklab, var(--c-text) 12%, transparent); }
+      .wp-r1-bar-fill { height:100%; }
+
+      @container (max-width: 420px) {
+        .wp-r1-hero { grid-template-columns:1fr; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: (data.place || data.label || "—"), accent: "green", right: data.time || nowTime() })}
-      <div style="flex:1;display:flex">
-        <div style="flex:1;padding:18px 24px;display:flex;flex-direction:column;justify-content:center">
-          <span class="wx-tnum" style="font-family:var(--wx-black);font-size:64px;line-height:.82;color:${WX.col(accent)}">${escapeHtml(data.level || "—")}</span>
-          <span style="font-weight:800;font-size:18px;letter-spacing:.03em;margin-top:8px">${escapeHtml((data.type || "Mixed").toUpperCase())}</span>
-          <span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60);margin-top:6px;letter-spacing:.04em">${escapeHtml(sourceText(data))}</span>
+      ${WX.darkHeader({ title: (data.place || data.label || "—"), accent: "red", right: data.time || nowTime() })}
+      <div class="wp-r1-hero">
+        <div class="wp-r1-hero-text">
+          <span class="wx-tnum wp-r1-level" style="color:${WX.col(accent)}">${escapeHtml(data.level || "—")}</span>
+          <span class="wp-r1-type">${escapeHtml((data.type || "Mixed").toUpperCase())}</span>
+          <span class="wp-r1-src">${escapeHtml(sourceText(data))}</span>
         </div>
-        <div style="width:38%;flex-shrink:0;background:${WX.tint("green")};display:flex;align-items:center;justify-content:center">
-          ${WX.icon("flower", { size: 110, color: WX.col("green") })}
+        <div class="wp-r1-hero-icon">
+          <i class="ph-bold ph-flower" aria-hidden="true"></i>
         </div>
       </div>
-      <div style="display:flex;border-top:2px solid var(--wx-ink)">
-        ${rows.map((b, i) => `
-          <div style="flex:1;padding:11px 16px;border-right:${i < rows.length - 1 ? "1px solid var(--c-line)" : "none"};display:flex;flex-direction:column;gap:6px">
-            <div style="display:flex;align-items:center;justify-content:space-between">
-              <span style="display:flex;align-items:center;gap:8px;font-family:var(--wx-mono);font-size:11px;letter-spacing:.08em;color:var(--wx-ink-60)">
-                ${WX.icon(b.icon, { size: 14, color: WX.col(b.accent) })}
+      <div class="wp-r1-bars">
+        ${rows.map((b) => `
+          <div class="wp-r1-bar">
+            <div class="wp-r1-bar-head">
+              <span class="wp-r1-bar-label">
+                ${WX.icon(b.icon, { size: 14, color: "var(--c-accent)" })}
                 ${escapeHtml(b.label.toUpperCase())}
               </span>
-              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:20px">${escapeHtml(String(b.value))}</span>
+              <span class="wx-tnum wp-r1-bar-value">${escapeHtml(String(b.value))}</span>
             </div>
-            <div style="height:5px;background:var(--c-line)">
-              <div style="width:${Number(b.level || 0).toFixed(1)}%;height:100%;background:${WX.col(b.accent)}"></div>
+            <div class="wp-r1-bar-track">
+              <div class="wp-r1-bar-fill" style="width:${Number(b.level || 0).toFixed(1)}%;background:var(--c-accent)"></div>
             </div>
           </div>
         `).join("")}

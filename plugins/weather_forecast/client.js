@@ -195,8 +195,11 @@ function segWidthPct(d, lo, hi) {
 
 // ===========================================================
 // R1 — REFINED
-// Charcoal header + 5 columns separated by hairlines. Today claims
-// a solid-blue block; other columns stay on paper.
+// Charcoal header → accent rule → forecast columns. Today's column
+// is a solid --c-accent panel (hero day), other days carry a soft
+// --wx-tint wash so the whole strip reads as colour-blocked instead
+// of mostly paper. Sized via clamp(cqw) for graceful small-cell
+// fallback.
 // ===========================================================
 function renderR1(data) {
   const days = (Array.isArray(data.days) ? data.days : []).map(shapeDay);
@@ -205,31 +208,54 @@ function renderR1(data) {
   const place = (data.place || data.label || "—").toUpperCase();
   return `
     ${styleBlock()}
-    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: place + " · 5-DAY FORECAST", accent: "blue", right: data.time || nowTime() })}
-      <div style="flex:1;display:grid;grid-template-columns:repeat(${days.length},1fr)">
-        ${days.map((d, i) => {
-          const isToday = d.today;
-          const colorOn = isToday ? WX.inkOn("blue") : "var(--wx-ink)";
-          const bg = isToday ? WX.col("blue") : "transparent";
-          const track = isToday ? "rgba(255,255,255,.3)" : "var(--c-line)";
-          const fill = isToday ? WX.inkOn("blue") : "var(--wx-ink)";
+    <style>
+      .wf-r1-root { display:flex; flex-direction:column; width:100%; height:100%; box-sizing:border-box; font-family:${DEFAULT_FONT}; min-height:0; overflow:hidden; }
+      .wf-r1-grid { flex:1; display:grid; grid-template-columns:repeat(${days.length},1fr); border-top:3px solid var(--c-accent); gap:1px; background:var(--c-line); min-height:0; min-width:0; }
+      .wf-r1-col { display:flex; flex-direction:column; align-items:center; justify-content:space-between; padding:clamp(8px, 1.6cqw, 14px) clamp(6px, 1.4cqw, 12px); gap:clamp(6px, 1cqw, 10px); min-width:0; overflow:hidden; background:var(--wx-tint); color:var(--c-text); }
+      .wf-r1-col.is-today { background:var(--c-accent); color:var(--wx-red-fg); }
+      .wf-r1-day { font-family:var(--wx-black); font-size:clamp(11px, 1.8cqw, 15px); letter-spacing:.04em; }
+      .wf-r1-icon { font-size:clamp(28px, 6cqw, 56px); line-height:1; color:var(--c-accent); }
+      .wf-r1-col.is-today .wf-r1-icon { color:var(--wx-red-fg); }
+      .wf-r1-cond { font-family:var(--wx-mono); font-size:clamp(8.5px, 1.4cqw, 11px); letter-spacing:.06em; opacity:.85; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+      .wf-r1-range { width:100%; height:4px; background:color-mix(in oklab, var(--c-text) 18%, transparent); position:relative; }
+      .wf-r1-col.is-today .wf-r1-range { background:color-mix(in oklab, var(--wx-red-fg) 30%, transparent); }
+      .wf-r1-range-fill { position:absolute; height:100%; background:var(--c-accent); }
+      .wf-r1-col.is-today .wf-r1-range-fill { background:var(--wx-red-fg); }
+      .wf-r1-temps { display:flex; align-items:baseline; gap:8px; }
+      .wf-r1-hi { font-family:var(--wx-black); font-size:clamp(18px, 3.4cqw, 28px); }
+      .wf-r1-lo { font-family:var(--wx-mono); font-size:clamp(11px, 1.8cqw, 14px); opacity:.7; }
+      .wf-r1-rain { display:flex; align-items:center; gap:5px; font-family:var(--wx-mono); font-size:clamp(9px, 1.5cqw, 12px); opacity:.85; }
+
+      /* Narrower cell — keep all columns but compact spacing. */
+      @container (max-width: 520px) {
+        .wf-r1-col { padding:8px 6px; gap:6px; }
+        .wf-r1-cond { display:none; }
+      }
+      /* Very narrow — drop rain row + range bar to keep day/icon/temp. */
+      @container (max-width: 360px) {
+        .wf-r1-range, .wf-r1-rain { display:none; }
+      }
+    </style>
+    <div class="wx-art wf-r1-root">
+      ${WX.darkHeader({ title: place + " · 5-DAY FORECAST", accent: "red", right: data.time || nowTime() })}
+      <div class="wf-r1-grid">
+        ${days.map((d) => {
           const segL = segLeftPct(d, lo, hi);
           const segW = segWidthPct(d, lo, hi);
           return `
-            <div style="border-right:${i < days.length - 1 ? "1px solid var(--wx-ink)" : "none"};background:${bg};color:${colorOn};display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:14px 12px;gap:10px">
-              <span style="font-family:var(--wx-black);font-size:15px;letter-spacing:.04em">${escapeHtml(d.day)}</span>
-              ${WX.icon(d.icon, { size: 48, color: colorOn })}
-              <span style="font-family:var(--wx-mono);font-size:11px;letter-spacing:.06em;opacity:.85">${escapeHtml((d.cond || "").toUpperCase())}</span>
-              <div style="width:100%;height:4px;background:${track};position:relative">
-                <div style="position:absolute;left:${segL.toFixed(1)}%;width:${segW.toFixed(1)}%;height:100%;background:${fill}"></div>
+            <div class="wf-r1-col${d.today ? " is-today" : ""}">
+              <span class="wf-r1-day">${escapeHtml(d.day)}</span>
+              <i class="ph-bold ph-${escapeHtml(WX.phName(d.icon))} wf-r1-icon" aria-hidden="true"></i>
+              <span class="wf-r1-cond">${escapeHtml((d.cond || "").toUpperCase())}</span>
+              <div class="wf-r1-range">
+                <div class="wf-r1-range-fill" style="left:${segL.toFixed(1)}%;width:${segW.toFixed(1)}%"></div>
               </div>
-              <div style="display:flex;align-items:baseline;gap:8px">
-                <span class="wx-tnum" style="font-family:var(--wx-black);font-size:26px">${fmtInt(d.hi)}°</span>
-                <span class="wx-tnum" style="font-family:var(--wx-mono);font-size:14px;opacity:.7">${fmtInt(d.lo)}°</span>
+              <div class="wf-r1-temps">
+                <span class="wx-tnum wf-r1-hi">${fmtInt(d.hi)}°</span>
+                <span class="wx-tnum wf-r1-lo">${fmtInt(d.lo)}°</span>
               </div>
-              <span style="display:flex;align-items:center;gap:5px;font-family:var(--wx-mono);font-size:12px;opacity:.85">
-                ${WX.icon("drop", { size: 12, color: isToday ? WX.inkOn("blue") : WX.col("blue") })}
+              <span class="wf-r1-rain">
+                ${WX.icon("drop", { size: 12, color: "currentColor" })}
                 ${d.rain == null ? "—" : d.rain + "%"}
               </span>
             </div>
