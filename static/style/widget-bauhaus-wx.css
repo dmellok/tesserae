@@ -80,6 +80,25 @@
   --wx-green-fg: var(--c-bg,      #f1ece0);
   --wx-green-t:  color-mix(in oklab, var(--c-data-3,  #45744c) 22%, var(--wx-paper));
 
+  /* --- soft tint backgrounds ---
+   *
+   * The themes ship desaturated accents on purpose (Ramen DNA), so a
+   * refined variant that paints accent text on paper bg reads as "95%
+   * paper + 5% dusty rose" — boring. These tints let widgets paint
+   * SECTIONS in a soft accent wash so the colour fills meaningful
+   * area without overpowering: hero blocks, lede strips, stat panels.
+   *
+   * Use as ``background: var(--wx-tint)`` for the soft pass, or
+   * ``--wx-tint-strong`` for a more saturated wash. The -blue/-green
+   * variants pull from the categorical ramp (--c-data-2/3) for
+   * secondary sections that need to read as a distinct zone from the
+   * accent. */
+  --wx-tint:        color-mix(in oklab, var(--c-accent)  14%, var(--wx-paper));
+  --wx-tint-strong: color-mix(in oklab, var(--c-accent)  26%, var(--wx-paper));
+  --wx-tint-blue:   color-mix(in oklab, var(--c-data-2)  14%, var(--wx-paper));
+  --wx-tint-green:  color-mix(in oklab, var(--c-data-3)  14%, var(--wx-paper));
+  --wx-tint-yellow: color-mix(in oklab, var(--c-warn)    14%, var(--wx-paper));
+
   /* --- type stack ---
    *
    * The named families are loaded by the fonts_core plugin (Archivo,
