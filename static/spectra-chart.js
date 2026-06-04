@@ -20,15 +20,26 @@ const FALLBACK = {
 
 // Read the current Spectra tokens off the host element. Falls back
 // to the light-theme values when a property is empty, so a chart
-// always renders even if the cascade hasn't resolved yet.
+// always renders even if the cascade hasn't resolved yet — but in
+// that case we also log a console warning so a silent
+// "charts always look light-theme on a dark page" bug shows up in
+// DevTools instead of being invisible.
 export function tokens(host) {
-  if (!host) return { ...FALLBACK };
+  if (!host) {
+    console.warn(
+      "[spectra-chart] tokens(host=null) — using light-theme fallbacks. " +
+      "Pass the cell host (shadow.host) so charts inherit the cell's theme."
+    );
+    return { ...FALLBACK };
+  }
   const s = getComputedStyle(host);
+  const missing = [];
   const get = (name, fallback) => {
     const v = s.getPropertyValue(name).trim();
+    if (!v) missing.push(name);
     return v || fallback;
   };
-  return {
+  const result = {
     accent1: get("--accent-1", FALLBACK.accent1),
     accent2: get("--accent-2", FALLBACK.accent2),
     accent3: get("--accent-3", FALLBACK.accent3),
@@ -42,6 +53,14 @@ export function tokens(host) {
     textMuted: get("--text-muted", FALLBACK.textMuted),
     fontFamily: get("--font-family", FALLBACK.fontFamily),
   };
+  if (missing.length) {
+    console.warn(
+      `[spectra-chart] Spectra tokens not resolved on cell host: ${missing.join(", ")}` +
+      " — falling back to light-theme defaults. Charts will look light-theme even on a dark page." +
+      " Check that spectra-tokens.css is loaded and the cell's data-theme cascade reaches the host."
+    );
+  }
+  return result;
 }
 
 function ensureChart(canvas) {
