@@ -81,7 +81,7 @@
   min-height: 120px;
 }
 .field select[multiple] option {
-  padding: 6px 10px;
+  padding: var(--t-space-2) var(--t-space-3);
 }
 .field select[multiple] option:checked {
   background: var(--t-accent-soft);
@@ -377,7 +377,7 @@ code {
 }
 .icon-picker-search input {
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--t-space-2) var(--t-space-3);
   font: inherit;
   font-size: var(--t-size-md);
   background: var(--t-surface-soft);
@@ -394,7 +394,7 @@ code {
 .icon-picker-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-  gap: 4px;
+  gap: var(--t-space-1);
   max-height: 360px;
   overflow-y: auto;
   padding-right: 2px;
@@ -541,7 +541,7 @@ code {
   width: 100%;
 }
 .entity-override-row .icon-picker--inline .icon-picker-trigger {
-  padding: 6px 8px;
+  padding: var(--t-space-2);
   justify-content: center;
 }
 .entity-override-row .icon-picker--inline .icon-picker-label {
@@ -634,8 +634,8 @@ code {
 .dropzone-browse {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 7px 16px;
+  gap: var(--t-space-1);
+  padding: var(--t-space-2) var(--t-space-4);
   margin-top: var(--t-space-2);
   border-radius: var(--t-radius-pill);
   background: var(--t-surface);
@@ -671,9 +671,9 @@ code {
   background: var(--t-surface);
   border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border);
-  padding: 6px;
+  padding: var(--t-space-2);
 }
-.dropzone-meta { display: grid; gap: 4px; min-width: 0; }
+.dropzone-meta { display: grid; gap: var(--t-space-1); min-width: 0; }
 .dropzone-meta strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -688,22 +688,22 @@ code {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--t-space-2);
 }
 
 .slider-value {
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   font-weight: 600;
   color: var(--t-fg-soft);
   background: var(--t-surface-soft);
-  padding: 2px 8px;
-  border-radius: 999px;
+  padding: 2px var(--t-space-2);
+  border-radius: var(--t-radius-pill);
 }
 
 input[type="range"].slider {
   width: 100%;
-  margin: 8px 0 4px;
+  margin: var(--t-space-2) 0 var(--t-space-1);
   -webkit-appearance: none;
   appearance: none;
   background: transparent;
@@ -777,7 +777,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .field--switch label.switch {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--t-space-3);
   cursor: pointer;
   font-weight: 500;
   color: var(--t-fg);

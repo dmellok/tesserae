@@ -98,7 +98,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 10px;
+  gap: var(--t-space-3);
 }
 
 .history-row {
@@ -152,7 +152,7 @@
 
 .history-meta {
   display: grid;
-  gap: 4px;
+  gap: var(--t-space-1);
   min-width: 0;
   overflow: hidden;
 }
@@ -160,12 +160,12 @@
 .history-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--t-space-2);
   flex-wrap: wrap;
 }
 
 .history-source {
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t-muted);
@@ -175,7 +175,7 @@
 .history-target {
   /* The dashboard / target name is the row's headline now (was a
      monospace slug chip) — give it weight over the source tag. */
-  font-size: 14px;
+  font-size: var(--t-size-base);
   color: var(--t-fg);
   font-weight: 600;
   overflow: hidden;
@@ -186,10 +186,10 @@
 }
 
 .history-sub {
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   color: var(--t-fg-soft);
   display: flex;
-  gap: 6px;
+  gap: var(--t-space-2);
   align-items: center;
   flex-wrap: wrap;
 }
@@ -197,19 +197,19 @@
 .history-err {
   color: var(--t-danger);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
+  font-size: var(--t-size-xs);
 }
 
 .history-renderers {
   display: flex;
-  gap: 4px;
+  gap: var(--t-space-1);
   flex-wrap: wrap;
 }
 
 .history-actions {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--t-space-1);
 }
 
 button:disabled,

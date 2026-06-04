@@ -46,7 +46,7 @@
 .check-row {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
+  gap: var(--t-space-2);
   padding: var(--t-space-2) 0;
   font-size: var(--t-size-sm);
   color: var(--t-fg-soft);
@@ -91,9 +91,9 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--t-radius-sm, 6px);
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  border-radius: var(--t-radius-sm);
   user-select: none;
 }
 .backups-disclosure > summary::-webkit-details-marker {
@@ -140,8 +140,8 @@
 /* ----- Device status block ------------------------------------------ */
 
 .device-status {
-  margin: 0 0 18px;
-  padding: 12px 14px;
+  margin: 0 0 var(--t-space-5);
+  padding: var(--t-space-3) var(--t-space-4);
   background: var(--t-surface-soft);
   border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border);
@@ -150,8 +150,8 @@
 .status-line {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-md);
   color: var(--t-fg-soft);
 }
 
@@ -173,10 +173,10 @@
 .status-fields {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
-  margin: 10px 0 0;
+  gap: var(--t-space-1) var(--t-space-4);
+  margin: var(--t-space-3) 0 0;
   padding: 0;
-  font-size: 12px;
+  font-size: var(--t-size-sm);
 }
 
 .status-fields div { display: contents; }
@@ -223,11 +223,11 @@
 .device-card-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--t-space-2);
   flex: 0 0 auto;
-  padding: 6px 12px;
+  padding: var(--t-space-2) var(--t-space-3);
   border: 1px solid var(--t-border);
-  border-radius: 999px;
+  border-radius: var(--t-radius-pill);
   background: var(--t-surface);
   color: var(--t-fg-soft);
   font-size: var(--t-size-sm);
@@ -366,7 +366,7 @@
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--t-space-2);
 }
 
 .backup-row {
@@ -386,15 +386,15 @@
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--t-space-2);
 }
 .timetable-row {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.4fr) auto;
   align-items: center;
   gap: var(--t-space-3);
-  padding: 10px var(--t-space-3);
-  border-radius: var(--t-radius-sm, 6px);
+  padding: var(--t-space-3);
+  border-radius: var(--t-radius-sm);
   background: var(--c-surface-2, rgba(0, 0, 0, 0.03));
 }
 .timetable-row.is-disabled {
@@ -407,7 +407,7 @@
 .timetable-what {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--t-space-2);
   min-width: 0;
   font-weight: 500;
 }
@@ -418,25 +418,25 @@
   text-align: right;
 }
 @media (max-width: 640px) {
-  .timetable-row { grid-template-columns: 1fr; gap: 6px; }
+  .timetable-row { grid-template-columns: 1fr; gap: var(--t-space-2); }
   .timetable-edit { text-align: left; }
 }
 
 .backup-meta {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: var(--t-space-1);
 }
 
 .backup-top {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--t-space-2);
   flex-wrap: wrap;
   min-width: 0;
 }
 .backup-top code {
-  font-size: 13px;
+  font-size: var(--t-size-md);
   font-weight: 600;
 }
 .backup-top .pill { text-transform: lowercase; }
@@ -456,7 +456,7 @@
 .backup-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--t-space-2);
   flex-shrink: 0;
 }
 /* Keep the three action controls (link / button / icon-only button) at
@@ -465,9 +465,9 @@
 .backup-actions button {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  font-size: 13px;
+  gap: var(--t-space-1);
+  padding: var(--t-space-2) var(--t-space-3);
+  font-size: var(--t-size-md);
   line-height: 1.2;
 }
 .backup-actions form.inline { display: inline-flex; margin: 0; }
@@ -485,7 +485,7 @@
   z-index: 1000;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: var(--t-space-6);
 }
 .restart-modal[hidden] { display: none; }
 .restart-modal-backdrop {
@@ -500,44 +500,44 @@
   background: var(--t-surface);
   color: var(--t-fg);
   border: 1px solid var(--t-border);
-  border-radius: var(--t-radius-md, 10px);
+  border-radius: var(--t-radius-md);
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
-  padding: 28px 28px 24px;
+  padding: var(--t-space-7) var(--t-space-7) var(--t-space-6);
   width: min(440px, 100%);
   text-align: center;
 }
 .restart-modal-spinner {
   font-size: 32px;
   color: var(--t-accent, var(--t-fg));
-  margin-bottom: 12px;
+  margin-bottom: var(--t-space-3);
   display: inline-flex;
   animation: restart-spin 1s linear infinite;
 }
 .restart-modal-card h2 {
-  margin: 0 0 6px;
-  font-size: var(--t-size-lg, 16px);
+  margin: 0 0 var(--t-space-2);
+  font-size: var(--t-size-lg);
   font-weight: 700;
   color: var(--t-fg);
 }
 .restart-modal-stage {
-  margin: 0 0 14px;
+  margin: 0 0 var(--t-space-4);
   color: var(--t-fg);
   font-weight: 500;
   min-height: 1.4em;
 }
 .restart-modal-help {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--t-size-md);
   color: var(--t-fg-soft, var(--t-fg));
   line-height: 1.45;
 }
 .restart-modal-error {
-  margin: 14px 0 0;
-  padding: 10px 12px;
+  margin: var(--t-space-4) 0 0;
+  padding: var(--t-space-3);
   background: rgba(220, 38, 38, 0.1);
   color: var(--t-danger, #b91c1c);
-  border-radius: var(--t-radius-sm, 6px);
-  font-size: 13px;
+  border-radius: var(--t-radius-sm);
+  font-size: var(--t-size-md);
   text-align: left;
 }
 @keyframes restart-spin {

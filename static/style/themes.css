@@ -248,8 +248,8 @@
   position: absolute;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: var(--t-space-2);
+  padding: var(--t-space-1) var(--t-space-2);
   background: var(--t-surface);
   border: 1px solid var(--t-border-strong);
   border-radius: var(--t-radius-sm);
@@ -332,7 +332,7 @@
 
 .tk-tile {
   display: grid;
-  gap: 4px;
+  gap: var(--t-space-1);
   padding: 0;
   background: transparent;
   position: relative;

@@ -3,7 +3,7 @@
 .editor-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 16px;
+  gap: var(--t-space-4);
 }
 
 /* Fluid panel-shaped preview. The frame fills its column width up to
@@ -79,7 +79,7 @@
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
   background: var(--t-surface-soft);
-  padding: 10px 12px;
+  padding: var(--t-space-3);
   font: inherit;
   color: var(--t-fg);
 }
@@ -104,7 +104,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 8px;
+  gap: var(--t-space-2);
 }
 
 /* icon-tile | name+meta (grows) | actions */
@@ -169,20 +169,20 @@
   opacity: 0.75;
 }
 
-.page-actions { display: flex; gap: 6px; align-items: center; }
+.page-actions { display: flex; gap: var(--t-space-2); align-items: center; }
 
 /* Outlined pill actions (Edit / Push / Delete). */
 .page-action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
   background: var(--t-surface);
   color: var(--t-fg-soft);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--t-size-md);
   font-weight: 500;
   text-decoration: none;
   cursor: pointer;
@@ -204,23 +204,23 @@
 @media (max-width: 640px) {
   /* Collapse action labels to icons on narrow screens. */
   .page-action span { display: none; }
-  .page-action { padding: 8px 10px; }
+  .page-action { padding: var(--t-space-2) var(--t-space-3); }
 }
 
 .cell-list {
   list-style: none;
-  margin: 0 0 14px;
+  margin: 0 0 var(--t-space-4);
   padding: 0;
   display: grid;
-  gap: 6px;
+  gap: var(--t-space-2);
 }
 
 .cell-row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 10px;
+  gap: var(--t-space-3);
   align-items: center;
-  padding: 8px 10px;
+  padding: var(--t-space-2) var(--t-space-3);
   background: var(--t-surface-soft);
   border: 1px solid transparent;
   border-radius: var(--t-radius-sm);
@@ -240,39 +240,39 @@
 .cell-row-name { font-weight: 600; font-size: 14px; }
 .cell-row-meta { font-size: 12px; }
 
-.add-cell { padding-top: 4px; border-top: 1px dashed var(--t-border); margin-top: 4px; }
+.add-cell { padding-top: var(--t-space-1); border-top: 1px dashed var(--t-border); margin-top: var(--t-space-1); }
 
 .form-group {
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
-  padding: 12px 14px;
-  margin: 0 0 14px;
+  padding: var(--t-space-3) var(--t-space-4);
+  margin: 0 0 var(--t-space-4);
 }
 .form-group > legend {
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t-fg-soft);
-  padding: 0 6px;
+  padding: 0 var(--t-space-2);
 }
 .form-group summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--t-fg-soft);
-  padding: 4px 0;
+  padding: var(--t-space-1) 0;
 }
-.form-group[open] summary { margin-bottom: 10px; }
+.form-group[open] summary { margin-bottom: var(--t-space-3); }
 
 .header-action {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-left: 14px;
-  padding: 7px 14px 7px 12px;
+  gap: var(--t-space-2);
+  margin-left: var(--t-space-4);
+  padding: var(--t-space-2) var(--t-space-4) var(--t-space-2) var(--t-space-3);
   background: var(--t-accent);
   color: var(--t-accent-fg, #fff);
   border: 1px solid color-mix(in oklab, var(--t-accent) 70%, black);
@@ -356,7 +356,7 @@
 .editor-header .header-back {
   font-size: 22px;
   text-decoration: none;
-  padding: 4px 10px;
+  padding: var(--t-space-1) var(--t-space-3);
   border-radius: var(--t-radius-sm);
   color: var(--t-fg-soft);
 }
@@ -378,7 +378,7 @@
 .inline-name-form { flex: 1; max-width: 480px; }
 .inline-name-input {
   font: 700 18px/1.2 system-ui, sans-serif;
-  padding: 6px 10px;
+  padding: var(--t-space-2) var(--t-space-3);
   border: 1px solid transparent;
   border-radius: var(--t-radius-sm);
   background: transparent;
@@ -391,11 +391,11 @@
 .save-status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-sm);
   font-weight: 600;
-  padding: 5px 12px;
-  border-radius: 999px;
+  padding: var(--t-space-1) var(--t-space-3);
+  border-radius: var(--t-radius-pill);
   background: var(--t-ok-bg);
   color: var(--t-ok);
   border: 1px solid color-mix(in oklab, var(--t-ok) 25%, transparent);
@@ -431,9 +431,9 @@
 .editor-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--t-space-2);
 }
-.editor-actions button { padding: 6px 12px; font-size: 13px; }
+.editor-actions button { padding: var(--t-space-2) var(--t-space-3); font-size: var(--t-size-md); }
 .editor-actions button[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 /* ----- Editor grid: options on the left, preview pinned on the right - */
@@ -445,13 +445,13 @@
   .editor-grid {
     grid-template-columns: minmax(0, 1fr) minmax(360px, 620px);
     grid-template-areas: "column preview";
-    gap: 24px;
+    gap: var(--t-space-6);
     align-items: start;
   }
   .editor-column {
     grid-area: column;
     display: grid;
-    gap: 14px;
+    gap: var(--t-space-4);
     min-width: 0;
   }
   .preview-card {
@@ -464,7 +464,7 @@
 }
 
 @media (max-width: 1099px) {
-  .editor-grid { gap: 14px; }
+  .editor-grid { gap: var(--t-space-4); }
   /* Centred, aspect-preserved preview frame. --panel-ar is set
      inline (w/h) so width = min(100%, max-height × --panel-ar);
      height comes from the existing aspect-ratio rule. Result: a
@@ -487,8 +487,8 @@
     max-height: 320px;
     width: min(100%, calc(320px * var(--panel-ar, 1)));
   }
-  .editor-grid { gap: 10px; }
-  .preview-dims { font-size: 11px; margin-top: 6px; text-align: center; }
+  .editor-grid { gap: var(--t-space-3); }
+  .preview-dims { font-size: var(--t-size-xs); margin-top: var(--t-space-2); text-align: center; }
 
   /* Two-row header. Row 1: back · icon · name input (takes the rest).
      Row 2: save-status (left) · actions (right). page-id-tag and the
@@ -497,7 +497,7 @@
     display: grid;
     grid-template-columns: auto auto 1fr auto;
     align-items: center;
-    gap: 6px 8px;
+    gap: var(--t-space-2);
     padding: var(--t-space-2) var(--t-space-1);
   }
   .editor-header .header-back { grid-row: 1; grid-column: 1; }
@@ -515,7 +515,7 @@
   /* Action button labels collapse — icons only at this width. */
   .editor-actions button > span:not(.icon) { display: none; }
   .editor-actions button {
-    padding: 8px 10px;
+    padding: var(--t-space-2) var(--t-space-3);
     min-width: 40px;
     justify-content: center;
   }
@@ -524,8 +524,8 @@
 .preview-card .preview-frame { margin: 0 auto; }
 .preview-dims {
   text-align: right;
-  font-size: 12px;
-  margin: 8px 4px 0;
+  font-size: var(--t-size-sm);
+  margin: var(--t-space-2) var(--t-space-1) 0;
 }
 
 /* Multi-device: stacked preview groups (one per distinct aspect). The
@@ -537,15 +537,15 @@
   border-top: 1px solid var(--t-border);
 }
 .preview-group-label {
-  font-size: 12px;
+  font-size: var(--t-size-sm);
   font-weight: 600;
   color: var(--t-fg-soft);
-  margin: 0 0 8px;
+  margin: 0 0 var(--t-space-2);
   text-align: center;
 }
 
 .cell-card {
-  scroll-margin-top: 16px;
+  scroll-margin-top: var(--t-space-4);
   transition:
     outline 200ms ease,
     box-shadow var(--t-trans),
@@ -564,13 +564,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: var(--t-space-3);
 }
 .cell-card .card-head h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-lg);
 }
 .cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
 
@@ -605,7 +605,7 @@
   color: var(--t-fg-soft);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--t-space-2);
 }
 .layout-editor-hint .ph { font-size: 14px; color: var(--t-accent); }
 
@@ -788,7 +788,7 @@
 .layout-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  gap: var(--t-space-3);
   /* Each card centres a fixed-height thumbnail in the panel aspect.
      The aspect is set inline from the current panel so portrait flips
      show portrait thumbnails. */
@@ -802,15 +802,15 @@
   display: grid;
   grid-template-rows: var(--thumb-h) auto;
   justify-items: center;
-  gap: 8px;
-  padding: 10px;
+  gap: var(--t-space-2);
+  padding: var(--t-space-3);
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-sm);
   background: var(--t-surface);
   cursor: pointer;
   width: 100%;
   text-align: center;
-  font: 12px/1.2 system-ui, sans-serif;
+  font: var(--t-size-sm)/1.2 system-ui, sans-serif;
   color: var(--t-fg);
   transition: border-color 80ms ease, transform 80ms ease;
   /* Reset the global button inline-flex so the grid-rows take effect. */
@@ -860,7 +860,7 @@
 
 .add-cell-card .full-width {
   width: 100%;
-  padding: 12px;
+  padding: var(--t-space-3);
   font-weight: 600;
   border-style: dashed;
 }
