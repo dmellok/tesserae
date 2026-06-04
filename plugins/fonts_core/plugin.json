@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Core fonts",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "font",
-  "description": "Curated open-source font set vendored locally. 15 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible — designed for low-vision and works great on e-ink), geometric (Space Grotesk), heavy display (Archivo Black, Anton, Bebas Neue), monospace (JetBrains Mono, IBM Plex Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora). All Latin subset, woff2.",
+  "description": "Curated open-source font set vendored locally. 18 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible — designed for low-vision and works great on e-ink), geometric (Space Grotesk, Jost), heavy display (Archivo Black, Anton, Bebas Neue), narrow (Archivo Narrow), monospace (JetBrains Mono, IBM Plex Mono, Space Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora, Bodoni Moda). All Latin subset, woff2.",
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },
@@ -175,6 +175,36 @@
       "files": {
         "400": "static/space-mono/400.woff2",
         "700": "static/space-mono/700.woff2"
+      }
+    },
+    {
+      "id": "bodoni_moda",
+      "name": "Bodoni Moda",
+      "category": "serif",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/bodoni-moda/400.woff2",
+        "700": "static/bodoni-moda/700.woff2"
+      }
+    },
+    {
+      "id": "archivo_narrow",
+      "name": "Archivo Narrow",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/archivo-narrow/400.woff2",
+        "700": "static/archivo-narrow/700.woff2"
+      }
+    },
+    {
+      "id": "jost",
+      "name": "Jost",
+      "category": "sans",
+      "weights": [400, 700],
+      "files": {
+        "400": "static/jost/400.woff2",
+        "700": "static/jost/700.woff2"
       }
     }
   ]

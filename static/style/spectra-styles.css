@@ -26,13 +26,12 @@
    pick up the style font even when fonts_core's per-family @font-face
    emission only includes the page's chosen font.
 
-   Three style fonts are NOT shipped today and fall through the
-   font-family chain to a sensible system alternative:
-     - elegant   → Bodoni Moda  (falls back to Georgia serif)
-     - condensed → Archivo Narrow (falls back to Archivo)
-     - bauhaus   → Jost         (falls back to Century Gothic / Inter)
-   Vendoring those three under plugins/fonts_core/static/ + adding the
-   matching @font-face block below would land the full personality.
+   All nine style families are vendored locally — no Google Fonts
+   round-trip at render time. Five came from the original fonts_core
+   set (Space Grotesk, IBM Plex Sans, JetBrains Mono, Archivo, Space
+   Mono); Bodoni Moda, Archivo Narrow, and Jost were added under
+   plugins/fonts_core/static/ in v0.19.3 to complete the Elegant /
+   Condensed / Bauhaus style personalities.
 ---------------------------------------------------------------------------- */
 @font-face {
   font-family: "Space Grotesk";
@@ -88,6 +87,36 @@
   font-family: "Space Mono";
   font-style: normal; font-weight: 700; font-display: swap;
   src: url("../../plugins/fonts_core/static/space-mono/700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../plugins/fonts_core/static/bodoni-moda/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Bodoni Moda";
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../../plugins/fonts_core/static/bodoni-moda/700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Archivo Narrow";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../plugins/fonts_core/static/archivo-narrow/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Archivo Narrow";
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../../plugins/fonts_core/static/archivo-narrow/700.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Jost";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../../plugins/fonts_core/static/jost/400.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Jost";
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../../plugins/fonts_core/static/jost/700.woff2") format("woff2");
 }
 
 /* ----------------------------------------------------------------------------
@@ -188,8 +217,6 @@
    Wide tracked serif caps, a thin rule under the title, generous
    whitespace. NOTE: serif hairlines read best on larger widgets — fine
    on full panels, can dither on the smallest tiles.
-   Falls back to Georgia when Bodoni Moda / Playfair Display aren't
-   vendored.
 ---------------------------------------------------------------------------- */
 [data-style="elegant"],
 .w[data-style="elegant"]{
@@ -218,8 +245,7 @@
 /* ----------------------------------------------------------------------------
    CONDENSED — Archivo Narrow, dense board, tall & loud.
    Narrow letterforms let type run large; tight padding & gaps pack
-   content; row rules give it the timetable-board feel. Falls back to
-   Archivo (the standard width) when Narrow isn't vendored.
+   content; row rules give it the timetable-board feel.
 ---------------------------------------------------------------------------- */
 [data-style="condensed"],
 .w[data-style="condensed"]{
@@ -250,8 +276,8 @@
    ============================================================================ */
 
 /* ---- BAUHAUS — geometric, circle marker (pair with the bauhaus theme) ----
-   Jost is the canonical font; Century Gothic and Inter are reasonable
-   geometric fallbacks if Jost isn't vendored. */
+   Jost is the canonical font; Century Gothic and Inter remain in the
+   chain as graceful fallbacks for older browsers or stripped builds. */
 [data-style="bauhaus"],
 .w[data-style="bauhaus"]{
   --font-family: "Jost", "Century Gothic", "Inter", "Helvetica Neue", sans-serif;
