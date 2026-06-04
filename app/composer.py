@@ -304,24 +304,6 @@ def _fetch_plugin_data(
         return {"error": f"{type(err).__name__}: {err}"}
 
 
-def _resolve_theme(page_theme: str | None) -> str:
-    """Resolve the Spectra theme for a page render.
-
-    Cascade: per-page override → app-wide default in Settings → App →
-    ``light`` as a last-resort fallback. Empty strings count as
-    "inherit" so a freshly-created page that hasn't picked a theme
-    falls through to the app default.
-    """
-    if page_theme:
-        return page_theme
-    store = current_app.config.get("SETTINGS_STORE")
-    if store is not None:
-        app_theme = str(store.get_section("app").get("theme") or "").strip()
-        if app_theme:
-            return app_theme
-    return "light"
-
-
 def _hydrate_page(
     page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False
 ) -> dict[str, Any]:
@@ -329,9 +311,10 @@ def _hydrate_page(
     registry = _registry()
     page_font = _resolve_font(page_dict.get("font"), registry)
     page_font_family = page_font.name if page_font else "system-ui"
-    # Resolve the Spectra theme so the template just renders
-    # ``page.theme`` without re-implementing the cascade.
-    page_dict = {**page_dict, "theme": _resolve_theme(page_dict.get("theme"))}
+    # Default to ``light`` when no per-page override is set so the
+    # template can render ``page.theme`` unconditionally.
+    if not page_dict.get("theme"):
+        page_dict = {**page_dict, "theme": "light"}
 
     gap = int(page_dict.get("gap", 0) or 0)
     # ``gap`` is the visible matting strip the user sees. Make it look
@@ -495,9 +478,7 @@ def test_render() -> str:
     sample_mode = request.args.get("sample") == "1"
     # ?theme=<id> picks one of the Spectra theme blocks
     # (light / dark / high-contrast / sepia / nord / cool-gray).
-    # Empty / missing falls through to the resolved cascade
-    # (page → app default → light).
-    theme_id = request.args.get("theme") or None
+    theme_id = request.args.get("theme") or "light"
 
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
