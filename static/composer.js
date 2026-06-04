@@ -108,9 +108,15 @@ async function mountCell(cell) {
 function applyPagePatch(page) {
   if (!page) return;
   if (typeof page.bleed_color === "string") {
-    document.body.style.background = page.bleed_color;
+    const bg = page.bleed_color || "var(--bg)";
+    document.body.style.background = bg;
     const panelEl = document.querySelector(".panel");
-    if (panelEl) panelEl.style.background = page.bleed_color;
+    if (panelEl) panelEl.style.background = bg;
+  }
+  // Page-level theme — flips data-theme on body so every cell that
+  // doesn't have its own override re-binds the Spectra tokens.
+  if (typeof page.theme === "string" && page.theme) {
+    document.body.setAttribute("data-theme", page.theme);
   }
   if (page.panel && Number(page.panel.w) > 0 && Number(page.panel.h) > 0) {
     const panelEl = document.querySelector(".panel");
@@ -150,7 +156,21 @@ async function applyCellPatch(patch) {
   }
   if (patch.font_family) {
     cell.style.fontFamily = `'${patch.font_family}', system-ui, sans-serif`;
+    // Spectra widgets read font-family from var(--font-family) inside
+    // their shadow root, so the inline cell font-family alone gets
+    // overridden by the .w rule. Setting --font-family on the cell host
+    // lets the custom-property cascade win.
+    cell.style.setProperty(
+      "--font-family",
+      `'${patch.font_family}', var(--font-family, system-ui, sans-serif)`,
+    );
     cell.dataset.fontFamily = patch.font_family;
+  }
+  // Per-cell theme override — empty / null clears it so the cell falls
+  // back to the page theme on body.
+  if (Object.prototype.hasOwnProperty.call(patch, "theme")) {
+    if (patch.theme) cell.setAttribute("data-theme", patch.theme);
+    else cell.removeAttribute("data-theme");
   }
 
   cell.dataset.options = JSON.stringify(patch.options ?? {});

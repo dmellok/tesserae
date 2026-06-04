@@ -61,7 +61,22 @@
 
     {% if plugin %}
     {% set font_options = [] %}{% for f in fonts %}{% set _ = font_options.append({'value': f.id, 'label': f.name}) %}{% endfor %}
+    {# Same six Spectra themes as the page picker; ``''`` (inherit) is
+       the default so a cell falls through to the page theme unless the
+       user picks a deliberate override. Setting data-theme on the cell
+       rebinds the semantic tokens for that subtree only. #}
+    {% set cell_theme_options = [
+      {'value': 'light', 'label': 'Light · warm paper'},
+      {'value': 'dark', 'label': 'Dark · warm charcoal'},
+      {'value': 'high-contrast', 'label': 'High contrast'},
+      {'value': 'sepia', 'label': 'Sepia · book paper'},
+      {'value': 'nord', 'label': 'Nord · cool blue night'},
+      {'value': 'cool-gray', 'label': 'Cool gray · neutral slate'},
+    ] %}
     <div class="field-grid">
+      {{ select_field('cell-' ~ cell.id ~ '-theme', 'theme', 'Theme override',
+                      value=cell.theme or '', options=cell_theme_options,
+                      blank_label='Inherit page') }}
       {{ select_field('cell-' ~ cell.id ~ '-font', 'font', 'Font override',
                       value=cell.font or '', options=font_options,
                       blank_label='Inherit page') }}

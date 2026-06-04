@@ -561,6 +561,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "y": _coerce_int(form.get("y"), cell.y, lo=0, hi=panel.h - 1),
             "w": _coerce_int(form.get("w"), cell.w, lo=1, hi=panel.w),
             "h": _coerce_int(form.get("h"), cell.h, lo=1, hi=panel.h),
+            "theme": (form.get("theme") or None),
             "font": (form.get("font") or None),
             "options": options,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),

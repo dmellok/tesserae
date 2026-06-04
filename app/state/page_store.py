@@ -55,9 +55,11 @@ class Cell(BaseModel):
     picks which widget renders into each slot. The composer skips
     cells where ``plugin`` is None / empty rather than 500-ing.
 
-    The theme / palette_overrides fields that used to live here were
-    stripped in v0.17 alongside the theme system. Pydantic silently
-    drops extras on load so old pages.json keep parsing.
+    ``theme`` is an optional per-cell override of the page-level theme.
+    When set, the composer emits ``data-theme="<id>"`` on the cell
+    element so the Spectra semantic tokens (--bg / --surface / accents)
+    rebind for just that subtree. ``None`` (the default) inherits from
+    the page.
     """
 
     id: str
@@ -66,6 +68,7 @@ class Cell(BaseModel):
     y: int = Field(..., ge=0)
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
+    theme: str | None = None
     font: str | None = None
     options: dict[str, Any] = Field(default_factory=dict)
     # Per-cell content zoom. Inverse-sized at render time: the widget
