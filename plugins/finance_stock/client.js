@@ -1,7 +1,9 @@
-// finance_stock — Spectra stat archetype with a sparkline rail.
+// finance_stock — Spectra stat archetype with a Chart.js sparkline.
 // Hero is the latest price; delta carries the change vs previous
 // close (accent-3 up, accent-1 down). Title bar shows the ticker
 // with the exchange + range as meta.
+
+import { sparkline, tokens } from "../../static/spectra-chart.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -17,23 +19,6 @@ function fmtPrice(n, ccy) {
   if (v >= 1000) return `${sym}${v.toFixed(2)}`;
   if (v >= 1) return `${sym}${v.toFixed(2)}`;
   return `${sym}${v.toFixed(4)}`;
-}
-
-function sparkline(values, accent) {
-  if (!Array.isArray(values) || values.length < 2) return "";
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const range = Math.max(0.0001, hi - lo);
-  const w = 100, h = 30;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - lo) / range) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  return `
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
 }
 
 export default function render(shadow, ctx) {
@@ -79,7 +64,12 @@ export default function render(shadow, ctx) {
           <span class="stat-delta" style="color:${deltaAccent}"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
           <span class="u-muted">${escapeHtml(name)}</span>
         </div>
-        <div class="stat-sparkline">${sparkline(data.series, deltaAccent)}</div>
+        <div class="stat-sparkline"><canvas></canvas></div>
       </div>
     </div>`;
+
+  const canvas = shadow.querySelector("canvas");
+  const t = tokens(shadow.host);
+  const lineColor = up ? t.accent3 : t.accent1;
+  sparkline(canvas, data.series, lineColor);
 }

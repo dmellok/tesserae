@@ -1,8 +1,10 @@
-// finance_crypto — Spectra stat archetype with a sparkline rail.
+// finance_crypto — Spectra stat archetype with a Chart.js sparkline.
 // Hero is the price; the delta carries the 24h % change (accent-3
 // up, accent-1 down) and the market cap goes in the title meta.
-// A tiny SVG sparkline of the 24h price series sits below the
-// caption so the stat tile carries a sense of momentum at a glance.
+// A Chart.js line of the 24h price series sits below the caption so
+// the tile carries a sense of momentum at a glance.
+
+import { sparkline, tokens } from "../../static/spectra-chart.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -29,26 +31,6 @@ function fmtMarketCap(n) {
   if (v >= 1e9) return `${(v / 1e9).toFixed(2)}B`;
   if (v >= 1e6) return `${(v / 1e6).toFixed(2)}M`;
   return v.toLocaleString();
-}
-
-// Build an SVG polyline from the series values. The viewBox is
-// 100x30, scaled to fit by the parent. Stroke uses the delta colour
-// so the line carries the same momentum signal as the % chip.
-function sparkline(values, accent) {
-  if (!Array.isArray(values) || values.length < 2) return "";
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const range = Math.max(0.0001, hi - lo);
-  const w = 100, h = 30;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - lo) / range) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  return `
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
 }
 
 export default function render(shadow, ctx) {
@@ -90,7 +72,12 @@ export default function render(shadow, ctx) {
           <span class="stat-delta" style="color:${deltaAccent}"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
           <span class="u-muted">24h</span>
         </div>
-        <div class="stat-sparkline">${sparkline(data.series, deltaAccent)}</div>
+        <div class="stat-sparkline"><canvas></canvas></div>
       </div>
     </div>`;
+
+  const canvas = shadow.querySelector("canvas");
+  const t = tokens(shadow.host);
+  const lineColor = up ? t.accent3 : t.accent1;
+  sparkline(canvas, data.series, lineColor);
 }

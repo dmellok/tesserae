@@ -1,6 +1,8 @@
-// ha_history — Spectra chart archetype. Single sensor → full bar
-// chart of the windowed series with trend arrow + min/max meta.
-// Multiple sensors → list of rows, each with current + trend.
+// ha_history — single sensor → full Chart.js line chart with axes
+// (current value + trend arrow + min/max in the chart legend strip).
+// Multiple sensors → compact list with each row's current value.
+
+import { lineChart, tokens } from "../../static/spectra-chart.js";
 
 const TREND_ICON = {
   up: "ph-arrow-up-right",
@@ -14,25 +16,16 @@ const TREND_ACCENT = {
   flat: "var(--text-secondary)",
 };
 
+const TREND_ACCENT_TOKEN = {
+  up: "accent3",
+  down: "accent1",
+  flat: "textSecondary",
+};
+
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
-}
-
-function renderChart(item) {
-  const values = Array.isArray(item.values) ? item.values : [];
-  if (!values.length) {
-    return `<p class="u-muted">No samples in the window.</p>`;
-  }
-  const vmax = Math.max(...values);
-  const vmin = Math.min(...values);
-  const range = Math.max(0.0001, vmax - vmin);
-  const bars = values.map((v) => {
-    const pct = Math.max(6, ((v - vmin) / range) * 94 + 6);
-    return `<div class="chart-col"><div class="chart-bar"><span style="height:${pct}%;background:var(--accent-5)"></span></div></div>`;
-  }).join("");
-  return `<div class="chart-figure">${bars}</div>`;
 }
 
 function renderSingle(item, hours) {
@@ -44,8 +37,12 @@ function renderSingle(item, hours) {
       <h3>${escapeHtml(item.name)}</h3>
       <span class="w-title-meta">${hours}H</span>
     </div>
-    <div class="w-body chart-body">
-      ${renderChart(item)}
+    <div class="w-body" style="gap:var(--space-2)">
+      <div style="flex:1 1 auto;min-height:0;position:relative">
+        ${Array.isArray(item.values) && item.values.length
+          ? '<canvas></canvas>'
+          : '<p class="u-muted">No samples in the window.</p>'}
+      </div>
       <div class="chart-legend">
         <span class="chart-key u-spread" style="gap:var(--space-3)">
           <span style="font-weight:var(--fw-black);font-size:var(--fs-lead);color:var(--text-primary)">
@@ -114,4 +111,20 @@ export default function render(shadow, ctx) {
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="ha_history">${body}</div>`;
+
+  if (items.length === 1) {
+    const item = items[0];
+    const canvas = shadow.querySelector("canvas");
+    if (canvas && Array.isArray(item.values) && item.values.length >= 2) {
+      const t = tokens(shadow.host);
+      const accent = t[TREND_ACCENT_TOKEN[item.trend] || "accent3"];
+      lineChart(canvas, {
+        tokens: t,
+        labels: item.values.map((_, i) => `${i + 1}`),
+        values: item.values,
+        color: accent,
+        fill: false,
+      });
+    }
+  }
 }

@@ -1,6 +1,8 @@
-// finance_currency — Spectra stat archetype with a sparkline rail.
+// finance_currency — Spectra stat archetype with a Chart.js sparkline.
 // Hero is the exchange rate; delta carries the 30-day % change and
 // the "as of" date sits in the title meta.
+
+import { sparkline, tokens } from "../../static/spectra-chart.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -15,23 +17,6 @@ function fmtRate(n) {
   if (v >= 100) return v.toFixed(2);
   if (v >= 1) return v.toFixed(4);
   return v.toFixed(6);
-}
-
-function sparkline(values, accent) {
-  if (!Array.isArray(values) || values.length < 2) return "";
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
-  const range = Math.max(0.0001, hi - lo);
-  const w = 100, h = 30;
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - ((v - lo) / range) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  return `
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-      <polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
 }
 
 export default function render(shadow, ctx) {
@@ -73,7 +58,12 @@ export default function render(shadow, ctx) {
           <span class="stat-delta" style="color:${deltaAccent}"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
           <span class="u-muted">30d</span>
         </div>
-        <div class="stat-sparkline">${sparkline(data.series, deltaAccent)}</div>
+        <div class="stat-sparkline"><canvas></canvas></div>
       </div>
     </div>`;
+
+  const canvas = shadow.querySelector("canvas");
+  const t = tokens(shadow.host);
+  const lineColor = up ? t.accent3 : t.accent1;
+  sparkline(canvas, data.series, lineColor);
 }

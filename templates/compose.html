@@ -26,6 +26,11 @@
        in spectra-widgets.css and are relinked per shadow root by each
        client.js since class selectors don't pierce shadow boundaries. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  <!-- Chart.js UMD. Loaded once at the document level so every widget
+       that imports static/spectra-chart.js can read window.Chart. The
+       script must be a regular non-module so composer.js's dynamic
+       widget imports don't race the global. -->
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
   <style>
     {{ page.font_face_css|safe }}
 

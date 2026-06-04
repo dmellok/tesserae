@@ -1,8 +1,11 @@
-// ha_energy — Spectra status archetype. Hero = current power flow's
-// signature value (solar generation if generating, else house load).
-// Pill names the flow (solar / grid / battery / mixed) with the
-// matching accent. Status grid breaks out the four wattage channels +
-// battery SOC if present.
+// ha_energy — Spectra status archetype with a Chart.js sparkline of
+// the last 24h. Hero = current power flow's signature value (solar
+// generation if generating, else house load). Pill names the flow
+// (solar / grid / battery / mixed). Status grid breaks out the four
+// wattage channels + battery SOC if present; the sparkline at the
+// bottom shows the trend in the flow accent.
+
+import { sparkline, tokens } from "../../static/spectra-chart.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -95,6 +98,19 @@ export default function render(shadow, ctx) {
         </div>
         <span class="pill" style="background:${accent}">${escapeHtml(flow)}</span>
         <div class="status-grid">${grid_html}</div>
+        ${Array.isArray(data.sparkline) && data.sparkline.length >= 2
+          ? `<div style="flex:0 0 25%;min-height:1.5em;position:relative"><canvas></canvas></div>`
+          : ""}
       </div>
     </div>`;
+
+  if (Array.isArray(data.sparkline) && data.sparkline.length >= 2) {
+    const canvas = shadow.querySelector("canvas");
+    const t = tokens(shadow.host);
+    const tokenName = (flow === "solar" ? "accent2"
+                    : flow === "grid" ? "accent5"
+                    : flow === "battery" ? "accent3"
+                    : "accent4");
+    sparkline(canvas, data.sparkline, t[tokenName]);
+  }
 }

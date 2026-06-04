@@ -1,8 +1,10 @@
-// weather_hourly — Spectra chart archetype, hourly temperature.
-//
-// Title bar shows place + current temp meta; body is a bar chart of the
-// next N hours' temperatures. Bars use --accent-5 except the current
-// hour (now), which is highlighted with --accent-1.
+// weather_hourly — Spectra chart archetype, hourly temperature, now
+// rendered as a Chart.js bar chart so it benefits from the same
+// e-ink-tuned axis styling as the other charted widgets. The
+// current hour (index 0 in the trimmed window) is highlighted with
+// accent-1 so the eye lands on "now" first.
+
+import { barChart, tokens } from "../../static/spectra-chart.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -32,44 +34,39 @@ export default function render(shadow, ctx) {
   const label = data.place || data.label || "";
   const hours = Array.isArray(data.hours) ? data.hours : [];
 
-  // Normalise the bar heights: max temp in the window → 100%; min → 10%
-  // so a flat-ish day still shows a visible bar. Negative temps still
-  // render (clamp to the 10% floor).
-  const temps = hours.map((h) => Number(h.temp)).filter((t) => !Number.isNaN(t));
-  const tMax = temps.length ? Math.max(...temps) : 0;
-  const tMin = temps.length ? Math.min(...temps) : 0;
-  const range = Math.max(1, tMax - tMin);
-
-  const bars = hours.map((h, i) => {
-    const t = Number(h.temp);
-    const valid = !Number.isNaN(t);
-    const pct = valid ? Math.max(10, ((t - tMin) / range) * 90 + 10) : 10;
-    const isNow = i === 0; // first hour is "current" in the trimmed array
-    const color = isNow ? "var(--accent-1)" : "var(--accent-5)";
-    return `
-      <div class="chart-col">
-        <div class="chart-bar"><span style="height:${pct}%;background:${color}"></span></div>
-        <span class="chart-x">${escapeHtml(h.hour ?? "")}</span>
-      </div>`;
-  }).join("");
-
-  const titleBar = `
-    <div class="w-title">
-      <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
-      <h3>${escapeHtml(label || "Hourly")}</h3>
-      ${data.now != null ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.now))} now</span>` : ""}
-    </div>`;
-
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="weather_hourly">
-      ${titleBar}
-      <div class="w-body chart-body">
-        <div class="chart-figure">${bars || '<p class="u-muted">No hourly data.</p>'}</div>
+      <div class="w-title">
+        <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
+        <h3>${escapeHtml(label || "Hourly")}</h3>
+        ${data.now != null ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.now))} NOW</span>` : ""}
+      </div>
+      <div class="w-body" style="gap:var(--space-2)">
+        <div style="flex:1 1 auto;min-height:0;position:relative">
+          ${hours.length ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}
+        </div>
         <div class="chart-legend">
           <span class="chart-key"><span class="dot" style="background:var(--accent-5)"></span>Forecast</span>
           <span class="chart-key"><span class="dot" style="background:var(--accent-1)"></span>Now</span>
         </div>
       </div>
     </div>`;
+
+  if (hours.length) {
+    const canvas = shadow.querySelector("canvas");
+    const t = tokens(shadow.host);
+    barChart(canvas, {
+      tokens: t,
+      labels: hours.map((h) => h.hour ?? ""),
+      values: hours.map((h) => {
+        const v = Number(h.temp);
+        return Number.isNaN(v) ? 0 : v;
+      }),
+      color: t.accent5,
+      highlightColor: t.accent1,
+      highlightIdx: 0,
+      showY: false,
+    });
+  }
 }
