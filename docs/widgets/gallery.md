@@ -151,7 +151,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_day](../screenshots/widgets/calendar_day.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/calendar_day--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_day--variants.png)</small>
 
     Today's agenda — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
@@ -163,7 +163,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_month](../screenshots/widgets/calendar_month.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/calendar_month--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_month--variants.png)</small>
 
     Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
 
@@ -175,7 +175,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/calendar_week--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_week--variants.png)</small>
 
     Seven-day strip — six Bauhaus / Swiss visual directions to choose from. Each event's colour comes from its feed (Plugins → Calendar Feeds).
 
@@ -479,7 +479,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_climate](../screenshots/widgets/ha_climate.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/ha_climate--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/ha_climate--variants.png)</small>
 
     One or more Home Assistant climate / thermostat entities — six Bauhaus / Swiss visual directions to choose from. Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
 
@@ -503,7 +503,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_entities](../screenshots/widgets/ha_entities.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/ha_entities--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/ha_entities--variants.png)</small>
 
     A status grid of several Home Assistant entities — six Bauhaus / Swiss visual directions to choose from. Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.
 
@@ -515,7 +515,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/ha_history--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/ha_history--variants.png)</small>
 
     A numeric Home Assistant sensor over time — six Bauhaus / Swiss visual directions to choose from. Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.
 
@@ -563,7 +563,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_sensor](../screenshots/widgets/ha_sensor.png)
 
-    <small>**6 directions** — [click to view](../screenshots/widgets/ha_sensor--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/ha_sensor--variants.png)</small>
 
     One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
 
@@ -615,7 +615,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![spotify_now_playing](../screenshots/widgets/spotify_now_playing.png)
 
-    <small>**5 directions** — [click to view](../screenshots/widgets/spotify_now_playing--variants.png)</small>
+    <small>**4 directions** — [click to view](../screenshots/widgets/spotify_now_playing--variants.png)</small>
 
     Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
 
