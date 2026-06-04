@@ -10,17 +10,27 @@ function escapeHtml(s) {
 
 function fmtPublished(iso) {
   if (typeof iso !== "string" || !iso) return "";
-  // Strip the time portion if present so rows read tightly.
-  if (iso.includes("T")) {
-    const [date] = iso.split("T");
-    const [y, mo, d] = date.split("-").map(Number);
-    if (Number.isNaN(y)) return "";
-    const today = new Date();
-    const isToday = today.getFullYear() === y && today.getMonth() + 1 === mo && today.getDate() === d;
-    if (isToday) return iso.split("T")[1].slice(0, 5);
-    return `${String(d).padStart(2, "0")}/${String(mo).padStart(2, "0")}`;
-  }
-  return iso;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return iso;
+  const secs = Math.max(0, (Date.now() - t) / 1000);
+  if (secs < 3600) return `${Math.max(1, Math.floor(secs / 60))}m`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
+  if (secs < 604800) return `${Math.floor(secs / 86400)}d`;
+  if (secs < 2592000) return `${Math.floor(secs / 604800)}w`;
+  return `${Math.floor(secs / 2592000)}mo`;
+}
+
+// Pick a leading icon based on the link's host / extension so a mixed
+// feed visually distinguishes a podcast / video / article. Falls
+// back to the generic ph-rss when nothing matches.
+function sourceIcon(url) {
+  if (typeof url !== "string") return "ph-rss";
+  const u = url.toLowerCase();
+  if (u.includes("youtube.com") || u.includes("youtu.be") || u.endsWith(".mp4") || u.endsWith(".mov")) return "ph-play";
+  if (u.endsWith(".mp3") || u.includes(".m4a") || u.includes("podcast")) return "ph-microphone";
+  if (u.includes("github.com")) return "ph-github-logo";
+  if (u.endsWith(".jpg") || u.endsWith(".png") || u.endsWith(".gif") || u.endsWith(".webp")) return "ph-image";
+  return "ph-rss";
 }
 
 export default function render(shadow, ctx) {
@@ -56,10 +66,10 @@ export default function render(shadow, ctx) {
   const rows = items.map((it, i) => `
     <div class="list-row ${i % 2 ? "is-zebra" : ""}">
       <div class="list-lead">
-        <i class="ph-bold ph-rss" style="color:var(--accent-2)"></i>
+        <i class="ph-bold ${sourceIcon(it.url)}" style="color:var(--accent-2)"></i>
         <span class="list-title">${escapeHtml(it.title)}</span>
       </div>
-      <span class="list-meta u-muted" style="font-weight:var(--fw-semi)">${escapeHtml(fmtPublished(it.published))}</span>
+      <span class="list-meta u-muted" style="font-weight:var(--fw-semi);font-feature-settings:'tnum'">${escapeHtml(fmtPublished(it.published))}</span>
     </div>`).join("");
 
   shadow.innerHTML = `
