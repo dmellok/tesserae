@@ -153,52 +153,96 @@ function hiLoFeels(data) {
 // ===========================================================
 // R1 — REFINED
 // Charcoal header + dense hairline-organised grid + sun row.
+// Container queries handle the small-viewport fallback: 4-col grid
+// drops to 2 cols when the cell is narrow, the metric grid hides
+// entirely on extremely small cells, the sun row drops when the
+// cell is short, and the hero block fluid-scales via cqw/cqh.
 // ===========================================================
 function renderR1(data) {
   const metrics = metricsAvailable(data);
   return `
     ${styleBlock()}
-    <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
+    <style>
+      .wn-r1-root { display:flex; flex-direction:column; width:100%; height:100%; box-sizing:border-box; font-family:${DEFAULT_FONT}; min-height:0; overflow:hidden; }
+      .wn-r1-hero { display:flex; align-items:center; padding:clamp(8px, 2.5cqw, 16px) clamp(10px, 3cqw, 24px); gap:clamp(10px, 2.5cqw, 20px); min-width:0; }
+      .wn-r1-hero-text { flex:1; min-width:0; }
+      .wn-r1-temp { font-family:var(--wx-black); font-size:clamp(40px, 17cqw, 86px); line-height:.82; }
+      .wn-r1-cond { font-weight:800; font-size:clamp(12px, 3.4cqw, 20px); letter-spacing:.02em; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .wn-r1-range { margin-top:6px; font-size:clamp(10px, 2.2cqw, 13px); }
+      .wn-r1-hero-art { display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:0; }
+      .wn-r1-icon { font-size:clamp(48px, 18cqw, 96px); color:var(--wx-ink); line-height:1; }
+      .wn-r1-rain { font-family:var(--wx-mono); font-size:clamp(9px, 1.8cqw, 11px); font-weight:700; letter-spacing:.06em; color:${WX.inkOn("blue")}; background:${WX.col("blue")}; padding:3px 9px; white-space:nowrap; }
+      .wn-r1-grid { flex:1; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:1fr 1fr; gap:1px; background:var(--c-line); border-top:2px solid var(--wx-ink); min-height:0; min-width:0; }
+      .wn-r1-cell { background:var(--wx-paper); padding:clamp(6px, 1.4cqw, 11px) clamp(8px, 1.8cqw, 14px); display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
+      .wn-r1-cell-head { display:flex; align-items:center; gap:8px; min-width:0; }
+      .wn-r1-cell-label { font-family:var(--wx-mono); font-size:clamp(9px, 1.6cqw, 12px); letter-spacing:.06em; color:var(--wx-ink-60); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .wn-r1-cell-value { display:flex; align-items:baseline; gap:4px; min-width:0; }
+      .wn-r1-cell-num { font-family:var(--wx-black); font-size:clamp(16px, 3.6cqw, 27px); }
+      .wn-r1-cell-unit { font-family:var(--wx-mono); font-size:clamp(10px, 1.8cqw, 13px); color:var(--wx-ink-60); }
+      .wn-r1-sun { display:flex; border-top:2px solid var(--wx-ink); }
+      .wn-r1-sun-cell { flex:1; display:flex; align-items:center; gap:9px; padding:clamp(5px, 1cqh, 8px) clamp(10px, 2cqw, 16px); min-width:0; font-family:var(--wx-mono); font-size:clamp(10px, 1.8cqw, 13px); letter-spacing:.04em; }
+      .wn-r1-sun-cell + .wn-r1-sun-cell { border-left:1px solid var(--c-line); }
+      .wn-r1-sun-time { margin-left:auto; font-weight:700; font-size:clamp(11px, 2cqw, 14px); }
+
+      /* Narrow cell — collapse 4-col grid to 2 cols and the rain tag /
+         range line tighten or drop. */
+      @container (max-width: 460px) {
+        .wn-r1-grid { grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(${Math.max(2, Math.ceil(metrics.length / 2))},1fr); }
+      }
+      /* Very narrow — drop the metric grid + range line; the hero
+         block becomes the entire widget. */
+      @container (max-width: 280px) {
+        .wn-r1-grid { display:none; }
+        .wn-r1-range { display:none; }
+        .wn-r1-rain { display:none; }
+      }
+      /* Short cell — drop the sun row. R1's grid is auto auto 1fr auto
+         (header/hero/grid/sun); without the sun row the grid grows. */
+      @container (max-height: 320px) {
+        .wn-r1-sun { display:none; }
+      }
+      /* Both narrow AND short — strip down to just temp + condition. */
+      @container (max-width: 280px) and (max-height: 240px) {
+        .wn-r1-range, .wn-r1-rain, .wn-r1-icon { display:none; }
+      }
+    </style>
+    <div class="wx-art wn-r1-root">
       ${WX.darkHeader({ title: data.label || "—", accent: "blue", right: nowTime() })}
-      <div style="display:flex;align-items:center;padding:16px 24px;gap:20px">
-        <div style="flex:1">
-          <div style="display:flex;align-items:flex-start;gap:2px">
-            <span class="wx-tnum" style="font-family:var(--wx-black);font-size:86px;line-height:.82">${fmtTemp(data.temp)}</span>
-          </div>
-          <div style="font-weight:800;font-size:20px;letter-spacing:.02em;margin-top:6px">${escapeHtml((data.cond || "").toUpperCase())}</div>
-          <div style="margin-top:6px">${hiLoFeels(data)}</div>
+      <div class="wn-r1-hero">
+        <div class="wn-r1-hero-text">
+          <span class="wx-tnum wn-r1-temp">${fmtTemp(data.temp)}</span>
+          <div class="wn-r1-cond">${escapeHtml((data.cond || "").toUpperCase())}</div>
+          <div class="wn-r1-range">${hiLoFeels(data)}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
-          ${data.rainChance != null ? `
-            <span style="font-family:var(--wx-mono);font-size:11px;font-weight:700;letter-spacing:.06em;color:${WX.inkOn("blue")};background:${WX.col("blue")};padding:3px 9px">${Math.round(data.rainChance)}% RAIN</span>
-          ` : ""}
-          ${WX.icon(data.icon || "cloud", { size: 96, color: "var(--wx-ink)" })}
+        <div class="wn-r1-hero-art">
+          ${data.rainChance != null ? `<span class="wn-r1-rain">${Math.round(data.rainChance)}% RAIN</span>` : ""}
+          <i class="ph-bold ph-${escapeHtml(data.icon || "cloud")} wn-r1-icon" aria-hidden="true"></i>
         </div>
       </div>
-      <div style="flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
-        ${metrics.map((m, i) => `
-          <div style="border-right:${(i % 4) < 3 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 4 ? "1px solid var(--c-line)" : "none"};padding:11px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px">
-            <div style="display:flex;align-items:center;gap:8px">
-              ${WX.icon(m.icon, { size: 22, color: WX.col(m.accent) })}
-              <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(m.label.toUpperCase())}</span>
+      <div class="wn-r1-grid">
+        ${metrics.map((m) => `
+          <div class="wn-r1-cell">
+            <div class="wn-r1-cell-head">
+              ${WX.icon(m.icon, { size: 20, color: WX.col(m.accent) })}
+              <span class="wn-r1-cell-label">${escapeHtml(m.label.toUpperCase())}</span>
             </div>
-            <div style="display:flex;align-items:baseline;gap:4px">
-              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:27px">${fmtMetricValue(m)}</span>
-              <span style="font-family:var(--wx-mono);font-size:13px;color:var(--wx-ink-60)">${escapeHtml(m.unit || "")}</span>
+            <div class="wn-r1-cell-value">
+              <span class="wx-tnum wn-r1-cell-num">${fmtMetricValue(m)}</span>
+              <span class="wn-r1-cell-unit">${escapeHtml(m.unit || "")}</span>
             </div>
           </div>
         `).join("")}
       </div>
-      <div style="display:flex;border-top:2px solid var(--wx-ink)">
-        <div style="flex:1;display:flex;align-items:center;gap:9px;padding:8px 16px;border-right:1px solid var(--c-line)">
+      <div class="wn-r1-sun">
+        <div class="wn-r1-sun-cell">
           ${WX.icon("sunrise", { size: 18, color: WX.col("yellow") })}
-          <span style="font-family:var(--wx-mono);font-size:13px;letter-spacing:.04em">SUNRISE</span>
-          <span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:14px">${escapeHtml(data.sun?.rise || "")}</span>
+          <span>SUNRISE</span>
+          <span class="wn-r1-sun-time">${escapeHtml(data.sun?.rise || "")}</span>
         </div>
-        <div style="flex:1;display:flex;align-items:center;gap:9px;padding:8px 16px">
+        <div class="wn-r1-sun-cell">
           ${WX.icon("sunset", { size: 18, color: "var(--wx-ink)" })}
-          <span style="font-family:var(--wx-mono);font-size:13px;letter-spacing:.04em">SUNSET</span>
-          <span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:14px">${escapeHtml(data.sun?.set || "")}</span>
+          <span>SUNSET</span>
+          <span class="wn-r1-sun-time">${escapeHtml(data.sun?.set || "")}</span>
         </div>
       </div>
     </div>
