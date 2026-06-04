@@ -4,6 +4,13 @@
    NO internal borders anywhere — hierarchy is spacing + weight + surface tint.
    ============================================================================ */
 
+/* Phosphor (bold weight) — pulled into every shadow root that links this
+   file. The font-face declaration on the compose document is enough for
+   the browser to *load* the font, but the .ph-bold class rules live in
+   light-DOM scope and don't pierce shadow boundaries — without this
+   @import the widget icons render as bare squares. */
+@import url("../icons/phosphor/bold/style.css");
+
 /* ---- Generic widget shell ------------------------------------------------- */
 .w{
   /* the single fluid base every child sizes from (em) */

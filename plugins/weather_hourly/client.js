@@ -1,44 +1,75 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// weather_hourly — Spectra chart archetype, hourly temperature.
+//
+// Title bar shows place + current temp meta; body is a bar chart of the
+// next N hours' temperatures. Bars use --accent-5 except the current
+// hour (now), which is highlighted with --accent-1.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function fmtTemp(v) {
+  if (v == null) return "—";
+  return Math.round(Number(v)) + "°";
+}
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="weather_hourly">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Hourly</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const label = data.place || data.label || "";
+  const hours = Array.isArray(data.hours) ? data.hours : [];
+
+  // Normalise the bar heights: max temp in the window → 100%; min → 10%
+  // so a flat-ish day still shows a visible bar. Negative temps still
+  // render (clamp to the 10% floor).
+  const temps = hours.map((h) => Number(h.temp)).filter((t) => !Number.isNaN(t));
+  const tMax = temps.length ? Math.max(...temps) : 0;
+  const tMin = temps.length ? Math.min(...temps) : 0;
+  const range = Math.max(1, tMax - tMin);
+
+  const bars = hours.map((h, i) => {
+    const t = Number(h.temp);
+    const valid = !Number.isNaN(t);
+    const pct = valid ? Math.max(10, ((t - tMin) / range) * 90 + 10) : 10;
+    const isNow = i === 0; // first hour is "current" in the trimmed array
+    const color = isNow ? "var(--accent-1)" : "var(--accent-5)";
+    return `
+      <div class="chart-col">
+        <div class="chart-bar"><span style="height:${pct}%;background:${color}"></span></div>
+        <span class="chart-x">${escapeHtml(h.hour ?? "")}</span>
+      </div>`;
+  }).join("");
+
+  const titleBar = `
+    <div class="w-title">
+      <i class="ph-bold ph-clock"></i>
+      <h3>${escapeHtml(label || "Hourly")}</h3>
+      ${data.now != null ? `<span class="w-title-meta">${escapeHtml(fmtTemp(data.now))} now</span>` : ""}
+    </div>`;
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="weather_hourly">
+      ${titleBar}
+      <div class="w-body chart-body">
+        <div class="chart-figure">${bars || '<p class="u-muted">No hourly data.</p>'}</div>
+        <div class="chart-legend">
+          <span class="chart-key"><span class="dot" style="background:var(--accent-5)"></span>Forecast</span>
+          <span class="chart-key"><span class="dot" style="background:var(--accent-1)"></span>Now</span>
+        </div>
+      </div>
+    </div>`;
 }
