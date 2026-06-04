@@ -37,40 +37,47 @@
   --wx-ink-60:   var(--c-text-soft, #6b675c);
   --wx-hair:     var(--c-line, #1b1a16);
 
-  /* --- refined title bar (pinned Bauhaus) ---
-   * Locked to the original Spectra colours regardless of theme so
-   * every refined widget wears the same dark strip with paper text.
-   * Title bar CSS in widget-bauhaus.css + each refined widget reads
-   * these instead of wx-ink / wx-paper. */
-  --wb-bar-bg:   #1b1a16;
-  --wb-bar-fg:   #f1ece0;
+  /* --- refined title bar ---
+   * Inverts against the body so it always contrasts: in light themes
+   * the bar reads dark-on-light (the original Bauhaus look), and in
+   * dark themes it reads light-on-dark instead of being pinned to
+   * Spectra ink and disappearing into the dark body. Title bar CSS
+   * in widget-bauhaus.css + each refined widget reads these instead
+   * of wx-ink / wx-paper. */
+  --wb-bar-bg:   var(--c-text, #1b1a16);
+  --wb-bar-fg:   var(--c-bg, #f1ece0);
 
-  /* --- Spectra 6 chromatics ---
+  /* --- decorative chromatic slots ---
    *
    * The four wx hues are decorative palette slots — widgets pick them
    * to colour-block tiles, NOT to convey status meaning. Each one
-   * flows through the cell's categorical accent ramp so themes retint
-   * every decorative wx surface; widgets that actually need to convey
-   * "this is alarming" / "this is fine" reach for ``--c-danger`` /
-   * ``--c-warn`` / ``--c-ok`` / ``--c-info`` directly instead.
+   * flows through a theme-driven token so the entire decorative
+   * surface retints with the active theme; nothing here is pinned to
+   * a fixed Spectra hex any more. Widgets that need to convey
+   * semantic state (alarm / fine / caution) reach for ``--c-danger``
+   * / ``--c-warn`` / ``--c-ok`` / ``--c-info`` directly.
    *
-   * Yellow stays at the Spectra hex — only three accents in the
-   * theme palette and yellow rarely matches a theme's accent ramp
-   * cleanly, so we keep it pinned for visual distinction. Tints
-   * (`-t`) derive via color-mix so they follow the source accent
-   * rather than freezing on the static Spectra value.
+   *   --wx-red    = theme accent     (--c-accent)
+   *   --wx-blue   = theme accent2    (--c-data-2)
+   *   --wx-yellow = theme warn slot  (--c-warn) — every theme's warn
+   *                 sits in the yellow/mustard space, so this still
+   *                 reads as "yellow" but tracks the theme's saturation
+   *   --wx-green  = theme accent3    (--c-data-3)
+   *
+   * Tints (`-t`) derive via color-mix so they follow the source token
+   * rather than freezing on a static value.
    */
   --wx-red:      var(--c-accent,  #b23a2e);
-  --wx-red-fg:   #ffffff;
+  --wx-red-fg:   var(--c-bg,      #f1ece0);
   --wx-red-t:    color-mix(in oklab, var(--c-accent,  #b23a2e) 22%, var(--wx-paper));
   --wx-blue:     var(--c-data-2,  #2f5d8a);
-  --wx-blue-fg:  #ffffff;
+  --wx-blue-fg:  var(--c-bg,      #f1ece0);
   --wx-blue-t:   color-mix(in oklab, var(--c-data-2,  #2f5d8a) 22%, var(--wx-paper));
-  --wx-yellow:   #d8a82a;
-  --wx-yellow-fg:#1b1a16;
-  --wx-yellow-t: #efdfb0;
+  --wx-yellow:   var(--c-warn,    #d8a82a);
+  --wx-yellow-fg:var(--c-text,    #1b1a16);
+  --wx-yellow-t: color-mix(in oklab, var(--c-warn,    #d8a82a) 22%, var(--wx-paper));
   --wx-green:    var(--c-data-3,  #45744c);
-  --wx-green-fg: #ffffff;
+  --wx-green-fg: var(--c-bg,      #f1ece0);
   --wx-green-t:  color-mix(in oklab, var(--c-data-3,  #45744c) 22%, var(--wx-paper));
 
   /* --- type stack ---

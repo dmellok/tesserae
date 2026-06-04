@@ -1,7 +1,6 @@
-/* news_wikipedia_otd — Bauhaus shape. Year IS the "rank" (no count
-   ordering), so it gets the huge mono treatment in both the lede and
-   the rows. Header icon swaps based on the kind (events / births /
-   deaths / holidays). */
+/* news_wikipedia_otd — variant styling lives inline in client.js via
+ * the shared widget-bauhaus-wx tokens. This file only holds the error
+ * shell + a few overflow guards the inline rules can't express. */
 
 :host {
   display: block;
@@ -9,119 +8,25 @@
   height: 100%;
   color: var(--c-text);
   background: var(--c-bg);
-  font-variant-numeric: tabular-nums;
-}
-
-.root {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  box-sizing: border-box;
-  overflow: hidden;
-}
-
-/* --- lede --- */
-
-.wo-lede {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: clamp(12px, 2.2cqw, 24px);
-  padding: clamp(12px, 2.4cqw, 28px) clamp(14px, 2.6cqw, 30px);
-  background: var(--c-accent);
-  color: var(--c-bg);
-  min-width: 0;
-  overflow: hidden;
-  border-bottom: clamp(3px, 0.6cqw, 6px) solid var(--c-text);
-}
-.wo-lede-year {
-  font: 900 clamp(38px, 9cqw, 104px)/0.85 var(--theme-font-mono, ui-monospace);
-  letter-spacing: -0.05em;
-  white-space: nowrap;
-}
-.wo-lede-body { min-width: 0; }
-.wo-lede-text {
-  margin: 0;
-  font-size: clamp(14px, 2.6cqw, 26px);
-  font-weight: 700;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* --- rows --- */
-
-.wo-list {
-  display: grid;
-  grid-auto-rows: min-content;
-  align-content: start;
-  background: var(--c-surface);
-  min-height: 0;
-  overflow: hidden;
-}
-.wo-row {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: clamp(12px, 2cqw, 22px);
-  padding: clamp(8px, 1.4cqh, 16px) clamp(12px, 2cqw, 22px);
-  align-items: baseline;
-  min-width: 0;
-  overflow: hidden;
-  border-top: 1px solid color-mix(in oklab, var(--c-text) 12%, transparent);
-}
-.wo-row:first-child { border-top: 0; }
-.wo-year {
-  font: 900 clamp(18px, 3.2cqw, 34px)/1 var(--theme-font-mono, ui-monospace);
-  min-width: 3em;
-  text-align: right;
-  letter-spacing: -0.03em;
-  opacity: 0.85;
-}
-.wo-body {
-  min-width: 0;
-  overflow: hidden;
-}
-.wo-text {
-  font-size: clamp(14px, 2.4cqw, 22px);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.005em;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  word-break: break-word;
-}
-
-/* --- sizing --- */
-
-.root.size-sm .wo-lede { padding: 10px 12px; gap: 10px; }
-.root.size-sm .wo-lede-year { font-size: 32px; }
-.root.size-sm .wo-lede-text { font-size: 13px; -webkit-line-clamp: 3; }
-.root.size-sm .wo-row { padding: 6px 10px; }
-.root.size-sm .wo-year { font-size: 16px; min-width: 2.4em; }
-.root.size-sm .wo-text { font-size: 13px; }
-
-.wo-empty {
-  padding: 28px;
-  text-align: center;
-  color: var(--c-text-soft);
-  font-size: 14px;
-  font-weight: 600;
 }
 
 .root.error {
-  display: grid;
-  place-items: center;
-  text-align: center;
-  color: var(--c-danger);
-  padding: 16px;
+  display: flex;
+  align-items: center;
   gap: 8px;
+  padding: 16px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  color: var(--c-danger);
+  background: var(--c-bg);
+  height: 100%;
+  box-sizing: border-box;
 }
-.root.error .ph { font-size: 28px; }
-.root.error span { font: 12px/1.4 monospace; word-break: break-word; max-width: 90%; }
+.root.error .ph-bold { font-size: 24px; }
+
+.wx-art {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}

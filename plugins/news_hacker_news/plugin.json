@@ -1,12 +1,24 @@
 {
   "tesserae_compat": "1.x",
   "name": "News — Hacker News",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
   "description": "Top / new / best / show / ask stories from Hacker News. Uses the free Firebase API (no auth, no key). Click-through opens the story; the lightbox doesn't apply.",
   "icon": "ph-flame",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
+    {
+      "name": "variant",
+      "type": "select",
+      "label": "Style",
+      "default": "r1",
+      "choices": [
+        { "value": "r1", "label": "1 · Refined" },
+        { "value": "g2", "label": "2 · Geometric" },
+        { "value": "s3", "label": "3 · Swiss" },
+        { "value": "d4", "label": "4 · Data" }
+      ]
+    },
     {
       "name": "feed",
       "type": "select",
