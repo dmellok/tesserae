@@ -14,19 +14,32 @@ function fmtTime(iso) {
   return iso;
 }
 
-// Render the current moon phase as a small SVG disc. ``fraction`` is
-// 0 (new) → 0.5 (full) → 1 (next new). Drawn with a single white
-// circle masked by an ellipse so a waxing crescent / gibbous reads
-// like a real photograph of the moon at this phase.
+// Render the current moon phase as a stylised SVG disc that scales
+// to whatever its container ends up at. ``fraction`` is 0 (new) →
+// 0.5 (full) → 1 (next new). Five fixed crater dots at --text-muted
+// give the disc weight at large sizes; a subtle accent-tinted halo
+// ring sits just outside the edge. No fine gradients — Spectra-spec
+// safe on e-ink.
 function moonSvg(fraction, waxing, accent) {
   const r = 12;
   const k = Math.cos(fraction * 2 * Math.PI);
   const flag = waxing ? 1 : 0;
-  // Draw a full disc, then a shadow piece to subtract the dark side.
+  // Fixed crater layout — same positions every phase so the moon
+  // reads as a body, not a flat disc. Sized to be visible at the
+  // larger clamp scales without becoming dust at the smaller ones.
+  const craters = [
+    [-3, -4, 1.4], [4, 1, 1.0], [-1, 5, 1.2], [5, -5, 0.7], [-5, 2, 0.8],
+  ];
+  const cratersSvg = craters.map(([cx, cy, cr]) =>
+    `<circle cx="${cx}" cy="${cy}" r="${cr}" fill="var(--text-muted)" opacity="0.25"/>`
+  ).join("");
   return `
-    <svg viewBox="-15 -15 30 30" style="width:1.8em;height:1.8em;display:block">
+    <svg viewBox="-15 -15 30 30" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">
+      <circle r="${r + 1.4}" fill="none" stroke="${accent}" stroke-width="0.6" opacity="0.22"/>
       <circle r="${r}" fill="${accent}"/>
-      <path fill="var(--surface-sunken)" d="M 0 -${r} A ${r} ${r} 0 1 ${flag} 0 ${r} A ${Math.abs(k * r)} ${r} 0 1 ${k >= 0 ? flag : 1 - flag} 0 -${r} Z"/>
+      ${cratersSvg}
+      <path fill="var(--surface-sunken)"
+            d="M 0 -${r} A ${r} ${r} 0 1 ${flag} 0 ${r} A ${Math.abs(k * r)} ${r} 0 1 ${k >= 0 ? flag : 1 - flag} 0 -${r} Z"/>
     </svg>`;
 }
 
@@ -72,12 +85,13 @@ export default function render(shadow, ctx) {
         <h3>${escapeHtml(place)}</h3>
       </div>
       <div class="w-body status-body">
-        <div class="status-hero">
-          <span>${moonIcon}</span>
-          <div class="lockup">
-            <span class="status-state">${escapeHtml(phase)}</span>
-            <span class="status-sub">${illum != null ? `${illum}% illuminated` : ""}</span>
-          </div>
+        <!-- Big moon as the centrepiece. Width clamps so a small tile
+             still gets a recognisable phase disc and a large panel
+             really shows it off. -->
+        <div style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-2)">
+          <div style="width:clamp(5em, 40cqmin, 12em);aspect-ratio:1;flex:0 0 auto">${moonIcon}</div>
+          <span style="font-size:var(--fs-jumbo);font-weight:var(--fw-black);line-height:var(--lh-tight);color:var(--text-primary)">${escapeHtml(phase)}</span>
+          ${illum != null ? `<span style="font-size:var(--fs-body);font-weight:var(--fw-semi);color:var(--text-secondary)">${escapeHtml(String(illum))}% illuminated</span>` : ""}
         </div>
         <div class="status-grid">${grid}</div>
       </div>
