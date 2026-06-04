@@ -32,7 +32,11 @@ export default function render(shadow, ctx) {
   }
 
   const label = data.place || data.label || "";
-  const hours = Array.isArray(data.hours) ? data.hours : [];
+  // ``data.hours`` is the *integer* "hours ahead" cell-option the
+  // server echoes back (12 / 24 / 48). The actual array of hourly
+  // samples sits at ``data.points`` — each entry is
+  // {iso, hour, temp, rain, code, is_day}.
+  const hours = Array.isArray(data.points) ? data.points : [];
 
   shadow.innerHTML = `
     ${css}
