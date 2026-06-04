@@ -3,7 +3,7 @@
   "name": "Home Assistant — History",
   "version": "0.3.0",
   "kind": "widget",
-  "description": "A numeric Home Assistant sensor over time — six Bauhaus / Swiss visual directions to choose from. Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.",
+  "description": "A numeric Home Assistant sensor over time Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
   "supports": {
     "sizes": [

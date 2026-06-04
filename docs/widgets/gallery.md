@@ -17,8 +17,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![weather_air_quality](../screenshots/widgets/weather_air_quality.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_air_quality--variants.png)</small>
-
     Air Quality Index (European or US scale) plus PM2.5, PM10, O3, NO2 readings. Data from Open-Meteo CAMS (no API key). Colour-coded panel block reflects the AQI band.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
@@ -28,8 +26,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![weather_forecast](../screenshots/widgets/weather_forecast.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_forecast--variants.png)</small>
 
     5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).
 
@@ -41,8 +37,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![weather_hourly](../screenshots/widgets/weather_hourly.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_hourly--variants.png)</small>
-
     Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
@@ -52,8 +46,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![weather_now](../screenshots/widgets/weather_now.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_now--variants.png)</small>
 
     Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).
 
@@ -65,8 +57,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![weather_pollen_count](../screenshots/widgets/weather_pollen_count.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_pollen_count--variants.png)</small>
-
     Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS — Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
@@ -76,8 +66,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![weather_wind](../screenshots/widgets/weather_wind.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/weather_wind--variants.png)</small>
 
     Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).
 
@@ -151,9 +139,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_day](../screenshots/widgets/calendar_day.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_day--variants.png)</small>
-
-    Today's agenda — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
+    Today's agenda Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -163,9 +149,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_month](../screenshots/widgets/calendar_month.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_month--variants.png)</small>
-
-    Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
+    Month-grid view Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
 
     **Sizes:** `md` `lg` &middot; **Tier:** —
 
@@ -175,9 +159,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/calendar_week--variants.png)</small>
-
-    Seven-day strip — six Bauhaus / Swiss visual directions to choose from. Each event's colour comes from its feed (Plugins → Calendar Feeds).
+    Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -239,9 +221,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_actions](../screenshots/widgets/github_actions.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/github_actions--variants.png)</small>
-
-    Most recent CI runs across watched repos — four Bauhaus / Swiss visual directions to choose from. Variants pair a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
+    Most recent CI runs across watched repos Pairs a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -251,9 +231,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_activity](../screenshots/widgets/github_activity.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/github_activity--variants.png)</small>
-
-    Recent public activity for a GitHub user — four Bauhaus / Swiss visual directions to choose from. Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.
+    Recent public activity for a GitHub user Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -263,9 +241,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_contributions](../screenshots/widgets/github_contributions.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/github_contributions--variants.png)</small>
-
-    The familiar 53-week contributions heatmap for a user — four Bauhaus / Swiss visual directions to choose from. Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
+    The familiar 53-week contributions heatmap for a user Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -275,9 +251,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_pr_queue](../screenshots/widgets/github_pr_queue.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/github_pr_queue--variants.png)</small>
-
-    Your open PRs + PRs awaiting your review — four Bauhaus / Swiss visual directions to choose from. Each variant shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.
+    Your open PRs + PRs awaiting your review Shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -297,9 +271,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_repo](../screenshots/widgets/github_repo.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/github_repo--variants.png)</small>
-
-    Single-repo card — four Bauhaus / Swiss visual directions to choose from. Each pairs the language split + stars / forks / issues / release stats with a 52-week commit activity chart. Public repos work without a token.
+    Single-repo card Each pairs the language split + stars / forks / issues / release stats with a 52-week commit activity chart. Public repos work without a token.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -315,8 +287,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![news_hacker_news](../screenshots/widgets/news_hacker_news.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/news_hacker_news--variants.png)</small>
-
     Top / new / best / show / ask stories from Hacker News. Uses the free Firebase API (no auth, no key). Click-through opens the story; the lightbox doesn't apply.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
@@ -326,8 +296,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![news_reddit](../screenshots/widgets/news_reddit.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/news_reddit--variants.png)</small>
 
     Top posts from a subreddit using the free .json endpoint (no API key, no OAuth). Pick the subreddit and time window per cell.
 
@@ -339,8 +307,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![news_rss](../screenshots/widgets/news_rss.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/news_rss--variants.png)</small>
-
     Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
@@ -350,8 +316,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![news_wikipedia_otd](../screenshots/widgets/news_wikipedia_otd.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/news_wikipedia_otd--variants.png)</small>
 
     Wikipedia 'On this day' — featured historical events for today's date. Uses the free Wikimedia REST API (no key).
 
@@ -425,8 +389,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![sky_bom_warnings](../screenshots/widgets/sky_bom_warnings.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/sky_bom_warnings--variants.png)</small>
-
     Current severe weather warnings from the Bureau of Meteorology (Australia). Filter by state — flood, severe thunderstorm, severe weather, bushfire, etc. Uses api.weather.bom.gov.au (the same backend the BoM website itself uses; no key, treat as private/non-redistribution per BoM's terms).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
@@ -436,8 +398,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![sky_moon](../screenshots/widgets/sky_moon.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/sky_moon--variants.png)</small>
 
     Sun arc + moon phase disc. Sunrise / sunset / day length / solar noon, plus moon phase, illumination, age, moonrise / moonset and upcoming new / first-quarter / full / last-quarter dates. Sun + moon times come from Open-Meteo when latitude / longitude are set; phase + age are computed locally from the synodic month.
 
@@ -455,8 +415,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_battery](../screenshots/widgets/ha_battery.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_battery--variants.png)</small>
-
     Auto-discovered battery levels across every Home Assistant entity with device_class=battery, sorted lowest-first. Picks up phones, sensors, vacuums, remotes — anything HA already exposes as a battery — and flags low/critical against per-cell thresholds.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
@@ -467,9 +425,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_camera](../screenshots/widgets/ha_camera.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_camera--variants.png)</small>
-
-    Snapshot from one or more Home Assistant camera.* entities, with four visual directions. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.
+    Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -479,9 +435,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_climate](../screenshots/widgets/ha_climate.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_climate--variants.png)</small>
-
-    One or more Home Assistant climate / thermostat entities — six Bauhaus / Swiss visual directions to choose from. Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
+    One or more Home Assistant climate / thermostat entities Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -490,8 +444,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![ha_energy](../screenshots/widgets/ha_energy.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_energy--variants.png)</small>
 
     Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.
 
@@ -503,9 +455,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_entities](../screenshots/widgets/ha_entities.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_entities--variants.png)</small>
-
-    A status grid of several Home Assistant entities — six Bauhaus / Swiss visual directions to choose from. Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.
+    A status grid of several Home Assistant entities Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -515,9 +465,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_history--variants.png)</small>
-
-    A numeric Home Assistant sensor over time — six Bauhaus / Swiss visual directions to choose from. Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.
+    A numeric Home Assistant sensor over time Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -526,8 +474,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![ha_lights](../screenshots/widgets/ha_lights.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_lights--variants.png)</small>
 
     An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.
 
@@ -539,8 +485,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_locks](../screenshots/widgets/ha_locks.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_locks--variants.png)</small>
-
     A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
@@ -551,9 +495,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_media](../screenshots/widgets/ha_media.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_media--variants.png)</small>
-
-    Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Four selectable visual directions. Requires the Home Assistant Core plugin.
+    Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -563,9 +505,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_sensor](../screenshots/widgets/ha_sensor.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_sensor--variants.png)</small>
-
-    One or more Home Assistant entities as bold value blocks — six Bauhaus / Swiss visual directions to choose from. A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
+    One or more Home Assistant entities as bold value blocks A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -575,9 +515,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_todo](../screenshots/widgets/ha_todo.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_todo--variants.png)</small>
-
-    Items from a Home Assistant todo list — built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Four selectable visual directions: Refined / Geometric / Swiss / Data. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.
+    Items from a Home Assistant todo list — built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV, anything exposed as a todo.* entity. Lead with the items needing action; show due dates when the integration sets them. Requires HA 2024.5+ (the todo.get_items service with return_response). Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -586,8 +524,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![ha_zones](../screenshots/widgets/ha_zones.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/ha_zones--variants.png)</small>
 
     Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.
 
@@ -614,8 +550,6 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     ---
 
     ![spotify_now_playing](../screenshots/widgets/spotify_now_playing.png)
-
-    <small>**4 directions** — [click to view](../screenshots/widgets/spotify_now_playing--variants.png)</small>
 
     Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
 
@@ -737,9 +671,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![octoprint_status](../screenshots/widgets/octoprint_status.png)
 
-    <small>**4 directions** — [click to view](../screenshots/widgets/octoprint_status--variants.png)</small>
-
-    Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures. Four visual directions per cell.
+    Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 

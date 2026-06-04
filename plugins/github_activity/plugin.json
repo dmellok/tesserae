@@ -3,7 +3,7 @@
   "name": "GitHub — Activity",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "Recent public activity for a GitHub user — four Bauhaus / Swiss visual directions to choose from. Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.",
+  "description": "Recent public activity for a GitHub user Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.",
   "icon": "ph-git-commit",
   "supports": {
     "sizes": [

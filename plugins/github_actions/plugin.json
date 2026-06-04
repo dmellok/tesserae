@@ -3,7 +3,7 @@
   "name": "GitHub — Actions",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "Most recent CI runs across watched repos — four Bauhaus / Swiss visual directions to choose from. Variants pair a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.",
+  "description": "Most recent CI runs across watched repos Pairs a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.",
   "icon": "ph-play-circle",
   "supports": {
     "sizes": [

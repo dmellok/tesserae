@@ -3,7 +3,7 @@
   "name": "Calendar — Month",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "Month-grid view — six Bauhaus / Swiss visual directions to choose from. Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.",
+  "description": "Month-grid view Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.",
   "icon": "ph-calendar",
   "supports": {
     "sizes": [
@@ -40,8 +40,14 @@
       "label": "Event style",
       "default": "bars",
       "choices": [
-        { "value": "bars", "label": "Coloured bars" },
-        { "value": "text", "label": "Title text with feed colour bar" }
+        {
+          "value": "bars",
+          "label": "Coloured bars"
+        },
+        {
+          "value": "text",
+          "label": "Title text with feed colour bar"
+        }
       ]
     },
     {

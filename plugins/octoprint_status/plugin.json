@@ -3,7 +3,7 @@
   "name": "OctoPrint — Status",
   "version": "0.1.2",
   "kind": "widget",
-  "description": "Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures. Four visual directions per cell.",
+  "description": "Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures.",
   "icon": "ph-printer",
   "supports": {
     "sizes": [

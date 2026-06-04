@@ -3,7 +3,7 @@
   "name": "Weather Core",
   "version": "0.1.0",
   "kind": "data",
-  "description": "Shared assets for the weather widget family. Bundles the Phosphor icon map, colour/tint helpers, and SVG chart primitives used by weather_now, weather_forecast, weather_hourly, weather_air_quality, weather_pollen_count, weather_wind, sky_moon, and sky_bom_warnings \u2014 so the design tokens and icon roles stay consistent across all 32 variant frames.",
+  "description": "Shared assets for the weather widget family. Bundles the Phosphor icon map, colour/tint helpers, and SVG chart primitives used by weather_now, weather_forecast, weather_hourly, weather_air_quality, weather_pollen_count, weather_wind, sky_moon, and sky_bom_warnings so the design tokens and icon roles stay consistent across the set.",
   "icon": "ph-cloud-sun",
   "supports": {
     "sizes": [

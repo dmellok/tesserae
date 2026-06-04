@@ -3,7 +3,7 @@
   "name": "GitHub — PR Queue",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "Your open PRs + PRs awaiting your review — four Bauhaus / Swiss visual directions to choose from. Each variant shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.",
+  "description": "Your open PRs + PRs awaiting your review Shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.",
   "icon": "ph-git-pull-request",
   "supports": {
     "sizes": [

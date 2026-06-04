@@ -118,19 +118,6 @@ def _family(wid: str) -> str:
     return wid.split("_", 1)[0]
 
 
-def _variant_count(manifest: dict) -> int:
-    """Number of non-legacy variants the widget exposes (0 if no picker)."""
-    variant_opt = next(
-        (o for o in manifest.get("cell_options", []) if o.get("name") == "variant"),
-        None,
-    )
-    if not variant_opt:
-        return 0
-    return sum(
-        1 for c in variant_opt.get("choices") or [] if c.get("value") and c.get("value") != "legacy"
-    )
-
-
 def _card(manifest: dict, tier: str) -> str:
     wid = manifest["_id"]
     name = manifest.get("name", wid)
@@ -143,26 +130,10 @@ def _card(manifest: dict, tier: str) -> str:
     else:
         img = "_Screenshot pending — run `python scripts/capture_widget_shots.py`._"
 
-    # Variant strip below the hero shot, when one exists. Glightbox
-    # makes the image clickable so a 1296×816 composite reads fine at
-    # card width but opens full-size on click. Wrapping in <details>
-    # would hide it under MkDocs Material's default theme — keep it
-    # always-visible but compact via a small caption.
-    variants_shot = SHOTS_DIR / f"{wid}--variants.png"
-    if variants_shot.exists():
-        n = _variant_count(manifest) or 4
-        variants_line = (
-            f"    <small>**{n} directions** — "
-            f"[click to view]({SHOTS_REL}/{wid}--variants.png)</small>\n\n"
-        )
-    else:
-        variants_line = ""
-
     return (
         f"-   **{name}** &middot; `{wid}`\n\n"
         f"    ---\n\n"
         f"    {img}\n\n"
-        f"{variants_line}"
         f"    {desc}\n\n"
         f"    **Sizes:** {size_str} &middot; **Tier:** {tier}\n"
     )

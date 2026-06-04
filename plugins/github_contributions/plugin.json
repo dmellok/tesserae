@@ -3,7 +3,7 @@
   "name": "GitHub — Contributions",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "The familiar 53-week contributions heatmap for a user — four Bauhaus / Swiss visual directions to choose from. Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).",
+  "description": "The familiar 53-week contributions heatmap for a user Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).",
   "icon": "ph-grid-four",
   "supports": {
     "sizes": [

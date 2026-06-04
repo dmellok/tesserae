@@ -3,7 +3,7 @@
   "name": "Calendar — Week",
   "version": "0.2.0",
   "kind": "widget",
-  "description": "Seven-day strip — six Bauhaus / Swiss visual directions to choose from. Each event's colour comes from its feed (Plugins → Calendar Feeds).",
+  "description": "Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).",
   "icon": "ph-calendar",
   "supports": {
     "sizes": [
