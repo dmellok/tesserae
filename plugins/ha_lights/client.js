@@ -74,32 +74,61 @@ function emptyShell(data, body) {
 }
 
 // ===========================================================
-// R1 — REFINED (charcoal header + tile grid)
+// R1 — REFINED (hero ON-count panel + tile grid)
 // ===========================================================
 function renderR1(data) {
   const lights = data.lights || [];
+  const onCount = data.on_count || 0;
+  const total = data.total || lights.length;
   // Decide how many columns based on count, so 4 lights look balanced
   // and 9 lights tile nicely too.
   const cols = lights.length <= 4 ? 2 : lights.length <= 9 ? 3 : 4;
   return `
     ${styleBlock()}
+    <style>
+      .hl-r1-hero { display:grid; grid-template-columns:1fr 1fr; border-top:3px solid var(--c-accent); }
+      .hl-r1-stat { padding:clamp(8px, 1.6cqh, 14px) clamp(12px, 2.4cqw, 20px); display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .hl-r1-stat--on { background:var(--c-accent); color:var(--wx-red-fg); }
+      .hl-r1-stat--off { background:var(--wx-tint); color:var(--c-text); }
+      .hl-r1-stat-label { font-family:var(--wx-mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+      .hl-r1-stat-num { font-family:var(--wx-black); font-size:clamp(28px, 6cqw, 44px); line-height:1; }
+      .hl-r1-grid { flex:1; display:grid; grid-template-columns:repeat(${cols},1fr); gap:1px; background:var(--c-line); border-top:3px solid var(--c-accent); min-height:0; }
+      .hl-r1-tile { background:var(--wx-paper); padding:12px 14px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+      .hl-r1-tile.is-on { background:var(--wx-tint); }
+      .hl-r1-pill-on { display:inline-block; background:var(--c-accent); color:var(--wx-red-fg); font-family:var(--wx-mono); font-weight:700; font-size:11.5px; padding:3px 8px; letter-spacing:.04em; }
+      .hl-r1-pill-off { display:inline-block; background:var(--c-line); color:var(--wx-ink-60); font-family:var(--wx-mono); font-weight:700; font-size:11.5px; padding:3px 8px; letter-spacing:.04em; }
+
+      @container (max-height: 240px) {
+        .hl-r1-hero { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
       ${WX.darkHeader({
         title: `${data.place || ""} · LIGHTS`,
-        accent: "yellow",
-        right: `${data.on_count || 0}/${data.total || 0} ON · ${data.time || nowTime()}`,
+        accent: "red",
+        right: `${onCount}/${total} ON · ${data.time || nowTime()}`,
       })}
-      <div style="flex:1;display:grid;grid-template-columns:repeat(${cols},1fr);gap:1px;background:var(--c-line);border-top:2px solid var(--wx-ink)">
+      <div class="hl-r1-hero">
+        <div class="hl-r1-stat hl-r1-stat--on">
+          <span class="hl-r1-stat-label">On</span>
+          <span class="wx-tnum hl-r1-stat-num">${onCount}</span>
+        </div>
+        <div class="hl-r1-stat hl-r1-stat--off">
+          <span class="hl-r1-stat-label" style="color:var(--wx-ink-60)">Off</span>
+          <span class="wx-tnum hl-r1-stat-num" style="color:var(--c-accent)">${Math.max(0, total - onCount)}</span>
+        </div>
+      </div>
+      <div class="hl-r1-grid">
         ${lights.map((l) => `
-          <div style="background:var(--wx-paper);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0">
+          <div class="hl-r1-tile${l.on ? " is-on" : ""}">
             <div style="display:flex;align-items:center;gap:8px;min-width:0">
-              ${bulbIcon({ on: l.on, color: l.on ? WX.col("yellow") : "var(--wx-ink-60)", size: 20 })}
-              <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.04em;color:${l.on ? "var(--wx-ink)" : "var(--wx-ink-60)"};text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(l.name || l.entity_id)}</span>
+              ${bulbIcon({ on: l.on, color: l.on ? "var(--c-accent)" : "var(--wx-ink-60)", size: 20 })}
+              <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.04em;color:${l.on ? "var(--c-text)" : "var(--wx-ink-60)"};text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(l.name || l.entity_id)}</span>
             </div>
             <div>
               ${l.on
-                ? `<span style="display:inline-block;background:${WX.col("yellow")};color:${WX.inkOn("yellow")};font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">ON · <span class="wx-tnum">${escapeHtml(pct(l.brightness_pct))}</span></span>`
-                : `<span style="display:inline-block;background:var(--c-line);color:var(--wx-ink-60);font-family:var(--wx-mono);font-weight:700;font-size:11.5px;padding:3px 8px;letter-spacing:.04em">${l.missing ? "MISSING" : "OFF"}</span>`}
+                ? `<span class="hl-r1-pill-on">ON · <span class="wx-tnum">${escapeHtml(pct(l.brightness_pct))}</span></span>`
+                : `<span class="hl-r1-pill-off">${l.missing ? "MISSING" : "OFF"}</span>`}
             </div>
           </div>
         `).join("")}

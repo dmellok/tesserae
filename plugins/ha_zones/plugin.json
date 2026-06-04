@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Zones",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.",
   "icon": "ph-house",

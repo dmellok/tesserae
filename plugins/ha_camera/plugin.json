@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Camera",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Snapshot from one or more Home Assistant camera.* entities, with four visual directions. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.",
   "icon": "ph-video-camera",

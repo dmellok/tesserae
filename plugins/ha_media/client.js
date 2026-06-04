@@ -138,7 +138,7 @@ function progressBar(d, { accent = "blue", showTimes = true } = {}) {
 }
 
 // ===========================================================
-// R1 — REFINED (header + art left, meta right, progress bottom)
+// R1 — REFINED (art panel on accent + meta on tint + progress)
 // ===========================================================
 function renderR1(data) {
   const showProgress = data.show_progress !== false;
@@ -151,23 +151,38 @@ function renderR1(data) {
   }
   return `
     ${styleBlock()}
+    <style>
+      .hm-r1-body { flex:1; display:grid; grid-template-columns:auto 1fr; gap:0; padding:0; min-height:0; border-top:3px solid var(--c-accent); }
+      .hm-r1-art { background:var(--c-accent); padding:clamp(10px, 2.4cqw, 18px); display:flex; align-items:center; justify-content:center; min-width:0; }
+      .hm-r1-art > div, .hm-r1-art > img { background:var(--wx-red-fg) !important; }
+      .hm-r1-meta { background:var(--wx-tint); padding:clamp(12px, 2.6cqw, 18px) clamp(14px, 3cqw, 20px); display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; }
+      .hm-r1-title { font-family:var(--wx-black); font-size:clamp(16px, 4cqw, 26px); line-height:1.05; color:var(--c-accent); overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+      .hm-r1-line { display:flex; align-items:center; gap:6px; color:var(--wx-ink-60); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .hm-r1-progress { padding:8px 16px 12px; background:var(--wx-paper); border-top:3px solid var(--c-accent); }
+
+      @container (max-width: 360px) {
+        .hm-r1-body { grid-template-columns:1fr; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
       ${WX.darkHeader({
         title: `NOW PLAYING${sourceTag}`,
-        accent: "blue",
+        accent: "red",
         right: headerRight,
       })}
-      <div style="flex:1;display:flex;gap:14px;padding:14px 16px;min-height:0;border-top:2px solid var(--wx-ink)">
-        ${artBlock(data, { size: "clamp(70px, 30%, 130px)" })}
-        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0">
-          <div style="font-family:var(--wx-black);font-size:clamp(18px, 5vw, 26px);line-height:1.05;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escapeHtml(data.title || "—")}</div>
-          ${data.artist ? `<div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--wx-ink-60);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${WX.icon("user", { size: 13, color: "var(--wx-ink-60)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.artist)}</span></div>` : ""}
-          ${data.album ? `<div style="display:flex;align-items:center;gap:6px;font-family:var(--wx-mono);font-size:11px;letter-spacing:.04em;color:var(--wx-ink-60);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${WX.icon("disc", { size: 12, color: "var(--wx-ink-60)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.album)}</span></div>` : ""}
+      <div class="hm-r1-body">
+        <div class="hm-r1-art">
+          ${artBlock(data, { size: "clamp(70px, 22cqw, 130px)" })}
+        </div>
+        <div class="hm-r1-meta">
+          <div class="hm-r1-title">${escapeHtml(data.title || "—")}</div>
+          ${data.artist ? `<div class="hm-r1-line" style="font-size:13px">${WX.icon("user", { size: 13, color: "var(--c-accent)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.artist)}</span></div>` : ""}
+          ${data.album ? `<div class="hm-r1-line" style="font-family:var(--wx-mono);font-size:11px;letter-spacing:.04em">${WX.icon("disc", { size: 12, color: "var(--c-accent)" })}<span style="overflow:hidden;text-overflow:ellipsis">${escapeHtml(data.album)}</span></div>` : ""}
         </div>
       </div>
       ${showProgress ? `
-        <div style="padding:8px 16px 12px;border-top:1px solid var(--c-line)">
-          ${progressBar(data, { accent: "blue" })}
+        <div class="hm-r1-progress">
+          ${progressBar(data, { accent: "red" })}
         </div>
       ` : ""}
     </div>

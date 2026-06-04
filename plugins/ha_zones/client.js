@@ -122,24 +122,50 @@ function emptyState(label) {
 }
 
 // ===========================================================
-// R1 — REFINED (header + avatar grid + name + state pill)
+// R1 — REFINED (hero 2-up HOME/AWAY + avatar grid)
 // ===========================================================
 function renderR1(data) {
   const items = data.items || [];
   const summary = data.summary || {};
-  const headerRight = `${summary.home ?? 0} / ${summary.total ?? items.length} AT HOME`;
+  const home = summary.home ?? 0;
+  const total = summary.total ?? items.length;
+  const away = Math.max(0, total - home);
+  const headerRight = `${home} / ${total} AT HOME`;
   return `
     ${styleBlock()}
+    <style>
+      .hz-r1-hero { display:grid; grid-template-columns:1fr 1fr; border-top:3px solid var(--c-accent); }
+      .hz-r1-stat { padding:clamp(8px, 1.6cqh, 14px) clamp(12px, 2.4cqw, 20px); display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .hz-r1-stat--home { background:var(--c-accent); color:var(--wx-red-fg); }
+      .hz-r1-stat--away { background:var(--wx-tint); color:var(--c-text); }
+      .hz-r1-stat-label { font-family:var(--wx-mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+      .hz-r1-stat-num { font-family:var(--wx-black); font-size:clamp(28px, 6cqw, 44px); line-height:1; }
+      .hz-r1-grid { flex:1; border-top:3px solid var(--c-accent); padding:14px; display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:14px 12px; align-content:start; overflow:hidden; background:var(--wx-paper); }
+
+      @container (max-height: 240px) {
+        .hz-r1-hero { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: (data.label || "HOME"), accent: "green", right: headerRight })}
-      <div style="flex:1;border-top:2px solid var(--wx-ink);padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:14px 12px;align-content:start;overflow:hidden">
+      ${WX.darkHeader({ title: (data.label || "HOME"), accent: "red", right: headerRight })}
+      <div class="hz-r1-hero">
+        <div class="hz-r1-stat hz-r1-stat--home">
+          <span class="hz-r1-stat-label">Home</span>
+          <span class="wx-tnum hz-r1-stat-num">${home}</span>
+        </div>
+        <div class="hz-r1-stat hz-r1-stat--away">
+          <span class="hz-r1-stat-label" style="color:var(--wx-ink-60)">Away</span>
+          <span class="wx-tnum hz-r1-stat-num" style="color:var(--c-accent)">${away}</span>
+        </div>
+      </div>
+      <div class="hz-r1-grid">
         ${items.length === 0 ? emptyState(data.label) : items.map((it) => {
           const accent = stateAccent(it.state);
           return `
             <div style="display:flex;flex-direction:column;align-items:center;gap:6px;min-width:0">
               ${avatar(it, 52)}
-              <span style="font-family:var(--wx-grotesk);font-size:12px;font-weight:600;color:var(--wx-ink);text-align:center;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
-              <span style="display:inline-flex;align-items:center;gap:4px;background:${WX.tint(accent)};color:var(--wx-ink);padding:2px 7px;border-radius:999px;font-family:var(--wx-mono);font-size:10px;letter-spacing:.06em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+              <span style="font-family:var(--wx-grotesk);font-size:12px;font-weight:600;color:var(--c-text);text-align:center;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(it.name)}</span>
+              <span style="display:inline-flex;align-items:center;gap:4px;background:${WX.tint(accent)};color:var(--c-text);padding:2px 7px;border-radius:999px;font-family:var(--wx-mono);font-size:10px;letter-spacing:.06em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                 <span style="width:5px;height:5px;border-radius:50%;background:${WX.col(accent)};display:inline-block;flex-shrink:0"></span>
                 ${escapeHtml(stateLabel(it.state))}
               </span>

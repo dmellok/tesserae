@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Media",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Four selectable visual directions. Requires the Home Assistant Core plugin.",
   "icon": "ph-play-circle",

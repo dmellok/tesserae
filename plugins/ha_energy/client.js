@@ -149,36 +149,52 @@ function flowTiles(d) {
 }
 
 // ===========================================================
-// R1 — REFINED (header + 4-tile grid + battery bar + sparkline)
+// R1 — REFINED (header + 4-tile grid where tile 0 is the solid
+// accent hero + sparkline tinted strip)
 // ===========================================================
 function renderR1(data) {
   const tiles = flowTiles(data);
   const hasSpark = Array.isArray(data.sparkline) && data.sparkline.length > 0;
   return `
     ${styleBlock()}
+    <style>
+      .he-r1-grid { flex:1; display:grid; grid-template-columns:repeat(2,1fr); grid-template-rows:1fr 1fr; gap:1px; background:var(--c-line); border-top:3px solid var(--c-accent); min-height:0; }
+      .he-r1-tile { background:var(--wx-paper); padding:14px 18px; display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; }
+      .he-r1-tile--hero { background:var(--c-accent); color:var(--wx-red-fg); }
+      .he-r1-tile--tint { background:var(--wx-tint); }
+      .he-r1-tile-label { font-family:var(--wx-mono); font-size:12px; letter-spacing:.06em; }
+      .he-r1-tile-num { font-family:var(--wx-black); font-size:30px; line-height:.85; }
+      .he-r1-solar { display:flex; align-items:center; gap:10px; padding:8px 16px; border-top:3px solid var(--c-accent); background:var(--wx-tint); height:48px; flex-shrink:0; }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: `${data.place || ""} · ENERGY`, accent: "yellow", right: data.time || nowTime() })}
-      <div style="flex:1;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:1fr 1fr;border-top:2px solid var(--wx-ink)">
-        ${tiles.map((t, i) => `
-          <div style="border-right:${i % 2 === 0 ? "1px solid var(--c-line)" : "none"};border-bottom:${i < 2 ? "1px solid var(--c-line)" : "none"};padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:6px">
-            <div style="display:flex;align-items:center;gap:8px">
-              ${WX.icon(t.icon, { size: 22, color: WX.col(t.accent) })}
-              <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.06em;color:var(--wx-ink-60)">${escapeHtml(t.label)}</span>
+      ${WX.darkHeader({ title: `${data.place || ""} · ENERGY`, accent: "red", right: data.time || nowTime() })}
+      <div class="he-r1-grid">
+        ${tiles.map((t, i) => {
+          const heroClass = i === 0 ? "he-r1-tile--hero" : (i === 3 ? "he-r1-tile--tint" : "");
+          const iconCol = i === 0 ? "var(--wx-red-fg)" : "var(--c-accent)";
+          const labelCol = i === 0 ? "var(--wx-red-fg)" : "var(--wx-ink-60)";
+          const numCol = i === 0 ? "var(--wx-red-fg)" : "var(--c-text)";
+          return `
+            <div class="he-r1-tile ${heroClass}">
+              <div style="display:flex;align-items:center;gap:8px">
+                ${WX.icon(t.icon, { size: 22, color: iconCol })}
+                <span class="he-r1-tile-label" style="color:${labelCol}">${escapeHtml(t.label)}</span>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px">
+                <span class="wx-tnum he-r1-tile-num" style="color:${numCol}">${escapeHtml(fmtW(t.value))}</span>
+                ${t.sub ? `<span style="font-family:var(--wx-mono);font-size:11px;margin-left:auto;color:${labelCol};opacity:.85">${escapeHtml(t.sub)}</span>` : ""}
+              </div>
             </div>
-            <div style="display:flex;align-items:baseline;gap:6px">
-              <span class="wx-tnum" style="font-family:var(--wx-black);font-size:30px;line-height:.85">${escapeHtml(fmtW(t.value))}</span>
-              ${t.sub ? `<span style="font-family:var(--wx-mono);font-size:11px;color:var(--wx-ink-60);margin-left:auto">${escapeHtml(t.sub)}</span>` : ""}
-            </div>
-          </div>
-        `).join("")}
+          `;
+        }).join("")}
       </div>
       ${hasSpark ? `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-top:2px solid var(--wx-ink);height:48px;flex-shrink:0">
-          ${WX.icon("sun", { size: 18, color: WX.col("yellow") })}
+        <div class="he-r1-solar">
+          ${WX.icon("sun", { size: 18, color: "var(--c-accent)" })}
           <span style="font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--wx-ink-60)">SOLAR · 24H</span>
-          ${data.solar_today_kwh != null ? `<span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:13px">${escapeHtml(data.solar_today_kwh.toFixed(1))} kWh</span>` : ""}
+          ${data.solar_today_kwh != null ? `<span style="margin-left:auto;font-family:var(--wx-mono);font-weight:700;font-size:13px;color:var(--c-accent)">${escapeHtml(data.solar_today_kwh.toFixed(1))} kWh</span>` : ""}
           <div style="flex:1;height:32px;min-width:60px">
-            ${sparkline({ series: data.sparkline, color: WX.col("yellow"), fill: WX.tint("yellow") })}
+            ${sparkline({ series: data.sparkline, color: "var(--c-accent)", fill: "var(--wx-tint-strong)" })}
           </div>
         </div>
       ` : ""}

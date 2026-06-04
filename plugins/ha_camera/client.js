@@ -88,8 +88,8 @@ function imageOrPlaceholder(url, alt) {
 
 // ===========================================================
 // R1 — REFINED
-// Charcoal header + image dominant + meta strip below. Multi-entity
-// items grid as 2×2 with each frame's name below it.
+// Image is the hero — the colour recipe sits in the gutters (accent
+// rules between sections, accent panel for the meta strip).
 // ===========================================================
 function renderR1(data) {
   const items = data.items || [];
@@ -98,31 +98,31 @@ function renderR1(data) {
   return `
     ${styleBlock()}
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
-      ${WX.darkHeader({ title: `${data.label || "Camera"}`, accent: "blue", right: headerRight })}
+      ${WX.darkHeader({ title: `${data.label || "Camera"}`, accent: "red", right: headerRight })}
       ${multi ? `
-        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:6px;padding:6px;background:var(--wx-ink);min-height:0">
+        <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:3px;padding:3px;background:var(--c-accent);border-top:3px solid var(--c-accent);min-height:0">
           ${items.slice(0, 4).map((it) => `
             <div style="background:var(--wx-paper);display:flex;flex-direction:column;min-height:0">
               <div style="flex:1;min-height:0;overflow:hidden">
                 ${imageOrPlaceholder(it.image_url, it.name)}
               </div>
-              <div style="padding:4px 8px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--wx-ink-60);display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--c-line)">
+              <div style="padding:4px 8px;font-family:var(--wx-mono);font-size:10.5px;letter-spacing:.04em;color:var(--c-accent);display:flex;justify-content:space-between;gap:8px;background:var(--wx-tint)">
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml((it.name || "").toUpperCase())}</span>
-                <span>${escapeHtml(fmtTime(it.last_updated))}</span>
+                <span style="color:var(--wx-ink-60)">${escapeHtml(fmtTime(it.last_updated))}</span>
               </div>
             </div>
           `).join("")}
         </div>
       ` : `
-        <div style="flex:1;min-height:0;overflow:hidden;border-top:2px solid var(--wx-ink)">
+        <div style="flex:1;min-height:0;overflow:hidden;border-top:3px solid var(--c-accent)">
           ${imageOrPlaceholder((items[0] || {}).image_url, (items[0] || {}).name)}
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;border-top:2px solid var(--wx-ink);height:42px;flex-shrink:0;font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--wx-ink-60)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 16px;border-top:3px solid var(--c-accent);background:var(--wx-tint);height:42px;flex-shrink:0;font-family:var(--wx-mono);font-size:11.5px;letter-spacing:.06em;color:var(--c-text)">
           <span style="display:flex;align-items:center;gap:8px">
-            ${WX.icon("video-camera", { size: 16, color: WX.col("blue") })}
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(((items[0] || {}).name || "").toUpperCase())}</span>
+            ${WX.icon("video-camera", { size: 16, color: "var(--c-accent)" })}
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--c-accent)">${escapeHtml(((items[0] || {}).name || "").toUpperCase())}</span>
           </span>
-          <span>${escapeHtml(fmtTime((items[0] || {}).last_updated))}</span>
+          <span style="color:var(--wx-ink-60)">${escapeHtml(fmtTime((items[0] || {}).last_updated))}</span>
         </div>
       `}
     </div>

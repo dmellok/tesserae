@@ -98,33 +98,60 @@ function emptyShell(body) {
 }
 
 // ===========================================================
-// R1 — REFINED (charcoal header + list with name/icon/state)
+// R1 — REFINED (2-up hero — secured/unsecured — + list)
 // ===========================================================
 function renderR1(data) {
   const entries = data.entries || [];
   const summary = data.summary || { secured: 0, unsecured: 0, total: 0 };
-  const accent = summary.unsecured > 0 ? "red" : "green";
-  const headerRight = `${summary.secured} SECURED · ${summary.unsecured} UNLOCKED`;
+  const anyOpen = summary.unsecured > 0;
   return `
     ${styleBlock()}
+    <style>
+      .ho-r1-hero { display:grid; grid-template-columns:1fr 1fr; border-top:3px solid var(--c-accent); }
+      .ho-r1-stat { padding:clamp(8px, 1.6cqh, 14px) clamp(12px, 2.4cqw, 20px); display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .ho-r1-stat--secured { background:var(--c-accent); color:var(--wx-red-fg); }
+      .ho-r1-stat--open-clear { background:var(--wx-tint); color:var(--c-text); }
+      .ho-r1-stat--open-alert { background:var(--c-danger); color:var(--c-bg); }
+      .ho-r1-stat-label { font-family:var(--wx-mono); font-size:11px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.9; }
+      .ho-r1-stat-num { font-family:var(--wx-black); font-size:clamp(28px, 6cqw, 44px); line-height:1; }
+      .ho-r1-list { flex:1; display:flex; flex-direction:column; border-top:3px solid var(--c-accent); overflow:hidden; background:var(--wx-paper); }
+      .ho-r1-row { display:flex; align-items:center; gap:10px; padding:9px 16px; min-width:0; }
+      .ho-r1-row + .ho-r1-row { border-top:1px solid var(--c-line); }
+      .ho-r1-row.is-open { background:color-mix(in oklab, var(--c-danger) 22%, var(--c-bg)); }
+      .ho-r1-name { font-family:var(--wx-mono); font-size:12px; letter-spacing:.04em; text-transform:uppercase; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--c-text); }
+      .ho-r1-pill { display:inline-block; font-family:var(--wx-mono); font-weight:700; font-size:11px; padding:3px 8px; letter-spacing:.06em; }
+      .ho-r1-pill--secured { background:var(--c-line); color:var(--wx-ink-60); }
+      .ho-r1-pill--open { background:var(--c-danger); color:var(--c-bg); }
+
+      @container (max-height: 240px) {
+        .ho-r1-hero { display:none; }
+      }
+    </style>
     <div class="wx-art" style="font-family:${DEFAULT_FONT};display:flex;flex-direction:column">
       ${WX.darkHeader({
         title: `${data.place || ""} · SECURITY`,
-        accent,
-        right: `${headerRight} · ${data.time || nowTime()}`,
+        accent: "red",
+        right: `${summary.secured}/${summary.total} SECURED · ${data.time || nowTime()}`,
       })}
-      <div style="flex:1;display:flex;flex-direction:column;border-top:2px solid var(--wx-ink);overflow:hidden">
-        ${entries.map((e, i) => {
+      <div class="ho-r1-hero">
+        <div class="ho-r1-stat ho-r1-stat--secured">
+          <span class="ho-r1-stat-label">Secured</span>
+          <span class="wx-tnum ho-r1-stat-num">${summary.secured}</span>
+        </div>
+        <div class="ho-r1-stat ${anyOpen ? "ho-r1-stat--open-alert" : "ho-r1-stat--open-clear"}">
+          <span class="ho-r1-stat-label" style="${anyOpen ? "" : "color:var(--wx-ink-60)"}">Open</span>
+          <span class="wx-tnum ho-r1-stat-num" style="${anyOpen ? "" : "color:var(--c-accent)"}">${summary.unsecured}</span>
+        </div>
+      </div>
+      <div class="ho-r1-list">
+        ${entries.map((e) => {
           const unsecured = !e.secured;
-          const accentCol = unsecured ? "var(--c-danger)" : "var(--wx-ink-60)";
-          const rowBg = unsecured ? "color-mix(in oklab, var(--c-danger) 22%, var(--c-bg))" : "var(--wx-paper)";
-          const stateBg = unsecured ? "var(--c-danger)" : "var(--c-line)";
-          const stateFg = unsecured ? "var(--c-bg)" : "var(--wx-ink-60)";
+          const iconCol = unsecured ? "var(--c-danger)" : "var(--c-accent)";
           return `
-            <div style="display:flex;align-items:center;gap:10px;padding:9px 16px;background:${rowBg};${i > 0 ? "border-top:1px solid var(--c-line);" : ""}min-width:0">
-              ${WX.icon(iconFor(e), { size: 20, color: accentCol, weight: unsecured ? "fill" : "bold" })}
-              <span style="font-family:var(--wx-mono);font-size:12px;letter-spacing:.04em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${unsecured ? "" : "color:var(--wx-ink)"}">${escapeHtml(e.name || e.entity_id)}</span>
-              <span style="display:inline-block;background:${stateBg};color:${stateFg};font-family:var(--wx-mono);font-weight:700;font-size:11px;padding:3px 8px;letter-spacing:.06em">${escapeHtml(stateLabel(e))}</span>
+            <div class="ho-r1-row${unsecured ? " is-open" : ""}">
+              ${WX.icon(iconFor(e), { size: 20, color: iconCol, weight: unsecured ? "fill" : "bold" })}
+              <span class="ho-r1-name">${escapeHtml(e.name || e.entity_id)}</span>
+              <span class="ho-r1-pill ${unsecured ? "ho-r1-pill--open" : "ho-r1-pill--secured"}">${escapeHtml(stateLabel(e))}</span>
             </div>
           `;
         }).join("")}
