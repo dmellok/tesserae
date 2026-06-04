@@ -123,7 +123,6 @@ export default function render(shadow, ctx) {
         labels: item.values.map((_, i) => `${i + 1}`),
         values: item.values,
         color: accent,
-        fill: false,
       });
     }
   }

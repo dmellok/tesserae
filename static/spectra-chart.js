@@ -55,9 +55,26 @@ function ensureChart(canvas) {
   return true;
 }
 
+// Convert ``#RRGGBB`` to ``rgba(r, g, b, alpha)`` so we can build
+// translucent area fills under chart lines without touching the
+// caller's source colour. Falls back to the input untouched if it
+// isn't a 6-digit hex (a CSS function form like rgb(...) already
+// renders correctly on canvas).
+function withAlpha(color, alpha) {
+  if (typeof color !== "string" || !color.startsWith("#") || color.length !== 7) return color;
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return color;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // Minimal sparkline — no axes, no legend, no tooltip. Tension 0.3 so
 // the line reads as a smooth trend rather than connected straight
-// segments. Used by finance, weather "now temp delta", energy flows.
+// segments. Stroke at 3px respects the Spectra data-stroke floor;
+// the area beneath is filled with the line colour at 18% alpha so
+// the trend has visible weight even at small sizes. Used by finance,
+// weather, energy.
 export function sparkline(canvas, values, color) {
   if (!ensureChart(canvas) || !Array.isArray(values) || values.length < 2) return null;
   const chart = new window.Chart(canvas, {
@@ -67,17 +84,30 @@ export function sparkline(canvas, values, color) {
       datasets: [{
         data: values,
         borderColor: color,
-        borderWidth: 2,
+        backgroundColor: withAlpha(color, 0.18),
+        borderWidth: 3,
         tension: 0.3,
         pointRadius: 0,
-        fill: false,
+        fill: "origin",
       }],
     },
     options: {
       animation: false,
       responsive: true,
       maintainAspectRatio: false,
-      scales: { x: { display: false }, y: { display: false } },
+      // For positive-only series (finance, energy flow) the y origin
+      // sits below the data so the fill reaches the bottom of the
+      // chart. Min/max stay auto so the line still tracks the range.
+      scales: {
+        x: { display: false },
+        y: {
+          display: false,
+          beginAtZero: false,
+          // Pad below the min so the fill doesn't collapse to a
+          // sliver against the bottom edge.
+          suggestedMin: Math.min(...values) - (Math.max(...values) - Math.min(...values)) * 0.15,
+        },
+      },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
     },
   });
@@ -142,13 +172,16 @@ export function barChart(canvas, opts) {
 }
 
 // Line chart with axis labels. Used by ha_history (single sensor
-// time-series). Filled area under the line is optional — pass
-// ``fill: true`` to get a soft tinted area beneath.
+// time-series). Default styling matches the sparkline — 3px stroke
+// with the area filled at 18% alpha — so the chart reads as a
+// confident bauhaus block, not a thin technical line. Pass
+// ``fill: false`` to opt out of the shaded area.
 export function lineChart(canvas, opts) {
   if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || opts.values.length < 2) return null;
   const t = opts.tokens || FALLBACK;
   const labels = opts.labels || opts.values.map((_, i) => i);
   const color = opts.color || t.accent4;
+  const wantsFill = opts.fill !== false;
 
   const chart = new window.Chart(canvas, {
     type: "line",
@@ -157,11 +190,11 @@ export function lineChart(canvas, opts) {
       datasets: [{
         data: opts.values,
         borderColor: color,
-        backgroundColor: opts.fill ? color : "transparent",
+        backgroundColor: wantsFill ? withAlpha(color, 0.18) : "transparent",
         borderWidth: 3,
         tension: 0.25,
         pointRadius: 0,
-        fill: opts.fill === true,
+        fill: wantsFill ? "origin" : false,
       }],
     },
     options: {
