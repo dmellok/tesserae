@@ -54,9 +54,13 @@ export async function getCircuit(circuitId) {
 export function trackSvg(circuit, opts = {}) {
   if (!circuit || !circuit.d) return "";
   const stroke = opts.stroke || "var(--text-primary)";
+  // No width/height on the SVG — the .f1-track CSS rule sizes it down
+  // and centers it via flex so there's visible breathing room around
+  // the path instead of edge-to-edge. The viewBox + preserveAspectRatio
+  // keeps the path's own proportions while CSS controls the box.
   return `
     <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
-         style="width:100%;height:100%;display:block">
+         style="display:block">
       <path d="${circuit.d}" fill="none" stroke="${stroke}"
             stroke-width="22" stroke-linejoin="round" stroke-linecap="round" />
     </svg>`;

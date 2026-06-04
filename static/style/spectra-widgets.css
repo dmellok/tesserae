@@ -773,7 +773,18 @@
   justify-content: center;
   color: var(--text-primary);
 }
-.f1-track svg{ max-width: 100%; max-height: 100%; }
+/* SVG renders at its viewBox-derived intrinsic aspect ratio and is
+   shrunk to ~75% of the available box, so the path always has
+   breathing room around it and the flex centering on the parent
+   actually has something smaller to center. width/height: auto lets
+   the SVG self-size from its viewBox; the max-* caps clamp it inside
+   the column. */
+.f1-track svg{
+  width: auto;
+  height: auto;
+  max-width: 75%;
+  max-height: 75%;
+}
 /* Hide the track strip on cells too narrow to show it as anything
    other than a sliver. ``360px`` is the Spectra "compact" breakpoint
    used by other widgets in this file — keeps the trim line consistent. */
