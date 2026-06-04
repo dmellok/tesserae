@@ -1,17 +1,20 @@
-// calendar_week — Spectra timetable archetype, seven-column variant.
-// One hour-axis on the left, then seven day lanes side-by-side. Events
-// plot inside their day's lane at their start time with height by
-// duration. Today's column header takes the accent-4 tint.
+// calendar_week — Spectra timetable, seven columns. Display header
+// shows the date range ("JUN 1 → 7 · 2026"), columns show DOW + day
+// number with today tinted accent-1. Same auto-fit hour axis as the
+// day view so a tightly-clustered work week reads at the right scale.
+
+const MONTH_SHORT = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+const DOW = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const DOW_SUN = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
 }
-
-const DEFAULT_RANGE = { start: 7, end: 22 };
-const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const DOW_SUN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 function parseTime(iso) {
   if (typeof iso !== "string" || !iso.includes("T")) return null;
@@ -26,18 +29,42 @@ function fmtHm(iso) {
 }
 
 function computeRange(days) {
-  let lo = DEFAULT_RANGE.start;
-  let hi = DEFAULT_RANGE.end;
+  let lo = 24, hi = 0, has = false;
   for (const d of days) {
     for (const ev of d.events || []) {
       if (ev.all_day) continue;
       const s = parseTime(ev.start);
-      if (s != null) lo = Math.min(lo, Math.floor(s));
+      if (s != null) { lo = Math.min(lo, s); has = true; }
       const e = parseTime(ev.end) ?? (s != null ? s + 1 : null);
-      if (e != null) hi = Math.max(hi, Math.ceil(e));
+      if (e != null) { hi = Math.max(hi, e); has = true; }
     }
   }
-  return { start: Math.max(0, lo), end: Math.min(24, hi) };
+  if (!has) return { start: 8, end: 18 };
+  return {
+    start: Math.max(0, Math.floor(lo) - 1),
+    end: Math.min(24, Math.ceil(hi) + 1),
+  };
+}
+
+function hourLabels(range) {
+  const out = [];
+  for (let h = range.start; h <= range.end; h++) {
+    if (h % 2 === 0) out.push(`<span>${String(h).padStart(2, "0")}:00</span>`);
+    else out.push(`<span style="opacity:0"></span>`);
+  }
+  return out.join("");
+}
+
+function fmtRange(startIso, endIso) {
+  if (!startIso || !endIso) return "";
+  const [sy, sm, sd] = startIso.split("-").map(Number);
+  const [ey, em, ed] = endIso.split("-").map(Number);
+  const startBit = `${MONTH_SHORT[sm - 1] || ""} ${sd}`;
+  const endBit = (sm === em)
+    ? `${ed}`
+    : `${MONTH_SHORT[em - 1] || ""} ${ed}`;
+  const year = sy === ey ? `${sy}` : `${sy}/${ey}`;
+  return `${startBit} → ${endBit} · ${year}`;
 }
 
 export default function render(shadow, ctx) {
@@ -48,34 +75,28 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="calendar_week">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Week</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
   }
 
-  const days = Array.isArray(data.days) ? data.days : [];
+  const days = Array.isArray(data.days) ? data.days.slice(0, 7) : [];
   const range = computeRange(days);
   const span = Math.max(1, range.end - range.start);
   const dowNames = (data.week_start === "sunday") ? DOW_SUN : DOW;
+  const rangeMeta = fmtRange(data.start, data.end);
 
-  const hourLabels = [];
-  for (let h = range.start; h <= range.end; h++) {
-    hourLabels.push(`<span>${String(h).padStart(2, "0")}</span>`);
-  }
-
-  // 7 column heads
-  const heads = days.slice(0, 7).map((d, i) => {
+  const heads = days.map((d, i) => {
     const name = dowNames[i] || "";
     const isToday = !!d.is_today;
-    return `<div class="tt-col-head ${isToday ? "is-today" : ""}">${escapeHtml(name)} ${escapeHtml(String(d.day || ""))}</div>`;
+    return `
+      <div class="tt-col-head ${isToday ? "is-today" : ""}">
+        <span>${escapeHtml(name)}</span>
+        <span class="day-num">${escapeHtml(String(d.day || ""))}</span>
+      </div>`;
   }).join("");
 
-  // 7 lanes with event blocks. Week view runs at .85em base size so
-  // titles fit a narrow column; the feed-colour tint is applied via
-  // --tt-bg so blocks read as coloured slots rather than blending
-  // into the sunken banding.
-  const lanes = days.slice(0, 7).map((d) => {
+  const lanes = days.map((d) => {
     const events = (d.events || []).filter((e) => !e.all_day);
     const blocks = events.map((ev) => {
       const s = parseTime(ev.start);
@@ -91,25 +112,27 @@ export default function render(shadow, ctx) {
           <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
         </div>`;
     }).join("");
-    return `<div class="tt-lane is-banded">${blocks}</div>`;
+    return `<div class="tt-lane has-rule">${blocks}</div>`;
   }).join("");
-
-  const totalEvents = days.reduce((n, d) => n + (d.events || []).length, 0);
 
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="calendar_week">
-      <div class="w-title">
-        <i class="ph-bold ph-calendar" style="color:var(--accent-3)"></i>
-        <h3>This week</h3>
-        <span class="w-title-meta">${totalEvents} EVENT${totalEvents === 1 ? "" : "S"}</span>
-      </div>
-      <div class="w-body tt-body" style="--tt-hours:${span}">
-        <div class="tt is-week" style="grid-template-rows:auto 1fr">
-          <div></div>
-          ${heads}
-          <div class="tt-hours">${hourLabels.join("")}</div>
-          ${lanes}
+      <div class="w-body" style="gap:var(--space-3)">
+        <div class="cal-head">
+          <div class="cal-head-row">
+            <span class="cal-head-title">THIS WEEK</span>
+            <span class="cal-head-meta">${escapeHtml(rangeMeta)}</span>
+          </div>
+          <div class="cal-head-rule"></div>
+        </div>
+        <div class="tt-body" style="--tt-hours:${span};flex:1 1 auto;min-height:0;display:flex;flex-direction:column">
+          <div class="tt is-week" style="flex:1 1 auto;min-height:0;grid-template-rows:auto 1fr">
+            <div></div>
+            ${heads}
+            <div class="tt-hours">${hourLabels(range)}</div>
+            ${lanes}
+          </div>
         </div>
       </div>
     </div>`;

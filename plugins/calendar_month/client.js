@@ -1,7 +1,8 @@
-// calendar_month — Spectra month-grid archetype. 7-col day-of-week
-// header + 5-6 row matrix of day cells. Out-of-month days dim down,
-// today gets an accent-4 day number, events surface as up to three
-// stacked bars in the feed colour with a "+N more" remainder.
+// calendar_month — Spectra month-grid. Display header shows the
+// month + year with WEEK STARTS MON/SUN as the meta line; today's
+// cell gets a filled accent-1 block behind its day number. Events
+// surface as up to N stacked coloured bars OR text rows, controlled
+// by the ``event_display`` cell option.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -23,7 +24,6 @@ export default function render(shadow, ctx) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="calendar_month">
-        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Month</h3></div>
         <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
       </div>`;
     return;
@@ -31,8 +31,9 @@ export default function render(shadow, ctx) {
 
   const days = Array.isArray(data.days) ? data.days : [];
   const dowNames = (data.week_start === "sunday") ? DOW_SUN : DOW;
-  const monthName = data.month_name || "";
+  const monthName = (data.month_name || "").toUpperCase();
   const year = data.year || "";
+  const weekStartLabel = (data.week_start === "sunday") ? "WEEK STARTS SUN" : "WEEK STARTS MON";
 
   const dowHeader = dowNames.map((name) => `<span>${escapeHtml(name)}</span>`).join("");
 
@@ -45,18 +46,15 @@ export default function render(shadow, ctx) {
     const visible = events.slice(0, maxPerDay);
     const remainder = Math.max(0, events.length - maxPerDay);
 
-    let body = "";
-    if (display === "text") {
-      body = visible.map((ev) => {
-        const colour = ev.colour || "var(--accent-4)";
-        return `<span class="mc-text" style="border-left-color:${colour}" title="${escapeHtml(ev.summary || "")}">${escapeHtml(ev.summary || "")}</span>`;
-      }).join("");
-    } else {
-      body = visible.map((ev) => {
-        const colour = ev.colour || "var(--accent-4)";
-        return `<span class="mc-dot" style="background:${colour}" title="${escapeHtml(ev.summary || "")}"></span>`;
-      }).join("");
-    }
+    const body = display === "text"
+      ? visible.map((ev) => {
+          const colour = ev.colour || "var(--accent-4)";
+          return `<span class="mc-text" style="border-left-color:${colour}" title="${escapeHtml(ev.summary || "")}">${escapeHtml(ev.summary || "")}</span>`;
+        }).join("")
+      : visible.map((ev) => {
+          const colour = ev.colour || "var(--accent-4)";
+          return `<span class="mc-dot" style="background:${colour}" title="${escapeHtml(ev.summary || "")}"></span>`;
+        }).join("");
     const more = remainder > 0
       ? `<span class="mc-more">+${remainder}</span>`
       : "";
@@ -71,13 +69,18 @@ export default function render(shadow, ctx) {
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="calendar_month">
-      <div class="w-title">
-        <i class="ph-bold ph-calendar" style="color:var(--accent-3)"></i>
-        <h3>${escapeHtml(monthName)} ${escapeHtml(String(year))}</h3>
-      </div>
-      <div class="w-body mc-body">
-        <div class="mc-dow">${dowHeader}</div>
-        <div class="mc-grid">${cells}</div>
+      <div class="w-body" style="gap:var(--space-3)">
+        <div class="cal-head">
+          <div class="cal-head-row">
+            <span class="cal-head-title">${escapeHtml(monthName)} <span class="num">${escapeHtml(String(year))}</span></span>
+            <span class="cal-head-meta">${escapeHtml(weekStartLabel)}</span>
+          </div>
+          <div class="cal-head-rule"></div>
+        </div>
+        <div class="mc-body" style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:var(--space-2)">
+          <div class="mc-dow">${dowHeader}</div>
+          <div class="mc-grid">${cells}</div>
+        </div>
       </div>
     </div>`;
 }

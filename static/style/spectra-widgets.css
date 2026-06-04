@@ -214,11 +214,49 @@
 .wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
 
 /* ============================================================================
-   WIDGET 6b · TIMETABLE  (calendar day / week — vertical hour axis +
-   positioned event blocks). No drawn dividers: the hour rhythm shows
-   through a repeating-linear-gradient of --surface-sunken bands.
+   WIDGET 6a · CAL-HEAD  (shared header for calendar day/week/month).
+   Big display title + small uppercase meta on the same baseline, a
+   thin accent rule below. Calendar widgets skip .w-title entirely and
+   put .cal-head at the top of .w-body so the header reads as part of
+   the data display, not as a generic widget label.
    ============================================================================ */
-.tt-body{ padding: 0; gap: 0; }
+.cal-head{
+  flex: 0 0 auto;
+  display: flex; flex-direction: column;
+  gap: var(--space-2);
+}
+.cal-head-row{
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--space-4);
+}
+.cal-head-title{
+  font-size: var(--fs-jumbo);
+  font-weight: var(--fw-black);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  color: var(--text-primary);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-head-title .num{ color: var(--text-secondary); margin-left: 0.2em; }
+.cal-head-meta{
+  font-size: var(--fs-label);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.cal-head-rule{
+  height: var(--stroke-2);
+  background: var(--accent-1);
+}
+
+/* ============================================================================
+   WIDGET 6b · TIMETABLE  (calendar day / week — vertical hour axis +
+   positioned event blocks). No banding lines: hours read from the
+   sparse left-axis labels alone, like the reference design.
+   ============================================================================ */
+.tt-body{ padding: 0; gap: var(--space-3); }
 .tt{
   flex: 1 1 auto;
   min-height: 0;
@@ -229,28 +267,32 @@
 .tt-hours{
   display: flex; flex-direction: column;
   justify-content: space-between;
-  padding: 0 var(--space-2) 0 0;
+  padding: 0 var(--space-3) 0 0;
+  font-family: var(--font-family);
+  font-feature-settings: "tnum";
   font-size: var(--fs-caption);
   font-weight: var(--fw-bold);
   color: var(--text-muted);
   letter-spacing: var(--ls-label);
 }
+.tt-hours span{ line-height: 1; transform: translateY(-50%); }
+.tt-hours span:first-child{ transform: none; }
+.tt-hours span:last-child{ transform: translateY(-100%); }
 .tt-lane{
   position: relative;
   min-width: 0;
 }
-.tt-lane.is-banded{
-  /* Hour-rhythm banding: every other hour gets a sunken band so the
-     rows read as a ruled timetable without drawing actual lines. The
-     gradient stops are percentages of the lane height — NO
-     background-size, or the gradient image tiles too small and the
-     stops calculate against the tile instead of the lane. */
+.tt-lane.has-rule{
+  /* Single faint hour-row rule every 2 hours so the eye can sweep a
+     time across all 7 columns in the week view. Drawn as a repeating
+     gradient against the lane height (no background-size, percentages
+     resolve against the lane). */
   background-image: repeating-linear-gradient(
     to bottom,
     transparent 0,
-    transparent calc(100% / var(--tt-hours, 18)),
-    var(--surface-sunken) calc(100% / var(--tt-hours, 18)),
-    var(--surface-sunken) calc(2 * 100% / var(--tt-hours, 18))
+    transparent calc((2 * 100% / var(--tt-hours, 12)) - 1px),
+    var(--surface-sunken) calc((2 * 100% / var(--tt-hours, 12)) - 1px),
+    var(--surface-sunken) calc(2 * 100% / var(--tt-hours, 12))
   );
 }
 .tt-col-head{
@@ -260,22 +302,21 @@
   text-transform: uppercase;
   color: var(--text-muted);
   text-align: center;
-  padding-bottom: var(--space-1);
+  padding-bottom: var(--space-2);
+  display: flex; align-items: baseline; justify-content: center; gap: 0.4em;
 }
-.tt-col-head.is-today{ color: var(--accent-4); }
+.tt-col-head .day-num{ font-size: var(--fs-body); color: var(--text-primary); }
+.tt-col-head.is-today{ color: var(--accent-1); }
+.tt-col-head.is-today .day-num{ color: var(--accent-1); }
 .tt-event{
   position: absolute;
   left: var(--space-1); right: var(--space-1);
-  /* Each event's feed colour is the left bar; the block body picks
-     up a tinted version of the same colour via --tt-bg (set inline
-     per event) so the event reads as a coloured slot, not a beige
-     card on a beige band. */
   border-left: var(--stroke-3) solid var(--accent-4);
   background: var(--tt-bg, var(--surface));
   padding: var(--space-1) var(--space-2);
   overflow: hidden;
   display: flex; flex-direction: column;
-  gap: 0;
+  gap: 0.1em;
   min-height: 0.6em;
   line-height: 1.1;
 }
@@ -285,9 +326,11 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tt-event .tt-sub{
+  font-family: var(--font-family);
+  font-feature-settings: "tnum";
   font-size: var(--fs-caption); font-weight: var(--fw-bold);
   color: var(--text-secondary);
-  letter-spacing: var(--ls-label);
+  letter-spacing: 0.04em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tt-allday{
@@ -297,7 +340,7 @@
 .tt-allday-pill{
   font-size: var(--fs-caption); font-weight: var(--fw-bold);
   padding: var(--space-1) var(--space-2);
-  background: var(--surface-sunken);
+  background: var(--tt-bg, var(--surface-sunken));
   border-left: var(--stroke-3) solid var(--accent-4);
 }
 
@@ -324,15 +367,23 @@
 .mc-cell{
   background: var(--surface);
   display: flex; flex-direction: column;
+  gap: 0.15em;
   padding: var(--space-1) var(--space-2);
   min-width: 0; min-height: 0;
 }
 .mc-cell.is-out{ background: var(--surface-sunken); opacity: 0.55; }
 .mc-num{
-  font-size: var(--fs-body); font-weight: var(--fw-bold);
+  font-size: var(--fs-body); font-weight: var(--fw-black);
   color: var(--text-primary); line-height: 1;
+  align-self: flex-start;
+  padding: 0.1em 0.35em;
 }
-.mc-cell.is-today .mc-num{ color: var(--accent-4); font-weight: var(--fw-black); }
+.mc-cell.is-today .mc-num{
+  /* Today indicator: small filled accent block behind the day number
+     (matches the reference design). Sharp corners per the spec. */
+  background: var(--accent-1);
+  color: var(--on-accent);
+}
 .mc-dots{
   display: flex; flex-direction: column;
   gap: 0.15em; margin-top: 0.15em;
