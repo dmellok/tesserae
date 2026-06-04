@@ -19,7 +19,7 @@ should read it too.
 ## Why this works well
 
 - **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the `--c-*` colour layer, container queries, the e-ink rules. A model that reads it has everything it needs.
-- **There are 55 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
+- **There are 58 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
 - **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
 - **Every widget ships a smoke test.** The model can write it and you can run it — objective "did it work" rather than vibes.
 
@@ -141,7 +141,7 @@ These are the things AI most often gets wrong on e-ink. Call them out explicitly
 - [ ] **Idempotent render.** Overwrite `shadow.innerHTML`; don't append (the renderer may call you twice).
 - [ ] **Don't load fonts.** `font-family: inherit` on `:host`; the page font arrives as `ctx.font.family`.
 - [ ] **`danger` / `warn` / `ok` are semantic only.** Use `accent` / `accent2` / `accent3` (i.e. the `--c-data-*` family) for decorative colour blocks.
-- [ ] **Multiple visual directions go in a `variant` cell option.** When a widget ships Refined / Geometric / Swiss / Data variants, expose them via a single `select` option named `variant` and dispatch to per-variant render functions in `client.js`. 28 shipped widgets follow this pattern — copy `weather_now/client.js` or `ha_climate/client.js`.
+- [ ] **Multiple visual directions go in a `variant` cell option.** When a widget ships Refined / Geometric / Swiss / Data variants, expose them via a single `select` option named `variant` and dispatch to per-variant render functions in `client.js`. 34 shipped widgets follow this pattern — copy `weather_now/client.js` or `ha_climate/client.js`. Ship the `legacy` value too for users who prefer the quiet pre-colour-pass look.
 
 ## Structured design first (optional)
 
@@ -157,9 +157,19 @@ and makes the build pass cleaner.
 - Open a PR. New widgets are welcome — especially ones backed by a documented, key-free public API (those land in the **Stable** tier; see [Screens & compatibility](../compatibility.md)).
 - If your widget hits an undocumented or scraped endpoint, say so in the PR — it'll be tiered **Best-effort** or **Fragile** so users know what to expect.
 
-Once it's merged and you've captured a screenshot
-(`python scripts/capture_widget_shots.py` against your `--dev` instance), it
-shows up automatically in the [widget gallery](../widgets/gallery.md).
+Once it's merged and you've captured screenshots, it shows up automatically
+in the [widget gallery](../widgets/gallery.md):
+
+```sh
+python scripts/capture_widget_shots.py                # single hero shot per widget
+python scripts/capture_widget_variants.py             # 2×N composite of every direction
+```
+
+The first refreshes `docs/screenshots/widgets/<id>.png` (the gallery's
+default hero image). The second walks every variant of every widget,
+stitches them into `<id>--variants.png`, and the gallery generator
+embeds it as a "N directions — click to view" caption under the hero
+shot.
 
 For ongoing design work, `python scripts/widget_contact_sheet.py` builds a
 single PNG showing your widget at all four sizes side-by-side — the easiest

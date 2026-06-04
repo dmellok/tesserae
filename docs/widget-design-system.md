@@ -3,7 +3,7 @@
 The cross-widget rulebook. [`widgets.md`](widgets.md) is the
 authoring contract (one widget, in isolation); this is the
 "how widgets relate to each other on a panel" layer — what makes
-57 separate widgets read as one design family instead of a patchwork.
+58 separate widgets read as one design family instead of a patchwork.
 
 The rules below codify what the **best current widgets already do**.
 They're not aspirational — they're written down so the next widget
@@ -25,14 +25,15 @@ Multi-direction widgets ship multiple visual layouts behind a single
 
 ### Canonical: 4 directions with single-letter prefix + number
 
-For new widgets, use the **four-direction family**:
+For new widgets, use the **four-direction family + legacy**:
 
 | value | direction | feel |
 |---|---|---|
-| `r1` | **Refined** | Bauhaus dark title bar, structured list/grid, the "main" body |
+| `r1` | **Refined** | Bauhaus dark title bar, structured list/grid, soft `--wx-tint` washes + solid `--c-accent` anchor block. The "main" body. |
 | `g2` | **Geometric** | Colour-block tiles, Archivo Black numerals, De Stijl rhythm |
 | `s3` | **Swiss** | Hairline header, low-contrast type, newspaper / international-style |
 | `d4` | **Data** | Stats forward — charts, sparklines, histograms, density |
+| `legacy` | **Legacy** *(v0.16.21+)* | Quiet paper-and-ink card: charcoal header, hairline rules, no solid accent panels. Conservative fallback for users who prefer the pre-colour-pass look. Default stays `r1`. |
 
 Reference: [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery),
 [`plugins/ha_locks`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_locks),
@@ -43,13 +44,14 @@ all weather widgets.
 {
   "name": "variant",
   "type": "select",
-  "label": "Direction",
+  "label": "Style",
   "default": "r1",
   "choices": [
-    { "value": "r1", "label": "1 · Bauhaus Refined" },
-    { "value": "g2", "label": "2 · Bauhaus Geometric" },
-    { "value": "s3", "label": "3 · Swiss / International" },
-    { "value": "d4", "label": "4 · Data forward" }
+    { "value": "r1",     "label": "1 · Bauhaus Refined" },
+    { "value": "g2",     "label": "2 · Bauhaus Geometric" },
+    { "value": "s3",     "label": "3 · Swiss / International" },
+    { "value": "d4",     "label": "4 · Data forward" },
+    { "value": "legacy", "label": "Legacy" }
   ]
 }
 ```
@@ -139,11 +141,14 @@ Pick whichever fits how your widget renders:
 - `padding: clamp(...) clamp(...)` for the bar — the bar height
   becomes a function of cell size and clashes with neighbours at
   the same zoom. (This is what the v0.14.3 github bar fix was.)
-- Hard-coded `background: var(--c-text)` and `color: var(--c-bg)`
-  for the bar — these *invert* on dark themes and the dark Bauhaus
-  bar becomes "dark on dark". Use `var(--wb-bar-bg, #1b1a16)` and
-  `var(--wb-bar-fg, #f1ece0)` instead, which stay locked to the
-  Spectra cream/ink regardless of theme.
+- Hard-coding the bar background/foreground to specific values
+  instead of using `var(--wb-bar-bg)` / `var(--wb-bar-fg)`. The
+  shared tokens **invert against the body** (`var(--c-text)` /
+  `var(--c-bg)`) so the bar reads dark-on-light in light themes
+  (the original Bauhaus look) and light-on-dark in dark themes —
+  always contrasts. (Changed in v0.16.13. Previously the tokens
+  pinned a fixed Spectra dark; the inversion was the fix for
+  refined widgets disappearing under dark themes.)
 - Custom title-bar font tokens. Bar text is `var(--wx-mono)` or
   `var(--theme-font)` mono fallback; don't introduce a new family.
 
@@ -250,9 +255,10 @@ The weather / HA / sky widgets share a decorative palette via
 |---|---|
 | `--wx-paper`, `--wx-paper-2`, `--wx-paper-3` | body backgrounds (flow through `--c-bg`) |
 | `--wx-ink`, `--wx-ink-60` | body text (flow through `--c-text`) |
-| `--wx-red`, `--wx-blue`, `--wx-yellow`, `--wx-green` | decorative colour chips (flow through `--c-accent`, `--c-data-*` — yellow stays pinned) |
-| `--wx-red-fg`, etc. | text colour for use ON each chip |
+| `--wx-red`, `--wx-blue`, `--wx-yellow`, `--wx-green` | decorative colour chips. **All four are theme-aware** (changed v0.16.13) — `red` flows through `--c-accent`, `blue` through `--c-data-2`, `yellow` through `--c-warn`, `green` through `--c-data-3`. None pinned to Spectra hex any more. |
+| `--wx-red-fg`, etc. | text colour for use ON each chip — flows through `--c-bg` |
 | `--wx-red-t`, etc. | tinted variants (chip-fill at 22% over paper) |
+| `--wx-tint`, `--wx-tint-strong`, `--wx-tint-blue`, `--wx-tint-green`, `--wx-tint-yellow` | **section-background washes** (added v0.16.15). `color-mix` of the underlying chip and paper at 14% (or 26% for `-strong`). Paint whole panels in a soft accent wash without the brightness of solid `var(--c-accent)`. R1 variants now use `--wx-tint` for hero text panels paired with a solid `--c-accent` block for the visual anchor. |
 
 If your widget belongs to this family, link
 `widget-bauhaus-wx.css` and paint from `--wx-*` — themes will
@@ -358,8 +364,10 @@ decorative tokens (the weather / sky / HA family). It introduces:
 - The `--wx-grotesk`, `--wx-black`, `--wx-geo`, `--wx-mono`,
   `--wx-swiss` font role tokens
 - The `.wx-header-dark`, `.wx-art`, `.wx-tnum` shapes
-- The `--wb-bar-bg` / `--wb-bar-fg` overrides (pinned Bauhaus
-  cream/ink regardless of theme)
+- The `--wb-bar-bg` / `--wb-bar-fg` definitions (invert against the
+  body via `--c-text` / `--c-bg` so the bar always contrasts; changed
+  v0.16.13 from a pinned Spectra dark)
+- The `--wx-tint*` section-wash tokens (added v0.16.15)
 
 A finance widget linking `widget-bauhaus-wx.css` would inherit a
 weather aesthetic it doesn't need. Don't import for the colour-name
@@ -390,8 +398,8 @@ something similar:
 A 30-second checklist when you finish a widget:
 
 - [ ] Title bar uses `var(--wb-bar-h)` (not `clamp(...)`)
-- [ ] Title bar background is `var(--wb-bar-bg, #1b1a16)` (not `var(--c-text)`)
-- [ ] Title bar foreground is `var(--wb-bar-fg, #f1ece0)` (not `var(--c-bg)`)
+- [ ] Title bar background is `var(--wb-bar-bg, #1b1a16)` (not raw `var(--c-text)` — the `--wb-bar-bg` token flows through `--c-text` already and adds the dark-theme inversion behaviour)
+- [ ] Title bar foreground is `var(--wb-bar-fg, #f1ece0)` (not raw `var(--c-bg)` — same reasoning as above)
 - [ ] `widget-bauhaus.css` is linked (if there's a title bar)
 - [ ] Body fonts lead with `var(--theme-font)` or paint from `--wx-*`
 - [ ] Decorative colour uses `--c-data-*` or `--wx-*`, status uses `--c-ok/warn/danger/info`

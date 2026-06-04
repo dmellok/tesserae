@@ -61,6 +61,16 @@ The form fields the editor will render. Types: `string` · `textarea` ·
 | `longitude` | `number` | `144.9631` | Longitude | — |
 | `label` | `string` | `Melbourne` | Place label | — |
 | `units` | `select` | `metric` | Units | `metric` (Metric °C) · `imperial` (Imperial °F) |
+| `variant` | `select` | `r1`      | Style | `r1` · `g2` · `s3` · `d4` · `legacy` (see note below) |
+
+!!! note "Multi-direction widgets — the `variant` option"
+    If the widget will ship more than one visual direction, **add a
+    `variant` `select`** using the canonical r1/g2/s3/d4 + legacy
+    values (see [widget contract — Per-cell variants](widgets.md#per-cell-variants-the-variant-cell-option)
+    and [design system § 1](widget-design-system.md#1-variant-naming)).
+    The default stays `r1`. Section 7 below should then carry one
+    mockup block per direction (Refined / Geometric / Swiss / Data),
+    not just per size — the direction is the bigger design decision.
 
 ---
 

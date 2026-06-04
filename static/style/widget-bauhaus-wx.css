@@ -27,9 +27,10 @@
    * inline text retint with the active theme. The Spectra hex stays
    * as the var() fallback for render paths that bypass the cell host.
    *
-   * The refined TITLE BAR stays at the original Bauhaus dark — see
-   * ``--wb-bar-bg`` / ``--wb-bar-fg`` below — so it doesn't flip to
-   * "light bar on dark body" when the body theme is dark. */
+   * The refined TITLE BAR inverts against the body — see
+   * ``--wb-bar-bg`` / ``--wb-bar-fg`` below — so it always contrasts:
+   * dark-on-light in light themes (the original Bauhaus look),
+   * light-on-dark in dark themes. */
   --wx-paper:    var(--c-bg, #f1ece0);
   --wx-paper-2:  color-mix(in oklab, var(--c-bg, #f1ece0) 92%, var(--c-text, #1b1a16));
   --wx-paper-3:  color-mix(in oklab, var(--c-bg, #f1ece0) 85%, var(--c-text, #1b1a16));

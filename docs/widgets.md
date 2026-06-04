@@ -511,16 +511,19 @@ the user changes themes.
 | `--wx-paper` / `--wx-paper-2` / `--wx-paper-3` | body backgrounds (flow through `--c-bg` + `--c-text` via `color-mix`) |
 | `--wx-ink` / `--wx-ink-60` | body text (flow through `--c-text` / `--c-text-soft`) |
 | `--wx-hair` | hairline rules (flows through `--c-line`) |
-| `--wx-red` / `--wx-blue` / `--wx-yellow` / `--wx-green` | decorative colour chips (flow through `--c-accent` / `--c-data-*` — yellow stays pinned to a Spectra hex) |
-| `--wx-red-fg` / `-blue-fg` / etc. | text colour for use ON each chip |
+| `--wx-red` / `--wx-blue` / `--wx-yellow` / `--wx-green` | decorative colour chips. **All four are theme-aware** — `red` flows through `--c-accent`, `blue` through `--c-data-2`, `yellow` through `--c-warn`, `green` through `--c-data-3`. None pinned to Spectra hex any more (changed in v0.16.13). |
+| `--wx-red-fg` / `-blue-fg` / etc. | text colour for use ON each chip — flows through `--c-bg` |
 | `--wx-red-t` / `-blue-t` / etc. | tinted variants (chip-fill at 22% over paper) |
+| `--wx-tint` / `--wx-tint-strong` / `--wx-tint-blue` / `--wx-tint-green` / `--wx-tint-yellow` | **section-background washes** (added v0.16.15) — `color-mix` between the underlying chip and paper at 14% (or 26% for `-strong`). Use to paint a whole panel in a soft accent wash without the brightness of `var(--c-accent)` solid. |
 | `--wx-grotesk` / `--wx-black` / `--wx-geo` / `--wx-mono` / `--wx-swiss` | type role tokens — all lead with the active theme font |
-| `--wb-bar-bg` / `--wb-bar-fg` | refined title bar (locked dark; doesn't follow theme) |
+| `--wb-bar-bg` / `--wb-bar-fg` | refined title bar — **inverts against the body** (`var(--c-text)` / `var(--c-bg)`) so it always contrasts in both light and dark themes (changed in v0.16.13) |
 
 The refined title bar (`.wb-bar`, `.wx-header-dark`, every `*-header`
-in the HA family) stays at the original Bauhaus dark via `--wb-bar-bg`
-/ `--wb-bar-fg` regardless of theme — so a refined widget on a dark
-theme doesn't flip to "light bar on dark body".
+in the HA family) reads dark-on-light in light themes (the original
+Bauhaus look) and light-on-dark in dark themes — `--wb-bar-bg` /
+`--wb-bar-fg` invert against the body so the strip always contrasts
+instead of pinning a fixed dark colour that disappears under dark
+themes.
 
 Link both stylesheets when you want the decorative layer:
 
@@ -540,8 +543,10 @@ When a widget ships multiple visual directions (Refined / Geometric /
 Swiss / Data / Editorial / etc.) the convention is a single `select`
 cell option named `variant`. The composer renders a per-cell dropdown
 in the page editor and the widget picks the matching layout in
-`client.js`. 28 widgets currently follow this pattern — calendar,
-HA, GitHub, weather, sky.
+`client.js`. 34 widgets currently follow this pattern — weather, HA,
+GitHub, calendar, news, sky, octoprint, spotify.
+
+The canonical four-direction shape:
 
 ```json
 {
@@ -550,19 +555,33 @@ HA, GitHub, weather, sky.
   "label": "Style",
   "default": "r1",
   "choices": [
-    { "value": "r1", "label": "Refined" },
-    { "value": "g2", "label": "Geometric" },
-    { "value": "s3", "label": "Swiss" },
-    { "value": "d4", "label": "Data" }
+    { "value": "r1",     "label": "1 · Refined" },
+    { "value": "g2",     "label": "2 · Geometric" },
+    { "value": "s3",     "label": "3 · Swiss" },
+    { "value": "d4",     "label": "4 · Data" },
+    { "value": "legacy", "label": "Legacy" }
   ]
 }
 ```
 
 ```js
-const VARIANTS = { r1: renderRefined, g2: renderGeometric, ... };
+const VARIANTS = {
+  r1: renderRefined,
+  g2: renderGeometric,
+  s3: renderSwiss,
+  d4: renderData,
+  legacy: renderLegacy,
+};
 const variant = ctx.cell.options.variant || "r1";
 (VARIANTS[variant] || VARIANTS.r1)(shadow, ctx);
 ```
+
+The **`legacy` variant** (added v0.16.21) is the quiet alternative:
+charcoal header, paper body, hairline rules, no solid accent panels.
+It's the conservative fallback for users who prefer the pre-colour-pass
+look or whose theme works better without big accent fills. Every
+widget on the r1/g2/s3/d4 scheme ships a `legacy` option. The default
+stays `r1`.
 
 Reference: [`plugins/weather_now/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/weather_now/client.js),
 [`plugins/ha_climate/client.js`](https://github.com/dmellok/tesserae/blob/main/plugins/ha_climate/client.js),
