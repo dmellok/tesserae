@@ -115,13 +115,16 @@ function applyPagePatch(page) {
   }
   // Page-level theme — flips data-theme on body so every cell that
   // doesn't have its own override re-binds the Spectra tokens.
+  let needsRemount = false;
   if (typeof page.theme === "string" && page.theme) {
+    if (document.body.getAttribute("data-theme") !== page.theme) needsRemount = true;
     document.body.setAttribute("data-theme", page.theme);
   }
   // Page-level style (the orthogonal typographic axis). Same shape as
   // theme: a string flips data-style on body and every non-overridden
   // cell picks up the style-tunable tokens (font / scale / edges).
   if (typeof page.style === "string" && page.style) {
+    if (document.body.getAttribute("data-style") !== page.style) needsRemount = true;
     document.body.setAttribute("data-style", page.style);
   }
   // Page-level font picker. Set --font-family on body inline ONLY when
@@ -131,12 +134,21 @@ function applyPagePatch(page) {
   // the style's font with the page default and the style picker would
   // stop affecting widget typography.
   if (typeof page.font === "string" && page.font && page.font_family) {
-    document.body.style.setProperty(
-      "--font-family",
-      `'${page.font_family}', system-ui, sans-serif`,
-    );
+    const wanted = `'${page.font_family}', system-ui, sans-serif`;
+    if (document.body.style.getPropertyValue("--font-family") !== wanted) needsRemount = true;
+    document.body.style.setProperty("--font-family", wanted);
   } else if (page && Object.prototype.hasOwnProperty.call(page, "font")) {
+    if (document.body.style.getPropertyValue("--font-family")) needsRemount = true;
     document.body.style.removeProperty("--font-family");
+  }
+  // Charts bake their colours into <canvas> at draw time, so a CSS-only
+  // cascade flip leaves them on the previous palette. Trigger a soft
+  // remount of every cell whenever theme / style / font changes so the
+  // chart helpers re-read tokens() and repaint.
+  if (needsRemount) {
+    remountAllCells().catch((err) =>
+      console.error("[composer] remountAllCells failed:", err),
+    );
   }
   if (page.panel && Number(page.panel.w) > 0 && Number(page.panel.h) > 0) {
     const panelEl = document.querySelector(".panel");
@@ -156,6 +168,45 @@ function ctxFingerprint(cell) {
     h: cell.h,
     z: cell.zoom ?? 1,
   });
+}
+
+// Re-render every mounted cell using its current dataset + cached data.
+// Triggered when the page-level theme / style / font changes, because
+// those flip CSS variables on body but DON'T change the per-cell
+// fingerprint — so charts (Chart.js bakes colours into the canvas
+// rather than reading CSS at paint time) silently keep their old
+// palette until the user nudges some other cell field. After this the
+// theme/style picker re-paints charts immediately, matching the way
+// CSS-based widgets already react to the cascade flip.
+async function remountAllCells() {
+  const prefix = window.TESSERAE_URL_PREFIX || "";
+  const tasks = [];
+  cellState.forEach((state, cellId) => {
+    const cell = document.querySelector(
+      `.cell[data-cell-id="${CSS.escape(cellId)}"]`,
+    );
+    if (!cell || !state.module) return;
+    let options = {};
+    try { options = JSON.parse(cell.dataset.options || "{}"); } catch { options = {}; }
+    let pluginData = null;
+    try { pluginData = JSON.parse(cell.dataset.data || "null"); } catch { pluginData = null; }
+    const fontFamily =
+      cell.dataset.fontFamily ||
+      'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    const ctx = buildCtx(cell, options, pluginData, fontFamily);
+    // Invalidate the cached fingerprint so the next data-driven patch
+    // also re-renders (the cell's data hasn't changed, but we want the
+    // chart re-render to stick).
+    state.lastFp = null;
+    state.shadow.innerHTML = "";
+    tasks.push(
+      Promise.resolve()
+        .then(() => state.module.default(state.shadow, ctx))
+        .then(() => prefixShadowUrls(state.shadow, prefix))
+        .catch((err) => reportError(cell, state.shadow, state.pluginId, err)),
+    );
+  });
+  await Promise.all(tasks);
 }
 
 async function applyCellPatch(patch) {
