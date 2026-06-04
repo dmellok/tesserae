@@ -333,6 +333,28 @@
   letter-spacing: 0.04em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* "Now" line — thin accent-1 stroke spanning the lane at the
+   current local time. A small filled dot at the left edge picks the
+   line out from the event blocks. Renders above events (z-index)
+   but stays pointer-events:none so hover targets aren't blocked. */
+.tt-now{
+  position: absolute;
+  left: 0; right: 0;
+  height: var(--stroke-2);
+  background: var(--accent-1);
+  z-index: 2;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.tt-now::before{
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  width: 0.7em; height: 0.7em;
+  background: var(--accent-1);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
 .tt-allday{
   display: flex; flex-wrap: wrap; gap: var(--space-1);
   padding: 0 0 var(--space-2);

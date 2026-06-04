@@ -122,6 +122,18 @@ export default function render(shadow, ctx) {
     ? `<div style="position:absolute;inset:0;display:grid;place-items:center"><p class="u-muted">No events today.</p></div>`
     : "";
 
+  // "Now" line — only render if the local time falls inside the
+  // visible hour range AND the page is showing today's date (the
+  // composer hydrates data.date as YYYY-MM-DD).
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  const showNow = isoDate === todayIso && nowH >= range.start && nowH <= range.end;
+  const nowPct = showNow ? ((nowH - range.start) / span) * 100 : 0;
+  const nowLine = showNow
+    ? `<div class="tt-now" style="top:${nowPct.toFixed(2)}%"></div>`
+    : "";
+
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="calendar_day">
@@ -139,6 +151,7 @@ export default function render(shadow, ctx) {
             <div class="tt-hours">${hourLabels(range)}</div>
             <div class="tt-lane has-rule">
               ${eventBlocks}
+              ${nowLine}
               ${emptyHint}
             </div>
           </div>

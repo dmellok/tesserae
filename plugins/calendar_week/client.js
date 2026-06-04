@@ -96,6 +96,13 @@ export default function render(shadow, ctx) {
       </div>`;
   }).join("");
 
+  // "Now" line for today's column only — Google-Calendar-style. Skip
+  // entirely if the current hour falls outside the visible range.
+  const now = new Date();
+  const nowH = now.getHours() + now.getMinutes() / 60;
+  const showNow = nowH >= range.start && nowH <= range.end;
+  const nowPct = showNow ? ((nowH - range.start) / span) * 100 : 0;
+
   const lanes = days.map((d) => {
     const events = (d.events || []).filter((e) => !e.all_day);
     const blocks = events.map((ev) => {
@@ -112,7 +119,10 @@ export default function render(shadow, ctx) {
           <span class="tt-name">${escapeHtml(ev.summary || "")}</span>
         </div>`;
     }).join("");
-    return `<div class="tt-lane has-rule">${blocks}</div>`;
+    const nowLine = (showNow && d.is_today)
+      ? `<div class="tt-now" style="top:${nowPct.toFixed(2)}%"></div>`
+      : "";
+    return `<div class="tt-lane has-rule">${blocks}${nowLine}</div>`;
   }).join("");
 
   shadow.innerHTML = `
