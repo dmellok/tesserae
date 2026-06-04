@@ -164,26 +164,25 @@ function renderR1(data) {
     ${styleBlock()}
     <style>
       .wn-r1-root { display:flex; flex-direction:column; width:100%; height:100%; box-sizing:border-box; font-family:${DEFAULT_FONT}; min-height:0; overflow:hidden; }
-      /* Hero block paints in a soft accent wash so the theme's signature
-         colour anchors the layout instead of the section reading as
-         all-paper. Big temp pulls --c-accent for the same reason. */
-      .wn-r1-hero { display:flex; align-items:center; padding:clamp(8px, 2.5cqw, 16px) clamp(10px, 3cqw, 24px); gap:clamp(10px, 2.5cqw, 20px); min-width:0; background:var(--wx-tint); }
-      .wn-r1-hero-text { flex:1; min-width:0; }
-      .wn-r1-temp { font-family:var(--wx-black); font-size:clamp(40px, 17cqw, 86px); line-height:.82; color:var(--c-accent); }
-      .wn-r1-cond { font-weight:800; font-size:clamp(12px, 3.4cqw, 20px); letter-spacing:.02em; margin-top:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .wn-r1-range { margin-top:6px; font-size:clamp(10px, 2.2cqw, 13px); }
-      .wn-r1-hero-art { display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:0; }
-      .wn-r1-icon { font-size:clamp(48px, 18cqw, 96px); color:var(--c-accent); line-height:1; }
-      .wn-r1-rain { font-family:var(--wx-mono); font-size:clamp(9px, 1.8cqw, 11px); font-weight:700; letter-spacing:.06em; color:${WX.inkOn("blue")}; background:${WX.col("blue")}; padding:3px 9px; white-space:nowrap; }
+      /* Hero block is a 60/40 split: tinted text panel on the left for
+         the temp + condition, solid --c-accent icon panel on the right
+         so the current condition reads as a true hero. The solid
+         accent block also gives the layout the non-tint colour anchor
+         that pure paper grids were missing. */
+      .wn-r1-hero { display:grid; grid-template-columns:1.4fr 1fr; min-width:0; min-height:0; }
+      .wn-r1-hero-text { padding:clamp(8px, 2.4cqw, 18px) clamp(10px, 2.6cqw, 22px); background:var(--wx-tint); display:flex; flex-direction:column; justify-content:center; gap:6px; min-width:0; overflow:hidden; }
+      .wn-r1-temp { font-family:var(--wx-black); font-size:clamp(40px, 16cqw, 84px); line-height:.82; color:var(--c-accent); }
+      .wn-r1-cond { font-weight:800; font-size:clamp(12px, 3.2cqw, 20px); letter-spacing:.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--c-text); }
+      .wn-r1-range { font-size:clamp(10px, 2cqw, 13px); }
+      .wn-r1-hero-art { background:var(--c-accent); color:var(--wx-red-fg); padding:clamp(8px, 2cqw, 16px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:clamp(6px, 1.4cqw, 12px); min-width:0; position:relative; }
+      .wn-r1-icon { font-size:clamp(64px, 26cqw, 160px); color:var(--wx-red-fg); line-height:1; }
+      .wn-r1-rain { font-family:var(--wx-mono); font-size:clamp(9px, 1.7cqw, 12px); font-weight:700; letter-spacing:.08em; color:var(--c-accent); background:var(--wx-red-fg); padding:3px 9px; white-space:nowrap; }
       .wn-r1-grid { flex:1; display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:1fr 1fr; gap:1px; background:var(--c-line); border-top:3px solid var(--c-accent); min-height:0; min-width:0; }
       .wn-r1-cell { background:var(--wx-paper); padding:clamp(6px, 1.4cqw, 11px) clamp(8px, 1.8cqw, 14px); display:flex; flex-direction:column; justify-content:center; gap:4px; min-width:0; overflow:hidden; }
-      /* Alternating tints across the metric tiles so the dense grid
-         carries colour at a glance instead of reading as flat paper. */
-      .wn-r1-cell:nth-child(odd) { background:var(--wx-tint-blue); }
       .wn-r1-cell-head { display:flex; align-items:center; gap:8px; min-width:0; }
       .wn-r1-cell-label { font-family:var(--wx-mono); font-size:clamp(9px, 1.6cqw, 12px); letter-spacing:.06em; color:var(--wx-ink-60); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
       .wn-r1-cell-value { display:flex; align-items:baseline; gap:4px; min-width:0; }
-      .wn-r1-cell-num { font-family:var(--wx-black); font-size:clamp(16px, 3.6cqw, 27px); }
+      .wn-r1-cell-num { font-family:var(--wx-black); font-size:clamp(16px, 3.6cqw, 27px); color:var(--c-text); }
       .wn-r1-cell-unit { font-family:var(--wx-mono); font-size:clamp(10px, 1.8cqw, 13px); color:var(--wx-ink-60); }
       .wn-r1-sun { display:flex; border-top:3px solid var(--c-accent); }
       .wn-r1-sun-cell { flex:1; display:flex; align-items:center; gap:9px; padding:clamp(5px, 1cqh, 8px) clamp(10px, 2cqw, 16px); min-width:0; font-family:var(--wx-mono); font-size:clamp(10px, 1.8cqw, 13px); letter-spacing:.04em; }
@@ -196,6 +195,13 @@ function renderR1(data) {
          range line tighten or drop. */
       @container (max-width: 460px) {
         .wn-r1-grid { grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(${Math.max(2, Math.ceil(metrics.length / 2))},1fr); }
+      }
+      /* Narrower — stack the hero so the icon panel keeps its hero
+         scale instead of squashing into a sliver. */
+      @container (max-width: 360px) {
+        .wn-r1-hero { grid-template-columns:1fr; }
+        .wn-r1-hero-art { padding:clamp(6px, 1.6cqw, 12px); flex-direction:row; gap:10px; }
+        .wn-r1-icon { font-size:clamp(48px, 14cqw, 80px); }
       }
       /* Very narrow — drop the metric grid + range line; the hero
          block becomes the entire widget. */
