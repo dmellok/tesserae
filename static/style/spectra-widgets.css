@@ -235,6 +235,38 @@
 .wx-cell .d{ font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform:uppercase; letter-spacing: var(--ls-label); }
 .wx-cell .t{ font-size: var(--fs-body); font-weight: var(--fw-bold); }
 
+/* Per-day temperature range bar. Track spans the column's full width;
+   the fill sits at the day's slice of the week's overall low→high
+   range. Lo / hi numbers flank the track so the bar reads as a tiny
+   forecast-app-style range indicator. */
+.wx-range{
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 0 var(--space-1);
+}
+.wx-range .wx-lo{
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-bold);
+  color: var(--text-muted);
+}
+.wx-range .wx-hi{
+  font-size: var(--fs-body);
+  font-weight: var(--fw-bold);
+}
+.wx-range-track{
+  height: var(--stroke-3);
+  background: var(--surface-sunken);
+  position: relative;
+}
+.wx-range-fill{
+  position: absolute;
+  top: 0; bottom: 0;
+  background: linear-gradient(to right, var(--accent-5), var(--accent-2));
+}
+
 /* ============================================================================
    WIDGET 6a · CAL-HEAD  (shared header for calendar day/week/month).
    Big display title + small uppercase meta on the same baseline, a

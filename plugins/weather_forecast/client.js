@@ -65,6 +65,15 @@ export default function render(shadow, ctx) {
   const label = data.place || data.label || "";
   const days = Array.isArray(data.days) ? data.days : [];
 
+  // Overall lo / hi across all days — the temp range bar is scaled to
+  // this window so a calm week reads as short slices and a swingy
+  // week stretches edge to edge.
+  const allHis = days.map((d) => Number(d.hi ?? d.high)).filter(Number.isFinite);
+  const allLos = days.map((d) => Number(d.lo ?? d.low)).filter(Number.isFinite);
+  const weekMax = allHis.length ? Math.max(...allHis) : 0;
+  const weekMin = allLos.length ? Math.min(...allLos) : 0;
+  const weekSpan = Math.max(1, weekMax - weekMin);
+
   const cells = days.map((d) => {
     const ph = PH_BY_NAME[d.icon] || "ph-cloud";
     const accent = COND_ACCENT[d.icon] || "var(--accent-5)";
@@ -72,12 +81,25 @@ export default function render(shadow, ctx) {
     // Today gets the day label tinted accent-4 so the column stands out
     // without taking the condition accent away from the icon itself.
     const dayStyle = isToday ? ' style="color:var(--accent-4);font-weight:var(--fw-black)"' : "";
-    const dayText = d.weekday || d.day || "";
+    // Server provides ``d.day`` as "Today" / "Tom" / "Mon" / … —
+    // prefer that over ``d.weekday`` which is a raw integer (0=Mon)
+    // and falsy on Mondays.
+    const dayText = d.day || (typeof d.weekday === "number" ? "" : d.weekday) || "";
+    const hi = Number(d.hi ?? d.high);
+    const lo = Number(d.lo ?? d.low);
+    const left = Number.isFinite(lo) ? ((lo - weekMin) / weekSpan) * 100 : 0;
+    const width = Number.isFinite(lo) && Number.isFinite(hi) ? ((hi - lo) / weekSpan) * 100 : 0;
     return `
       <div class="wx-cell">
         <span class="d"${dayStyle}>${escapeHtml(dayText)}</span>
         <i class="ph-bold ${ph}" style="color:${accent}"></i>
-        <span class="t">${escapeHtml(fmtTemp(d.hi ?? d.high))}<span class="u-muted" style="font-weight:var(--fw-semi)"> ${escapeHtml(fmtTemp(d.lo ?? d.low))}</span></span>
+        <div class="wx-range">
+          <span class="wx-lo">${escapeHtml(fmtTemp(lo))}</span>
+          <div class="wx-range-track">
+            <div class="wx-range-fill" style="left:${left.toFixed(1)}%;width:${Math.max(8, width).toFixed(1)}%"></div>
+          </div>
+          <span class="wx-hi">${escapeHtml(fmtTemp(hi))}</span>
+        </div>
       </div>`;
   }).join("");
 
