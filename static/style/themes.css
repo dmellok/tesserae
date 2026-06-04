@@ -434,8 +434,12 @@
 
 .tk-gallery {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--t-space-4);
+  /* 240px min packs ~5 columns at 1200px content width (vs 4 at the
+     old 280px). 30 themes scroll roughly 30% shorter, without any
+     individual card feeling cramped — the weather-widget mockup
+     still reads at 240. */
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--t-space-3);
 }
 .tk-card {
   display: grid;
@@ -455,7 +459,7 @@
 }
 .tk-card-preview {
   display: block;
-  padding: var(--t-space-3);
+  padding: var(--t-space-2);
   background: var(--t-surface-soft);
   border-bottom: 1px solid var(--t-border);
   text-decoration: none;
@@ -463,8 +467,8 @@
 }
 .tk-card-foot {
   display: grid;
-  gap: var(--t-space-2);
-  padding: var(--t-space-3) var(--t-space-4);
+  gap: var(--t-space-1);
+  padding: var(--t-space-2) var(--t-space-3);
 }
 .tk-card-title {
   display: flex;

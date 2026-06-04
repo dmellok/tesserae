@@ -90,6 +90,28 @@
 .backups-disclosure > .backup-list {
   margin-top: var(--t-space-3);
 }
+
+/* Recent-updates disclosure — same pattern as backups. Wraps the
+   history-list so the SHA log doesn't fill the System page by
+   default. Summary names the count + flips the caret on open. */
+.history-disclosure { margin: var(--t-space-2) 0 var(--t-space-3); }
+.history-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-1) var(--t-space-2);
+  border-radius: var(--t-radius-sm);
+  font-size: var(--t-size-sm);
+  color: var(--t-fg-soft);
+  user-select: none;
+}
+.history-disclosure > summary::-webkit-details-marker { display: none; }
+.history-disclosure > summary:hover { background: var(--t-surface-soft); color: var(--t-fg); }
+.history-disclosure[open] > summary > .ph-caret-down { transform: rotate(180deg); }
+.history-disclosure > summary > .ph-caret-down { transition: transform 0.12s ease; }
+.history-disclosure > .history-list { margin: var(--t-space-2) 0 0; }
 .settings-actions .card--compact {
   margin: 0;
   padding: var(--t-space-4);
@@ -125,6 +147,24 @@
   border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border);
 }
+/* Inline (in the device-card summary) — just the heartbeat dot + a
+   relative time. No frame, no padding, sits flush so the closed
+   card stays compact. */
+.device-status--summary {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+/* In the expanded body — keep the framed look, but give it a
+   subhead-style label and sit at the top of the body so the user
+   sees diagnostics immediately on expand. */
+.device-status--body {
+  margin: 0 0 var(--t-space-4);
+}
+.device-status--body .device-subhead { margin: 0 0 var(--t-space-2); }
+.device-status--body .status-fields { margin: 0; }
 
 .status-line {
   display: flex;

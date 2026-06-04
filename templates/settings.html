@@ -137,19 +137,17 @@
           </dl>
           {% endif %}
         </header>
+        {# Heartbeat dot + relative time only — the parsed diagnostic
+           fields (LAST_PAINT_AT, FW_VERSION, IP, …) moved down into
+           the .device-card-body so the closed summary stays compact.
+           Users who want the full diagnostic still see it the moment
+           they click Configure. #}
         {% if section.status %}
-        <div class="device-status">
+        <div class="device-status device-status--summary">
           <div class="status-line">
             <span class="status-dot is-{{ section.status.health }}" aria-hidden="true"></span>
             <span class="status-label">{{ section.status.relative }}</span>
           </div>
-          {% if section.status.parsed %}
-          <dl class="status-fields">
-            {% for key, value in section.status.parsed.items() %}
-            <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
-            {% endfor %}
-          </dl>
-          {% endif %}
         </div>
         {% endif %}
       </div>
@@ -160,6 +158,19 @@
       </span>
     </summary>
     <div class="device-card-body">
+      {# Diagnostic fields (parsed heartbeat payload). Lives in the body
+         now so the closed device card stays compact; expands the moment
+         the user clicks Configure. #}
+      {% if section.status and section.status.parsed %}
+      <div class="device-status device-status--body">
+        <p class="device-subhead">Diagnostics</p>
+        <dl class="status-fields">
+          {% for key, value in section.status.parsed.items() %}
+          <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
+          {% endfor %}
+        </dl>
+      </div>
+      {% endif %}
   {% else %}
   <header class="card-head">
     <h2>
@@ -604,11 +615,21 @@ docker compose up -d</code></pre>
           <button type="submit" class="button ghost"{% if system_dev_mode %} disabled{% endif %}><i class="ph ph-arrow-u-up-left"></i> Roll back to {{ system_history[0].from_sha[:7] }}</button>
         </form>
       </div>
-      <ul class="history-list">
-        {% for entry in system_history %}
-        <li><code>{{ entry.from_sha[:7] }} → {{ entry.to_sha[:7] }}</code> ({{ entry.channel }}){% if entry.pip_changed %} &middot; deps reinstalled{% endif %}</li>
-        {% endfor %}
-      </ul>
+      {# Collapsed by default — every line is "X → Y (channel) · deps
+         reinstalled" so the list reads as noise at a glance. The
+         "Rollback to <last>" button above already names the most
+         recent SHA so the user has what they need without expanding. #}
+      <details class="history-disclosure">
+        <summary>
+          <span>{{ system_history|length }} recent update{{ '' if system_history|length == 1 else 's' }}</span>
+          <i class="ph ph-caret-down caret-soft" aria-hidden="true"></i>
+        </summary>
+        <ul class="history-list">
+          {% for entry in system_history %}
+          <li><code>{{ entry.from_sha[:7] }} → {{ entry.to_sha[:7] }}</code> ({{ entry.channel }}){% if entry.pip_changed %} &middot; deps reinstalled{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </details>
       <p class="field-help">Rolling back restores the pre-update <code>data/</code> snapshot too. Use this when an update broke something.</p>
     </section>
     {% endif %}
