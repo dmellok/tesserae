@@ -90,23 +90,26 @@ export default function render(shadow, ctx) {
     for (const [r, c] of WORDS[w]) lit.add(`${r}:${c}`);
   }
 
-  let rows = "";
+  // Build the grid as a single CSS grid: 11 columns × 10 rows, each
+  // cell exactly 1fr wide + monospace, so words line up vertically
+  // across rows like the real QLOCKTWO. Unlit letters drop to 22%
+  // opacity so the lit words really pop.
+  const cells = [];
   for (let r = 0; r < GRID.length; r++) {
-    const cells = [];
     for (let c = 0; c < GRID[r].length; c++) {
       const isLit = lit.has(`${r}:${c}`);
-      const color = isLit ? litColor : "var(--text-muted)";
+      const color = isLit ? litColor : "var(--text-primary)";
       const weight = isLit ? "var(--fw-black)" : "var(--fw-bold)";
-      cells.push(`<span style="color:${color};font-weight:${weight}">${escapeHtml(GRID[r][c])}</span>`);
+      const opacity = isLit ? 1 : 0.22;
+      cells.push(`<span style="color:${color};font-weight:${weight};opacity:${opacity};text-align:center;line-height:1">${escapeHtml(GRID[r][c])}</span>`);
     }
-    rows += `<div style="display:flex;gap:.4em;justify-content:center">${cells.join("")}</div>`;
   }
 
   const minMod5 = now.getMinutes() % 5;
-  const dot = (active) => `<span style="width:.4em;height:.4em;border-radius:50%;background:${active ? litColor : "var(--text-muted)"};opacity:${active ? 1 : .25}"></span>`;
+  const dot = (active) => `<span style="width:.5em;height:.5em;border-radius:50%;background:${active ? litColor : "var(--text-muted)"};opacity:${active ? 1 : .25}"></span>`;
   const corners = showCorners
     ? `
-      <div style="position:absolute;inset:.6em;pointer-events:none">
+      <div style="position:absolute;inset:.5em;pointer-events:none">
         <div style="position:absolute;top:0;left:0">${dot(minMod5 >= 1)}</div>
         <div style="position:absolute;top:0;right:0">${dot(minMod5 >= 2)}</div>
         <div style="position:absolute;bottom:0;right:0">${dot(minMod5 >= 3)}</div>
@@ -114,11 +117,27 @@ export default function render(shadow, ctx) {
       </div>`
     : "";
 
+  // Grid square: pick the smaller of cqw/cqh and stay centred so the
+  // 11×10 letter matrix keeps a near-square aspect on any cell shape.
+  // Letter-spacing 0 and monospace so all letters are uniform width.
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/style/spectra-widgets.css">
     <div class="w" data-widget="clock_qlock">
-      <div class="w-body" style="justify-content:center;align-items:stretch;position:relative;font-size:clamp(1.1em, 7.5cqmin, 2.6em);letter-spacing:.06em;gap:.3em;line-height:1">
-        ${rows}
+      <div class="w-body" style="justify-content:center;align-items:center;position:relative">
+        <div style="
+          display:grid;
+          grid-template-columns:repeat(11, 1fr);
+          grid-auto-rows:1fr;
+          width:min(100%, calc(100cqh * 11 / 10));
+          aspect-ratio:11 / 10;
+          font-family:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+          font-size:clamp(0.75em, 8cqmin, 1.8em);
+          letter-spacing:0;
+          line-height:1;
+          place-items:center
+        ">
+          ${cells.join("")}
+        </div>
         ${corners}
       </div>
     </div>`;
