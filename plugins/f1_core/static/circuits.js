@@ -36,3 +36,28 @@ export async function getCircuit(circuitId) {
   const all = await loadCircuits();
   return all[circuitId] || null;
 }
+
+// Render a circuit outline as an inline SVG. Bolder stroke than the
+// older inline version every widget used to ship — stroke-width 22
+// is roughly 2.2% of the viewBox width, so the track reads as a
+// confident bauhaus line that scales with the panel rather than the
+// hairline 6 it used to be. The track strip is hidden on cells too
+// narrow to render it cleanly (see ``.f1-track`` in
+// spectra-widgets.css), so we don't need a small-size floor here.
+//
+// ``stroke`` is the colour. ``--text-primary`` by default so the track
+// reads as neutral; callers can pass an accent to tint it (f1_next
+// uses accent-1 to echo the "next race" headline colour).
+//
+// Returns an empty string when the circuit data is missing so the
+// caller can drop the wrapper element entirely.
+export function trackSvg(circuit, opts = {}) {
+  if (!circuit || !circuit.d) return "";
+  const stroke = opts.stroke || "var(--text-primary)";
+  return `
+    <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
+         style="width:100%;height:100%;display:block">
+      <path d="${circuit.d}" fill="none" stroke="${stroke}"
+            stroke-width="22" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>`;
+}

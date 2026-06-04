@@ -3,7 +3,7 @@
 // names the circuit + locality; the status-grid stacks the session
 // times for the weekend.
 
-import { getCircuit } from "../f1_core/static/circuits.js";
+import { getCircuit, trackSvg } from "../f1_core/static/circuits.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -37,16 +37,6 @@ function fmtSessionTime(date, time) {
   if (!date) return "";
   if (!time) return date.slice(5);
   return `${date.slice(5)} ${time.slice(0, 5)}`;
-}
-
-function trackSvg(circuit) {
-  if (!circuit || !circuit.d) return "";
-  return `
-    <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
-         style="width:100%;height:100%;display:block">
-      <path d="${circuit.d}" fill="none" stroke="var(--text-primary)"
-            stroke-width="6" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
 }
 
 export default async function render(shadow, ctx) {
@@ -101,17 +91,19 @@ export default async function render(shadow, ctx) {
         <h3>${escapeHtml(data.raceName || "Next Race")}</h3>
         ${data.round ? `<span class="w-title-meta">R${data.round}</span>` : ""}
       </div>
-      <div class="w-body status-body">
-        ${track ? `<div style="flex:0 0 25%;min-height:2.5em">${trackSvg(track)}</div>` : ""}
-        <div class="status-hero">
-          <i class="ph-bold ph-clock" style="color:var(--accent-1)"></i>
-          <div class="lockup">
-            <span class="status-state">${escapeHtml(countdownLabel)}</span>
-            <span class="status-sub">${escapeHtml(subBits)}</span>
+      <div class="w-body f1-body">
+        <div class="f1-data">
+          <div class="status-hero">
+            <i class="ph-bold ph-clock" style="color:var(--accent-1)"></i>
+            <div class="lockup">
+              <span class="status-state">${escapeHtml(countdownLabel)}</span>
+              <span class="status-sub">${escapeHtml(subBits)}</span>
+            </div>
           </div>
+          ${data.country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(data.country)}</span>` : ""}
+          ${sessionCells ? `<div class="status-grid">${sessionCells}</div>` : ""}
         </div>
-        ${data.country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(data.country)}</span>` : ""}
-        ${sessionCells ? `<div class="status-grid">${sessionCells}</div>` : ""}
+        ${track ? `<div class="f1-track" style="color:var(--accent-1)">${trackSvg(track, { stroke: "var(--accent-1)" })}</div>` : ""}
       </div>
     </div>`;
 }

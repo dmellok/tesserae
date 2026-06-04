@@ -738,6 +738,50 @@
   font-weight: var(--fw-bold);
 }
 
+/* ============================================================================
+   WIDGET FAMILY · F1 (.f1-body wraps the data + circuit outline)
+   ----------------------------------------------------------------------------
+   Two-column row layout: the data (hero / status grid / rows) stacks on
+   the left, the circuit outline sits on the right as a bauhaus block.
+   On narrow cells the right column collapses entirely so the data
+   keeps full width instead of fighting a sliver track. The trackSvg
+   helper in plugins/f1_core/static/circuits.js paints the path at
+   stroke-width 22 (≈2.2% of viewBox) for the bolder line.
+   ============================================================================ */
+.f1-body{
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--space-4);
+}
+.f1-data{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  justify-content: flex-start;
+}
+.f1-track{
+  flex: 0 0 38%;
+  min-width: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+}
+.f1-track svg{ max-width: 100%; max-height: 100%; }
+/* Hide the track strip on cells too narrow to show it as anything
+   other than a sliver. ``360px`` is the Spectra "compact" breakpoint
+   used by other widgets in this file — keeps the trim line consistent. */
+@container (max-width: 360px){
+  .f1-track{ display: none; }
+  .f1-data{ flex: 1 1 100%; }
+}
+
 /* ---- compact mode for very small tiles: trim secondary content ---------- */
 @container (max-width: 240px){
   .stat-value{ font-size: 2.4em; }

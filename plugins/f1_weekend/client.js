@@ -4,7 +4,7 @@
 // time as right-aligned meta. The race row picks up accent-1 so the
 // headline session always reads first.
 
-import { getCircuit } from "../f1_core/static/circuits.js";
+import { getCircuit, trackSvg } from "../f1_core/static/circuits.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -25,16 +25,6 @@ function fmtDayLabel(date) {
 function fmtTime(time) {
   if (typeof time !== "string" || !time) return "";
   return time.slice(0, 5);
-}
-
-function trackSvg(circuit) {
-  if (!circuit || !circuit.d) return "";
-  return `
-    <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
-         style="width:100%;height:100%;display:block">
-      <path d="${circuit.d}" fill="none" stroke="var(--text-primary)"
-            stroke-width="6" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
 }
 
 export default async function render(shadow, ctx) {
@@ -79,10 +69,12 @@ export default async function render(shadow, ctx) {
         <h3>${escapeHtml(data.raceName || "Weekend")}</h3>
         ${data.round ? `<span class="w-title-meta">R${data.round}</span>` : ""}
       </div>
-      <div class="w-body list-body" style="gap:var(--space-2)">
-        ${track ? `<div style="flex:0 0 22%;min-height:2.5em;padding:0 var(--space-3)">${trackSvg(track)}</div>` : ""}
-        ${subBits ? `<p class="u-muted" style="padding:0 var(--space-3);font-weight:var(--fw-bold)">${escapeHtml(subBits)}</p>` : ""}
-        ${rows}
+      <div class="w-body f1-body">
+        <div class="f1-data list-body" style="gap:var(--space-2)">
+          ${subBits ? `<p class="u-muted" style="padding:0 var(--space-3);font-weight:var(--fw-bold)">${escapeHtml(subBits)}</p>` : ""}
+          ${rows}
+        </div>
+        ${track ? `<div class="f1-track" style="color:var(--accent-1)">${trackSvg(track, { stroke: "var(--accent-1)" })}</div>` : ""}
       </div>
     </div>`;
 }

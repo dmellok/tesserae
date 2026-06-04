@@ -4,7 +4,7 @@
 // line, top-three finishers rendered as a three-cell podium row
 // with gold / silver / bronze accents.
 
-import { getCircuit } from "../f1_core/static/circuits.js";
+import { getCircuit, trackSvg } from "../f1_core/static/circuits.js";
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -13,19 +13,6 @@ function escapeHtml(s) {
 }
 
 const PODIUM_ACCENT = ["var(--accent-2)", "var(--text-secondary)", "var(--accent-1)"];
-
-// Inline circuit outline. Returns SVG markup for the track path or
-// an empty string if the circuit isn't in the bundled JSON (new
-// venues land before the bundle is rebuilt).
-function trackSvg(circuit) {
-  if (!circuit || !circuit.d) return "";
-  return `
-    <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
-         style="width:100%;height:100%;display:block">
-      <path d="${circuit.d}" fill="none" stroke="var(--text-primary)"
-            stroke-width="6" stroke-linejoin="round" stroke-linecap="round" />
-    </svg>`;
-}
 
 export default async function render(shadow, ctx) {
   const data = ctx?.data ?? {};
@@ -70,17 +57,19 @@ export default async function render(shadow, ctx) {
         <h3>${escapeHtml(data.raceName || "Last Race")}</h3>
         ${data.round ? `<span class="w-title-meta">R${data.round}</span>` : ""}
       </div>
-      <div class="w-body status-body">
-        ${track ? `<div style="flex:0 0 25%;min-height:2.5em">${trackSvg(track)}</div>` : ""}
-        <div class="status-hero">
-          <i class="ph-bold ph-trophy" style="color:var(--accent-2)"></i>
-          <div class="lockup">
-            <span class="status-state">${escapeHtml(podium[0]?.code || "—")}</span>
-            <span class="status-sub">${escapeHtml(subBits)}</span>
+      <div class="w-body f1-body">
+        <div class="f1-data">
+          <div class="status-hero">
+            <i class="ph-bold ph-trophy" style="color:var(--accent-2)"></i>
+            <div class="lockup">
+              <span class="status-state">${escapeHtml(podium[0]?.code || "—")}</span>
+              <span class="status-sub">${escapeHtml(subBits)}</span>
+            </div>
           </div>
+          ${country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(country)}</span>` : ""}
+          ${cells ? `<div class="status-grid" style="grid-template-columns:1fr 1fr 1fr">${cells}</div>` : ""}
         </div>
-        ${country ? `<span class="pill" style="background:var(--accent-1)">${escapeHtml(country)}</span>` : ""}
-        ${cells ? `<div class="status-grid" style="grid-template-columns:1fr 1fr 1fr">${cells}</div>` : ""}
+        ${track ? `<div class="f1-track" style="color:var(--accent-2)">${trackSvg(track, { stroke: "var(--accent-2)" })}</div>` : ""}
       </div>
     </div>`;
 }
