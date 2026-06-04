@@ -1,44 +1,88 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
+// f1_weekend — Spectra list archetype with an inline circuit
+// outline above the session rows. Each session (FP1 / FP2 / FP3 /
+// Sprint / Qualifying / Race) is a zebra row with the label + day,
+// time as right-aligned meta. The race row picks up accent-1 so the
+// headline session always reads first.
 
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+import { getCircuit } from "../f1_core/static/circuits.js";
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+function fmtDayLabel(date) {
+  if (typeof date !== "string") return "";
+  try {
+    const dt = new Date(date + "T00:00:00Z");
+    return dt.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+  } catch {
+    return date;
+  }
+}
+
+function fmtTime(time) {
+  if (typeof time !== "string" || !time) return "";
+  return time.slice(0, 5);
+}
+
+function trackSvg(circuit) {
+  if (!circuit || !circuit.d) return "";
+  return `
+    <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
+         style="width:100%;height:100%;display:block">
+      <path d="${circuit.d}" fill="none" stroke="var(--text-primary)"
+            stroke-width="6" stroke-linejoin="round" stroke-linecap="round" />
+    </svg>`;
+}
+
+export default async function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="f1_weekend">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>Weekend</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+  const subBits = [data.circuitName, data.country].filter(Boolean).join(" · ");
+
+  let track = null;
+  try { track = await getCircuit(data.circuitId); } catch { track = null; }
+
+  const rows = sessions.map((s, i) => {
+    const isRace = (s.label || "").toLowerCase() === "race";
+    const accent = isRace ? "var(--accent-1)" : "var(--text-secondary)";
+    const ph = isRace ? "ph-flag-checkered" : "ph-clock";
+    return `
+      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead">
+          <i class="ph-bold ${ph}" style="color:${accent}"></i>
+          <span class="list-title" style="${isRace ? `color:${accent};font-weight:var(--fw-black)` : ""}">${escapeHtml(s.label)}<small class="u-muted" style="font-weight:var(--fw-semi);font-size:.7em;margin-left:.4em">${escapeHtml(fmtDayLabel(s.date))}</small></span>
+        </div>
+        <span class="list-meta" style="color:${accent}">${escapeHtml(fmtTime(s.time))}</span>
+      </div>`;
+  }).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="f1_weekend">
+      <div class="w-title">
+        <i class="ph-bold ph-flag-checkered" style="color:var(--accent-1)"></i>
+        <h3>${escapeHtml(data.raceName || "Weekend")}</h3>
+        ${data.round ? `<span class="w-title-meta">R${data.round}</span>` : ""}
+      </div>
+      <div class="w-body list-body" style="gap:var(--space-2)">
+        ${track ? `<div style="flex:0 0 22%;min-height:2.5em;padding:0 var(--space-3)">${trackSvg(track)}</div>` : ""}
+        ${subBits ? `<p class="u-muted" style="padding:0 var(--space-3);font-weight:var(--fw-bold)">${escapeHtml(subBits)}</p>` : ""}
+        ${rows}
+      </div>
+    </div>`;
 }

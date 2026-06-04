@@ -1,44 +1,99 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// sky_bom_warnings — Spectra list archetype. Each Bureau of
+// Meteorology warning is a zebra row with a severity-coloured icon
+// (red → terracotta, orange → ochre, yellow → moss, blue/info →
+// slate), tag-uppercase in the meta column. Title meta surfaces the
+// worst-active severity so a glance reads the state.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+const SEV_ACCENT = {
+  red: "var(--accent-1)",
+  orange: "var(--accent-2)",
+  yellow: "var(--accent-3)",
+  blue: "var(--accent-5)",
+};
+
+const ICON_PH = {
+  fire: "ph-fire",
+  flood: "ph-drop",
+  thunderstorm: "ph-cloud-lightning",
+  cyclone: "ph-tornado",
+  wind: "ph-wind",
+  heat: "ph-sun",
+  snow: "ph-snowflake",
+  rain: "ph-cloud-rain",
+  warning: "ph-warning",
+};
+
+function sevAccent(sev) {
+  return SEV_ACCENT[sev] || "var(--text-secondary)";
+}
+
+function iconFor(name) {
+  return ICON_PH[name] || "ph-warning";
+}
+
+const SEV_RANK = { red: 4, orange: 3, yellow: 2, blue: 1 };
+
+export default function render(shadow, ctx) {
+  const data = ctx?.data ?? {};
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (data.error) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="sky_bom_warnings">
+        <div class="w-title"><i class="ph-bold ph-warning-circle"></i><h3>BoM</h3></div>
+        <div class="w-body"><p class="u-muted">${escapeHtml(data.error)}</p></div>
+      </div>`;
+    return;
+  }
+
+  const warnings = Array.isArray(data.warnings) ? data.warnings : [];
+
+  if (warnings.length === 0) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="sky_bom_warnings">
+        <div class="w-title">
+          <i class="ph-bold ph-shield-check" style="color:var(--accent-3)"></i>
+          <h3>BoM</h3>
+          <span class="w-title-meta">ALL CLEAR</span>
+        </div>
+        <div class="w-body"><p class="u-muted">No active warnings.</p></div>
+      </div>`;
+    return;
+  }
+
+  // Worst-case severity drives the title icon + meta colour.
+  const worst = warnings.reduce((w, cur) => (SEV_RANK[cur.severity] || 0) > (SEV_RANK[w.severity] || 0) ? cur : w, warnings[0]);
+  const worstAccent = sevAccent(worst.severity);
+
+  const rows = warnings.map((w, i) => {
+    const accent = sevAccent(w.severity);
+    const ph = iconFor(w.icon);
+    return `
+      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead">
+          <i class="ph-bold ${ph}" style="color:${accent}"></i>
+          <span class="list-title">${escapeHtml(w.area || w.tag)}</span>
+        </div>
+        <span class="list-meta" style="color:${accent};font-weight:var(--fw-black);letter-spacing:var(--ls-label);text-transform:uppercase">${escapeHtml(w.tag)}</span>
+      </div>`;
+  }).join("");
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w" data-widget="sky_bom_warnings">
+      <div class="w-title">
+        <i class="ph-bold ph-warning" style="color:${worstAccent}"></i>
+        <h3>BoM</h3>
+        <span class="w-title-meta" style="color:${worstAccent}">${warnings.length} ACTIVE</span>
+      </div>
+      <div class="w-body list-body">${rows}</div>
+    </div>`;
 }

@@ -1,44 +1,51 @@
-// Stripped widget render. Theming + design system removed in v0.17
-// to clear the slate for a redesign. Renders the raw ctx.data as
-// semantic HTML so the widget is still visible while the new design
-// system is built.
-
-export default function render(shadow, ctx) {
-  const data = ctx?.data ?? null;
-  const pluginId = ctx?.cell?.plugin_id ?? ctx?.cell?.plugin ?? "widget";
-  const parts = [`<h2>${escapeHtml(pluginId)}</h2>`];
-  if (data && typeof data === "object" && !Array.isArray(data) && typeof data.error === "string") {
-    parts.push(`<p>error: ${escapeHtml(data.error)}</p>`);
-  } else if (data == null) {
-    parts.push(`<p>no data</p>`);
-  } else {
-    parts.push(renderValue(data));
-  }
-  shadow.innerHTML = parts.join("");
-}
-
-function renderValue(v) {
-  if (v === null || v === undefined) return `<p>null</p>`;
-  if (typeof v === "string") return `<p>${escapeHtml(v)}</p>`;
-  if (typeof v === "number" || typeof v === "boolean") return `<p>${escapeHtml(String(v))}</p>`;
-  if (Array.isArray(v)) {
-    if (!v.length) return `<p>empty list</p>`;
-    return `<ul>${v.map((item) => `<li>${renderValue(item)}</li>`).join("")}</ul>`;
-  }
-  if (typeof v === "object") {
-    const entries = Object.entries(v);
-    if (!entries.length) return `<p>empty object</p>`;
-    return `<dl>${entries.map(([k, val]) => `<dt>${escapeHtml(k)}</dt><dd>${renderValue(val)}</dd>`).join("")}</dl>`;
-  }
-  return `<p>${escapeHtml(String(v))}</p>`;
-}
+// webpage — Spectra full-bleed iframe. The cell hosts an external
+// URL inside a sandboxed iframe; ``scale`` shrinks the page's logical
+// pixels so a desktop layout fits in a small cell, and a fixed
+// ``viewport_w`` keeps responsive sites from collapsing to a mobile
+// breakpoint. The composer's headless render screenshots whatever
+// the iframe lands on.
 
 function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[c]));
+}
+
+export default function render(shadow, ctx) {
+  const opts = ctx?.cell?.options || {};
+  const url = String(opts.url || "").trim();
+  const scaleOpt = String(opts.scale || "fit");
+  const viewportW = Math.max(200, Math.min(4096, Number(opts.viewport_w) || 1280));
+  const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
+
+  if (!url || !url.startsWith("http")) {
+    shadow.innerHTML = `
+      ${css}
+      <div class="w" data-widget="webpage">
+        <div class="w-title"><i class="ph-bold ph-globe" style="color:var(--text-muted)"></i><h3>Webpage</h3></div>
+        <div class="w-body"><p class="u-muted">Set a URL in the cell options (must start with http/https).</p></div>
+      </div>`;
+    return;
+  }
+
+  // Compute a target scale. "fit" sizes the iframe to viewport_w
+  // logical pixels and lets CSS scale it down to fit the cell;
+  // numeric options (25/50/75/100) are pinned.
+  const cellW = Number(ctx?.cell?.w) || 1;
+  const scale = scaleOpt === "fit"
+    ? Math.min(1, cellW / viewportW)
+    : Math.max(0.1, Math.min(1, Number(scaleOpt) / 100));
+  const sizedW = `${(100 / scale).toFixed(2)}%`;
+  const sizedH = `${(100 / scale).toFixed(2)}%`;
+
+  shadow.innerHTML = `
+    ${css}
+    <div class="w is-bleed" data-widget="webpage">
+      <iframe
+        src="${escapeHtml(url)}"
+        sandbox="allow-same-origin allow-scripts"
+        style="border:0;width:${sizedW};height:${sizedH};transform-origin:top left;transform:scale(${scale.toFixed(3)});display:block"
+        loading="eager"
+        referrerpolicy="no-referrer"></iframe>
+    </div>`;
 }
