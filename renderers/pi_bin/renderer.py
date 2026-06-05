@@ -22,6 +22,7 @@ DEFAULTS: dict[str, Any] = {
     # before quantise to avoid washed-out output.
     "saturation": 1.4,
     "contrast": 1.0,
+    "calibrated": False,
 }
 
 
@@ -76,6 +77,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # Waveshare E6 differ in palette + index order), threaded through
         # the Panel so one shared renderer serves both.
         gamut=panel.gamut,
+        calibrated=bool(_setting(settings, "calibrated")),
     )
 
 

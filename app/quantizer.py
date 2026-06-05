@@ -56,38 +56,26 @@ SPECTRA_6_PALETTE: tuple[tuple[int, int, int], ...] = (
 )
 
 
-# The .bin-path palettes below carry the **calibrated** display colours
-# — what the panel actually reproduces under normal viewing light, not
-# the nominal sRGB primaries. Dithering against the calibrated targets
-# (a dusty red instead of pure red, etc.) lets Floyd-Steinberg / Bayer
-# spread the gap into neighbouring pixels, so the *perceived* colour on
-# the panel is much closer to the source than what a nominal-palette
-# quantize produces.
-#
-# Each palette index still maps to the same device nibble via the
-# matching LUT — the firmware sees identical bytes on the wire, only
-# the quantizer's notion of "closest colour" changes.
-#
-# Calibration data ported from paperlesspaper/epdoptimize
-# (https://github.com/paperlesspaper/epdoptimize, Apache 2.0),
-# specifically the ``spectra6`` and ``acep`` profiles from
-# ``src/dither/data/default-palettes.json``. See NOTICES.md for full
-# attribution.
-
-
-# Waveshare E6 6-colour palette — the .bin packers target this. No orange:
-# the firmware reserves nibble 0x4 (we map blue to 0x5, green to 0x6 via
-# the LUT below) so the gamut is one colour smaller than Spectra 6.
+# Waveshare E6 6-colour palette — the .bin packers' default target. No
+# orange: the firmware reserves nibble 0x4 (we map blue to 0x5, green
+# to 0x6 via the LUT below) so the gamut is one colour smaller than
+# Spectra 6.
 #
 # Palette order matters: Pillow's quantize emits indices 0…N-1 in the
 # order we declare. The LUT translates those to firmware nibbles.
+#
+# Calibrated alternative below
+# (``WAVESHARE_E6_CALIBRATED_PALETTE``) is opt-in via the per-device
+# ``calibrated`` toggle and pairs with ``_compress_to_calibrated_range``;
+# enabling it without the tone-mapping pre-pass collapses mid-tones to
+# solid paper-grey on the panel, which is why the swap stays gated.
 WAVESHARE_E6_PALETTE: tuple[tuple[int, int, int], ...] = (
-    (0x1F, 0x22, 0x26),  # 0 -> 0x0 black   (calibrated, panel dark grey)
-    (0xB9, 0xC7, 0xC9),  # 1 -> 0x1 white   (calibrated, panel paper)
-    (0xC1, 0xBB, 0x1E),  # 2 -> 0x2 yellow  (calibrated, mustard)
-    (0x62, 0x20, 0x1E),  # 3 -> 0x3 red     (calibrated, dusty red)
-    (0x23, 0x3F, 0x8E),  # 4 -> 0x5 blue    (calibrated, navy)
-    (0x35, 0x56, 0x3A),  # 5 -> 0x6 green   (calibrated, forest)
+    (0, 0, 0),  # 0 -> 0x0 black
+    (255, 255, 255),  # 1 -> 0x1 white
+    (255, 255, 0),  # 2 -> 0x2 yellow
+    (255, 0, 0),  # 3 -> 0x3 red
+    (0, 0, 255),  # 4 -> 0x5 blue (firmware reserves 0x4)
+    (0, 255, 0),  # 5 -> 0x6 green (firmware reserves 0x7)
 )
 
 _E6_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3, 0x5, 0x6)
@@ -99,16 +87,49 @@ _E6_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3, 0x5, 0x6)
 # Pi client can write it straight into the UC8159 buffer. Declaring the
 # palette in that index order makes the LUT an identity map (0…6).
 INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
-    (0x19, 0x1E, 0x21),  # 0 black   (calibrated)
-    (0xF1, 0xF1, 0xF1),  # 1 white   (calibrated paper)
-    (0x53, 0xA4, 0x28),  # 2 green   (calibrated)
-    (0x31, 0x31, 0x8F),  # 3 blue    (calibrated)
-    (0xD2, 0x0E, 0x13),  # 4 red     (calibrated, brighter than E6 red)
-    (0xF3, 0xCF, 0x11),  # 5 yellow  (calibrated)
-    (0xB8, 0x5E, 0x1C),  # 6 orange  (calibrated, brick)
+    (0, 0, 0),  # 0 black
+    (255, 255, 255),  # 1 white
+    (0, 255, 0),  # 2 green
+    (0, 0, 255),  # 3 blue
+    (255, 0, 0),  # 4 red
+    (255, 255, 0),  # 5 yellow
+    (255, 140, 0),  # 6 orange
 )
 
 _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
+
+
+# Calibrated targets — what the panels actually reproduce under normal
+# viewing light. Used **only** when the per-device ``calibrated`` toggle
+# is on, and always paired with the ``_compress_to_calibrated_range``
+# tone-mapping pass below: the palette alone makes mid-tones collapse
+# to solid calibrated-white (washed out); the tone-mapping rescales the
+# source range into [calibrated_black, calibrated_white] so dither has
+# room to work again.
+#
+# Order matches the nominal palettes above so the same nibble LUT
+# applies to both.
+#
+# Ported from paperlesspaper/epdoptimize (Apache 2.0), specifically the
+# ``spectra6`` (E6) and ``acep`` (Inky 7-colour) profiles in
+# ``src/dither/data/default-palettes.json``. See NOTICES.md.
+WAVESHARE_E6_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0x1F, 0x22, 0x26),  # 0 black   (panel dark slate)
+    (0xB9, 0xC7, 0xC9),  # 1 white   (panel paper)
+    (0xC1, 0xBB, 0x1E),  # 2 yellow  (mustard)
+    (0x62, 0x20, 0x1E),  # 3 red     (dusty red)
+    (0x23, 0x3F, 0x8E),  # 4 blue    (navy)
+    (0x35, 0x56, 0x3A),  # 5 green   (forest)
+)
+INKY_7COLOUR_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0x19, 0x1E, 0x21),  # 0 black
+    (0xF1, 0xF1, 0xF1),  # 1 white
+    (0x53, 0xA4, 0x28),  # 2 green
+    (0x31, 0x31, 0x8F),  # 3 blue
+    (0xD2, 0x0E, 0x13),  # 4 red
+    (0xF3, 0xCF, 0x11),  # 5 yellow
+    (0xB8, 0x5E, 0x1C),  # 6 orange  (brick)
+)
 
 
 # Panel colour gamuts the .bin packer can target, keyed by the value
@@ -117,6 +138,49 @@ _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
 # always-E6 ESP32 path are unchanged.
 PanelGamut = Literal["waveshare_e6", "inky_7colour"]
 PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour")
+# Look up the calibrated palette for a gamut, or None when no calibration
+# profile exists (custom panels, future gamuts). Both calibrated palettes
+# use the same nibble LUT as their nominal counterparts so the on-wire
+# bytes are unchanged — only the dither targets and the source tone
+# mapping change.
+_CALIBRATED_PALETTES: dict[str, tuple[tuple[int, int, int], ...]] = {
+    "waveshare_e6": WAVESHARE_E6_CALIBRATED_PALETTE,
+    "inky_7colour": INKY_7COLOUR_CALIBRATED_PALETTE,
+}
+
+
+def _compress_to_calibrated_range(
+    img: Image.Image, palette: tuple[tuple[int, int, int], ...]
+) -> Image.Image:
+    """Linearly remap a source's [0, 255] RGB range into the palette's
+    [calibrated_black, calibrated_white] band so the calibrated palette
+    actually has data to dither against.
+
+    Without this step the palette alone makes mid-tones collapse: a
+    near-white source pixel is already inside the calibrated white's
+    neighbourhood (the white target is ~#B9C7C9, not pure white), so
+    Floyd-Steinberg sees zero error to diffuse and the panel paints a
+    flat block of paper-grey. After compression, the same source pixel
+    sits well into the upper end of the palette's range with real error
+    to spread — the dither field reappears and the panel reads as
+    properly bright.
+
+    Linear per-channel rescale is the dumber-but-honest version of
+    epdoptimize's LAB dynamic-range compression; the panel itself is so
+    nonlinear that any tone curve is an approximation, and the perceptual
+    delta between this and a proper LAB pass isn't worth the numpy/colour
+    complexity at the gamut sizes we target. The first and second palette
+    entries are always (black, white) in both the E6 and 7-colour decks.
+    """
+    if len(palette) < 2:
+        return img
+    pmin = np.array(palette[0], dtype=np.float32)
+    pmax = np.array(palette[1], dtype=np.float32)
+    arr = np.asarray(img.convert("RGB"), dtype=np.float32)
+    scaled = arr * (pmax - pmin) / 255.0 + pmin
+    return Image.fromarray(np.clip(scaled, 0, 255).astype(np.uint8))
+
+
 _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]] = {
     "waveshare_e6": (WAVESHARE_E6_PALETTE, _E6_NIBBLE_BY_PALETTE_INDEX),
     "inky_7colour": (INKY_7COLOUR_PALETTE, _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX),
@@ -464,6 +528,7 @@ def pack_to_panel_bin(
     saturation: float = 1.0,
     contrast: float = 1.0,
     gamut: str = "waveshare_e6",
+    calibrated: bool = False,
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
@@ -475,6 +540,15 @@ def pack_to_panel_bin(
     Pi clients) or ``inky_7colour`` (7 colours incl. orange, indices matching
     the Pimoroni inky library so a Pi client writes them straight to the
     UC8159 buffer). An unknown value falls back to ``waveshare_e6``.
+
+    ``calibrated`` swaps the dither target from nominal sRGB primaries to
+    measured panel colours and runs a tone-mapping pre-pass that squeezes
+    the source's [0, 255] range into the panel's reproducible band. Pair
+    works as one: the palette alone makes mid-tones collapse without the
+    tone mapping; the tone mapping alone darkens nothing because it
+    quantizes against the unchanged nominal targets. Off by default — turn
+    it on per device once you've A/B'd a frame and decided the calibrated
+    look beats the nominal one for that panel and that content.
 
     ``width`` must be even. The image must already be at
     ``(width, height)`` — callers resize / orient first (the dashboard
@@ -503,9 +577,19 @@ def pack_to_panel_bin(
         raise ValueError(f"image must be {width}x{height}, got {img.size}")
 
     palette, nibble_by_index = _GAMUT_TABLE.get(gamut, _GAMUT_TABLE["waveshare_e6"])
+    # When the caller opts into calibration, swap the dither target to the
+    # calibrated palette for this gamut (if we have one) and compress the
+    # source range into the calibrated [black, white] band so the dither
+    # has somewhere to spread error to. Nibble LUT stays the rendered
+    # gamut's — on-wire bytes are unchanged.
+    calibrated_active = calibrated and gamut in _CALIBRATED_PALETTES
+    if calibrated_active:
+        palette = _CALIBRATED_PALETTES[gamut]
     pal_arr = np.array(palette, dtype=np.float32)
 
     rgb = img.convert("RGB")
+    if calibrated_active:
+        rgb = _compress_to_calibrated_range(rgb, palette)
     # ImageEnhance is C-speed and idempotent at factor=1.0 (no-op fast path).
     if saturation != 1.0:
         rgb = ImageEnhance.Color(rgb).enhance(saturation)

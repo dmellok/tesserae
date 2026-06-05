@@ -47,6 +47,14 @@
       "max": 3,
       "step": 0.05,
       "device_setting": true
+    },
+    {
+      "name": "calibrated",
+      "type": "boolean",
+      "label": "Calibrated palette + tone mapping",
+      "default": false,
+      "device_setting": true,
+      "help": "Experimental. Dithers against the panel's measured colours (a dusty red instead of pure red, etc.) and compresses the source range into the panel's reproducible band so Floyd-Steinberg has somewhere to spread error. Helps on photographic / colour-heavy content; can introduce a cool tint on neutral greys because the calibrated white is slightly green-blue. A/B with your actual dashboards before leaving on. Calibration data ported from the paperlesspaper/epdoptimize project (Apache 2.0)."
     }
   ]
 }

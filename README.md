@@ -320,6 +320,7 @@ Tesserae stands on generously-licensed open source:
 - **[Chart.js](https://chartjs.org/)** v4.4.0 — the line / bar / radar / pie / horizon plots across finance, weather, and stats widgets (MIT).
 - **17 typefaces** under SIL OFL or Apache 2.0 — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
 - **[KOReader](https://github.com/koreader/koreader)** trmnl-display plugin — the upstream Lua client that turns a jailbroken Kindle into a TRMNL-compatible panel.
+- **[paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)** — calibrated Spectra 6 + ACeP palette measurements (Apache 2.0) that power Tesserae's opt-in calibrated dither path. Measurements made by the team at [paperlesspaper](https://paperlesspaper.de/en) on their eInk picture frames; we ported the numbers into [`app/quantizer.py`](app/quantizer.py) and paired them with our own linear tone-mapping pre-pass. Full attribution in [NOTICES.md](NOTICES.md).
 
 Full list in [docs/credits](https://dmellok.github.io/tesserae/credits/).
 
