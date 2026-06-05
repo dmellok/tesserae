@@ -1,12 +1,13 @@
-"""Themes browse, builder, and user-themes CSS endpoints.
+"""Themes index + builder + user-themes CSS endpoints + image extract.
 
-M-A shipped the read-only browse over the bundled registry. M-B (this
-revision) layers a user-themes store on top: the browse page now
-shows user themes alongside bundled ones, a builder lets the user
-create / edit / duplicate / delete them, and the cascade picks them
-up via a server-generated ``user.css`` payload loaded next to the
-Spectra stylesheets. M-C will hang an image-extract endpoint off this
-blueprint to seed the builder form.
+M-A shipped the read-only browse over the bundled registry. M-B added
+the user-themes store. M-C (this revision) collapses the browse + edit
+pages into a single ``/themes`` view: a left strip lists every theme,
+a right pane holds the builder form for whichever theme is selected,
+and an image-upload section at the top of the builder seeds the form
+from a k-means-extracted palette. Bundled themes show a read-only
+form with a prominent Duplicate-to-edit CTA so they're never mutated
+directly; user themes are editable + deletable.
 """
 
 from __future__ import annotations
@@ -21,12 +22,18 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
     url_for,
 )
 
+from app.palette_extract import (
+    PaletteExtractError,
+    assign_to_tokens,
+    extract_dominant,
+)
 from app.state.theme_registry import (
     BUNDLED_THEMES,
     FAMILY_LABELS,
@@ -75,77 +82,145 @@ def _all_themes() -> tuple[list[Theme], list[UserTheme]]:
 
 
 @bp.get("")
-def index() -> str:
-    """Catalogue page: bundled + user themes, grouped by family."""
+def index() -> Response | str:
+    """Unified themes page: vertical strip + builder pane.
+
+    Default selection prefers the user's first saved theme so a user
+    iterating on their own work lands back where they were. Falls
+    back to the bundled ``light`` theme on a fresh install.
+    """
+    registry, user_themes = _all_themes()
+    default_id = user_themes[0].id if user_themes else "light"
+    return _render_index(registry, default_id)
+
+
+@bp.get("/<theme_id>")
+def show(theme_id: str) -> Response | str:
+    """Same unified view, with ``<theme_id>`` selected. Routes named
+    ``new`` / ``user.css`` are declared before this so the catch-all
+    doesn't shadow them."""
+    if theme_id in {"new", "user.css", "extract-palette"}:
+        abort(404)
     registry, _ = _all_themes()
+    return _render_index(registry, theme_id)
+
+
+# Legacy alias used by the M-B builder route and any external links
+# that hit ``/themes/<id>/edit`` from the pre-unification UI. Redirect
+# to the unified page so bookmarks keep working.
+@bp.get("/<theme_id>/edit")
+def edit_alias(theme_id: str) -> Response:
+    return redirect(url_for("themes.show", theme_id=theme_id))
+
+
+@bp.get("/user.css")
+def user_css() -> Response:
+    """Serve the concatenated user-themes CSS. ``compose.html`` and
+    the themes page both load it so user-defined ``data-theme``
+    selectors land alongside the bundled Spectra cascade.
+
+    Short ``Cache-Control`` so a save-then-edit cycle picks up changes
+    inside a second on subsequent loads."""
+    store = _store()
+    body = emit_css(store)
+    resp = Response(body, mimetype="text/css")
+    resp.headers["Cache-Control"] = "max-age=2"
+    return resp
+
+
+@bp.get("/new")
+def new() -> Response | str:
+    """Synonym for "show me the builder seeded for a fresh save."
+    Renders the unified view with a placeholder ``new`` theme on the
+    right; the strip on the left highlights nothing."""
+    registry, _ = _all_themes()
+    return _render_index(registry, selected_id=None, is_new=True)
+
+
+def _render_index(
+    registry: list[Theme],
+    selected_id: str | None,
+    *,
+    is_new: bool = False,
+) -> Response | str:
+    """Shared renderer for the unified themes view. ``selected_id``
+    drives the builder on the right; ``None`` (paired with ``is_new=True``)
+    means "blank seed, save as new." A bad id 404s rather than silently
+    falling back, so a typo'd link is visible."""
     grouped = themes_by_family(registry)
+    bundled_ids = {t.id for t in BUNDLED_THEMES}
+
+    is_bundled = False
+    theme: UserTheme
+    action_url: str
+
+    if is_new or selected_id is None:
+        theme = _seed_from_template("light")
+        action_url = url_for("themes.create")
+        is_new = True
+    elif selected_id in bundled_ids:
+        theme = _seed_from_template(selected_id)
+        # Reflect the chosen bundled id back to the form so the live
+        # preview pane paints with that theme's CSS variables.
+        theme.id = selected_id
+        is_bundled = True
+        # Bundled themes can't be updated; the form's submit button is
+        # disabled, so action_url is harmless either way.
+        action_url = url_for("themes.create")
+    else:
+        existing = _store().get(selected_id)
+        if existing is None:
+            abort(404)
+        theme = existing
+        action_url = url_for("themes.update", theme_id=existing.id)
+
     return render_template(
         "themes.html",
         families=FAMILY_ORDER,
         family_labels=FAMILY_LABELS,
         grouped=grouped,
         total=len(registry),
-    )
-
-
-@bp.get("/user.css")
-def user_css() -> Response:
-    """Serve the concatenated user-themes CSS. ``compose.html`` and the
-    themes browse page both load it so user-defined ``data-theme``
-    selectors land alongside the bundled Spectra cascade.
-
-    Cache-busted on a per-flush basis via the file's mtime — flips
-    immediately after a save without forcing a hard refresh of every
-    page that's already painting with the old cascade."""
-    store = _store()
-    body = emit_css(store)
-    resp = Response(body, mimetype="text/css")
-    # Short max-age so a save-then-edit cycle picks up changes inside
-    # one second. The browse page also adds a ``?v=`` query string when
-    # it links the file, so most cache hits are intentional.
-    resp.headers["Cache-Control"] = "max-age=2"
-    return resp
-
-
-@bp.get("/new")
-def new() -> str:
-    """Render the builder form pre-filled from ``?from=<theme_id>`` if
-    present (defaults to ``light`` so the form is never empty).
-    ``from`` may name a bundled theme; we copy whatever colour tokens
-    we can read from the Spectra CSS, falling back to the dataclass
-    defaults for any miss."""
-    base_id = (request.args.get("from") or "light").strip()
-    seed = _seed_from_template(base_id)
-    return render_template(
-        "theme_builder.html",
-        is_new=True,
-        theme=_template_view(seed),
-        bundled_themes=BUNDLED_THEMES,
-        action_url=url_for("themes.create"),
-    )
-
-
-@bp.get("/<theme_id>/edit")
-def edit(theme_id: str) -> str:
-    store = _store()
-    theme = store.get(theme_id)
-    if theme is None:
-        abort(404)
-    return render_template(
-        "theme_builder.html",
-        is_new=False,
+        selected_id=theme.id if not is_new else None,
+        is_new=is_new,
+        is_bundled=is_bundled,
         theme=_template_view(theme),
         bundled_themes=BUNDLED_THEMES,
-        action_url=url_for("themes.update", theme_id=theme.id),
+        action_url=action_url,
     )
 
 
 def _template_view(theme: UserTheme) -> dict[str, Any]:
     """Adapt a UserTheme into a dict the Jinja template can index by
-    string. Lets the builder template loop over ``accent_1`` …
-    ``accent_6`` without needing a getattr filter."""
-    raw = asdict(theme)
-    return raw
+    string. Lets the builder loop over ``accent_1`` … ``accent_6``
+    without needing a getattr filter."""
+    return asdict(theme)
+
+
+@bp.post("/extract-palette")
+def extract_palette() -> Response:
+    """Take an uploaded image, return JSON with a Spectra palette
+    suggestion. The builder posts the upload with ``fetch`` and
+    paints the response into the form inputs client-side; no full
+    reload, so the user can keep iterating without losing
+    half-typed values.
+
+    Returns 400 on a decode / size error with a friendly ``error``
+    string the JS can surface as an inline message."""
+    upload = request.files.get("image")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "Pick an image to extract from."}), 400
+    raw = upload.read()
+    try:
+        colors = extract_dominant(raw)
+    except PaletteExtractError as err:
+        return jsonify({"error": str(err)}), 400
+    mode_hint = request.form.get("mode") or None
+    tokens = assign_to_tokens(colors, mode=mode_hint)
+    # Include the detected mode so the JS can flip the mode dropdown
+    # too — gives users the same "light vs dark" heuristic the
+    # extractor itself used to assign tokens.
+    detected_mode = "dark" if colors and colors[0].luminance < 0.4 else "light"
+    return jsonify({"tokens": tokens, "mode": detected_mode})
 
 
 @bp.post("/new")
@@ -159,7 +234,7 @@ def create() -> Response:
     theme = _theme_from_form(request.form, fallback_id=new_id)
     store.save(theme)
     flash(f"Saved theme {theme.name!r}.", "ok")
-    return redirect(url_for("themes.edit", theme_id=theme.id))
+    return redirect(url_for("themes.show", theme_id=theme.id))
 
 
 @bp.post("/<theme_id>/update")
@@ -174,7 +249,7 @@ def update(theme_id: str) -> Response:
     theme.id = existing.id
     store.save(theme)
     flash(f"Updated theme {theme.name!r}.", "ok")
-    return redirect(url_for("themes.edit", theme_id=theme.id))
+    return redirect(url_for("themes.show", theme_id=theme.id))
 
 
 @bp.post("/<theme_id>/delete")
@@ -214,7 +289,7 @@ def duplicate(theme_id: str) -> Response:
     src.id = new_id
     store.save(src)
     flash(f"Duplicated as {src.name!r}.", "ok")
-    return redirect(url_for("themes.edit", theme_id=src.id))
+    return redirect(url_for("themes.show", theme_id=src.id))
 
 
 # -- form helpers ------------------------------------------------------

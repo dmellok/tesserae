@@ -1,154 +1,17 @@
-/* Themes browse page (Settings → Themes).
+/* Themes page (top-nav → Themes).
  *
- * Each .theme-card sets data-theme="<id>" on itself, so its inner
- * swatches and preview lines paint from that theme's CSS variables
- * via the spectra-tokens cascade — no Python-side palette plumbing
- * is needed to render previews accurately. M-B will append user
- * themes to the same grid via a server-emitted user-themes
- * stylesheet so the same render works for those too.
+ * Unified layout: a left strip of every theme (bundled + user),
+ * a centre builder pane for the selected theme, and a sticky
+ * preview pane on the right. Each strip item sets data-theme="<id>"
+ * on itself so the mini-swatches paint from that theme's CSS
+ * variables via the spectra-tokens cascade. The preview pane uses
+ * the same trick with inline-style overrides driven by the form
+ * inputs, so what the user sees there is exactly what the cells
+ * will paint when they pick this theme.
  */
 
-.theme-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--t-space-2);
-  margin: var(--t-space-4) 0;
-}
-.theme-filter .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--t-space-2);
-  padding: var(--t-space-2) var(--t-space-3);
-  border: 1px solid var(--t-border, #d6dbe1);
-  border-radius: 999px;
-  color: var(--t-text, #1B1A16);
-  background: var(--t-surface, #fff);
-  font-size: var(--t-size-sm);
-  text-decoration: none;
-  transition: background 0.12s, border-color 0.12s;
-}
-.theme-filter .chip:hover {
-  background: var(--t-accent-soft, #e6f3f1);
-  border-color: var(--t-accent, #0d8c7e);
-}
-.theme-filter .chip-count {
-  font-size: var(--t-size-xs);
-  color: var(--t-text-muted, #837F73);
-}
+/* ---- Page-head row ------------------------------------------------- */
 
-.theme-section {
-  margin-top: var(--t-space-6);
-}
-.theme-section-head {
-  margin: 0 0 var(--t-space-3);
-  font-size: var(--t-size-lg);
-}
-
-.theme-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--t-space-4);
-}
-
-.theme-card {
-  /* Card paints from the theme's variables — that's the whole point.
-     We're using the Spectra cascade here, so what users see on the
-     page editor's preview iframe is what this card shows. */
-  background: var(--surface);
-  color: var(--text-primary);
-  border: 1px solid var(--edge);
-  border-radius: 10px;
-  padding: var(--t-space-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--t-space-3);
-  /* Soft shadow that defers to the theme's bg colour for the halo, so
-     dark themes don't get a bright glow against the admin chrome. */
-  box-shadow: 0 1px 3px rgba(16, 12, 8, 0.08);
-  font-family: var(--font-family, "Helvetica Neue", Helvetica, Arial, sans-serif);
-}
-
-.theme-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--t-space-2);
-}
-.theme-card-head h3 {
-  margin: 0;
-  font-size: var(--t-size-md);
-  color: var(--text-primary);
-}
-.theme-card-id {
-  font-size: var(--t-size-xs);
-  color: var(--text-muted);
-  background: var(--bg);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.theme-swatches {
-  display: grid;
-  grid-template-columns: repeat(9, 1fr);
-  gap: 4px;
-}
-.theme-swatch {
-  aspect-ratio: 1 / 1;
-  border-radius: 4px;
-  border: 1px solid var(--edge);
-}
-.theme-swatch--bg        { background: var(--bg); }
-.theme-swatch--surface   { background: var(--surface-sunken); }
-.theme-swatch--text      { background: var(--text-primary); }
-.theme-swatch--accent-1  { background: var(--accent-1); }
-.theme-swatch--accent-2  { background: var(--accent-2); }
-.theme-swatch--accent-3  { background: var(--accent-3); }
-.theme-swatch--accent-4  { background: var(--accent-4); }
-.theme-swatch--accent-5  { background: var(--accent-5); }
-.theme-swatch--accent-6  { background: var(--accent-6); }
-
-.theme-preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--t-space-2);
-  /* Sit on the theme's sunken surface so a panel-edge contrast like
-     bg vs surface-sunken is visible on the card. */
-  background: var(--surface-sunken);
-  border: 1px solid var(--edge);
-  border-radius: 6px;
-  padding: var(--t-space-2) var(--t-space-3);
-}
-.theme-preview-line {
-  margin: 0;
-  font-size: var(--t-size-sm);
-  color: var(--text-primary);
-}
-.theme-preview-line--soft {
-  color: var(--text-muted);
-  font-size: var(--t-size-xs);
-}
-.theme-preview-pills {
-  display: flex;
-  gap: var(--t-space-2);
-  margin-top: var(--t-space-1);
-}
-.theme-preview-pill {
-  font-size: var(--t-size-xs);
-  padding: 2px 8px;
-  border-radius: 999px;
-  color: var(--on-accent);
-}
-.theme-preview-pill--a1 { background: var(--accent-1); }
-.theme-preview-pill--a3 { background: var(--accent-3); }
-.theme-preview-pill--a5 { background: var(--accent-5); }
-
-.theme-footnote {
-  margin-top: var(--t-space-6);
-  color: var(--t-text-muted, #837F73);
-  font-size: var(--t-size-sm);
-}
-
-/* Page-head action row — sits the New-theme button next to the title. */
 .themes-head {
   display: flex;
   align-items: flex-end;
@@ -162,40 +25,219 @@
   flex-wrap: wrap;
 }
 
-/* Card actions row at the bottom of each theme card. Buttons sit on
-   the Spectra surface so they don't look glued onto a foreign theme. */
-.theme-card-actions {
-  display: flex;
-  gap: var(--t-space-2);
-  margin-top: auto;
-}
-.theme-card-actions .button {
-  flex: 1 1 auto;
-  padding: var(--t-space-2) var(--t-space-3);
-  font-size: var(--t-size-sm);
-}
+/* ---- Three-column shell ------------------------------------------- */
 
-/* ---- Builder layout ------------------------------------------------ */
-
-.theme-builder {
-  margin-top: var(--t-space-4);
-}
-.theme-builder-grid {
+.themes-layout {
   display: grid;
   gap: var(--t-space-4);
+  margin-top: var(--t-space-4);
+  grid-template-columns: 1fr;
+  grid-template-areas:
+    "strip"
+    "builder"
+    "preview";
 }
-@media (min-width: 980px) {
-  .theme-builder-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-    align-items: start;
+@media (min-width: 900px) {
+  .themes-layout {
+    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-areas:
+      "strip builder"
+      "strip preview";
+  }
+}
+@media (min-width: 1280px) {
+  .themes-layout {
+    grid-template-columns: 240px minmax(0, 1fr) 320px;
+    grid-template-areas:
+      "strip builder preview";
   }
 }
 
-.theme-builder-form {
-  display: grid;
+/* ---- Left strip ---------------------------------------------------- */
+
+.themes-strip {
+  grid-area: strip;
+  display: flex;
+  flex-direction: column;
   gap: var(--t-space-4);
+  align-self: start;
+  /* Independent scroll on tall viewports so the user can jump between
+     themes without scrolling the builder. */
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  padding-right: var(--t-space-2);
+}
+.themes-strip-family {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.themes-strip-head {
+  margin: 0;
+  font-size: var(--t-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-text-muted, #837F73);
+}
+.themes-strip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.themes-strip-item {
+  /* Each item paints from its own theme's variables — the mini
+     swatch row reads like a tiny postcard of the full theme. */
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  text-decoration: none;
+  font-size: var(--t-size-sm);
+  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+}
+.themes-strip-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 6px rgba(16, 12, 8, 0.10);
+}
+.themes-strip-item.is-active {
+  border-color: var(--t-accent, #0d8c7e);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--t-accent, #0d8c7e) 30%, transparent);
+}
+.themes-strip-swatches {
+  display: inline-flex;
+  gap: 2px;
+}
+.strip-sw {
+  width: 12px;
+  height: 18px;
+  border-radius: 3px;
+  border: 1px solid var(--edge);
+}
+.strip-sw--bg   { background: var(--bg); }
+.strip-sw--text { background: var(--text-primary); }
+.strip-sw--a1   { background: var(--accent-1); }
+.strip-sw--a3   { background: var(--accent-3); }
+.strip-sw--a5   { background: var(--accent-5); }
+.themes-strip-meta {
+  display: inline-flex;
+  flex-direction: column;
+  line-height: 1.1;
   min-width: 0;
 }
+.themes-strip-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.themes-strip-tag {
+  font-size: var(--t-size-xs);
+  color: var(--text-muted);
+}
+
+/* ---- Builder pane -------------------------------------------------- */
+
+.themes-builder {
+  grid-area: builder;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+  min-width: 0;
+}
+.themes-builder-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  flex-wrap: wrap;
+}
+.themes-builder-head h2 {
+  margin: 0;
+  font-size: var(--t-size-lg);
+}
+.themes-builder-head .muted {
+  color: var(--t-text-muted, #837F73);
+  font-weight: 400;
+  font-size: var(--t-size-sm);
+}
+.themes-builder-head-actions {
+  display: flex;
+  gap: var(--t-space-2);
+  flex-wrap: wrap;
+}
+
+/* Bundled themes: form is rendered for visual reference but every
+   input is locked down so a typo can't make it past the (also-
+   disabled) submit. JS sets `disabled` on each control; this fades
+   the whole pane so the "look but don't touch" affordance is loud. */
+[data-builder-readonly] {
+  opacity: 0.85;
+  pointer-events: none;
+}
+[data-builder-readonly] input,
+[data-builder-readonly] select {
+  background: var(--t-surface-sunken, #f3f1ec);
+}
+
+.theme-builder {
+  display: grid;
+  gap: var(--t-space-4);
+}
+
+/* Image-to-theme block. Dashed border signals "drop / pick a file"
+   without needing a separate icon. */
+.theme-builder-extract {
+  border-style: dashed;
+}
+.theme-extract-row {
+  display: flex;
+  gap: var(--t-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--t-space-2);
+}
+.theme-extract-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px dashed var(--t-border, #d6dbe1);
+  border-radius: 8px;
+  font-size: var(--t-size-sm);
+  color: var(--t-text-soft, #5b6470);
+  cursor: pointer;
+  max-width: 320px;
+  position: relative;
+}
+.theme-extract-file input[type="file"] {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+.theme-extract-file-label {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.theme-extract-status {
+  margin: var(--t-space-2) 0 0;
+  font-size: var(--t-size-sm);
+}
+.theme-extract-status[data-kind="error"] { color: var(--t-danger, #c0392b); }
+.theme-extract-status[data-kind="ok"]    { color: var(--t-ok, #1f9d55); }
+.theme-extract-status[data-kind="info"]  { color: var(--t-text-soft, #5b6470); }
+
 .theme-builder-fields {
   display: grid;
   gap: var(--t-space-3);
@@ -213,19 +255,18 @@
   flex-wrap: wrap;
 }
 
-/* Sticky preview pane on desktop so the user can edit deep down the
-   form and still see the visual result. On mobile we just let it
-   stack at the bottom of the form. */
-.theme-builder-preview {
-  position: static;
+/* ---- Right preview pane ------------------------------------------- */
+
+.themes-preview {
+  grid-area: preview;
+  align-self: start;
 }
-@media (min-width: 980px) {
-  .theme-builder-preview {
+@media (min-width: 1280px) {
+  .themes-preview {
     position: sticky;
     top: calc(var(--t-space-6) + 60px);
   }
 }
-
 .theme-preview-pane {
   background: var(--surface);
   color: var(--text-primary);
@@ -254,11 +295,66 @@
   padding: 2px 6px;
   border-radius: 4px;
 }
-.theme-preview-pane .theme-preview-pill--a2 { background: var(--accent-2); }
-.theme-preview-pane .theme-preview-pill--a4 { background: var(--accent-4); }
-.theme-preview-pane .theme-preview-pill--a6 { background: var(--accent-6); }
 .theme-preview-hint {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--t-size-xs);
 }
+
+/* Larger swatch grid in the preview pane than in the strip — same
+   markup, but the variables paint at a roomier scale here. */
+.theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: 4px;
+}
+.theme-swatch {
+  aspect-ratio: 1 / 1;
+  border-radius: 4px;
+  border: 1px solid var(--edge);
+}
+.theme-swatch--bg        { background: var(--bg); }
+.theme-swatch--surface   { background: var(--surface-sunken); }
+.theme-swatch--text      { background: var(--text-primary); }
+.theme-swatch--accent-1  { background: var(--accent-1); }
+.theme-swatch--accent-2  { background: var(--accent-2); }
+.theme-swatch--accent-3  { background: var(--accent-3); }
+.theme-swatch--accent-4  { background: var(--accent-4); }
+.theme-swatch--accent-5  { background: var(--accent-5); }
+.theme-swatch--accent-6  { background: var(--accent-6); }
+
+.theme-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  background: var(--surface-sunken);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  padding: var(--t-space-2) var(--t-space-3);
+}
+.theme-preview-line {
+  margin: 0;
+  font-size: var(--t-size-sm);
+  color: var(--text-primary);
+}
+.theme-preview-line--soft {
+  color: var(--text-muted);
+  font-size: var(--t-size-xs);
+}
+.theme-preview-pills {
+  display: flex;
+  gap: var(--t-space-2);
+  margin-top: var(--t-space-1);
+}
+.theme-preview-pill {
+  font-size: var(--t-size-xs);
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--on-accent);
+}
+.theme-preview-pill--a1 { background: var(--accent-1); }
+.theme-preview-pill--a2 { background: var(--accent-2); }
+.theme-preview-pill--a3 { background: var(--accent-3); }
+.theme-preview-pill--a4 { background: var(--accent-4); }
+.theme-preview-pill--a5 { background: var(--accent-5); }
+.theme-preview-pill--a6 { background: var(--accent-6); }

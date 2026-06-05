@@ -1,13 +1,14 @@
 {% extends "_base.html" %}
-{% from "_components.html" import button %}
-{% block title %}Themes — Tesserae{% endblock %}
+{% from "_components.html" import button, text_input, select_field, color_input %}
+{% block title %}
+{% if is_new %}New theme — Themes — Tesserae
+{% else %}{{ theme.name }} — Themes — Tesserae
+{% endif %}
+{% endblock %}
 {% block head_extra %}
-{# Spectra token cascade — only loaded on this page (and compose.html);
-   admin chrome elsewhere doesn't need them. spectra-tokens defines the
-   bundled [data-theme="..."] blocks; spectra-base16 layers the
-   editor-palette themes; user.css drops in any custom themes the user
-   has saved. themes.css paints the card grid using those variables,
-   so the swatches always match what the editor preview will paint. #}
+{# Spectra cascade powers the strip swatches + the live preview.
+   user.css drops in any saved user themes so their data-theme blocks
+   paint here too. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
 <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
@@ -18,99 +19,313 @@
   <div>
     <h1><i class="ph ph-palette"></i> Themes</h1>
     <p class="lede">
-      Browse bundled themes and your own. Each is a complete Spectra
-      palette (surfaces, text, six accents) selectable per page or per
-      cell from the editor. Duplicate a bundled theme to start your own.
+      Click any theme in the strip to load it. Bundled themes are
+      read-only — duplicate one to start your own. Upload a photo at
+      the top of the builder to seed a palette from it.
     </p>
   </div>
   <div class="themes-head-actions">
-    <a class="button primary" href="{{ url_for('themes.new') }}">
+    <a class="button {% if is_new %}is-active{% endif %} ghost" href="{{ url_for('themes.new') }}">
       <i class="ph ph-plus" aria-hidden="true"></i>
-      <span>New theme</span>
+      <span>New from blank</span>
     </a>
   </div>
 </header>
 
-{# Filter chips — anchor links per family so the user can jump
-   without a full reload. Hidden on tiny viewports where the page
-   already scrolls quickly. #}
-<nav class="theme-filter" aria-label="Theme families">
-  {% for family in families %}
-    {% if grouped[family] %}
-    <a href="#family-{{ family }}" class="chip">
-      {{ family_labels[family] }}
-      <span class="chip-count">{{ grouped[family]|length }}</span>
-    </a>
-    {% endif %}
-  {% endfor %}
-</nav>
+<div class="themes-layout">
 
-{% for family in families %}
-  {% if grouped[family] %}
-  <section class="theme-section" id="family-{{ family }}">
-    <h2 class="theme-section-head">{{ family_labels[family] }}</h2>
-    <div class="theme-grid">
-      {% for theme in grouped[family] %}
-      <article class="theme-card" data-theme="{{ theme.id }}">
-        <header class="theme-card-head">
-          <h3>{{ theme.name }}</h3>
-          <code class="theme-card-id">{{ theme.id }}</code>
-        </header>
-        {# Swatches paint from the theme's own CSS variables via the
-           data-theme attribute on the card. No Python-side hex codes. #}
-        <div class="theme-swatches" aria-hidden="true">
-          <div class="theme-swatch theme-swatch--bg"></div>
-          <div class="theme-swatch theme-swatch--surface"></div>
-          <div class="theme-swatch theme-swatch--text"></div>
-          <div class="theme-swatch theme-swatch--accent-1"></div>
-          <div class="theme-swatch theme-swatch--accent-2"></div>
-          <div class="theme-swatch theme-swatch--accent-3"></div>
-          <div class="theme-swatch theme-swatch--accent-4"></div>
-          <div class="theme-swatch theme-swatch--accent-5"></div>
-          <div class="theme-swatch theme-swatch--accent-6"></div>
-        </div>
-        {# Compact preview row so the theme card shows the type +
-           accent treatment in context, not just chips. #}
-        <div class="theme-preview">
-          <p class="theme-preview-line">The quick brown fox</p>
-          <p class="theme-preview-line theme-preview-line--soft">jumps over the lazy dog</p>
-          <div class="theme-preview-pills">
-            <span class="theme-preview-pill theme-preview-pill--a1">A1</span>
-            <span class="theme-preview-pill theme-preview-pill--a3">A3</span>
-            <span class="theme-preview-pill theme-preview-pill--a5">A5</span>
-          </div>
-        </div>
-        {# Actions row — bundled themes get Duplicate only (read-only
-           upstream); user themes get Edit + Delete. The forms are
-           inline-style so the buttons can sit next to a link. #}
-        <div class="theme-card-actions">
-          {% if theme.user %}
-          <a class="button ghost" href="{{ url_for('themes.edit', theme_id=theme.id) }}">
-            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
-          </a>
-          <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline"
-                onsubmit="return confirm('Delete {{ theme.name }}? Pages and cells using it fall back to Light.');">
-            <button type="submit" class="button ghost danger" aria-label="Delete theme">
-              <i class="ph ph-trash" aria-hidden="true"></i>
-            </button>
-          </form>
-          {% else %}
-          <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
-            <button type="submit" class="button ghost">
-              <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
-            </button>
-          </form>
-          {% endif %}
-        </div>
-      </article>
-      {% endfor %}
+  {# ----- Left strip: every theme, grouped by family ----------------- #}
+  <aside class="themes-strip" aria-label="Theme catalogue">
+    {% for family in families %}
+      {% if grouped[family] %}
+      <section class="themes-strip-family">
+        <h3 class="themes-strip-head">{{ family_labels[family] }}</h3>
+        <ul class="themes-strip-list">
+          {% for t in grouped[family] %}
+          <li>
+            <a class="themes-strip-item {% if selected_id == t.id %}is-active{% endif %}"
+               href="{{ url_for('themes.show', theme_id=t.id) }}"
+               data-theme="{{ t.id }}">
+              <span class="themes-strip-swatches" aria-hidden="true">
+                <span class="strip-sw strip-sw--bg"></span>
+                <span class="strip-sw strip-sw--text"></span>
+                <span class="strip-sw strip-sw--a1"></span>
+                <span class="strip-sw strip-sw--a3"></span>
+                <span class="strip-sw strip-sw--a5"></span>
+              </span>
+              <span class="themes-strip-meta">
+                <span class="themes-strip-name">{{ t.name }}</span>
+                {% if t.user %}<span class="themes-strip-tag">yours</span>{% endif %}
+              </span>
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+    {% endfor %}
+  </aside>
+
+  {# ----- Right pane: builder ---------------------------------------- #}
+  <section class="themes-builder" data-theme-builder>
+    <div class="themes-builder-head">
+      <h2>
+        {% if is_new %}New theme
+        {% elif is_bundled %}{{ theme.name }} <span class="muted">— bundled, read-only</span>
+        {% else %}Editing {{ theme.name }}
+        {% endif %}
+      </h2>
+      <div class="themes-builder-head-actions">
+        {% if is_bundled %}
+        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
+          <button type="submit" class="button primary">
+            <i class="ph ph-copy" aria-hidden="true"></i>
+            <span>Duplicate to edit</span>
+          </button>
+        </form>
+        {% elif not is_new %}
+        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
+          <button type="submit" class="button ghost"
+                  onclick="return confirm('Duplicate this theme? You\'ll be editing the copy.');">
+            <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline"
+              onsubmit="return confirm('Delete {{ theme.name }}? Pages and cells using it fall back to Light.');">
+          <button type="submit" class="button ghost danger">
+            <i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
     </div>
-  </section>
-  {% endif %}
-{% endfor %}
 
-<p class="theme-footnote">
-  {{ total }} theme{{ '' if total == 1 else 's' }} total.
-  Click <em>Duplicate</em> on any bundled card to make it editable.
-</p>
+    <form method="post" action="{{ action_url }}" class="theme-builder"
+          {% if is_bundled %}data-builder-readonly{% endif %}>
+
+      {# Image-to-theme — sits at the top so users iterate
+         upload → tweak → save. Hidden form pane handles the multipart
+         upload via fetch so the rest of the form state survives. #}
+      {% if not is_bundled %}
+      <section class="card theme-builder-extract" data-theme-extract>
+        <header class="card-head">
+          <h3><i class="ph ph-image"></i> Seed from image</h3>
+        </header>
+        <p class="field-help">
+          Upload a photo, poster, or screenshot. Tesserae extracts the
+          dominant colours and fills the form below. Re-uploading
+          reroles; you can keep editing afterwards.
+        </p>
+        <div class="theme-extract-row">
+          <label class="theme-extract-file">
+            <input type="file" accept="image/*" data-extract-input>
+            <span class="theme-extract-file-label" data-extract-file-label>Choose image…</span>
+          </label>
+          <button type="button" class="button" data-extract-go>
+            <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Extract palette</span>
+          </button>
+        </div>
+        <p class="theme-extract-status" data-extract-status hidden></p>
+      </section>
+      {% endif %}
+
+      <section class="card">
+        <header class="card-head"><h3><i class="ph ph-tag"></i> Identity</h3></header>
+        {{ text_input('theme-name', 'name', 'Name', value=theme.name, required=True,
+                      help='Shown in the picker. The slug (URL id) is generated from this.') }}
+        {{ select_field('theme-mode', 'mode', 'Mode',
+                        value=theme.mode,
+                        options=[{'value':'light','label':'Light'},{'value':'dark','label':'Dark'}],
+                        help='Drives the image extractor\'s light/dark heuristic and seeds defaults.') }}
+        {{ text_input('theme-font', 'font_family', 'Font family (optional)',
+                      value=theme.font_family or '',
+                      placeholder='"Inter", system-ui, sans-serif',
+                      help='Pass through as --font-family. Leave blank to inherit the Spectra default.') }}
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h3><i class="ph ph-stack"></i> Surfaces</h3></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-bg', 'bg', 'Page background', value=theme.bg) }}
+          {{ color_input('tok-surface', 'surface', 'Card surface', value=theme.surface) }}
+          {{ color_input('tok-surface-sunken', 'surface_sunken', 'Sunken surface', value=theme.surface_sunken) }}
+          {{ color_input('tok-edge', 'edge', 'Edge / divider', value=theme.edge) }}
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h3><i class="ph ph-text-aa"></i> Text</h3></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-text-primary', 'text_primary', 'Primary', value=theme.text_primary) }}
+          {{ color_input('tok-text-secondary', 'text_secondary', 'Secondary', value=theme.text_secondary) }}
+          {{ color_input('tok-text-muted', 'text_muted', 'Muted', value=theme.text_muted) }}
+          {{ color_input('tok-on-accent', 'on_accent', 'On accent (text on coloured backgrounds)', value=theme.on_accent) }}
+        </div>
+      </section>
+
+      {% for n in range(1, 7) %}
+      <section class="card">
+        <header class="card-head"><h3><i class="ph ph-circles-three"></i> Accent {{ n }}</h3></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-a' ~ n, 'accent_' ~ n, 'Accent ' ~ n, value=theme['accent_' ~ n]) }}
+          {{ color_input('tok-a' ~ n ~ '-soft', 'accent_' ~ n ~ '_soft', 'Soft tint',
+                         value=theme['accent_' ~ n ~ '_soft'],
+                         help='Tinted pill background. Mix of the accent with bg works well.') }}
+        </div>
+      </section>
+      {% endfor %}
+
+      {% if not is_bundled %}
+      <div class="theme-builder-actions">
+        {{ button(('Save theme' if is_new else 'Update theme'), icon='floppy-disk') }}
+      </div>
+      {% endif %}
+    </form>
+  </section>
+
+  {# ----- Sticky live preview ---------------------------------------- #}
+  <aside class="themes-preview" data-theme-preview>
+    <div class="theme-preview-pane" data-theme-preview-pane
+         data-theme="{{ selected_id or 'light' }}">
+      <header class="theme-preview-pane-head">
+        <h3 data-preview-name>{{ theme.name or 'New theme' }}</h3>
+        <code data-preview-id>{{ selected_id or 'user-…' }}</code>
+      </header>
+      <div class="theme-swatches" aria-hidden="true">
+        <div class="theme-swatch theme-swatch--bg"></div>
+        <div class="theme-swatch theme-swatch--surface"></div>
+        <div class="theme-swatch theme-swatch--text"></div>
+        <div class="theme-swatch theme-swatch--accent-1"></div>
+        <div class="theme-swatch theme-swatch--accent-2"></div>
+        <div class="theme-swatch theme-swatch--accent-3"></div>
+        <div class="theme-swatch theme-swatch--accent-4"></div>
+        <div class="theme-swatch theme-swatch--accent-5"></div>
+        <div class="theme-swatch theme-swatch--accent-6"></div>
+      </div>
+      <div class="theme-preview">
+        <p class="theme-preview-line">The quick brown fox jumps over the lazy dog</p>
+        <p class="theme-preview-line theme-preview-line--soft">Soft / muted secondary line below the headline</p>
+        <div class="theme-preview-pills">
+          {% for n in range(1, 7) %}
+          <span class="theme-preview-pill theme-preview-pill--a{{ n }}">A{{ n }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      <p class="theme-preview-hint">
+        Preview tracks the form state — click <em>Save theme</em> to commit it.
+      </p>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+// Builder wiring — three jobs, all client-side so users keep their
+// scroll position and half-typed values across changes:
+//
+// 1. Live preview tracks form input changes (overrides CSS variables
+//    inline on the preview pane).
+// 2. Image upload posts to /themes/extract-palette and paints the
+//    response into every matching form input. Triggers the preview
+//    via the same event handlers (no special path).
+// 3. Disable everything on read-only (bundled) builders so a typo'd
+//    edit can't reach the submit button.
+(function () {
+  const form = document.querySelector(".theme-builder");
+  const pane = document.querySelector("[data-theme-preview-pane]");
+  if (!form || !pane) return;
+  const nameEl = pane.querySelector("[data-preview-name]");
+  const readOnly = form.hasAttribute("data-builder-readonly");
+
+  function cssVar(fieldName) {
+    if (fieldName === "font_family") return "--font-family";
+    if (["name", "mode"].includes(fieldName)) return null;
+    return "--" + fieldName.replaceAll("_", "-");
+  }
+  function paint(input) {
+    const variable = cssVar(input.name);
+    if (variable === null) {
+      if (input.name === "name" && nameEl) {
+        nameEl.textContent = input.value.trim() || "New theme";
+      }
+      return;
+    }
+    if (input.value) pane.style.setProperty(variable, input.value);
+    else pane.style.removeProperty(variable);
+  }
+  // Seed the inline overrides from the form's initial state.
+  form.querySelectorAll("input[name], select[name]").forEach(paint);
+  form.addEventListener("input", (ev) => {
+    if (ev.target.matches("input[name], select[name]")) paint(ev.target);
+  });
+
+  if (readOnly) {
+    form.querySelectorAll("input, select, textarea, button[type=submit]")
+      .forEach((el) => el.setAttribute("disabled", "disabled"));
+  }
+
+  // ---- Image extract -------------------------------------------------
+  const extractBlock = document.querySelector("[data-theme-extract]");
+  if (!extractBlock) return;
+  const fileInput = extractBlock.querySelector("[data-extract-input]");
+  const fileLabel = extractBlock.querySelector("[data-extract-file-label]");
+  const goBtn = extractBlock.querySelector("[data-extract-go]");
+  const statusEl = extractBlock.querySelector("[data-extract-status]");
+
+  function setStatus(message, kind) {
+    if (!statusEl) return;
+    statusEl.hidden = !message;
+    statusEl.textContent = message || "";
+    statusEl.dataset.kind = kind || "";
+  }
+
+  fileInput.addEventListener("change", () => {
+    fileLabel.textContent = fileInput.files[0]?.name || "Choose image…";
+    setStatus("", "");
+  });
+
+  goBtn.addEventListener("click", async () => {
+    if (!fileInput.files[0]) {
+      setStatus("Pick an image first.", "error");
+      return;
+    }
+    setStatus("Extracting…", "info");
+    goBtn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append("image", fileInput.files[0]);
+      // Pass the current mode selection so the extractor's heuristic
+      // can override its own light/dark detection on demand.
+      const modeSel = form.querySelector("select[name='mode']");
+      if (modeSel) fd.append("mode", modeSel.value);
+      const resp = await fetch({{ url_for('themes.extract_palette')|tojson }}, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        setStatus(data.error || "Extract failed.", "error");
+        return;
+      }
+      // Paint every token field. The form's existing input listeners
+      // pick up the dispatched events and update the preview.
+      for (const [key, value] of Object.entries(data.tokens || {})) {
+        const input = form.querySelector(`input[name='${key}']`);
+        if (!input) continue;
+        input.value = value;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      if (data.mode && modeSel) {
+        modeSel.value = data.mode;
+        modeSel.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+      setStatus("Applied. Edit any colour to tweak, then Save.", "ok");
+    } catch (err) {
+      setStatus("Couldn't reach the server. " + err, "error");
+    } finally {
+      goBtn.disabled = false;
+    }
+  });
+})();
+</script>
 {% endblock %}
