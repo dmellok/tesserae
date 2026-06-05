@@ -182,7 +182,7 @@ def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Pan
     return resolve_settings_panel(settings)
 
 
-def _device_panel(device: Device) -> Panel | None:
+def device_panel(device: Device) -> Panel | None:
     """Panel for a single device, or None if it declares no panel block.
 
     Picks up firmware-native dims from the device manifest when
@@ -238,7 +238,7 @@ def _selected_device_panels(
         device = devices.devices.get(did)
         if device is None:
             continue
-        panel = _device_panel(device)
+        panel = device_panel(device)
         if panel is not None:
             out.append((device, panel))
     return out

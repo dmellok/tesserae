@@ -43,7 +43,7 @@ from typing import Any, Literal
 
 from app.device_loader import DeviceRegistry
 from app.panel import (
-    is_flipped_orientation,
+    device_panel,
     panel_groups_for_push,
     resolve_settings_panel,
 )
@@ -763,20 +763,38 @@ class PushManager:
         display matches its panel). Otherwise fall back to the virtual
         panel (``resolve_settings_panel``) so the preset / custom dims /
         portrait orientation are honoured identically to every other
-        code path."""
+        code path.
+
+        Crucially: copy ``native_w / native_h`` through. Skipping them
+        sends the renderer (e.g. esp32_bin) back to the pre-v0.19.19
+        "pack at panel (w, h)" path, which paints ghosts on any panel
+        whose composition orientation doesn't match the firmware's
+        hardware stride (the PhotoPainter calibration symptom)."""
         if device_id and self._devices is not None:
             device = self._devices.devices.get(device_id)
             if device is not None and device.panel is not None:
-                block = device.panel
-                return {
-                    "w": int(block["w"]),
-                    "h": int(block["h"]),
-                    "flip": is_flipped_orientation(block.get("orientation")),
-                    "gamut": str(block.get("gamut") or "waveshare_e6"),
-                    "underscan": max(0, int(block.get("underscan") or 0)),
-                }
+                # device_panel handles the preset / manifest matching
+                # that lifts the firmware-native stride into Panel —
+                # reuse it instead of rebuilding the dict by hand.
+                resolved = device_panel(device)
+                if resolved is not None:
+                    out: dict[str, Any] = {
+                        "w": resolved.w,
+                        "h": resolved.h,
+                        "flip": resolved.flip,
+                        "gamut": resolved.gamut,
+                        "underscan": resolved.underscan,
+                    }
+                    if resolved.native_w is not None and resolved.native_h is not None:
+                        out["native_w"] = resolved.native_w
+                        out["native_h"] = resolved.native_h
+                    return out
         panel = resolve_settings_panel(self._settings)
-        return {"w": panel.w, "h": panel.h}
+        out2: dict[str, Any] = {"w": panel.w, "h": panel.h}
+        if panel.native_w is not None and panel.native_h is not None:
+            out2["native_w"] = panel.native_w
+            out2["native_h"] = panel.native_h
+        return out2
 
     def _fetch_remote_image(self, url: str) -> bytes:
         """Download an image URL with bounded size + timeout."""
