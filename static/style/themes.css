@@ -268,22 +268,14 @@
 .theme-builder-group-head:first-child {
   margin-top: 0;
 }
-.theme-builder-group-head-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--t-space-3);
-  flex-wrap: wrap;
-  margin: var(--t-space-3) 0 var(--t-space-1);
+/* Auto-soft row sits between the Accents heading and the first
+   accent pair, so the switch reads as "this controls the column
+   below me". Flatten the macro's default field margin so the row
+   keeps a tight vertical rhythm with the headings on either side. */
+.theme-builder-auto-soft-row {
+  margin: 0 0 var(--t-space-2);
 }
-.theme-builder-group-head-row .theme-builder-group-head {
-  margin: 0;
-}
-/* The auto-soft switch sits inline with the Accents sub-heading.
-   The macro renders it inside a ``.field--switch`` block whose
-   default margin would push the heading row taller — flatten it
-   here so the row reads as one tight line. */
-.theme-builder-group-head-row .field--switch {
+.theme-builder-auto-soft-row .field--switch {
   margin: 0;
 }
 

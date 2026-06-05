@@ -162,12 +162,16 @@
           {{ color_input('tok-on-accent', 'on_accent', 'On accent', value=theme.on_accent) }}
         </div>
 
-        <div class="theme-builder-group-head-row">
-          <p class="theme-builder-group-head">Accents</p>
+        <p class="theme-builder-group-head">Accents</p>
+
+        {# Switch sits directly above the accent pairs so the user
+           reads "if I turn this on, the soft column below is
+           computed" without scanning a separate header row. #}
+        <div class="theme-builder-auto-soft-row">
           {{ switch('auto-soft-tints', 'auto_soft_tints',
-                    'Auto-derive soft tints',
+                    'Auto-derive soft tints from accent + background',
                     checked=theme.auto_soft_tints,
-                    help='Soft tints become a mix of each accent with the page background. Edit an accent or the background and the matching soft updates instantly.') }}
+                    help='Each soft tint becomes a mix of its accent with the page background. Edit an accent or the background and the matching soft updates instantly.') }}
         </div>
 
         {% for n in range(1, 7) %}
