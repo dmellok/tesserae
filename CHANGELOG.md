@@ -8,6 +8,165 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 — in flight on `main` —
 
+## [0.29.0] — 2026-06-05
+
+Theme system rebuilt end-to-end, calibrated dither path landed,
+admin password management filled in, plus a long tail of editor /
+device-pipeline polish. Eighty-eight commits aggregated since
+v0.16.26; the intermediate tags v0.16.27 through v0.28.2 carry the
+incremental history.
+
+### Themes — the headline rebuild
+
+- **Spectra design system** — orthogonal `data-theme` × `data-style`
+  axes, set on `<body>` and overridable per cell. Theme controls
+  colour only; style controls typography / spacing / shape, never
+  colour. Any of the 19 bundled themes composes with any of the 9
+  bundled styles.
+- **19 bundled themes** across four families: Light
+  (light / sepia / cool-gray / high-contrast), Dark (dark / nord),
+  Movement (bauhaus / destijl / brutalist palettes), and base16 (10
+  popular code-editor palettes: Gruvbox, Solarized, Dracula,
+  Catppuccin Mocha, Monokai, Tomorrow, One Dark).
+- **Themes page** at top-nav → Themes — a vertical strip of every
+  theme on the left, the builder pane in the middle, and a sticky
+  preview on the right. Click any theme to load it; bundled themes
+  show a "Duplicate to edit" CTA, user themes are editable +
+  deletable.
+- **Theme builder**: 20 colour tokens (3 surfaces + 4 text + 1 edge
+  + 6 accents × 2 (base + soft) + 1 on-accent), plus mode
+  (light/dark) and an optional font-family. Live preview tracks
+  every input via inline CSS-variable overrides on the preview pane.
+- **Image-to-theme** — upload a photo or poster, k-means picks
+  dominant colours, the assignment heuristic spreads them across the
+  Spectra tokens (light/dark mode auto-detected from the modal
+  cluster's luminance). One click fills the form. Calibration data
+  ported from
+  [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)
+  (Apache 2.0).
+- **Auto-derive soft tints switch** — when on, every
+  `accent_N_soft` becomes a mix of its accent with the page
+  background, recomputed live as either edits. Persists on the
+  user theme.
+- **User-saved themes** at `data/themes/user.json` (no longer under
+  `data/plugins/themes_core/`, since the themes_core plugin is gone).
+  Served as a single `[data-theme="user-<slug>"]` stylesheet from
+  `/themes/user.css`; loaded alongside the bundled Spectra cascade
+  on every composed page.
+- **Bundled-colour parsing** — the builder lifts each bundled
+  theme's actual `bg / surface / accent-*` values straight from the
+  Spectra CSS at import time, so duplicating Nord (or any other
+  bundled theme) produces a copy carrying that theme's real colours
+  instead of the Light defaults.
+
+### Quantizer / colour pipeline
+
+- **Opt-in calibrated palette + tone mapping** — per-device toggle on
+  the `esp32_bin` and `pi_bin` renderers. Dithers Floyd-Steinberg
+  against the panel's measured Spectra 6 / ACeP colours instead of
+  nominal sRGB primaries, and runs a linear tone-map pre-pass that
+  squeezes the source range into the calibrated black/white band so
+  the dither has room to spread error. Calibration data ported from
+  paperlesspaper/epdoptimize.
+- **Eight dither modes** for the `.bin` packers: Floyd-Steinberg,
+  none, Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer-8x8, halftone,
+  crosshatch.
+- **Firmware-native panel orientation** auto-detected from the
+  panel preset (`PanelPreset.native_landscape`); the renderer packs
+  at the firmware's actual row stride regardless of how the user
+  mounts the panel.
+- **Pre-v0.20 ESP32 manifest backfill** — startup migration adds
+  `native_w` / `native_h` to existing `esp32_client` instance
+  manifests so legacy installs don't paint at the wrong stride.
+
+### Authentication & admin ops
+
+- **Change / disable / re-enable password** from Settings → System
+  → Authentication. When disabled, the gate still 403s public IPs
+  and only lets LAN traffic through.
+- **`tesserae --reset-password`** CLI escape hatch for when the
+  password is lost.
+- **Firmware splash PNGs** at nine common sizes
+  (64 / 96 / 128 / 192 / 256 / 384 / 512 / 768 / 1024) under
+  `static/brand/firmware/` for client builders.
+- **Dev dropdown** in the top-nav (under `--dev`) grouping the
+  Widget gallery + Theme × style matrix.
+
+### Editor / UI polish
+
+- **Reactive editor**: floating back-to-top FAB on the small-viewport
+  layout. Drag along the bottom edge to flip the FAB to the other
+  side; the side preference persists in localStorage.
+- **Composer remounts cells** whenever theme / style / font flips so
+  the new cascade actually paints instead of inheriting stale
+  variables.
+- **Multiselect search box actually filters now** (composer regression).
+- **Single-card palette** in the theme builder — surfaces, text, and
+  the six accent pairs collapsed into one card with sub-group
+  headings.
+- **F1 widget pass**: track outline moved + bolder stroke, backing
+  card behind the track, team-colour stripe on standings rows, more
+  Phosphor icons across the family.
+- **Weather suite visual punch**: shaded line chart in `weather_hourly`
+  (12h default), hero icon scaling in `weather_now`, AQI scale in
+  `weather_air_quality`, compass rose in `weather_wind`, tile cards
+  in `weather_pollen_count`.
+
+### Bug fixes
+
+- `Device.panel` now propagates `native_w` / `native_h` through to
+  the renderer (regression fixed the office Waveshare 13.3"
+  appearing distorted).
+- `push.py`'s `_panel_dims_for_send` builds the dict via
+  `device_panel(device)` instead of hand-rolling, so native dims
+  ride through.
+- esp32_bin renderer packs at firmware-native dims, not the
+  calibration choice.
+- `ha_camera` unwraps `items[0]` from the server-side wrapper;
+  full-bleed mode added.
+- `weather_now` hero icon resizes via `cqmin` + container query so
+  it doesn't clip text at high zoom levels.
+- `sky_moon` row layout at medium widths + hard-coded moon colours
+  so dark themes don't desaturate the disc.
+- Chart self-referencing `--font-family` variable broke cell inline
+  styles; fixed.
+
+### Docs
+
+- README + wiki refreshed against current state (widget count,
+  theme tally, palette token count, removed-feature scrub).
+- `dev/writing-a-plugin.md` refreshed for Spectra — drops the dead
+  `--c-*` / `--theme-*` / variant-cell-option doctrine; replaces
+  with the semantic-token list, the `data-style` axis, and the
+  seven body archetypes.
+- New `NOTICES.md` crediting paperlesspaper/epdoptimize for the
+  calibration palette data (Apache 2.0).
+
+### Quality
+
+- **779 tests** passing (pytest), up from ~600.
+- `mypy --strict` module list extended to include `themes_routes`.
+- New guard test ensures the Spectra CSS `[data-theme="..."]` blocks
+  and the Python theme registry never drift.
+
+### Removed (since v0.16.26)
+
+- Pre-v0.16.27 widget `--c-bg` / `--c-fg` / `--c-accent` /
+  `--c-data-*` / `--c-ok/warn/danger` token cascade.
+  The Spectra rebuild paints widgets from `--bg`, `--surface`,
+  `--text-primary`, `--accent-1..6`, etc. directly. `--c-zoom`
+  survived as the cell-content-zoom variable.
+- `variant` cell option from widget manifests. The orthogonal
+  `data-theme` × `data-style` axes mean one widget composes with
+  every (theme, style) pair instead of shipping N visual directions.
+- `plugins/themes_core/` plugin — themes now live in
+  `static/style/spectra-*.css` + a Python registry, not the plugin
+  tree.
+- `scripts/capture_widget_variants.py` — the per-widget variant
+  composite generator. `scripts/capture_widget_shots.py` still
+  refreshes the gallery hero shot; cross-theme / cross-style
+  comparison lives at `/_test/matrix`.
+
 ## [0.16.10] — 2026-06-04
 
 ### Fixed
