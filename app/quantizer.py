@@ -42,7 +42,9 @@ DitherMode = Literal[
 
 # Spectra 6 7-colour palette. Nominal sRGB approximations of the panel's
 # ink primaries — the panel firmware does the actual gamut projection.
-# Used by Pi-side PNG listeners that quantise their own buffer.
+# Used by Pi-side PNG listeners that quantise their own buffer (the
+# inky library projects back to its own palette anyway, so calibrated
+# targets here would just feed two rounds of misprojection).
 SPECTRA_6_PALETTE: tuple[tuple[int, int, int], ...] = (
     (0, 0, 0),  # black
     (255, 255, 255),  # white
@@ -54,6 +56,25 @@ SPECTRA_6_PALETTE: tuple[tuple[int, int, int], ...] = (
 )
 
 
+# The .bin-path palettes below carry the **calibrated** display colours
+# — what the panel actually reproduces under normal viewing light, not
+# the nominal sRGB primaries. Dithering against the calibrated targets
+# (a dusty red instead of pure red, etc.) lets Floyd-Steinberg / Bayer
+# spread the gap into neighbouring pixels, so the *perceived* colour on
+# the panel is much closer to the source than what a nominal-palette
+# quantize produces.
+#
+# Each palette index still maps to the same device nibble via the
+# matching LUT — the firmware sees identical bytes on the wire, only
+# the quantizer's notion of "closest colour" changes.
+#
+# Calibration data ported from paperlesspaper/epdoptimize
+# (https://github.com/paperlesspaper/epdoptimize, Apache 2.0),
+# specifically the ``spectra6`` and ``acep`` profiles from
+# ``src/dither/data/default-palettes.json``. See NOTICES.md for full
+# attribution.
+
+
 # Waveshare E6 6-colour palette — the .bin packers target this. No orange:
 # the firmware reserves nibble 0x4 (we map blue to 0x5, green to 0x6 via
 # the LUT below) so the gamut is one colour smaller than Spectra 6.
@@ -61,12 +82,12 @@ SPECTRA_6_PALETTE: tuple[tuple[int, int, int], ...] = (
 # Palette order matters: Pillow's quantize emits indices 0…N-1 in the
 # order we declare. The LUT translates those to firmware nibbles.
 WAVESHARE_E6_PALETTE: tuple[tuple[int, int, int], ...] = (
-    (0, 0, 0),  # 0 -> 0x0 black
-    (255, 255, 255),  # 1 -> 0x1 white
-    (255, 255, 0),  # 2 -> 0x2 yellow
-    (255, 0, 0),  # 3 -> 0x3 red
-    (0, 0, 255),  # 4 -> 0x5 blue (firmware reserves 0x4)
-    (0, 255, 0),  # 5 -> 0x6 green (firmware reserves 0x7)
+    (0x1F, 0x22, 0x26),  # 0 -> 0x0 black   (calibrated, panel dark grey)
+    (0xB9, 0xC7, 0xC9),  # 1 -> 0x1 white   (calibrated, panel paper)
+    (0xC1, 0xBB, 0x1E),  # 2 -> 0x2 yellow  (calibrated, mustard)
+    (0x62, 0x20, 0x1E),  # 3 -> 0x3 red     (calibrated, dusty red)
+    (0x23, 0x3F, 0x8E),  # 4 -> 0x5 blue    (calibrated, navy)
+    (0x35, 0x56, 0x3A),  # 5 -> 0x6 green   (calibrated, forest)
 )
 
 _E6_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3, 0x5, 0x6)
@@ -78,13 +99,13 @@ _E6_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3, 0x5, 0x6)
 # Pi client can write it straight into the UC8159 buffer. Declaring the
 # palette in that index order makes the LUT an identity map (0…6).
 INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
-    (0, 0, 0),  # 0 black
-    (255, 255, 255),  # 1 white
-    (0, 255, 0),  # 2 green
-    (0, 0, 255),  # 3 blue
-    (255, 0, 0),  # 4 red
-    (255, 255, 0),  # 5 yellow
-    (255, 140, 0),  # 6 orange
+    (0x19, 0x1E, 0x21),  # 0 black   (calibrated)
+    (0xF1, 0xF1, 0xF1),  # 1 white   (calibrated paper)
+    (0x53, 0xA4, 0x28),  # 2 green   (calibrated)
+    (0x31, 0x31, 0x8F),  # 3 blue    (calibrated)
+    (0xD2, 0x0E, 0x13),  # 4 red     (calibrated, brighter than E6 red)
+    (0xF3, 0xCF, 0x11),  # 5 yellow  (calibrated)
+    (0xB8, 0x5E, 0x1C),  # 6 orange  (calibrated, brick)
 )
 
 _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)

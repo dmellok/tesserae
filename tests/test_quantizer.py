@@ -21,7 +21,13 @@ from app.quantizer import (
 
 @pytest.fixture
 def red_panel() -> Image.Image:
-    return Image.new("RGB", (100, 80), (255, 0, 0))
+    """A panel-sized image filled with the E6 palette's red entry. Using
+    the palette entry directly (instead of a hardcoded ``(255, 0, 0)``)
+    keeps the "this colour maps to nibble 0x3" assertions stable across
+    calibrated-vs-nominal palette swaps. The byte-level invariants the
+    firmware contract relies on are about palette-index → nibble, not
+    about absolute sRGB triplets."""
+    return Image.new("RGB", (100, 80), WAVESHARE_E6_PALETTE[3])
 
 
 def _png_bytes(img: Image.Image) -> bytes:
@@ -50,12 +56,13 @@ def test_pack_size_mismatch_rejected(red_panel: Image.Image) -> None:
 
 
 def test_pack_red_panel_maps_to_palette_red_nibble(red_panel: Image.Image) -> None:
-    # Pure red is the 4th entry of WAVESHARE_E6_PALETTE -> firmware nibble 0x3.
+    """The 4th E6 palette entry (red) packs to firmware nibble 0x3 — the
+    invariant the firmware contract depends on. The red_panel fixture is
+    filled with that entry's exact RGB so it round-trips cleanly through
+    quantize regardless of whether the palette is nominal or calibrated."""
     packed = pack_to_panel_bin(red_panel, width=100, height=80, dither="none")
     # Every byte: (red_nibble << 4) | red_nibble = 0x33.
     assert all(b == 0x33 for b in packed)
-    # Sanity check the palette entry we asserted on.
-    assert WAVESHARE_E6_PALETTE[3] == (255, 0, 0)
 
 
 @pytest.mark.parametrize(
@@ -68,24 +75,45 @@ def test_pack_dispatches_every_dither_mode(red_panel: Image.Image, dither: str) 
 
 
 def test_pack_inky_7colour_orange_maps_to_nibble_six() -> None:
-    # Orange exists only in the 7-colour gamut; it's palette index 6 and the
-    # LUT is identity, so a pure-orange panel packs to 0x66 bytes. On the E6
-    # gamut the same orange would snap to a different (6-colour) entry.
-    orange = Image.new("RGB", (100, 80), (255, 140, 0))
+    """Orange exists only in the 7-colour gamut: palette index 6, LUT is
+    identity, so a panel filled with that exact calibrated orange packs
+    to 0x66 bytes. (Pure sRGB orange would dither across orange + yellow
+    on the calibrated palette, which is exactly what we want on hardware
+    — but unhelpful for a byte-level invariant test.)"""
+    orange = Image.new("RGB", (100, 80), INKY_7COLOUR_PALETTE[6])
     packed = pack_to_panel_bin(orange, width=100, height=80, dither="none", gamut="inky_7colour")
     assert all(b == 0x66 for b in packed)
-    assert INKY_7COLOUR_PALETTE[6] == (255, 140, 0)
 
 
 def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:
-    # Red is index 3 on E6 (nibble 0x3) but index 4 on the 7-colour gamut
-    # (identity LUT -> nibble 0x4): the index spaces genuinely differ.
-    red = Image.new("RGB", (100, 80), (255, 0, 0))
-    e6 = pack_to_panel_bin(red, width=100, height=80, dither="none")
-    inky = pack_to_panel_bin(red, width=100, height=80, dither="none", gamut="inky_7colour")
+    """Red is index 3 on E6 (nibble 0x3) but index 4 on the 7-colour gamut
+    (identity LUT → nibble 0x4): the index spaces genuinely differ.
+    Each test panel is filled with that gamut's calibrated red so the
+    "this palette entry maps to this nibble" invariant lands cleanly."""
+    e6_red = Image.new("RGB", (100, 80), WAVESHARE_E6_PALETTE[3])
+    inky_red = Image.new("RGB", (100, 80), INKY_7COLOUR_PALETTE[4])
+    e6 = pack_to_panel_bin(e6_red, width=100, height=80, dither="none")
+    inky = pack_to_panel_bin(inky_red, width=100, height=80, dither="none", gamut="inky_7colour")
     assert all(b == 0x33 for b in e6)
     assert all(b == 0x44 for b in inky)
-    assert INKY_7COLOUR_PALETTE[4] == (255, 0, 0)
+
+
+def test_calibrated_palette_is_dustier_than_nominal() -> None:
+    """Sanity check the calibration swap: each E6 palette entry is the
+    panel's measured colour, not pure sRGB. We don't pin the exact RGB
+    values (those are tuning knobs) but we do pin the *qualitative*
+    claim that motivates the swap — red is dimmer, yellow is olive,
+    blue is navy. Catches an accidental revert to nominal pure
+    primaries."""
+    _, _, yellow, red, blue, _green = (WAVESHARE_E6_PALETTE[i] for i in range(6))
+    assert red != (255, 0, 0), "E6 red should be calibrated dusty red, not pure sRGB"
+    assert yellow != (255, 255, 0), "E6 yellow should be calibrated mustard, not pure sRGB"
+    assert blue != (0, 0, 255), "E6 blue should be calibrated navy, not pure sRGB"
+    # The red component of "red" should still dominate green/blue (it's
+    # still a red, just dimmer).
+    assert red[0] > red[1] and red[0] > red[2]
+    # Blue component of "blue" should still dominate.
+    assert blue[2] > blue[0] and blue[2] > blue[1]
 
 
 def test_pack_unknown_gamut_falls_back_to_e6(red_panel: Image.Image) -> None:
