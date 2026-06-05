@@ -29,34 +29,6 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 > still assumes you can read tracebacks if something goes wrong. Aimed at
 > people running a Pi appliance at home.
 
-## Community
-
-- **[Discussions](https://github.com/dmellok/tesserae/discussions)** — show your dashboard, pitch a widget, ask "how do I…", or feed back on what's coming next.
-- **[Contributing](.github/CONTRIBUTING.md)** — dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
-- **[Security policy](.github/SECURITY.md)** — how to report a vulnerability privately.
-- **[Code of conduct](.github/CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
-
-<details>
-<summary><b>More dashboards</b> — example frames rendered by Tesserae (click to expand)</summary>
-
-<sub>Each dashboard renders to a panel-sized frame and publishes only to the display(s) it's bound to.</sub>
-
-<table>
-  <tr>
-    <td align="center"><a href="docs/screenshots/dash-music.png"><img src="docs/screenshots/dash-music.png" height="220" alt="Morning — weather, music, Reddit, forecast"></a><br><sub>Morning</sub></td>
-    <td align="center"><a href="docs/screenshots/dash-f1.png"><img src="docs/screenshots/dash-f1.png" height="220" alt="F1 — driver standings + next race"></a><br><sub>F1</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="docs/screenshots/dash-github.png"><img src="docs/screenshots/dash-github.png" height="220" alt="GitHub — activity, CI runs, contributions heatmap"></a><br><sub>GitHub</sub></td>
-    <td align="center"><a href="docs/screenshots/dash-calendar.png"><img src="docs/screenshots/dash-calendar.png" height="220" alt="Calendar — day, week, month"></a><br><sub>Calendar</sub></td>
-  </tr>
-  <tr>
-    <td align="center" colspan="2"><a href="docs/screenshots/dash-todo.png"><img src="docs/screenshots/dash-todo.png" height="220" alt="Todo + word clock"></a><br><sub>Todo + word clock</sub></td>
-  </tr>
-</table>
-
-</details>
-
 ## Status
 
 A working hobbyist build. Composer → renderers → transport → devices
@@ -334,6 +306,11 @@ testers on panels other than the Inky 13.3" and the Waveshare 13.3"
 ESP32 panel are especially welcome — the matrix is small and we
 mark verified panels in
 [Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/#whats-been-tested-on-real-hardware).
+
+- **[Discussions](https://github.com/dmellok/tesserae/discussions)** — show your dashboard, pitch a widget, ask "how do I…", or feed back on what's coming next.
+- **[Contributing guide](.github/CONTRIBUTING.md)** — dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
+- **[Security policy](.github/SECURITY.md)** — how to report a vulnerability privately.
+- **[Code of conduct](.github/CODE_OF_CONDUCT.md)** — be kind, assume good faith, don't be a jerk.
 
 ## Built with
 
