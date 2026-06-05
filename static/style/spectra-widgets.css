@@ -282,9 +282,20 @@
      cqmin. That's how a 5-column forecast strip gets larger icons in
      a wide cell. */
   container-type: size;
-  font-size: clamp(14px, 12cqmin, 32px);
+  font-size: clamp(11px, 10cqmin, 26px);
+  /* Belt-and-braces: even when the stack of label + icon + value
+     would technically overflow the cell (e.g. at zoom > 1 where the
+     virtual viewport shrinks faster than the clamp floor), clip the
+     overflow so we don't bleed labels above and values below the
+     adjacent cells. */
+  overflow: hidden;
 }
-.wx-cell .ph-bold{ font-size: var(--icon-lg); color: var(--icon); }
+/* Icon uses --icon-md (1.5em) instead of --icon-lg (2.2em). The old
+   2.2em was pushing the stack past the cell at zoom > 1 because the
+   per-cell font-size hit its 14px floor while the icon held its em
+   multiple — meaning the icon scaled but the label/value didn't. The
+   smaller multiplier keeps the stack inside the cell at any zoom. */
+.wx-cell .ph-bold{ font-size: var(--icon-md); color: var(--icon); }
 .wx-cell .d{
   font-size: var(--fs-caption);
   font-weight: var(--fw-bold);

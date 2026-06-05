@@ -32,6 +32,13 @@
       "type": "string",
       "label": "Label",
       "default": "Camera"
+    },
+    {
+      "name": "full_bleed",
+      "type": "boolean",
+      "label": "Full-bleed frame",
+      "default": false,
+      "help": "Drop the title bar + padding and let the camera image fill the entire cell edge-to-edge. The camera name + state overlay sits at the bottom on a faint gradient so it stays legible."
     }
   ],
   "render": {

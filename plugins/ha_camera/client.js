@@ -20,6 +20,8 @@ function stateAccent(s) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
+  const opts = ctx?.cell?.options || {};
+  const fullBleed = opts.full_bleed === true;
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -47,14 +49,43 @@ export default function render(shadow, ctx) {
 
   const accent = stateAccent(state);
 
-  const heroBody = url
-    ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`
-    : `<i class="ph-bold ph-video-camera-slash"></i>`;
-
   const stateBits = [];
   if (state) stateBits.push(state);
   if (motion) stateBits.push("motion");
   const sub = stateBits.length ? stateBits.join(" · ") : "no signal";
+
+  // Full-bleed mode reuses the same .w.is-bleed shell the picture
+  // widgets use: the .w drops its border + padding, the image fills
+  // the cell edge-to-edge, and an overlay strip at the bottom carries
+  // the camera name + state on a faint gradient so the data stays
+  // legible against any frame.
+  if (fullBleed) {
+    if (url) {
+      shadow.innerHTML = `
+        ${css}
+        <div class="w is-bleed" data-widget="ha_camera">
+          <img src="${escapeHtml(url)}" alt="${escapeHtml(name)}">
+          <div class="img-overlay">
+            <span class="title">${escapeHtml(name)}</span>
+            <span class="sub" style="color:${accent === "var(--text-secondary)" ? "rgba(255,255,255,0.85)" : accent}">${escapeHtml(sub)}${motion ? " · MOTION" : ""}</span>
+          </div>
+        </div>`;
+    } else {
+      shadow.innerHTML = `
+        ${css}
+        <div class="w is-bleed" data-widget="ha_camera">
+          <div class="bleed-empty">
+            <i class="ph-bold ph-video-camera-slash" style="font-size:2em;margin-bottom:0.3em"></i>
+            ${escapeHtml(name)}
+          </div>
+        </div>`;
+    }
+    return;
+  }
+
+  const heroBody = url
+    ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(name)}">`
+    : `<i class="ph-bold ph-video-camera-slash"></i>`;
 
   shadow.innerHTML = `
     ${css}

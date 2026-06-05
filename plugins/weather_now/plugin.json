@@ -47,13 +47,6 @@
           "label": "Imperial (°F, mph)"
         }
       ]
-    },
-    {
-      "name": "sky_background",
-      "type": "boolean",
-      "label": "Sky background (experimental)",
-      "default": false,
-      "help": "Paint a flat-style sky illustration behind the data, tinted by the current condition (clear/cloudy/rain/storm/night). Experimental — turn off if it clashes with your dashboard."
     }
   ],
   "render": {
