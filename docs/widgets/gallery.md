@@ -37,7 +37,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![weather_hourly](../screenshots/widgets/weather_hourly.png)
 
-    Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.
+    Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 

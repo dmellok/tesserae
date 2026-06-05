@@ -147,32 +147,27 @@ def _ha_battery() -> dict[str, Any]:
     }
 
 
+_CAMERA_SAMPLE_DATA_URL = (
+    "data:image/svg+xml;utf8,"
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 180'>"
+    "<rect width='320' height='180' fill='%231f2933'/>"
+    "<rect x='30' y='110' width='90' height='40' fill='%23556070'/>"
+    "<polygon points='30,110 75,80 120,110' fill='%23394353'/>"
+    "<rect x='160' y='90' width='130' height='60' fill='%23485061'/>"
+    "<polygon points='160,90 225,55 290,90' fill='%23394353'/>"
+    "<circle cx='250' cy='40' r='12' fill='%23e8c98a'/>"
+    "<text x='10' y='20' font-family='monospace' font-size='10' fill='%23e8c98a'>FRONT DOOR · LIVE</text>"
+    "</svg>"
+)
+
+
 def _ha_camera() -> dict[str, Any]:
-    # No real image URL — let the widget render its placeholder state
-    # so the layout is still visible. Variants that fall back on a
-    # name + state pill will look the same as production.
     return {
-        "label": "Cameras",
-        "items": [
-            {
-                "entity_id": "camera.front_door",
-                "name": "Front Door",
-                "image_url": "",
-                "last_updated": "2026-06-03T14:30:12+00:00",
-                "last_changed": "2026-06-03T14:30:12+00:00",
-                "state": "recording",
-                "motion": True,
-            },
-            {
-                "entity_id": "camera.back_yard",
-                "name": "Back Yard",
-                "image_url": "",
-                "last_updated": "2026-06-03T14:28:04+00:00",
-                "last_changed": "2026-06-03T14:28:04+00:00",
-                "state": "idle",
-                "motion": False,
-            },
-        ],
+        "name": "Front Door",
+        "image_url": _CAMERA_SAMPLE_DATA_URL,
+        "last_updated": "2026-06-03T14:30:12+00:00",
+        "state": "recording",
+        "motion": True,
     }
 
 
@@ -562,7 +557,203 @@ def _sky_moon() -> dict[str, Any]:
     }
 
 
+def _todo() -> dict[str, Any]:
+    return {
+        "list_name": "Today",
+        "items": [
+            {"text": "Walk the dog", "completed_at": "2026-06-05T07:42:00"},
+            {"text": "Review the v0.20 plan", "completed_at": None},
+            {"text": "Order new MicroSD for the dev panel", "completed_at": None},
+            {"text": "Reply to home insurance email", "completed_at": None},
+            {"text": "Pick up dry-cleaning", "completed_at": "2026-06-05T11:18:00"},
+        ],
+    }
+
+
+def _github_pr_queue() -> dict[str, Any]:
+    return {
+        "yours": [
+            {
+                "title": "Spectra: orthogonal data-style axis",
+                "repo": "dmellok/tesserae",
+                "number": 187,
+                "draft": False,
+            },
+            {
+                "title": "Charts read theme tokens via probe",
+                "repo": "dmellok/tesserae",
+                "number": 192,
+                "draft": False,
+            },
+            {
+                "title": "Vendor Bodoni Moda / Archivo Narrow / Jost",
+                "repo": "dmellok/tesserae",
+                "number": 194,
+                "draft": True,
+            },
+        ],
+        "review": [
+            {
+                "title": "Pin renderer screenshot timeout to 15s",
+                "repo": "dmellok/tesserae",
+                "number": 188,
+                "draft": False,
+            },
+            {
+                "title": "MQTT: reconnect backoff with jitter",
+                "repo": "dmellok/tesserae",
+                "number": 191,
+                "draft": False,
+            },
+        ],
+    }
+
+
+def _github_releases() -> dict[str, Any]:
+    return {
+        "label": "tesserae",
+        "releases": [
+            {
+                "tag": "v0.19.15",
+                "name": "v0.19.15 · F1 track polish",
+                "published_at": "2026-06-05T15:20:00Z",
+                "prerelease": False,
+                "draft": False,
+            },
+            {
+                "tag": "v0.19.12",
+                "name": "v0.19.12 · Moon shadow + clock_world icons",
+                "published_at": "2026-06-04T18:02:00Z",
+                "prerelease": False,
+                "draft": False,
+            },
+            {
+                "tag": "v0.19.6",
+                "name": "v0.19.6 · Theme-change cell remount",
+                "published_at": "2026-06-03T11:11:00Z",
+                "prerelease": False,
+                "draft": False,
+            },
+            {
+                "tag": "v0.19.0",
+                "name": "v0.19.0 · Spectra orthogonal axes",
+                "published_at": "2026-06-01T09:48:00Z",
+                "prerelease": False,
+                "draft": False,
+            },
+            {
+                "tag": "v0.20.0-rc.1",
+                "name": "v0.20.0 release candidate",
+                "published_at": "2026-06-05T17:00:00Z",
+                "prerelease": True,
+                "draft": False,
+            },
+        ],
+    }
+
+
+def _github_actions() -> dict[str, Any]:
+    return {
+        "repos": ["dmellok/tesserae"],
+        "runs": [
+            {
+                "repo": "dmellok/tesserae",
+                "name": "CI",
+                "branch": "main",
+                "status": "completed",
+                "conclusion": "success",
+                "updated_at": "2026-06-05T17:42:11Z",
+                "run_number": 612,
+            },
+            {
+                "repo": "dmellok/tesserae",
+                "name": "CI",
+                "branch": "polish-pass",
+                "status": "in_progress",
+                "conclusion": None,
+                "updated_at": "2026-06-05T17:51:02Z",
+                "run_number": 613,
+            },
+            {
+                "repo": "dmellok/tesserae",
+                "name": "Docs",
+                "branch": "main",
+                "status": "completed",
+                "conclusion": "success",
+                "updated_at": "2026-06-05T17:40:50Z",
+                "run_number": 87,
+            },
+            {
+                "repo": "dmellok/tesserae",
+                "name": "CI",
+                "branch": "spectra-rewrite",
+                "status": "completed",
+                "conclusion": "failure",
+                "updated_at": "2026-06-04T22:14:33Z",
+                "run_number": 605,
+            },
+            {
+                "repo": "dmellok/tesserae",
+                "name": "Release",
+                "branch": "main",
+                "status": "completed",
+                "conclusion": "success",
+                "updated_at": "2026-06-05T15:21:48Z",
+                "run_number": 41,
+            },
+        ],
+    }
+
+
+_GALLERY_SAMPLE_DATA_URL = (
+    "data:image/svg+xml;utf8,"
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'>"
+    "<defs><radialGradient id='g' cx='30%25' cy='35%25' r='75%25'>"
+    "<stop offset='0%25' stop-color='%23f4dbb1'/>"
+    "<stop offset='60%25' stop-color='%23c97a4a'/>"
+    "<stop offset='100%25' stop-color='%231e1b2e'/></radialGradient></defs>"
+    "<rect width='600' height='400' fill='url(%23g)'/>"
+    "<polygon points='0,400 240,180 380,260 600,140 600,400' fill='%231e1b2e' opacity='0.85'/>"
+    "<polygon points='0,400 160,290 320,330 480,260 600,310 600,400' fill='%23120f1f'/>"
+    "<circle cx='160' cy='110' r='38' fill='%23f4dbb1' opacity='0.85'/>"
+    "</svg>"
+)
+
+
+def _picture_gallery() -> dict[str, Any]:
+    # Single inline SVG so the widget paints its hero image instead of
+    # the "no images" placeholder. The widget reads from `data.url`
+    # (the public URL of the chosen file) and an optional `filename`
+    # for the overlay caption.
+    return {
+        "url": _GALLERY_SAMPLE_DATA_URL,
+        "filename": "dusk-over-the-range.png",
+    }
+
+
+def _weather_pollen_count() -> dict[str, Any]:
+    # Open-Meteo returns nulls outside Europe; the gallery is shot at
+    # Melbourne which falls outside CAMS coverage, so the upstream
+    # path lands with `breakdown[i].level == None` and the tiles
+    # render em-dashes. This fixture gives all three categories a
+    # plausible mid-spring reading so the visual treatment is
+    # actually exercised.
+    return {
+        "place": "Melbourne",
+        "label": "Melbourne",
+        "level": "Moderate",
+        "breakdown": [
+            {"label": "Tree", "icon": "tree", "level": "Low", "value": 1.2},
+            {"label": "Grass", "icon": "grass", "level": "High", "value": 28.4},
+            {"label": "Weed", "icon": "weed", "level": "Moderate", "value": 9.1},
+        ],
+    }
+
+
 SAMPLES: dict[str, Any] = {
+    "github_actions": _github_actions,
+    "github_pr_queue": _github_pr_queue,
+    "github_releases": _github_releases,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
     "ha_climate": _ha_climate,
@@ -576,10 +767,13 @@ SAMPLES: dict[str, Any] = {
     "ha_todo": _ha_todo,
     "ha_zones": _ha_zones,
     "octoprint_status": _octoprint_status,
+    "picture_gallery": _picture_gallery,
+    "sky_moon": _sky_moon,
     "spotify_now_playing": _spotify_now_playing,
     "spotify_album_art": _spotify_album_art,
     "spotify_queue": _spotify_queue,
-    "sky_moon": _sky_moon,
+    "todo": _todo,
+    "weather_pollen_count": _weather_pollen_count,
 }
 
 

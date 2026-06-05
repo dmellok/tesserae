@@ -146,7 +146,7 @@ def main() -> int:
             w, h = SIZE_DIMS[size]
             page = context.new_page()
             page.set_viewport_size({"width": w, "height": h})
-            url = f"{BASE_URL}/_test/render?plugin={plugin_id}&size={size}"
+            url = f"{BASE_URL}/_test/render?plugin={plugin_id}&size={size}&sample=1"
             try:
                 try:
                     page.goto(url, wait_until="networkidle", timeout=20000)
