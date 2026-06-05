@@ -33,7 +33,10 @@ function formatTime(now, tz, format) {
 }
 
 function dayOffset(now, tz) {
-  // What day-of-month is it in that timezone vs the host?
+  // What day-of-month is it in that timezone vs the host? Returns
+  // "tomorrow" / "yesterday" / "" so the row can mark a calendar
+  // shift with an icon instead of pushing extra text into the time
+  // column.
   try {
     const fmt = new Intl.DateTimeFormat([], { timeZone: tz, day: "numeric" });
     const remote = parseInt(fmt.format(now), 10);
@@ -44,6 +47,23 @@ function dayOffset(now, tz) {
     return "yesterday";
   } catch {
     return "";
+  }
+}
+
+// Return the local hour (0-23) at the given timezone, or -1 on
+// failure. Used to pick a day vs night icon for the leading slot
+// instead of the generic globe every row used to share.
+function localHour(now, tz) {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      hour: "2-digit",
+      hour12: false,
+    });
+    const h = parseInt(fmt.format(now), 10);
+    return Number.isFinite(h) ? h % 24 : -1;
+  } catch {
+    return -1;
   }
 }
 
@@ -68,14 +88,32 @@ export default function render(shadow, ctx) {
   const rows = cities.map((c, i) => {
     const t = formatTime(now, c.tz, format);
     const off = dayOffset(now, c.tz);
-    const offSpan = off ? `<small style="font-size:.6em;color:var(--text-muted);font-weight:var(--fw-semi);margin-left:.3em">${escapeHtml(off)}</small>` : "";
+    const h = localHour(now, c.tz);
+    // Day / night by hour band (06–17 inclusive = day). The icon
+    // replaces the old generic ph-globe lead so the row tells you
+    // at a glance whether it's the middle of the night in Tokyo
+    // without having to read the time.
+    const isDay = h >= 6 && h <= 17;
+    const leadIcon = h < 0 ? "ph-globe" : (isDay ? "ph-sun" : "ph-moon");
+    const leadColor = isDay ? "var(--accent-2)" : "var(--accent-5)";
+    // Day-shift cue. Lives in its own slot to the LEFT of the time
+    // so the time itself stays in a single right-aligned column —
+    // adding "yesterday" inline used to push the time leftward and
+    // break the column alignment across rows. ph-arrow-down for a
+    // calendar day BEHIND the host; ph-arrow-up for AHEAD.
+    let shiftIcon = "";
+    if (off === "yesterday") {
+      shiftIcon = `<i class="ph-bold ph-arrow-down" title="yesterday" style="font-size:.85em;color:var(--text-muted);margin-right:.3em;vertical-align:-.05em"></i>`;
+    } else if (off === "tomorrow") {
+      shiftIcon = `<i class="ph-bold ph-arrow-up" title="tomorrow" style="font-size:.85em;color:var(--text-muted);margin-right:.3em;vertical-align:-.05em"></i>`;
+    }
     return `
       <div class="list-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead">
-          <i class="ph-bold ph-globe" style="color:var(--accent-5)"></i>
+          <i class="ph-bold ${leadIcon}" style="color:${leadColor}"></i>
           <span class="list-title">${escapeHtml(c.label)}</span>
         </div>
-        <span class="list-meta">${escapeHtml(t)}${offSpan}</span>
+        <span class="list-meta" style="font-variant-numeric:tabular-nums">${shiftIcon}${escapeHtml(t)}</span>
       </div>`;
   }).join("");
 

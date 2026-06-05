@@ -139,7 +139,10 @@
 /* ----------------------------------------------------------------------------
    DISPLAY — Space Grotesk, BIG & heavy, poster energy.
    Outsized headline scale, tight tracking, thick edge, accent rule under
-   the title (the "masthead" / poster cue).
+   the title (the "masthead" / poster cue). Lists drop zebra grouping
+   so the loud headline rule reads as the focal point and rows
+   breathe via whitespace; otherwise the alternating tint plus the
+   accent rule above fight each other and the widget reads as chaotic.
 ---------------------------------------------------------------------------- */
 [data-style="display"],
 .w[data-style="display"]{
@@ -159,6 +162,9 @@
   --title-rule-c: var(--accent-1);
   --title-rule-pad: var(--space-2);
   --pill-radius: 0px;
+  --zebra-bg: transparent;
+  --list-pad-y: 0.5em;
+  --list-gap: var(--space-2);
 }
 
 /* ----------------------------------------------------------------------------
