@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather — Hourly",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Next-24-hours temperature curve with a rain-probability strip. Data from Open-Meteo (no API key). Renders via Chart.js for a smooth, theme-coloured curve.",
+  "description": "Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).",
   "icon": "ph-chart-line",
   "supports": {
     "sizes": [
@@ -51,7 +51,7 @@
       "name": "hours",
       "type": "select",
       "label": "Window",
-      "default": "24",
+      "default": "12",
       "choices": [
         {
           "value": "12",

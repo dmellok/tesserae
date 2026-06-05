@@ -8,7 +8,7 @@
 // data.temps) the new variants paint from; falls back to data.points
 // when the older shape is what's cached.
 
-import { barChart, tokens } from "../../static/spectra-chart.js";
+import { lineChart, tokens } from "../../static/spectra-chart.js";
 
 const PH_BY_NAME = {
   sun: "ph-sun",
@@ -123,8 +123,8 @@ export default function render(shadow, ctx) {
           ${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}
         </div>
         <div class="chart-legend">
-          <span class="chart-key"><span class="dot" style="background:var(--accent-5)"></span>Forecast</span>
-          <span class="chart-key"><span class="dot" style="background:var(--accent-1)"></span>Now</span>
+          <span class="chart-key"><span class="dot" style="background:var(--accent-5)"></span>Temperature</span>
+          <span class="chart-key"><i class="ph-bold ph-circle-fill" style="font-size:.7em;color:var(--accent-1);margin-right:.3em"></i>Now</span>
         </div>
       </div>
     </div>`;
@@ -132,13 +132,18 @@ export default function render(shadow, ctx) {
   if (hasData) {
     const canvas = shadow.querySelector("canvas");
     const t = tokens(shadow.host);
-    barChart(canvas, {
+    // Shaded line — temperature curve with the area filled under it
+    // for visual weight. "Now" is the first point in the series; the
+    // icon strip above already calls it out in accent-1, and the
+    // condition icons carry the band. The temperature line keeps a
+    // single colour (accent-5) so the eye reads it as one trend
+    // rather than fragmenting at each hour.
+    lineChart(canvas, {
       tokens: t,
       labels,
       values,
       color: t.accent5,
-      highlightColor: t.accent1,
-      highlightIdx: 0,
+      fill: true,
       showY: false,
     });
   }
