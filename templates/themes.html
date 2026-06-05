@@ -253,13 +253,21 @@
     if (input.value) pane.style.setProperty(variable, input.value);
     else pane.style.removeProperty(variable);
   }
-  // Seed the inline overrides from the form's initial state.
-  form.querySelectorAll("input[name], select[name]").forEach(paint);
-  form.addEventListener("input", (ev) => {
-    if (ev.target.matches("input[name], select[name]")) paint(ev.target);
-  });
-
-  if (readOnly) {
+  if (!readOnly) {
+    // Seed the inline overrides from the form's initial state so the
+    // preview matches what the user is editing. Skipped for bundled
+    // themes — their form values are the seed defaults (Light), not
+    // the actual bundled colours, so painting them would overwrite
+    // the data-theme cascade with stale defaults and leave the
+    // preview locked on Light no matter which strip card is clicked.
+    form.querySelectorAll("input[name], select[name]").forEach(paint);
+    form.addEventListener("input", (ev) => {
+      if (ev.target.matches("input[name], select[name]")) paint(ev.target);
+    });
+  } else {
+    // Read-only view: the cascade paints the preview from the
+    // bundled theme's CSS block. Disable every input + the submit so
+    // a stray edit can't sneak through.
     form.querySelectorAll("input, select, textarea, button[type=submit]")
       .forEach((el) => el.setAttribute("disabled", "disabled"));
   }

@@ -159,12 +159,16 @@ def _render_index(
         action_url = url_for("themes.create")
         is_new = True
     elif selected_id in bundled_ids:
+        bundled = next(t for t in BUNDLED_THEMES if t.id == selected_id)
         theme = _seed_from_template(selected_id)
-        # Reflect the chosen bundled id back to the form so the live
-        # preview pane paints with that theme's CSS variables.
+        # Reflect the chosen bundled id + name back so the preview
+        # pane's data-theme attribute targets the right CSS block and
+        # its header reads the bundled theme's actual name (instead of
+        # the seed's placeholder "New theme").
         theme.id = selected_id
+        theme.name = bundled.name
         is_bundled = True
-        # Bundled themes can't be updated; the form's submit button is
+        # Bundled themes can't be updated; the form's submit is
         # disabled, so action_url is harmless either way.
         action_url = url_for("themes.create")
     else:

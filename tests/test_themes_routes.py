@@ -98,6 +98,35 @@ def test_show_route_does_not_shadow_special_paths(app: Flask) -> None:
     assert client.get("/themes/user.css").status_code == 200
 
 
+def test_bundled_theme_preview_pane_targets_selected_theme(app: Flask) -> None:
+    """Regression for v0.26.1: clicking a bundled theme in the strip
+    used to leave the preview painted with Light because the JS
+    seeded the pane from the form's (default-Light) values on every
+    load, overriding the data-theme cascade. The fix gates the seed
+    behind the read-only check; pin the data-theme attribute on the
+    preview pane so the cascade has the right id to paint from."""
+    import re
+
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/themes/nord").get_data(as_text=True)
+    pane_tag = re.search(r'<div class="theme-preview-pane"[^>]*>', body)
+    assert pane_tag is not None
+    assert 'data-theme="nord"' in pane_tag.group(0)
+
+
+def test_bundled_theme_preview_header_shows_actual_name(app: Flask) -> None:
+    """Preview header used to read "New theme" for every bundled
+    selection because the seed UserTheme carried the placeholder
+    name. Fixed by lifting the bundled theme's actual name in
+    _render_index."""
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/themes/nord").get_data(as_text=True)
+    # Find the preview-name <h3> and assert it says "Nord".
+    assert "<h3 data-preview-name>Nord</h3>" in body
+
+
 def test_bundled_theme_view_has_duplicate_to_edit_cta(app: Flask) -> None:
     """Bundled themes can't be saved over; the builder is shown for
     reference but the prominent action is "Duplicate to edit"."""
