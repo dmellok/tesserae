@@ -88,14 +88,31 @@
         </div>
       </details>
       {% if config.DEV_MODE %}
-      {# Dev-only review surface — every widget at every supported size
-         iframed via /_test/render, with theme + orientation pickers.
-         Hidden in production builds because the underlying routes are
-         themselves gated on ``current_app.debug or .testing``. #}
-      <a href="{{ url_for('composer.test_widget_gallery') }}"
-         class="{% if request.endpoint in ('composer.test_widget_gallery', 'composer.test_render') %}is-active{% endif %}">
-         <i class="ph ph-binoculars" aria-hidden="true"></i><span>Widget gallery</span>
-      </a>
+      {# Dev-only review surfaces — every widget at every supported size
+         iframed via /_test/render (Widget gallery), plus the
+         theme × style matrix that paints one widget across every
+         theme + style combination. Both underlying routes are gated on
+         ``current_app.debug or .testing`` so they don't expose in prod.
+         Dropdown so the nav stays compact as more dev tools land. #}
+      {% set _dev_endpoints = (
+        'composer.test_widget_gallery',
+        'composer.test_render',
+        'composer.test_theme_style_matrix',
+      ) %}
+      <details class="nav-dropdown {% if request.endpoint in _dev_endpoints %}is-active{% endif %}">
+        <summary>
+          <i class="ph ph-binoculars" aria-hidden="true"></i><span>Dev</span>
+          <i class="ph ph-caret-down caret-soft" aria-hidden="true"></i>
+        </summary>
+        <div class="nav-dropdown-panel">
+          <a class="nav-dropdown-link" href="{{ url_for('composer.test_widget_gallery') }}">
+            <i class="ph ph-squares-four" aria-hidden="true"></i>Widget gallery
+          </a>
+          <a class="nav-dropdown-link" href="{{ url_for('composer.test_theme_style_matrix') }}">
+            <i class="ph ph-grid-four" aria-hidden="true"></i>Theme × style matrix
+          </a>
+        </div>
+      </details>
       {% endif %}
       <a href="{{ url_for('auth.settings') }}"
          class="{% if request.endpoint in ('auth.settings', 'auth.settings_area') or request.blueprint == 'events' %}is-active{% endif %}">
