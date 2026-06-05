@@ -266,6 +266,22 @@ def create_app(
     for rerr in renderers.errors:
         logger.warning("renderer loader: %s — %s", rerr.renderer_id, rerr.message)
 
+    # Backfill firmware-native panel dims on ESP32 instance manifests
+    # that predate the v0.20.x PanelPreset refactor. Without this, a
+    # Waveshare 13.3" added before the refactor (which has no
+    # native_w / native_h on disk) gets misclassified at runtime as an
+    # Inky 13.3" by the dims-only matching loop, packs at the wrong row
+    # stride, and prints a distorted-looking frame. Idempotent — does
+    # nothing on a fresh install or for already-migrated manifests.
+    from app.device_service import backfill_native_panel_dims
+
+    _patched_ids = backfill_native_panel_dims(device_data_root)
+    if _patched_ids:
+        logger.info(
+            "device migration: backfilled native panel dims on %s",
+            ", ".join(_patched_ids),
+        )
+
     devices = device_loader.discover(
         devices_dir,
         schema_path=device_schema,

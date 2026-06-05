@@ -204,6 +204,69 @@ def create_instance(
     return InstanceResult(device)
 
 
+# Map of esp32_client panel dims → firmware-native (w, h). Used by the
+# startup migration to backfill ``panel.native_w / panel.native_h`` on
+# instance manifests that predate the v0.20.x PanelPreset refactor.
+#
+# Why is this hardcoded here instead of inferred from PANEL_PRESETS?
+# Inky 13.3" (1600×1200 landscape-native) and Waveshare 13.3" Spectra 6
+# (1200×1600 portrait-native) share dims, so a generic "match by
+# dims" lookup is ambiguous for ESP32 devices. Restricting the lookup
+# to esp32_client and hard-coding the two ESP32 panels that ship with
+# Tesserae makes the inference deterministic.
+_ESP32_NATIVE_BY_DIMS: dict[tuple[int, int], tuple[int, int]] = {
+    (1200, 1600): (1200, 1600),  # Waveshare 13.3" Spectra 6 (portrait-native)
+    (1600, 1200): (1200, 1600),  # ditto, mounted sideways
+    (800, 480): (800, 480),  # Waveshare 7.3" PhotoPainter / 7.5" / Inky 7.3"
+    (480, 800): (800, 480),  # ditto, mounted sideways
+}
+
+
+def backfill_native_panel_dims(data_root: Path) -> list[str]:
+    """One-shot migration: add ``panel.native_w / panel.native_h`` to
+    ESP32 instance manifests that were created before the v0.20.x
+    PanelPreset refactor.
+
+    Without these fields, ``device_panel`` falls back to a dims-only
+    preset lookup that gets the wrong row stride on Waveshare 13.3"
+    devices (it picks the Inky 13.3" preset, which shares dims but is
+    landscape-native). The esp32_bin renderer then packs at the wrong
+    stride and the panel paints a distorted, tile-looking frame.
+
+    Idempotent: manifests already carrying both keys are left alone.
+    Returns the list of instance ids that were patched, for logging.
+    Non-esp32 devices are skipped because pi_bin / pi_png / trmnl_png
+    don't read native dims."""
+    patched: list[str] = []
+    if not data_root.exists():
+        return patched
+    for path in sorted(data_root.glob("*.json")):
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if raw.get("kind") != "esp32_client":
+            continue
+        panel = raw.get("panel")
+        if not isinstance(panel, dict):
+            continue
+        if "native_w" in panel and "native_h" in panel:
+            continue
+        try:
+            w = int(panel.get("w", 0))
+            h = int(panel.get("h", 0))
+        except (TypeError, ValueError):
+            continue
+        native = _ESP32_NATIVE_BY_DIMS.get((w, h))
+        if native is None:
+            continue
+        panel["native_w"], panel["native_h"] = native
+        raw["panel"] = panel
+        path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+        patched.append(str(raw.get("id") or path.stem))
+    return patched
+
+
 def update_instance_panel(
     *,
     devices: DeviceRegistry,
