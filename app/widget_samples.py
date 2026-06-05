@@ -162,12 +162,22 @@ _CAMERA_SAMPLE_DATA_URL = (
 
 
 def _ha_camera() -> dict[str, Any]:
+    # Matches the server shape: ``{label, items: [{...}, ...]}``. The
+    # client unwraps ``items[0]`` to drive the hero — multi-camera
+    # rendering is a future iteration.
     return {
-        "name": "Front Door",
-        "image_url": _CAMERA_SAMPLE_DATA_URL,
-        "last_updated": "2026-06-03T14:30:12+00:00",
-        "state": "recording",
-        "motion": True,
+        "label": "Cameras",
+        "items": [
+            {
+                "entity_id": "camera.front_door",
+                "name": "Front Door",
+                "image_url": _CAMERA_SAMPLE_DATA_URL,
+                "last_updated": "2026-06-03T14:30:12+00:00",
+                "last_changed": "2026-06-03T14:30:12+00:00",
+                "state": "recording",
+                "motion": True,
+            },
+        ],
     }
 
 

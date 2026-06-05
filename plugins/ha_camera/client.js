@@ -32,10 +32,18 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const name = data.name || "Camera";
-  const url = data.image_url || "";
-  const state = data.state || "";
-  const motion = data.motion === true;
+  // Server returns ``{label, items: [{image_url, name, state, motion, …}]}``.
+  // Single-camera widget renders ``items[0]``; if a future build adds
+  // multi-camera support it can read items[1..] for the grid. Fall back
+  // to top-level fields when items is absent so older payloads (or a
+  // hand-rolled sample) still work.
+  const cam = (Array.isArray(data.items) && data.items.length > 0)
+    ? data.items[0]
+    : data;
+  const name = cam.name || data.label || "Camera";
+  const url = cam.image_url || "";
+  const state = cam.state || "";
+  const motion = cam.motion === true;
 
   const accent = stateAccent(state);
 
