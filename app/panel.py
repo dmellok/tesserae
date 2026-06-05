@@ -22,6 +22,7 @@ mypy --strict applies to this module — see pyproject.toml.
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from math import gcd
 from typing import TYPE_CHECKING, Any
 
@@ -32,38 +33,103 @@ if TYPE_CHECKING:
     from app.device_loader import Device, DeviceRegistry
     from app.state.page_store import Page
 
-# (native_landscape_w, native_landscape_h) per panel. Orientation is
-# applied separately so users can mount any panel landscape or portrait
-# without us shipping double the entries.
-PANEL_PRESETS: dict[str, tuple[int, int]] = {
-    "inky_13_3": (1600, 1200),  # Pimoroni Inky Impression 13.3" (Spectra 6)
-    "inky_7_3": (800, 480),  # Pimoroni Inky Impression 7.3" (Spectra 6)
-    "inky_5_7": (600, 448),  # Pimoroni Inky Impression 5.7" (7-colour legacy)
-    "inky_4": (640, 400),  # Pimoroni Inky Impression 4" (Spectra 6)
-    "waveshare_e6_7_5": (800, 480),  # Waveshare E6 7.5"
+
+@dataclass(frozen=True)
+class PanelPreset:
+    """A panel preset's intrinsic facts.
+
+    ``w`` / ``h`` are the firmware-native row stride — what the panel's
+    on-device firmware expects to feed SPI / its own composite buffer.
+    The user can mount the panel in any orientation; the composer
+    handles the rotation upstream, but the renderer must always pack at
+    the native stride or the firmware will read the wrong row width.
+
+    ``native_landscape`` is True when the firmware-native stride is
+    wider than tall (most consumer panels). It's False for the
+    portrait-native Waveshare 13.3" Spectra 6 used with ESP32, whose
+    firmware reads 1200 wide × 1600 tall regardless of how the user
+    mounts it.
+
+    ``label`` is the user-facing string shown in the panel picker.
+    """
+
+    w: int
+    h: int
+    label: str
+    native_landscape: bool = True
+
+
+PANEL_PRESETS: dict[str, PanelPreset] = {
+    "inky_13_3": PanelPreset(
+        1600, 1200, label='Inky Impression 13.3" — 1600x1200'
+    ),  # Pimoroni Inky Impression 13.3" (Spectra 6) — landscape native
+    "inky_7_3": PanelPreset(
+        800, 480, label='Inky Impression 7.3" — 800x480'
+    ),  # Pimoroni Inky Impression 7.3" (Spectra 6) — landscape native
+    "inky_5_7": PanelPreset(
+        600, 448, label='Inky Impression 5.7" — 600x448'
+    ),  # Pimoroni Inky Impression 5.7" (7-colour legacy) — landscape native
+    "inky_4": PanelPreset(
+        640, 400, label='Inky Impression 4" — 640x400'
+    ),  # Pimoroni Inky Impression 4" (Spectra 6) — landscape native
+    "waveshare_e6_7_5": PanelPreset(
+        800, 480, label='Waveshare E6 7.5" — 800x480'
+    ),  # Waveshare E6 7.5" — landscape native
+    "waveshare_e6_13_3": PanelPreset(
+        1200,
+        1600,
+        label='Waveshare 13.3" Spectra 6 (ESP32) — 1200x1600',
+        native_landscape=False,
+    ),  # ESP32 Waveshare 13.3" — portrait-native (firmware reads 1200×1600 portrait)
 }
 
 PANEL_PRESET_CHOICES: list[dict[str, str]] = [
-    {"value": "inky_13_3", "label": 'Inky Impression 13.3" — 1600x1200'},
-    {"value": "inky_7_3", "label": 'Inky Impression 7.3" — 800x480'},
-    {"value": "inky_5_7", "label": 'Inky Impression 5.7" — 600x448'},
-    {"value": "inky_4", "label": 'Inky Impression 4" — 640x400'},
-    {"value": "waveshare_e6_7_5", "label": 'Waveshare E6 7.5" — 800x480'},
+    {"value": pid, "label": preset.label} for pid, preset in PANEL_PRESETS.items()
+] + [
     {"value": "custom", "label": "Custom (set width + height below)"},
 ]
 
 DEFAULT_PRESET: str = "inky_13_3"
 
 
+def _preset_composition_landscape(preset: PanelPreset) -> tuple[int, int]:
+    """Return the (w, h) the panel takes when mounted **landscape**.
+
+    For a landscape-native preset that's already ``(preset.w, preset.h)``;
+    for a portrait-native one the user gets a landscape view by mounting
+    the panel sideways, which swaps the visible dims to
+    ``(preset.h, preset.w)``."""
+    if preset.native_landscape:
+        return (preset.w, preset.h)
+    return (preset.h, preset.w)
+
+
 def panel_overrides_from_form(form: Any) -> dict[str, Any]:
     """Resolve an Add-device form's panel size into a ``{"w","h"}``
-    override dict. A named preset wins; otherwise the custom width /
-    height inputs are used (ignored if non-numeric). Shared between
-    Settings → Devices and the onboarding wizard's manual-add form."""
-    preset = (form.get("panel_preset") or "").strip()
-    if preset in PANEL_PRESETS:
-        w, h = PANEL_PRESETS[preset]
-        return {"w": w, "h": h}
+    override dict (and ``native_w / native_h`` for known presets). A
+    named preset wins; otherwise the custom width / height inputs are
+    used (ignored if non-numeric). Shared between Settings → Devices
+    and the onboarding wizard's manual-add form.
+
+    ``w``/``h`` are the panel's **landscape composition dims** — the
+    legacy convention every downstream caller (onboarding, device
+    routes, page hydration) already expects. The orientation pick is
+    applied separately and rounds out the composition orientation.
+
+    ``native_w``/``native_h`` are the **firmware-native row stride** —
+    populated only when a preset is chosen, because custom panels
+    can't tell us their hardware orientation without an extra UI
+    knob. Downstream callers pass them through to the renderer."""
+    preset_id = (form.get("panel_preset") or "").strip()
+    if preset_id in PANEL_PRESETS:
+        preset = PANEL_PRESETS[preset_id]
+        landscape_w, landscape_h = _preset_composition_landscape(preset)
+        return {
+            "w": landscape_w,
+            "h": landscape_h,
+            "native_w": preset.w,
+            "native_h": preset.h,
+        }
     overrides: dict[str, Any] = {}
     for field_name, key in (("panel_w", "w"), ("panel_h", "h")):
         raw = form.get(field_name)
@@ -76,18 +142,29 @@ def panel_overrides_from_form(form: Any) -> dict[str, Any]:
 def resolve_settings_panel(settings: SettingsStore) -> Panel:
     """Compute the panel dims from the app settings section."""
     app = settings.get_section("app")
-    preset = str(app.get("panel_preset") or DEFAULT_PRESET)
-    if preset in PANEL_PRESETS:
-        w, h = PANEL_PRESETS[preset]
+    preset_id = str(app.get("panel_preset") or DEFAULT_PRESET)
+    native_w: int | None = None
+    native_h: int | None = None
+    if preset_id in PANEL_PRESETS:
+        preset = PANEL_PRESETS[preset_id]
+        # Start from the panel's landscape composition view (legacy
+        # convention everything else expects).
+        w, h = _preset_composition_landscape(preset)
+        # Firmware-native row stride is fixed by the hardware regardless
+        # of how the user mounts it.
+        native_w, native_h = preset.w, preset.h
     else:
         # 'custom' or any value the user typed in by hand falls back to
         # the explicit w/h fields. Defaults match Inky 13.3" so a fresh
-        # install with no settings still works.
+        # install with no settings still works. We can't infer the
+        # firmware-native orientation for a hand-typed panel; the
+        # renderer treats native_w / native_h == None as "pack at panel
+        # (w, h) directly", which matches pre-v0.19.19 behaviour.
         w = _int_or(app.get("panel_w"), 1600)
         h = _int_or(app.get("panel_h"), 1200)
     if _is_portrait(app.get("panel_orientation")):
         w, h = h, w
-    return Panel(w=max(1, w), h=max(1, h))
+    return Panel(w=max(1, w), h=max(1, h), native_w=native_w, native_h=native_h)
 
 
 def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Panel:
@@ -103,16 +180,46 @@ def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Pan
 
 
 def _device_panel(device: Device) -> Panel | None:
-    """Panel for a single device, or None if it declares no panel block."""
+    """Panel for a single device, or None if it declares no panel block.
+
+    Picks up firmware-native dims from the device manifest when
+    available (``panel.native_w`` / ``panel.native_h``). Without those,
+    falls back to the matching preset's native dims if the device's
+    declared (w, h) matches a known preset's landscape composition.
+    Custom panels with no preset hit and no manifest hint leave
+    ``native_w / native_h`` as None — the renderer packs at (w, h)
+    directly in that case."""
     block = device.panel
     if block is None:
         return None
+    w = int(block["w"])
+    h = int(block["h"])
+    native_w: int | None = None
+    native_h: int | None = None
+    # Explicit manifest declaration wins.
+    if "native_w" in block and "native_h" in block:
+        with contextlib.suppress(TypeError, ValueError):
+            native_w = int(block["native_w"])
+            native_h = int(block["native_h"])
+    else:
+        # Try to match the device's (w, h) against a known preset's
+        # landscape composition. If a preset matches, lift its native
+        # dims. This means a device.json that already says (800, 480)
+        # implicitly picks up the PhotoPainter's landscape-native
+        # stride, no manifest change required.
+        for preset in PANEL_PRESETS.values():
+            comp_w, comp_h = _preset_composition_landscape(preset)
+            if (w, h) == (comp_w, comp_h) or (w, h) == (comp_h, comp_w):
+                native_w, native_h = preset.w, preset.h
+                break
     return Panel(
-        w=int(block["w"]),
-        h=int(block["h"]),
+        w=w,
+        h=h,
         flip=is_flipped_orientation(block.get("orientation")),
         gamut=str(block.get("gamut") or "waveshare_e6"),
         underscan=max(0, int(block.get("underscan") or 0)),
+        native_w=native_w,
+        native_h=native_h,
     )
 
 

@@ -45,6 +45,18 @@ class Panel(BaseModel):
     flip: bool = False
     gamut: str = "waveshare_e6"
     underscan: int = Field(default=0, ge=0)
+    # Firmware-native row stride. The panel hardware fixes its (w, h)
+    # regardless of how the user has the composition oriented — the
+    # renderer must pack at these dims (firmware streams straight to
+    # SPI / the device's display buffer). Optional: populated from
+    # PANEL_PRESETS or a device manifest's ``native_w``/``native_h``
+    # block at resolution time. Renderers fall back to (w, h) when
+    # absent, matching pre-v0.19.19 behaviour for custom / unknown
+    # panels. Not persisted on pages — pages serialize their own
+    # ``panel`` optional override but native dims are a hardware fact,
+    # not a per-page choice.
+    native_w: int | None = Field(default=None, gt=0)
+    native_h: int | None = Field(default=None, gt=0)
 
 
 class Cell(BaseModel):

@@ -7,39 +7,31 @@ Wire contract:
 
 * Exactly ``width * height / 2`` bytes — 960000 for the 13.3" Waveshare,
   192000 for the 7.3" PhotoPainter.
-* Buffer is packed at the **panel's firmware-native hardware
-  orientation** — NOT at the composition orientation the user picked
-  during calibration. The firmware streams the bytes straight to SPI
-  with no resize / rotate, so the bin's row stride must match the
-  panel hardware. Two shipped cases:
+* Buffer is packed at the panel's firmware-native row stride
+  (``panel.native_w × panel.native_h``), NOT at the composition
+  orientation the user picked during calibration. The firmware streams
+  the bytes straight to SPI with no resize / rotate, so the bin's row
+  stride must match the panel hardware regardless of how the user
+  mounts the screen.
 
-  * Waveshare 13.3" Spectra 6 — portrait native: 1200 wide × 1600
-    tall.
-  * Waveshare 7.3" PhotoPainter (ESP32-S3) — landscape native: 800
-    wide × 480 tall.
-
-  Packing at the user's composition orientation paints garbled
-  vertical ghosts when calibration disagrees with the panel hardware
-  (e.g. user picks portrait calibration on the landscape-native
-  PhotoPainter).
+  ``native_w / native_h`` are populated by ``app.panel``'s
+  ``resolve_settings_panel`` / ``_device_panel`` from the panel preset
+  or the device manifest. Custom / unknown panels leave them as None;
+  the renderer then falls back to packing at ``(panel.w, panel.h)``
+  directly — matching pre-v0.19.19 behaviour for those cases.
 
 * 4-bpp packed, scanline order, no row padding. High nibble = even
   column, low nibble = odd column.
 
 Pipeline:
 
-1. Resolve the firmware-native (w, h) from the panel's pixel count.
-   Both supported ESP32 panels have unique pixel counts so the
-   lookup is unambiguous. Unknown sizes fall back to packing at the
-   panel arg unchanged, matching pre-v0.19.19 behaviour.
+1. Use ``panel.native_w / panel.native_h`` if present, else fall back
+   to ``(panel.w, panel.h)`` for custom panels.
 2. If the input image's orientation doesn't match the firmware's,
    rotate 90° CW so its left edge lands at the panel's top edge.
-   This rotation covers both: (a) compositions rendered at the
-   user's calibration orientation that doesn't match the firmware,
-   and (b) ad-hoc input PNGs that arrive at a non-matching shape.
-3. Apply ``panel.flip`` (180° rotation for upside-down mounts).
+3. Apply ``panel.flip`` (180° for upside-down mounts).
 4. Letterbox (white) to fit the firmware-native dims exactly.
-5. Apply per-device underscan if set.
+5. Apply per-device underscan.
 6. Pack at the firmware-native dims.
 """
 
@@ -59,26 +51,19 @@ DEFAULTS: dict[str, Any] = {
     "contrast": 1.0,
 }
 
-# Firmware-native (w, h) per supported ESP32 panel, keyed by pixel
-# count. The panel hardware fixes its row stride; the user's
-# calibration orientation only determines the composition canvas.
-# Looking up by area lets us accept the panel arg in either
-# orientation (e.g. (800, 480) or (480, 800) both resolve to the
-# PhotoPainter's 800w × 480h native stride).
-_PANEL_FIRMWARE_NATIVE: dict[int, tuple[int, int]] = {
-    800 * 480: (800, 480),  # Waveshare 7.3" PhotoPainter — landscape
-    1200 * 1600: (1200, 1600),  # Waveshare 13.3" Spectra 6 — portrait
-}
-
 
 def _firmware_native_dims(panel: Panel) -> tuple[int, int]:
     """Return the firmware-native (w, h) for ``panel``.
 
-    Looked up by pixel count from ``_PANEL_FIRMWARE_NATIVE``. An
-    unknown size (custom panel, future hardware) falls back to the
-    panel arg unchanged — the caller assumes the firmware stride
-    matches whatever orientation the user has configured."""
-    return _PANEL_FIRMWARE_NATIVE.get(panel.w * panel.h, (panel.w, panel.h))
+    Prefers ``panel.native_w / panel.native_h`` (populated upstream
+    from PANEL_PRESETS / device manifest). Custom panels with no
+    preset hit and no manifest hint fall back to the composition
+    dims, matching pre-v0.19.19 behaviour: those users had to mount
+    the panel in the firmware-native orientation to avoid stride
+    drift, and they still do."""
+    if panel.native_w is not None and panel.native_h is not None:
+        return (panel.native_w, panel.native_h)
+    return (panel.w, panel.h)
 
 
 def _setting(settings: dict[str, Any], key: str) -> Any:

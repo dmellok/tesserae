@@ -213,6 +213,75 @@ def test_unknown_device_ids_are_skipped(env) -> None:
     assert len(groups) == 1 and groups[0][1] == []
 
 
+def test_landscape_native_preset_populates_native_dims(tmp_path: Path) -> None:
+    """``resolve_settings_panel`` carries the preset's firmware-native
+    row stride through to ``Panel.native_w / native_h``. For a
+    landscape-native preset (Inky 7.3") the native dims equal the
+    landscape composition; portrait calibration just swaps the
+    composition w/h."""
+    from app.panel import resolve_settings_panel
+
+    settings = SettingsStore(tmp_path / "s.json")
+    settings.update_section(
+        "app", {"panel_preset": "inky_7_3", "panel_orientation": "landscape"}
+    )
+    panel = resolve_settings_panel(settings)
+    assert (panel.w, panel.h) == (800, 480)
+    assert (panel.native_w, panel.native_h) == (800, 480)
+
+    settings.update_section(
+        "app", {"panel_preset": "inky_7_3", "panel_orientation": "portrait"}
+    )
+    panel = resolve_settings_panel(settings)
+    assert (panel.w, panel.h) == (480, 800)  # portrait composition
+    assert (panel.native_w, panel.native_h) == (800, 480)  # firmware stride unchanged
+
+
+def test_portrait_native_preset_populates_native_dims(tmp_path: Path) -> None:
+    """Waveshare 13.3" Spectra 6 (used with ESP32) is portrait-native
+    (1200×1600). The preset's landscape composition view is the
+    rotated (1600, 1200), but native_w/native_h always carry the
+    portrait stride regardless of which way the user mounts it."""
+    from app.panel import resolve_settings_panel
+
+    settings = SettingsStore(tmp_path / "s.json")
+    settings.update_section(
+        "app", {"panel_preset": "waveshare_e6_13_3", "panel_orientation": "portrait"}
+    )
+    panel = resolve_settings_panel(settings)
+    assert (panel.w, panel.h) == (1200, 1600)
+    assert (panel.native_w, panel.native_h) == (1200, 1600)
+
+    settings.update_section(
+        "app", {"panel_preset": "waveshare_e6_13_3", "panel_orientation": "landscape"}
+    )
+    panel = resolve_settings_panel(settings)
+    assert (panel.w, panel.h) == (1600, 1200)  # landscape composition
+    assert (panel.native_w, panel.native_h) == (1200, 1600)  # firmware stride unchanged
+
+
+def test_custom_panel_has_no_native_dims(tmp_path: Path) -> None:
+    """Custom dims can't tell us the firmware orientation without an
+    extra UI knob, so the renderer falls back to packing at (w, h).
+    ``native_w / native_h`` stay None for the custom path."""
+    from app.panel import resolve_settings_panel
+
+    settings = SettingsStore(tmp_path / "s.json")
+    settings.update_section(
+        "app",
+        {
+            "panel_preset": "custom",
+            "panel_w": 1024,
+            "panel_h": 768,
+            "panel_orientation": "landscape",
+        },
+    )
+    panel = resolve_settings_panel(settings)
+    assert (panel.w, panel.h) == (1024, 768)
+    assert panel.native_w is None
+    assert panel.native_h is None
+
+
 def _virtual(w: int, h: int):
     from app.state.page_store import Panel
 

@@ -173,7 +173,7 @@ def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
 
 
 def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
-    """Reported bug: user runs the device calibration on a 7.3"
+    """Reported bug: user runs device calibration on a 7.3"
     PhotoPainter and picks the portrait option. The device record
     then has panel.w=480, panel.h=800 (portrait composition). The
     panel hardware is still landscape-native (800w × 480h fixed in
@@ -181,11 +181,10 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
     bytes back at 240 bytes/row vs the firmware's 400, the ghosts
     return.
 
-    Fix: the renderer resolves the firmware-native dims from the
-    panel's pixel count (800 × 480 = 384000 → 800×480 landscape),
-    rotates the portrait composition 90° CW to fit, and packs at
-    800×480 regardless of which orientation the user calibrated
-    for."""
+    Fix: ``resolve_settings_panel`` populates panel.native_w /
+    panel.native_h from the PhotoPainter preset's firmware-native
+    stride (800w × 480h). The renderer reads those directly and
+    rotates the portrait composition 90° CW to fit."""
     # Portrait composition at the panel.w × panel.h shape: red TOP,
     # blue BOTTOM. Composer paints this for a user with portrait
     # calibration on the PhotoPainter.
@@ -197,7 +196,9 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        panel=Panel(w=480, h=800),  # PORTRAIT calibration on the PhotoPainter
+        # PORTRAIT calibration on the PhotoPainter — native dims still
+        # carry the landscape (800, 480) firmware stride.
+        panel=Panel(w=480, h=800, native_w=800, native_h=480),
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
     # Output is the firmware-native 800×480 landscape buffer — 192000
@@ -216,8 +217,9 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
 def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     """Symmetric case: a 13.3" Waveshare Spectra 6 is portrait native
     (1200×1600). If the user calibrates landscape, panel arrives as
-    (1600, 1200). The renderer must still pack at 1200×1600 portrait
-    (firmware-fixed) and rotate the landscape composition to fit."""
+    (1600, 1200) with native dims still (1200, 1600). The renderer
+    must still pack at 1200×1600 portrait and rotate the landscape
+    composition to fit."""
     # Landscape composition at the panel.w × panel.h shape: red LEFT,
     # blue RIGHT.
     img = Image.new("RGB", (1600, 1200), "white")
@@ -228,7 +230,9 @@ def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        panel=Panel(w=1600, h=1200),  # landscape calibration on the 13.3"
+        # Landscape calibration on the Waveshare 13.3" — native dims
+        # carry the portrait (1200, 1600) firmware stride.
+        panel=Panel(w=1600, h=1200, native_w=1200, native_h=1600),
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
     # Output is the firmware-native 1200×1600 portrait buffer.
