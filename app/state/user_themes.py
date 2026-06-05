@@ -101,6 +101,14 @@ class UserTheme:
 
     on_accent: str = "#F7F5F0"
 
+    # UI preference: when true, the builder auto-derives every
+    # ``accent_*_soft`` from its base accent + bg whenever the user
+    # edits either, and shows the soft inputs as read-only. Persisted
+    # so the preference survives page reloads. Doesn't affect the CSS
+    # output — the soft fields still emit normally; this flag only
+    # changes how the builder treats them.
+    auto_soft_tints: bool = False
+
     # The colour-token field names in the order they appear on disk and
     # in the CSS output. Excludes the metadata trio (id / name / mode /
     # font_family). Kept as a ClassVar so dataclass treats it as

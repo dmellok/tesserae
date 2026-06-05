@@ -312,6 +312,10 @@ def _theme_from_form(form: Any, *, fallback_id: str) -> UserTheme:
         "name": name,
         "mode": mode if mode in ("light", "dark") else "light",
         "font_family": font_family,
+        # Checkbox-style boolean — present in form data only when the
+        # box is checked. Persist the preference so toggling survives
+        # reloads.
+        "auto_soft_tints": form.get("auto_soft_tints") == "on",
     }
     for key in UserTheme.TOKEN_FIELDS:
         raw = (form.get(key) or "").strip()

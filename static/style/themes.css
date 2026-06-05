@@ -255,6 +255,52 @@
   flex-wrap: wrap;
 }
 
+/* Single-card palette layout — sub-group headings replace the per-card
+   chrome so the surface / text / accent groups still read as separated
+   without 9 cards. */
+.theme-builder-group-head {
+  margin: var(--t-space-3) 0 var(--t-space-1);
+  font-size: var(--t-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-text-muted, #837F73);
+}
+.theme-builder-group-head:first-child {
+  margin-top: 0;
+}
+.theme-builder-group-head-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  flex-wrap: wrap;
+  margin: var(--t-space-3) 0 var(--t-space-1);
+}
+.theme-builder-group-head-row .theme-builder-group-head {
+  margin: 0;
+}
+/* The auto-soft switch sits inline with the Accents sub-heading.
+   The macro renders it inside a ``.field--switch`` block whose
+   default margin would push the heading row taller — flatten it
+   here so the row reads as one tight line. */
+.theme-builder-group-head-row .field--switch {
+  margin: 0;
+}
+
+.theme-builder-accent-pair {
+  margin-top: var(--t-space-2);
+}
+
+/* When auto-soft is on, the soft inputs are read-only — surface that
+   visually so the user understands the value is computed. The native
+   readOnly attribute keeps the value in the form submission so the
+   server still gets the derived value. */
+.theme-builder input.is-derived {
+  background: var(--t-surface-sunken, #f3f1ec);
+  color: var(--t-text-soft, #5b6470);
+  cursor: not-allowed;
+}
+
 /* ---- Right preview pane ------------------------------------------- */
 
 .themes-preview {

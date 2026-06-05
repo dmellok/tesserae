@@ -242,6 +242,31 @@ def test_create_redirects_to_show_and_persists_theme(app: Flask) -> None:
     assert saved.accent_1 == "#CC3333"
 
 
+def test_create_persists_auto_soft_tints_when_checkbox_present(app: Flask) -> None:
+    """The auto-soft checkbox is a real ``name="auto_soft_tints"``
+    input, so an "on" value (the checkbox's standard checked payload)
+    must flip the stored boolean to True. Absence of the field means
+    unchecked → False."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/themes/new",
+        data={"name": "Sun", "auto_soft_tints": "on"},
+    )
+    saved = app.config["USER_THEMES_STORE"].get("user-sun")
+    assert saved is not None
+    assert saved.auto_soft_tints is True
+
+
+def test_create_defaults_auto_soft_tints_to_false_when_absent(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/themes/new", data={"name": "Moon"})
+    saved = app.config["USER_THEMES_STORE"].get("user-moon")
+    assert saved is not None
+    assert saved.auto_soft_tints is False
+
+
 def test_update_preserves_id_when_name_changes(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

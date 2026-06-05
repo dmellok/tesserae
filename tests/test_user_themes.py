@@ -233,3 +233,32 @@ def test_to_registry_theme_marks_user_family(tmp_path: Path) -> None:
     t = UserTheme(id=f"{USER_THEME_PREFIX}x", name="X").to_registry_theme()
     assert t.family == "user"
     assert t.user is True
+
+
+# -- auto_soft_tints field --------------------------------------------
+
+
+def test_auto_soft_tints_defaults_false(tmp_path: Path) -> None:
+    """New themes have the auto-soft toggle off so the user opts in
+    rather than getting derived values they didn't ask for."""
+    t = UserTheme(id=f"{USER_THEME_PREFIX}x", name="X")
+    assert t.auto_soft_tints is False
+
+
+def test_auto_soft_tints_round_trips_through_store(tmp_path: Path) -> None:
+    store = UserThemeStore(tmp_path / "user.json")
+    store.save(UserTheme(id=f"{USER_THEME_PREFIX}x", name="X", auto_soft_tints=True))
+    fresh = UserThemeStore(tmp_path / "user.json")
+    saved = fresh.get(f"{USER_THEME_PREFIX}x")
+    assert saved is not None
+    assert saved.auto_soft_tints is True
+
+
+def test_emit_css_does_not_include_auto_soft_tints_flag(tmp_path: Path) -> None:
+    """``auto_soft_tints`` is a builder preference, not a CSS variable
+    — the emitter must skip it so it doesn't leak into the stylesheet
+    as a meaningless ``--auto-soft-tints`` rule."""
+    store = UserThemeStore(tmp_path / "user.json")
+    store.save(UserTheme(id=f"{USER_THEME_PREFIX}x", name="X", auto_soft_tints=True))
+    css = emit_css(store)
+    assert "auto-soft" not in css.lower()

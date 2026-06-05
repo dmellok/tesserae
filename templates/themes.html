@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import button, text_input, select_field, color_input %}
+{% from "_components.html" import button, text_input, select_field, color_input, switch %}
 {% block title %}
 {% if is_new %}New theme — Themes — Tesserae
 {% else %}{{ theme.name }} — Themes — Tesserae
@@ -143,37 +143,41 @@
                       help='Pass through as --font-family. Leave blank to inherit the Spectra default.') }}
       </section>
 
-      <section class="card">
-        <header class="card-head"><h3><i class="ph ph-stack"></i> Surfaces</h3></header>
+      <section class="card theme-builder-palette">
+        <header class="card-head"><h3><i class="ph ph-paint-brush"></i> Colour palette</h3></header>
+
+        <p class="theme-builder-group-head">Surfaces</p>
         <div class="theme-builder-fields">
           {{ color_input('tok-bg', 'bg', 'Page background', value=theme.bg) }}
           {{ color_input('tok-surface', 'surface', 'Card surface', value=theme.surface) }}
           {{ color_input('tok-surface-sunken', 'surface_sunken', 'Sunken surface', value=theme.surface_sunken) }}
           {{ color_input('tok-edge', 'edge', 'Edge / divider', value=theme.edge) }}
         </div>
-      </section>
 
-      <section class="card">
-        <header class="card-head"><h3><i class="ph ph-text-aa"></i> Text</h3></header>
+        <p class="theme-builder-group-head">Text</p>
         <div class="theme-builder-fields">
           {{ color_input('tok-text-primary', 'text_primary', 'Primary', value=theme.text_primary) }}
           {{ color_input('tok-text-secondary', 'text_secondary', 'Secondary', value=theme.text_secondary) }}
           {{ color_input('tok-text-muted', 'text_muted', 'Muted', value=theme.text_muted) }}
-          {{ color_input('tok-on-accent', 'on_accent', 'On accent (text on coloured backgrounds)', value=theme.on_accent) }}
+          {{ color_input('tok-on-accent', 'on_accent', 'On accent', value=theme.on_accent) }}
         </div>
-      </section>
 
-      {% for n in range(1, 7) %}
-      <section class="card">
-        <header class="card-head"><h3><i class="ph ph-circles-three"></i> Accent {{ n }}</h3></header>
-        <div class="theme-builder-fields">
-          {{ color_input('tok-a' ~ n, 'accent_' ~ n, 'Accent ' ~ n, value=theme['accent_' ~ n]) }}
-          {{ color_input('tok-a' ~ n ~ '-soft', 'accent_' ~ n ~ '_soft', 'Soft tint',
-                         value=theme['accent_' ~ n ~ '_soft'],
-                         help='Tinted pill background. Mix of the accent with bg works well.') }}
+        <div class="theme-builder-group-head-row">
+          <p class="theme-builder-group-head">Accents</p>
+          {{ switch('auto-soft-tints', 'auto_soft_tints',
+                    'Auto-derive soft tints',
+                    checked=theme.auto_soft_tints,
+                    help='Soft tints become a mix of each accent with the page background. Edit an accent or the background and the matching soft updates instantly.') }}
         </div>
+
+        {% for n in range(1, 7) %}
+        <div class="theme-builder-fields theme-builder-accent-pair">
+          {{ color_input('tok-a' ~ n, 'accent_' ~ n, 'Accent ' ~ n, value=theme['accent_' ~ n]) }}
+          {{ color_input('tok-a' ~ n ~ '-soft', 'accent_' ~ n ~ '_soft', 'Soft tint ' ~ n,
+                         value=theme['accent_' ~ n ~ '_soft']) }}
+        </div>
+        {% endfor %}
       </section>
-      {% endfor %}
 
       {% if not is_bundled %}
       <div class="theme-builder-actions">
@@ -253,6 +257,82 @@
     if (input.value) pane.style.setProperty(variable, input.value);
     else pane.style.removeProperty(variable);
   }
+  // ---- Auto-derive soft tints ---------------------------------------
+  // When the checkbox is on, every accent_N_soft = mix(accent_N, bg, 0.78)
+  // — the same ratio the Python extractor uses, so an extracted theme
+  // matches whatever the toggle later produces. Soft inputs go
+  // read-only while the toggle is on so the user can't fight the
+  // automation (or rather, can't fight it without unchecking).
+  const SOFT_MIX = 0.78;
+  function hexToRgb(hex) {
+    const h = hex.replace("#", "");
+    if (h.length !== 6) return null;
+    return [
+      parseInt(h.slice(0, 2), 16),
+      parseInt(h.slice(2, 4), 16),
+      parseInt(h.slice(4, 6), 16),
+    ];
+  }
+  function rgbToHex(r, g, b) {
+    const to = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0").toUpperCase();
+    return "#" + to(r) + to(g) + to(b);
+  }
+  function mix(a, b, t) {
+    const ra = hexToRgb(a), rb = hexToRgb(b);
+    if (!ra || !rb) return a;
+    return rgbToHex(
+      ra[0] * (1 - t) + rb[0] * t,
+      ra[1] * (1 - t) + rb[1] * t,
+      ra[2] * (1 - t) + rb[2] * t,
+    );
+  }
+
+  const autoSoftCheckbox = form.querySelector("input[name='auto_soft_tints']");
+  function softInputs() {
+    return form.querySelectorAll("input[name$='_soft']");
+  }
+  function applyAutoSoftState() {
+    if (!autoSoftCheckbox) return;
+    const on = autoSoftCheckbox.checked;
+    softInputs().forEach((el) => {
+      el.readOnly = on;
+      el.classList.toggle("is-derived", on);
+    });
+    if (on) recomputeAllSoftTints();
+  }
+  function recomputeAllSoftTints() {
+    const bgInput = form.querySelector("input[name='bg']");
+    if (!bgInput) return;
+    const bg = bgInput.value;
+    for (let n = 1; n <= 6; n++) {
+      const accent = form.querySelector(`input[name='accent_${n}']`);
+      const soft = form.querySelector(`input[name='accent_${n}_soft']`);
+      if (!accent || !soft) continue;
+      soft.value = mix(accent.value, bg, SOFT_MIX);
+      // Bubble so the preview-paint listener picks the new value up.
+      soft.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+  function maybeRecomputeOne(name) {
+    if (!autoSoftCheckbox || !autoSoftCheckbox.checked) return;
+    // bg change touches every accent's soft; accent_N change touches
+    // only soft_N. Anything else is irrelevant.
+    if (name === "bg") return recomputeAllSoftTints();
+    const m = name.match(/^accent_([1-6])$/);
+    if (!m) return;
+    const n = m[1];
+    const accent = form.querySelector(`input[name='accent_${n}']`);
+    const soft = form.querySelector(`input[name='accent_${n}_soft']`);
+    const bgInput = form.querySelector("input[name='bg']");
+    if (!accent || !soft || !bgInput) return;
+    soft.value = mix(accent.value, bgInput.value, SOFT_MIX);
+    soft.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  if (autoSoftCheckbox) {
+    autoSoftCheckbox.addEventListener("change", applyAutoSoftState);
+    applyAutoSoftState();
+  }
+
   if (!readOnly) {
     // Seed the inline overrides from the form's initial state so the
     // preview matches what the user is editing. Skipped for bundled
@@ -262,7 +342,10 @@
     // preview locked on Light no matter which strip card is clicked.
     form.querySelectorAll("input[name], select[name]").forEach(paint);
     form.addEventListener("input", (ev) => {
-      if (ev.target.matches("input[name], select[name]")) paint(ev.target);
+      if (ev.target.matches("input[name], select[name]")) {
+        paint(ev.target);
+        maybeRecomputeOne(ev.target.name);
+      }
     });
   } else {
     // Read-only view: the cascade paints the preview from the
