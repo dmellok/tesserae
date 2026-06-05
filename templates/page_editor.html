@@ -65,28 +65,11 @@
        (inherit) is the default so a cell falls through to the page
        value unless the user picks something deliberate. Setting
        data-theme / data-style on the cell rebinds the relevant tokens
-       for that subtree only. #}
-    {% set cell_theme_options = [
-      {'value': 'light', 'label': 'Light · warm paper', 'group': 'Spectra'},
-      {'value': 'dark', 'label': 'Dark · warm charcoal', 'group': 'Spectra'},
-      {'value': 'high-contrast', 'label': 'High contrast', 'group': 'Spectra'},
-      {'value': 'sepia', 'label': 'Sepia · book paper', 'group': 'Spectra'},
-      {'value': 'nord', 'label': 'Nord · cool blue night', 'group': 'Spectra'},
-      {'value': 'cool-gray', 'label': 'Cool gray · neutral slate', 'group': 'Spectra'},
-      {'value': 'bauhaus', 'label': 'Bauhaus palette (colour only)', 'group': 'Movement themes'},
-      {'value': 'destijl', 'label': 'De Stijl palette (colour only)', 'group': 'Movement themes'},
-      {'value': 'brutalist', 'label': 'Brutalist palette (colour only)', 'group': 'Movement themes'},
-      {'value': 'base16-gruvbox-dark', 'label': 'Gruvbox · dark', 'group': 'base16'},
-      {'value': 'base16-gruvbox-light', 'label': 'Gruvbox · light', 'group': 'base16'},
-      {'value': 'base16-solarized-dark', 'label': 'Solarized · dark', 'group': 'base16'},
-      {'value': 'base16-solarized-light', 'label': 'Solarized · light', 'group': 'base16'},
-      {'value': 'base16-dracula', 'label': 'Dracula', 'group': 'base16'},
-      {'value': 'base16-catppuccin-mocha', 'label': 'Catppuccin Mocha', 'group': 'base16'},
-      {'value': 'base16-monokai', 'label': 'Monokai', 'group': 'base16'},
-      {'value': 'base16-tomorrow-night', 'label': 'Tomorrow Night', 'group': 'base16'},
-      {'value': 'base16-tomorrow', 'label': 'Tomorrow', 'group': 'base16'},
-      {'value': 'base16-one-dark', 'label': 'One Dark', 'group': 'base16'},
-    ] %}
+       for that subtree only. Theme options come from
+       ``app.state.theme_registry.picker_options`` via the editor
+       context, so they stay in lockstep with the catalogue at
+       /themes and with the page-level picker further down. #}
+    {% set cell_theme_options = theme_options %}
     {% set cell_style_options = [
       {'value': 'standard', 'label': 'Standard', 'group': 'Neutral styles'},
       {'value': 'display', 'label': 'Display', 'group': 'Neutral styles'},
@@ -298,33 +281,11 @@
           {% endif %}
         </div>
 
-        {# Spectra themes — self-contained semantic blocks in
-           static/style/spectra-tokens.css. Adding a theme = duplicate a
-           block in tokens.css and add a row here. The three movement
-           themes (bauhaus / destijl / brutalist) ship palettes that
-           pair with the matching movement *style* — pair them via the
-           Style picker for the full design-movement look. #}
-        {% set theme_options = [
-          {'value': 'light', 'label': 'Light · warm paper', 'group': 'Spectra'},
-          {'value': 'dark', 'label': 'Dark · warm charcoal', 'group': 'Spectra'},
-          {'value': 'high-contrast', 'label': 'High contrast', 'group': 'Spectra'},
-          {'value': 'sepia', 'label': 'Sepia · book paper', 'group': 'Spectra'},
-          {'value': 'nord', 'label': 'Nord · cool blue night', 'group': 'Spectra'},
-          {'value': 'cool-gray', 'label': 'Cool gray · neutral slate', 'group': 'Spectra'},
-          {'value': 'bauhaus', 'label': 'Bauhaus palette (colour only)', 'group': 'Movement themes'},
-          {'value': 'destijl', 'label': 'De Stijl palette (colour only)', 'group': 'Movement themes'},
-          {'value': 'brutalist', 'label': 'Brutalist palette (colour only)', 'group': 'Movement themes'},
-          {'value': 'base16-gruvbox-dark', 'label': 'Gruvbox · dark', 'group': 'base16'},
-          {'value': 'base16-gruvbox-light', 'label': 'Gruvbox · light', 'group': 'base16'},
-          {'value': 'base16-solarized-dark', 'label': 'Solarized · dark', 'group': 'base16'},
-          {'value': 'base16-solarized-light', 'label': 'Solarized · light', 'group': 'base16'},
-          {'value': 'base16-dracula', 'label': 'Dracula', 'group': 'base16'},
-          {'value': 'base16-catppuccin-mocha', 'label': 'Catppuccin Mocha', 'group': 'base16'},
-          {'value': 'base16-monokai', 'label': 'Monokai', 'group': 'base16'},
-          {'value': 'base16-tomorrow-night', 'label': 'Tomorrow Night', 'group': 'base16'},
-          {'value': 'base16-tomorrow', 'label': 'Tomorrow', 'group': 'base16'},
-          {'value': 'base16-one-dark', 'label': 'One Dark', 'group': 'base16'},
-        ] %}
+        {# Page-level theme picker — same source as the per-cell
+           override above (theme_options comes from the editor context,
+           sourced from app.state.theme_registry). Adding or renaming a
+           theme touches that registry and the matching CSS block, and
+           both pickers update automatically. #}
         {# Spectra styles — orthogonal typographic / scale / shape axis in
            static/style/spectra-styles.css. Styles never set colour; they
            compose with any theme. The three movement styles pair with the

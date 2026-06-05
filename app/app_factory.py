@@ -42,6 +42,7 @@ from app import (
     schedule_routes,
     send_routes,
     settings_routes,
+    themes_routes,
     trmnl_api,
     webhook_routes,
 )
@@ -472,6 +473,7 @@ def create_app(
     events_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)
+    themes_routes.register(app)
     webhook_routes.register(app)
     trmnl_api.register(app)
 

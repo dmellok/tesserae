@@ -335,6 +335,15 @@ def _editor_context(page: Page) -> dict[str, Any]:
         for g in preview_groups_for_page(page, device_registry, _settings_store())
     ]
 
+    # Theme picker options come from the central registry so the page
+    # editor's "Theme" dropdown stays in lockstep with what's actually
+    # available (bundled + later, user-saved). Previously hardcoded
+    # twice in the template — once for the page-level picker and once
+    # for the per-cell override — which drifted on every theme add.
+    from app.state.theme_registry import build_registry, picker_options
+
+    theme_options = picker_options(build_registry(user_themes=None))
+
     return {
         "page": page,
         "panel": panel,
@@ -347,6 +356,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "preview_groups": preview_groups,
         "layout_editor_cells": layout_editor_cells,
         "device_options": device_options,
+        "theme_options": theme_options,
     }
 
 

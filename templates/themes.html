@@ -1,0 +1,87 @@
+{% extends "_base.html" %}
+{% from "_components.html" import settings_tabs %}
+{% block title %}Settings: Themes — Tesserae{% endblock %}
+{% block head_extra %}
+{# Spectra token cascade — only loaded on this page (and compose.html);
+   admin chrome elsewhere doesn't need them. spectra-tokens defines the
+   bundled [data-theme="..."] blocks; spectra-base16 layers the
+   editor-palette themes. themes.css paints the card grid using those
+   variables, so the swatches always match what the editor preview
+   will paint. #}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
+{% endblock %}
+{% block main %}
+<header class="page-head">
+  <h1><i class="ph ph-palette"></i> Themes</h1>
+  <p class="lede">
+    Browse every bundled theme. Each one is a complete Spectra palette
+    (surfaces, text, six accents) selectable per page or per cell from
+    the editor. Builder + image-to-theme land in a follow-up.
+  </p>
+</header>
+
+{{ settings_tabs(active_area) }}
+
+{# Filter chips — anchor links per family so the user can jump
+   without a full reload. Hidden on tiny viewports where the page
+   already scrolls quickly. #}
+<nav class="theme-filter" aria-label="Theme families">
+  {% for family in families %}
+    {% if grouped[family] %}
+    <a href="#family-{{ family }}" class="chip">
+      {{ family_labels[family] }}
+      <span class="chip-count">{{ grouped[family]|length }}</span>
+    </a>
+    {% endif %}
+  {% endfor %}
+</nav>
+
+{% for family in families %}
+  {% if grouped[family] %}
+  <section class="theme-section" id="family-{{ family }}">
+    <h2 class="theme-section-head">{{ family_labels[family] }}</h2>
+    <div class="theme-grid">
+      {% for theme in grouped[family] %}
+      <article class="theme-card" data-theme="{{ theme.id }}">
+        <header class="theme-card-head">
+          <h3>{{ theme.name }}</h3>
+          <code class="theme-card-id">{{ theme.id }}</code>
+        </header>
+        {# Swatches paint from the theme's own CSS variables via the
+           data-theme attribute on the card. No Python-side hex codes. #}
+        <div class="theme-swatches" aria-hidden="true">
+          <div class="theme-swatch theme-swatch--bg"></div>
+          <div class="theme-swatch theme-swatch--surface"></div>
+          <div class="theme-swatch theme-swatch--text"></div>
+          <div class="theme-swatch theme-swatch--accent-1"></div>
+          <div class="theme-swatch theme-swatch--accent-2"></div>
+          <div class="theme-swatch theme-swatch--accent-3"></div>
+          <div class="theme-swatch theme-swatch--accent-4"></div>
+          <div class="theme-swatch theme-swatch--accent-5"></div>
+          <div class="theme-swatch theme-swatch--accent-6"></div>
+        </div>
+        {# Compact preview row so the theme card shows the type +
+           accent treatment in context, not just chips. #}
+        <div class="theme-preview">
+          <p class="theme-preview-line">The quick brown fox</p>
+          <p class="theme-preview-line theme-preview-line--soft">jumps over the lazy dog</p>
+          <div class="theme-preview-pills">
+            <span class="theme-preview-pill theme-preview-pill--a1">A1</span>
+            <span class="theme-preview-pill theme-preview-pill--a3">A3</span>
+            <span class="theme-preview-pill theme-preview-pill--a5">A5</span>
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+{% endfor %}
+
+<p class="theme-footnote">
+  {{ total }} bundled theme{{ '' if total == 1 else 's' }}.
+  Builder + image-to-theme coming in M-B / M-C.
+</p>
+{% endblock %}
