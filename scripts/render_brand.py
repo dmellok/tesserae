@@ -89,6 +89,16 @@ def render(size: int = BASE_SIZE) -> Image.Image:
     return Image.alpha_composite(canvas, overlay)
 
 
+# Firmware splash bakes — square PNGs with a transparent backdrop the
+# client can composite over whatever paper-white / dithered background
+# the panel uses. The brand mark itself stays opaque (the rounded
+# square + white tessellation pattern); only the corners outside the
+# rounded square are transparent. Picked to cover the panel range
+# from Inky pHAT (~212px wide) through to the Inky 13.3" (1600×1200);
+# the client builder picks the size closest to its target dim.
+FIRMWARE_SIZES: tuple[int, ...] = (64, 96, 128, 192, 256, 384, 512, 768, 1024)
+
+
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     # 128×128 — HA add-on standard sidebar icon.
@@ -102,6 +112,22 @@ def main() -> None:
         OUT_DIR / "favicon-32.png", optimize=True
     )
     print(f"Wrote PNGs into {OUT_DIR.relative_to(REPO_ROOT)}")
+
+    # Firmware splash bakes — keep them in their own subdir so the
+    # `find / | xargs` workflows that pick up brand assets for the
+    # admin UI don't accidentally hoover up the splash sizes.
+    fw_dir = OUT_DIR / "firmware"
+    fw_dir.mkdir(parents=True, exist_ok=True)
+    # Render fresh at each target size when small enough to avoid one
+    # ResizeStep aliasing; for sizes above BASE_SIZE, render at the
+    # target size directly so the rounded-rectangle stays sharp.
+    for size in FIRMWARE_SIZES:
+        if size <= BASE_SIZE:
+            img = render(BASE_SIZE).resize((size, size), Image.LANCZOS)
+        else:
+            img = render(size)
+        img.save(fw_dir / f"tesserae-splash-{size}.png", optimize=True)
+    print(f"Wrote {len(FIRMWARE_SIZES)} firmware splash PNGs into {fw_dir.relative_to(REPO_ROOT)}")
 
 
 if __name__ == "__main__":
