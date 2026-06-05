@@ -38,9 +38,10 @@ export async function getCircuit(circuitId) {
 }
 
 // Render a circuit outline as an inline SVG. Bauhaus-bold stroke —
-// stroke-width 36 is roughly 3.6% of the viewBox width, so the path
-// reads as a confident diagram inside the .f1-track card rather than
-// a thin line floating in space. The track strip is hidden on cells
+// stroke-width 28 is roughly 2.8% of the viewBox width: confident
+// enough to read as a deliberate diagram inside the .f1-track card,
+// without crowding tight track sections (chicanes, hairpins) into
+// solid blobs the way 36 did. The track strip is hidden on cells
 // too narrow to render it cleanly (see ``.f1-track`` in
 // spectra-widgets.css), so we don't need a small-size floor here.
 //
@@ -61,6 +62,6 @@ export function trackSvg(circuit, opts = {}) {
     <svg viewBox="${circuit.viewBox}" preserveAspectRatio="xMidYMid meet"
          style="display:block">
       <path d="${circuit.d}" fill="none" stroke="${stroke}"
-            stroke-width="36" stroke-linejoin="round" stroke-linecap="round" />
+            stroke-width="28" stroke-linejoin="round" stroke-linecap="round" />
     </svg>`;
 }

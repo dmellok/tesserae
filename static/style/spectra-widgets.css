@@ -778,7 +778,7 @@
      across all 19 themes without a bespoke colour per palette. */
   background: var(--surface-sunken);
   border-radius: var(--radius-1);
-  padding: var(--space-3);
+  padding: var(--space-5);
 }
 /* SVG renders at its viewBox-derived intrinsic aspect ratio and is
    shrunk inside the card so the path has breathing room and the
