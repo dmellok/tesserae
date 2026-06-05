@@ -170,3 +170,73 @@ def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
     # bottom) lands on the LEFT half.
     assert _decode_pixel(out, 200, 240, 800) == blue_nibble  # mid of left half
     assert _decode_pixel(out, 600, 240, 800) == red_nibble  # mid of right half
+
+
+def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
+    """Reported bug: user runs the device calibration on a 7.3"
+    PhotoPainter and picks the portrait option. The device record
+    then has panel.w=480, panel.h=800 (portrait composition). The
+    panel hardware is still landscape-native (800w × 480h fixed in
+    firmware) — packing at the panel arg's 480×800 stride puts the
+    bytes back at 240 bytes/row vs the firmware's 400, the ghosts
+    return.
+
+    Fix: the renderer resolves the firmware-native dims from the
+    panel's pixel count (800 × 480 = 384000 → 800×480 landscape),
+    rotates the portrait composition 90° CW to fit, and packs at
+    800×480 regardless of which orientation the user calibrated
+    for."""
+    # Portrait composition at the panel.w × panel.h shape: red TOP,
+    # blue BOTTOM. Composer paints this for a user with portrait
+    # calibration on the PhotoPainter.
+    img = Image.new("RGB", (480, 800), "white")
+    img.paste((255, 0, 0), (0, 0, 480, 400))
+    img.paste((0, 0, 255), (0, 400, 480, 800))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    out = esp.transform(
+        _png_bytes(img),
+        panel=Panel(w=480, h=800),  # PORTRAIT calibration on the PhotoPainter
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    # Output is the firmware-native 800×480 landscape buffer — 192000
+    # bytes at 400 bytes/row — regardless of which calibration the
+    # user picked.
+    assert len(out) == 800 * 480 // 2
+
+    red_nibble = 0x3
+    blue_nibble = 0x5
+    # CW rotation: red (top of portrait) → right of landscape; blue
+    # (bottom of portrait) → left of landscape.
+    assert _decode_pixel(out, 200, 240, 800) == blue_nibble
+    assert _decode_pixel(out, 600, 240, 800) == red_nibble
+
+
+def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
+    """Symmetric case: a 13.3" Waveshare Spectra 6 is portrait native
+    (1200×1600). If the user calibrates landscape, panel arrives as
+    (1600, 1200). The renderer must still pack at 1200×1600 portrait
+    (firmware-fixed) and rotate the landscape composition to fit."""
+    # Landscape composition at the panel.w × panel.h shape: red LEFT,
+    # blue RIGHT.
+    img = Image.new("RGB", (1600, 1200), "white")
+    img.paste((255, 0, 0), (0, 0, 800, 1200))
+    img.paste((0, 0, 255), (800, 0, 1600, 1200))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    out = esp.transform(
+        _png_bytes(img),
+        panel=Panel(w=1600, h=1200),  # landscape calibration on the 13.3"
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    # Output is the firmware-native 1200×1600 portrait buffer.
+    assert len(out) == 1200 * 1600 // 2
+
+    red_nibble = 0x3
+    blue_nibble = 0x5
+    # CW rotation: red (left of landscape) → top of portrait; blue
+    # (right of landscape) → bottom of portrait.
+    assert _decode_pixel(out, 600, 400, 1200) == red_nibble
+    assert _decode_pixel(out, 600, 1200, 1200) == blue_nibble

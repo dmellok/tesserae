@@ -7,35 +7,40 @@ Wire contract:
 
 * Exactly ``width * height / 2`` bytes — 960000 for the 13.3" Waveshare,
   192000 for the 7.3" PhotoPainter.
-* Buffer is packed at the **panel's native hardware orientation** —
-  ``panel.w × panel.h`` directly. The firmware streams the bytes
-  straight to SPI with no resize / rotate, so the device record's
-  panel.w / panel.h must match the firmware's hardware-configured row
-  stride. Two shipped cases:
+* Buffer is packed at the **panel's firmware-native hardware
+  orientation** — NOT at the composition orientation the user picked
+  during calibration. The firmware streams the bytes straight to SPI
+  with no resize / rotate, so the bin's row stride must match the
+  panel hardware. Two shipped cases:
 
-  * Waveshare 13.3" Spectra 6 — portrait native: ``panel.w = 1200,
-    panel.h = 1600``. The bin is 1200 wide × 1600 tall.
-  * Waveshare 7.3" PhotoPainter (ESP32-S3) — landscape native:
-    ``panel.w = 800, panel.h = 480``. The bin is 800 wide × 480 tall.
+  * Waveshare 13.3" Spectra 6 — portrait native: 1200 wide × 1600
+    tall.
+  * Waveshare 7.3" PhotoPainter (ESP32-S3) — landscape native: 800
+    wide × 480 tall.
 
-  Packing at min/max-swapped dims (the old "force portrait" path)
-  paints garbled vertical ghosts on the 7.3" PhotoPainter because the
-  firmware feeds it a 400-byte/row stride and the renderer was
-  emitting 240-byte rows.
+  Packing at the user's composition orientation paints garbled
+  vertical ghosts when calibration disagrees with the panel hardware
+  (e.g. user picks portrait calibration on the landscape-native
+  PhotoPainter).
 
 * 4-bpp packed, scanline order, no row padding. High nibble = even
   column, low nibble = odd column.
 
 Pipeline:
 
-1. If the input composition's orientation doesn't match the panel's
-   (i.e. input landscape vs panel portrait, or vice versa), rotate
-   90° CW so the input's left edge lands at the panel's top edge. On
-   matching orientations the input passes through.
-2. Apply ``panel.flip`` (180° rotation for upside-down mounts).
-3. Letterbox (white) to fit ``panel.w × panel.h`` exactly.
-4. Apply per-device underscan if set.
-5. Pack at ``panel.w × panel.h``.
+1. Resolve the firmware-native (w, h) from the panel's pixel count.
+   Both supported ESP32 panels have unique pixel counts so the
+   lookup is unambiguous. Unknown sizes fall back to packing at the
+   panel arg unchanged, matching pre-v0.19.19 behaviour.
+2. If the input image's orientation doesn't match the firmware's,
+   rotate 90° CW so its left edge lands at the panel's top edge.
+   This rotation covers both: (a) compositions rendered at the
+   user's calibration orientation that doesn't match the firmware,
+   and (b) ad-hoc input PNGs that arrive at a non-matching shape.
+3. Apply ``panel.flip`` (180° rotation for upside-down mounts).
+4. Letterbox (white) to fit the firmware-native dims exactly.
+5. Apply per-device underscan if set.
+6. Pack at the firmware-native dims.
 """
 
 from __future__ import annotations
@@ -54,6 +59,27 @@ DEFAULTS: dict[str, Any] = {
     "contrast": 1.0,
 }
 
+# Firmware-native (w, h) per supported ESP32 panel, keyed by pixel
+# count. The panel hardware fixes its row stride; the user's
+# calibration orientation only determines the composition canvas.
+# Looking up by area lets us accept the panel arg in either
+# orientation (e.g. (800, 480) or (480, 800) both resolve to the
+# PhotoPainter's 800w × 480h native stride).
+_PANEL_FIRMWARE_NATIVE: dict[int, tuple[int, int]] = {
+    800 * 480: (800, 480),  # Waveshare 7.3" PhotoPainter — landscape
+    1200 * 1600: (1200, 1600),  # Waveshare 13.3" Spectra 6 — portrait
+}
+
+
+def _firmware_native_dims(panel: Panel) -> tuple[int, int]:
+    """Return the firmware-native (w, h) for ``panel``.
+
+    Looked up by pixel count from ``_PANEL_FIRMWARE_NATIVE``. An
+    unknown size (custom panel, future hardware) falls back to the
+    panel arg unchanged — the caller assumes the firmware stride
+    matches whatever orientation the user has configured."""
+    return _PANEL_FIRMWARE_NATIVE.get(panel.w * panel.h, (panel.w, panel.h))
+
 
 def _setting(settings: dict[str, Any], key: str) -> Any:
     return settings.get(key, DEFAULTS[key])
@@ -61,15 +87,13 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     img = Image.open(io.BytesIO(png_bytes))
-    # Pack at the panel's native dims — see module docstring for why
-    # the old min/max swap was wrong for landscape-native devices.
-    native_w = panel.w
-    native_h = panel.h
-    panel_landscape = native_w > native_h
+    native_w, native_h = _firmware_native_dims(panel)
+    firmware_landscape = native_w > native_h
     img_landscape = img.size[0] > img.size[1]
-    if panel_landscape != img_landscape:
-        # Orientation mismatch — rotate 90° CW so the input's left edge
-        # lands at the panel's top edge. PIL ``rotate(angle)`` is
+    if firmware_landscape != img_landscape:
+        # Orientation mismatch (either input PNG or user-calibrated
+        # composition) — rotate 90° CW so the input's left edge lands
+        # at the panel's top edge. PIL ``rotate(angle)`` is
         # counter-clockwise; ``-90`` gives CW.
         img = img.rotate(-90, expand=True)
     if panel.flip:
