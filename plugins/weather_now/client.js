@@ -121,8 +121,29 @@ export default function render(shadow, ctx) {
     ? `<div class="w-title"><i class="ph-bold ph-map-pin" style="color:var(--accent-4)"></i><h3>${escapeHtml(label)}</h3></div>`
     : "";
 
+  // At lg the hero condition icon really wants to be the centrepiece —
+  // a 2.6em sun next to a big temperature reads OK but doesn't fill a
+  // 1200×800 cell. ``@container (min-width: 700px)`` switches the hero
+  // to a "left column = hero icon, right column = temp / sub / metric
+  // strip" layout, with the icon scaled up to clamp(8em, 26cqw, 14em).
+  // Smaller cells keep the existing compact stack.
+  const layout = `
+    @container (min-width: 700px) {
+      .wx-body { gap: var(--space-5); }
+      .wx-now {
+        flex: 0 0 auto;
+        gap: var(--space-6);
+        align-items: center;
+      }
+      .wx-now .ph-bold { font-size: clamp(8em, 26cqw, 14em); line-height: 1; }
+      .wx-now .wx-temp { font-size: clamp(4em, 11cqw, 7em); }
+      .wx-now .wx-cond { font-size: var(--fs-lead); }
+    }
+  `;
+
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/style/spectra-widgets.css">
+    <style>${layout}</style>
     <div class="w" data-widget="weather_now">
       ${titleBar}
       <div class="w-body wx-body">

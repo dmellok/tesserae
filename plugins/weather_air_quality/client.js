@@ -68,8 +68,117 @@ export default function render(shadow, ctx) {
       </div>`;
   }).join("");
 
+  // Horizontal AQI band scale — six coloured segments showing the
+  // 0/20/40/60/80/100+ European AQI bands with a marker pip sitting at
+  // the current value. Gives the widget a real visual anchor: instead
+  // of "22 European AQI / FAIR" reading as just two text rows, the
+  // scale shows at a glance "you're sitting in the lower-half of band
+  // 2". Band boundaries match Open-Meteo's European AQI segmentation
+  // (0–20 Good, 20–40 Fair, 40–60 Moderate, 60–80 Poor, 80–100 Very
+  // Poor, 100+ Extreme).
+  const BAND_STOPS = [0, 20, 40, 60, 80, 100];
+  const BAND_LABELS = ["GOOD", "FAIR", "MOD", "POOR", "V.POOR", "EXT"];
+  const eaqiNum = Number(eaqi);
+  const scaleVal = Number.isFinite(eaqiNum) ? Math.max(0, Math.min(120, eaqiNum)) : null;
+  const scaleSegments = BAND_STOPS.map((_, i) => {
+    const segAccent = bandAccent(i);
+    const segLabel = BAND_LABELS[i] || "";
+    return `
+      <div class="aqi-seg" style="background:${segAccent}">
+        <span class="aqi-seg-label">${segLabel}</span>
+      </div>`;
+  }).join("");
+  // Marker position as a percentage across the 0..120 scale (we cap at
+  // 120 so an extreme reading still has a visible pip rather than
+  // disappearing off the right edge).
+  const markerPct = scaleVal != null ? (scaleVal / 120) * 100 : null;
+  const scale = scaleVal != null ? `
+    <div class="aqi-scale">
+      <div class="aqi-segs">${scaleSegments}</div>
+      <div class="aqi-marker" style="left:${markerPct.toFixed(1)}%">
+        <span class="aqi-marker-pip" style="background:${accent}"></span>
+        <span class="aqi-marker-value" style="color:${accent}">${escapeHtml(eaqi ?? "—")}</span>
+      </div>
+    </div>` : "";
+
+  const layout = `
+    .aqi-scale {
+      position: relative;
+      width: 100%;
+      padding-top: 1.8em;
+    }
+    .aqi-segs {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: var(--stroke-1);
+      height: 1.2em;
+    }
+    .aqi-seg {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .aqi-seg-label {
+      font-size: 0.62em;
+      font-weight: var(--fw-bold);
+      letter-spacing: 0.06em;
+      color: var(--on-accent);
+      text-transform: var(--label-transform, uppercase);
+      white-space: nowrap;
+    }
+    @container (max-width: 360px) {
+      .aqi-seg-label { display: none; }
+    }
+    .aqi-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 0;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2em;
+    }
+    .aqi-marker-pip {
+      width: 0.7em;
+      height: 1.6em;
+      border-radius: 0.15em;
+      border: var(--stroke-2) solid var(--surface);
+      box-shadow: 0 0 0 var(--stroke-1) currentColor;
+      flex: 0 0 auto;
+      margin-top: 1.2em;
+    }
+    .aqi-marker-value {
+      font-size: var(--fs-label);
+      font-weight: var(--fw-black);
+      letter-spacing: var(--ls-tight);
+      order: -1;
+    }
+    /* Hero pill grows so the band label reads as the headline next to
+       the AQI number rather than a footnote below it. */
+    .aqi-hero {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+    .aqi-band {
+      font-size: var(--fs-label);
+      font-weight: var(--fw-black);
+      letter-spacing: 0.1em;
+      text-transform: var(--label-transform, uppercase);
+      padding: 0.3em 0.7em;
+      color: var(--on-accent);
+      border-radius: var(--pill-radius, var(--radius-0));
+    }
+  `;
+
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="weather_air_quality">
       <div class="w-title">
         <i class="ph-bold ph-wind" style="color:${accent}"></i>
@@ -80,11 +189,14 @@ export default function render(shadow, ctx) {
         <div class="status-hero">
           <i class="ph-bold ph-gauge" style="color:${accent}"></i>
           <div class="lockup">
-            <span class="status-state">${escapeHtml(eaqi ?? "—")}</span>
+            <div class="aqi-hero">
+              <span class="status-state">${escapeHtml(eaqi ?? "—")}</span>
+              <span class="aqi-band" style="background:${accent}">${escapeHtml(band)}</span>
+            </div>
             <span class="status-sub">European AQI</span>
           </div>
         </div>
-        <span class="pill" style="background:${accent}">${escapeHtml(band)}</span>
+        ${scale}
         ${grid ? `<div class="status-grid">${grid}</div>` : ""}
       </div>
     </div>`;
