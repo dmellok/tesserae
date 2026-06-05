@@ -142,6 +142,13 @@ def settings_area(area: str) -> str | Response:
             (_app_raw.get("webhook_token_secret") or _app_raw.get("webhook_token") or "").strip()
         )
 
+    # Auth state for the System → Authentication card. Cheap to compute,
+    # so we read it for any tab — the template only uses it on System.
+    from app import auth as _auth
+
+    system_password_set = _auth.password_is_set(settings_store())
+    system_password_required = _auth.password_required(settings_store())
+
     return render_template(
         "settings.html",
         sections=sections,
@@ -171,6 +178,8 @@ def settings_area(area: str) -> str | Response:
         system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,
         system_webhook_reveal_token=system_webhook_reveal_token,
+        system_password_set=system_password_set,
+        system_password_required=system_password_required,
         trmnl_token_reveal=trmnl_token_reveal,
     )
 

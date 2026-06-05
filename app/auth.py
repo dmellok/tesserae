@@ -160,6 +160,25 @@ def verify_password(settings: SettingsStore, password: str) -> bool:
     return hmac.compare_digest(derived, expected)
 
 
+def clear_password(settings: SettingsStore) -> None:
+    """Wipe the auth section. Used by ``tesserae --reset-password`` so the
+    next request drops to ``/setup`` and a fresh password can be picked."""
+    settings.update_section("auth", {})
+
+
+def password_required(settings: SettingsStore) -> bool:
+    """True iff the gate should enforce a session. The Settings UI exposes
+    a switch that writes ``auth.disabled: true`` here; default is enforce."""
+    return not bool(settings.get_section("auth").get("disabled"))
+
+
+def set_password_disabled(settings: SettingsStore, disabled: bool) -> None:
+    """Flip the disabled flag without touching the stored hash. Re-enabling
+    later restores the existing password — useful as a temporary "trust LAN"
+    toggle without losing the credential."""
+    settings.patch_section("auth", {"disabled": bool(disabled)})
+
+
 # -- session helpers ---------------------------------------------------
 
 
@@ -233,6 +252,14 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
         # bypass auth.
         if current_app.config.get("HA_INGRESS_MODE") and request.headers.get("X-Ingress-Path"):
             return None
+        # Admin opted out of the password (Settings → System → Auth).
+        # Private network + loopback clients reach anything; public IPs
+        # still 403 so a disabled-auth LAN install doesn't expose the
+        # admin UI to the open internet by accident.
+        if not password_required(settings):
+            if _is_loopback() or _is_private_client():
+                return None
+            return Response("forbidden", status=403)
         # Compose is loopback-only (the in-process Playwright renderer)
         # OR authed (the editor's preview iframe loads it over the LAN).
         if _path_is_loopback_only(path):

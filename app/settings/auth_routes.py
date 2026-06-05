@@ -66,3 +66,64 @@ def logout_view() -> Response:
     auth.logout()
     log_auth("logout", "ok")
     return redirect(url_for("auth.login_view"))
+
+
+# -- Settings → System → Authentication --------------------------------
+# Three endpoints for managing the admin password while logged in.
+# Disable requires ``confirmed=1`` so a stray POST can't silently drop
+# auth — the Settings switch sets it after a JS confirm() dialog. The
+# matching CLI escape hatch (``tesserae --reset-password``) lives in
+# ``app.main`` for when the user has lost the password entirely.
+
+
+@bp.post("/settings/system/auth/change-password")
+def change_password() -> Response:
+    settings = settings_store()
+    if not auth.password_is_set(settings):
+        flash("No password is set — visit /setup first.", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    current = request.form.get("current_password", "")
+    new_pw = request.form.get("new_password", "")
+    confirm = request.form.get("new_password_confirm", "")
+    if not auth.verify_password(settings, current):
+        log_auth("change_password", "denied", error="incorrect current password")
+        flash("Current password didn't match.", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    if len(new_pw) < 8:
+        flash("New password must be at least 8 characters.", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    if new_pw != confirm:
+        flash("New passwords don't match.", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    auth.set_password(settings, new_pw)
+    log_auth("change_password", "ok")
+    flash("Password updated.", "ok")
+    return redirect(url_for("auth.settings_area", area="system"))
+
+
+@bp.post("/settings/system/auth/disable")
+def disable_password_view() -> Response:
+    settings = settings_store()
+    if request.form.get("confirmed") != "1":
+        flash("Disable requires confirmation.", "error")
+        return redirect(url_for("auth.settings_area", area="system"))
+    auth.set_password_disabled(settings, True)
+    log_auth("disable_password", "ok")
+    flash(
+        "Password disabled. Anyone on the LAN can reach the admin UI; "
+        "public IPs are still blocked. Re-enable here when you're done.",
+        "ok",
+    )
+    return redirect(url_for("auth.settings_area", area="system"))
+
+
+@bp.post("/settings/system/auth/enable")
+def enable_password_view() -> Response:
+    settings = settings_store()
+    auth.set_password_disabled(settings, False)
+    log_auth("enable_password", "ok")
+    if not auth.password_is_set(settings):
+        flash("Password protection re-enabled. Pick a password.", "ok")
+        return redirect(url_for("auth.setup"))
+    flash("Password protection re-enabled.", "ok")
+    return redirect(url_for("auth.settings_area", area="system"))

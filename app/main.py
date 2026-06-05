@@ -64,7 +64,18 @@ def _serve(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--host", default="0.0.0.0", help="Bind host (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8765, help="Bind port (default: 8765)")
+    parser.add_argument(
+        "--reset-password",
+        action="store_true",
+        help="Clear the stored admin password and exit. The next request "
+        "drops to /setup so a fresh one can be picked. Resolves the data "
+        "root from TESSERAE_DATA_ROOT or <repo>/data.",
+    )
     args = parser.parse_args(argv)
+
+    if args.reset_password:
+        _reset_password()
+        return
 
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
@@ -99,6 +110,36 @@ def _serve(argv: list[str] | None = None) -> None:
         args.port,
     )
     serve(app, host=args.host, port=args.port, threads=8, ident="tesserae")
+
+
+def _reset_password() -> None:
+    """Implementation of ``tesserae --reset-password``. Loads the settings
+    store from the same data-root resolution the app factory uses
+    (``TESSERAE_DATA_ROOT`` env, else ``<repo>/data``), wipes the auth
+    section, and prints what happened. Designed to run without booting
+    Flask so there's nothing to race with."""
+    import os
+    from pathlib import Path
+
+    from app import auth
+    from app.state.settings_store import SettingsStore
+
+    env_root = os.environ.get("TESSERAE_DATA_ROOT", "").strip()
+    data_root = Path(env_root) if env_root else REPO_ROOT / "data"
+    settings_path = data_root / "core" / "settings.json"
+
+    if not settings_path.exists():
+        print(f"No settings.json at {settings_path} — nothing to reset.")
+        return
+
+    store = SettingsStore(settings_path)
+    was_set = auth.password_is_set(store)
+    auth.clear_password(store)
+    if was_set:
+        print(f"Cleared admin password in {settings_path}.")
+        print("Next page load drops to /setup so a fresh one can be picked.")
+    else:
+        print(f"No admin password was set in {settings_path}. Nothing to clear.")
 
 
 if __name__ == "__main__":

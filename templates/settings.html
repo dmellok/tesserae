@@ -641,6 +641,54 @@ docker compose up -d</code></pre>
   {% endif %}
 
   <section class="card">
+    {{ card_head('Authentication', icon_name='lock-key', blurb='Change the admin password or turn off the password gate for a trusted LAN. Public IPs are blocked either way. Locked out? Run tesserae --reset-password on the host.') }}
+
+    <p>
+      Status:
+      {% if not system_password_required %}
+        <span class="pill is-warn">password disabled</span>
+        <span class="muted">— private-network clients reach the admin UI without a prompt.</span>
+      {% elif system_password_set %}
+        <span class="pill is-ok">password set</span>
+      {% else %}
+        <span class="pill is-warn">no password</span>
+      {% endif %}
+    </p>
+
+    {% if system_password_set and system_password_required %}
+    <form method="post" action="{{ url_for('auth.change_password') }}" class="form">
+      <p class="device-subhead">Change password</p>
+      {{ text_input('auth-current', 'current_password', 'Current password', value='', required=True, type='password', autocomplete='current-password') }}
+      {{ text_input('auth-new', 'new_password', 'New password', value='', required=True, type='password', autocomplete='new-password', help='At least 8 characters.') }}
+      {{ text_input('auth-confirm', 'new_password_confirm', 'Confirm new password', value='', required=True, type='password', autocomplete='new-password') }}
+      <div class="actions">{{ button('Update password', icon='key') }}</div>
+    </form>
+    {% endif %}
+
+    <p class="device-subhead">Password gate</p>
+    {% if system_password_required %}
+    {# Disable requires a JS confirm so a stray click can't silently drop
+       auth; the server-side handler also requires confirmed=1 (a hand-
+       crafted POST without the hidden field gets a flash + bounce). #}
+    <form method="post" action="{{ url_for('auth.disable_password_view') }}" class="form"
+          onsubmit="return confirm('Disable the admin password?\n\nAnyone on your LAN will reach the admin UI without a prompt. Public IPs are still blocked. The stored hash is preserved — re-enable here to restore it.\n\nLocked out later? Run: tesserae --reset-password');">
+      <input type="hidden" name="confirmed" value="1">
+      <p class="field-help">Turn the gate off if you're on a trusted home network and the password prompt is in your way. Flipping it back on restores the same password.</p>
+      <div class="actions">{{ button('Disable password', icon='lock-open', variant='ghost') }}</div>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('auth.enable_password_view') }}" class="form">
+      <p class="field-help">Re-enable the gate. If a password was previously set it still works; otherwise you'll land on <code>/setup</code> to pick one.</p>
+      <div class="actions">{{ button('Enable password', icon='lock', variant='primary') }}</div>
+    </form>
+    {% endif %}
+
+    <p class="field-help">
+      Forgot your password? Run <code>tesserae --reset-password</code> on the host. That clears the stored hash so the next page load drops to <code>/setup</code>.
+    </p>
+  </section>
+
+  <section class="card">
     {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth) — keep them somewhere safe.') }}
 
     <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">

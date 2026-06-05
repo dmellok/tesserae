@@ -111,7 +111,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - **Data export / import** — pack the entire install (pages, themes, devices, plugin settings, secrets) into a single ZIP; restore on a fresh install. Validated against JSON Schemas before writing.
 - **Webhook push** — `POST /api/v1/push` with a bearer token. Re-renders a named page and fans the frame out to every device bound to it. Generate / rotate the token from Settings → System → Webhook. Useful from HA automations, cron, GitHub Actions.
 - **Event log** captures every push, schedule fire, and discovery event for the History view.
-- **Auth**: password setup on first request, persistent session, logout.
+- **Auth**: password setup on first run, persistent session, change / disable / re-enable from Settings → System, and a `tesserae --reset-password` CLI escape hatch when the password is lost.
 
 ### Networking
 
