@@ -1,25 +1,34 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs %}
+{% from "_components.html" import settings_tabs, button %}
 {% block title %}Settings: Themes — Tesserae{% endblock %}
 {% block head_extra %}
 {# Spectra token cascade — only loaded on this page (and compose.html);
    admin chrome elsewhere doesn't need them. spectra-tokens defines the
    bundled [data-theme="..."] blocks; spectra-base16 layers the
-   editor-palette themes. themes.css paints the card grid using those
-   variables, so the swatches always match what the editor preview
-   will paint. #}
+   editor-palette themes; user.css drops in any custom themes the user
+   has saved. themes.css paints the card grid using those variables,
+   so the swatches always match what the editor preview will paint. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
+<link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
 {% endblock %}
 {% block main %}
-<header class="page-head">
-  <h1><i class="ph ph-palette"></i> Themes</h1>
-  <p class="lede">
-    Browse every bundled theme. Each one is a complete Spectra palette
-    (surfaces, text, six accents) selectable per page or per cell from
-    the editor. Builder + image-to-theme land in a follow-up.
-  </p>
+<header class="page-head themes-head">
+  <div>
+    <h1><i class="ph ph-palette"></i> Themes</h1>
+    <p class="lede">
+      Browse bundled themes and your own. Each is a complete Spectra
+      palette (surfaces, text, six accents) selectable per page or per
+      cell from the editor. Duplicate a bundled theme to start your own.
+    </p>
+  </div>
+  <div class="themes-head-actions">
+    <a class="button primary" href="{{ url_for('themes.new') }}">
+      <i class="ph ph-plus" aria-hidden="true"></i>
+      <span>New theme</span>
+    </a>
+  </div>
 </header>
 
 {{ settings_tabs(active_area) }}
@@ -73,6 +82,28 @@
             <span class="theme-preview-pill theme-preview-pill--a5">A5</span>
           </div>
         </div>
+        {# Actions row — bundled themes get Duplicate only (read-only
+           upstream); user themes get Edit + Delete. The forms are
+           inline-style so the buttons can sit next to a link. #}
+        <div class="theme-card-actions">
+          {% if theme.user %}
+          <a class="button ghost" href="{{ url_for('themes.edit', theme_id=theme.id) }}">
+            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+          </a>
+          <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline"
+                onsubmit="return confirm('Delete {{ theme.name }}? Pages and cells using it fall back to Light.');">
+            <button type="submit" class="button ghost danger" aria-label="Delete theme">
+              <i class="ph ph-trash" aria-hidden="true"></i>
+            </button>
+          </form>
+          {% else %}
+          <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
+            <button type="submit" class="button ghost">
+              <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
+            </button>
+          </form>
+          {% endif %}
+        </div>
       </article>
       {% endfor %}
     </div>
@@ -81,7 +112,7 @@
 {% endfor %}
 
 <p class="theme-footnote">
-  {{ total }} bundled theme{{ '' if total == 1 else 's' }}.
-  Builder + image-to-theme coming in M-B / M-C.
+  {{ total }} theme{{ '' if total == 1 else 's' }} total.
+  Click <em>Duplicate</em> on any bundled card to make it editable.
 </p>
 {% endblock %}

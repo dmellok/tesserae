@@ -1,0 +1,183 @@
+{% extends "_base.html" %}
+{% from "_components.html" import settings_tabs, button, text_input, select_field, color_input %}
+{% block title %}{{ 'New theme' if is_new else theme.name }} — Themes — Tesserae{% endblock %}
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
+<link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
+{% endblock %}
+{% block main %}
+<header class="page-head themes-head">
+  <div>
+    <h1><i class="ph ph-palette"></i> {{ 'New theme' if is_new else 'Edit theme' }}</h1>
+    <p class="lede">
+      Pick a colour for each token. The preview on the right updates as
+      you type. Changes save when you click <em>Save theme</em>; nothing
+      lands on disk until then.
+    </p>
+  </div>
+  <div class="themes-head-actions">
+    <a class="button ghost" href="{{ url_for('themes.index') }}">
+      <i class="ph ph-arrow-left" aria-hidden="true"></i>
+      <span>All themes</span>
+    </a>
+  </div>
+</header>
+
+{{ settings_tabs(active_area) }}
+
+<form method="post" action="{{ action_url }}" class="theme-builder" data-theme-builder>
+  <div class="theme-builder-grid">
+
+    {# Left column: metadata + token inputs grouped by role. Form
+       inputs use the dataclass field names directly so the route can
+       round-trip with a single ``UserTheme(**form_dict)`` after
+       sanitising via ``_theme_from_form``. #}
+    <div class="theme-builder-form">
+
+      <section class="card">
+        <header class="card-head"><h2><i class="ph ph-tag"></i> Identity</h2></header>
+        {{ text_input('theme-name', 'name', 'Name', value=theme.name, required=True,
+                      help='Shown in the picker. The slug (URL id) is generated from this.') }}
+        {{ select_field('theme-mode', 'mode', 'Mode',
+                        value=theme.mode,
+                        options=[
+                          {'value':'light', 'label':'Light'},
+                          {'value':'dark', 'label':'Dark'},
+                        ],
+                        help='Informational; seeds sensible defaults when M-C image-to-theme lands.') }}
+        {{ text_input('theme-font', 'font_family', 'Font family (optional)',
+                      value=theme.font_family or '',
+                      placeholder='"Inter", system-ui, sans-serif',
+                      help='Pass through as --font-family. Leave blank to inherit the Spectra default.') }}
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h2><i class="ph ph-stack"></i> Surfaces</h2></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-bg', 'bg', 'Page background', value=theme.bg) }}
+          {{ color_input('tok-surface', 'surface', 'Card surface', value=theme.surface) }}
+          {{ color_input('tok-surface-sunken', 'surface_sunken', 'Sunken surface', value=theme.surface_sunken) }}
+          {{ color_input('tok-edge', 'edge', 'Edge / divider', value=theme.edge) }}
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><h2><i class="ph ph-text-aa"></i> Text</h2></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-text-primary', 'text_primary', 'Primary', value=theme.text_primary) }}
+          {{ color_input('tok-text-secondary', 'text_secondary', 'Secondary', value=theme.text_secondary) }}
+          {{ color_input('tok-text-muted', 'text_muted', 'Muted', value=theme.text_muted) }}
+          {{ color_input('tok-on-accent', 'on_accent', 'On accent (text colour on coloured backgrounds)', value=theme.on_accent) }}
+        </div>
+      </section>
+
+      {% for n in range(1, 7) %}
+      <section class="card">
+        <header class="card-head"><h2><i class="ph ph-circles-three"></i> Accent {{ n }}</h2></header>
+        <div class="theme-builder-fields">
+          {{ color_input('tok-a' ~ n, 'accent_' ~ n, 'Accent ' ~ n, value=theme['accent_' ~ n|string]) }}
+          {{ color_input('tok-a' ~ n ~ '-soft', 'accent_' ~ n ~ '_soft', 'Soft tint',
+                         value=theme['accent_' ~ n ~ '_soft'|string],
+                         help='Used for tinted pill backgrounds. Mix of the accent with the page background works well.') }}
+        </div>
+      </section>
+      {% endfor %}
+
+      <div class="theme-builder-actions">
+        {{ button(('Save theme' if is_new else 'Update theme'), icon='floppy-disk') }}
+        {% if not is_new %}
+        <a class="button ghost" href="{{ url_for('themes.duplicate', theme_id=theme.id) }}"
+           onclick="return confirm('Duplicate this theme? You\'ll be editing the copy.');">
+          <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Right column: sticky live preview. The preview block re-uses
+       the same data-theme="" cascade the browse cards use; an inline
+       <style> in the preview overrides individual variables as the
+       user edits the form, so the swatches update without a round
+       trip. #}
+    <aside class="theme-builder-preview" data-theme-preview>
+      <div class="theme-preview-pane" data-theme-preview-pane
+           data-theme="{{ theme.id if not is_new else 'light' }}">
+        <header class="theme-preview-pane-head">
+          <h3 data-preview-name>{{ theme.name or 'New theme' }}</h3>
+          <code data-preview-id>{{ theme.id if not is_new else 'user-…' }}</code>
+        </header>
+        <div class="theme-swatches" aria-hidden="true">
+          <div class="theme-swatch theme-swatch--bg"></div>
+          <div class="theme-swatch theme-swatch--surface"></div>
+          <div class="theme-swatch theme-swatch--text"></div>
+          <div class="theme-swatch theme-swatch--accent-1"></div>
+          <div class="theme-swatch theme-swatch--accent-2"></div>
+          <div class="theme-swatch theme-swatch--accent-3"></div>
+          <div class="theme-swatch theme-swatch--accent-4"></div>
+          <div class="theme-swatch theme-swatch--accent-5"></div>
+          <div class="theme-swatch theme-swatch--accent-6"></div>
+        </div>
+        <div class="theme-preview">
+          <p class="theme-preview-line">The quick brown fox jumps over the lazy dog</p>
+          <p class="theme-preview-line theme-preview-line--soft">Soft / muted secondary line below the headline</p>
+          <div class="theme-preview-pills">
+            {% for n in range(1, 7) %}
+            <span class="theme-preview-pill theme-preview-pill--a{{ n }}">A{{ n }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        <p class="theme-preview-hint">
+          Preview reflects the form state — click <em>Save theme</em> to commit it.
+        </p>
+      </div>
+    </aside>
+  </div>
+</form>
+
+<script>
+// Live preview wiring. The pane carries data-theme="<id>" so the
+// existing cascade paints from the bundled or saved theme; as the
+// user edits any colour input we overwrite the matching CSS variable
+// inline on the pane, so the preview tracks the form state without a
+// round trip. Form names line up 1:1 with dataclass fields (e.g.
+// "accent_1" → "--accent-1"), so the mapping is mechanical.
+(function () {
+  const form = document.querySelector("[data-theme-builder]");
+  const pane = document.querySelector("[data-theme-preview-pane]");
+  if (!form || !pane) return;
+  const nameEl = pane.querySelector("[data-preview-name]");
+
+  // Token field name → CSS custom property mapping. Skip metadata
+  // fields (name / mode / font_family); those don't affect swatches.
+  function cssVar(fieldName) {
+    if (fieldName === "font_family") return "--font-family";
+    if (["name", "mode"].includes(fieldName)) return null;
+    return "--" + fieldName.replaceAll("_", "-");
+  }
+
+  function paint(input) {
+    const variable = cssVar(input.name);
+    if (variable === null) return;
+    if (input.name === "name") {
+      nameEl.textContent = input.value.trim() || "New theme";
+      return;
+    }
+    if (input.value) {
+      pane.style.setProperty(variable, input.value);
+    } else {
+      pane.style.removeProperty(variable);
+    }
+  }
+
+  // Seed the inline overrides from the form's current values so a
+  // page reload after a save round-trips visually.
+  form.querySelectorAll("input[name], select[name]").forEach(paint);
+
+  form.addEventListener("input", (ev) => {
+    if (ev.target.matches("input[name], select[name]")) paint(ev.target);
+  });
+})();
+</script>
+{% endblock %}

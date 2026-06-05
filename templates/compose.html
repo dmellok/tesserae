@@ -30,6 +30,12 @@
        which then cascade into the shadow root via inheritance. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
+  {# User themes load right after the bundled blocks so cells bound to
+     a "user-*" data-theme paint from the matching server-generated
+     rule. The endpoint is concatenated CSS; on a fresh install with
+     no user themes it returns a one-line comment, so the link tag
+     stays unconditional and the cascade order is stable. #}
+  <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   <!-- Chart.js UMD. Loaded once at the document level so every widget
        that imports static/spectra-chart.js can read window.Chart. The

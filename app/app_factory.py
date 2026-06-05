@@ -304,6 +304,12 @@ def create_app(
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
+    # User themes live alongside core stores at ``data/themes/user.json``.
+    # The store creates the directory on first save so a fresh install
+    # without any custom themes leaves no empty directory behind.
+    from app.state.user_themes import UserThemeStore
+
+    user_themes_store = UserThemeStore(data_root / "themes" / "user.json")
     # Global cap 2000; device heartbeats get a 500-row sub-cap so a busy
     # fleet can't evict push / scheduler / auth history. We also only log a
     # device event when the status actually changed (below), so steady
@@ -327,6 +333,7 @@ def create_app(
     app.config["DISCOVERY_CACHE"] = discovery_cache
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
+    app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["EVENT_LOG"] = event_log
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir

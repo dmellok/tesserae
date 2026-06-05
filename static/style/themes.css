@@ -147,3 +147,118 @@
   color: var(--t-text-muted, #837F73);
   font-size: var(--t-size-sm);
 }
+
+/* Page-head action row — sits the New-theme button next to the title. */
+.themes-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--t-space-4);
+  flex-wrap: wrap;
+}
+.themes-head-actions {
+  display: flex;
+  gap: var(--t-space-2);
+  flex-wrap: wrap;
+}
+
+/* Card actions row at the bottom of each theme card. Buttons sit on
+   the Spectra surface so they don't look glued onto a foreign theme. */
+.theme-card-actions {
+  display: flex;
+  gap: var(--t-space-2);
+  margin-top: auto;
+}
+.theme-card-actions .button {
+  flex: 1 1 auto;
+  padding: var(--t-space-2) var(--t-space-3);
+  font-size: var(--t-size-sm);
+}
+
+/* ---- Builder layout ------------------------------------------------ */
+
+.theme-builder {
+  margin-top: var(--t-space-4);
+}
+.theme-builder-grid {
+  display: grid;
+  gap: var(--t-space-4);
+}
+@media (min-width: 980px) {
+  .theme-builder-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+    align-items: start;
+  }
+}
+
+.theme-builder-form {
+  display: grid;
+  gap: var(--t-space-4);
+  min-width: 0;
+}
+.theme-builder-fields {
+  display: grid;
+  gap: var(--t-space-3);
+}
+@media (min-width: 600px) {
+  .theme-builder-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.theme-builder-actions {
+  display: flex;
+  gap: var(--t-space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Sticky preview pane on desktop so the user can edit deep down the
+   form and still see the visual result. On mobile we just let it
+   stack at the bottom of the form. */
+.theme-builder-preview {
+  position: static;
+}
+@media (min-width: 980px) {
+  .theme-builder-preview {
+    position: sticky;
+    top: calc(var(--t-space-6) + 60px);
+  }
+}
+
+.theme-preview-pane {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: var(--t-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+  font-family: var(--font-family, "Helvetica Neue", Helvetica, Arial, sans-serif);
+}
+.theme-preview-pane-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--t-space-2);
+}
+.theme-preview-pane-head h3 {
+  margin: 0;
+  font-size: var(--t-size-lg);
+}
+.theme-preview-pane-head code {
+  font-size: var(--t-size-xs);
+  color: var(--text-muted);
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.theme-preview-pane .theme-preview-pill--a2 { background: var(--accent-2); }
+.theme-preview-pane .theme-preview-pill--a4 { background: var(--accent-4); }
+.theme-preview-pane .theme-preview-pill--a6 { background: var(--accent-6); }
+.theme-preview-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--t-size-xs);
+}
