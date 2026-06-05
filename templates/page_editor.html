@@ -427,6 +427,103 @@
   </div>
 </div>
 
+{# Floating "back to top" button — appears only on small viewports
+   where the preview stacks above the cell forms (the layout's reactive
+   mode). Tap = smooth scroll to the top of the page. Press-and-drag
+   along the bottom edge moves it to the other side; the side
+   preference persists in localStorage so a left-handed user only has
+   to drag once. Hidden by CSS on desktop (≥1100px) where the preview
+   is already a sticky sidebar.
+
+   Visibility is driven by the ``is-visible`` class (not the ``hidden``
+   attribute) so the CSS slide-up + fade-in transitions actually run on
+   show/hide rather than snapping. #}
+<button type="button" class="scroll-to-preview" data-scroll-to-preview
+        aria-label="Scroll to top">
+  <i class="ph-bold ph-arrow-up" aria-hidden="true"></i>
+</button>
+
 <script src="{{ url_for('static', filename='pages/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/layout_editor.js') }}"></script>
+<script>
+(function () {
+  const btn = document.querySelector("[data-scroll-to-preview]");
+  const preview = document.querySelector(".preview-card");
+  if (!btn || !preview) return;
+
+  // Side preference: left by default; left-handed user drags once and
+  // the choice persists across visits. Stored as a plain string so any
+  // accidental sync loss falls back cleanly to the default.
+  const SIDE_KEY = "tesserae.scrollPreviewSide";
+  const initialSide = localStorage.getItem(SIDE_KEY) === "right" ? "right" : "left";
+  btn.dataset.side = initialSide;
+
+  // Visibility: show the FAB only when the preview is scrolled out of
+  // view. IntersectionObserver fires once when the threshold crosses;
+  // we toggle a class so the CSS slide-up + fade-in transitions
+  // animate the show/hide instead of snapping. The desktop hide rule
+  // still wins via the @media (min-width: 1100px) override.
+  const obs = new IntersectionObserver(
+    ([entry]) => {
+      btn.classList.toggle("is-visible", !entry.isIntersecting);
+    },
+    { threshold: 0.05 },
+  );
+  obs.observe(preview);
+
+  // Drag-to-flip: pointerdown starts a tentative gesture. If the
+  // pointer moves more than DRAG_THRESHOLD before release it's a drag
+  // (we translate the button to follow the finger, then snap to the
+  // nearer side on release). Under the threshold it's a tap, and we
+  // smooth-scroll the preview into view.
+  const DRAG_THRESHOLD = 8;
+  let downX = null;
+  let dragging = false;
+
+  btn.addEventListener("pointerdown", (ev) => {
+    downX = ev.clientX;
+    dragging = false;
+    btn.setPointerCapture(ev.pointerId);
+  });
+
+  btn.addEventListener("pointermove", (ev) => {
+    if (downX === null) return;
+    const dx = ev.clientX - downX;
+    if (!dragging && Math.abs(dx) > DRAG_THRESHOLD) {
+      dragging = true;
+      btn.classList.add("is-dragging");
+    }
+    if (dragging) {
+      btn.style.transform = `translateX(${dx}px)`;
+    }
+  });
+
+  const finish = (ev) => {
+    if (downX === null) return;
+    const startedDragging = dragging;
+    const releaseX = ev.clientX;
+    downX = null;
+    dragging = false;
+    if (startedDragging) {
+      // Flip the side anchor + clear the inline transform while the
+      // is-dragging class is still on (transitions suppressed), so the
+      // visual swap from one corner to the other is instantaneous.
+      // Strip the class one frame later, after the browser has committed
+      // the new position, so future transitions (focus ring, hover)
+      // still animate normally.
+      const side = releaseX > window.innerWidth / 2 ? "right" : "left";
+      btn.dataset.side = side;
+      btn.style.transform = "";
+      localStorage.setItem(SIDE_KEY, side);
+      requestAnimationFrame(() => btn.classList.remove("is-dragging"));
+    } else {
+      // No drag — treat as tap. The transform was never applied so
+      // there's nothing to clear besides the (never-added) class.
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+  btn.addEventListener("pointerup", finish);
+  btn.addEventListener("pointercancel", finish);
+})();
+</script>
 {% endblock %}

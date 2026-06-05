@@ -528,6 +528,124 @@
   margin: var(--t-space-2) var(--t-space-1) 0;
 }
 
+/* Floating "back to top" FAB — only meaningful on the reactive
+   (mobile) layout where the preview card is stacked at the top and a
+   long cell list pushes it off-screen. Hidden on desktop where the
+   preview is already a sticky sidebar. Side preference lives on the
+   button as data-side="left|right" so a left-handed user can drag it
+   once and the choice persists via localStorage.
+
+   Visibility is class-driven (`is-visible`) so the entry/exit
+   animations actually run. Default state is fade-and-slide-out below
+   the viewport with pointer-events off; adding `is-visible` lifts the
+   FAB up + fades it in. */
+.scroll-to-preview {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--t-space-4));
+  left: calc(env(safe-area-inset-left, 0px) + var(--t-space-4));
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: var(--t-shadow-xl);
+  cursor: pointer;
+  /* touch-action: none keeps the browser from claiming the gesture for
+     scrolling once the user starts dragging the FAB horizontally. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  z-index: 1000;
+  /* Hidden by default: dropped below its anchor + transparent + inert.
+     The is-visible class lifts it back into place. */
+  opacity: 0;
+  transform: translateY(140%);
+  pointer-events: none;
+  will-change: transform, opacity;
+  transition:
+    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.22s ease,
+    background 0.15s ease,
+    box-shadow 0.2s ease;
+}
+.scroll-to-preview[data-side="right"] {
+  left: auto;
+  right: calc(env(safe-area-inset-right, 0px) + var(--t-space-4));
+}
+.scroll-to-preview.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.scroll-to-preview:hover,
+.scroll-to-preview:focus-visible {
+  background: var(--t-accent-hover);
+  outline: none;
+}
+.scroll-to-preview:focus-visible {
+  box-shadow:
+    var(--t-shadow-xl),
+    var(--t-ring);
+}
+/* Hover lift on desktop pointers — the icon nudges up to telegraph the
+   "back to top" action. Skipped on touch (`hover: none`) so a finger
+   release doesn't strand the icon in the lifted state. */
+@media (hover: hover) {
+  .scroll-to-preview.is-visible:hover .ph-bold {
+    transform: translateY(-2px);
+  }
+  .scroll-to-preview .ph-bold {
+    transition: transform 0.18s ease;
+  }
+}
+/* Tap feedback: brief inset push on press. The drag override below
+   wins via class precedence so the active state can't interfere with
+   a real drag-to-flip gesture. */
+.scroll-to-preview.is-visible:active {
+  transform: translateY(0) scale(0.9);
+  box-shadow: var(--t-shadow-lg);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+/* Drag in progress: kill the transform transition so the button tracks
+   the finger 1:1 instead of lagging. JS sets translateX inline; that
+   inline transform wins over the :active scale because inline styles
+   beat any class-driven rule. */
+.scroll-to-preview.is-dragging {
+  transition: none !important;
+  cursor: grabbing;
+  box-shadow: var(--t-shadow-xl);
+}
+/* Reduced-motion: drop the bouncy entry + lift transitions to a quick
+   fade so the user gets the same affordance without the animation. */
+@media (prefers-reduced-motion: reduce) {
+  .scroll-to-preview,
+  .scroll-to-preview.is-visible,
+  .scroll-to-preview.is-visible:active {
+    transition:
+      opacity 0.15s ease,
+      background 0.15s ease;
+    transform: none;
+  }
+  .scroll-to-preview:not(.is-visible) {
+    transform: none;
+  }
+}
+/* Desktop: the preview is sticky in the right column, so the FAB has
+   no job. Use !important to win against an in-flight is-visible class
+   left over from a narrow→wide viewport resize. */
+@media (min-width: 1100px) {
+  .scroll-to-preview {
+    display: none !important;
+  }
+}
+
 /* Multi-device: stacked preview groups (one per distinct aspect). The
    first sits flush under the card head; subsequent ones get a divider
    so the shapes read as separate displays. */
