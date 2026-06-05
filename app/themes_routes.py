@@ -18,7 +18,6 @@ from typing import Any
 from flask import (
     Blueprint,
     Flask,
-    Response,
     abort,
     current_app,
     flash,
@@ -28,6 +27,7 @@ from flask import (
     request,
     url_for,
 )
+from werkzeug.wrappers import Response
 
 from app.palette_extract import (
     PaletteExtractError,
@@ -202,7 +202,7 @@ def _template_view(theme: UserTheme) -> dict[str, Any]:
 
 
 @bp.post("/extract-palette")
-def extract_palette() -> Response:
+def extract_palette() -> Response | tuple[Response, int]:
     """Take an uploaded image, return JSON with a Spectra palette
     suggestion. The builder posts the upload with ``fetch`` and
     paints the response into the form inputs client-side; no full
