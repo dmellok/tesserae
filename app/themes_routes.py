@@ -81,7 +81,6 @@ def index() -> str:
     grouped = themes_by_family(registry)
     return render_template(
         "themes.html",
-        active_area="themes",
         families=FAMILY_ORDER,
         family_labels=FAMILY_LABELS,
         grouped=grouped,
@@ -119,7 +118,6 @@ def new() -> str:
     seed = _seed_from_template(base_id)
     return render_template(
         "theme_builder.html",
-        active_area="themes",
         is_new=True,
         theme=_template_view(seed),
         bundled_themes=BUNDLED_THEMES,
@@ -135,7 +133,6 @@ def edit(theme_id: str) -> str:
         abort(404)
     return render_template(
         "theme_builder.html",
-        active_area="themes",
         is_new=False,
         theme=_template_view(theme),
         bundled_themes=BUNDLED_THEMES,

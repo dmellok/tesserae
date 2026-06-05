@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, button %}
-{% block title %}Settings: Themes — Tesserae{% endblock %}
+{% from "_components.html" import button %}
+{% block title %}Themes — Tesserae{% endblock %}
 {% block head_extra %}
 {# Spectra token cascade — only loaded on this page (and compose.html);
    admin chrome elsewhere doesn't need them. spectra-tokens defines the
@@ -30,8 +30,6 @@
     </a>
   </div>
 </header>
-
-{{ settings_tabs(active_area) }}
 
 {# Filter chips — anchor links per family so the user can jump
    without a full reload. Hidden on tiny viewports where the page

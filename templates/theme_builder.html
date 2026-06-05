@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs, button, text_input, select_field, color_input %}
+{% from "_components.html" import button, text_input, select_field, color_input %}
 {% block title %}{{ 'New theme' if is_new else theme.name }} — Themes — Tesserae{% endblock %}
 {% block head_extra %}
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
@@ -24,8 +24,6 @@
     </a>
   </div>
 </header>
-
-{{ settings_tabs(active_area) }}
 
 <form method="post" action="{{ action_url }}" class="theme-builder" data-theme-builder>
   <div class="theme-builder-grid">

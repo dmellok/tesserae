@@ -62,6 +62,10 @@
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
          <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Schedules</span>
       </a>
+      <a href="{{ url_for('themes.index') }}"
+         class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
+         <i class="ph ph-palette" aria-hidden="true"></i><span>Themes</span>
+      </a>
       <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
         <summary>
           <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Plugins</span>
