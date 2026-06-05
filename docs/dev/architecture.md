@@ -129,8 +129,10 @@ Home Assistant.
 ```
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
-  plugins/<id>/    widget / theme / font / data / admin plugins
-                   (drop-a-folder) — 55 widgets ship bundled
+  plugins/<id>/    widget / font / data / admin plugins
+                   (drop-a-folder) — 58 widgets ship bundled.
+                   Themes live in static/style/spectra-*.css + a
+                   Python registry, not the plugin tree.
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests

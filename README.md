@@ -21,7 +21,7 @@ contained change.
 
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** —
 install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-(55 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
+(58 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plugin/) (with AI).
 
 > **Self-hosted hobby project.** Tesserae installs with `docker compose up`
@@ -33,12 +33,13 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plu
 
 A working hobbyist build. Composer → renderers → transport → devices
 pipeline, scheduler, Home Assistant MQTT auto-discovery, webhook push,
-data export / import, theme builder, form-driven page editor, and the
-modern admin UI are all in. Multi-head is built in throughout —
-register multiple panels, bind a dashboard to a specific display,
-auto-discover clients that announce themselves on the broker.
+data export / import, theme builder (with image-to-palette extraction),
+form-driven page editor, and the modern admin UI are all in. Multi-head
+is built in throughout — register multiple panels, bind a dashboard to
+a specific display, auto-discover clients that announce themselves on
+the broker.
 
-55 widgets bundled across weather, F1, calendar, news, finance, GitHub,
+58 widgets bundled across weather, F1, calendar, news, finance, GitHub,
 clocks, sky, pictures, todo, and Melbourne public transport. See
 [widget stability tiers](https://dmellok.github.io/tesserae/widgets/tiers/)
 for an upfront read on which depend on undocumented upstreams.
@@ -55,15 +56,18 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 - **Browser-based page editor** with form-driven cell options, live preview, and per-cell content-zoom slider.
 - **10 layout presets** (1-cell, 2/3 column, 2/3 row, 2×2 grid, hero top/bottom/left/right, hero sandwich) — fraction-based so the same layout works at any panel size; "Custom layout" snaps to a grid you set.
-- **Per-cell overrides**: theme, font, content zoom, any of the 15 palette tokens.
-- **55 widgets bundled** across 11 categories — weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
-- **Drop-a-folder widget plugins** — `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. 28 widgets ship multiple selectable visual directions through a single `variant` cell option (Refined / Geometric / Swiss / Data / etc.).
+- **Per-cell overrides**: theme, style (typography), font, content zoom. Cells inherit the page's pick by default; the override flag lets a single tile break from the rest.
+- **Reactive layout for mobile editing** — preview stacks above the cell forms on small viewports, with a floating back-to-top button (drag along the bottom to flip side for left-handed grips).
+- **58 widgets bundled** across 11 categories — weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
+- **Drop-a-folder widget plugins** — `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The orthogonal `data-theme` × `data-style` Spectra axes let one widget compose with every theme + typography pairing instead of shipping N variants per widget.
 
 ### Rendering
 
 - **Headless Playwright** server-side renderer with a persistent browser pool (toggle to fall back to one-shot).
 - **Drop-a-folder renderer plugins** — currently 4: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 + 7.3" PhotoPainter over MQTT), `trmnl_png` (1-bit greyscale PNG over HTTP).
-- **Cell-level palette pre-quantisation** so widgets dither cleanly on Spectra 6 / ACeP panels.
+- **Eight dither modes** for the `.bin` packers: Floyd-Steinberg + none (Pillow paths), plus Atkinson / Jarvis-Judice-Ninke / Stucki / Bayer-8x8 / halftone / crosshatch (NumPy paths).
+- **Opt-in calibrated palette + tone mapping** (per device) — dithers against the panel's measured colours instead of nominal sRGB primaries. Palette data ported from [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize); paired with a linear sRGB tone-map pre-pass.
+- **Firmware-native panel orientation** auto-detected from the panel preset, with a startup migration that backfills pre-v0.20 ESP32 instance manifests so legacy installs don't paint at the wrong row stride.
 - **Per-device gamut switching** (ACeP vs Spectra 6) for Impressions sold in both revisions.
 - **Partial-update preview** in the composer — skips full iframe reloads.
 - **Stable per-device preview alias** for Home Assistant generic-camera entities.
@@ -95,23 +99,28 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - **HA widget set** — `ha_climate`, `ha_entities`, `ha_history`, `ha_sensor`, each with 6 selectable visual directions.
 - **Stale-discovery sweep on start** so deleted Tesserae devices stop ghosting HA tiles.
 
-### Themes & typography
+### Themes & typography (Spectra design system)
 
-- **31 bundled themes** in 4 families: 10 light + 10 dark (warm-undertone, dusty-accent Ramen DNA), 5 neon dark (synthwave/cyberpunk), 6 monochrome (Paper, Carbon, Newsprint, Halftone, Ash, Graphite) for 1-bit Kindle / TRMNL panels.
-- **Theme builder** in the admin UI with **palette extraction** from any uploaded image.
-- **User-saved themes** persist under `data/plugins/themes_core/user.json`.
+- **19 bundled themes** across four families: Light (light / sepia / cool-gray / high-contrast), Dark (dark / nord), Movement (bauhaus / destijl / brutalist palettes), and base16 (10 popular code-editor palettes adapted for dashboards: Gruvbox, Solarized, Dracula, Catppuccin Mocha, Monokai, Tomorrow, One Dark).
+- **Themes page** (top-nav → Themes) with a vertical strip of every theme on the left, a builder pane in the middle, and a sticky preview on the right. Click any theme to load it; bundled themes show a "Duplicate to edit" CTA, user themes are editable + deletable.
+- **Theme builder**: 20 colour tokens (3 surfaces + 4 text + 1 edge + 6 accents × 2 (base + soft) + 1 on-accent) plus mode (light/dark) and optional font-family. Live preview tracks every input. Optional auto-derive switch computes each `accent_*_soft` as `mix(accent, bg, 0.78)` for one less thing to tune.
+- **Image-to-theme** — upload a photo or poster; k-means picks dominant colours and the assignment heuristic spreads them across the Spectra tokens (light/dark mode auto-detected from the modal cluster's luminance). One click fills the form.
+- **User-saved themes** persist at `data/themes/user.json`. The user-CSS endpoint (`/themes/user.css`) emits one `[data-theme="user-<slug>"]` block per saved theme, loaded alongside the bundled Spectra cascade. Themes ride along in the data-export ZIP.
+- **Orthogonal `data-style` axis** — typography / scale / shape, composes with any theme. Bundled styles: Standard / Display / Editorial / Mono / Elegant / Condensed plus Bauhaus / De Stijl / Brutalist forms.
 - **17 bundled typefaces** (SIL OFL / Apache 2.0) — Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
-- **Semantic token layer** (`--c-*`) — widgets paint from 15 semantic tokens, never raw palette primitives. Decorative `--wx-*` layer (paper / ink / chromatic chips) drives the weather + sky widget family. CI test enforces semantic-only painting so a theme retune touches every widget cleanly.
+- **Bundled-theme colour parsing** — the builder lifts every bundled theme's actual `bg / surface / accent-*` values straight from the Spectra CSS at import time, so duplicating Nord produces a Nord-coloured copy (not Light's defaults).
 
 ### Administration & ops
 
 - **First-run onboarding wizard** — welcome → broker → device → dashboard. Every step skippable.
-- **Settings UI**: server, broker, telemetry, auth, devices, themes, fonts, diagnostics.
-- **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts).
+- **Top-nav structure**: Send / Dashboards / Schedules / Themes / Plugins (dropdown) / Settings, plus a Dev dropdown under `--dev` grouping Widget gallery + Theme × style matrix.
+- **Settings UI** tabs: Server, Renderers, Devices, Plugins, System, Events.
+- **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts) — gated to git-clone installs; Docker shows an upgrade hint instead.
 - **Data export / import** — pack the entire install (pages, themes, devices, plugin settings, secrets) into a single ZIP; restore on a fresh install. Validated against JSON Schemas before writing.
 - **Webhook push** — `POST /api/v1/push` with a bearer token. Re-renders a named page and fans the frame out to every device bound to it. Generate / rotate the token from Settings → System → Webhook. Useful from HA automations, cron, GitHub Actions.
 - **Event log** captures every push, schedule fire, and discovery event for the History view.
-- **Auth**: password setup on first run, persistent session, change / disable / re-enable from Settings → System, and a `tesserae --reset-password` CLI escape hatch when the password is lost.
+- **Auth**: password setup on first run, persistent session, change / disable / re-enable from Settings → System, and a `tesserae --reset-password` CLI escape hatch when the password is lost. When disabled, the gate still 403s public IPs and only lets LAN traffic through.
+- **Brand assets** — firmware-ready PNG splash images at nine sizes (64 → 1024px square, transparent backdrop) under [`static/brand/firmware/`](static/brand/firmware/) for client builders.
 
 ### Networking
 
@@ -133,10 +142,10 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Quality
 
-- **~600 tests** (pytest) green; CI runs every push.
+- **779 tests** (pytest) green; CI runs every push.
 - **`ruff check` + `ruff format --check`** in CI.
-- **`mypy --strict`** on contract modules (plugin loader, scheduler, push, onboarding).
-- **Semantic-token enforcement test** fails CI if any widget references raw `--theme-*` primitives instead of the `--c-*` layer.
+- **`mypy --strict`** on contract modules (state, push, plugin / renderer / device loaders, renderer, themes routes).
+- **Spectra CSS ↔ theme-registry guard test** — every `[data-theme="..."]` block in the stylesheet has a registry entry and vice versa, so the picker and the cascade can never drift.
 
 </details>
 
@@ -182,6 +191,11 @@ renderer).
 | Inky Impression 7.3" (ACeP) | 800×480 | 7 colour (ACeP) | ✓ | ✓ | — |
 | Inky Impression 7.3" (PIM773) | 800×480 | 6 colour (Spectra 6) | ✓ | ✓ | — |
 | Inky Impression 13.3" | 1600×1200 | 6 colour (Spectra 6) | ✓ | ✓ | ✅ |
+
+Each device card carries a per-instance "Calibrated palette + tone
+mapping" switch (off by default). Turning it on dithers against the
+panel's measured colours instead of nominal sRGB; A/B with your own
+content since the trade-off is content-dependent.
 
 The `pi_bin` path is faster (the server packs the 4-bpp buffer) but
 needs an Impression — the smaller pHAT / wHAT panels go through the
