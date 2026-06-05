@@ -16,15 +16,17 @@ Built-in sizes (Settings → Panel). Pick `custom` for anything not listed — t
 | `inky_5_7` | 600x448 | Inky Impression 5.7" |
 | `inky_4` | 640x400 | Inky Impression 4" |
 | `waveshare_e6_7_5` | 800x480 | Waveshare E6 7.5" |
+| `waveshare_photopainter_7_3` | 800x480 | Waveshare 7.3" PhotoPainter (ESP32-S3) |
+| `waveshare_e6_13_3` | 1200x1600 | Waveshare 13.3" Spectra 6 (ESP32) |
 | `custom` | any (set width + height) | anything the inky / Waveshare path drives |
 
 ## Renderers
 
 A renderer turns the composition PNG into the exact bytes a client wants. Each ships as a drop-a-folder plugin under `renderers/<id>/`.
 
-| Renderer | Output | Target client | What it's for |
+| Renderer | Output | Target client(s) | What it's for |
 |---|---|---|---|
-| `esp32_bin` | `.bin` | [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
+| `esp32_bin` | `.bin` | [tesserae-esp32-bin-client (13.3" Waveshare)](https://github.com/dmellok/tesserae-esp32-bin-client)<br>[tesserae-photopainter-7.3-bin-client (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
 | `pi_bin` | `.bin` | [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
 | `pi_png` | `.png` | [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
@@ -46,7 +48,7 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken — 
 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
-| `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) | :material-check-circle: Tested | Primary daily driver — battery-powered, deep-sleep. |
+| `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver — battery-powered, deep-sleep. The 13.3" client lives at tesserae-esp32-bin-client; the 7.3" PhotoPainter client at tesserae-photopainter-7.3-bin-client. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path — packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. Native TRMNL hardware is supported but not yet confirmed here. |

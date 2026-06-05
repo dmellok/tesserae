@@ -222,16 +222,12 @@ def test_landscape_native_preset_populates_native_dims(tmp_path: Path) -> None:
     from app.panel import resolve_settings_panel
 
     settings = SettingsStore(tmp_path / "s.json")
-    settings.update_section(
-        "app", {"panel_preset": "inky_7_3", "panel_orientation": "landscape"}
-    )
+    settings.update_section("app", {"panel_preset": "inky_7_3", "panel_orientation": "landscape"})
     panel = resolve_settings_panel(settings)
     assert (panel.w, panel.h) == (800, 480)
     assert (panel.native_w, panel.native_h) == (800, 480)
 
-    settings.update_section(
-        "app", {"panel_preset": "inky_7_3", "panel_orientation": "portrait"}
-    )
+    settings.update_section("app", {"panel_preset": "inky_7_3", "panel_orientation": "portrait"})
     panel = resolve_settings_panel(settings)
     assert (panel.w, panel.h) == (480, 800)  # portrait composition
     assert (panel.native_w, panel.native_h) == (800, 480)  # firmware stride unchanged

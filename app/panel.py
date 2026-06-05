@@ -75,6 +75,9 @@ PANEL_PRESETS: dict[str, PanelPreset] = {
     "waveshare_e6_7_5": PanelPreset(
         800, 480, label='Waveshare E6 7.5" — 800x480'
     ),  # Waveshare E6 7.5" — landscape native
+    "waveshare_photopainter_7_3": PanelPreset(
+        800, 480, label='Waveshare 7.3" PhotoPainter (ESP32-S3) — 800x480'
+    ),  # Waveshare 7.3" PhotoPainter (ESP32-S3 Spectra 6) — landscape native
     "waveshare_e6_13_3": PanelPreset(
         1200,
         1600,

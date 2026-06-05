@@ -25,18 +25,30 @@ DEVICES_DIR = REPO_ROOT / "devices"
 TESTED = REPO_ROOT / "docs" / "_data" / "tested.json"
 OUT = REPO_ROOT / "docs" / "compatibility.md"
 
-# Reference client repos, keyed by renderer id.
-CLIENT_REPOS: dict[str, tuple[str, str]] = {
-    "pi_png": ("tesserae-pi-png-client", "https://github.com/dmellok/tesserae-pi-png-client"),
-    "pi_bin": ("tesserae-pi-bin-client", "https://github.com/dmellok/tesserae-pi-bin-client"),
-    "esp32_bin": (
-        "tesserae-esp32-bin-client",
-        "https://github.com/dmellok/tesserae-esp32-bin-client",
-    ),
-    "trmnl_png": (
-        "tesserae-trmnl-client",
-        "https://github.com/dmellok/tesserae-trmnl-client",
-    ),
+# Reference client repos, keyed by renderer id. A renderer can pair
+# with multiple firmware/client repos (e.g. ``esp32_bin`` serves both
+# the 13.3" Waveshare client and the 7.3" PhotoPainter client) — each
+# entry is a list of ``(label, url)`` tuples.
+CLIENT_REPOS: dict[str, list[tuple[str, str]]] = {
+    "pi_png": [
+        ("tesserae-pi-png-client", "https://github.com/dmellok/tesserae-pi-png-client"),
+    ],
+    "pi_bin": [
+        ("tesserae-pi-bin-client", "https://github.com/dmellok/tesserae-pi-bin-client"),
+    ],
+    "esp32_bin": [
+        (
+            'tesserae-esp32-bin-client (13.3" Waveshare)',
+            "https://github.com/dmellok/tesserae-esp32-bin-client",
+        ),
+        (
+            'tesserae-photopainter-7.3-bin-client (7.3" PhotoPainter)',
+            "https://github.com/dmellok/tesserae-photopainter-7.3-bin-client",
+        ),
+    ],
+    "trmnl_png": [
+        ("tesserae-trmnl-client", "https://github.com/dmellok/tesserae-trmnl-client"),
+    ],
 }
 
 
@@ -77,12 +89,12 @@ def _panel_table() -> list[str]:
 
 
 def _renderer_table() -> list[str]:
-    rows = ["| Renderer | Output | Target client | What it's for |", "|---|---|---|---|"]
+    rows = ["| Renderer | Output | Target client(s) | What it's for |", "|---|---|---|---|"]
     for m in _manifests(RENDERERS_DIR):
         rid = m["_id"]
         ext = m.get("extension", "")
-        repo = CLIENT_REPOS.get(rid)
-        client = f"[{repo[0]}]({repo[1]})" if repo else "—"
+        repos = CLIENT_REPOS.get(rid) or []
+        client = "<br>".join(f"[{label}]({url})" for label, url in repos) if repos else "—"
         desc = m.get("description", "").strip().replace("\n", " ")
         # Keep the table cell short — first sentence only.
         first = desc.split(". ")[0].rstrip(".") + "." if desc else ""

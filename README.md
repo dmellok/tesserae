@@ -90,7 +90,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 ### Rendering
 
 - **Headless Playwright** server-side renderer with a persistent browser pool (toggle to fall back to one-shot).
-- **Drop-a-folder renderer plugins** — currently 4: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 over MQTT), `trmnl_png` (1-bit greyscale PNG over HTTP).
+- **Drop-a-folder renderer plugins** — currently 4: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 + 7.3" PhotoPainter over MQTT), `trmnl_png` (1-bit greyscale PNG over HTTP).
 - **Cell-level palette pre-quantisation** so widgets dither cleanly on Spectra 6 / ACeP panels.
 - **Per-device gamut switching** (ACeP vs Spectra 6) for Impressions sold in both revisions.
 - **Partial-update preview** in the composer — skips full iframe reloads.
@@ -187,13 +187,16 @@ supports two transport shapes:
 | [**tesserae-pi-png-client**](https://github.com/dmellok/tesserae-pi-png-client) | `pi_png` renderer | MQTT | Pi-side Python daemon using [`inky`](https://github.com/pimoroni/inky)'s `set_image()`. Works on every panel the inky lib supports. Slower of the two Pi paths (quantises every frame) but wire-compatible with the inky-dash v3/v4 protocol. |
 | [**tesserae-pi-bin-client**](https://github.com/dmellok/tesserae-pi-bin-client) | `pi_bin` renderer | MQTT | Same Pi-side shape but writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf` — no PIL on the paint path. Fastest path on a Pimoroni Inky Impression. |
 | [**tesserae-esp32-bin-client**](https://github.com/dmellok/tesserae-esp32-bin-client) | `esp32_bin` renderer | MQTT | Battery-powered ESP32-S3 firmware for the Waveshare 13.3" Spectra 6 panel. Deep-sleeps between wakes; months of battery life from a single Li-Po. Refresh cadence set via `sleep_interval_s` config. |
+| [**tesserae-photopainter-7.3-bin-client**](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client) | `esp32_bin` renderer | MQTT | ESP32-S3 firmware for the Waveshare 7.3" PhotoPainter (landscape-native, 800×480 Spectra 6). Same wire contract + deep-sleep pattern as the 13.3" client; just sized for the smaller panel. Pick `waveshare_photopainter_7_3` as the panel preset. |
 | Any BYOS-compatible client | `trmnl_png` renderer | HTTP | TRMNL-spec client. Pair via the **Add device → TRMNL** flow in Settings: server mints a short access token, you paste it into the client, the client polls. Tested with the [KOReader trmnl-display plugin](https://github.com/koreader/koreader) on a jailbroken Kindle. |
 
 ## Compatible displays
 
 Any panel the [`inky`](https://github.com/pimoroni/inky) library drives
-works via the Pi clients. The ESP32 client is purpose-built for the
-Waveshare 13.3" Spectra 6.
+works via the Pi clients. Two purpose-built ESP32 firmwares cover the
+Waveshare Spectra 6 family: a 13.3" client and a 7.3" PhotoPainter
+client (different sizes, same MQTT contract, same server-side
+renderer).
 
 ### Pimoroni Inky lineup
 
@@ -223,7 +226,8 @@ you've run a panel that isn't ticked.
 
 | Panel | Resolution | Colours | Client | Tested |
 |---|---|---|---|---|
-| Waveshare 13.3" E6 (ESP32-S3) | 1600×1200 | 6 colour (Spectra 6) | ESP32 `esp32_bin` | ✅ |
+| Waveshare 13.3" Spectra 6 (ESP32-S3) | 1200×1600 (portrait native) | 6 colour (Spectra 6) | [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client) | ✅ |
+| Waveshare 7.3" PhotoPainter (ESP32-S3) | 800×480 (landscape native) | 6 colour (Spectra 6) | [tesserae-photopainter-7.3-bin-client](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client) | ✅ |
 
 ### TRMNL-compatible (HTTP pull)
 
