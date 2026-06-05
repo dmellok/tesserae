@@ -519,6 +519,11 @@ def create_app(
             instances = [d for d in devices.all() if d.kind_of is not None]
             kinds = sorted({str(d.kind_of) for d in instances if d.kind_of})
             n_pages = len(page_store.list())
+            # Themes shape — number of user-saved themes signals
+            # whether the builder is actually getting used. Telemetry
+            # docstring listed this as a planned prop pre-v0.27; wire
+            # it now that the UserThemeStore is in app.config.
+            n_user_themes = len(user_themes_store.list_all())
             # Activity counters — events recorded since the previous
             # heartbeat. event_log.list() returns most-recent-first; we
             # paginate by 500 and stop once we cross the baseline so
@@ -559,6 +564,7 @@ def create_app(
                 "n_devices": str(len(instances)),
                 "device_kinds": ",".join(kinds),
                 "n_pages": str(n_pages),
+                "n_user_themes": str(n_user_themes),
                 # Bucketed activity counters since the previous heartbeat.
                 "n_pushes_since_last": _bucket(n_pushes),
                 "n_push_failures_since_last": _bucket(n_push_failures),

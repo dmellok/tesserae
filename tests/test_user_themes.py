@@ -36,6 +36,25 @@ def test_slugify_name_handles_user_input(name: str, expected: str) -> None:
     assert slugify_name(name) == expected
 
 
+def test_slugify_name_caps_long_input_to_48_chars() -> None:
+    """A 200-char display name would otherwise produce a 200-char slug
+    that 1) doesn't survive the ``valid_slug`` regex and 2) bloats CSS
+    selectors, URL paths, and dropdown labels. Cap the slug at 48
+    chars and strip any trailing hyphen the truncation might leave."""
+    huge = "X" * 200
+    slug = slugify_name(huge)
+    assert len(slug) <= 48
+    assert slug.endswith("x")  # truncation didn't leave a hyphen tail
+
+
+def test_slugify_name_truncated_slug_is_still_valid() -> None:
+    """The capped slug must still pass ``valid_slug`` so the create
+    route doesn't reject themes generated from long names."""
+    name = "supercalifragilisticexpialidocious " * 6
+    slug = slugify_name(name)
+    assert valid_slug(slug)
+
+
 @pytest.mark.parametrize(
     "slug, ok",
     [

@@ -33,6 +33,30 @@ def _read_db_rows(db_path: Path) -> list[tuple]:
         conn.close()
 
 
+def test_user_themes_included_in_snapshot(tmp_path: Path) -> None:
+    """``data/themes/user.json`` is the only place user-saved themes
+    live; it must ride along in the snapshot so a restore on a fresh
+    install brings back the user's curated palette."""
+    import json
+    import zipfile
+
+    root = tmp_path / "data"
+    _seed(root)
+    themes_dir = root / "themes"
+    themes_dir.mkdir()
+    (themes_dir / "user.json").write_text(
+        json.dumps([{"id": "user-sunset", "name": "Sunset"}]),
+        encoding="utf-8",
+    )
+
+    backup = bk.create(root, label="manual")
+    with zipfile.ZipFile(backup.path) as zf:
+        names = zf.namelist()
+        assert "themes/user.json" in names
+        data = json.loads(zf.read("themes/user.json"))
+    assert data == [{"id": "user-sunset", "name": "Sunset"}]
+
+
 def test_create_then_restore_round_trips_everything(tmp_path: Path) -> None:
     root = tmp_path / "data"
     _seed(root)

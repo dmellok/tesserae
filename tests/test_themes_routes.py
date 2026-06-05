@@ -299,6 +299,32 @@ def test_duplicate_bundled_theme_creates_user_copy(app: Flask) -> None:
     assert user_themes[0].id.startswith("user-")
 
 
+def test_duplicate_bundled_theme_copies_actual_bundled_colours(app: Flask) -> None:
+    """Regression: duplicating Nord used to produce a user theme with
+    Light's colours because ``_seed_from_template`` only returned the
+    UserTheme dataclass defaults. Now bundled colours are parsed from
+    the Spectra CSS so a Duplicate from Nord lifts Nord's actual
+    bg / surface / accent values into the new user theme."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/themes/nord/duplicate")
+    saved = app.config["USER_THEMES_STORE"].list_all()
+    assert len(saved) == 1
+    copy = saved[0]
+    nord = bundled_theme_colours("nord")
+    # Surface trio + every accent must match Nord's actual values, not
+    # the Light-shaped dataclass defaults.
+    assert copy.bg == nord["bg"]
+    assert copy.surface == nord["surface"]
+    assert copy.surface_sunken == nord["surface_sunken"]
+    assert copy.text_primary == nord["text_primary"]
+    for n in range(1, 7):
+        assert getattr(copy, f"accent_{n}") == nord[f"accent_{n}"]
+        assert getattr(copy, f"accent_{n}_soft") == nord[f"accent_{n}_soft"]
+
+
 # -- extract-palette endpoint -----------------------------------------
 
 

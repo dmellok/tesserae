@@ -43,7 +43,8 @@ USER_THEME_PREFIX = "user-"
 # ``user-`` prefix. Forbids leading / trailing hyphens to keep the
 # resulting CSS selector legible. The 2-char floor means the picker's
 # tagline column has room to render something sensible alongside.
-_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,46}[a-z0-9]$")
+_SLUG_MAX = 48
+_SLUG_RE = re.compile(rf"^[a-z0-9][a-z0-9-]{{0,{_SLUG_MAX - 2}}}[a-z0-9]$")
 _SLUG_SAFE_NAME = re.compile(r"[^a-z0-9]+")
 
 # Default mode → on-accent colour. Used for a brand-new user theme when
@@ -168,8 +169,16 @@ class UserTheme:
 
 def slugify_name(name: str) -> str:
     """Turn a free-form display name into a slug suitable for the
-    ``user-<slug>`` id. Empty / all-symbol names degrade to ``theme``."""
+    ``user-<slug>`` id. Empty / all-symbol names degrade to ``theme``.
+
+    Capped at :data:`_SLUG_MAX` chars to keep CSS selectors, URL
+    paths, and dropdown labels readable. A trailing hyphen left by
+    the truncation gets stripped — slugs always end on an
+    alphanumeric so the matching ``valid_slug`` regex accepts them.
+    """
     slug = _SLUG_SAFE_NAME.sub("-", name.lower()).strip("-")
+    if len(slug) > _SLUG_MAX:
+        slug = slug[:_SLUG_MAX].rstrip("-")
     return slug or "theme"
 
 

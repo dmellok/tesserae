@@ -126,3 +126,51 @@ def test_default_themes_css_file_exists() -> None:
     stylesheet that's been moved or renamed."""
     for fname in _SPECTRA_FILES:
         assert (REPO_ROOT / "static" / "style" / fname).is_file()
+
+
+# -- bundled colour parsing -------------------------------------------
+
+
+def test_bundled_theme_colours_round_trips_light_palette() -> None:
+    """Light's parsed map has the full Spectra token set keyed by the
+    UserTheme field names (``bg``, ``accent_1_soft``, etc.), with
+    values pulled verbatim from the CSS rule."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    light = bundled_theme_colours("light")
+    assert light["bg"] == "#E7E4DC"
+    assert light["surface"] == "#F7F5F0"
+    assert light["text_primary"] == "#1B1A16"
+    assert light["accent_1"] == "#A84B2A"
+    assert light["accent_6_soft"] == "#E5D2DF"
+
+
+def test_bundled_theme_colours_resolves_var_references() -> None:
+    """``--icon: var(--text-primary);`` should land in the parsed map
+    as the literal text-primary hex value, not a string ``var(...)``
+    that the builder couldn't paint into a colour input."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    dark = bundled_theme_colours("dark")
+    # icon resolves to text-primary's value (#F1EEE4 for dark).
+    assert dark["icon"] == dark["text_primary"]
+    assert dark["icon"].startswith("#")
+
+
+def test_bundled_theme_colours_returns_empty_for_unknown_id() -> None:
+    """Unknown / typo'd theme ids degrade silently so the caller can
+    fall through to dataclass defaults without a KeyError."""
+    from app.state.theme_registry import bundled_theme_colours
+
+    assert bundled_theme_colours("does-not-exist") == {}
+
+
+def test_every_bundled_theme_has_a_parsed_colour_map() -> None:
+    """Pin that every registry entry has a usable colour map. Catches
+    a refactor that renames a CSS file or breaks the parser."""
+    from app.state.theme_registry import BUNDLED_THEMES, bundled_theme_colours
+
+    for theme in BUNDLED_THEMES:
+        colours = bundled_theme_colours(theme.id)
+        assert "bg" in colours, f"{theme.id} missing bg in parsed colours"
+        assert "accent_1" in colours, f"{theme.id} missing accent_1 in parsed colours"

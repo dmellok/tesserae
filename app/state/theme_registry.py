@@ -19,7 +19,9 @@ are no hex codes to keep in lockstep here.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 ThemeFamily = Literal["light", "dark", "movement", "base16", "user"]
@@ -160,3 +162,93 @@ def picker_options(themes: list[Theme]) -> list[dict[str, str]]:
         }
         for t in themes
     ]
+
+
+# -- bundled theme colour lookup --------------------------------------
+#
+# The Spectra CSS files are the source of truth for what each bundled
+# theme actually paints. The builder needs those colours too — when a
+# user clicks Duplicate on Nord we want the new user theme to carry
+# Nord's actual ``bg`` / ``surface`` / ``accent-*`` values, not the
+# UserTheme dataclass defaults (which mirror Light). Parsing the CSS
+# at import time keeps that single source of truth and avoids having
+# to hand-maintain a Python copy of every theme's palette.
+
+_BLOCK_RE = re.compile(
+    r'\[data-theme="([^"]+)"\]\s*(?:,\s*\[data-theme="[^"]+"\]\s*)*\{([^}]+)\}',
+    re.DOTALL,
+)
+_VAR_RE = re.compile(r"(--[a-z0-9-]+)\s*:\s*([^;]+);")
+_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
+def _parse_theme_blocks(css_text: str) -> dict[str, dict[str, str]]:
+    """Pull every ``[data-theme="x"] { ... }`` block out of a Spectra
+    stylesheet and return a ``{theme_id: {css_var_name: value}}`` map.
+    Comments are stripped first so example syntax in the file header
+    doesn't get scraped as a real rule. Values are returned verbatim
+    (whitespace trimmed) so a colour like ``var(--text-primary)`` can
+    be detected and resolved by the caller."""
+    out: dict[str, dict[str, str]] = {}
+    cleaned = _COMMENT_RE.sub("", css_text)
+    for match in _BLOCK_RE.finditer(cleaned):
+        theme_id, body = match.group(1), match.group(2)
+        # A rule like ``:root, [data-theme="light"]{...}`` matches twice;
+        # the regex still attributes the body to "light" because that's
+        # the captured selector. Other comma-grouped selectors aren't
+        # used by Spectra today but the loop handles them via update.
+        variables: dict[str, str] = {}
+        for var_match in _VAR_RE.finditer(body):
+            variables[var_match.group(1)] = var_match.group(2).strip()
+        if variables:
+            out.setdefault(theme_id, {}).update(variables)
+    return out
+
+
+def _load_bundled_theme_colours() -> dict[str, dict[str, str]]:
+    """Parse the Spectra stylesheets once at import time, return a
+    ``{theme_id: {field_name: hex}}`` map keyed by the UserTheme
+    dataclass field names (``--text-primary`` → ``text_primary``).
+
+    Variables whose value is ``var(--other)`` (e.g. ``--icon:
+    var(--text-primary)``) are resolved within the same theme block so
+    the seed colours are concrete hex codes the builder form can
+    populate inputs with. Unknown bundled themes simply yield an empty
+    inner dict, and the caller falls back to dataclass defaults.
+    """
+    here = Path(__file__).resolve()
+    css_dir = here.parent.parent.parent / "static" / "style"
+    files = ("spectra-tokens.css", "spectra-base16.css")
+    raw: dict[str, dict[str, str]] = {}
+    for fname in files:
+        path = css_dir / fname
+        if not path.is_file():
+            continue
+        raw.update(_parse_theme_blocks(path.read_text(encoding="utf-8")))
+
+    out: dict[str, dict[str, str]] = {}
+    for theme_id, variables in raw.items():
+        # Resolve trivial ``var(--other)`` indirections within the same
+        # block. One pass suffices because Spectra never chains more
+        # than one level of indirection (``--icon: var(--text-primary)``
+        # being the only case).
+        resolved: dict[str, str] = {}
+        for css_name, value in variables.items():
+            if value.startswith("var(") and value.endswith(")"):
+                ref = value[len("var(") : -1].split(",")[0].strip()
+                value = variables.get(ref, value)
+            field = css_name.removeprefix("--").replace("-", "_")
+            resolved[field] = value
+        out[theme_id] = resolved
+    return out
+
+
+_BUNDLED_THEME_COLOURS: dict[str, dict[str, str]] = _load_bundled_theme_colours()
+
+
+def bundled_theme_colours(theme_id: str) -> dict[str, str]:
+    """Return the bundled theme's parsed colour map keyed by UserTheme
+    field names (``bg``, ``accent_1_soft``, etc.) or an empty dict for
+    an unknown id. Caller blends the result with the dataclass
+    defaults so missing tokens don't show up as empty inputs."""
+    return dict(_BUNDLED_THEME_COLOURS.get(theme_id, {}))

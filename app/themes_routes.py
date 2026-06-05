@@ -40,6 +40,7 @@ from app.state.theme_registry import (
     FAMILY_ORDER,
     Theme,
     build_registry,
+    bundled_theme_colours,
     themes_by_family,
 )
 from app.state.user_themes import (
@@ -328,21 +329,29 @@ def _seed_from_template(theme_id: str) -> UserTheme:
     """Build a :class:`UserTheme` initialized from a bundled theme's
     colours so the builder form has a sensible starting point.
 
-    We don't parse the Spectra CSS — that file is already source of
-    truth at render time, but for the builder seed we only need
-    ballpark defaults. Use the UserTheme dataclass defaults (which
-    mirror the ``light`` theme) and stamp the requested mode if the
-    template id starts with ``dark`` / ``nord`` / etc.
+    The Spectra stylesheets are parsed once at import time (see
+    :func:`app.state.theme_registry.bundled_theme_colours`); we lift
+    the matching theme's actual ``bg`` / ``surface`` / ``accent-*``
+    values into the seed so a Duplicate from Nord produces a Nord-
+    coloured copy, not the UserTheme dataclass defaults (which mirror
+    Light). Unknown ids — and any tokens the CSS leaves out — fall
+    through to the dataclass defaults so the form is always fully
+    populated.
     """
     mode = "dark" if theme_id in {"dark", "nord"} else "light"
-    seed_name = "New theme"
     seed = UserTheme(
         id=f"{USER_THEME_PREFIX}new",
-        name=seed_name,
+        name="New theme",
         mode=mode,
     )
-    # M-C-friendly hook: a future image-extract suggestion can fill
-    # seed before the form renders.
+    bundled = bundled_theme_colours(theme_id)
+    if not bundled:
+        return seed
+    valid_fields = {*UserTheme.TOKEN_FIELDS, "font_family"}
+    for field, value in bundled.items():
+        if field not in valid_fields:
+            continue
+        setattr(seed, field, value)
     return seed
 
 
