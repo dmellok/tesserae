@@ -1,7 +1,15 @@
-"""esp32_bin smoke: manifest contract, payload shape, and the critical
-landscape→portrait rotation that keeps the firmware happy (it reads the
-buffer as native portrait, period — passing landscape-stride bytes paints
-3x2 tiles)."""
+"""esp32_bin smoke: manifest contract, payload shape, and the
+orientation-matching pack pipeline.
+
+The renderer packs at panel.w × panel.h directly. Two shipped
+panel orientations:
+
+  * 13.3" Waveshare: portrait native (1200, 1600)
+  * 7.3" PhotoPainter: landscape native (800, 480)
+
+When the composition's orientation doesn't match the panel's, the
+input gets a 90° CW rotation before packing so the bytes land at the
+firmware's expected row stride."""
 
 from __future__ import annotations
 
@@ -55,80 +63,110 @@ def test_esp32_bin_payload(registry) -> None:
     assert renderer.payload("zzz", "http://x/", settings={}) == {"url": "http://x/renders/zzz.bin"}
 
 
-def test_landscape_source_is_rotated_to_portrait(registry) -> None:
-    """Bug fingerprint: with the panel configured landscape (1600x1200
-    via inky_13_3 preset, default orientation), the composer used to
-    emit a 1600x1200 landscape PNG and the renderer packed it at
-    landscape stride. The firmware then read the 960000-byte buffer as
-    1200x1600 portrait and painted 3x2 tiles of the source.
+@pytest.mark.parametrize(
+    "panel_w,panel_h",
+    [
+        (1200, 1600),  # 13.3" Waveshare — portrait native
+        (800, 480),  # 7.3" PhotoPainter — landscape native
+    ],
+)
+def test_matching_orientation_round_trip(registry, panel_w: int, panel_h: int) -> None:
+    """An input whose orientation already matches the panel passes
+    straight through (no rotation surprise) and unpacks at panel.w ×
+    panel.h to reproduce the input. Paints two coloured halves
+    horizontally for landscape panels and vertically for portrait so
+    the test's expected positions follow the natural reading order."""
+    if panel_w > panel_h:
+        # Landscape input matches landscape panel.
+        img = Image.new("RGB", (panel_w, panel_h), "white")
+        img.paste((255, 0, 0), (0, 0, panel_w // 2, panel_h))
+        img.paste((0, 0, 255), (panel_w // 2, 0, panel_w, panel_h))
+    else:
+        # Portrait input matches portrait panel.
+        img = Image.new("RGB", (panel_w, panel_h), "white")
+        img.paste((255, 0, 0), (0, 0, panel_w, panel_h // 2))
+        img.paste((0, 0, 255), (0, panel_h // 2, panel_w, panel_h))
 
-    The fix forces native-portrait output. This test feeds a landscape
-    input with red on the left half and blue on the right half, then
-    decodes the resulting buffer as if it were portrait — red must now
-    be in the top half, blue in the bottom half."""
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    out = esp.transform(
+        _png_bytes(img),
+        panel=Panel(w=panel_w, h=panel_h),
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    assert len(out) == panel_w * panel_h // 2  # exact byte count
+
+    red_nibble = 0x3
+    blue_nibble = 0x5
+    if panel_w > panel_h:
+        # Landscape panel — red occupies the LEFT half, blue the RIGHT.
+        # Read mid-row from both halves to confirm orientation.
+        assert _decode_pixel(out, panel_w // 4, panel_h // 2, panel_w) == red_nibble
+        assert _decode_pixel(out, 3 * panel_w // 4, panel_h // 2, panel_w) == blue_nibble
+    else:
+        # Portrait panel — red on TOP, blue on BOTTOM.
+        assert _decode_pixel(out, panel_w // 2, panel_h // 4, panel_w) == red_nibble
+        assert _decode_pixel(out, panel_w // 2, 3 * panel_h // 4, panel_w) == blue_nibble
+
+
+def test_landscape_source_to_portrait_panel_rotates_cw(registry) -> None:
+    """13.3" Waveshare is portrait native. A landscape composition gets
+    a 90° CW rotation so its left edge lands at the panel top. Solid
+    red on the left and solid blue on the right of the 1600×400 input
+    must end up as red TOP and blue BOTTOM of the 1200×1600 buffer."""
     img = Image.new("RGB", (1600, 400), "white")
     img.paste((255, 0, 0), (0, 0, 800, 400))
     img.paste((0, 0, 255), (800, 0, 1600, 400))
 
     esp = registry.get("esp32_bin")
     assert esp is not None
-    # Panel arg is the user's setting; could be landscape (1600x1200) or
-    # portrait (1200x1600). Either way the renderer must emit 1200x1600.
-    panel = Panel(w=1600, h=1200)
     out = esp.transform(
         _png_bytes(img),
-        panel=panel,
-        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
-    )
-    assert len(out) == 1200 * 1600 // 2  # 960000 bytes, exact
-
-    # After CW rotation + fit_to_panel, the 1600x400 input becomes a
-    # 400x1600 portrait strip letterboxed centred on the 1200x1600 panel.
-    # The original left half (red) now occupies the panel's TOP half
-    # (rows 0..799) within the centre strip; the original right half
-    # (blue) lands in the BOTTOM half (rows 800..1599).
-    red_nibble = 0x3
-    blue_nibble = 0x5
-    white_nibble = 0x1
-    assert _decode_pixel(out, 600, 400, 1200) == red_nibble
-    assert _decode_pixel(out, 600, 1200, 1200) == blue_nibble
-    # Letterbox sides on either column stay white nibble 0x1.
-    assert _decode_pixel(out, 100, 800, 1200) == white_nibble
-    assert _decode_pixel(out, 1100, 800, 1200) == white_nibble
-
-
-def test_portrait_source_passes_through_unchanged(registry) -> None:
-    """Regression guard: portrait input must NOT get rotated. A solid
-    red top half + solid blue bottom half should stay that way."""
-    img = Image.new("RGB", (1200, 1600), "white")
-    img.paste((255, 0, 0), (0, 0, 1200, 800))
-    img.paste((0, 0, 255), (0, 800, 1200, 1600))
-
-    esp = registry.get("esp32_bin")
-    assert esp is not None
-    panel = Panel(w=1200, h=1600)
-    out = esp.transform(
-        _png_bytes(img),
-        panel=panel,
+        panel=Panel(w=1200, h=1600),  # portrait native
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
     assert len(out) == 1200 * 1600 // 2
 
-    assert _decode_pixel(out, 600, 400, 1200) == 0x3  # red, top half
-    assert _decode_pixel(out, 600, 1200, 1200) == 0x5  # blue, bottom half
+    red_nibble = 0x3
+    blue_nibble = 0x5
+    white_nibble = 0x1
+    # After CW rotation + letterbox-fit to 1200×1600, the 400-wide CW-
+    # rotated strip lands centred. Red (was left) is the top half of
+    # the centre strip; blue (was right) is the bottom half.
+    assert _decode_pixel(out, 600, 400, 1200) == red_nibble
+    assert _decode_pixel(out, 600, 1200, 1200) == blue_nibble
+    # Letterbox columns left + right of the strip stay white.
+    assert _decode_pixel(out, 100, 800, 1200) == white_nibble
+    assert _decode_pixel(out, 1100, 800, 1200) == white_nibble
 
 
-def test_landscape_panel_setting_still_emits_portrait(registry) -> None:
-    """The panel arg arrives from app settings. If the user has the
-    Inky 13.3" preset selected with default landscape orientation, panel
-    comes in as (1600, 1200). The renderer must still emit a 1200x1600
-    portrait buffer because the firmware contract is fixed."""
-    img = Image.new("RGB", (1200, 1600), "white")  # portrait composition
+def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
+    """7.3" PhotoPainter is landscape native. A portrait composition
+    gets a 90° CW rotation so its top edge lands at the panel's RIGHT
+    edge (think of physically rotating the image clockwise: north →
+    east). Red TOP + blue BOTTOM portrait input ends up as red on the
+    RIGHT, blue on the LEFT of the 800×480 landscape buffer.
+
+    Without this, the firmware would feed the panel a 400-byte/row
+    stride against the renderer's 240-byte/row pack — paints garbled
+    vertical ghosts (the reported PhotoPainter symptom)."""
+    img = Image.new("RGB", (480, 800), "white")
+    img.paste((255, 0, 0), (0, 0, 480, 400))
+    img.paste((0, 0, 255), (0, 400, 480, 800))
+
     esp = registry.get("esp32_bin")
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        panel=Panel(w=1600, h=1200),  # user has it as landscape
+        panel=Panel(w=800, h=480),  # landscape native
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
-    assert len(out) == 1200 * 1600 // 2  # native portrait, regardless
+    assert len(out) == 800 * 480 // 2  # 192000 bytes — matches the firmware report
+
+    red_nibble = 0x3
+    blue_nibble = 0x5
+    # CW rotation maps original top → right, original bottom → left.
+    # Red (was on top) lands on the panel's RIGHT half; blue (was on
+    # bottom) lands on the LEFT half.
+    assert _decode_pixel(out, 200, 240, 800) == blue_nibble  # mid of left half
+    assert _decode_pixel(out, 600, 240, 800) == red_nibble  # mid of right half

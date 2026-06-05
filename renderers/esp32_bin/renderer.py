@@ -3,30 +3,39 @@
 Published retained to ``tesserae/esp32/frame/bin`` so a freshly-woken
 ESP32 client sees the current frame on first wake.
 
-Wire contract (Waveshare 13.3" Spectra 6 firmware, strict mode):
+Wire contract:
 
-* Exactly ``width * height / 2`` bytes — 960000 for the 13.3" panel.
-* **Portrait orientation always**: 1200 wide x 1600 tall pixel grid.
+* Exactly ``width * height / 2`` bytes — 960000 for the 13.3" Waveshare,
+  192000 for the 7.3" PhotoPainter.
+* Buffer is packed at the **panel's native hardware orientation** —
+  ``panel.w × panel.h`` directly. The firmware streams the bytes
+  straight to SPI with no resize / rotate, so the device record's
+  panel.w / panel.h must match the firmware's hardware-configured row
+  stride. Two shipped cases:
+
+  * Waveshare 13.3" Spectra 6 — portrait native: ``panel.w = 1200,
+    panel.h = 1600``. The bin is 1200 wide × 1600 tall.
+  * Waveshare 7.3" PhotoPainter (ESP32-S3) — landscape native:
+    ``panel.w = 800, panel.h = 480``. The bin is 800 wide × 480 tall.
+
+  Packing at min/max-swapped dims (the old "force portrait" path)
+  paints garbled vertical ghosts on the 7.3" PhotoPainter because the
+  firmware feeds it a 400-byte/row stride and the renderer was
+  emitting 240-byte rows.
+
 * 4-bpp packed, scanline order, no row padding. High nibble = even
   column, low nibble = odd column.
 
-The firmware does **no** rotation, resize, or decode — it streams the
-buffer straight to SPI. If we hand it a landscape-stride buffer the
-panel paints a wrong-stride tile artefact (3x2 tiles of the source
-visible on the panel). So:
+Pipeline:
 
-1. If the input composition is landscape (W > H), rotate 90° CW so its
-   left edge ends up at the panel's top edge. For typical dashboards
-   text then reads top-to-bottom — sideways, but unavoidable on a
-   portrait panel.
-2. Letterbox (white) to fit whatever portrait dims the firmware wants.
-3. Pack at the panel's native portrait orientation (smaller dim = width,
-   larger = height) regardless of how the user has the panel oriented
-   in app settings. The firmware grid is fixed; the user setting only
-   affects the composition rendered upstream.
-
-Portrait input passes through with no rotation — only the fit + pack
-steps run, exactly like before.
+1. If the input composition's orientation doesn't match the panel's
+   (i.e. input landscape vs panel portrait, or vice versa), rotate
+   90° CW so the input's left edge lands at the panel's top edge. On
+   matching orientations the input passes through.
+2. Apply ``panel.flip`` (180° rotation for upside-down mounts).
+3. Letterbox (white) to fit ``panel.w × panel.h`` exactly.
+4. Apply per-device underscan if set.
+5. Pack at ``panel.w × panel.h``.
 """
 
 from __future__ import annotations
@@ -52,15 +61,16 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     img = Image.open(io.BytesIO(png_bytes))
-    # Force portrait output regardless of how the user has panel.w / panel.h
-    # configured — the Waveshare 13.3" firmware reads the buffer as
-    # 1200x1600 portrait, period.
-    native_w = min(panel.w, panel.h)
-    native_h = max(panel.w, panel.h)
-    if img.size[0] > img.size[1]:
-        # Landscape composition → rotate 90° CW so it fills the portrait
-        # panel (original left edge → new top edge). PIL ``rotate(angle)``
-        # is counter-clockwise; ``-90`` gives CW.
+    # Pack at the panel's native dims — see module docstring for why
+    # the old min/max swap was wrong for landscape-native devices.
+    native_w = panel.w
+    native_h = panel.h
+    panel_landscape = native_w > native_h
+    img_landscape = img.size[0] > img.size[1]
+    if panel_landscape != img_landscape:
+        # Orientation mismatch — rotate 90° CW so the input's left edge
+        # lands at the panel's top edge. PIL ``rotate(angle)`` is
+        # counter-clockwise; ``-90`` gives CW.
         img = img.rotate(-90, expand=True)
     if panel.flip:
         # Upside-down physical mount — turn 180° so it reads upright.
