@@ -541,10 +541,14 @@
    FAB up + fades it in. */
 .scroll-to-preview {
   position: fixed;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--t-space-4));
-  left: calc(env(safe-area-inset-left, 0px) + var(--t-space-4));
-  width: 52px;
-  height: 52px;
+  /* Inset further from the edges than the default --t-space-4 so the
+     FAB lands in the thumb's natural arc instead of the screen corner.
+     Bottom + inline use a slightly larger gap so a one-handed grip can
+     reach it without stretching. */
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--t-space-6));
+  left: calc(env(safe-area-inset-left, 0px) + var(--t-space-6));
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: 0;
   background: var(--t-accent);
@@ -552,7 +556,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 26px;
   box-shadow: var(--t-shadow-xl);
   cursor: pointer;
   /* touch-action: none keeps the browser from claiming the gesture for
@@ -575,7 +579,7 @@
 }
 .scroll-to-preview[data-side="right"] {
   left: auto;
-  right: calc(env(safe-area-inset-right, 0px) + var(--t-space-4));
+  right: calc(env(safe-area-inset-right, 0px) + var(--t-space-6));
 }
 .scroll-to-preview.is-visible {
   opacity: 1;
