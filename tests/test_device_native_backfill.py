@@ -12,7 +12,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from app import device_loader, device_service, renderer_loader
 from app.device_service import backfill_native_panel_dims
+from app.main import REPO_ROOT
+from app.panel import device_panel
 
 
 def _write(path: Path, raw: dict) -> None:
@@ -164,3 +167,90 @@ def test_backfill_skips_unknown_dims(tmp_path: Path) -> None:
 def test_backfill_returns_empty_on_missing_dir(tmp_path: Path) -> None:
     """A fresh install with no devices/ dir yet — no-op, no exception."""
     assert backfill_native_panel_dims(tmp_path / "does-not-exist") == []
+
+
+def test_manifest_native_dims_reach_device_panel(tmp_path: Path) -> None:
+    """End-to-end: a Waveshare 13.3" instance with native_w/native_h in
+    its on-disk manifest must surface those values through Device.panel
+    and into the resolved Panel object. Without the passthrough in
+    Device.panel, the dims-only preset matcher in device_panel picks
+    Inky 13.3" (1600×1200, landscape-native) for any (1200, 1600) device
+    and the renderer packs at the wrong row stride. Regression test for
+    the bug behind the office Waveshare's distorted-tile symptom."""
+    devices_dir = tmp_path / "devices"
+    devices_dir.mkdir()
+    inst = devices_dir / "esp32_office.json"
+    _write(
+        inst,
+        {
+            "id": "esp32_office",
+            "kind": "esp32_client",
+            "name": "Office",
+            "panel": {
+                "w": 1200,
+                "h": 1600,
+                "orientation": "portrait",
+                "native_w": 1200,
+                "native_h": 1600,
+            },
+        },
+    )
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=devices_dir,
+    )
+    # Sanity: the migration backfill is unrelated here (manifest already
+    # carries native_w/native_h); we're proving the passthrough alone is
+    # enough to reach device_panel.
+    inst_device = devices.get("esp32_office")
+    assert inst_device is not None and inst_device.panel is not None
+    assert inst_device.panel.get("native_w") == 1200
+    assert inst_device.panel.get("native_h") == 1600
+
+    resolved = device_panel(inst_device)
+    assert resolved is not None
+    assert (resolved.native_w, resolved.native_h) == (1200, 1600)
+
+
+def test_manifest_without_native_dims_falls_through(tmp_path: Path) -> None:
+    """Counter-test: a manifest with no native_w/native_h goes through
+    the preset-matching fallback. For an esp32 (1200, 1600) device that
+    fallback currently picks Inky 13.3" first — wrong, but the matter
+    of the dims-only fallback's dict order, not the passthrough. The
+    backfill migration is the supported fix for pre-v0.20 manifests."""
+    devices_dir = tmp_path / "devices"
+    devices_dir.mkdir()
+    inst = devices_dir / "esp32_office.json"
+    _write(
+        inst,
+        {
+            "id": "esp32_office",
+            "kind": "esp32_client",
+            "name": "Office",
+            "panel": {"w": 1200, "h": 1600, "orientation": "portrait"},
+        },
+    )
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=devices_dir,
+    )
+    inst_device = devices.get("esp32_office")
+    assert inst_device is not None and inst_device.panel is not None
+    assert "native_w" not in inst_device.panel
+
+    resolved = device_panel(inst_device)
+    assert resolved is not None
+    # Dims-only fallback hits inky_13_3 first (1600, 1200) - the very
+    # bug the migration fixes. This test pins the misbehaviour so we
+    # don't accidentally "fix" the fallback in a way that breaks the
+    # migration's contract.
+    assert (resolved.native_w, resolved.native_h) == (1600, 1200)
+
+
+# Suppress unused-import warning when the device_service / renderer_loader
+# helpers aren't directly referenced — both are used implicitly through
+# the discover machinery above.
+_ = device_service
+_ = renderer_loader

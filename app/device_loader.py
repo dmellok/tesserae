@@ -145,6 +145,24 @@ class Device:
             underscan = 0
         if underscan > 0:
             out["underscan"] = underscan
+        # Firmware-native row stride (when the manifest carries it; the
+        # v0.20 add-device path writes it for preset-picked panels, and
+        # the startup backfill in app.device_service patches existing
+        # esp32 instance manifests). Without this passthrough the dict
+        # arrives at device_panel() missing the keys and the dims-only
+        # preset-matching fallback wins — for a 1200×1600 Waveshare
+        # 13.3" it picks Inky 13.3" (1600×1200) by dict order and the
+        # renderer packs at the wrong stride.
+        for stride_key in ("native_w", "native_h"):
+            raw = block.get(stride_key)
+            if raw is None:
+                continue
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                out[stride_key] = value
         return out
 
     def parse_status(self, payload: bytes) -> dict[str, Any]:
