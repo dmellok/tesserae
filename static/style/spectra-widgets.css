@@ -772,18 +772,24 @@
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
+  /* Subtle card behind the track outline so the bold line reads as a
+     deliberate diagram instead of floating loose in the cell. Picks
+     up the active theme's sunken-surface tint so it integrates
+     across all 19 themes without a bespoke colour per palette. */
+  background: var(--surface-sunken);
+  border-radius: var(--radius-1);
+  padding: var(--space-3);
 }
 /* SVG renders at its viewBox-derived intrinsic aspect ratio and is
-   shrunk to ~75% of the available box, so the path always has
-   breathing room around it and the flex centering on the parent
-   actually has something smaller to center. width/height: auto lets
-   the SVG self-size from its viewBox; the max-* caps clamp it inside
-   the column. */
+   shrunk inside the card so the path has breathing room and the
+   flex centring on the parent actually has something smaller to
+   centre. width/height: auto lets the SVG self-size from its
+   viewBox; the max-* caps clamp it inside the column. */
 .f1-track svg{
   width: auto;
   height: auto;
-  max-width: 75%;
-  max-height: 75%;
+  max-width: 100%;
+  max-height: 100%;
 }
 /* Hide the track strip on cells too narrow to show it as anything
    other than a sliver. ``360px`` is the Spectra "compact" breakpoint
