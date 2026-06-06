@@ -244,7 +244,30 @@ for the renderer / device kind matrix and current test status.
 
 ## Install
 
-### Docker (quickest)
+### Home Assistant Add-on (easiest if you already run HA)
+
+Tesserae ships as a Home Assistant Add-on that installs through HA
+Supervisor and shows up as a sidebar Ingress tab. No Docker, no
+shell, no separate password, HA's auth gates the admin UI.
+
+1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste
+   `https://github.com/dmellok/homeassistant-tesserae-addon`, click
+   **Add**.
+2. The new repository surfaces a **Tesserae** entry (stable) and a
+   **Tesserae (edge)** entry (tracks `main`, rebuilt every release).
+   Click **Install** on whichever you want.
+3. After install, hit **Start**, then **Open Web UI**, the admin
+   UI loads inside HA's Ingress tab.
+
+The Add-on persists `/data` across upgrades, sets
+`TESSERAE_HA_INGRESS=1` so the standalone login is skipped (HA's
+session gates it instead), and wires `SUPERVISOR_TOKEN` through so
+Tesserae can call Supervisor for version + restart niceties. See
+[**Install on Home Assistant**](https://dmellok.github.io/tesserae/install/home-assistant/)
+for the full Add-on guide, MQTT auto-discovery, and the broker-
+sharing story.
+
+### Docker (quickest standalone)
 
 ```sh
 mkdir tesserae && cd tesserae
