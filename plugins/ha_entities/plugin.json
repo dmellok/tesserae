@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Entities",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "kind": "widget",
-  "description": "A status grid of several Home Assistant entities Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.",
+  "description": "A status grid of several Home Assistant entities. Each row tints by its state (on / off / other), leads with a device-class-aware Phosphor glyph (temperature → thermometer, CO₂ → wind, motion → person walking, …), and shows its current value. Rows that changed within the last 10 minutes pick up an accent-4 wash + a 'just now' / 'Nm ago' badge.",
   "icon": "ph-squares-four",
   "supports": {
     "sizes": [

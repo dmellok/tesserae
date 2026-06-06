@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Sensor",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "kind": "widget",
-  "description": "One or more Home Assistant entities as bold value blocks A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.",
+  "description": "One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). Requires the Home Assistant Core plugin.",
   "icon": "ph-gauge",
   "supports": {
     "sizes": [
@@ -38,6 +38,18 @@
       "name": "show_unit",
       "type": "boolean",
       "label": "Show units",
+      "default": true
+    },
+    {
+      "name": "show_trend",
+      "type": "boolean",
+      "label": "Show trend arrow (up / down / flat vs 24h)",
+      "default": true
+    },
+    {
+      "name": "show_sparkline",
+      "type": "boolean",
+      "label": "Show 24h sparkline",
       "default": true
     }
   ],

@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Locks & Doors",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "kind": "widget",
-  "description": "A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.",
+  "description": "A security-focused overview of every lock.* entity plus door / window / garage / opening binary_sensors. Stateful kind glyphs (ph-lock ↔ ph-lock-open, ph-door ↔ ph-door-open, etc.) communicate state via icon rather than text colour alone; unsecured rows wear a terracotta wash + an 'unsecured for Xm' timer chip. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.",
   "icon": "ph-lock",
   "supports": {
     "sizes": [

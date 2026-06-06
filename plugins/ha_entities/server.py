@@ -24,10 +24,110 @@ _DOMAIN_ICONS: dict[str, str] = {
     "switch": "toggle-right",
     "fan": "fan",
     "climate": "thermometer-simple",
-    "person": "house",
-    "device_tracker": "house",
+    "person": "user",
+    "device_tracker": "map-pin",
     "sensor": "gauge",
     "binary_sensor": "circle",
+    "media_player": "speaker-high",
+    "camera": "video-camera",
+    "vacuum": "broom",
+    "automation": "gear",
+    "script": "code",
+    "scene": "palette",
+    "input_boolean": "toggle-right",
+    "input_number": "sliders",
+    "input_select": "list",
+    "input_text": "text-aa",
+    "weather": "cloud-sun",
+    "sun": "sun",
+    "timer": "timer",
+    "calendar": "calendar",
+    "alarm_control_panel": "shield",
+    "update": "arrow-circle-up",
+    "todo": "check-square",
+    "button": "circle-dashed",
+    "select": "list",
+    "number": "hash",
+    "text": "text-aa",
+    "zone": "map-pin-area",
+}
+
+# Device-class → Phosphor icon. Wins over the domain default because
+# device_class is the most specific signal HA exposes. A
+# `sensor.living_room_co2` has domain=sensor (default → gauge) but
+# device_class=carbon_dioxide → ph-wind, far more useful.
+_DEVICE_CLASS_ICONS: dict[str, str] = {
+    # Environmental sensors
+    "temperature": "thermometer",
+    "humidity": "drop",
+    "pressure": "gauge",
+    "illuminance": "sun-dim",
+    "co2": "wind",
+    "carbon_dioxide": "wind",
+    "carbon_monoxide": "skull",
+    "pm1": "circles-three-plus",
+    "pm10": "circles-three-plus",
+    "pm25": "circles-three-plus",
+    "aqi": "wind",
+    "vocs": "wind",
+    "nitrogen_dioxide": "wind",
+    "ozone": "wind",
+    "sulphur_dioxide": "wind",
+    "moisture": "drop-half",
+    "smoke": "cloud",
+    "gas": "flame",
+    # Power / electricity
+    "battery": "battery-medium",
+    "power": "lightning",
+    "energy": "lightning",
+    "voltage": "wave-sawtooth",
+    "current": "wave-sine",
+    "power_factor": "wave-square",
+    "frequency": "wave-triangle",
+    "apparent_power": "lightning",
+    "reactive_power": "lightning",
+    # Counters / quantities
+    "distance": "ruler",
+    "duration": "clock",
+    "speed": "speedometer",
+    "wind_speed": "wind",
+    "weight": "scales",
+    "volume": "tray-arrow-down",
+    "volume_flow_rate": "drop",
+    "water": "drop",
+    "monetary": "currency-circle-dollar",
+    "data_size": "database",
+    "data_rate": "wifi-high",
+    "signal_strength": "wifi-high",
+    "atmospheric_pressure": "gauge",
+    "irradiance": "sun",
+    # Binary-sensor specifics
+    "motion": "person-simple-walk",
+    "occupancy": "user",
+    "presence": "user",
+    "vibration": "wave-sine",
+    "sound": "speaker-high",
+    "tamper": "warning",
+    "safety": "shield-check",
+    "problem": "warning-circle",
+    "running": "play",
+    "plug": "plug",
+    "power_failure": "lightning-slash",
+    "moving": "arrow-fat-line-right",
+    "light": "sun",
+    "cold": "snowflake",
+    "heat": "thermometer-hot",
+    "connectivity": "wifi-high",
+    "battery_charging": "battery-charging",
+    "update": "arrow-circle-up",
+    # Door / window / opening — used as a fallback for the door-aware
+    # icon switch below.
+    "door": "door",
+    "window": "frame-corners",
+    "garage": "garage",
+    "garage_door": "garage",
+    "opening": "door",
+    "lock": "lock",
 }
 
 _DOOR_CLASSES = {"door", "window", "garage_door", "opening", "garage"}
@@ -75,10 +175,17 @@ def _parse_overrides(raw: Any) -> dict[str, dict[str, str]]:
 def _icon_for(entity_id: str, attrs: dict[str, Any], status: str) -> str:
     domain = entity_id.split(".", 1)[0]
     device_class = str(attrs.get("device_class") or "")
+    # Domain-specific stateful glyph swaps win over the device-class
+    # lookup because the same device_class can mean different things
+    # in different domains (e.g. cover with device_class=garage_door
+    # should swap open ↔ closed glyph).
     if domain == "lock":
         return "lock-open" if status == "on" else "lock"
     if domain == "cover" or (domain == "binary_sensor" and device_class in _DOOR_CLASSES):
         return "door-open" if status == "on" else "door"
+    # Device-class wins over domain default for sensors / binary_sensors.
+    if device_class and device_class in _DEVICE_CLASS_ICONS:
+        return _DEVICE_CLASS_ICONS[device_class]
     return _DOMAIN_ICONS.get(domain, "circle")
 
 
@@ -157,6 +264,12 @@ def fetch(
                 "label": "unavailable" if status == "missing" else _humanise(raw, unit),
                 "status": status,
                 "icon": ov.get("icon") or _icon_for(eid, attrs, status),
+                # Surface last_changed so the client can flag rows
+                # that just transitioned; format is HA's standard
+                # ISO 8601 with timezone.
+                "last_changed": str(st.get("last_changed") or ""),
+                "domain": eid.split(".", 1)[0],
+                "device_class": str(attrs.get("device_class") or ""),
             }
         )
 

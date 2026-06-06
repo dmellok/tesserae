@@ -142,17 +142,37 @@ def fetch(
         if today_state is not None:
             solar_today_kwh = _f_or_none(today_state.get("state"))
 
-    # 24-hour sparkline. Prefer the solar entity (it has a clear
-    # day-shaped curve); fall back to house consumption when solar's
-    # not configured.
+    # 48-hour sparkline split into yesterday + today so the client
+    # can paint a comparison ghost line. Prefer the solar entity (it
+    # has a clear day-shaped curve); fall back to house consumption
+    # when solar's not configured.
     spark_entity = (options.get("solar_entity") or options.get("house_entity") or "").strip()
-    sparkline: list[float] = []
+    sparkline_today: list[float] = []
+    sparkline_yesterday: list[float] = []
     if spark_entity:
         try:
-            hist = core.history(spark_entity, hours=24)
+            hist_24 = core.history(spark_entity, hours=24)
         except Exception:
-            hist = []
-        sparkline = _downsample([_f(s.get("state")) for s in hist], slots=48)
+            hist_24 = []
+        try:
+            hist_48 = core.history(spark_entity, hours=48)
+        except Exception:
+            hist_48 = []
+        # Today's 24h: the last 24h of samples. Yesterday's 24h: the
+        # 24-48h window. We bin BEFORE splitting so both halves get
+        # the same 48-slot density even if the underlying sample
+        # rate varies.
+        today_raw = [_f(s.get("state")) for s in hist_24]
+        sparkline_today = _downsample(today_raw, slots=48)
+        if hist_48:
+            full_48 = [_f(s.get("state")) for s in hist_48]
+            binned = _downsample(full_48, slots=96)
+            sparkline_yesterday = binned[:48]
+            # If today's downsample produced fewer than 48 samples
+            # (sparse history), pull today's half out of the 48h bin too
+            # so both lines line up under the same x-axis.
+            if not sparkline_today:
+                sparkline_today = binned[48:]
 
     flow = _dominant_flow(solar, grid, battery, house)
 
@@ -160,6 +180,7 @@ def fetch(
         "label": options.get("label", "Home"),
         "place": options.get("label", "Home"),
         "time": datetime.now().strftime("%H:%M"),
+        "hour": datetime.now().hour,
         "solar_w": round(solar, 1),
         "grid_w": round(grid, 1),
         "battery_w": round(battery, 1),
@@ -167,7 +188,10 @@ def fetch(
         "battery_soc": round(soc, 1) if soc is not None else None,
         "solar_today_kwh": round(solar_today_kwh, 2) if solar_today_kwh is not None else None,
         "flow": flow,
-        "sparkline": sparkline,
+        # Backwards-compat: `sparkline` mirrors today's series.
+        "sparkline": sparkline_today,
+        "sparkline_today": sparkline_today,
+        "sparkline_yesterday": sparkline_yesterday,
         # Bookkeeping for the cache layer.
         "_fetched_at": int(time.time()),
     }

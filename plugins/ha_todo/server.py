@@ -28,13 +28,24 @@ def choices(name: str) -> list[dict[str, str]]:
 
 
 def _normalise_item(raw: dict[str, Any]) -> dict[str, Any]:
-    """Flatten HA's todo item into the shape the client expects."""
+    """Flatten HA's todo item into the shape the client expects.
+
+    Some integrations include an iCal-style ``priority`` field (0-9,
+    where 1-4 is high, 5 is medium, 6-9 is low, 0/missing is "no
+    priority"). Forward it when it's there so the client can paint a
+    priority dot."""
+    priority = raw.get("priority")
+    try:
+        priority_n: int | None = int(priority) if priority not in (None, "") else None
+    except (TypeError, ValueError):
+        priority_n = None
     return {
         "uid": str(raw.get("uid") or ""),
         "summary": str(raw.get("summary") or "").strip(),
         "status": str(raw.get("status") or "needs_action"),
         "due": raw.get("due"),  # ISO datetime, ISO date, or None
         "description": str(raw.get("description") or "").strip(),
+        "priority": priority_n,
     }
 
 

@@ -42,6 +42,11 @@
        script must be a regular non-module so composer.js's dynamic
        widget imports don't race the global. -->
   <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  <!-- chartjs-chart-sankey plugin — registers a `sankey` controller on
+       the global Chart so widgets can render proper Sankey diagrams
+       (e.g. ha_energy's flow visualization) without hand-rolling the
+       layout algorithm. ~10KB. -->
+  <script src="{{ url_for('static', filename='vendor/chartjs-chart-sankey.min.js') }}"></script>
   <style>
     {{ page.font_face_css|safe }}
 

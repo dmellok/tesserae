@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — Lights",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "kind": "widget",
-  "description": "An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.",
+  "description": "An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, what colour, and what share of the house is currently lit. Each row carries a brightness mini-bar tinted by the light's actual colour-temperature (warm-white to cool-white) or RGB hue, plus a swatch dot for the colour itself. Reads from your existing Home Assistant install via the Core plugin.",
   "icon": "ph-lightbulb",
   "supports": {
     "sizes": [

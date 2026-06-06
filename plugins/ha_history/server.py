@@ -79,6 +79,36 @@ def _trend(values: list[float]) -> str:
     return "up" if delta > 0 else "down"
 
 
+def _hourly_profile(samples: list[dict[str, Any]]) -> list[float | None]:
+    """Average value by hour-of-day across the entire window. Returns 24
+    floats (or None for hours with no samples). Used by the client to
+    overlay a "what does an average day at this hour look like?" ghost
+    line on top of the live series. Worth computing only when the
+    window is long enough to span multiple days (caller decides)."""
+    from datetime import datetime
+
+    buckets: list[list[float]] = [[] for _ in range(24)]
+    for s in samples:
+        value = _to_float(s.get("state"))
+        if value is None:
+            continue
+        ts = s.get("last_changed") or s.get("last_updated")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            continue
+        buckets[dt.hour].append(value)
+    out: list[float | None] = []
+    for hour_samples in buckets:
+        if hour_samples:
+            out.append(round(sum(hour_samples) / len(hour_samples), 2))
+        else:
+            out.append(None)
+    return out
+
+
 def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[str, Any]:
     st = by_id.get(eid)
     if st is None:
@@ -112,11 +142,21 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
             "sparse": True,
             "trend": "flat",
         }
+    # Compute hourly profile BEFORE downsampling — it needs the raw
+    # timestamps. Only emit a profile when the window is at least
+    # three days, otherwise the per-hour averages are too noisy to
+    # carry meaning.
+    profile = _hourly_profile(samples) if hours >= 72 else []
     values = _downsample(values)
     # Round each sample to 2 decimals so the chart's tooltip / axis
     # labels stay clean (the chart itself just plots floats so the
     # rounding is purely cosmetic at the client layer).
     values = [round(v, 2) for v in values]
+    # Find the min/max INDEX so the client can mark them as dots on
+    # the line. Use the downsampled series so indexes line up with
+    # what the chart plots.
+    min_idx = values.index(min(values))
+    max_idx = values.index(max(values))
     lo, hi = min(values), max(values)
     return {
         "name": name,
@@ -125,6 +165,9 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
         "values": values,
         "min": f"{lo:g}",
         "max": f"{hi:g}",
+        "min_idx": min_idx,
+        "max_idx": max_idx,
+        "hourly_profile": profile,
         "trend": _trend(values),
         "sparse": False,
     }
@@ -156,4 +199,16 @@ def fetch(
 
     if not title:
         title = items[0]["name"] if len(items) == 1 else "History"
-    return {"title": title, "hours": hours, "items": items}
+    # Pass the threshold options through verbatim so the client can
+    # draw a horizontal threshold line + tint min-max ranges. Both
+    # values are optional; the client falls back gracefully when they
+    # aren't present.
+    threshold = _to_float(options.get("threshold"))
+    return {
+        "title": title,
+        "hours": hours,
+        "items": items,
+        "threshold": threshold,
+        "show_profile": options.get("show_profile") is not False,
+        "show_min_max": options.get("show_min_max") is not False,
+    }

@@ -164,12 +164,39 @@ def fetch(
         if on:
             on_count += 1
         brightness = _brightness_pct(attrs.get("brightness")) if on else None
+        # Colour information — HA reports either color_temp_kelvin
+        # (direct), color_temp (mireds, legacy), or hs_color (when
+        # the bulb is in colour mode). We forward whatever's there;
+        # the client picks one to render as a tiny swatch dot.
+        color_temp_kelvin = None
+        if on:
+            kelvin_raw = attrs.get("color_temp_kelvin")
+            mireds_raw = attrs.get("color_temp")
+            try:
+                if kelvin_raw not in (None, "", "unavailable"):
+                    color_temp_kelvin = int(float(kelvin_raw))
+                elif mireds_raw not in (None, "", "unavailable"):
+                    mireds = float(mireds_raw)
+                    if mireds > 0:
+                        color_temp_kelvin = int(1_000_000 / mireds)
+            except (TypeError, ValueError):
+                color_temp_kelvin = None
+        hs_color = attrs.get("hs_color") if on else None
+        if isinstance(hs_color, (list, tuple)) and len(hs_color) >= 2:
+            try:
+                hs_color = [float(hs_color[0]), float(hs_color[1])]
+            except (TypeError, ValueError):
+                hs_color = None
+        else:
+            hs_color = None
         lights.append(
             {
                 "entity_id": eid,
                 "name": core.friendly_name(st),
                 "on": on,
                 "brightness_pct": brightness,
+                "color_temp_kelvin": color_temp_kelvin,
+                "hs_color": hs_color,
                 "domain_icon": _icon_hint(attrs),
                 "missing": False,
             }

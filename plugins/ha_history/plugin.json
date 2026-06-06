@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant — History",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "widget",
-  "description": "A numeric Home Assistant sensor over time Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.",
+  "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",
   "icon": "ph-chart-line",
   "supports": {
     "sizes": [
@@ -25,6 +25,25 @@
       "label": "Entities",
       "default": [],
       "choices_from": "entity"
+    },
+    {
+      "name": "threshold",
+      "type": "number",
+      "label": "Threshold (optional)",
+      "default": "",
+      "help": "Draws a horizontal dashed line at this value. Useful for 'too cold' / 'too high' / 'over budget' thresholds."
+    },
+    {
+      "name": "show_min_max",
+      "type": "boolean",
+      "label": "Mark min / max points on the chart",
+      "default": true
+    },
+    {
+      "name": "show_profile",
+      "type": "boolean",
+      "label": "Show averaged hourly-profile overlay (long windows)",
+      "default": true
     },
     {
       "name": "window",

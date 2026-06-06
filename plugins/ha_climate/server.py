@@ -69,6 +69,13 @@ def _shape(core: Any, st: dict[str, Any]) -> dict[str, Any]:
         "target": _fmt(attrs.get("temperature")),
         "target_low": _fmt(attrs.get("target_temp_low")),
         "target_high": _fmt(attrs.get("target_temp_high")),
+        # min/max bound the thermometer chart; humidity adds the
+        # secondary drop glyph when the integration surfaces it.
+        "min_temp": _fmt(attrs.get("min_temp")),
+        "max_temp": _fmt(attrs.get("max_temp")),
+        "humidity": _fmt(attrs.get("current_humidity")),
+        "humidity_target": _fmt(attrs.get("humidity")),
+        "unit": str(attrs.get("temperature_unit") or "°"),
         "unavailable": mode.lower() in _UNAVAILABLE,
     }
 

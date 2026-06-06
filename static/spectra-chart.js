@@ -275,6 +275,12 @@ export function barChart(canvas, opts) {
 // with the area filled at 18% alpha — so the chart reads as a
 // confident bauhaus block, not a thin technical line. Pass
 // ``fill: false`` to opt out of the shaded area.
+//
+// Optional advanced features:
+//   threshold: { value, label, color } — draws a horizontal dashed line
+//   markers: [{ index, color, label, position }] — point markers on the line
+//   overlay: { values, color, label } — secondary series rendered behind
+//     the main line as a thin dashed ghost
 export function lineChart(canvas, opts) {
   if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || opts.values.length < 2) return null;
   const t = opts.tokens || FALLBACK;
@@ -282,20 +288,126 @@ export function lineChart(canvas, opts) {
   const color = opts.color || t.accent4;
   const wantsFill = opts.fill !== false;
 
+  // Per-point radius array. Most points are size 0 (hidden); marker
+  // indexes get a chunky pip.
+  const markers = Array.isArray(opts.markers) ? opts.markers : [];
+  const pointRadiusArr = opts.values.map(() => 0);
+  const pointBgArr = opts.values.map(() => color);
+  const pointBorderArr = opts.values.map(() => t.surface);
+  for (const m of markers) {
+    if (Number.isFinite(m.index) && m.index >= 0 && m.index < opts.values.length) {
+      pointRadiusArr[m.index] = m.radius || 5;
+      pointBgArr[m.index] = m.color || color;
+    }
+  }
+
+  const datasets = [{
+    data: opts.values,
+    borderColor: color,
+    backgroundColor: wantsFill ? withAlpha(color, 0.18) : "transparent",
+    borderWidth: 3,
+    tension: 0.25,
+    pointRadius: pointRadiusArr,
+    pointBackgroundColor: pointBgArr,
+    pointBorderColor: pointBorderArr,
+    pointBorderWidth: 2,
+    fill: wantsFill ? "origin" : false,
+    order: 1,
+  }];
+
+  // Secondary "overlay" series, e.g. an hourly-profile ghost on top
+  // of a multi-day window. Always thin + dashed + muted so it reads
+  // as background context, not data the eye should track first.
+  if (opts.overlay && Array.isArray(opts.overlay.values) && opts.overlay.values.length >= 2) {
+    datasets.push({
+      data: opts.overlay.values,
+      borderColor: opts.overlay.color || t.textMuted,
+      borderWidth: 1.5,
+      borderDash: [3, 3],
+      tension: 0.4,
+      pointRadius: 0,
+      fill: false,
+      order: 2,
+    });
+  }
+
+  // Threshold-line plugin — draws a dashed horizontal line + a value
+  // label at the threshold's y-coordinate. Defined inline because it
+  // needs access to the per-call opts.
+  const thresholdPlugin = opts.threshold && Number.isFinite(opts.threshold.value) ? {
+    id: "tess_threshold",
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      const yScale = scales.y;
+      if (!yScale) return;
+      const y = yScale.getPixelForValue(opts.threshold.value);
+      if (y < chartArea.top || y > chartArea.bottom) return;
+      ctx.save();
+      ctx.strokeStyle = opts.threshold.color || t.accent1;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, y);
+      ctx.lineTo(chartArea.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Label pill, top-right of the line.
+      const label = String(opts.threshold.label ?? opts.threshold.value);
+      ctx.font = `700 11px ${t.fontFamily}`;
+      const pad = 4;
+      const tw = ctx.measureText(label).width + pad * 2;
+      const th = 14;
+      const tx = chartArea.right - tw - 2;
+      const ty = y - th - 2;
+      ctx.fillStyle = opts.threshold.color || t.accent1;
+      ctx.fillRect(tx, ty, tw, th);
+      ctx.fillStyle = t.surface;
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, tx + pad, ty + th / 2 + 0.5);
+      ctx.restore();
+    },
+  } : null;
+
+  // Marker-label plugin — draws a small label next to each marker
+  // (e.g. "12.5" beside the min point).
+  const markerLabelPlugin = markers.length > 0 ? {
+    id: "tess_markers",
+    afterDatasetsDraw(chart) {
+      const { ctx, scales } = chart;
+      const yScale = scales.y;
+      const xScale = scales.x;
+      if (!yScale || !xScale) return;
+      ctx.save();
+      ctx.font = `800 11px ${t.fontFamily}`;
+      ctx.textBaseline = "middle";
+      for (const m of markers) {
+        if (!Number.isFinite(m.index) || !m.label) continue;
+        const x = xScale.getPixelForValue(m.index);
+        const y = yScale.getPixelForValue(opts.values[m.index]);
+        const placeAbove = m.position === "above";
+        const label = String(m.label);
+        const pad = 4;
+        const tw = ctx.measureText(label).width + pad * 2;
+        const th = 14;
+        const bx = x - tw / 2;
+        const by = placeAbove ? y - th - 8 : y + 10;
+        ctx.fillStyle = m.color || color;
+        ctx.fillRect(bx, by, tw, th);
+        ctx.fillStyle = t.surface;
+        ctx.fillText(label, bx + pad, by + th / 2 + 0.5);
+      }
+      ctx.restore();
+    },
+  } : null;
+
+  const plugins = [];
+  if (thresholdPlugin) plugins.push(thresholdPlugin);
+  if (markerLabelPlugin) plugins.push(markerLabelPlugin);
+
   const chart = new window.Chart(canvas, {
     type: "line",
-    data: {
-      labels,
-      datasets: [{
-        data: opts.values,
-        borderColor: color,
-        backgroundColor: wantsFill ? withAlpha(color, 0.18) : "transparent",
-        borderWidth: 3,
-        tension: 0.25,
-        pointRadius: 0,
-        fill: wantsFill ? "origin" : false,
-      }],
-    },
+    data: { labels, datasets },
+    plugins,
     options: {
       animation: false,
       responsive: true,
@@ -329,6 +441,55 @@ export function lineChart(canvas, opts) {
           border: { display: false },
         },
       },
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  });
+  canvas._chart = chart;
+  return chart;
+}
+
+// Sankey diagram — flows between source rails (left) and sink rails
+// (right) with proportional band thickness. Backed by
+// chartjs-chart-sankey, which adds a `sankey` controller to the
+// global Chart constructor when its script loads.
+//
+// Pass:
+//   flows: [{ from: "Solar", to: "House", flow: 1.4 }, ...]
+//   colors: { "Solar": "#A87412", "House": "#1B1A16", ... }
+//   tokens (optional, used for axis text colour)
+//
+// Each `from` and `to` key becomes a labelled rail. The library lays
+// the rails out automatically — heights ∝ summed flow through each
+// node. `colors` keys must match the rail names exactly.
+export function sankey(canvas, opts) {
+  if (!ensureChart(canvas) || !opts || !Array.isArray(opts.flows) || !opts.flows.length) return null;
+  const t = opts.tokens || FALLBACK;
+  const colors = opts.colors || {};
+  const data = opts.flows.map((f) => ({ from: String(f.from), to: String(f.to), flow: Number(f.flow) || 0 }));
+
+  const chart = new window.Chart(canvas, {
+    type: "sankey",
+    data: {
+      datasets: [{
+        data,
+        colorFrom: (c) => colors[c.dataset.data[c.dataIndex].from] || t.accent4,
+        colorTo: (c) => colors[c.dataset.data[c.dataIndex].to] || t.accent4,
+        colorMode: opts.colorMode || "gradient",
+        labels: opts.labels || undefined,
+        size: opts.sizeMode || "max",
+        // Padding around each rail's stack of bands.
+        nodePadding: opts.nodePadding ?? 8,
+        borderWidth: 0,
+        // Override font for rail labels so they pick up the cell's
+        // theme tokens.
+        font: { family: t.fontFamily, weight: 800, size: opts.labelSize ?? 12 },
+        color: t.textSecondary,
+      }],
+    },
+    options: {
+      animation: false,
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
     },
   });

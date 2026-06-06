@@ -17,21 +17,54 @@ from flask import current_app
 # back to a generic gauge. Picked server-side so the client just renders
 # ``ph-<icon>``.
 _DEVICE_CLASS_ICONS: dict[str, str] = {
-    "temperature": "thermometer-simple",
+    # Environmental
+    "temperature": "thermometer",
     "humidity": "drop",
-    "moisture": "drop",
-    "power": "lightning",
-    "energy": "lightning",
-    "current": "lightning",
-    "voltage": "lightning",
-    "battery": "battery-medium",
-    "illuminance": "sun",
+    "moisture": "drop-half",
+    "pressure": "gauge",
+    "atmospheric_pressure": "gauge",
+    "illuminance": "sun-dim",
+    "irradiance": "sun",
     "co2": "wind",
     "carbon_dioxide": "wind",
-    "pm25": "wind",
-    "pressure": "gauge",
-    "timestamp": "clock",
+    "carbon_monoxide": "skull",
+    "pm1": "circles-three-plus",
+    "pm10": "circles-three-plus",
+    "pm25": "circles-three-plus",
+    "aqi": "wind",
+    "vocs": "wind",
+    "nitrogen_dioxide": "wind",
+    "nitrous_oxide": "wind",
+    "ozone": "wind",
+    "sulphur_dioxide": "wind",
+    "smoke": "cloud",
+    "gas": "flame",
+    # Power / electricity
+    "battery": "battery-medium",
+    "power": "lightning",
+    "energy": "lightning",
+    "current": "wave-sine",
+    "voltage": "wave-sawtooth",
+    "power_factor": "wave-square",
+    "frequency": "wave-triangle",
+    "apparent_power": "lightning",
+    "reactive_power": "lightning",
+    # Counters / quantities
+    "distance": "ruler",
+    "duration": "clock",
+    "speed": "speedometer",
+    "wind_speed": "wind",
+    "weight": "scales",
+    "volume": "tray-arrow-down",
+    "volume_flow_rate": "drop",
+    "water": "drop",
+    "monetary": "currency-circle-dollar",
+    "data_size": "database",
+    "data_rate": "wifi-high",
     "signal_strength": "wifi-high",
+    "timestamp": "clock",
+    "date": "calendar",
+    "temperature_change": "thermometer-cold",
 }
 
 # Domain icons for non-sensor entities (lights, switches, …) shown by id.
@@ -115,6 +148,34 @@ def _icon_for(entity_id: str, attrs: dict[str, Any]) -> str:
     return _DOMAIN_ICONS.get(domain, "gauge")
 
 
+def _to_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _downsample(values: list[float], cap: int = 24) -> list[float]:
+    n = len(values)
+    if n <= cap:
+        return values
+    step = (n - 1) / (cap - 1)
+    return [values[round(i * step)] for i in range(cap)]
+
+
+def _trend(values: list[float]) -> str:
+    """up / down / flat based on the window's first sample → last
+    sample, treating moves smaller than 5% of the range as flat so a
+    noisy sensor doesn't show a "trend" that's just jitter."""
+    if len(values) < 2:
+        return "flat"
+    delta = values[-1] - values[0]
+    span = (max(values) - min(values)) or 1
+    if abs(delta) < span * 0.05:
+        return "flat"
+    return "up" if delta > 0 else "down"
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
@@ -135,6 +196,12 @@ def fetch(
 
     by_id = {str(s.get("entity_id")): s for s in states}
     show_unit = options.get("show_unit", True)
+    # Trend + sparkline default to on for the single-entity stat mode
+    # (where they really pay off) and to opt-in for the multi-entity
+    # list (where the sparkline is too cramped to read). The user can
+    # flip them either way.
+    show_trend = options.get("show_trend") is not False
+    show_sparkline = options.get("show_sparkline") is not False
     overrides = _parse_overrides(options.get("overrides"))
     items: list[dict[str, Any]] = []
     for eid in wanted:
@@ -153,15 +220,28 @@ def fetch(
             continue
         attrs = st.get("attributes") or {}
         raw = str(st.get("state") or "")
-        items.append(
-            {
-                "name": ov.get("name") or core.friendly_name(st),
-                "value": _format_value(raw),
-                "unit": str(attrs.get("unit_of_measurement") or "") if show_unit else "",
-                "icon": ov.get("icon") or _icon_for(eid, attrs),
-                "unavailable": raw.lower() in _UNAVAILABLE,
-            }
-        )
+        is_unavailable = raw.lower() in _UNAVAILABLE
+        item = {
+            "name": ov.get("name") or core.friendly_name(st),
+            "value": _format_value(raw),
+            "unit": str(attrs.get("unit_of_measurement") or "") if show_unit else "",
+            "icon": ov.get("icon") or _icon_for(eid, attrs),
+            "unavailable": is_unavailable,
+        }
+        # Trend + sparkline only for numeric, available sensors. Skip
+        # the API call for non-numeric or unavailable entries.
+        if (show_trend or show_sparkline) and not is_unavailable and _to_float(raw) is not None:
+            try:
+                samples = core.history(eid, hours=24)
+            except Exception:
+                samples = []
+            values = [v for v in (_to_float(s.get("state")) for s in samples) if v is not None]
+            if len(values) >= 2:
+                if show_trend:
+                    item["trend"] = _trend(values)
+                if show_sparkline:
+                    item["sparkline"] = [round(v, 2) for v in _downsample(values, cap=24)]
+        items.append(item)
 
     # Title precedence: explicit override → the single entity's name → generic.
     if not title:
