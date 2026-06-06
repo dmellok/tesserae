@@ -94,6 +94,7 @@ export default function render(shadow, ctx) {
   const archived = data.is_archived;
   const series = Array.isArray(data.commit_weeks) ? data.commit_weeks : [];
   const langs = Array.isArray(data.languages) ? data.languages : [];
+  const contributors = Array.isArray(data.contributors) ? data.contributors : [];
 
   // Six headline counters — laid out by the status-grid as 2 columns
   // × 3 rows. Counters everyone glances for in a repo card.
@@ -120,8 +121,95 @@ export default function render(shadow, ctx) {
       ${branch ? `<span class="u-label" style="font-size:var(--fs-caption)">${escapeHtml(branch)}</span>` : ""}
     </div>`;
 
+  // Top-contributors strip — up to 5 leading committers with their
+  // avatar, login, and contribution count. Renders below the language
+  // bar at md+ sizes; hidden at xs/sm via the container query below.
+  const contribStrip = contributors.length
+    ? `
+      <div class="contrib-row">
+        <span class="u-label contrib-row-label">Top contributors</span>
+        <div class="contrib-list">
+          ${contributors.slice(0, 5).map((c) => {
+            const initials = (c.login || "?").slice(0, 2).toUpperCase();
+            const avatar = c.avatar_url
+              ? `<img class="contrib-avatar" src="${escapeHtml(c.avatar_url)}&size=48" alt="" loading="lazy">`
+              : `<span class="contrib-avatar contrib-avatar-fallback">${escapeHtml(initials)}</span>`;
+            return `
+              <span class="contrib-tile" title="${escapeHtml(c.login)} · ${c.contributions} commits">
+                ${avatar}
+                <span class="contrib-login">${escapeHtml(c.login)}</span>
+                <span class="contrib-count">${fmtCount(c.contributions)}</span>
+              </span>`;
+          }).join("")}
+        </div>
+      </div>`
+    : "";
+
+  const layout = `
+    .contrib-row {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .contrib-row-label {
+      color: var(--text-muted);
+    }
+    .contrib-list {
+      display: flex;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+    }
+    .contrib-tile {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: 3px var(--space-1);
+      border-radius: var(--radius-1);
+      background: color-mix(in oklab, var(--text-primary) 4%, transparent);
+      font-size: var(--fs-caption);
+      font-variant-numeric: tabular-nums;
+      min-width: 0;
+    }
+    .contrib-avatar {
+      width: 1.4em;
+      height: 1.4em;
+      border-radius: 50%;
+      object-fit: cover;
+      flex: 0 0 auto;
+      background: var(--surface-sunken);
+    }
+    .contrib-avatar-fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: var(--fw-black);
+      font-size: .7em;
+      color: var(--text-secondary);
+      letter-spacing: 0;
+    }
+    .contrib-login {
+      font-weight: var(--fw-bold);
+      color: var(--text-secondary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 8em;
+    }
+    .contrib-count {
+      color: var(--text-muted);
+      font-weight: var(--fw-semi);
+    }
+    @container (max-width: 360px) {
+      .contrib-login { display: none; }
+    }
+    @container (max-width: 280px) {
+      .contrib-row { display: none; }
+    }
+  `;
+
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="github_repo">
       <div class="w-title">
         <i class="ph-bold ph-git-branch" style="color:var(--accent-3)"></i>
@@ -139,6 +227,7 @@ export default function render(shadow, ctx) {
         ${(language || release || branch) ? chipRow : ""}
         <div class="status-grid">${grid}</div>
         ${langs.length ? languageBar(langs) : ""}
+        ${contribStrip}
         ${series.length >= 2 ? `<div style="flex:0 0 18%;min-height:1.8em;position:relative"><canvas></canvas></div>` : ""}
       </div>
     </div>`;

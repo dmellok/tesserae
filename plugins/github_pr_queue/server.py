@@ -25,6 +25,7 @@ def _slim(item: dict[str, Any]) -> dict[str, Any]:
         "title": item.get("title") or "",
         "number": item.get("number"),
         "repo": repo,
+        "created_at": item.get("created_at"),
         "updated_at": item.get("updated_at"),
         "user": (item.get("user") or {}).get("login") or "",
         "comments": item.get("comments") or 0,

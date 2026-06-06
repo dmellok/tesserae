@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "GitHub — PR Queue",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "widget",
-  "description": "Your open PRs + PRs awaiting your review Shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.",
+  "description": "Your open PRs + PRs awaiting your review. Each row leads with a draft / ready-for-review glyph, carries a PR-age chip (muted → ochre → terracotta → plum as the PR ages), and a comment-bubble chip showing discussion activity. Sections are sorted oldest-first so the staler PR floats to the top. Requires a PAT in Plugins → GitHub Core.",
   "icon": "ph-git-pull-request",
   "supports": {
     "sizes": [

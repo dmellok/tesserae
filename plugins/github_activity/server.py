@@ -114,6 +114,12 @@ def fetch(
 
     now = datetime.now(UTC)
     seven_days = [0] * 7
+    # Per-type daily breakdown for the stacked histogram. Each entry
+    # is {commits, prs, issues, releases, other} indexed by the same
+    # 0-6 oldest-first ordering as seven_days.
+    daily_typed: list[dict[str, int]] = [
+        {"commits": 0, "prs": 0, "issues": 0, "releases": 0, "other": 0} for _ in range(7)
+    ]
     type_counts = {
         "PushEvent": 0,
         "PullRequestEvent": 0,
@@ -121,7 +127,15 @@ def fetch(
         "ReleaseEvent": 0,
         "other": 0,
     }
+    TYPE_BUCKET = {
+        "PushEvent": "commits",
+        "PullRequestEvent": "prs",
+        "IssuesEvent": "issues",
+        "ReleaseEvent": "releases",
+    }
     repos_set: set[str] = set()
+    # Track which dates the user was active on, for a streak count.
+    active_dates: set[Any] = set()
     for ev_raw, ev in zip((raw or []), all_events, strict=False):
         repos_set.add(ev.get("repo") or "")
         kind = ev_raw.get("type") or ""
@@ -137,9 +151,28 @@ def fetch(
             dt = datetime.fromisoformat(at.replace("Z", "+00:00"))
         except ValueError:
             continue
+        active_dates.add(dt.date())
         delta_days = (now.date() - dt.date()).days
         if 0 <= delta_days < 7:
             seven_days[6 - delta_days] += 1  # oldest first → newest last
+            bucket = TYPE_BUCKET.get(kind, "other")
+            daily_typed[6 - delta_days][bucket] += 1
+
+    # Current streak — count consecutive days back from today (or
+    # yesterday, if today is empty) where the user was active. Public
+    # events go back at most 30 days, so 30 is the streak ceiling.
+    streak = 0
+    cursor = now.date()
+    if cursor not in active_dates:
+        # Allow today to be empty — only break if yesterday is also empty.
+        from datetime import timedelta
+
+        cursor = cursor - timedelta(days=1)
+    from datetime import timedelta as _td
+
+    while cursor in active_dates:
+        streak += 1
+        cursor = cursor - _td(days=1)
 
     events = all_events[:max_events]
     result = {
@@ -148,6 +181,8 @@ def fetch(
         "count": len(events),
         "total_30": len(all_events),
         "daily": seven_days,
+        "daily_typed": daily_typed,
+        "streak": streak,
         "repos_count": len([r for r in repos_set if r]),
         "type_commits": type_counts.get("PushEvent", 0),
         "type_prs": type_counts.get("PullRequestEvent", 0),

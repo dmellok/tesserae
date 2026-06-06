@@ -69,6 +69,13 @@ def fetch(
             activity_pending = True
         except Exception:
             activity = []
+        try:
+            # Top contributors — login + avatar + contribution count.
+            contributors = core.request_json(
+                f"https://api.github.com/repos/{repo}/contributors?per_page=6"
+            )
+        except Exception:
+            contributors = []
     except Exception as err:
         return {"error": core.coerce_error(err)}
 
@@ -88,6 +95,19 @@ def fetch(
     if isinstance(activity, list):
         commit_weeks = [int(w.get("total") or 0) for w in activity if isinstance(w, dict)]
 
+    contrib_items: list[dict[str, Any]] = []
+    if isinstance(contributors, list):
+        for c in contributors[:6]:
+            if not isinstance(c, dict):
+                continue
+            contrib_items.append(
+                {
+                    "login": c.get("login") or "",
+                    "avatar_url": c.get("avatar_url") or "",
+                    "contributions": int(c.get("contributions") or 0),
+                }
+            )
+
     result = {
         "repo": info.get("full_name") or repo,
         "description": info.get("description") or "",
@@ -105,6 +125,7 @@ def fetch(
         "commit_weeks": commit_weeks,
         "commits_year": sum(commit_weeks),
         "busiest_week": max(commit_weeks) if commit_weeks else 0,
+        "contributors": contrib_items,
     }
     # Don't cache while the commit_activity stats are still being
     # computed by GitHub — that'd lock in an empty bars chart for
