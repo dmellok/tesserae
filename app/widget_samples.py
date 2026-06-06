@@ -760,10 +760,28 @@ def _weather_pollen_count() -> dict[str, Any]:
     }
 
 
+def _glances_status() -> dict[str, Any]:
+    """Healthy server snapshot — CPU + RAM + disk in the safe zone so
+    the state pill paints `OK`. ``uptime`` is multi-day to exercise
+    the ``Nd`` formatting branch in the client."""
+    return {
+        "label": "nas",
+        "time": "14:32",
+        "hostname": "nas",
+        "cpu": 18.4,
+        "mem": 42.7,
+        "disk": {"percent": 63.2, "mnt_point": "/"},
+        "load": 0.51,
+        "uptime": 4 * 86400 + 3 * 3600 + 17 * 60,
+        "state": {"text": "OK", "tone": "ok"},
+    }
+
+
 SAMPLES: dict[str, Any] = {
     "github_actions": _github_actions,
     "github_pr_queue": _github_pr_queue,
     "github_releases": _github_releases,
+    "glances_status": _glances_status,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
     "ha_climate": _ha_climate,
