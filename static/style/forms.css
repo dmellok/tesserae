@@ -781,6 +781,12 @@ input[type="range"].slider:focus::-moz-range-thumb {
   cursor: pointer;
   font-weight: 500;
   color: var(--t-fg);
+  /* Pad vertically so the switch claims roughly the same height as a
+     text-input field. Without this, the inline-flex label is just the
+     thumb-track height (~22px), which makes the switch field read as
+     touching whatever sits directly above it in a stacked form (eg.
+     a select dropdown's button). */
+  padding-block: var(--t-space-2);
 }
 
 .field--switch input[type="checkbox"] {
