@@ -50,7 +50,7 @@ def test_single_entity_titles_from_name(app: Flask, monkeypatch) -> None:
     it = out["items"][0]
     assert it["value"] == "21.4"
     assert it["unit"] == "°C"
-    assert it["icon"] == "thermometer-simple"
+    assert it["icon"] == "thermometer"
 
 
 def test_choices_delegates_to_core(app: Flask, monkeypatch) -> None:
@@ -75,7 +75,7 @@ def test_multiple_entities_grid_and_icons(app: Flask, monkeypatch) -> None:
     names = [i["name"] for i in out["items"]]
     assert names == ["Lounge", "Humidity", "Desk"]
     icons = [i["icon"] for i in out["items"]]
-    assert icons == ["thermometer-simple", "drop", "lightbulb"]  # device_class + domain
+    assert icons == ["thermometer", "drop", "lightbulb"]  # device_class + domain
 
 
 def test_hide_units(app: Flask, monkeypatch) -> None:
