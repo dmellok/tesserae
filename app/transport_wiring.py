@@ -482,6 +482,10 @@ def _rebuild_transport(
         # toggle of ``keep_browser_warm`` switches the pipeline without
         # rebuilding the PushManager.
         browser_pool_fn=lambda: _current_browser_pool(app),
+        # Lazy lookup so each push reads the fresh heartbeat cache
+        # (mutated on every device status message) rather than a
+        # snapshot captured at PushManager construction.
+        device_status_fn=lambda: app.config.get("DEVICE_STATUS") or {},
     )
     # Sweep render artifacts orphaned by event-log eviction (or a manual
     # history clear) at boot. Idempotent + never fatal.

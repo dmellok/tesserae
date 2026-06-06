@@ -77,6 +77,87 @@ _HTTP_TIMEOUT_S: float = 10.0
 # at startup) so the dir stays bounded on long-running instances.
 _PRUNE_EVERY_RENDERS: int = 50
 
+# Vendored Phosphor regular TTF, used by the low-battery overlay to paint
+# the warning glyph. Resolved relative to the repo root so it works under
+# both ``pip install -e .`` and a packaged install where ``app/`` and
+# ``static/`` are siblings.
+_PHOSPHOR_TTF_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "static"
+    / "icons"
+    / "phosphor"
+    / "regular"
+    / "Phosphor.ttf"
+)
+
+# Font caches keyed by pixel size. Pillow's truetype loader is not free
+# (it re-reads the TTF on each call); a busy fan-out hits this twice per
+# device, so cache to avoid the I/O.
+_phosphor_font_cache: dict[int, Any] = {}
+_ui_font_cache: dict[int, Any] = {}
+
+
+def _phosphor_font(size: int) -> Any | None:
+    """Return a cached Pillow truetype handle for the Phosphor TTF at
+    the requested pixel size, or ``None`` if the TTF can't be loaded
+    (file missing, Pillow lacks freetype). Used by the low-battery
+    overlay; callers fall back to a hand-drawn block when this is
+    ``None``."""
+    size = max(8, int(size))
+    cached = _phosphor_font_cache.get(size)
+    if cached is not None:
+        return cached
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        return None
+    try:
+        font = ImageFont.truetype(str(_PHOSPHOR_TTF_PATH), size=size)
+    except (OSError, ValueError):
+        return None
+    _phosphor_font_cache[size] = font
+    return font
+
+
+def _ui_font(size: int) -> Any | None:
+    """Return a cached Pillow truetype handle for a UI text font at the
+    requested pixel size. Tries a small set of common system paths so
+    the percent text in the low-battery chip renders crisply; falls
+    back to Pillow's bitmap default if none are present (still
+    readable, just less polished)."""
+    size = max(8, int(size))
+    cached = _ui_font_cache.get(size)
+    if cached is not None:
+        return cached
+    try:
+        from PIL import ImageFont
+    except ImportError:
+        return None
+    # Common DejaVu / Liberation paths across Linux distros, plus macOS
+    # system fallbacks. First hit wins; missing files raise OSError and
+    # we move on to the next candidate.
+    candidates = (
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+    )
+    for path in candidates:
+        try:
+            font = ImageFont.truetype(path, size=size)
+            _ui_font_cache[size] = font
+            return font
+        except (OSError, ValueError):
+            continue
+    try:
+        font = ImageFont.load_default()
+    except Exception:
+        return None
+    _ui_font_cache[size] = font
+    return font
+
 
 @dataclass(frozen=True)
 class RendererResult:
@@ -132,6 +213,7 @@ class PushManager:
         base_url_fn: Callable[[], str],
         devices: DeviceRegistry | None = None,
         browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
+        device_status_fn: Callable[[], dict[str, dict[str, Any]]] | None = None,
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -146,6 +228,11 @@ class PushManager:
         # Returning ``None`` falls back to the cold per-render Chromium
         # spin-up; returning a pool reuses the warm browser.
         self._browser_pool_fn = browser_pool_fn or (lambda: None)
+        # Same trick for the device-status cache: read it lazily so each
+        # push sees the fresh heartbeat data (battery_pct in particular,
+        # which the low-battery overlay reads). Constructor-snapshot
+        # would freeze the value at boot.
+        self._device_status_fn = device_status_fn or (lambda: {})
         # Optional, enables multi-head routing. When a page sets a
         # device_id, the panel comes from that device's manifest and
         # only its renderers fire in _fan_out.
@@ -720,6 +807,112 @@ class PushManager:
             event_id=event_id,
         )
 
+    def _overlay_low_battery_if_needed(self, composition_png: bytes, device_id: str) -> bytes:
+        """Paint a small low-battery chip in the top-right corner when
+        the target device is on battery and the level is at or below
+        the threshold. Returns the input unchanged when the feature is
+        disabled, the device has no heartbeat yet, the device has no
+        battery_pct (Pi / mains-powered), the battery is above the
+        threshold, or Pillow can't decode the input PNG.
+
+        The icon comes from the vendored Phosphor TTF at
+        ``static/icons/phosphor/regular/Phosphor.ttf`` (battery-warning
+        glyph, U+E0C8); rendering happens BEFORE the per-renderer
+        transform (resize / dither / quantize) so the chip survives the
+        panel-specific pipeline and reaches the device exactly as
+        painted here.
+        """
+        if not device_id:
+            return composition_png
+        app_settings = self._settings.get_section("app") or {}
+        if not bool(app_settings.get("low_battery_overlay", True)):
+            return composition_png
+        try:
+            threshold = int(app_settings.get("low_battery_threshold", 15))
+        except (TypeError, ValueError):
+            threshold = 15
+        status = self._device_status_fn().get(device_id) or {}
+        parsed = status.get("parsed") or {}
+        battery_pct = parsed.get("battery_pct")
+        if battery_pct is None:
+            return composition_png
+        try:
+            pct = int(battery_pct)
+        except (TypeError, ValueError):
+            return composition_png
+        if pct > threshold:
+            return composition_png
+        try:
+            from io import BytesIO
+
+            from PIL import Image, ImageDraw
+        except ImportError:
+            return composition_png
+        try:
+            img = Image.open(BytesIO(composition_png)).convert("RGB")
+        except Exception:
+            return composition_png
+
+        # Chip sized as a fraction of panel width so it scales across
+        # 400x300 (small TRMNL) through 1872x1404 (big ESP32).
+        w, h = img.size
+        chip_w = max(64, min(int(w * 0.13), 150))
+        chip_h = max(26, min(int(chip_w * 0.42), 52))
+        margin = max(6, int(min(w, h) * 0.012))
+        x0 = w - margin - chip_w
+        y0 = margin
+        x1 = x0 + chip_w
+        y1 = y0 + chip_h
+
+        draw = ImageDraw.Draw(img)
+        # White rectangle background + black border. Two-tone so the
+        # chip survives the 1-bit dither used by the e-ink renderers,
+        # and reads on any dashboard content underneath.
+        draw.rectangle((x0, y0, x1, y1), fill=(255, 255, 255), outline=(0, 0, 0), width=2)
+
+        # Phosphor battery-warning glyph, loaded lazily and cached on
+        # the class so a busy fan-out doesn't re-open the TTF for every
+        # renderer.
+        icon_glyph = ""  # ph-battery-warning
+        icon_font = _phosphor_font(int(chip_h * 0.72))
+        text_font = _ui_font(int(chip_h * 0.46))
+        icon_x = x0 + max(4, chip_h // 6)
+        # Centre the glyph vertically within the chip via the font's
+        # actual bbox so different sizes line up cleanly.
+        if icon_font is not None:
+            ibbox = icon_font.getbbox(icon_glyph)
+            ih = ibbox[3] - ibbox[1]
+            icon_y = y0 + (chip_h - ih) // 2 - ibbox[1]
+            draw.text((icon_x, icon_y), icon_glyph, fill=(208, 56, 28), font=icon_font)
+            icon_advance = ibbox[2] - ibbox[0]
+        else:
+            # Phosphor TTF missing, draw a fallback square block so the
+            # chip still communicates SOMETHING. Should never trigger
+            # in normal installs since the TTF is vendored.
+            block = chip_h // 2
+            icon_y = y0 + (chip_h - block) // 2
+            draw.rectangle(
+                (icon_x, icon_y, icon_x + block, icon_y + block),
+                fill=(208, 56, 28),
+            )
+            icon_advance = block
+
+        # Percentage text to the right of the icon. Sized at ~46% of
+        # chip height so it sits visually balanced with the glyph.
+        text = f"{pct}%"
+        text_x = icon_x + icon_advance + 6
+        if text_font is not None:
+            tbbox = text_font.getbbox(text)
+            th = tbbox[3] - tbbox[1]
+            text_y = y0 + (chip_h - th) // 2 - tbbox[1]
+            draw.text((text_x, text_y), text, fill=(0, 0, 0), font=text_font)
+        else:
+            draw.text((text_x, y0 + chip_h // 3), text, fill=(0, 0, 0))
+
+        out = BytesIO()
+        img.save(out, format="PNG", optimize=True)
+        return out.getvalue()
+
     def _publish_artifact(
         self,
         renderer: Renderer,
@@ -737,6 +930,11 @@ class PushManager:
             # read ``image_fit`` (server-side fit_to_panel); pi_png passes it
             # to the client via its ``scale`` payload field.
             settings = {**settings, "image_fit": image_fit, "scale": image_fit}
+        # Device-aware low-battery chip: per-renderer so each device's
+        # last-known battery decides whether its push wears the warning.
+        # A composition fanned out to a Pi + a TRMNL only paints the
+        # chip on the TRMNL artifact when its battery is low.
+        composition_png = self._overlay_low_battery_if_needed(composition_png, renderer.device)
         artifact = renderer.transform(composition_png, panel=panel, settings=settings)
         digest = hashlib.sha256(artifact).hexdigest()[:16]
 

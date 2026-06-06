@@ -121,6 +121,35 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "low_battery_overlay",
+        "type": "switch",
+        "label": "Low-battery overlay on device pushes",
+        "default": True,
+        "help": (
+            "When a device with a battery (TRMNL, ESP32) reports a charge "
+            "below the threshold, paint a small low-battery chip in the "
+            "top-right corner of the composition before it's dithered and "
+            "sent. Devices without a battery reading (Pi, virtual panels) "
+            "are ignored. The chip has a solid white background + dark "
+            "border so it stays readable on any dashboard content."
+        ),
+    },
+    {
+        "name": "low_battery_threshold",
+        "type": "slider",
+        "label": "Low-battery threshold",
+        "default": 15,
+        "min": 5,
+        "max": 50,
+        "step": 1,
+        "unit": "%",
+        "help": (
+            "Battery percent at or below which the overlay paints. Default "
+            "15%, raise if you want earlier warning, lower if 15% already "
+            "fires too often for your setup."
+        ),
+    },
+    {
         "name": "mobile_zoom_lock",
         "type": "switch",
         "label": "Lock mobile zoom",

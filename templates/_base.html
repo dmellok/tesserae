@@ -18,6 +18,15 @@
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
   <link rel="alternate icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+  {# Inline theme background so the *canvas* (the area the browser paints
+     before external CSS arrives) matches the page bg. Without this, every
+     navigation showed a brief white frame in dark mode while base.css was
+     in-flight, the body bg only took effect after the stylesheet parsed.
+     Kept in sync with --t-bg in static/style/base.css. #}
+  <style>
+    html { background: #f1f0ec; color-scheme: light; }
+    html[data-theme="dark"] { background: #0e1015; color-scheme: dark; }
+  </style>
   <script>
     // Apply the saved theme before paint to avoid a light-mode flash.
     (function () {

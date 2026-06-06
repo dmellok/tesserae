@@ -58,9 +58,11 @@ def test_send_index_renders_all_tabs(app: Flask) -> None:
     resp = client.get("/send")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    # History moved to its own /history page (top-level nav). Only the
-    # four push tabs live on /send now.
-    for slug in ("file", "saved", "url", "webpage"):
+    # History moved to its own /history page (top-level nav). Saved-
+    # dashboard sends live on the Dashboards page (per-row Send + the
+    # editor Push-now button), so only the arbitrary-input tabs live
+    # on /send now.
+    for slug in ("file", "url", "webpage"):
         assert f"tab-{slug}" in body
         assert f"tab={slug}" in body
 

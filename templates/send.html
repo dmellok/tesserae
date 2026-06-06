@@ -10,9 +10,11 @@
 {% set form_values = form_values | default({}, true) %}
 {% set form_device_ids = form_device_ids | default([], true) %}
 
+{# Saved-dashboard sends live on the Dashboards page (per-row Send +
+   editor Push-now button). Keeping a duplicate picker here gave two
+   places to do the same thing; Send is now arbitrary-input only. #}
 {% set CORE_TABS = [
   ('file','File','upload-simple'),
-  ('saved','Saved','squares-four'),
   ('url','URL','link'),
   ('webpage','Webpage','globe'),
 ] %}
@@ -68,6 +70,7 @@
     {% for d in device_options %}
     <label class="device-check">
       <input type="checkbox" name="device_id" value="{{ d.id }}"
+             data-panel-w="{{ d.w }}" data-panel-h="{{ d.h }}"
              {% if form_device_ids %}{% if d.id in form_device_ids %}checked{% endif %}{% elif d.id == sole_device %}checked{% endif %}>
       <span class="device-check-icon"><i class="ph ph-{{ d.icon }}" aria-hidden="true"></i></span>
       <span class="device-check-body">
@@ -189,38 +192,6 @@
       <i class="ph-duotone ph-image" aria-hidden="true"></i>
       <p>Drop a file to see the preview.</p>
     </div>
-  {% endcall %}
-</div>
-
-{# ----- Saved tab ----- #}
-<div class="send-pair" id="tab-saved" {% if tab != 'saved' %}hidden{% endif %}>
-  <section class="card send-pair-options">
-    {{ card_head('Saved dashboard', icon_name='squares-four') }}
-    <form method="post" action="{{ url_for('send.send_page') }}" class="form">
-      <div class="field">
-        <label for="saved-page">Dashboard{{ info_pop('The dashboard renders through the composer, then publishes through every loaded renderer.') }}</label>
-        <select id="saved-page" name="page_id" required data-saved-preview-target>
-          {% if not pages %}<option value="">(no saved dashboards yet)</option>{% endif %}
-          {% for p in pages %}
-          <option value="{{ p.id }}">{{ p.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="actions">{{ button('Push dashboard', icon='paper-plane-tilt', disabled=not pages) }}</div>
-    </form>
-  </section>
-  {% call preview_card('Live preview', blurb='Composer output as the panel will see it.') %}
-    {% if pages %}
-    <iframe data-saved-preview-iframe
-            src="{{ url_for('composer.compose', page_id=pages[0].id) }}?preview=1"
-            style="width: {{ panel.w }}px; height: {{ panel.h }}px;"
-            loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
-    {% else %}
-    <div class="preview-placeholder">
-      <i class="ph-duotone ph-squares-four" aria-hidden="true"></i>
-      <p>No saved dashboards yet, create one under Dashboards.</p>
-    </div>
-    {% endif %}
   {% endcall %}
 </div>
 

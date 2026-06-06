@@ -99,3 +99,72 @@
     });
   });
 })();
+
+// Live-preview dims follow the picked target device.
+//
+// The Send page renders its preview frame at the global virtual panel
+// size (server-injected), so a user picking a non-default target on
+// File / URL / Webpage / Gallery would see a preview at the wrong
+// shape, fit-mode previews are useless when the aspect's off. Mirror
+// the picked device's data-panel-w/h onto the sibling preview frame
+// (aspect-ratio, data attrs, the dims label, and any iframe sized in
+// panel pixels) so what you see reflects what you're about to send.
+// Falls back to the original server-rendered dims when no device is
+// ticked.
+(function () {
+  function applyDims(pair, w, h) {
+    const frame = pair.querySelector("[data-fit-preview]");
+    if (!frame) return;
+    frame.dataset.panelW = String(w);
+    frame.dataset.panelH = String(h);
+    frame.style.aspectRatio = `${w} / ${h}`;
+    // Iframes carry inline panel-pixel dims because components.js
+    // fitPreview scales them via CSS transform, raster <img> previews
+    // letterbox via object-fit and need no per-element update.
+    frame.querySelectorAll("iframe").forEach((el) => {
+      el.style.width = w + "px";
+      el.style.height = h + "px";
+    });
+    const label = pair.querySelector(".preview-dims");
+    if (label) label.textContent = `${w} × ${h}`;
+  }
+
+  function syncPreviewDims(form) {
+    const checklist = form.querySelector("[data-send-device-checklist]");
+    if (!checklist) return;
+    const pair = form.closest(".send-pair");
+    if (!pair) return;
+    const frame = pair.querySelector("[data-fit-preview]");
+    if (!frame) return;
+    // Stash the server-rendered fallback on first run so unticking
+    // every device reverts to the virtual-panel dims the user picked
+    // under Settings → Server, not whatever device was last ticked.
+    if (!frame.dataset.defaultPanelW) {
+      frame.dataset.defaultPanelW = frame.dataset.panelW || "";
+      frame.dataset.defaultPanelH = frame.dataset.panelH || "";
+    }
+    const picked = checklist.querySelector(
+      'input[name="device_id"]:checked',
+    );
+    let w, h;
+    if (picked && picked.dataset.panelW && picked.dataset.panelH) {
+      w = parseInt(picked.dataset.panelW, 10);
+      h = parseInt(picked.dataset.panelH, 10);
+    } else {
+      w = parseInt(frame.dataset.defaultPanelW, 10);
+      h = parseInt(frame.dataset.defaultPanelH, 10);
+    }
+    if (!w || !h) return;
+    applyDims(pair, w, h);
+  }
+
+  document.querySelectorAll("form").forEach((form) => {
+    if (!form.querySelector("[data-send-device-checklist]")) return;
+    syncPreviewDims(form);
+    form.addEventListener("change", (ev) => {
+      if (ev.target && ev.target.matches('input[name="device_id"]')) {
+        syncPreviewDims(form);
+      }
+    });
+  });
+})();

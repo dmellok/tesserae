@@ -36,7 +36,7 @@ from flask import (
 from werkzeug.wrappers import Response
 
 from app.device_loader import DeviceRegistry
-from app.panel import resolve_settings_panel
+from app.panel import device_panel, resolve_settings_panel
 from app.push import PushManager, PushResult
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
@@ -67,22 +67,32 @@ def _devices() -> DeviceRegistry | None:
     return current_app.config.get("DEVICE_REGISTRY")
 
 
-def _device_options() -> list[dict[str, str]]:
+def _device_options() -> list[dict[str, Any]]:
     """Registered instances that can be targeted by a manual send. Mirrors
-    the page-editor picker: instances only (kinds aren't bindable)."""
+    the page-editor picker: instances only (kinds aren't bindable).
+
+    ``w`` / ``h`` are the device's composition dimensions (post-orientation,
+    as ``device_panel`` resolves them). The Send-page template hangs them
+    on each checkbox's ``data-panel-w`` / ``-h`` so send.js can reshape
+    the live preview frame to match the picked target."""
     registry = _devices()
     if registry is None:
         return []
-    opts: list[dict[str, str]] = []
+    opts: list[dict[str, Any]] = []
     for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
         if dev.kind_of is None or dev.panel is None:
+            continue
+        panel = device_panel(dev)
+        if panel is None:
             continue
         opts.append(
             {
                 "id": dev.id,
                 "label": dev.display_name,
                 "icon": dev.icon,
-                "dims": f"{dev.panel['w']}×{dev.panel['h']}",
+                "w": panel.w,
+                "h": panel.h,
+                "dims": f"{panel.w}×{panel.h}",
             }
         )
     return opts
@@ -118,11 +128,9 @@ def _render_send_with_form(tab: str) -> Response:
     missing field and resubmit. The file-upload field can't be
     preserved (browser security), but every other input round-trips.
     """
-    pages = _pages().list()
     return make_response(
         render_template(
             "send.html",
-            pages=pages,
             panel=resolve_settings_panel(_settings()),
             device_options=_device_options(),
             tab=tab,
@@ -268,12 +276,10 @@ def _gallery_ref() -> dict[str, str] | None:
 
 @bp.get("")
 def index() -> str:
-    pages = _pages().list()
     gallery = _gallery_ref()
     tab = request.args.get("tab") or ("gallery" if gallery else "file")
     return render_template(
         "send.html",
-        pages=pages,
         panel=resolve_settings_panel(_settings()),
         device_options=_device_options(),
         tab=tab,

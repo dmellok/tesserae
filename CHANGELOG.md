@@ -6,6 +6,51 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.32.0], 2026-06-07
+
+Polish pass on Send + low-battery overlay for battery-powered devices.
+
+### Added
+
+- **Low-battery overlay on device pushes** (Settings → Server → App).
+  When a device with a battery reports a charge at or below the
+  threshold (default 15%, configurable 5-50%), a small white-on-black
+  chip with a Phosphor `battery-warning` glyph + percent label paints
+  in the top-right of the composition before the per-renderer
+  transform. So the warning survives dithering / quantization and
+  reaches the panel as drawn. Per-renderer (each device's last-known
+  battery decides whether its push wears the chip), so a fan-out to a
+  mains-powered Pi + a low TRMNL only marks the TRMNL. Toggle off
+  entirely under Settings → Server → App.
+- **Phosphor regular TTF vendored** at
+  `static/icons/phosphor/regular/Phosphor.ttf`. Server-side image
+  rendering (currently the low-battery overlay) needs the icon font
+  on disk because PIL can't read the woff2 web font. Loaded lazily +
+  cached by pixel size.
+
+### Changed
+
+- **Send page live preview now follows the picked target device.**
+  Ticking a device on File / URL / Webpage / Gallery reshapes the
+  preview frame to that device's panel aspect (e.g. 800×480 landscape
+  vs 1200×1600 portrait). Previously the preview was pinned to the
+  global virtual panel preset, so fit-mode previews on a non-default
+  target were misleading. Falls back to the virtual panel when no
+  device is ticked.
+- **Removed the Saved-dashboard tab from Send.** Pushing a saved
+  dashboard already lives on the Dashboards page (per-row Send
+  button) and inside the editor (Push-now). Send is now arbitrary-
+  input only: File / URL / Webpage / Gallery.
+
+### Fixed
+
+- **White flash on every page navigation in dark mode.** External
+  CSS was responsible for the body bg, so the canvas painted white
+  for a frame while base.css was in flight. An inline `<style>` in
+  `<head>` now sets the `html` element's background + `color-scheme`
+  to match the saved theme, so the canvas paints the right colour
+  before any external CSS arrives.
+
 ## [0.31.0], 2026-06-06
 
 Whole-catalogue widget visual pass (59 widgets, every family) plus an
