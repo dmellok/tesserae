@@ -181,10 +181,9 @@ export default function render(shadow, ctx) {
        canvas: positioning context, clip the SVG to its bounds, and
        keep the hero / lockup on top of the sky via z-index. Using
        .wx-lockup as an explicit class (rather than the generic
-       ``.wx-now > div`` from before) so the rule doesn't also paint
-       the .wx-sky child back to position: relative — that's what
-       used to leave the backdrop sitting beside the hero instead of
-       behind it. */
+       .wx-now > div from before) so the rule does not also paint
+       the .wx-sky child back to position: relative — that left the
+       backdrop sitting beside the hero instead of behind it. */
     .wx-now { position: relative; isolation: isolate; overflow: hidden; }
     .wx-sky {
       position: absolute;
