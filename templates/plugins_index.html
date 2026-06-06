@@ -11,6 +11,12 @@
     a <code>blueprint()</code> in <code>server.py</code> get an
     <em>Open admin</em> link, that's where their dedicated UI lives.
   </p>
+  <p>
+    <a class="primary" href="{{ url_for('marketplace.browse') }}">
+      <i class="ph ph-storefront" aria-hidden="true"></i>
+      <span>Browse community widgets</span>
+    </a>
+  </p>
 </header>
 
 {% if errors %}

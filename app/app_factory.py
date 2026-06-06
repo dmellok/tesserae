@@ -340,6 +340,38 @@ def create_app(
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
     app.config["DATA_ROOT"] = data_root
+    app.config["PLUGINS_DIR"] = plugins_dir
+
+    # Audit-only community widget marketplace. Browse / install /
+    # uninstall via Settings → Plugins → Browse. Index URL is a
+    # settings switch so a user can fork the catalog or empty the
+    # field to disable Browse entirely. See app/marketplace.py for
+    # the trust model + sequencing notes.
+    from app.marketplace import IndexUrlProvider as _IndexUrlProvider
+    from app.marketplace import Marketplace as _Marketplace
+
+    # Settings-backed callable. Falls back to the catalog default
+    # when the user hasn't customised the URL (settings_store returns
+    # only stored keys, defaults are resolved by the consumer per the
+    # convention in app/push.py). The literal here MUST stay in sync
+    # with the ``marketplace_index_url`` field in field_defs.py.
+    _MARKETPLACE_INDEX_DEFAULT = (
+        "https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json"
+    )
+
+    class _SettingsIndexUrlProvider(_IndexUrlProvider):
+        def __call__(self) -> str:
+            app_settings = settings.get_section("app") or {}
+            url = app_settings.get("marketplace_index_url", _MARKETPLACE_INDEX_DEFAULT)
+            return str(url) if isinstance(url, str) else ""
+
+    app.config["MARKETPLACE"] = _Marketplace(
+        plugins_dir=plugins_dir,
+        state_path=data_root / "core" / "marketplace.json",
+        schema_path=plugin_schema,
+        index_schema_path=REPO_ROOT / "schema" / "marketplace.schema.json",
+        index_url_provider=_SettingsIndexUrlProvider(),
+    )
     # Self-update + backup live under Settings → System. Both are no-ops
     # under --dev (the reloader handles restarts there) and gated behind
     # admin auth.
@@ -474,6 +506,14 @@ def create_app(
         scheduler.start()
 
     plugin_loader.register_routes(app, plugins)
+    # Marketplace mounts at /plugins/browse, AFTER plugin_loader's
+    # blueprint so the static path wins over plugin_loader's
+    # /<plugin_id>/<asset> parametric route by Flask's specificity
+    # rules. Both blueprints share the /plugins prefix; their names
+    # ('plugins' vs 'marketplace') keep them distinct.
+    from app import marketplace_routes
+
+    marketplace_routes.register(app)
     app.register_blueprint(composer.bp)
     settings_routes.register(app)
     schedule_routes.register(app)

@@ -1,0 +1,77 @@
+# Catalog CI: validate widgets.json end-to-end so malformed PRs die
+# at the gate. Three checks:
+#   1. widgets.json matches schema/marketplace.schema.json.
+#   2. Every release.tarball_url is fetchable + matches release.sha256.
+#   3. Every screenshot path declared in screenshot_sizes exists as a
+#      PNG under screenshots/<id>/<size>.png.
+name: Validate catalog
+
+on:
+  pull_request:
+    paths:
+      - 'widgets.json'
+      - 'schema/**'
+      - 'screenshots/**'
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install validator deps
+        run: pip install jsonschema requests
+
+      - name: Validate catalog
+        run: |
+          python <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          import jsonschema, requests
+
+          root = Path(".")
+          index = json.loads((root / "widgets.json").read_text())
+          schema = json.loads((root / "schema" / "marketplace.schema.json").read_text())
+          jsonschema.validate(index, schema)
+
+          failures = []
+          for w in index.get("widgets", []):
+              wid = w["id"]
+              # screenshots
+              for size in w.get("screenshot_sizes", []):
+                  p = root / "screenshots" / wid / f"{size}.png"
+                  if not p.exists():
+                      failures.append(f"{wid}: missing screenshot {p}")
+                      continue
+                  if p.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                      failures.append(f"{wid}: {p} is not a PNG (bad magic)")
+              # tarball
+              rel = w["release"]
+              try:
+                  resp = requests.get(rel["tarball_url"], stream=True, timeout=20)
+                  resp.raise_for_status()
+                  h = hashlib.sha256()
+                  for chunk in resp.iter_content(64 * 1024):
+                      h.update(chunk)
+                  actual = h.hexdigest()
+              except Exception as err:
+                  failures.append(f"{wid}: tarball fetch failed: {err}")
+                  continue
+              if actual != rel["sha256"]:
+                  failures.append(
+                      f"{wid}: sha256 mismatch (declared {rel['sha256'][:12]}..., "
+                      f"got {actual[:12]}...)"
+                  )
+
+          if failures:
+              print("\n".join(failures))
+              sys.exit(1)
+          print(f"OK: {len(index.get('widgets', []))} widget(s) validated")
+          PY

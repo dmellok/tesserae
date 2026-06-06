@@ -6,6 +6,71 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.33.0], 2026-06-07
+
+Community widget marketplace, phase 1 (audit-only catalog).
+
+### Added
+
+- **Settings → Plugins → Browse community widgets.** A new Browse
+  page (also reachable from the Plugins nav dropdown) shows a card
+  grid of community-contributed widgets, each with a screenshot,
+  description, author, tags, and an Install button. Behind the scenes
+  the host fetches a static `widgets.json` index from a configurable
+  catalog URL (default
+  `raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json`),
+  validates it against the new `schema/marketplace.schema.json`, and
+  on install: downloads the pinned release tarball, verifies the
+  declared sha256, validates the embedded `plugin.json` against
+  `schema/plugin.schema.json`, and drops the result into
+  `plugins/<id>/` alongside the bundled widgets.
+- **Update + Uninstall flows.** Browse shows "Update available" when
+  the catalog's `release.version` exceeds the installed one;
+  Uninstall refuses to touch any plugin not tracked in
+  `data/core/marketplace.json` (so bundled plugins are safe even
+  against a hand-crafted POST), with an optional tick to also drop
+  the plugin's data dir.
+- **Restart-required banner + button.** Install / uninstall flash a
+  "Restart Tesserae to load it" notice and add a one-click button
+  that hits the existing updater re-exec path. Live re-discovery of
+  the plugin registry would need blueprint deregistration + safe
+  `importlib.reload` which Flask doesn't support cleanly, so v1
+  treats every marketplace mutation as restart-to-pick-up.
+- **`marketplace_index_url` setting** (Settings → Server → App). Point
+  at a fork or empty the field to disable the Browse page entirely.
+- **Catalog repo seed** at `docs/marketplace-catalog-seed/`. A
+  copy-into-a-new-repo scaffold for `dmellok/tesserae-widgets`:
+  empty `widgets.json`, a copy of the host's index schema,
+  `CONTRIBUTING.md` (PR review checklist + submission flow), a PR
+  template, and a GitHub Actions workflow that validates the index
+  + fetches every tarball + verifies sha256 + checks screenshot
+  PNGs exist before any PR can merge.
+
+### Trust model (audit-only, phase 1)
+
+Every catalog entry is a PR reviewed by the catalog maintainer. There
+is no capability sandbox or process isolation in this phase — see
+GitHub issues #2 and #3 for the follow-up work those represent.
+Audit-only is fine while every entry passes through human review; it
+does not scale to "anyone can publish without review", which is
+gated behind those two issues.
+
+### Internals
+
+- `app/marketplace.py` — `Marketplace` orchestrator with `fetch_index`,
+  `install`, `uninstall`, and a 5-minute in-memory index cache.
+  Tarball extraction uses `tarfile.data_filter` (PEP 706) so path
+  traversal + suid attacks die at extract time; downloads cap at
+  4 MiB.
+- `app/marketplace_routes.py` — Browse / install / uninstall / restart
+  endpoints mounted at `/plugins/browse*` (alongside the existing
+  plugin admin routes, but on a separate blueprint).
+- `tests/test_marketplace.py` — 18 cases covering index fetch failure
+  modes, install rejections (bundled collision, compat mismatch,
+  sha256 mismatch, oversize tarball, missing manifest, kind
+  mismatch), happy path, upgrade-in-place, uninstall safety net,
+  data-dir preservation by default, corrupt-state recovery.
+
 ## [0.32.1], 2026-06-07
 
 ### Fixed

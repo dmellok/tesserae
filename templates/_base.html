@@ -118,6 +118,9 @@
           <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">
             <i class="ph ph-list-bullets" aria-hidden="true"></i>All plugins
           </a>
+          <a class="nav-dropdown-link" href="{{ url_for('marketplace.browse') }}">
+            <i class="ph ph-storefront" aria-hidden="true"></i>Browse community widgets
+          </a>
           {% if nav_admin_plugins %}
           <div class="nav-dropdown-sep">Admin pages</div>
           {% for p in nav_admin_plugins %}

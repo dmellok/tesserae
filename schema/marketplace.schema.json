@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/marketplace.schema.json",
+  "title": "Tesserae widget marketplace index",
+  "description": "Shape of widgets.json in the catalog repo (e.g. dmellok/tesserae-widgets). See docs/contracts/marketplace.md for the prose contract.",
+  "type": "object",
+  "required": ["version", "widgets"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Bump on breaking changes to this index shape. Host rejects unknown index versions."
+    },
+    "widgets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/widget" }
+    }
+  },
+  "$defs": {
+    "widget": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "description",
+        "author",
+        "tags",
+        "kind",
+        "tesserae_compat",
+        "screenshot_sizes",
+        "release"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Plugin folder name. Must be unique across the catalog and must not collide with a bundled plugin."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280,
+          "description": "One-line pitch shown on the Browse card. Keep it tight; the widget's own README is for long-form."
+        },
+        "icon": {
+          "type": "string",
+          "pattern": "^ph-[a-z0-9-]+$",
+          "description": "Phosphor icon class. Optional; falls back to ph-puzzle-piece if absent."
+        },
+        "author": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "github": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9-]{0,38}$",
+              "description": "GitHub handle, without the leading @."
+            }
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "calendar",
+              "clock",
+              "finance",
+              "github",
+              "home-assistant",
+              "media",
+              "news",
+              "sports",
+              "transit",
+              "utility",
+              "weather"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Used by the Browse filter chips. New tags need a host bump (intentional friction; keeps the taxonomy small)."
+        },
+        "kind": {
+          "enum": ["widget", "font"],
+          "description": "Only widgets and fonts are catalog-installable. Renderers + devices stay bundled."
+        },
+        "tesserae_compat": {
+          "type": "string",
+          "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$",
+          "description": "Same shape as plugin.json's field. Host filters the Browse list against its major version."
+        },
+        "official": {
+          "type": "boolean",
+          "default": false,
+          "description": "Set to true ONLY for entries whose source repo is owned by the catalog maintainer. The Browse page shows a shield badge."
+        },
+        "screenshot_sizes": {
+          "type": "array",
+          "items": { "enum": ["xs", "sm", "md", "lg"] },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Sizes contributed under screenshots/<id>/<size>.png in the catalog repo. Must include 'lg'; CI rejects entries that don't ship the lg thumbnail."
+        },
+        "release": {
+          "type": "object",
+          "required": ["version", "tarball_url", "sha256"],
+          "properties": {
+            "version": {
+              "type": "string",
+              "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$"
+            },
+            "tarball_url": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "Hex sha256 of the tarball at tarball_url. Verified on install; mismatch hard-fails."
+            }
+          }
+        },
+        "source": {
+          "type": "string",
+          "format": "uri",
+          "description": "Public source URL (GitHub repo, etc.) shown on the Browse card so users can read the code before installing."
+        }
+      }
+    }
+  }
+}
