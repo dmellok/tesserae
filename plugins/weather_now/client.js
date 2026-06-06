@@ -70,42 +70,6 @@ function escapeHtml(s) {
   }[c]));
 }
 
-// Sky backdrop — two flat horizontal bands of accent-soft tone per
-// condition family. The top band's hue sets the mood (warm for sun,
-// cool for rain, dim for night); the bottom band is the surface
-// sunken token so the backdrop reads as "sky above ground". The
-// hero icon + temp lockup sit on top via z-index, so this layer
-// only hints at mood — the hero does the condition-specific work.
-//
-// Solid blocks only (no decorative shapes, no gradients) — both
-// dither into mush on Spectra 6, and the user explicitly asked for
-// the quieter two-tone version.
-function skyBackdrop(iconName) {
-  // Per-condition top band token. Anything we don't have a tone for
-  // falls back to a neutral cool slate.
-  const TOP_BY_ICON = {
-    sun: "--accent-2-soft",
-    partly: "--accent-2-soft",
-    moon: "--surface-sunken",
-    "partly-night": "--surface-sunken",
-    cloud: "--accent-5-soft",
-    drizzle: "--accent-4-soft",
-    rain: "--accent-4-soft",
-    "rain-heavy": "--accent-4-soft",
-    showers: "--accent-4-soft",
-    snow: "--accent-5-soft",
-    storm: "--accent-1-soft",
-    fog: "--surface-sunken",
-  };
-  const top = TOP_BY_ICON[iconName] || "--accent-5-soft";
-  return `
-    <svg viewBox="0 0 400 200" preserveAspectRatio="none"
-         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="400" height="120" fill="var(${top})"/>
-      <rect y="120" width="400" height="80" fill="var(--surface-sunken)"/>
-    </svg>`;
-}
-
 function fmtTemp(v) {
   if (v == null) return "—";
   return Math.round(Number(v)) + "°";
@@ -122,8 +86,6 @@ function fmtMetric(m) {
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
-  const opts = ctx?.cell?.options || {};
-  const showSky = !!opts.sky_backdrop;
   if (data.error) {
     shadow.innerHTML = `
       <link rel="stylesheet" href="/static/style/spectra-widgets.css">
@@ -177,29 +139,6 @@ export default function render(shadow, ctx) {
   // temp lockup read as the cell's focal point instead of hugging
   // the left edge.
   const layout = `
-    /* When the sky backdrop is on, the .wx-now block becomes the
-       canvas: positioning context, clip the SVG to its bounds, and
-       keep the hero / lockup on top of the sky via z-index. Using
-       .wx-lockup as an explicit class (rather than the generic
-       .wx-now > div from before) so the rule does not also paint
-       the .wx-sky child back to position: relative — that left the
-       backdrop sitting beside the hero instead of behind it. */
-    .wx-now { position: relative; isolation: isolate; overflow: hidden; }
-    .wx-sky {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .wx-sky svg { width: 100%; height: 100%; display: block; }
-    .wx-now > i.ph-bold,
-    .wx-now > .wx-lockup { position: relative; z-index: 1; }
-    /* Hide the backdrop at xs — the cell is too small to read both
-       the illustration and the hero icon. The hero alone carries
-       the condition at that size. */
-    @container (max-width: 220px) {
-      .wx-sky { display: none; }
-    }
     @container (min-width: 700px) {
       .wx-body { gap: var(--space-4); min-height: 0; }
       .wx-now {
@@ -215,7 +154,7 @@ export default function render(shadow, ctx) {
         font-size: clamp(5em, 28cqmin, 12em);
         line-height: 1;
       }
-      .wx-now > .wx-lockup {
+      .wx-now > div {
         flex: 0 1 auto;
         min-width: 0;
         display: flex;
@@ -239,9 +178,8 @@ export default function render(shadow, ctx) {
       ${titleBar}
       <div class="w-body wx-body">
         <div class="wx-now">
-          ${showSky ? `<div class="wx-sky">${skyBackdrop(data.icon)}</div>` : ""}
           <i class="ph-bold ${icon}" style="color:${heroAccent}"></i>
-          <div class="wx-lockup">
+          <div>
             <div class="wx-temp">${escapeHtml(temp)}</div>
             <div class="wx-cond">${escapeHtml(subParts.join(" · "))}</div>
           </div>
