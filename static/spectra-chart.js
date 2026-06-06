@@ -174,22 +174,46 @@ function withAlpha(color, alpha) {
 // the area beneath is filled with the line colour at 18% alpha so
 // the trend has visible weight even at small sizes. Used by finance,
 // weather, energy.
-export function sparkline(canvas, values, color) {
+//
+// Optional `opts` (third arg, when sparkline is called with the
+// three-arg form `sparkline(canvas, values, color)` the third can
+// instead be an options object). Supports:
+//   overlay: { values, color, dash } — a thin secondary series
+//     rendered behind the main line (e.g. rolling average).
+export function sparkline(canvas, values, colorOrOpts) {
   if (!ensureChart(canvas) || !Array.isArray(values) || values.length < 2) return null;
+  // Tolerate both `sparkline(c, v, "#hex")` and `sparkline(c, v, {color, overlay})`.
+  const opts = (colorOrOpts && typeof colorOrOpts === "object" && !Array.isArray(colorOrOpts))
+    ? colorOrOpts
+    : { color: colorOrOpts };
+  const color = opts.color;
+
+  const datasets = [{
+    data: values,
+    borderColor: color,
+    backgroundColor: withAlpha(color, 0.18),
+    borderWidth: 3,
+    tension: 0.3,
+    pointRadius: 0,
+    fill: "origin",
+    order: 1,
+  }];
+  if (opts.overlay && Array.isArray(opts.overlay.values) && opts.overlay.values.length >= 2) {
+    datasets.push({
+      data: opts.overlay.values,
+      borderColor: opts.overlay.color || color,
+      borderWidth: 1.6,
+      borderDash: opts.overlay.dash || [4, 4],
+      tension: 0.35,
+      pointRadius: 0,
+      fill: false,
+      order: 2,
+    });
+  }
+
   const chart = new window.Chart(canvas, {
     type: "line",
-    data: {
-      labels: values.map((_, i) => i),
-      datasets: [{
-        data: values,
-        borderColor: color,
-        backgroundColor: withAlpha(color, 0.18),
-        borderWidth: 3,
-        tension: 0.3,
-        pointRadius: 0,
-        fill: "origin",
-      }],
-    },
+    data: { labels: values.map((_, i) => i), datasets },
     options: {
       animation: false,
       responsive: true,

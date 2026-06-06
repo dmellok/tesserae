@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Sky — Aurora Forecast",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "kind": "widget",
   "description": "Current planetary Kp index + 3-day forecast from NOAA SWPC. Higher Kp = aurora visible further from the poles. Includes a viewer-latitude hint so the band reads as 'visible from your location' when conditions allow.",
   "icon": "ph-mountains",

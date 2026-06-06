@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Todo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Persistent todo lists. Create lists and add items on the admin page (Plugins → Todo); the widget cell renders the chosen list as a read-only checklist. Completed items auto-prune after 24 hours so the list doesn't grow indefinitely.",
   "icon": "ph-list-checks",

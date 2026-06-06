@@ -1,8 +1,9 @@
 // news_reddit — Spectra list archetype. Title bar carries the
-// subreddit + sort/window meta; each post is a zebra row with a
-// reddit-aware leading icon, the headline, and (when available) the
-// upvote score. The score colour is accent-1 on the leading post
-// so the top story always reads first.
+// subreddit + sort/window meta; each row has a post-type lead glyph
+// (image / link / video / text-post / github / youtube …), the
+// title, and author + age on the meta side. The widget itself wears
+// a subreddit-coloured left stripe (deterministic hash → accent
+// token) so two side-by-side subreddit cells feel visually distinct.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -27,16 +28,29 @@ function fmtAgo(epochSec) {
   return `${Math.floor(secs / 604800)}w`;
 }
 
-function sourceIcon(url, isSelf) {
-  if (isSelf) return "ph-chat-circle-text";
+// Post-type / source glyph. self-posts → text-post, image → image,
+// video → video, github → github logo, etc. Falls back to ph-link.
+function postTypeIcon(url, isSelf) {
+  if (isSelf) return "ph-text-aa";
   if (typeof url !== "string") return "ph-link";
   const u = url.toLowerCase();
+  if (u.includes("v.redd.it") || u.includes("youtube.com") || u.includes("youtu.be") || u.endsWith(".mp4")) return "ph-video-camera";
+  if (u.includes("i.redd.it") || u.includes("imgur.com") || /\.(jpe?g|png|gif|webp)(\?|$)/.test(u)) return "ph-image";
   if (u.includes("github.com")) return "ph-github-logo";
-  if (u.includes("youtube.com") || u.includes("youtu.be")) return "ph-youtube-logo";
   if (u.includes("twitter.com") || u.includes("x.com/")) return "ph-x-logo";
-  if (u.includes("reddit.com") || u.includes("redd.it") || u.includes("i.redd.it") || u.includes("v.redd.it")) return "ph-image";
-  if (u.includes(".jpg") || u.includes(".png") || u.includes(".gif") || u.includes(".webp")) return "ph-image";
+  if (u.includes("arxiv.org")) return "ph-graduation-cap";
+  if (u.includes("reddit.com/r/")) return "ph-chat-circle-text";
   return "ph-link";
+}
+
+// Hash a subreddit name → one of the six accent tokens. Stable
+// across renders so the stripe colour stays put per subreddit.
+function subColor(sub) {
+  let h = 0;
+  const s = String(sub || "").toLowerCase();
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  const accents = ["var(--accent-1)", "var(--accent-2)", "var(--accent-3)", "var(--accent-4)", "var(--accent-5)", "var(--accent-6)"];
+  return accents[Math.abs(h) % accents.length];
 }
 
 export default function render(shadow, ctx) {
@@ -56,13 +70,14 @@ export default function render(shadow, ctx) {
   const posts = Array.isArray(data.posts) ? data.posts : [];
   const sub = data.subreddit || "reddit";
   const sort = data.sort ? String(data.sort).toUpperCase() : "TOP";
+  const accent = subColor(sub);
 
   if (posts.length === 0) {
     shadow.innerHTML = `
       ${css}
       <div class="w" data-widget="news_reddit">
         <div class="w-title">
-          <i class="ph-bold ph-reddit-logo" style="color:var(--accent-1)"></i>
+          <i class="ph-bold ph-reddit-logo" style="color:${accent}"></i>
           <h3>r/${escapeHtml(sub)}</h3>
         </div>
         <div class="w-body"><p class="u-muted">No posts.</p></div>
@@ -71,40 +86,94 @@ export default function render(shadow, ctx) {
   }
 
   const rows = posts.map((p, i) => {
-    const isLead = i === 0;
-    const ph = sourceIcon(p.url, p.is_self);
+    const ph = postTypeIcon(p.url, p.is_self);
     const ago = fmtAgo(p.time);
-    // Meta stacks: upvote count + arrow on top, author + comments +
-    // time underneath. The RSS path returns null for score / comments
-    // so each piece is rendered conditionally; what survives reads as
-    // a clean line.
     const scoreLine = p.score != null
-      ? `<span style="display:flex;align-items:center;gap:.25em;font-feature-settings:'tnum';color:${isLead ? "var(--accent-1)" : "var(--text-primary)"}"><i class="ph-bold ph-arrow-fat-up" style="font-size:.85em"></i>${escapeHtml(fmtScore(p.score))}</span>`
+      ? `<span class="rd-score"><i class="ph-bold ph-arrow-fat-up"></i>${escapeHtml(fmtScore(p.score))}</span>`
       : "";
     const subBits = [];
-    if (p.author) subBits.push(`<span>u/${escapeHtml(p.author)}</span>`);
-    if (p.comments != null) subBits.push(`<span style="display:inline-flex;align-items:center;gap:.2em"><i class="ph-bold ph-chat-circle" style="font-size:.85em"></i>${escapeHtml(fmtScore(p.comments))}</span>`);
+    if (p.author) subBits.push(`u/${escapeHtml(p.author)}`);
+    if (p.comments != null) subBits.push(`<span><i class="ph-bold ph-chat-circle"></i>${escapeHtml(fmtScore(p.comments))}</span>`);
     if (ago) subBits.push(`<span>${escapeHtml(ago)}</span>`);
-    const subLine = subBits.length
-      ? `<small style="display:flex;align-items:center;gap:.4em;color:var(--text-muted);font-weight:var(--fw-semi);font-size:.7em;font-feature-settings:'tnum'">${subBits.join("")}</small>`
-      : "";
     return `
-      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
-        <div class="list-lead">
-          <i class="ph-bold ${ph}" style="color:var(--accent-5)"></i>
+      <div class="rd-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead rd-row-lead">
+          <i class="ph-bold ${ph}" style="color:${accent}"></i>
           <span class="list-title">${escapeHtml(p.title)}</span>
         </div>
-        <span class="list-meta" style="display:flex;flex-direction:column;align-items:flex-end;gap:.1em">
-          ${scoreLine}${subLine}
-        </span>
+        <div class="rd-meta">
+          ${scoreLine}
+          ${subBits.length ? `<small class="rd-sub">${subBits.join(" · ")}</small>` : ""}
+        </div>
       </div>`;
   }).join("");
 
+  const layout = `
+    /* Subreddit-coloured left stripe — a 3px accent border via
+       box-shadow inset, so the widget itself wears the subreddit's
+       colour identity. Two r/programming + r/eink cells side by side
+       are immediately distinguishable without reading the heading. */
+    .w[data-widget="news_reddit"] {
+      box-shadow: inset 4px 0 0 ${accent};
+    }
+    .rd-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-1);
+      min-width: 0;
+    }
+    .rd-row.is-zebra {
+      background: color-mix(in oklab, var(--text-primary) 3%, transparent);
+    }
+    .rd-row-lead {
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: var(--space-2);
+    }
+    .rd-row-lead .list-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rd-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1px;
+      flex: 0 0 auto;
+    }
+    .rd-score {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      color: ${accent};
+      font-weight: var(--fw-black);
+      font-variant-numeric: tabular-nums;
+    }
+    .rd-score i {
+      font-size: .85em;
+    }
+    .rd-sub {
+      color: var(--text-muted);
+      font-weight: var(--fw-semi);
+      font-size: .75em;
+      font-variant-numeric: tabular-nums;
+    }
+    .rd-sub i {
+      font-size: .9em;
+      margin-right: 2px;
+    }
+  `;
+
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="news_reddit">
       <div class="w-title">
-        <i class="ph-bold ph-reddit-logo" style="color:var(--accent-1)"></i>
+        <i class="ph-bold ph-reddit-logo" style="color:${accent}"></i>
         <h3>r/${escapeHtml(sub)}</h3>
         <span class="w-title-meta">${escapeHtml(sort)}</span>
       </div>

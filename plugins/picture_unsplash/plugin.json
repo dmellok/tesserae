@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Picture — Unsplash",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.",
   "icon": "ph-camera",
@@ -22,7 +22,8 @@
         { "value": "squarish",  "label": "Square" }
       ]
     },
-    { "name": "show_credit", "type": "boolean", "label": "Show photographer credit overlay", "default": true },
+    { "name": "show_credit", "type": "boolean", "label": "Show photographer credit chip + avatar", "default": true },
+    { "name": "show_location", "type": "boolean", "label": "Show location overlay when Unsplash provides it", "default": true },
     {
       "name": "scale",
       "type": "select",

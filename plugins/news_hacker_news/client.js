@@ -1,8 +1,10 @@
 // news_hacker_news — Spectra list archetype.
 //
-// Title bar shows the feed name; body is a zebra-striped grid of stories
-// with a leading newspaper icon, the headline, and a right-aligned
-// upvote count (accent-1 for the leading story).
+// Each row carries a story-type chip (Show / Ask / Job / Story
+// derived from title prefix), the headline, and a right column with
+// the score, a thin proportional score-strength bar (relative to
+// the feed's max), and comments + age beneath. Source-host glyph
+// leads each row so the feed's palette stays varied.
 
 const FEED_LABELS = {
   top: "Top",
@@ -35,10 +37,6 @@ function fmtAgo(epochSec) {
   return `${Math.floor(secs / 604800)}w`;
 }
 
-// Source-host → leading icon. The default ph-newspaper-clipping stays
-// the fallback so unfamiliar hosts read as plain "news"; familiar
-// ones get a recognisable wordmark icon so the row palette has more
-// variety than a column of identical squares.
 function sourceIcon(url) {
   if (typeof url !== "string") return "ph-newspaper-clipping";
   const u = url.toLowerCase();
@@ -49,6 +47,27 @@ function sourceIcon(url) {
   if (u.includes("medium.com") || u.includes(".substack.com")) return "ph-article";
   if (u.includes("news.ycombinator.com")) return "ph-chat-circle-text";
   return "ph-newspaper-clipping";
+}
+
+// Story-type from the title prefix. HN's API doesn't ship a type
+// field for the top stories endpoint; the prefix convention is how
+// the site itself categorises them.
+function storyType(title) {
+  if (typeof title !== "string") return null;
+  if (/^show hn:?/i.test(title)) return { label: "SHOW", color: "var(--accent-3)" };
+  if (/^ask hn:?/i.test(title)) return { label: "ASK", color: "var(--accent-5)" };
+  if (/^tell hn:?/i.test(title)) return { label: "TELL", color: "var(--accent-4)" };
+  if (/^launch hn:?/i.test(title)) return { label: "LAUNCH", color: "var(--accent-2)" };
+  // Pure-domain hire posts are typically titled like a company name + month/year.
+  if (/^[A-Z][A-Za-z0-9 .&-]+\s+\(YC\b/.test(title) && /hiring/i.test(title)) return { label: "JOB", color: "var(--accent-6)" };
+  return null;
+}
+
+// Strip the type prefix from the title so the chip carries the
+// label and the text stays clean.
+function cleanTitle(title, type) {
+  if (!type) return title;
+  return title.replace(/^(Show|Ask|Tell|Launch)\s+HN:?\s*/i, "");
 }
 
 export default function render(shadow, ctx) {
@@ -82,40 +101,142 @@ export default function render(shadow, ctx) {
     return;
   }
 
+  // Score-strength bar uses the feed's max score so the ratio is
+  // honest within this widget instance — a quiet new-stories feed
+  // and a peak top-stories feed both scale to their own context.
+  const maxScore = Math.max(1, ...stories.map((s) => Number(s.score) || 0));
+
   const rows = stories.map((s, i) => {
-    const isLead = i === 0;
+    const type = storyType(s.title);
+    const title = cleanTitle(s.title, type);
     const ph = sourceIcon(s.url);
     const ago = fmtAgo(s.time);
-    // Two-line meta: upvote count on top with the trend arrow,
-    // comments + relative time underneath. Reads denser without
-    // crowding the headline column.
-    const scoreLine = `
-      <span style="display:flex;align-items:center;gap:.25em;font-feature-settings:'tnum';color:${isLead ? "var(--accent-1)" : "var(--text-primary)"}">
-        <i class="ph-bold ph-arrow-fat-up" style="font-size:.85em"></i>${escapeHtml(fmtScore(s.score))}
-      </span>`;
-    const subBits = [];
-    if (s.comments != null) subBits.push(`<span style="display:inline-flex;align-items:center;gap:.2em"><i class="ph-bold ph-chat-circle" style="font-size:.85em"></i>${escapeHtml(fmtScore(s.comments))}</span>`);
-    if (ago) subBits.push(`<span>${escapeHtml(ago)}</span>`);
-    const subLine = subBits.length
-      ? `<small style="display:flex;align-items:center;gap:.4em;color:var(--text-muted);font-weight:var(--fw-semi);font-size:.7em;font-feature-settings:'tnum'">${subBits.join("")}</small>`
+    const score = Number(s.score) || 0;
+    const scorePct = (score / maxScore) * 100;
+    const scoreColor = i === 0 ? "var(--accent-1)" : "var(--accent-2)";
+    const typeChip = type
+      ? `<span class="hn-type" style="color:${type.color};background:color-mix(in oklab, ${type.color} 14%, var(--surface))">${type.label}</span>`
       : "";
+    const subBits = [];
+    if (s.comments != null) subBits.push(`<span class="hn-sub-item"><i class="ph-bold ph-chat-circle"></i>${escapeHtml(fmtScore(s.comments))}</span>`);
+    if (ago) subBits.push(`<span class="hn-sub-item">${escapeHtml(ago)}</span>`);
     return `
-      <div class="list-row ${i % 2 ? "is-zebra" : ""}">
-        <div class="list-lead">
-          <i class="ph-bold ${ph}" style="color:var(--accent-5)"></i>
-          <span class="list-title">${escapeHtml(s.title)}</span>
+      <div class="hn-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="hn-row-head">
+          <div class="list-lead hn-row-lead">
+            <i class="ph-bold ${ph}" style="color:var(--accent-5)"></i>
+            ${typeChip}
+            <span class="list-title">${escapeHtml(title)}</span>
+          </div>
+          <div class="hn-score-cell">
+            <span class="hn-score" style="color:${scoreColor}">
+              <i class="ph-bold ph-arrow-fat-up"></i>${escapeHtml(fmtScore(score))}
+            </span>
+            ${subBits.length ? `<small class="hn-sub">${subBits.join("")}</small>` : ""}
+          </div>
         </div>
-        <span class="list-meta" style="display:flex;flex-direction:column;align-items:flex-end;gap:.1em">
-          ${scoreLine}${subLine}
-        </span>
+        <div class="hn-bar-track">
+          <div class="hn-bar-fill" style="width:${scorePct.toFixed(1)}%;background:${scoreColor}"></div>
+        </div>
       </div>`;
   }).join("");
 
+  const layout = `
+    .hn-row {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-1);
+    }
+    .hn-row.is-zebra {
+      background: color-mix(in oklab, var(--text-primary) 3%, transparent);
+    }
+    .hn-row-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--space-3);
+      min-width: 0;
+    }
+    .hn-row-lead {
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: var(--space-2);
+      align-items: baseline;
+    }
+    .hn-row-lead .list-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .hn-type {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px var(--space-1);
+      border-radius: 999px;
+      font-size: var(--fs-caption);
+      font-weight: var(--fw-black);
+      letter-spacing: var(--ls-label);
+      flex: 0 0 auto;
+    }
+    .hn-score-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+      flex: 0 0 auto;
+    }
+    .hn-score {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-weight: var(--fw-black);
+      font-variant-numeric: tabular-nums;
+    }
+    .hn-score i {
+      font-size: .85em;
+    }
+    .hn-sub {
+      display: flex;
+      gap: var(--space-2);
+      color: var(--text-muted);
+      font-weight: var(--fw-semi);
+      font-size: .75em;
+      font-variant-numeric: tabular-nums;
+    }
+    .hn-sub-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+    .hn-sub-item i {
+      font-size: .9em;
+    }
+    /* Score-strength bar — thin track + filled portion proportional
+       to the story's score vs the feed's max. Sits at the bottom of
+       the row as a tertiary signal. */
+    .hn-bar-track {
+      height: 3px;
+      border-radius: 2px;
+      background: color-mix(in oklab, var(--text-primary) 5%, transparent);
+      overflow: hidden;
+    }
+    .hn-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+    @container (max-width: 320px) {
+      .hn-sub { display: none; }
+    }
+  `;
+
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="news_hacker_news">
       <div class="w-title">
-        <i class="ph-bold ph-newspaper-clipping"></i>
+        <i class="ph-bold ph-flame" style="color:var(--accent-1)"></i>
         <h3>Hacker News</h3>
         <span class="w-title-meta">${escapeHtml(feedLabel)}</span>
       </div>

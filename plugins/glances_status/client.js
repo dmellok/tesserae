@@ -1,8 +1,8 @@
-// glances_status — Spectra status archetype. The hero shows CPU%
-// as the headline number, with a tone-coded pill that swings ok →
-// warn → danger based on the server's combined metric heuristic.
-// At sm+ a status-grid carries the secondary stats (RAM, disk,
-// load, uptime); xs drops everything below the hero.
+// glances_status — Spectra status archetype. CPU as the hero number
+// + tone-coded state pill. Below: per-metric mini ring gauges for
+// CPU / RAM / Disk so the percentage reads as a filled arc rather
+// than just a number. xs drops the ring grid for a clean single-
+// number layout.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -11,9 +11,9 @@ function escapeHtml(s) {
 }
 
 const TONE_ACCENT = {
-  ok: "var(--accent-3)",       // forest / moss — calm
-  warn: "var(--accent-2)",     // ochre / mustard
-  danger: "var(--accent-1)",   // terracotta
+  ok: "var(--accent-3)",
+  warn: "var(--accent-2)",
+  danger: "var(--accent-1)",
   offline: "var(--text-muted)",
 };
 
@@ -35,8 +35,6 @@ function fmtLoad(v) {
   if (v == null) return "—";
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  // Two decimal places at small values, one at high — matches how
-  // load averages read on a typical Linux shell.
   return n < 10 ? n.toFixed(2) : n.toFixed(1);
 }
 
@@ -48,6 +46,35 @@ function fmtUptime(secs) {
   if (days >= 1) return hours > 0 ? `${days}d${hours}h` : `${days}d`;
   if (hours >= 1) return mins > 0 ? `${hours}h${mins}m` : `${hours}h`;
   return `${mins}m`;
+}
+
+// SVG mini ring gauge. Shows a percentage as a filled arc on a
+// circular track. Renders the percent number in the centre.
+function ringSvg({ pct, label, color, sublabel }) {
+  const r = 22;
+  const circ = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+  const filled = circ * (clamped / 100);
+  return `
+    <div class="glances-ring-tile">
+      <div class="glances-ring-wrap">
+        <svg viewBox="-28 -28 56 56" aria-hidden="true" style="width:100%;height:100%;display:block">
+          <g transform="rotate(-90)">
+            <circle r="${r}" fill="none" stroke="color-mix(in oklab, var(--text-primary) 8%, var(--surface))" stroke-width="5"/>
+            <circle r="${r}" fill="none" stroke="${color}" stroke-width="5"
+                    stroke-dasharray="${filled.toFixed(2)} ${circ.toFixed(2)}"
+                    stroke-linecap="round"/>
+          </g>
+          <text x="0" y="3" text-anchor="middle" font-size="13" font-weight="900"
+                fill="${color}" font-family="var(--font-family)"
+                font-variant-numeric="tabular-nums">${Math.round(clamped)}%</text>
+        </svg>
+      </div>
+      <div class="glances-ring-meta">
+        <span class="glances-ring-label">${escapeHtml(label)}</span>
+        ${sublabel ? `<small class="glances-ring-sub">${escapeHtml(sublabel)}</small>` : ""}
+      </div>
+    </div>`;
 }
 
 export default function render(shadow, ctx) {
@@ -78,40 +105,80 @@ export default function render(shadow, ctx) {
   const uptime = data.uptime;
   const offline = tone === "offline";
 
-  // At xs we hand the user one number — CPU% — and a state pill.
-  // Everything else fights for space and reads as noise on a small
-  // tile. md/lg get the full metric grid; sm drops uptime + load to
-  // keep the grid readable at 380×240.
-  const showRam = size !== "xs";
-  const showDisk = size !== "xs";
-  const showLoad = size === "md" || size === "lg";
-  const showUptime = size === "md" || size === "lg";
+  const showRings = size !== "xs";
+  const showFooter = size === "md" || size === "lg";
 
-  // Build the secondary metric grid. Each cell is (label, value,
-  // colour). Cells colour by accent role so the eye reads the same
-  // family at a glance — RAM uses accent-4 (teal), disk accent-5
-  // (slate-blue), load accent-2 (ochre), uptime stays in muted text
-  // because it's contextual not actionable.
-  const cells = [];
-  if (showRam) cells.push(["RAM", fmtPct(mem), "var(--accent-4)"]);
-  if (showDisk) cells.push([
-    "Disk",
-    disk ? `${fmtPct(disk.percent)}` : "—",
-    "var(--accent-5)",
-  ]);
-  if (showLoad) cells.push(["Load 1m", fmtLoad(load), "var(--accent-2)"]);
-  if (showUptime) cells.push(["Uptime", fmtUptime(uptime), "var(--text-primary)"]);
+  const ringRow = showRings && !offline ? `
+    <div class="glances-rings">
+      ${ringSvg({ pct: cpu, label: "CPU", color: "var(--accent-3)" })}
+      ${ringSvg({ pct: mem, label: "RAM", color: "var(--accent-4)" })}
+      ${ringSvg({ pct: disk?.percent, label: "Disk", color: "var(--accent-5)" })}
+    </div>` : "";
 
-  const grid = cells.length
-    ? `<div class="status-grid">${cells.map(([l, v, c]) => `
-        <div class="status-cell">
-          <span class="u-label">${escapeHtml(l)}</span>
-          <span class="v" style="color:${c}">${v}</span>
-        </div>`).join("")}</div>`
-    : "";
+  // Footer row: load + uptime as compact text strings on the same
+  // line. These don't need rings — they're textual context, not
+  // percentages.
+  const footer = showFooter && !offline ? `
+    <div class="glances-footer">
+      <span class="glances-footer-cell"><span class="u-label">Load</span><span style="color:var(--accent-2);font-weight:var(--fw-black);font-variant-numeric:tabular-nums">${fmtLoad(load)}</span></span>
+      <span class="glances-footer-cell"><span class="u-label">Uptime</span><span style="font-weight:var(--fw-black);font-variant-numeric:tabular-nums">${escapeHtml(fmtUptime(uptime))}</span></span>
+    </div>` : "";
+
+  const layout = `
+    .glances-rings {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: var(--space-2);
+      width: 100%;
+    }
+    .glances-ring-tile {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      min-width: 0;
+    }
+    .glances-ring-wrap {
+      width: clamp(3em, 18cqmin, 5em);
+      aspect-ratio: 1;
+    }
+    .glances-ring-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      line-height: 1.05;
+    }
+    .glances-ring-label {
+      font-size: var(--fs-caption);
+      font-weight: var(--fw-black);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+    .glances-ring-sub {
+      font-size: .7em;
+      color: var(--text-muted);
+      font-weight: var(--fw-semi);
+    }
+    .glances-footer {
+      display: flex;
+      gap: var(--space-3);
+      justify-content: space-around;
+      width: 100%;
+    }
+    .glances-footer-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      line-height: 1.05;
+    }
+  `;
 
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="glances_status">
       <div class="w-title">
         <i class="ph-bold ph-pulse" style="color:${accent}"></i>
@@ -127,7 +194,8 @@ export default function render(shadow, ctx) {
           </div>
         </div>
         <span class="pill" style="background:${accent}">${escapeHtml(state.text)}</span>
-        ${grid}
+        ${ringRow}
+        ${footer}
       </div>
     </div>`;
 }

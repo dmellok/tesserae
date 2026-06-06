@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Spotify — Now Playing",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "widget",
   "description": "Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",
   "icon": "ph-music-notes",
@@ -39,6 +39,12 @@
       "name": "show_progress",
       "type": "boolean",
       "label": "Show progress bar",
+      "default": true
+    },
+    {
+      "name": "show_waveform",
+      "type": "boolean",
+      "label": "Show track-deterministic waveform glyph",
       "default": true
     }
   ],

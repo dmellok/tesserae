@@ -50,12 +50,15 @@ def fetch(
     raw_items = payload.get(kind) or payload.get("events") or []
     items = []
     for r in raw_items[:max_items]:
-        # Each entry: { text, year, pages: [{normalizedtitle, ...}] }
+        # Each entry: { text, year, pages: [{normalizedtitle, thumbnail, ...}] }
+        first_page = (r.get("pages") or [{}])[0]
+        thumb = (first_page.get("thumbnail") or {}).get("source") or ""
         items.append(
             {
                 "year": r.get("year"),
                 "text": r.get("text") or "",
-                "page": ((r.get("pages") or [{}])[0].get("normalizedtitle")) or "",
+                "page": first_page.get("normalizedtitle") or "",
+                "thumb": thumb,
             }
         )
 

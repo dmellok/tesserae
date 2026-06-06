@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Picture — Gallery",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Plugins → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",
   "icon": "ph-images",
@@ -43,7 +43,9 @@
         { "value": "blurred", "label": "Fit with blurred background" }
       ]
     },
-    { "name": "show_filename", "type": "boolean", "label": "Show filename overlay", "default": false }
+    { "name": "show_filename", "type": "boolean", "label": "Show filename overlay", "default": false },
+    { "name": "show_folder_chip", "type": "boolean", "label": "Show folder-name chip in the corner", "default": true },
+    { "name": "show_count", "type": "boolean", "label": "Show photo count indicator", "default": true }
   ],
   "render": { "dither": "floyd-steinberg", "full_bleed": true }
 }

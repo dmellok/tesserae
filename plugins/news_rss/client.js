@@ -1,6 +1,8 @@
-// news_rss — Spectra list archetype. Title bar takes the feed's own
-// title with a "RSS" identifier meta; each item is a zebra row
-// showing the headline + the published date.
+// news_rss — Spectra list archetype. Title bar shows the feed's own
+// title with an "RSS" identifier. Each row carries a source-host chip
+// (host initial + hash-stable accent tint) on the left + a published
+// chip on the right, plus a type-aware lead glyph (video / audio /
+// image / article).
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -20,17 +22,37 @@ function fmtPublished(iso) {
   return `${Math.floor(secs / 2592000)}mo`;
 }
 
-// Pick a leading icon based on the link's host / extension so a mixed
-// feed visually distinguishes a podcast / video / article. Falls
-// back to the generic ph-rss when nothing matches.
+function hostOf(url) {
+  if (typeof url !== "string") return "";
+  try {
+    const u = new URL(url);
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+// Source-host → leading glyph. Mixed feeds with podcasts / videos /
+// articles read more clearly when each row carries a recognisable
+// type icon than identical RSS squares.
 function sourceIcon(url) {
-  if (typeof url !== "string") return "ph-rss";
+  if (typeof url !== "string") return "ph-article";
   const u = url.toLowerCase();
-  if (u.includes("youtube.com") || u.includes("youtu.be") || u.endsWith(".mp4") || u.endsWith(".mov")) return "ph-play";
-  if (u.endsWith(".mp3") || u.includes(".m4a") || u.includes("podcast")) return "ph-microphone";
+  if (u.includes("youtube.com") || u.includes("youtu.be") || /\.(mp4|mov|webm)(\?|$)/.test(u)) return "ph-play";
+  if (/\.(mp3|m4a|ogg)(\?|$)/.test(u) || u.includes("podcast")) return "ph-microphone";
   if (u.includes("github.com")) return "ph-github-logo";
-  if (u.endsWith(".jpg") || u.endsWith(".png") || u.endsWith(".gif") || u.endsWith(".webp")) return "ph-image";
-  return "ph-rss";
+  if (/\.(jpe?g|png|gif|webp)(\?|$)/.test(u)) return "ph-image";
+  return "ph-article";
+}
+
+// Hash a host name → one of six accent tokens. Same host always
+// picks the same colour, so a list mixing TechCrunch + The Verge
+// reads as two visually-distinct streams.
+function hostColor(host) {
+  let h = 0;
+  for (let i = 0; i < host.length; i++) h = (h * 31 + host.charCodeAt(i)) | 0;
+  const accents = ["var(--accent-1)", "var(--accent-2)", "var(--accent-3)", "var(--accent-4)", "var(--accent-5)", "var(--accent-6)"];
+  return accents[Math.abs(h) % accents.length];
 }
 
 export default function render(shadow, ctx) {
@@ -63,17 +85,79 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const rows = items.map((it, i) => `
-    <div class="list-row ${i % 2 ? "is-zebra" : ""}">
-      <div class="list-lead">
-        <i class="ph-bold ${sourceIcon(it.url)}" style="color:var(--accent-2)"></i>
-        <span class="list-title">${escapeHtml(it.title)}</span>
-      </div>
-      <span class="list-meta u-muted" style="font-weight:var(--fw-semi);font-feature-settings:'tnum'">${escapeHtml(fmtPublished(it.published))}</span>
-    </div>`).join("");
+  const rows = items.map((it, i) => {
+    const host = hostOf(it.url);
+    const initial = (host.match(/[a-z]/i) || ["?"])[0].toUpperCase();
+    const color = host ? hostColor(host) : "var(--accent-2)";
+    const ph = sourceIcon(it.url);
+    const ago = fmtPublished(it.published);
+    return `
+      <div class="rss-row ${i % 2 ? "is-zebra" : ""}">
+        <div class="list-lead rss-row-lead">
+          <span class="rss-source" style="background:${color}" title="${escapeHtml(host)}">${escapeHtml(initial)}</span>
+          <i class="ph-bold ${ph} rss-type" style="color:${color}"></i>
+          <span class="list-title">${escapeHtml(it.title)}</span>
+        </div>
+        ${ago ? `<span class="rss-ago" title="${escapeHtml(it.published)}">${escapeHtml(ago)}</span>` : ""}
+      </div>`;
+  }).join("");
+
+  const layout = `
+    .rss-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-1);
+      min-width: 0;
+    }
+    .rss-row.is-zebra {
+      background: color-mix(in oklab, var(--text-primary) 3%, transparent);
+    }
+    .rss-row-lead {
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: var(--space-2);
+    }
+    .rss-row-lead .list-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rss-source {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.4em;
+      height: 1.4em;
+      border-radius: 4px;
+      color: var(--surface);
+      font-weight: var(--fw-black);
+      font-size: .8em;
+      letter-spacing: 0;
+      flex: 0 0 auto;
+    }
+    .rss-type {
+      font-size: .9em;
+      flex: 0 0 auto;
+    }
+    .rss-ago {
+      color: var(--text-muted);
+      font-weight: var(--fw-bold);
+      font-size: var(--fs-caption);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-label);
+      flex: 0 0 auto;
+    }
+    @container (max-width: 280px) {
+      .rss-type { display: none; }
+    }
+  `;
 
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="news_rss">
       <div class="w-title">
         <i class="ph-bold ph-rss" style="color:var(--accent-2)"></i>

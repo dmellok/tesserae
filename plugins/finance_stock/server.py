@@ -76,6 +76,12 @@ def fetch(
     closes_raw = indicators[0].get("close") or []
     series = [round(float(v), 4) for v in closes_raw if v is not None]
 
+    # Volume series — paired with the close samples so the bars line
+    # up under the line. Nulls are emitted as 0 so a sparse bar
+    # doesn't leave a gap in the chart.
+    volume_raw = indicators[0].get("volume") or []
+    volume_series = [int(v) if v is not None else 0 for v in volume_raw]
+
     price = meta.get("regularMarketPrice")
     prev_close = meta.get("chartPreviousClose") or meta.get("previousClose")
     change_pct = ((price - prev_close) / prev_close * 100.0) if (price and prev_close) else None
@@ -90,6 +96,14 @@ def fetch(
         "change_pct": change_pct,
         "range": rng,
         "series": series,
+        # Yahoo's day-range fields. day_low / day_high are the
+        # session's intraday low/high; 52w_low/high are the rolling
+        # year. Both surface optional client-side chrome.
+        "day_low": meta.get("regularMarketDayLow"),
+        "day_high": meta.get("regularMarketDayHigh"),
+        "fifty_two_week_low": meta.get("fiftyTwoWeekLow"),
+        "fifty_two_week_high": meta.get("fiftyTwoWeekHigh"),
+        "volume": volume_series,
     }
     with contextlib.suppress(OSError):
         cache.write_text(json.dumps(result), encoding="utf-8")

@@ -1,8 +1,9 @@
 // finance_crypto — Spectra stat archetype with a Chart.js sparkline.
-// Hero is the price; the delta carries the 24h % change (accent-3
-// up, accent-1 down) and the market cap goes in the title meta.
-// A Chart.js line of the 24h price series sits below the caption so
-// the tile carries a sense of momentum at a glance.
+// Hero is the price; the 24h delta wears an up/down badge (moss
+// rising, terracotta falling) with a chunky arrow + percentage.
+// Market cap appears in the title meta with a rank chip when
+// available. Sparkline area-fills in the delta accent so the chart
+// reinforces "this is up" / "this is down" at a glance.
 
 import { sparkline, tokens } from "../../static/spectra-chart.js";
 
@@ -58,8 +59,44 @@ export default function render(shadow, ctx) {
   const deltaPh = up ? "ph-trend-up" : "ph-trend-down";
   const deltaText = change == null ? "—" : `${Math.abs(change).toFixed(2)}%`;
 
+  const layout = `
+    /* Delta-pill — the 24h change as a colored badge so the
+       up/down direction reads from the colour alone, not just the
+       arrow. Sits inline with the "24h" caption beside the hero. */
+    .crypto-delta {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 1px var(--space-2);
+      border-radius: 999px;
+      background: color-mix(in oklab, ${deltaAccent} 14%, var(--surface));
+      color: ${deltaAccent};
+      font-weight: var(--fw-black);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      font-size: var(--fs-caption);
+    }
+    .crypto-delta i {
+      font-size: 1em;
+    }
+    .crypto-caption {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .crypto-caption-window {
+      font-size: var(--fs-caption);
+      font-weight: var(--fw-bold);
+      letter-spacing: var(--ls-label);
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+  `;
+
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w" data-widget="finance_crypto">
       <div class="w-title">
         <i class="ph-bold ph-coin" style="color:var(--accent-2)"></i>
@@ -68,9 +105,9 @@ export default function render(shadow, ctx) {
       </div>
       <div class="w-body stat-body">
         <div class="stat-value">${escapeHtml(price)}<span class="unit">${escapeHtml(vs.toUpperCase())}</span></div>
-        <div class="stat-caption u-row">
-          <span class="stat-delta" style="color:${deltaAccent}"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
-          <span class="u-muted">24h</span>
+        <div class="stat-caption crypto-caption">
+          <span class="crypto-delta"><i class="ph-bold ${deltaPh}"></i>${escapeHtml(deltaText)}</span>
+          <span class="crypto-caption-window">24h</span>
         </div>
         <div class="stat-sparkline"><canvas></canvas></div>
       </div>

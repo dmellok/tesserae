@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Glances — Status",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "widget",
   "description": "Live system stats from a Glances instance: CPU / RAM / disk / load / uptime, with a tone-coded state pill that swings from ok → warn → danger as the headline metric crosses thresholds. Each cell targets its own Glances server so a dashboard can monitor several boxes side by side.",
   "icon": "ph-pulse",

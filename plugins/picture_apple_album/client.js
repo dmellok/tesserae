@@ -1,6 +1,8 @@
-// picture_apple_album — Spectra full-bleed image. Renders one signed
-// Apple Photos shared-album asset filling the cell. No overlay; the
-// stream's vibe is the whole point.
+// picture_apple_album — Spectra full-bleed image. Renders one
+// signed Apple Photos shared-album asset filling the cell. Optional
+// caption surfaces date / owner / total count; a sequence indicator
+// (3/12) sits in the top-right corner when the server reports the
+// asset's index within the album.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
@@ -10,7 +12,6 @@ function escapeHtml(s) {
 
 function fmtDate(iso) {
   if (typeof iso !== "string" || !iso) return "";
-  // Apple gives ISO "2024-05-12T13:45:00.123Z" — slice to date only.
   return iso.slice(0, 10);
 }
 
@@ -18,6 +19,7 @@ export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
   const showCaption = opts.show_caption === true; // default false — pictures are the point
+  const showSequence = opts.show_sequence !== false; // default true
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {
@@ -44,12 +46,52 @@ export default function render(shadow, ctx) {
     if (data.date) captionBits.push(fmtDate(data.date));
     if (data.owner) captionBits.push(data.owner);
     if (data.count) captionBits.push(`${data.count} photos`);
+    if (data.location) captionBits.push(data.location);
   }
+
+  // Sequence indicator — "3 / 12" pill in the top-right corner when
+  // the server reports asset index + total count. 1-indexed for the
+  // display.
+  let sequence = "";
+  if (showSequence && Number.isFinite(data.index) && Number.isFinite(data.count) && data.count > 1) {
+    const oneBased = data.index + 1;
+    sequence = `
+      <div class="apple-seq">
+        <span class="apple-seq-num">${oneBased}</span>
+        <span class="apple-seq-sep">/</span>
+        <span class="apple-seq-total">${data.count}</span>
+      </div>`;
+  }
+
+  const layout = `
+    .apple-seq {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-2);
+      display: inline-flex;
+      align-items: baseline;
+      gap: 2px;
+      padding: 3px var(--space-2);
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.55);
+      color: white;
+      font-weight: var(--fw-black);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: var(--ls-label);
+      font-size: var(--fs-caption);
+      pointer-events: none;
+    }
+    .apple-seq-sep, .apple-seq-total {
+      opacity: 0.65;
+    }
+  `;
 
   shadow.innerHTML = `
     ${css}
+    <style>${layout}</style>
     <div class="w is-bleed" data-widget="picture_apple_album">
       <img src="${escapeHtml(data.url)}" alt="">
+      ${sequence}
       ${captionBits.length
         ? `<div class="img-overlay"><span class="sub">${escapeHtml(captionBits.join(" · "))}</span></div>`
         : ""}

@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "News — Reddit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "kind": "widget",
   "description": "Top posts from a subreddit using the free .json endpoint (no API key, no OAuth). Pick the subreddit and time window per cell.",
   "icon": "ph-reddit-logo",

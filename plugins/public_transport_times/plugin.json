@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Public Transport (PTV)",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.",
   "icon": "ph-train",
