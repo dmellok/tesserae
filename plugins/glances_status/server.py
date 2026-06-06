@@ -32,6 +32,7 @@ import base64
 import re
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from app.plugin_http import fetch_json
 
@@ -153,23 +154,47 @@ def _fetch_all(base: str, headers: dict[str, str]) -> dict[str, Any] | None:
     return None
 
 
+def _split_auth_from_url(url: str) -> tuple[str, dict[str, str]]:
+    """If ``url`` carries ``user:pass@`` credentials, strip them off
+    and return the cleaned URL plus an ``Authorization`` header dict.
+
+    Lets the user paste ``http://admin:hunter2@nas:61208`` straight
+    into a cell-options field — same auth shape as every other tool
+    that talks HTTP — without needing per-cell secret inputs (which
+    cell options don't mask on the editor form anyway). For un-authed
+    Glances installs the returned dict is empty and the URL is
+    returned unchanged.
+    """
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return url, {}
+    if not parts.username:
+        return url, {}
+    creds = f"{parts.username}:{parts.password or ''}"
+    token = base64.b64encode(creds.encode("utf-8")).decode("ascii")
+    # Strip user:pass@ from netloc but keep host[:port] intact.
+    host = parts.hostname or ""
+    if parts.port:
+        host = f"{host}:{parts.port}"
+    cleaned = urlunsplit((parts.scheme, host, parts.path, parts.query, parts.fragment))
+    return cleaned, {"Authorization": f"Basic {token}"}
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
-    del ctx
-    base = str(settings.get("base_url", "")).strip().rstrip("/")
+    del settings, ctx
+    base = str(options.get("base_url", "")).strip().rstrip("/")
     label = (options.get("label") or "").strip()
     now = datetime.now().strftime("%H:%M")
 
     if not base:
-        return {"error": "Set the Glances URL in plugin settings."}
+        return {"error": "Set the Glances URL on this cell."}
 
+    base, auth_headers = _split_auth_from_url(base)
     headers: dict[str, str] = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-    username = str(settings.get("username") or "").strip()
-    password = str(settings.get("password_secret") or settings.get("password") or "").strip()
-    if username:
-        token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
-        headers["Authorization"] = f"Basic {token}"
+    headers.update(auth_headers)
 
     payload = _fetch_all(base, headers)
     if payload is None:

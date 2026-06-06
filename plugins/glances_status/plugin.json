@@ -1,44 +1,31 @@
 {
   "tesserae_compat": "1.x",
   "name": "Glances — Status",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "widget",
-  "description": "Live system stats from a Glances instance: CPU / RAM / disk / load / uptime, with a tone-coded state pill that swings from ok → warn → danger as the headline metric crosses thresholds.",
+  "description": "Live system stats from a Glances instance: CPU / RAM / disk / load / uptime, with a tone-coded state pill that swings from ok → warn → danger as the headline metric crosses thresholds. Each cell targets its own Glances server so a dashboard can monitor several boxes side by side.",
   "icon": "ph-pulse",
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },
   "cell_options": [
     {
-      "name": "label",
-      "type": "string",
-      "label": "Title",
-      "default": "Server",
-      "help": "Shown in the title bar. Leave blank to fall back to the Glances hostname."
-    }
-  ],
-  "settings": [
-    {
       "name": "base_url",
       "type": "string",
       "label": "Glances URL",
       "default": "http://localhost:61208",
-      "help": "Base URL of a Glances REST server (the host that runs `glances -w`). Tesserae appends /api/4/all itself."
+      "required": true,
+      "help": "Base URL of the Glances REST server (the host that runs `glances -w`). Tesserae appends /api/4/all itself. For HTTP-Basic auth, embed credentials: http://user:pass@host:61208."
     },
     {
-      "name": "username",
+      "name": "label",
       "type": "string",
-      "label": "Username (optional)",
-      "help": "Set only if your Glances instance is started with --username; otherwise leave blank."
-    },
-    {
-      "name": "password",
-      "type": "string",
-      "label": "Password (optional)",
-      "secret": true,
-      "help": "Pairs with the username above for HTTP Basic auth."
+      "label": "Title",
+      "default": "",
+      "help": "Shown in the title bar. Leave blank to fall back to the Glances hostname."
     }
   ],
+  "settings": [],
   "render": {
     "needs_network": true
   }

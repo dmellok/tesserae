@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from flask.testing import FlaskClient
 
-from plugins.glances_status.server import _tone, _uptime_seconds
+from plugins.glances_status.server import _split_auth_from_url, _tone, _uptime_seconds
 
 
 @pytest.mark.parametrize("size", ["xs", "sm", "md", "lg"])
@@ -62,6 +62,39 @@ def test_tone_thresholds(
     cpu: float | None, mem: float | None, disk: float | None, expected: str
 ) -> None:
     assert _tone(cpu, mem, disk) == expected
+
+
+# -- URL-embedded auth -------------------------------------------------
+
+
+def test_split_auth_from_url_no_creds_passes_through() -> None:
+    """A bare URL must come back unchanged with no Authorization
+    header — the bulk-case for unauthed Glances installs shouldn't
+    pay any cost."""
+    cleaned, headers = _split_auth_from_url("http://nas.local:61208")
+    assert cleaned == "http://nas.local:61208"
+    assert headers == {}
+
+
+def test_split_auth_from_url_extracts_basic_auth() -> None:
+    """``user:pass@`` in the URL becomes a Basic ``Authorization``
+    header and the credentials are scrubbed from the cleaned URL so
+    nothing leaks into log lines or error messages."""
+    cleaned, headers = _split_auth_from_url("http://admin:hunter2@nas.local:61208/api")
+    assert cleaned == "http://nas.local:61208/api"
+    # Decode the token back to confirm the expected creds round-trip.
+    import base64
+
+    token = headers["Authorization"].removeprefix("Basic ")
+    assert base64.b64decode(token).decode() == "admin:hunter2"
+
+
+def test_split_auth_from_url_handles_empty_password() -> None:
+    """Some users set a username with no password — the encoder must
+    still produce a valid ``user:`` Basic token instead of crashing."""
+    cleaned, headers = _split_auth_from_url("http://watcher@nas:61208")
+    assert cleaned == "http://nas:61208"
+    assert "Authorization" in headers
 
 
 # -- uptime parser -----------------------------------------------------
