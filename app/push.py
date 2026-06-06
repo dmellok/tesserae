@@ -144,6 +144,7 @@ def _ui_font(size: int) -> Any | None:
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/System/Library/Fonts/Helvetica.ttc",
     )
+    font: Any
     for path in candidates:
         try:
             font = ImageFont.truetype(path, size=size)

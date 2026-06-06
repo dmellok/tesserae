@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.32.1], 2026-06-07
+
+### Fixed
+
+- CI mypy --strict failure on `app/push.py`: the `_ui_font` helper
+  reassigned `font` from a `FreeTypeFont` to the base `ImageFont`
+  type on the bitmap-default fallback path, which is incompatible
+  under strict typing. Annotated as `Any` to match the function's
+  return type.
+
 ## [0.32.0], 2026-06-07
 
 Polish pass on Send + low-battery overlay for battery-powered devices.
