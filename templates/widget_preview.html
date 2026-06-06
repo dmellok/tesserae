@@ -1,10 +1,12 @@
 {# Dev-only single-widget preview.
 
-   One widget rendered at every supported size (xs / sm / md / lg) in a
-   single grid, with a left rail for the controls: widget picker, theme,
-   style, sample-data toggle, and a form-builder generated from the
-   plugin's cell_options schema. Submitting the form bounces the page
-   with the new URL so every iframe re-renders with the chosen options.
+   One widget rendered into a 7-cell synthetic page that walks every
+   size bucket (lg → md → sm → xs) plus an unassigned cell so the
+   reviewer can compare a populated cell against the empty placeholder
+   side by side. The left rail holds the controls (widget, panel,
+   theme, style, sample data, cell options); the right pane is a
+   single iframe loading /_test/preview/page at the chosen panel
+   dimensions, scaled down to fit.
 
    Reach this directly at /_test/preview. Dev-only — the backend route
    guards on ``debug or testing`` like the rest of /_test/. #}
@@ -41,7 +43,8 @@
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
-                 font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+                 font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                 height: 100%; }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
@@ -49,17 +52,18 @@
     .shell {
       display: grid;
       grid-template-columns: 320px 1fr;
-      min-height: 100vh;
+      height: 100vh;
     }
     @media (max-width: 900px) {
-      .shell { grid-template-columns: 1fr; }
+      .shell { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
       .controls { border-right: 0; border-bottom: 1px solid var(--border); }
     }
 
     /* ---- left rail ---- */
     .controls {
-      position: sticky; top: 0; align-self: start;
-      max-height: 100vh; overflow-y: auto;
+      align-self: start;
+      max-height: 100vh;
+      overflow-y: auto;
       padding: 18px 18px 36px;
       background: var(--panel);
       border-right: 1px solid var(--border);
@@ -140,8 +144,6 @@
       width: 16px; height: 16px;
     }
 
-    /* Theme + style + sample-data live in the top block; the two
-       primary axes the maintainer is flipping while testing. */
     .pickers {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -170,100 +172,71 @@
     }
     .btn-ghost:hover { background: var(--border); }
 
-    /* ---- main column ---- */
+    /* ---- right pane: composer iframe ---- */
     .stage {
-      padding: 24px 28px 64px;
+      position: relative;
+      padding: 28px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-height: 0;
     }
     .stage-head {
-      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-      margin-bottom: 24px;
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      flex: 0 0 auto;
     }
     .stage-head h1 {
-      font-size: 18px; font-weight: 700; margin: 0;
+      font-size: 16px; font-weight: 700; margin: 0;
     }
     .stage-head .lede {
-      margin: 0; color: var(--fgSoft); font-size: 13px;
+      margin: 0; color: var(--fgSoft); font-size: 12px;
     }
-    .stage-head .meta {
+    .stage-head .chips {
       margin-left: auto;
-      display: inline-flex; align-items: center; gap: 12px;
-      font: 600 11px/1 ui-monospace, monospace;
-      color: var(--fgSoft);
-      letter-spacing: 0.04em;
+      display: inline-flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
     }
-    .stage-head .meta .chip {
-      padding: 4px 9px;
+    .stage-head .chip {
+      padding: 3px 9px;
       background: var(--panel2);
       border: 1px solid var(--border);
       border-radius: 999px;
-    }
-
-    .sizes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 24px;
-      align-items: start;
-    }
-    .size-card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
-      display: grid;
-      gap: 10px;
-    }
-    .size-card h3 {
-      font: 700 11px/1 ui-monospace, monospace;
-      text-transform: uppercase; letter-spacing: 0.08em;
-      color: var(--fg);
-      margin: 0;
-      display: flex; align-items: baseline; gap: 8px;
-    }
-    .size-card h3 .tag {
-      padding: 3px 7px;
-      background: var(--accent);
-      color: var(--bg);
-      border-radius: 4px;
-    }
-    .size-card h3 .dims {
+      font: 600 11px/1 ui-monospace, monospace;
+      letter-spacing: 0.04em;
       color: var(--fgSoft);
-      font-weight: 500;
-      letter-spacing: 0.02em;
     }
-    /* Native render at panel resolution, scaled down with CSS transform
-       so a 1200×800 lg cell fits in the card. --tw/--th are native
-       dims; --s is computed at render time so the painted iframe fills
-       the card width and the card grows to match the natural aspect. */
+    .stage-head .chip strong { color: var(--fg); margin-left: 0.3em; font-weight: 700; }
+
+    /* The composer iframe renders at the panel's native dimensions
+       (e.g. 1200×1600) and CSS-scales down so the whole composition
+       fits the stage. --tw / --th are native; --s is the display
+       scale; the frame's outer size = native × s so layout stays
+       proportional to the panel's aspect, and any centring happens
+       around the scaled box. */
     .frame {
-      position: relative;
+      flex: 0 0 auto;
+      align-self: center;
       background: var(--panel2);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
       overflow: hidden;
-      width: 100%;
-      height: 0;
-      padding-bottom: calc(var(--th) / var(--tw) * 100%);
+      position: relative;
+      width: calc(var(--tw) * var(--s) * 1px);
+      height: calc(var(--th) * var(--s) * 1px);
     }
     .frame iframe {
-      position: absolute;
-      top: 0; left: 0;
+      display: block;
       border: 0;
       background: white;
+      position: absolute;
+      top: 0; left: 0;
       width: calc(var(--tw) * 1px);
       height: calc(var(--th) * 1px);
+      transform: scale(var(--s));
       transform-origin: 0 0;
-      /* width of the frame in px divided by --tw — set per-card by JS
-         after layout. Initialised to 0.001 so the frame paints from
-         the centre while we wait for measurement instead of blowing
-         past the card boundary. */
-      transform: scale(var(--s, 0.001));
     }
-    .size-card .open-link {
-      font: 600 11px/1 ui-monospace, monospace;
-      color: var(--fgSoft);
-      margin-left: auto;
-    }
-    .size-card .open-link:hover { color: var(--accent); }
   </style>
 </head>
 <body>
@@ -282,18 +255,30 @@
     <form method="get" action="{{ url_for('composer.test_widget_preview') }}" id="preview-form">
       <h2>Widget</h2>
       <div class="field">
-        {# All four chrome pickers (widget / theme / style / sample) live
-           on the data-auto-submit channel so flipping any of them
-           reloads the preview without hunting for an Apply button. The
-           JS at the bottom of the page wires the change event to
-           ``form.requestSubmit()`` so the existing submit handler still
-           runs — which is what bundles the cell_options form fields
-           into ``?opts=<json>``. Plain ``form.submit()`` would skip the
-           handler and lose the typed-but-not-yet-applied option values. #}
+        {# All four chrome pickers (widget / panel / theme / style /
+           sample) share data-auto-submit so flipping any of them
+           reloads the preview without hunting for an Apply button.
+           The JS at the bottom of the page wires the change event to
+           ``form.requestSubmit()`` so the existing submit handler
+           still runs — which is what bundles the cell_options form
+           fields into ``?opts=<json>``. Plain ``form.submit()`` would
+           skip the handler and lose the typed-but-not-yet-applied
+           option values. #}
         <select name="widget" data-auto-submit>
           {% for w in widgets %}
           <option value="{{ w.id }}" {% if w.id == widget.id %}selected{% endif %}>
             {{ w.name }} ({{ w.id }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <h2>Panel</h2>
+      <div class="field">
+        <select name="panel" data-auto-submit>
+          {% for p in panels %}
+          <option value="{{ p.id }}" {% if p.id == panel_id %}selected{% endif %}>
+            {{ p.label }}
           </option>
           {% endfor %}
         </select>
@@ -335,10 +320,10 @@
 
       {% if schema %}
       <h2>Cell options</h2>
-      {# JS reads each field via the name attribute and bundles them into
-         the ?opts JSON parameter on submit. Native form serialisation
-         can't do that — we'd lose the nested-dict shape — so the form
-         intercept lives at the bottom of this template. #}
+      {# JS reads each field via the name attribute and bundles them
+         into the ?opts JSON parameter on submit. Native form
+         serialisation can't do that — we'd lose the nested-dict shape
+         — so the form intercept lives at the bottom of this template. #}
       {% for spec in schema %}
         {% set name = spec.name %}
         {% set type = spec.type or 'string' %}
@@ -363,7 +348,7 @@
         {% elif type == 'textarea' or type == 'multiselect' or type == 'entity_overrides' %}
           <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="json">
             <label for="opt-{{ name }}">{{ label }}</label>
-            <textarea id="opt-{{ name }}" data-opt-input placeholder='{{ "" if type != "textarea" else "" }}'>{% if val is mapping or val is iterable and val is not string %}{{ val|tojson }}{% elif val is not none %}{{ val }}{% endif %}</textarea>
+            <textarea id="opt-{{ name }}" data-opt-input>{% if val is mapping or val is iterable and val is not string %}{{ val|tojson }}{% elif val is not none %}{{ val }}{% endif %}</textarea>
             <span class="hint">{{ 'JSON value' if type != 'textarea' else 'Plain text — newlines OK' }}</span>
           </div>
         {% elif type == 'number' %}
@@ -389,7 +374,7 @@
         <button type="submit" class="btn-primary">
           <i class="ph ph-eye" aria-hidden="true"></i> Apply
         </button>
-        <a href="{{ url_for('composer.test_widget_preview', widget=widget.id) }}" class="btn-ghost"
+        <a href="{{ url_for('composer.test_widget_preview', widget=widget.id, panel=panel_id) }}" class="btn-ghost"
            style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
           Reset
         </a>
@@ -401,44 +386,26 @@
     <header class="stage-head">
       <div>
         <h1>{{ widget.name }}</h1>
-        <p class="lede">
-          {% if widget.manifest.get('description') %}{{ widget.manifest.get('description') }}{% endif %}
-        </p>
+        <p class="lede">7 cells across xs / sm / md / lg + one unassigned slot — laid out on a real panel for context.</p>
       </div>
-      <div class="meta">
-        <span class="chip">theme: {{ theme_id }}</span>
-        <span class="chip">style: {{ style_id }}</span>
+      <div class="chips">
+        <span class="chip">panel <strong>{{ panel_w }}×{{ panel_h }}</strong></span>
+        <span class="chip">theme <strong>{{ theme_id }}</strong></span>
+        <span class="chip">style <strong>{{ style_id }}</strong></span>
         {% if sample %}<span class="chip">sample data</span>{% endif %}
       </div>
     </header>
 
-    {# Which sizes does the plugin claim it supports? Default to all
-       four if the manifest doesn't say so we always have something to
-       look at. #}
-    {% set supported = widget.manifest.get('supports', {}).get('sizes') or ['xs','sm','md','lg'] %}
-    {% set show_sizes = [] %}
-    {% for s in ['xs','sm','md','lg'] %}{% if s in supported %}{% set _ = show_sizes.append(s) %}{% endif %}{% endfor %}
+    {% set preview_qs = '?widget=' ~ widget.id ~ '&panel=' ~ panel_id ~ '&theme=' ~ theme_id ~ '&style=' ~ style_id %}
+    {% if sample %}{% set preview_qs = preview_qs ~ '&sample=1' %}{% endif %}
+    {% if opts_json %}{% set preview_qs = preview_qs ~ '&opts=' ~ (opts_json | urlencode) %}{% endif %}
 
-    <div class="sizes">
-      {% for size in show_sizes %}
-        {% set dims = size_dims[size] %}
-        <section class="size-card" data-size-card>
-          <h3>
-            <span class="tag">{{ size }}</span>
-            <span class="dims">{{ dims[0] }} × {{ dims[1] }}</span>
-            <a class="open-link" target="_blank" rel="noopener"
-               href="{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme_id, style=style_id) }}{% if sample %}&sample=1{% endif %}{% if opts_json %}&opts={{ opts_json|urlencode }}{% endif %}"
-               title="Open in new tab">↗</a>
-          </h3>
-          <div class="frame" data-frame style="--tw: {{ dims[0] }}; --th: {{ dims[1] }};">
-            <iframe
-                src="{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme_id, style=style_id) }}{% if sample %}&sample=1{% endif %}{% if opts_json %}&opts={{ opts_json|urlencode }}{% endif %}"
-                loading="lazy"
-                sandbox="allow-scripts allow-same-origin"
-                title="{{ widget.name }} at {{ size }}"></iframe>
-          </div>
-        </section>
-      {% endfor %}
+    <div class="frame" data-frame style="--tw: {{ panel_w }}; --th: {{ panel_h }}; --s: 0.5;">
+      <iframe
+          src="{{ url_for('composer.test_widget_preview_page') }}{{ preview_qs }}"
+          loading="eager"
+          sandbox="allow-scripts allow-same-origin"
+          title="{{ widget.name }} preview at {{ panel_w }}×{{ panel_h }}"></iframe>
     </div>
   </main>
 </div>
@@ -480,21 +447,15 @@
       });
       return opts;
     }
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', () => {
       const opts = buildOpts();
       hidden.value = Object.keys(opts).length ? JSON.stringify(opts) : '';
       // Drop the per-field inputs from submission so the URL only
-      // carries widget, theme, style, sample, opts — clean and
-      // bookmarkable. The widget/theme/style fields aren't tagged
-      // with data-opt-field so they go through normally.
+      // carries widget, panel, theme, style, sample, opts — clean and
+      // bookmarkable. The chrome pickers aren't tagged with
+      // data-opt-field so they go through normally.
       document.querySelectorAll('[data-opt-input]').forEach((inp) => { inp.disabled = true; });
     });
-
-    // Auto-submit channel: widget, theme, style, sample. Anything tagged
-    // data-auto-submit fires requestSubmit() on change so the submit
-    // listener above still runs and rebuilds ?opts from the typed-but-
-    // not-yet-applied option fields. Without this, picking a new theme
-    // would silently lose any user edits in the cell_options form.
     document.querySelectorAll('[data-auto-submit]').forEach((el) => {
       el.addEventListener('change', () => {
         if (typeof form.requestSubmit === 'function') form.requestSubmit();
@@ -503,23 +464,29 @@
     });
   })();
 
-  // Compute --s per frame so the iframe paints into the card width.
-  // Re-runs on resize so dragging the window doesn't leave the iframe
-  // misaligned with its card.
+  // Compute --s so the iframe scales to fit the available stage area.
+  // The frame is sized as native-w × scale and native-h × scale, so we
+  // pick the largest scale that keeps the frame inside the stage's
+  // content box (with a small safety margin).
   (function () {
-    const frames = Array.from(document.querySelectorAll('[data-frame]'));
-    function paint() {
-      frames.forEach((frame) => {
-        const tw = parseFloat(frame.style.getPropertyValue('--tw')) || 1;
-        const w = frame.clientWidth;
-        if (w > 0) frame.style.setProperty('--s', String(w / tw));
-      });
+    const stage = document.querySelector('.stage');
+    const frame = document.querySelector('[data-frame]');
+    if (!stage || !frame) return;
+    const head = document.querySelector('.stage-head');
+    const tw = parseFloat(frame.style.getPropertyValue('--tw')) || 1;
+    const th = parseFloat(frame.style.getPropertyValue('--th')) || 1;
+    function fit() {
+      const padX = 56; // stage horizontal padding ×2
+      const padY = 56 + (head ? head.offsetHeight + 14 : 0);
+      const availW = Math.max(0, stage.clientWidth - padX);
+      const availH = Math.max(0, stage.clientHeight - padY);
+      if (availW <= 0 || availH <= 0) return;
+      const scale = Math.min(availW / tw, availH / th, 1);
+      frame.style.setProperty('--s', String(scale));
     }
-    paint();
-    window.addEventListener('resize', paint);
-    // Some browsers report 0 width before fonts/layout settle — retry
-    // on the next animation frame so the first paint isn't blank.
-    requestAnimationFrame(paint);
+    fit();
+    window.addEventListener('resize', fit);
+    requestAnimationFrame(fit);
   })();
 </script>
 </body>

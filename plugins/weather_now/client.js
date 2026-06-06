@@ -91,12 +91,13 @@ function fmtMetric(m) {
   return String(v);
 }
 
-// Sunrise / sunset arc — only painted at lg. Plots a semicircle from
-// rise to set with a marker at the current wall-clock position so the
-// reader can see at a glance where in the day they are. Times print
-// under each end of the arc. Falls back to an empty string when the
-// upstream payload is missing rise/set values so md and below never
-// reserve space for a band they won't draw.
+// Sunrise / sunset arc — painted at md-tall + lg. Plots a semicircle
+// from rise to set with a marker at the current wall-clock position.
+// viewBox 100x60 keeps the arc a true semicircle (rx=ry=40) so it
+// reads well in both the wide horizontal band below the metrics (md
+// tall) and the tall narrow right-column strip (lg). Falls back to an
+// empty string when the upstream payload is missing rise/set values
+// so cells that don't paint it don't reserve dead space.
 function sunArc(sun) {
   if (!sun || sun.riseMin == null || sun.setMin == null) return "";
   const rise = sun.riseMin;
@@ -104,30 +105,25 @@ function sunArc(sun) {
   const now = sun.nowMin ?? rise;
   const span = Math.max(1, set - rise);
   const t = Math.max(0, Math.min(1, (now - rise) / span));
-  // Arc geometry: viewBox 100x52, semicircle centred at (50, 50) with
-  // radius 40. Parametric position on the arc: angle = pi - pi*t goes
-  // from pi (left horizon, t=0) round to 0 (right horizon, t=1).
+  // Semicircle centred at (50, 50), rx=ry=40. Parametric sun position:
+  // x = 50 - 40*cos(pi*t), y = 50 - 40*sin(pi*t).
   const cx = (50 - 40 * Math.cos(Math.PI * t)).toFixed(1);
   const cy = (50 - 40 * Math.sin(Math.PI * t)).toFixed(1);
   const dayLengthMin = Math.max(0, set - rise);
   const dayH = Math.floor(dayLengthMin / 60);
   const dayM = dayLengthMin % 60;
   const dayLabel = `${dayH}h ${String(dayM).padStart(2, "0")}m`;
-  // Marker uses currentColor of the inner group set to accent-2 so
-  // the sun reads as the same ochre as the hero icon at midday. The
-  // arc itself is a faint dashed line in text-secondary so the
-  // marker is what catches the eye.
   return `
     <div class="wx-sun">
-      <svg viewBox="0 0 100 52" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+      <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
         <line x1="0" y1="50" x2="100" y2="50"
-              stroke="var(--text-muted)" stroke-width="0.6" opacity="0.5"/>
+              stroke="var(--text-muted)" stroke-width="0.8" opacity="0.45"/>
         <path d="M 10 50 A 40 40 0 0 1 90 50"
               fill="none" stroke="var(--text-secondary)"
-              stroke-width="1.2" stroke-dasharray="2 2" opacity="0.55"/>
+              stroke-width="1.4" stroke-dasharray="2 2" opacity="0.55"/>
         <circle cx="${cx}" cy="${cy}" r="3.5" fill="var(--accent-2)"/>
-        <circle cx="10" cy="50" r="1.6" fill="var(--text-muted)"/>
-        <circle cx="90" cy="50" r="1.6" fill="var(--text-muted)"/>
+        <circle cx="10" cy="50" r="1.8" fill="var(--text-muted)"/>
+        <circle cx="90" cy="50" r="1.8" fill="var(--text-muted)"/>
       </svg>
       <div class="wx-sun-meta">
         <span class="wx-sun-end">
@@ -227,17 +223,102 @@ export default function render(shadow, ctx) {
       .wx-forecast { gap: var(--space-3); }
       .wx-cell { gap: var(--space-1); }
     }
+    /* md (441-699 wide) default: hero + 4-metric strip, no arc. */
     @container (min-width: 441px) and (max-width: 699px) {
       .wx-sun { display: none; }
     }
-    @container (min-width: 700px) {
-      .wx-body { gap: var(--space-4); min-height: 0; }
-      .wx-now {
-        flex: 0 0 auto;
+
+    /* md tight (short cells, height under 450) clips when the metric
+       labels squeeze the icons + values past the cell. Drop the
+       labels and stack icon + value tighter toward the top so the
+       row never gets cut off at the bottom. Height-only query so the
+       browser parses it independently of width — the combined
+       width+height shape was silently failing in some engines. */
+    @container (max-height: 449px) {
+      .wx-cell .d { display: none; }
+      .wx-forecast { gap: var(--space-3); }
+      .wx-cell {
+        gap: var(--space-2);
+        justify-content: flex-start;
+        padding-top: var(--space-2);
+      }
+    }
+
+    /* md tall (height 600+) has spare room below the metric strip.
+       Drop the sun arc band in there so the cell stops reading as
+       empty at the bottom. Same 3-row hero / metrics / arc grid the
+       earlier lg block had. */
+    @container (min-width: 441px) and (max-width: 699px) and (min-height: 600px) {
+      .wx-body {
+        display: grid;
+        /* Explicit 1-column track so every grid item stretches to
+           the full cell width. Without this the implicit column
+           sizes to its widest content (the hero) and the sun arc
+           ends up shrunk into the left half of the cell. */
+        grid-template-columns: 1fr;
+        grid-template-rows: 5fr 3fr 4fr;
+        gap: var(--space-4);
         min-height: 0;
-        min-width: 0;
+      }
+      .wx-now {
+        min-height: 0;
         align-items: center;
         justify-content: center;
+        gap: var(--space-4);
+      }
+      .wx-forecast {
+        align-items: stretch;
+        gap: var(--space-3);
+        min-height: 0;
+      }
+      .wx-sun {
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: var(--space-2);
+        padding: var(--space-3) var(--space-4);
+        background: var(--surface-sunken);
+        border-radius: var(--radius-0);
+        min-height: 0;
+      }
+      .wx-sun svg {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        display: block;
+      }
+      .wx-sun-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: var(--fs-caption);
+        font-weight: var(--fw-bold);
+        color: var(--text-muted);
+        letter-spacing: var(--ls-label);
+        text-transform: var(--label-transform, uppercase);
+      }
+      .wx-sun-end { display: inline-flex; align-items: center; gap: 0.35em; }
+      .wx-sun-end .ph-bold { font-size: 1.1em; }
+      .wx-sun-day { color: var(--text-secondary); }
+    }
+
+    /* lg (700+ wide): 2-column grid. Hero + metrics stack in the left
+       column, sun arc fills the right column as a tall vertical strip.
+       The right column was the dead space in the first lg pass; moving
+       the arc there fills it without crowding the hero or metrics. */
+    @container (min-width: 700px) {
+      .wx-body {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        grid-template-rows: 5fr 4fr;
+        gap: var(--space-5);
+        min-height: 0;
+      }
+      .wx-now {
+        grid-column: 1;
+        grid-row: 1;
+        align-items: center;
+        justify-content: center;
+        min-height: 0;
         gap: var(--space-6);
       }
       .wx-now .ph-bold {
@@ -259,37 +340,61 @@ export default function render(shadow, ctx) {
       .wx-now .wx-cond {
         font-size: clamp(1em, 4cqmin, 1.6em);
       }
-      .wx-forecast { flex: 0 0 auto; }
-      .wx-sun {
-        display: flex;
-        flex: 1 1 auto;
-        min-height: 0;
-        flex-direction: column;
+      .wx-forecast {
+        grid-column: 1;
+        grid-row: 2;
         align-items: stretch;
-        justify-content: center;
-        gap: var(--space-2);
-        padding: var(--space-3) var(--space-4);
+        gap: var(--space-4);
+        min-height: 0;
+      }
+      .wx-forecast .wx-cell {
+        font-size: clamp(14px, 6cqmin, 30px);
+      }
+      /* Sun arc as a tall right-column strip: SVG semicircle on top
+         (xMidYMax keeps the horizon line glued to the arc's bottom),
+         captions stack vertically below with extra weight so the
+         column doesn't read as decorative chrome. */
+      .wx-sun {
+        grid-column: 2;
+        grid-row: 1 / -1;
+        display: grid;
+        grid-template-rows: 1fr auto;
+        gap: var(--space-4);
+        padding: var(--space-4);
         background: var(--surface-sunken);
         border-radius: var(--radius-0);
+        min-height: 0;
       }
       .wx-sun svg {
         width: 100%;
-        height: clamp(2.4em, 12cqmin, 5em);
+        height: 100%;
+        min-height: 0;
         display: block;
+        align-self: end;
       }
       .wx-sun-meta {
-        display: flex;
-        justify-content: space-between;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: var(--space-3);
         align-items: center;
-        font-size: var(--fs-caption);
+        justify-items: center;
+        text-align: center;
+        font-size: clamp(0.95em, 2.4cqmin, 1.5em);
         font-weight: var(--fw-bold);
         color: var(--text-muted);
         letter-spacing: var(--ls-label);
         text-transform: var(--label-transform, uppercase);
       }
-      .wx-sun-end { display: inline-flex; align-items: center; gap: 0.35em; }
-      .wx-sun-end .ph-bold { font-size: 1.1em; }
-      .wx-sun-day { color: var(--text-secondary); }
+      .wx-sun-end {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5em;
+      }
+      .wx-sun-end .ph-bold { font-size: 1.3em; }
+      .wx-sun-day {
+        color: var(--text-secondary);
+        font-size: 1.15em;
+      }
     }
   `;
 

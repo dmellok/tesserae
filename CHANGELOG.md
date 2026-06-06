@@ -6,6 +6,80 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Weather widget visual pass
+
+Family-by-family enhancement of every weather widget (plus `sky_bom_warnings`,
+which is conceptually weather even though it lives under `sky_*`). Goal: give
+each widget a real visual anchor instead of paragraphs of numbers, and make
+the layout adapt cleanly across xs / sm / md / lg cells.
+
+- **weather_now** (0.1.5 → 0.1.8). LG is now a 2-column grid — hero +
+  4-metric strip on the left, full-height sunrise/sunset arc strip on the
+  right (was a thin band crammed under the metrics). MD-tall (height ≥ 600)
+  shows the arc band below the metrics; MD-tight (height ≤ 449) drops the
+  metric labels and tightens the icon+value stack to fit without clipping.
+- **weather_forecast** (0.1.1 → 0.1.5). Replaced the horizontal day strip
+  with a vertical day stack: `[Day] [Icon] [Lo ─── Hi] [Rain%]` per row,
+  today's row tinted with `--surface-sunken` and the day label flipped to
+  `--accent-4`. LG cells get a side-by-side layout with a Chart.js filled
+  `lineChart` of the daily highs in terracotta (`--accent-1`). Rain droplet
+  icon repositioned to the right of the percentage so every row's icon
+  column lines up.
+- **weather_hourly** (0.2.0 → 0.2.2). Single-colour temperature line
+  replaced with a mixed bar+line chart: rain probability bars on a right
+  y-axis (teal), temperature line with a vertical warm-to-cool gradient
+  (accent-1 → accent-2 → accent-5). Custom Chart.js plugin shades night
+  hours (18-06) with a translucent text-primary tint, clamped to the
+  chart area so the bands don't spill past the final tick. Hour count
+  culls by cell width (24 lg / 18 md / 12 sm / 6 xs); axis tick font
+  auto-scales 10–20px so wide cells paint legible numbers.
+- **weather_air_quality** (0.1.1 → 0.1.3). Hero replaced with a
+  half-circle gauge — 6 EAQI band segments (moss → teal → ochre →
+  terracotta → plum → red) with a marker pip at the current value;
+  number reads inside the arc, band label below. Per-pollutant grid
+  cells gain a micro-bar showing `value / band_max`, tinted by the
+  pollutant's own band. Cells participate in the grid via subgrid so
+  every row's label / value / bar tracks stay synchronised — a wrapped
+  "4.2 μg/m³" no longer drops one bar below its neighbours.
+- **weather_pollen_count** (0.1.1 → 0.1.7). 4-step severity bar per tile
+  (Low / Moderate / High / Very High). Icons scale by severity
+  (0.75× / 1.0× / 1.25× / 1.5×) so a Very High weed tile visibly dwarfs
+  a Low grass tile. No-data tiles collapse the value + bar + level word
+  triplet into a single centred `ph-minus-circle`. Empty bar segments
+  use a `color-mix` translucent overlay so they read against the soft-
+  tinted backgrounds where `--surface-sunken` was invisible. Plus a bug
+  fix: `item.level` from the server was a 0-100 percent being used as a
+  string key, falling through to muted-grey on every tile.
+- **weather_wind** (0.1.1 → 0.1.3). Compass rose now grows 8 teal petals
+  sized by the server's 24h speed-weighted directional histogram
+  (`data.rose`); current-direction needle (ochre) overlays as an outline
+  so the petals stay visible underneath. Beaufort chip
+  (`B7 NEAR GALE`-style) replaces the text-only Beaufort label, with the
+  background tinted by severity (accent-3 → -2 → -1 → -6 by bucket). LG
+  cells get a 12-hour filled gust sparkline below the main row.
+- **sky_bom_warnings** (0.1.0 → 0.1.1). Vertical severity colour-band
+  down the left of each row (`accent-1 / -3 / -5` by severity). Tag is
+  now a proper severity-tinted chip; region (state code) + time-since-
+  issued chip in the row meta. Rows sort worst-first
+  (red → yellow → blue, then phase, then original order). The
+  no-warnings empty state replaced with a moss-tinted card carrying a
+  chunky `ph-shield-check` so "all clear" reads as confident
+  reassurance instead of blank space.
+
+### Widget preview rebuild
+
+- The dev `/_test/preview` page is now a **single composed page** in one
+  iframe instead of four separate cards. Cells lay out as a recursive
+  halving spiral — cell 1 takes half the panel, cell 2 takes half the
+  remainder, etc. — so the same widget paints at LG → MD → MD → SM →
+  SM → XS → XS-unassigned in a single render at panel native dimensions.
+- **Panel-size dropdown** drives the synthetic page's dimensions (Inky
+  / Waveshare presets), so the same widget can be eyeballed at every
+  Tesserae-supported panel without composing a real page.
+- Cell tags in preview mode now include the **size bucket** alongside
+  the cell index and plugin id (e.g. `1 · LG · weather_now`), matching
+  the bucket the widget's own container queries fire against.
+
 ### History page + per-trigger source chips
 
 - **History moved to a top-level nav entry** (`/history`). Previously

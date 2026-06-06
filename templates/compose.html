@@ -189,7 +189,7 @@
   <div class="preview-tags">
     {% for cell in page.cells %}
     <div class="cell-tag" style="left: {{ cell.x + 6 }}px; top: {{ cell.y + 6 }}px;">
-      {{ loop.index }} · {{ cell.plugin or 'unassigned' }}
+      {{ loop.index }}{% if cell.size_label %} · {{ cell.size_label }}{% endif %} · {{ cell.plugin or 'unassigned' }}
     </div>
     <button class="cell-click-shim"
             type="button"

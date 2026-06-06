@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather — BoM Warnings",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Current severe weather warnings from the Bureau of Meteorology (Australia). Filter by state — flood, severe thunderstorm, severe weather, bushfire, etc. Uses api.weather.bom.gov.au (the same backend the BoM website itself uses; no key, treat as private/non-redistribution per BoM's terms).",
   "icon": "ph-warning-octagon",

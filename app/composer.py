@@ -20,7 +20,7 @@ from typing import Any, Final
 
 from flask import Blueprint, abort, current_app, render_template, request
 
-from app.panel import resolve_panel_for_page
+from app.panel import PANEL_PRESETS, resolve_panel_for_page
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
 
@@ -620,30 +620,186 @@ def test_theme_style_matrix() -> str:
     )
 
 
+# Panel presets the preview page exposes in its panel-size dropdown.
+# Hand-ordered: the portrait 13.3" (which most of the dev work targets)
+# leads; the rest follow native landscape sizes top-to-bottom. ``label``
+# is the picker text; ``w`` / ``h`` are the composition dimensions the
+# synthetic page renders at.
+_PREVIEW_PANELS: Final[list[dict[str, Any]]] = [
+    {"id": pid, "label": preset.label, "w": preset.w, "h": preset.h}
+    for pid, preset in PANEL_PRESETS.items()
+]
+_PREVIEW_PANEL_IDS: Final[set[str]] = {p["id"] for p in _PREVIEW_PANELS}
+_DEFAULT_PREVIEW_PANEL_ID: Final[str] = "waveshare_e6_13_3"
+
+
+# Multi-cell layout for the preview synthetic page. Spiral halving:
+# each cell takes half of the remaining region, alternating sides
+# (top / left / bottom / right) so the layout spirals inward and each
+# cell ends up at half the area of the previous one. The last cell is
+# the leftover remainder so the unassigned placeholder sits in the
+# tightest corner.
+#
+# On a 1200×1600 portrait panel the cells land at:
+#   1: 1200×800 [LG]   2: 600×800  [MD]   3: 600×400 [MD]
+#   4: 300×400 [SM]    5: 300×200  [SM]   6: 150×200 [XS]
+#   7: 150×200 [XS, unassigned]
+# Fractions stay relative so the same pattern reflows on any panel.
+def _spiral_halving_cells(n: int) -> list[tuple[float, float, float, float]]:
+    """Recursive halving spiral. ``n`` is the total cell count incl. the
+    leftover remainder cell."""
+    cells: list[tuple[float, float, float, float]] = []
+    # (x, y, w, h) of the still-unallocated region, as panel fractions.
+    rx, ry, rw, rh = 0.0, 0.0, 1.0, 1.0
+    # Direction sequence — top first (the user's "half the page is used
+    # on the top"), then left (their "half of the left hand side"),
+    # then continue the spiral with bottom + right so successive cells
+    # tessellate cleanly around the centre.
+    dirs = ("top", "left", "bottom", "right")
+    for i in range(n - 1):
+        d = dirs[i % 4]
+        half_w = rw / 2
+        half_h = rh / 2
+        if d == "top":
+            cells.append((rx, ry, rw, half_h))
+            ry += half_h
+            rh = half_h
+        elif d == "left":
+            cells.append((rx, ry, half_w, rh))
+            rx += half_w
+            rw = half_w
+        elif d == "bottom":
+            cells.append((rx, ry + half_h, rw, half_h))
+            rh = half_h
+        else:  # right
+            cells.append((rx + half_w, ry, half_w, rh))
+            rw = half_w
+    cells.append((rx, ry, rw, rh))
+    return cells
+
+
+_PREVIEW_CELLS_FRAC: Final[list[tuple[float, float, float, float]]] = _spiral_halving_cells(7)
+
+
+def _size_label(w_px: int) -> str:
+    """Bucket cell width into the same xs/sm/md/lg buckets widgets use
+    in their container queries. Boundaries match the breakpoints in
+    weather_now / weather_forecast (and the other Spectra widgets that
+    do size-tiered layouts) so the preview's label tracks the layout
+    the widget actually picks."""
+    if w_px < 280:
+        return "XS"
+    if w_px < 440:
+        return "SM"
+    if w_px < 700:
+        return "MD"
+    return "LG"
+
+
+def _build_preview_page(
+    *,
+    plugin_id: str,
+    panel_w: int,
+    panel_h: int,
+    theme_id: str,
+    style_id: str,
+    cell_options: dict[str, Any],
+) -> dict[str, Any]:
+    """Compose the synthetic multi-cell page the widget preview renders.
+
+    Cells 1-6 are assigned to ``plugin_id`` so the same widget paints at
+    every size bucket (lg / md / sm / xs). Cell 7 has ``plugin=None`` so
+    the composer paints the empty "pick a widget" placeholder beside the
+    live cells. Coordinates round to integers because Page / Cell are
+    pydantic-typed for ``int`` — float fractions blow up at hydrate.
+    ``size_label`` rides along on each cell so compose.html's preview-
+    mode tag can show the bucket the widget is actually rendering in."""
+    cells: list[dict[str, Any]] = []
+    for idx, (x_frac, y_frac, w_frac, h_frac) in enumerate(_PREVIEW_CELLS_FRAC):
+        is_unassigned = idx == len(_PREVIEW_CELLS_FRAC) - 1
+        w_px = round(panel_w * w_frac)
+        cells.append(
+            {
+                "id": f"preview-{idx + 1}",
+                "x": round(panel_w * x_frac),
+                "y": round(panel_h * y_frac),
+                "w": w_px,
+                "h": round(panel_h * h_frac),
+                "plugin": None if is_unassigned else plugin_id,
+                "options": {} if is_unassigned else cell_options,
+                "zoom": 1.0,
+                "size_label": _size_label(w_px),
+            }
+        )
+    return {
+        "id": "_test_preview",
+        "name": f"Preview: {plugin_id}",
+        "panel": {"w": panel_w, "h": panel_h},
+        "font": "default",
+        "theme": theme_id,
+        "style": style_id,
+        "cells": cells,
+    }
+
+
+def _parse_preview_args() -> dict[str, Any]:
+    """Common querystring parse for the preview controls. Pulled into a
+    helper so the parent page and the iframe-rendered synthetic page
+    agree on defaults + validation."""
+    widget_id = request.args.get("widget") or ""
+    theme_id = request.args.get("theme") or "light"
+    style_id = request.args.get("style") or "standard"
+    sample_mode = request.args.get("sample") == "1"
+    panel_id = request.args.get("panel") or _DEFAULT_PREVIEW_PANEL_ID
+    if panel_id not in _PREVIEW_PANEL_IDS:
+        panel_id = _DEFAULT_PREVIEW_PANEL_ID
+    preset = PANEL_PRESETS[panel_id]
+    opts_raw = request.args.get("opts") or ""
+    cell_options: dict[str, Any] = {}
+    if opts_raw:
+        try:
+            parsed = json.loads(opts_raw)
+            if isinstance(parsed, dict):
+                cell_options = parsed
+        except (json.JSONDecodeError, ValueError):
+            cell_options = {}
+    return {
+        "widget_id": widget_id,
+        "theme_id": theme_id,
+        "style_id": style_id,
+        "sample": sample_mode,
+        "panel_id": panel_id,
+        "panel_w": preset.w,
+        "panel_h": preset.h,
+        "panel_label": preset.label,
+        "cell_options": cell_options,
+        "opts_raw": opts_raw,
+    }
+
+
 @bp.get("/_test/preview")
 def test_widget_preview() -> str:
-    """Interactive single-widget preview at every supported size.
+    """Interactive single-widget preview as a synthetic composed page.
 
-    Like ``/_test/render`` but with controls on the page: pick a widget,
-    fill its ``cell_options`` from the schema, swap theme + style, and
-    see the result rendered as four iframes (xs / sm / md / lg) so the
-    same options + style render in every cell shape at once.
+    Renders the chosen widget across a 7-cell layout that exercises
+    every size bucket (lg / md / sm / xs) plus one unassigned cell so
+    the reviewer can compare a populated cell against the empty
+    placeholder side by side. The dropdown drives panel dimensions so
+    the same widget can be eyeballed at every Tesserae-supported
+    panel (Inky / Waveshare presets) without composing a real page.
 
     Dev-only — guarded behind ``debug or testing`` like every other
-    ``/_test/...`` route. Cell options post via ``?opts=<json>`` and
-    flow through ``test_render`` unchanged."""
+    ``/_test/...`` route. Cell options post via ``?opts=<json>``;
+    panel via ``?panel=<preset_id>``."""
     if not (current_app.debug or current_app.testing):
         abort(404)
     widgets = sorted(_registry().widgets(), key=lambda p: p.name.lower())
     if not widgets:
         abort(404)
-    widget_id = request.args.get("widget") or widgets[0].id
-    plugin = next((p for p in widgets if p.id == widget_id), None)
+    parsed = _parse_preview_args()
+    plugin = next((p for p in widgets if p.id == parsed["widget_id"]), None)
     if plugin is None:
         plugin = widgets[0]
-    theme_id = request.args.get("theme") or "light"
-    style_id = request.args.get("style") or "standard"
-    sample_mode = request.args.get("sample") == "1"
 
     # ``cell_options`` from the plugin manifest drive the form-builder.
     # Each entry shape: ``{name, type, label, default?, choices?, secret?}``
@@ -651,19 +807,7 @@ def test_widget_preview() -> str:
     # values only when the URL omits a field, so reloading the page with
     # an explicit blank still wins over the manifest default.
     schema = list(plugin.manifest.get("cell_options") or [])
-    supplied_opts: dict[str, Any] = {}
-    opts_raw = request.args.get("opts") or ""
-    if opts_raw:
-        try:
-            parsed = json.loads(opts_raw)
-            if isinstance(parsed, dict):
-                supplied_opts = parsed
-        except (json.JSONDecodeError, ValueError):
-            supplied_opts = {}
-    # The form needs a starting value per field. Use the user's submitted
-    # value if present, otherwise the manifest default. Don't fall back
-    # to the global lat/lon here — that's done at render time by
-    # _resolved_options so the preview behaves like a real cell.
+    supplied_opts: dict[str, Any] = parsed["cell_options"]
     form_values: dict[str, Any] = {}
     for spec in schema:
         name = spec.get("name")
@@ -678,15 +822,51 @@ def test_widget_preview() -> str:
         "widget_preview.html",
         widget=plugin,
         widgets=widgets,
-        size_dims=SIZE_DIMENSIONS,
         themes=_MATRIX_THEMES,
         styles=_MATRIX_STYLES,
-        theme_id=theme_id,
-        style_id=style_id,
-        sample=sample_mode,
+        panels=_PREVIEW_PANELS,
+        theme_id=parsed["theme_id"],
+        style_id=parsed["style_id"],
+        panel_id=parsed["panel_id"],
+        panel_w=parsed["panel_w"],
+        panel_h=parsed["panel_h"],
+        panel_label=parsed["panel_label"],
+        sample=parsed["sample"],
         schema=schema,
         form_values=form_values,
         opts_json=json.dumps(supplied_opts) if supplied_opts else "",
+    )
+
+
+@bp.get("/_test/preview/page")
+def test_widget_preview_page() -> str:
+    """Iframe target for ``/_test/preview``: renders the synthetic
+    multi-cell page through ``compose.html`` with preview-mode badges
+    so the cells get their "1 · widget_id" tags. The parent
+    ``widget_preview.html`` embeds this in a single iframe.
+
+    Dev-only — same gate as ``/_test/render``."""
+    if not (current_app.debug or current_app.testing):
+        abort(404)
+    parsed = _parse_preview_args()
+    plugin = _registry().get(parsed["widget_id"])
+    # No widget picked yet — surface a blank synthetic page rather than
+    # 404. Cells stay unassigned so the reviewer sees seven empty
+    # placeholders instead of an opaque error.
+    widget_id = "" if plugin is None else plugin.id
+    page = _build_preview_page(
+        plugin_id=widget_id,
+        panel_w=parsed["panel_w"],
+        panel_h=parsed["panel_h"],
+        theme_id=parsed["theme_id"],
+        style_id=parsed["style_id"],
+        cell_options=parsed["cell_options"],
+    )
+    return render_template(
+        "compose.html",
+        page=_hydrate_page(page, preview=True, sample=parsed["sample"]),
+        for_push=False,
+        preview_mode=True,
     )
 
 
