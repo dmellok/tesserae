@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Clock — Sunrise / Sunset",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "kind": "widget",
   "description": "Today's sunrise, sunset, golden hour, and day length for a chosen lat/lon. The hero shows a sun-arc visualisation with the current position marked. Data from Open-Meteo (no key).",
   "icon": "ph-sun-horizon",
@@ -9,7 +9,10 @@
   "cell_options": [
     { "name": "latitude",  "type": "number", "label": "Latitude",  "default": "" },
     { "name": "longitude", "type": "number", "label": "Longitude", "default": "" },
-    { "name": "label",     "type": "string", "label": "Place label", "default": "Melbourne" }
+    { "name": "label",     "type": "string", "label": "Place label", "default": "Melbourne" },
+    { "name": "show_arc", "type": "boolean", "label": "Show sun-path arc", "default": true },
+    { "name": "show_golden", "type": "boolean", "label": "Tint golden-hour bands", "default": true },
+    { "name": "show_twilight", "type": "boolean", "label": "Tint twilight bands beyond the horizon (civil / nautical / astronomical)", "default": true }
   ],
   "render": { "dither": "none", "needs_network": true }
 }

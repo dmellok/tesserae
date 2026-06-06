@@ -83,6 +83,13 @@ def fetch(
                     {
                         "summary": e["summary"],
                         "start": e["start"],
+                        # Forward end so a future client variant that wants
+                        # to time-slot events in the day cell can; the
+                        # current month grid only shows summaries but
+                        # keeping the field consistent across calendar_*
+                        # avoids drift if/when the month cell grows a
+                        # mini-timeline.
+                        "end": e.get("end"),
                         "all_day": e.get("all_day", False),
                         "colour": e.get("feed_colour"),
                     }

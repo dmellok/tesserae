@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Clock — Analog",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "kind": "widget",
   "description": "Analog clock face. Pure SVG, no network. Five face styles — pick the one that suits the rest of your dashboard.",
   "icon": "ph-clock",
@@ -20,7 +20,20 @@
         { "value": "skeleton",   "label": "Skeleton — just the hands" }
       ]
     },
-    { "name": "show_seconds", "type": "boolean", "label": "Show second hand", "default": true }
+    { "name": "show_seconds", "type": "boolean", "label": "Show second hand", "default": true },
+    {
+      "name": "numerals",
+      "type": "select",
+      "label": "Numerals",
+      "default": "arabic",
+      "choices": [
+        { "value": "arabic", "label": "Arabic — 12 / 3 / 6 / 9" },
+        { "value": "roman", "label": "Roman — XII / III / VI / IX" },
+        { "value": "dots", "label": "Dots only" }
+      ]
+    },
+    { "name": "show_date", "type": "boolean", "label": "Show date plate", "default": true },
+    { "name": "show_am_pm", "type": "boolean", "label": "Show sun/moon AM-PM indicator", "default": true }
   ],
   "render": { "dither": "none", "needs_network": false }
 }

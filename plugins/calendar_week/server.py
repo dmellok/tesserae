@@ -67,6 +67,12 @@ def fetch(
                     {
                         "summary": e["summary"],
                         "start": e["start"],
+                        # The client's height calculation falls back to a
+                        # 1-hour duration when end is missing. Forward it
+                        # here so a real 2-hour event renders at its true
+                        # height instead of every event collapsing to the
+                        # same 1-hour block.
+                        "end": e.get("end"),
                         "all_day": e.get("all_day", False),
                         "colour": e.get("feed_colour"),
                     }

@@ -82,6 +82,15 @@ export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
   const litColor = ACCENT_TOKEN[opts.lit_color] || ACCENT_TOKEN.fg;
   const showCorners = opts.show_corners !== false;
+  // Background treatment — clean / vignette / paper. Vignette gives a
+  // soft radial darkening around the edges (the QLOCKTWO display has
+  // a slight border darkening from its acrylic face); paper adds a
+  // faint repeating noise tint on top for a card-stock feel. Both
+  // compose with the active theme via color-mix tokens so a swap
+  // between light and dark themes keeps the effect proportional.
+  const bgStyle = ["clean", "vignette", "paper"].includes(opts.background)
+    ? opts.background
+    : "vignette";
 
   const now = new Date();
   const active = new Set(activeWords(now));
@@ -117,13 +126,44 @@ export default function render(shadow, ctx) {
       </div>`
     : "";
 
+  // Background treatments — CSS gradient layered over the surface
+  // token, applied to the .w shell itself so it fills the full cell
+  // (not just .w-body which sits inside .w's padding). Paper variant
+  // adds a tiny SVG-noise pattern on top via an absolute overlay.
+  //
+  // The SVG noise tile is encoded with %22 for the inner attribute
+  // quotes so the URL stays inside the surrounding single-quoted CSS
+  // string + double-quoted HTML attribute without any escape dances.
+  let widgetBackground = "var(--surface)";
+  let backdropOverlay = "";
+  const vignetteGradient = `radial-gradient(ellipse at 50% 35%,
+    color-mix(in oklab, var(--surface) 95%, white 5%) 0%,
+    var(--surface) 55%,
+    color-mix(in oklab, var(--surface) 88%, var(--text-primary) 12%) 100%)`;
+  if (bgStyle === "vignette") {
+    widgetBackground = vignetteGradient;
+  } else if (bgStyle === "paper") {
+    widgetBackground = vignetteGradient;
+    // SVG noise tile, single-quoted URL with %22 for the inner SVG
+    // attribute quotes — keeps the data URI inside the style attr
+    // without escape gymnastics.
+    const noiseUri = "data:image/svg+xml;utf8,"
+      + "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22>"
+      + "<filter id=%22n%22><feTurbulence baseFrequency=%220.95%22 numOctaves=%222%22 stitchTiles=%22stitch%22/>"
+      + "<feColorMatrix values=%220 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.04 0%22/></filter>"
+      + "<rect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22/></svg>";
+    backdropOverlay = `
+      <div style="position:absolute;inset:0;pointer-events:none;opacity:0.5;background-image:url('${noiseUri}');mix-blend-mode:multiply;z-index:0"></div>`;
+  }
+
   // Grid square: pick the smaller of cqw/cqh and stay centred so the
   // 11×10 letter matrix keeps a near-square aspect on any cell shape.
   // Letter-spacing 0 and monospace so all letters are uniform width.
   shadow.innerHTML = `
     <link rel="stylesheet" href="/static/style/spectra-widgets.css">
-    <div class="w" data-widget="clock_qlock">
-      <div class="w-body" style="justify-content:center;align-items:center;position:relative">
+    <div class="w" data-widget="clock_qlock" style="background:${widgetBackground};position:relative">
+      ${backdropOverlay}
+      <div class="w-body" style="justify-content:center;align-items:center;position:relative;z-index:1;background:transparent">
         <div style="
           display:grid;
           grid-template-columns:repeat(11, 1fr);
@@ -134,7 +174,9 @@ export default function render(shadow, ctx) {
           font-size:clamp(0.75em, 8cqmin, 1.8em);
           letter-spacing:0;
           line-height:1;
-          place-items:center
+          place-items:center;
+          position:relative;
+          z-index:1
         ">
           ${cells.join("")}
         </div>

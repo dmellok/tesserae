@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar — Week",
-  "version": "0.2.0",
+  "version": "0.2.5",
   "kind": "widget",
   "description": "Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).",
   "icon": "ph-calendar",
@@ -28,6 +28,12 @@
           "label": "Monday"
         }
       ]
+    },
+    {
+      "name": "hide_labels",
+      "type": "boolean",
+      "label": "Hide event labels (show colour bars only)",
+      "default": false
     },
     {
       "name": "feeds_filter",

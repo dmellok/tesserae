@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Calendar — Day",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "kind": "widget",
   "description": "Today's agenda Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.",
   "icon": "ph-calendar-check",
