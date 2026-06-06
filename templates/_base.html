@@ -54,6 +54,10 @@
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">
          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
       </a>
+      <a href="{{ url_for('history.index') }}"
+         class="{% if request.blueprint == 'history' %}is-active{% endif %}">
+         <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
+      </a>
       <a href="{{ url_for('pages.index') }}"
          class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
          <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
@@ -98,6 +102,7 @@
         'composer.test_widget_gallery',
         'composer.test_render',
         'composer.test_theme_style_matrix',
+        'composer.test_widget_preview',
       ) %}
       <details class="nav-dropdown {% if request.endpoint in _dev_endpoints %}is-active{% endif %}">
         <summary>
@@ -105,6 +110,9 @@
           <i class="ph ph-caret-down caret-soft" aria-hidden="true"></i>
         </summary>
         <div class="nav-dropdown-panel">
+          <a class="nav-dropdown-link" href="{{ url_for('composer.test_widget_preview') }}">
+            <i class="ph ph-eye" aria-hidden="true"></i>Widget preview
+          </a>
           <a class="nav-dropdown-link" href="{{ url_for('composer.test_widget_gallery') }}">
             <i class="ph ph-squares-four" aria-hidden="true"></i>Widget gallery
           </a>

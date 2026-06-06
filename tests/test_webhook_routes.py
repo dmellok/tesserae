@@ -89,7 +89,9 @@ def test_webhook_with_bearer_token_invokes_push(app: Flask) -> None:
     assert body["status"] == "sent"
     assert body["event_id"] == 42
 
-    pm.push.assert_called_once_with("home", device_ids=None, respect_quiet_hours=True)
+    pm.push.assert_called_once_with(
+        "home", device_ids=None, respect_quiet_hours=True, source="webhook"
+    )
 
 
 def test_webhook_with_x_tesserae_token_header_works(app: Flask) -> None:
@@ -125,6 +127,7 @@ def test_webhook_device_ids_restricts_fanout(app: Flask) -> None:
         "home",
         device_ids={"pi_kitchen", "pi_bedroom"},
         respect_quiet_hours=True,
+        source="webhook",
     )
 
 

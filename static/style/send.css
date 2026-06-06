@@ -172,6 +172,58 @@
   font-weight: 700;
 }
 
+/* Source/trigger chip on history rows — at-a-glance "what triggered
+   this push": Send page, scheduler, webhook, Home Assistant. The
+   colour is a faint tint of the accent so the eye can group like-
+   triggered rows on a busy History without the page becoming a
+   parrot. Tone classes live alongside the base so adding a new
+   trigger only needs a new ``--src-chip--<tone>`` block. */
+.src-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in oklab, var(--t-fg) 6%, transparent);
+  color: var(--t-fg);
+  border: 1px solid color-mix(in oklab, var(--t-fg) 10%, transparent);
+  white-space: nowrap;
+  line-height: 1.3;
+}
+.src-chip .ph,
+.src-chip .ph-fill {
+  font-size: 13px;
+  line-height: 1;
+}
+.src-chip--accent-teal {
+  background: color-mix(in oklab, #178a7a 14%, var(--t-surface));
+  color: color-mix(in oklab, #178a7a 75%, var(--t-fg));
+  border-color: color-mix(in oklab, #178a7a 25%, transparent);
+}
+.src-chip--accent-ochre {
+  background: color-mix(in oklab, #c08a18 14%, var(--t-surface));
+  color: color-mix(in oklab, #c08a18 75%, var(--t-fg));
+  border-color: color-mix(in oklab, #c08a18 25%, transparent);
+}
+.src-chip--accent-terracotta {
+  background: color-mix(in oklab, #c95d2e 14%, var(--t-surface));
+  color: color-mix(in oklab, #c95d2e 78%, var(--t-fg));
+  border-color: color-mix(in oklab, #c95d2e 25%, transparent);
+}
+.src-chip--accent-slate {
+  background: color-mix(in oklab, #5e7186 14%, var(--t-surface));
+  color: color-mix(in oklab, #5e7186 80%, var(--t-fg));
+  border-color: color-mix(in oklab, #5e7186 25%, transparent);
+}
+:root[data-theme="dark"] .src-chip--accent-teal { color: #6ed4be; border-color: color-mix(in oklab, #6ed4be 35%, transparent); }
+:root[data-theme="dark"] .src-chip--accent-ochre { color: #e5b94d; border-color: color-mix(in oklab, #e5b94d 35%, transparent); }
+:root[data-theme="dark"] .src-chip--accent-terracotta { color: #f29170; border-color: color-mix(in oklab, #f29170 35%, transparent); }
+:root[data-theme="dark"] .src-chip--accent-slate { color: #a4b4c4; border-color: color-mix(in oklab, #a4b4c4 35%, transparent); }
+
 .history-target {
   /* The dashboard / target name is the row's headline now (was a
      monospace slug chip) — give it weight over the source tag. */

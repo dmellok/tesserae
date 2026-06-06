@@ -1,0 +1,526 @@
+{# Dev-only single-widget preview.
+
+   One widget rendered at every supported size (xs / sm / md / lg) in a
+   single grid, with a left rail for the controls: widget picker, theme,
+   style, sample-data toggle, and a form-builder generated from the
+   plugin's cell_options schema. Submitting the form bounces the page
+   with the new URL so every iframe re-renders with the chosen options.
+
+   Reach this directly at /_test/preview. Dev-only — the backend route
+   guards on ``debug or testing`` like the rest of /_test/. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget preview — {{ widget.name }} — Tesserae</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel2: #1e242c;
+      --fg: #e6edf3;
+      --fgSoft: #9aa6b3;
+      --border: #2a313a;
+      --accent: #4ec9b0;
+      --accent2: #f0b020;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fafbfc;
+        --panel: #ffffff;
+        --panel2: #f3f5f8;
+        --fg: #14181d;
+        --fgSoft: #5b6470;
+        --border: #d6dbe1;
+        --accent: #0d8c7e;
+        --accent2: #b87a00;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+                 font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+    }
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      .controls { border-right: 0; border-bottom: 1px solid var(--border); }
+    }
+
+    /* ---- left rail ---- */
+    .controls {
+      position: sticky; top: 0; align-self: start;
+      max-height: 100vh; overflow-y: auto;
+      padding: 18px 18px 36px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+    }
+    .controls h1 {
+      font-size: 14px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--fgSoft);
+      margin: 0 0 4px;
+    }
+    .widget-meta {
+      margin: 0 0 18px;
+      color: var(--fg);
+      font-size: 16px;
+      font-weight: 600;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .widget-meta .icon { color: var(--accent); font-size: 20px; }
+    .widget-meta .id { font: 500 11px/1 ui-monospace, monospace; color: var(--fgSoft); }
+
+    .controls h2 {
+      font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--fgSoft);
+      margin: 22px 0 8px;
+    }
+
+    .field { display: grid; gap: 4px; margin-bottom: 12px; }
+    .field label {
+      font-size: 12px; font-weight: 600;
+      color: var(--fg);
+    }
+    .field .hint {
+      font-size: 11px;
+      color: var(--fgSoft);
+    }
+    .field input[type="text"],
+    .field input[type="number"],
+    .field input[type="password"],
+    .field textarea,
+    .field select {
+      width: 100%;
+      background: var(--panel2);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font: 500 13px/1.3 system-ui, sans-serif;
+    }
+    .field textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; resize: vertical; min-height: 60px; }
+    .field select {
+      appearance: none; -webkit-appearance: none;
+      padding-right: 28px;
+      background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position: calc(100% - 14px) center, calc(100% - 10px) center;
+      background-size: 4px 4px, 4px 4px;
+      background-repeat: no-repeat;
+      cursor: pointer;
+    }
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+    }
+    .field--check {
+      flex-direction: row;
+      align-items: center;
+    }
+    .field--check label {
+      display: inline-flex; align-items: center; gap: 8px;
+      cursor: pointer;
+    }
+    .field--check input[type="checkbox"] {
+      accent-color: var(--accent);
+      width: 16px; height: 16px;
+    }
+
+    /* Theme + style + sample-data live in the top block; the two
+       primary axes the maintainer is flipping while testing. */
+    .pickers {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .form-actions {
+      display: flex; gap: 8px; margin-top: 16px;
+    }
+    .form-actions button {
+      flex: 1;
+      padding: 9px 12px;
+      border: 0; border-radius: 6px;
+      font: 700 12px/1 ui-monospace, monospace;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--accent); color: var(--bg);
+    }
+    .btn-primary:hover { filter: brightness(1.05); }
+    .btn-ghost {
+      background: var(--panel2); color: var(--fg);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--border); }
+
+    /* ---- main column ---- */
+    .stage {
+      padding: 24px 28px 64px;
+    }
+    .stage-head {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 24px;
+    }
+    .stage-head h1 {
+      font-size: 18px; font-weight: 700; margin: 0;
+    }
+    .stage-head .lede {
+      margin: 0; color: var(--fgSoft); font-size: 13px;
+    }
+    .stage-head .meta {
+      margin-left: auto;
+      display: inline-flex; align-items: center; gap: 12px;
+      font: 600 11px/1 ui-monospace, monospace;
+      color: var(--fgSoft);
+      letter-spacing: 0.04em;
+    }
+    .stage-head .meta .chip {
+      padding: 4px 9px;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+
+    .sizes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      align-items: start;
+    }
+    .size-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .size-card h3 {
+      font: 700 11px/1 ui-monospace, monospace;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--fg);
+      margin: 0;
+      display: flex; align-items: baseline; gap: 8px;
+    }
+    .size-card h3 .tag {
+      padding: 3px 7px;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 4px;
+    }
+    .size-card h3 .dims {
+      color: var(--fgSoft);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+    /* Native render at panel resolution, scaled down with CSS transform
+       so a 1200×800 lg cell fits in the card. --tw/--th are native
+       dims; --s is computed at render time so the painted iframe fills
+       the card width and the card grows to match the natural aspect. */
+    .frame {
+      position: relative;
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      width: 100%;
+      height: 0;
+      padding-bottom: calc(var(--th) / var(--tw) * 100%);
+    }
+    .frame iframe {
+      position: absolute;
+      top: 0; left: 0;
+      border: 0;
+      background: white;
+      width: calc(var(--tw) * 1px);
+      height: calc(var(--th) * 1px);
+      transform-origin: 0 0;
+      /* width of the frame in px divided by --tw — set per-card by JS
+         after layout. Initialised to 0.001 so the frame paints from
+         the centre while we wait for measurement instead of blowing
+         past the card boundary. */
+      transform: scale(var(--s, 0.001));
+    }
+    .size-card .open-link {
+      font: 600 11px/1 ui-monospace, monospace;
+      color: var(--fgSoft);
+      margin-left: auto;
+    }
+    .size-card .open-link:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="shell">
+
+  <aside class="controls">
+    <h1>Widget preview</h1>
+    <p class="widget-meta">
+      {% if widget.manifest.get('icon') %}
+        <i class="ph ph-{{ widget.manifest.get('icon').removeprefix('ph-') }} icon" aria-hidden="true"></i>
+      {% endif %}
+      <span>{{ widget.name }}</span>
+      <span class="id">{{ widget.id }}</span>
+    </p>
+
+    <form method="get" action="{{ url_for('composer.test_widget_preview') }}" id="preview-form">
+      <h2>Widget</h2>
+      <div class="field">
+        {# All four chrome pickers (widget / theme / style / sample) live
+           on the data-auto-submit channel so flipping any of them
+           reloads the preview without hunting for an Apply button. The
+           JS at the bottom of the page wires the change event to
+           ``form.requestSubmit()`` so the existing submit handler still
+           runs — which is what bundles the cell_options form fields
+           into ``?opts=<json>``. Plain ``form.submit()`` would skip the
+           handler and lose the typed-but-not-yet-applied option values. #}
+        <select name="widget" data-auto-submit>
+          {% for w in widgets %}
+          <option value="{{ w.id }}" {% if w.id == widget.id %}selected{% endif %}>
+            {{ w.name }} ({{ w.id }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <h2>Look</h2>
+      <div class="pickers">
+        <div class="field">
+          <label for="theme-select">Theme</label>
+          <select id="theme-select" name="theme" data-auto-submit>
+            {% set ns = namespace(prev_group='') %}
+            {% for t in themes %}
+              {% if t.group != ns.prev_group %}
+                {% if ns.prev_group %}</optgroup>{% endif %}
+                <optgroup label="{{ t.group }}">
+                {% set ns.prev_group = t.group %}
+              {% endif %}
+              <option value="{{ t.id }}" {% if t.id == theme_id %}selected{% endif %}>{{ t.label }}</option>
+            {% endfor %}
+            {% if ns.prev_group %}</optgroup>{% endif %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="style-select">Style</label>
+          <select id="style-select" name="style" data-auto-submit>
+            {% for s in styles %}
+            <option value="{{ s.id }}" {% if s.id == style_id %}selected{% endif %}>{{ s.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="field field--check">
+        <label>
+          <input type="checkbox" name="sample" value="1" data-auto-submit {% if sample %}checked{% endif %}>
+          Sample data (for widgets that ship fixtures)
+        </label>
+      </div>
+
+      {% if schema %}
+      <h2>Cell options</h2>
+      {# JS reads each field via the name attribute and bundles them into
+         the ?opts JSON parameter on submit. Native form serialisation
+         can't do that — we'd lose the nested-dict shape — so the form
+         intercept lives at the bottom of this template. #}
+      {% for spec in schema %}
+        {% set name = spec.name %}
+        {% set type = spec.type or 'string' %}
+        {% set label = spec.label or name %}
+        {% set val = form_values.get(name) %}
+        {% if type == 'select' %}
+          <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="select">
+            <label for="opt-{{ name }}">{{ label }}</label>
+            <select id="opt-{{ name }}" data-opt-input>
+              {% for c in (spec.choices or []) %}
+              <option value="{{ c.value }}" {% if (val|string) == (c.value|string) %}selected{% endif %}>{{ c.label or c.value }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% elif type == 'boolean' %}
+          <div class="field field--check" data-opt-field data-opt-name="{{ name }}" data-opt-type="boolean">
+            <label>
+              <input type="checkbox" data-opt-input {% if val %}checked{% endif %}>
+              {{ label }}
+            </label>
+          </div>
+        {% elif type == 'textarea' or type == 'multiselect' or type == 'entity_overrides' %}
+          <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="json">
+            <label for="opt-{{ name }}">{{ label }}</label>
+            <textarea id="opt-{{ name }}" data-opt-input placeholder='{{ "" if type != "textarea" else "" }}'>{% if val is mapping or val is iterable and val is not string %}{{ val|tojson }}{% elif val is not none %}{{ val }}{% endif %}</textarea>
+            <span class="hint">{{ 'JSON value' if type != 'textarea' else 'Plain text — newlines OK' }}</span>
+          </div>
+        {% elif type == 'number' %}
+          <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="number">
+            <label for="opt-{{ name }}">{{ label }}</label>
+            <input id="opt-{{ name }}" type="number" step="any" data-opt-input value="{{ val if val is not none else '' }}">
+          </div>
+        {% else %}
+          <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="string">
+            <label for="opt-{{ name }}">{{ label }}</label>
+            <input id="opt-{{ name }}"
+                   type="{% if spec.secret %}password{% else %}text{% endif %}"
+                   data-opt-input
+                   value="{{ val if val is not none else '' }}">
+            {% if spec.secret %}<span class="hint">Stored as plain text in the URL while previewing — paste a throwaway key.</span>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% endif %}
+
+      <input type="hidden" name="opts" id="opts-hidden" value="{{ opts_json }}">
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">
+          <i class="ph ph-eye" aria-hidden="true"></i> Apply
+        </button>
+        <a href="{{ url_for('composer.test_widget_preview', widget=widget.id) }}" class="btn-ghost"
+           style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+          Reset
+        </a>
+      </div>
+    </form>
+  </aside>
+
+  <main class="stage">
+    <header class="stage-head">
+      <div>
+        <h1>{{ widget.name }}</h1>
+        <p class="lede">
+          {% if widget.manifest.get('description') %}{{ widget.manifest.get('description') }}{% endif %}
+        </p>
+      </div>
+      <div class="meta">
+        <span class="chip">theme: {{ theme_id }}</span>
+        <span class="chip">style: {{ style_id }}</span>
+        {% if sample %}<span class="chip">sample data</span>{% endif %}
+      </div>
+    </header>
+
+    {# Which sizes does the plugin claim it supports? Default to all
+       four if the manifest doesn't say so we always have something to
+       look at. #}
+    {% set supported = widget.manifest.get('supports', {}).get('sizes') or ['xs','sm','md','lg'] %}
+    {% set show_sizes = [] %}
+    {% for s in ['xs','sm','md','lg'] %}{% if s in supported %}{% set _ = show_sizes.append(s) %}{% endif %}{% endfor %}
+
+    <div class="sizes">
+      {% for size in show_sizes %}
+        {% set dims = size_dims[size] %}
+        <section class="size-card" data-size-card>
+          <h3>
+            <span class="tag">{{ size }}</span>
+            <span class="dims">{{ dims[0] }} × {{ dims[1] }}</span>
+            <a class="open-link" target="_blank" rel="noopener"
+               href="{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme_id, style=style_id) }}{% if sample %}&sample=1{% endif %}{% if opts_json %}&opts={{ opts_json|urlencode }}{% endif %}"
+               title="Open in new tab">↗</a>
+          </h3>
+          <div class="frame" data-frame style="--tw: {{ dims[0] }}; --th: {{ dims[1] }};">
+            <iframe
+                src="{{ url_for('composer.test_render', plugin=widget.id, size=size, theme=theme_id, style=style_id) }}{% if sample %}&sample=1{% endif %}{% if opts_json %}&opts={{ opts_json|urlencode }}{% endif %}"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin"
+                title="{{ widget.name }} at {{ size }}"></iframe>
+          </div>
+        </section>
+      {% endfor %}
+    </div>
+  </main>
+</div>
+
+<script>
+  // Bundle every [data-opt-field] into ?opts=<json>, then submit.
+  // Browser-native form serialisation can't do this — the cell_options
+  // schema is a nested dict, not a flat URL-encoded blob.
+  (function () {
+    const form = document.getElementById('preview-form');
+    if (!form) return;
+    const hidden = document.getElementById('opts-hidden');
+    function buildOpts() {
+      const opts = {};
+      document.querySelectorAll('[data-opt-field]').forEach((field) => {
+        const name = field.dataset.optName;
+        const type = field.dataset.optType;
+        const input = field.querySelector('[data-opt-input]');
+        if (!name || !input) return;
+        if (type === 'boolean') {
+          opts[name] = input.checked;
+        } else if (type === 'number') {
+          const v = input.value.trim();
+          if (v === '') { opts[name] = ''; }
+          else {
+            const n = Number(v);
+            opts[name] = Number.isFinite(n) ? n : v;
+          }
+        } else if (type === 'json') {
+          const v = input.value.trim();
+          if (v === '') { opts[name] = ''; return; }
+          try { opts[name] = JSON.parse(v); }
+          catch { opts[name] = v; }
+        } else if (type === 'select') {
+          opts[name] = input.value;
+        } else {
+          opts[name] = input.value;
+        }
+      });
+      return opts;
+    }
+    form.addEventListener('submit', (e) => {
+      const opts = buildOpts();
+      hidden.value = Object.keys(opts).length ? JSON.stringify(opts) : '';
+      // Drop the per-field inputs from submission so the URL only
+      // carries widget, theme, style, sample, opts — clean and
+      // bookmarkable. The widget/theme/style fields aren't tagged
+      // with data-opt-field so they go through normally.
+      document.querySelectorAll('[data-opt-input]').forEach((inp) => { inp.disabled = true; });
+    });
+
+    // Auto-submit channel: widget, theme, style, sample. Anything tagged
+    // data-auto-submit fires requestSubmit() on change so the submit
+    // listener above still runs and rebuilds ?opts from the typed-but-
+    // not-yet-applied option fields. Without this, picking a new theme
+    // would silently lose any user edits in the cell_options form.
+    document.querySelectorAll('[data-auto-submit]').forEach((el) => {
+      el.addEventListener('change', () => {
+        if (typeof form.requestSubmit === 'function') form.requestSubmit();
+        else form.submit();
+      });
+    });
+  })();
+
+  // Compute --s per frame so the iframe paints into the card width.
+  // Re-runs on resize so dragging the window doesn't leave the iframe
+  // misaligned with its card.
+  (function () {
+    const frames = Array.from(document.querySelectorAll('[data-frame]'));
+    function paint() {
+      frames.forEach((frame) => {
+        const tw = parseFloat(frame.style.getPropertyValue('--tw')) || 1;
+        const w = frame.clientWidth;
+        if (w > 0) frame.style.setProperty('--s', String(w / tw));
+      });
+    }
+    paint();
+    window.addEventListener('resize', paint);
+    // Some browsers report 0 width before fonts/layout settle — retry
+    // on the next animation frame so the first paint isn't blank.
+    requestAnimationFrame(paint);
+  })();
+</script>
+</body>
+</html>

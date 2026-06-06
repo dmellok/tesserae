@@ -263,6 +263,7 @@ class PushManager:
         *,
         device_ids: set[str] | None = None,
         respect_quiet_hours: bool = False,
+        source: str = "page",
     ) -> PushResult:
         """Render a saved Page through the composer and publish.
 
@@ -278,15 +279,20 @@ class PushManager:
         quiet the push is logged as ``status="quiet"`` and skipped.
         Scheduler firings and webhook calls pass ``True``; manual Send
         / Push-now flows leave it ``False`` so user intent always
-        goes through."""
+        goes through.
+
+        ``source`` (default ``"page"``): the trigger label written to the
+        event log so History can chip what kicked it off. Callers pass
+        ``"scheduler"``, ``"webhook"``, ``"home_assistant"``, etc."""
         if not self._lock.acquire(blocking=False):
-            result = self._log_busy(source="page", target=page_id)
+            result = self._log_busy(source=source, target=page_id)
         else:
             try:
                 result = self._push_page_locked(
                     page_id,
                     device_ids=device_ids,
                     respect_quiet_hours=respect_quiet_hours,
+                    source=source,
                 )
             finally:
                 self._lock.release()
@@ -467,12 +473,13 @@ class PushManager:
         page_id: str,
         device_ids: set[str] | None = None,
         respect_quiet_hours: bool = False,
+        source: str = "page",
     ) -> PushResult:
         started = time.monotonic()
         page = self._page_store.get(page_id)
         if page is None:
             return self._log_failure(
-                source="page", target=page_id, status="not_found", error="page not found"
+                source=source, target=page_id, status="not_found", error="page not found"
             )
         # Multi-head: the page may target several devices with different
         # panels. Render once per distinct panel (a 4:3 and a portrait
@@ -489,7 +496,7 @@ class PushManager:
             groups = [(panel, dids) for panel, dids in groups if dids]
             if not groups:
                 return self._log_failure(
-                    source="page",
+                    source=source,
                     target=page_id,
                     status="failed",
                     error="dashboard targets none of the requested device(s)",
@@ -500,7 +507,7 @@ class PushManager:
                 # Every bound device is currently quiet. Log a soft skip
                 # and return — not a failure (the user intent is
                 # respected) but not a successful push either.
-                return self._log_quiet_skip(page_id)
+                return self._log_quiet_skip(page_id, source=source)
         base_url = self._base_url_fn().rstrip("/")
 
         all_renderers: list[RendererResult] = []
@@ -523,7 +530,7 @@ class PushManager:
                 err_msg = str(err) or type(err).__name__
                 group_results.append(
                     self._log_failure(
-                        source="page",
+                        source=source,
                         target=page_id,
                         error=f"render: {err_msg}",
                         duration_s=time.monotonic() - started,
@@ -533,7 +540,7 @@ class PushManager:
             result = self._fan_out(
                 composition_png,
                 panel.model_dump(),
-                source="page",
+                source=source,
                 target=page_id,
                 started=started,
                 device_filters=set(group_dids) if group_dids else None,
@@ -885,7 +892,7 @@ class PushManager:
                 kept.append((panel, surviving))
         return kept
 
-    def _log_quiet_skip(self, page_id: str) -> PushResult:
+    def _log_quiet_skip(self, page_id: str, *, source: str = "page") -> PushResult:
         """Record a soft skip when every bound device is currently in
         quiet hours. Not a failure — the user's "no pushes overnight"
         intent is being honoured — but worth surfacing in the Events
@@ -893,7 +900,7 @@ class PushManager:
         one-look answer."""
         event_id = self._event_log.record(
             type="push",
-            source="page",
+            source=source,
             target=page_id,
             status="quiet",
             error="all bound devices in quiet hours",

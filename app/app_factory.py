@@ -35,6 +35,7 @@ from app import (
     composer,
     device_loader,
     events_routes,
+    history_routes,
     onboarding,
     page_routes,
     plugin_loader,
@@ -477,6 +478,7 @@ def create_app(
     settings_routes.register(app)
     schedule_routes.register(app)
     send_routes.register(app)
+    history_routes.register(app)
     events_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)

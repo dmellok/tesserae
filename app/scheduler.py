@@ -247,6 +247,7 @@ class Scheduler:
         result = self._push_factory().push(
             schedule.page_id,
             respect_quiet_hours=respect_quiet_hours,
+            source="scheduler",
         )
         # Successful fires bump last_fired so the daily / interval gates
         # work; a failed push doesn't update it (the next tick can retry).

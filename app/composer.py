@@ -498,6 +498,20 @@ def test_render() -> str:
         zoom_val = 1.0
     zoom_val = max(0.5, min(3.0, zoom_val))
 
+    # ?opts=<json> lets the dev widget-preview page inject cell options
+    # (place label, units, API key, etc.) so the preview reflects what a
+    # composed dashboard would actually show. Malformed JSON silently
+    # falls through to the plugin's defaults via ``_resolved_options``.
+    opts_raw = request.args.get("opts") or ""
+    cell_options: dict[str, Any] = {}
+    if opts_raw:
+        try:
+            parsed = json.loads(opts_raw)
+            if isinstance(parsed, dict):
+                cell_options = parsed
+        except (json.JSONDecodeError, ValueError):
+            cell_options = {}
+
     cell_w, cell_h = SIZE_DIMENSIONS[size]
     page = {
         "id": "_test",
@@ -514,7 +528,7 @@ def test_render() -> str:
                 "w": cell_w,
                 "h": cell_h,
                 "plugin": plugin_id,
-                "options": {},
+                "options": cell_options,
                 "zoom": zoom_val,
             }
         ],
@@ -603,6 +617,76 @@ def test_theme_style_matrix() -> str:
         themes=_MATRIX_THEMES,
         styles=_MATRIX_STYLES,
         sample=sample,
+    )
+
+
+@bp.get("/_test/preview")
+def test_widget_preview() -> str:
+    """Interactive single-widget preview at every supported size.
+
+    Like ``/_test/render`` but with controls on the page: pick a widget,
+    fill its ``cell_options`` from the schema, swap theme + style, and
+    see the result rendered as four iframes (xs / sm / md / lg) so the
+    same options + style render in every cell shape at once.
+
+    Dev-only — guarded behind ``debug or testing`` like every other
+    ``/_test/...`` route. Cell options post via ``?opts=<json>`` and
+    flow through ``test_render`` unchanged."""
+    if not (current_app.debug or current_app.testing):
+        abort(404)
+    widgets = sorted(_registry().widgets(), key=lambda p: p.name.lower())
+    if not widgets:
+        abort(404)
+    widget_id = request.args.get("widget") or widgets[0].id
+    plugin = next((p for p in widgets if p.id == widget_id), None)
+    if plugin is None:
+        plugin = widgets[0]
+    theme_id = request.args.get("theme") or "light"
+    style_id = request.args.get("style") or "standard"
+    sample_mode = request.args.get("sample") == "1"
+
+    # ``cell_options`` from the plugin manifest drive the form-builder.
+    # Each entry shape: ``{name, type, label, default?, choices?, secret?}``
+    # — same schema the page editor reads. Defaults override URL-supplied
+    # values only when the URL omits a field, so reloading the page with
+    # an explicit blank still wins over the manifest default.
+    schema = list(plugin.manifest.get("cell_options") or [])
+    supplied_opts: dict[str, Any] = {}
+    opts_raw = request.args.get("opts") or ""
+    if opts_raw:
+        try:
+            parsed = json.loads(opts_raw)
+            if isinstance(parsed, dict):
+                supplied_opts = parsed
+        except (json.JSONDecodeError, ValueError):
+            supplied_opts = {}
+    # The form needs a starting value per field. Use the user's submitted
+    # value if present, otherwise the manifest default. Don't fall back
+    # to the global lat/lon here — that's done at render time by
+    # _resolved_options so the preview behaves like a real cell.
+    form_values: dict[str, Any] = {}
+    for spec in schema:
+        name = spec.get("name")
+        if not isinstance(name, str):
+            continue
+        if name in supplied_opts:
+            form_values[name] = supplied_opts[name]
+        else:
+            form_values[name] = spec.get("default", "")
+
+    return render_template(
+        "widget_preview.html",
+        widget=plugin,
+        widgets=widgets,
+        size_dims=SIZE_DIMENSIONS,
+        themes=_MATRIX_THEMES,
+        styles=_MATRIX_STYLES,
+        theme_id=theme_id,
+        style_id=style_id,
+        sample=sample_mode,
+        schema=schema,
+        form_values=form_values,
+        opts_json=json.dumps(supplied_opts) if supplied_opts else "",
     )
 
 

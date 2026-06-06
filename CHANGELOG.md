@@ -6,7 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-— in flight on `main` —
+### History page + per-trigger source chips
+
+- **History moved to a top-level nav entry** (`/history`). Previously
+  the push log was a tab buried inside Send; now it's one click from
+  anywhere. Send loses its History tab; the four remaining tabs
+  (File / Saved / URL / Webpage) still redirect to the new History
+  page after a push, so the "I just pushed, where's the result?"
+  flow stays muscle-memory.
+- **Per-trigger chips on every history row**. Pushes now carry a
+  `source` value through the whole pipeline so each row shows what
+  kicked it off: **Send page** (paper plane, teal), **Schedule**
+  (clock, ochre), **Webhook** (arrow-in, terracotta), **Home
+  Assistant** (house, slate). The trigger was already in the event
+  log but every page-push was getting logged as `page` regardless of
+  caller; `PushManager.push()` now takes a `source=` kwarg and the
+  scheduler / webhook / HA call sites pass the right value.
+
+### Dev widget preview page
+
+- **New `/_test/preview` page** (Dev nav → Widget preview). One
+  widget rendered at every supported size (xs / sm / md / lg) in a
+  single grid, with a left rail for the controls: widget picker,
+  theme picker, style picker, sample-data toggle, and a form-builder
+  generated from the plugin's `cell_options` schema. Useful when
+  iterating on a widget's layout — you can tweak a place label or
+  unit and see all four sizes reflow without composing a dashboard
+  first. Dev-only, gated behind `debug or testing` like the rest of
+  `/_test/`.
+- The underlying `/_test/render` endpoint now accepts `?opts=<json>`
+  so the preview page can inject cell options through the existing
+  composer pipeline.
+
+### Weather widget polish
+
+- **weather_now sizing pass**. Content-adaptive at xs (hero-only,
+  vertical stack), sm (two metrics, no labels), md (unchanged), lg
+  (hero icon + temp grow to fill, new sunrise/sunset arc band shows
+  the sun's current position between rise and set). Fixes the
+  "feels empty at lg, cramped at sm" complaint from the visual pass.
 
 ## [0.29.0] — 2026-06-05
 

@@ -15,7 +15,6 @@
   ('saved','Saved','squares-four'),
   ('url','URL','link'),
   ('webpage','Webpage','globe'),
-  ('history','History','clock-counter-clockwise'),
 ] %}
 {# The Gallery tab only appears when you arrive via a gallery image's Send. #}
 {% set TABS = ([('gallery','Gallery','image-square')] + CORE_TABS) if gallery else CORE_TABS %}
@@ -299,67 +298,6 @@
     </div>
   {% endcall %}
 </div>
-
-{# ----- History tab (no preview) ----- #}
-<section class="card" id="tab-history" {% if tab != 'history' %}hidden{% endif %}>
-  {{ card_head('History', icon_name='clock-counter-clockwise',
-               blurb='Last ' ~ history|length ~ ' push attempts. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
-  {% if not history %}
-  <p class="lede" data-history-empty>No pushes yet.</p>
-  {% else %}
-  <ul class="history">
-    {% for ev in history %}
-    <li class="history-row">
-      <a class="history-thumb" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
-        {% if ev.digest %}
-        {# ``?w=`` thumbnail variant so the history feed doesn't decode the
-           full panel PNG into a ~7.7 MB bitmap per row (see events.html
-           for the rationale). Lightbox click target stays the original. #}
-        <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
-             alt="" width="120" height="90"
-             loading="lazy" decoding="async">
-        {% else %}
-        <span class="history-thumb-empty">no preview</span>
-        {% endif %}
-      </a>
-      <div class="history-meta">
-        <div class="history-top">
-          {# Only flag the exceptions — a green "sent" on every row is noise. #}
-          {% if ev.status != 'sent' %}{{ pill_status(ev.status) }}{% endif %}
-          <span class="history-source">{{ ev.source }}</span>
-          <span class="history-target">{{ ev.target }}</span>
-        </div>
-        <div class="history-sub">
-          <time title="{{ ev.abs }}">{{ ev.rel }}</time>
-          <span class="muted">·</span>
-          <span>{{ '%.2f'|format(ev.duration_s) }} s</span>
-          {% if ev.error %}<span class="muted">·</span><span class="history-err">{{ ev.error }}</span>{% endif %}
-        </div>
-        {% if ev.renderers %}
-        <div class="history-renderers">
-          {% for r in ev.renderers %}
-          <span class="pill {% if r.error %}is-danger{% endif %}">{{ r.label }}</span>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      <div class="history-actions">
-        <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="inline">
-          <button type="submit" class="ghost" {% if not ev.digest %}disabled title="no composition PNG stored"{% endif %}>
-            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Resend</span>
-          </button>
-        </form>
-        <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="inline" onsubmit="return confirm('Delete this entry?');">
-          <button type="submit" class="ghost danger" title="Delete entry">
-            <i class="ph ph-trash" aria-hidden="true"></i>
-          </button>
-        </form>
-      </div>
-    </li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</section>
 
 <script>
   // File dropzone: drag-and-drop, click-to-browse, preview thumb.

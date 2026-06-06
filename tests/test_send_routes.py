@@ -58,7 +58,9 @@ def test_send_index_renders_all_tabs(app: Flask) -> None:
     resp = client.get("/send")
     body = resp.get_data(as_text=True)
     assert resp.status_code == 200
-    for slug in ("file", "saved", "url", "webpage", "history"):
+    # History moved to its own /history page (top-level nav). Only the
+    # four push tabs live on /send now.
+    for slug in ("file", "saved", "url", "webpage"):
         assert f"tab-{slug}" in body
         assert f"tab={slug}" in body
 
@@ -203,7 +205,8 @@ def test_history_lists_event_log_rows(app: Flask, tmp_path: Path) -> None:
 
     client = app.test_client()
     _sign_in(client)
-    body = client.get("/send?tab=history").get_data(as_text=True)
+    # History page moved off /send to its own top-level route in 0.29.7.
+    body = client.get("/history").get_data(as_text=True)
     assert "home" in body
     assert "x.png" in body
     assert "boom" in body

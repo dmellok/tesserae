@@ -1,7 +1,7 @@
 """Admin Send page.
 
-Five tabs, one URL: ``/send``. Each tab POSTs to a dedicated endpoint and
-redirects back so the result lands in the History tab's event-log feed.
+Four tabs, one URL: ``/send``. Each tab POSTs to a dedicated endpoint and
+redirects to ``/history`` so the result lands in the push log.
 
 Tabs:
 
@@ -9,16 +9,17 @@ Tabs:
 * **Saved** — pick a saved dashboard, render through the composer
 * **URL**   — fetch an image URL, push the bytes
 * **Webpage** — Playwright-screenshot an arbitrary URL, push the bytes
-* **History** — last N push events with resend / delete
+
+The standalone History page (``history_routes``) shows the push log and
+hosts resend / delete actions that POST back to ``/send/resend/...`` and
+``/send/delete/...`` defined here.
 """
 
 from __future__ import annotations
 
 import logging
 import threading
-import time
 from collections.abc import Callable
-from datetime import datetime
 from typing import Any
 
 from flask import (
@@ -37,8 +38,7 @@ from werkzeug.wrappers import Response
 from app.device_loader import DeviceRegistry
 from app.panel import resolve_settings_panel
 from app.push import PushManager, PushResult
-from app.renderer_loader import RendererRegistry
-from app.state.event_log import EventLog, EventRow
+from app.state.event_log import EventLog
 from app.state.page_store import PageStore
 from app.state.settings_store import SettingsStore
 
@@ -118,13 +118,11 @@ def _render_send_with_form(tab: str) -> Response:
     missing field and resubmit. The file-upload field can't be
     preserved (browser security), but every other input round-trips.
     """
-    history = _history_view(_events().list(type="push", limit=100))
     pages = _pages().list()
     return make_response(
         render_template(
             "send.html",
             pages=pages,
-            history=history,
             panel=resolve_settings_panel(_settings()),
             device_options=_device_options(),
             tab=tab,
@@ -234,63 +232,6 @@ def _push_to_targets(
     )
 
 
-def _relative(epoch: float) -> str:
-    """Short 'time since' label for the history feed."""
-    seconds = max(0.0, time.time() - epoch)
-    if seconds < 60:
-        return "just now"
-    if seconds < 3600:
-        return f"{int(seconds / 60)} min ago"
-    if seconds < 86400:
-        return f"{int(seconds / 3600)} h ago"
-    return f"{int(seconds / 86400)} d ago"
-
-
-def _renderer_label(renderer_id: str) -> str:
-    """Friendly name for a renderer id. A per-instance clone
-    (``pi_bin__bin_mini``) resolves to its device's display name; a base
-    renderer falls back to the renderer's own name; an unknown id (renderer
-    since removed) shows verbatim."""
-    renderers: RendererRegistry | None = current_app.config.get("RENDERER_REGISTRY")
-    renderer = renderers.get(renderer_id) if renderers is not None else None
-    if renderer is None:
-        return renderer_id
-    devices = _devices()
-    if devices is not None:
-        device = devices.devices.get(renderer.device)
-        if device is not None and device.kind_of is not None:
-            return device.display_name
-    return renderer.name
-
-
-def _history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
-    """Shape raw event rows for the History tab: page name instead of id,
-    humanised time, friendly device labels."""
-    page_names = {p.id: p.name for p in _pages().list()}
-    out: list[dict[str, Any]] = []
-    for ev in rows:
-        target = page_names.get(ev.target, ev.target) if ev.source == "page" else ev.target
-        renderers = [
-            {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
-            for r in (ev.extra.get("renderers") or [])
-        ]
-        out.append(
-            {
-                "id": ev.id,
-                "status": ev.status,
-                "digest": ev.digest,
-                "source": ev.source,
-                "target": target,
-                "rel": _relative(ev.timestamp),
-                "abs": datetime.fromtimestamp(ev.timestamp).strftime("%Y-%m-%d %H:%M:%S"),
-                "duration_s": ev.duration_s,
-                "error": ev.error,
-                "renderers": renderers,
-            }
-        )
-    return out
-
-
 _FIT_MODES: frozenset[str] = frozenset({"fit", "fill", "stretch", "center", "blur"})
 
 
@@ -327,14 +268,12 @@ def _gallery_ref() -> dict[str, str] | None:
 
 @bp.get("")
 def index() -> str:
-    history = _history_view(_events().list(type="push", limit=100))
     pages = _pages().list()
     gallery = _gallery_ref()
     tab = request.args.get("tab") or ("gallery" if gallery else "file")
     return render_template(
         "send.html",
         pages=pages,
-        history=history,
         panel=resolve_settings_panel(_settings()),
         device_options=_device_options(),
         tab=tab,
@@ -362,7 +301,7 @@ def send_file() -> Response:
         targets,
         lambda tid: _push().push_image(image_bytes, source_label=filename, device_id=tid, fit=fit),
     )
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/page")
@@ -402,7 +341,7 @@ def _redirect_after_page_push(page_id: str, *, on_error: bool = False) -> Respon
         return redirect(url_for("pages.edit", page_id=page_id))
     if on_error:
         return redirect(url_for("send.index", tab="saved"))
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/url")
@@ -420,7 +359,7 @@ def send_url() -> Response:
         targets,
         lambda tid: _push().push_url_image(url, device_id=tid, fit=fit),
     )
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/webpage")
@@ -446,7 +385,7 @@ def send_webpage() -> Response:
             url, viewport_w=viewport_w, viewport_h=viewport_h, device_id=tid, fit=fit
         ),
     )
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/gallery")
@@ -475,7 +414,7 @@ def send_gallery() -> Response:
         targets,
         lambda tid: _push().push_image(image_bytes, source_label=label, device_id=tid, fit=fit),
     )
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/history/<int:event_id>/resend")
@@ -485,7 +424,7 @@ def resend(event_id: int) -> Response:
         f"Resending #{event_id}. The History tab will update when the render lands.",
         "ok",
     )
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 @bp.post("/history/<int:event_id>/delete")
@@ -495,7 +434,7 @@ def delete(event_id: int) -> Response:
         flash("History entry deleted.", "ok")
     else:
         flash(f"No history entry #{event_id}.", "error")
-    return redirect(url_for("send.index", tab="history"))
+    return redirect(url_for("history.index"))
 
 
 def register(app: Flask) -> None:

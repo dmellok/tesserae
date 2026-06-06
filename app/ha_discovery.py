@@ -586,7 +586,7 @@ class HomeAssistantDiscovery:
         logger.info("HA discovery: HA requested push of page %r", page_id)
         self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
         try:
-            self._push_manager.push(page_id)
+            self._push_manager.push(page_id, source="home_assistant")
         except Exception:
             self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
             raise
@@ -613,7 +613,7 @@ class HomeAssistantDiscovery:
         logger.info("HA discovery: push %r to display %r", name, device_id)
         self._publish_str(STATE_TOPIC_BUSY, "1", retain=True)
         try:
-            self._push_manager.push(page_id, device_ids={device_id})
+            self._push_manager.push(page_id, device_ids={device_id}, source="home_assistant")
         except Exception:
             self._publish_str(STATE_TOPIC_BUSY, "0", retain=True)
             raise

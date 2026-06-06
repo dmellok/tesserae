@@ -36,7 +36,8 @@ class EventRow:
     Common columns:
       type:      event kind — currently only ``"push"``; M8 adds more
       source:    who triggered it (``page``, ``file``, ``url``, ``webpage``,
-                 ``scheduler``, ``manual``, ``resend``)
+                 ``scheduler``, ``webhook``, ``home_assistant``, ``manual``,
+                 ``resend``)
       target:    what was pushed (page id, source label, URL)
       status:    ``sent`` | ``failed`` | ``busy`` | ``not_found``
       digest:    composition PNG digest (used as thumbnail reference);

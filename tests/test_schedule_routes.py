@@ -180,7 +180,9 @@ def test_fire_now_invokes_push(app: Flask) -> None:
     resp = client.post("/schedules/manual/fire", follow_redirects=True)
     assert resp.status_code == 200
     # "Fire now" is a manual user action — quiet hours don't apply.
-    pm.push.assert_called_once_with("home", respect_quiet_hours=False)
+    pm.push.assert_called_once_with(
+        "home", respect_quiet_hours=False, source="scheduler"
+    )
 
 
 def test_nav_links_to_schedules(app: Flask) -> None:
