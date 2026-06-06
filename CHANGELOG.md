@@ -6,6 +6,54 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### F1 family visual pass
+
+Continued the widget visual pass through the four F1 widgets. Same goal as
+the weather pass: turn paragraphs of numbers into real visual anchors that
+adapt cleanly across cell sizes.
+
+- **f1_last_race** (0.1.0 → 0.1.4). Replaced the 3-cell status-grid podium
+  with team-coloured podium steps in P2-P1-P3 visual order (P1 tallest,
+  centre). Each block tinted by constructor livery (Ferrari red, Mercedes
+  teal, Red Bull navy, etc.) using a small inline hex map keyed by
+  Jolpica's `constructorId`. Trophy glyph hangs above the winner's code;
+  plum lightning above whichever driver set the fastest lap (`data.podium[i].fastest`).
+  Meta line (circuit · locality · country) progressively sheds bits as the
+  cell narrows so it doesn't clip at the bottom. Circuit silhouette lives on
+  the right column only at LG; SVG sized to `100% × 100%` with the
+  `preserveAspectRatio` from f1_core's `trackSvg` doing the letterboxing.
+- **f1_next** (0.1.0 → 0.1.3). Country flag emoji in the title (Canada →
+  🇨🇦, Bahrain → 🇧🇭, etc.) — every host on the current calendar plus a
+  few historical venues mapped. Six session mini-cards (FP1 / FP2 / FP3 /
+  Sprint / Quali / **Race**) replace the status-grid; the Race card was
+  previously missing entirely. Each card has icon + label + `Sat 14` date
+  + `14:00` time, accent-bordered and `color-mix`-soft-tinted by session
+  type (practice = muted, sprint/quali = ochre, race = terracotta). Hero
+  countdown gets `--accent-1` weight and a `ph-clock-countdown` glyph.
+  Schedule is 3 columns × 2 rows at LG so "QUALI" no longer clips to
+  "QUA", and adaptive height/width queries handle short MD cells.
+- **f1_standings_drivers** (0.1.0 → 0.1.1). `server.py` now fetches the
+  previous round's standings (`/current/{round-1}/driverStandings.json`)
+  and computes a per-driver `delta` field so the client can render
+  position-change chips (`↑3` accent-3, `↓1` accent-1, `—` muted,
+  omitted when no previous-round data). Points-gap micro-bar under each
+  row scales to `points / leader_points`, filled in the driver's team
+  livery colour. Crown glyph (`ph-crown`) marks the championship leader
+  to keep `ph-trophy` reserved for race wins in f1_last_race.
+- **f1_weekend** (0.1.0 → 0.1.1). Sessions cluster under
+  `FRIDAY · 14 MAR` / `SATURDAY · 15 MAR` / `SUNDAY · 16 MAR` day
+  headers so the weekend's shape reads in one scan. Race row gets a soft
+  accent-1 tinted background + accent-1 left border + black weight so
+  "RACE at 13:00" always pops. Country flag in title matches f1_next.
+
+### Color emoji rendering
+
+- **`Dockerfile`**: added `fonts-noto-color-emoji` to the apt install
+  alongside `gosu` (~12 MB on top of the existing image). Without it,
+  country flag emoji in widgets fall back to regional-indicator letter
+  pairs in boxes on Linux. macOS dev hosts use Apple Color Emoji so this
+  bug wouldn't have surfaced in local preview.
+
 ### Weather widget visual pass
 
 Family-by-family enhancement of every weather widget (plus `sky_bom_warnings`,

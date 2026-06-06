@@ -63,8 +63,15 @@ RUN pip install -e /app
 # the bind-mount ownership. It's a single ~2 MB static binary; the
 # obvious alternative ``su-exec`` only ships on Alpine. The base
 # image's ``setpriv`` works too but lacks gosu's standard semantics.
+#
+# ``fonts-noto-color-emoji`` is the de-facto Linux colour-emoji font.
+# Widgets that paint country flags (f1_next, sky_*) and any other
+# Unicode emoji need this to render properly inside the headless
+# Chromium that drives the composer — without it, flag emojis fall
+# back to regional-indicator letter pairs in boxes. ~12 MB on top
+# of the existing image, paid once for every emoji widget.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends gosu \
+    && apt-get install -y --no-install-recommends gosu fonts-noto-color-emoji \
     && rm -rf /var/lib/apt/lists/* \
     && gosu nobody true
 
