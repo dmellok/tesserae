@@ -37,17 +37,17 @@ def test_scheduler_resolves_timezone_via_provider(tmp_path: Path) -> None:
     store.upsert(
         Schedule(id="morning", name="Morning", page_id="home", type="daily", fires_at=fires_at)
     )
-    # Tick at 06:30 Melbourne — target hasn't passed; first_seen records.
+    # Tick at 06:30 Melbourne, target hasn't passed; first_seen records.
     pre_target_utc = datetime(2026, 6, 1, 6, 30, tzinfo=mel_tz).astimezone(UTC)
     sched.find_due(pre_target_utc)
-    # Tick at 07:30 Melbourne — target has passed; should be due.
+    # Tick at 07:30 Melbourne, target has passed; should be due.
     post_target_utc = datetime(2026, 6, 1, 7, 30, tzinfo=mel_tz).astimezone(UTC)
     due = sched.find_due(post_target_utc)
     assert [s.id for s in due] == ["morning"]
 
 
 def test_scheduler_provider_returning_none_uses_host_local(tmp_path: Path) -> None:
-    """A None tz provider falls back to host-local — the existing M6
+    """A None tz provider falls back to host-local, the existing M6
     behaviour. Sanity check: an interval schedule still becomes due."""
     store = ScheduleStore(tmp_path / "schedules.json")
     pm = MagicMock()
@@ -184,7 +184,7 @@ def test_stream_emits_recorded_event(app: Flask) -> None:
     # The first chunk is always the :connected comment.
     first = next(gen)
     assert b":connected" in first
-    # Record an event from this same request thread — the listener fires
+    # Record an event from this same request thread, the listener fires
     # synchronously, populating the queue the generator reads from.
     log.record(type="push", source="page", target="home_sse", status="sent")
     # The next yield should be either a :keepalive (if our record raced)
@@ -198,7 +198,7 @@ def test_stream_emits_recorded_event(app: Flask) -> None:
             break
     assert b"event: log" in payload
     assert b"home_sse" in payload
-    # Done — close the response so the generator's finally: unregisters
+    # Done, close the response so the generator's finally: unregisters
     # the listener.
     resp.close()
 

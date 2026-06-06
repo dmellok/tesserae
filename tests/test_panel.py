@@ -150,7 +150,7 @@ def test_first_bound_device_drives_single_panel_contexts(env) -> None:
 
 def test_push_groups_split_by_gamut(env) -> None:
     """Two devices with identical dims but different colour gamuts must
-    render as separate push groups — each frame packs to its own palette."""
+    render as separate push groups, each frame packs to its own palette."""
     devices, settings, make = env
     make("esp32_e6")  # default waveshare_e6
     make("esp32_7c", gamut="inky_7colour")  # same 800x480, 7-colour

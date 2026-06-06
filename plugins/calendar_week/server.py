@@ -1,4 +1,4 @@
-"""calendar_week — fetch events for the current 7-day window."""
+"""calendar_week, fetch events for the current 7-day window."""
 
 from __future__ import annotations
 

@@ -28,7 +28,7 @@ macro here instead.
 {#- Small click-to-open info popover. Pops a panel with the help text
     below the icon; click-away or Escape closes. Use for field-level
     explanation, card subhead blurbs, anywhere a paragraph of context
-    used to live inline. The content arg is escaped — pass HTML via
+    used to live inline. The content arg is escaped, pass HTML via
     ``content|safe`` if you need it. -#}
 {%- if content -%}
 <span class="info-pop-wrap">
@@ -113,7 +113,7 @@ macro here instead.
 {#- options: list of {value, label} dicts (optionally with {group}) OR
     (value, label) tuples. Consecutive options sharing the same non-empty
     ``group`` are wrapped in a single <optgroup> labelled with the group
-    name — so callers can keep the picker single-element while users see
+    name, so callers can keep the picker single-element while users see
     related themes / fonts / etc. clustered. -#}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
@@ -155,7 +155,7 @@ macro here instead.
 {#- Per-entity name + icon override list. Pairs with a multiselect in
    the same fieldset: ``static/entity-overrides.js`` reads which entities
    are ticked there and renders one row (name field + icon picker) per
-   ticked entity. The hidden textarea is the source of truth — JS keeps
+   ticked entity. The hidden textarea is the source of truth, JS keeps
    it in the legacy pipe-separated format so the server-side parser
    (`_parse_overrides`) stays unchanged. -#}
 {%- macro entity_overrides_field(field_id, name, label, value='', help=None) -%}
@@ -249,7 +249,7 @@ macro here instead.
 {#- Card header with an optional icon-box on the left, blurb popover
    next to the title, and a right-aligned action slot (typically a
    small button or link). The blurb used to render as a visible lede
-   paragraph — now it's a click-to-pop ``?`` icon next to the title,
+   paragraph, now it's a click-to-pop ``?`` icon next to the title,
    per the UI-cleanup pass. Pages that want the descriptive paragraph
    inline can still render a ``<p class="lede">…</p>`` themselves. -#}
 <header class="card-head">

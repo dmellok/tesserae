@@ -1,5 +1,5 @@
 """Telemetry: instance-id, env-var off switch, disabled-state guarantees,
-and event payload format (urlopen mocked — no network in tests)."""
+and event payload format (urlopen mocked, no network in tests)."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ def test_disabled_when_baked_constants_are_empty(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Tesserae ships with the constants empty until the maintainer fills
-    them in — even a user toggling the setting on can't send."""
+    them in, even a user toggling the setting on can't send."""
     monkeypatch.setattr(tm, "APTABASE_HOST", "")
     monkeypatch.setattr(tm, "APTABASE_APP_KEY", "")
     monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
@@ -70,7 +70,7 @@ def test_settings_cannot_override_baked_endpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Even if a malicious settings file injects telemetry_host/app_key,
-    they're ignored — the endpoint is baked."""
+    they're ignored, the endpoint is baked."""
     monkeypatch.setattr(tm, "APTABASE_HOST", "https://baked.example")
     monkeypatch.setattr(tm, "APTABASE_APP_KEY", "BAKEDKEY")
     monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
@@ -198,7 +198,7 @@ def test_send_posts_aptabase_shaped_payload(
     assert body["systemProps"]["isDebug"] is False
     assert body["props"] == {}
     assert "timestamp" in body
-    # JS-SDK-style User-Agent header — server rejects/silently drops
+    # JS-SDK-style User-Agent header, server rejects/silently drops
     # plain "tesserae/..." UA strings on some deployments.
     headers = {k.lower(): v for k, v in captured["headers"].items()}  # type: ignore[union-attr]
     ua = headers.get("user-agent", "")
@@ -230,7 +230,7 @@ def test_system_props_match_aptabase_strict_shape(
     assert sys_props["isDebug"] is False, "Aptabase requires bool, not 'false'"
     assert "@" in sys_props["sdkVersion"], "Aptabase requires name@version, not name/version"
     assert "/" not in sys_props["sdkVersion"]
-    # JS-SDK minimal field set: nothing beyond these four — server-side
+    # JS-SDK minimal field set: nothing beyond these four, server-side
     # validators on some self-hosted deployments reject extras.
     assert set(sys_props.keys()) == {"locale", "isDebug", "appVersion", "sdkVersion"}
 
@@ -292,7 +292,7 @@ def test_heartbeat_carries_props_from_registered_provider(
 def test_heartbeat_survives_provider_exception(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A provider that raises must not silence the heartbeat — the event
+    """A provider that raises must not silence the heartbeat, the event
     still fires with empty props so the maintainer's liveness signal
     keeps working even when the props provider is broken."""
     captured_names: list[str] = []
@@ -320,7 +320,7 @@ def test_heartbeat_survives_provider_exception(
 
 
 def test_heartbeat_stops_on_shutdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """``shutdown()`` must cancel the heartbeat thread cleanly — without
+    """``shutdown()`` must cancel the heartbeat thread cleanly, without
     this an idle Tesserae process would prevent a clean test teardown."""
     monkeypatch.setattr("app.telemetry.urllib.request.urlopen", lambda req, timeout=0: _FakeResp())
     monkeypatch.setattr(tm, "HEARTBEAT_INTERVAL_S", 0.05)
@@ -441,7 +441,7 @@ def test_test_send_returns_error_string_on_http_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # urllib.error.HTTPError's internal fp uses a _TemporaryFileCloser
-    # whose finalizer fires after the test on Python 3.14 — pytest
+    # whose finalizer fires after the test on Python 3.14, pytest
     # surfaces that as PytestUnraisableExceptionWarning. The exception
     # itself is irrelevant to what we're testing here, so we ignore it.
     def http_error(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
@@ -524,7 +524,7 @@ def test_test_send_records_success_row_in_event_log(
     assert row.error is None
     assert row.target == "https://analytics.example.com"
     # The exact payload is exposed in ``extra`` so the Events tab can
-    # surface what we shipped — this is what made the v0.4.2 -> v0.4.3
+    # surface what we shipped, this is what made the v0.4.2 -> v0.4.3
     # 400-debugging session quick (the body shape was visible).
     payload = row.extra["payload"]
     assert isinstance(payload, dict)

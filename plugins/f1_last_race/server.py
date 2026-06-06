@@ -1,6 +1,6 @@
 """Last-race fetch for the f1_last_race widget.
 
-Jolpica-F1, no API key. Caches for 12 hours — results don't change once
+Jolpica-F1, no API key. Caches for 12 hours, results don't change once
 the race is over, and a stale cache between race-end and the next
 refresh is harmless (we'll get the next race's podium on the next pull).
 """

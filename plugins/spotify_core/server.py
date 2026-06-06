@@ -1,4 +1,4 @@
-"""spotify_core — shared Spotify OAuth + now-playing helper.
+"""spotify_core, shared Spotify OAuth + now-playing helper.
 
 No widget cell of its own; the spotify_* widgets reach in via the
 registry and call ``now_playing()`` so they share one OAuth connection.
@@ -179,7 +179,7 @@ def exchange_code(code: str, redirect_uri: str) -> None:
 def _refresh_locked(tokens: dict[str, Any]) -> dict[str, Any]:
     refresh = tokens.get("refresh_token")
     if not refresh:
-        raise RuntimeError("no refresh token — reconnect Spotify")
+        raise RuntimeError("no refresh token, reconnect Spotify")
     payload = _post_token({"grant_type": "refresh_token", "refresh_token": refresh})
     return _store_token_response(payload, prior=tokens)
 
@@ -249,7 +249,7 @@ def now_playing() -> dict[str, Any]:
     if not connected():
         return {
             "connected": False,
-            "error": "Spotify not connected — connect at Plugins → Spotify.",
+            "error": "Spotify not connected, connect at Plugins → Spotify.",
         }
     try:
         token = _valid_access_token()
@@ -259,7 +259,7 @@ def now_playing() -> dict[str, Any]:
         status, body = _api_get(NOW_PLAYING_URL, token)
     except urllib.error.HTTPError as err:
         if err.code == 401:
-            # Token rejected mid-flight — force a refresh and retry once.
+            # Token rejected mid-flight, force a refresh and retry once.
             try:
                 with _lock:
                     _refresh_locked(_load_tokens())
@@ -285,7 +285,7 @@ def now_playing() -> dict[str, Any]:
 
 
 def _track_summary(item: dict[str, Any]) -> dict[str, Any]:
-    """Compact normalised representation of a Spotify track object —
+    """Compact normalised representation of a Spotify track object -
     enough for a list row (title, artist, album, art) without the
     audio-features / external-url ballast."""
     album = item.get("album") or {}
@@ -328,7 +328,7 @@ def queue() -> dict[str, Any]:
     if not connected():
         return {
             "connected": False,
-            "error": "Spotify not connected — connect at Plugins → Spotify.",
+            "error": "Spotify not connected, connect at Plugins → Spotify.",
         }
     try:
         token = _valid_access_token()
@@ -362,7 +362,7 @@ def queue() -> dict[str, Any]:
     current = body.get("currently_playing")
     queue_items = body.get("queue") or []
     if not isinstance(current, dict):
-        # Ads, podcasts with no track item, or a private session — same
+        # Ads, podcasts with no track item, or a private session, same
         # treatment as ``now_playing``.
         return {"connected": True, "idle": True}
     return {
@@ -432,7 +432,7 @@ def blueprint() -> Blueprint:
             return redirect(url_for("spotify_core_admin.index"))
         expected = session.pop("spotify_oauth_state", None)
         if not expected or request.args.get("state") != expected:
-            flash("OAuth state mismatch — please try connecting again.", "error")
+            flash("OAuth state mismatch, please try connecting again.", "error")
             return redirect(url_for("spotify_core_admin.index"))
         code = request.args.get("code")
         if not code:

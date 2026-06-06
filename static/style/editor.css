@@ -12,7 +12,7 @@
    pixels so the composer renders unscaled; static/components.js
    (fitPreview) sets a `transform: scale(...)` to fit.
 
-   Flat surface — no checkerboard, no inset glass. The placeholder
+   Flat surface, no checkerboard, no inset glass. The placeholder
    carries the empty state on its own. */
 .preview-frame {
   position: relative;
@@ -492,7 +492,7 @@
 
   /* Two-row header. Row 1: back · icon · name input (takes the rest).
      Row 2: save-status (left) · actions (right). page-id-tag and the
-     flex spacer drop out — the row layout supplies the spacing. */
+     flex spacer drop out, the row layout supplies the spacing. */
   .editor-header {
     display: grid;
     grid-template-columns: auto auto 1fr auto;
@@ -512,7 +512,7 @@
     justify-self: end;
     flex-wrap: nowrap;
   }
-  /* Action button labels collapse — icons only at this width. */
+  /* Action button labels collapse, icons only at this width. */
   .editor-actions button > span:not(.icon) { display: none; }
   .editor-actions button {
     padding: var(--t-space-2) var(--t-space-3);
@@ -528,7 +528,7 @@
   margin: var(--t-space-2) var(--t-space-1) 0;
 }
 
-/* Floating "back to top" FAB — only meaningful on the reactive
+/* Floating "back to top" FAB, only meaningful on the reactive
    (mobile) layout where the preview card is stacked at the top and a
    long cell list pushes it off-screen. Hidden on desktop where the
    preview is already a sticky sidebar. Side preference lives on the
@@ -596,7 +596,7 @@
     var(--t-shadow-xl),
     var(--t-ring);
 }
-/* Hover lift on desktop pointers — the icon nudges up to telegraph the
+/* Hover lift on desktop pointers, the icon nudges up to telegraph the
    "back to top" action. Skipped on touch (`hover: none`) so a finger
    release doesn't strand the icon in the lifted state. */
 @media (hover: hover) {
@@ -683,7 +683,7 @@
     0 0 0 8px color-mix(in oklab, var(--t-accent) 8%, transparent);
 }
 /* Cell cards inherit .card-head + .card-head h2 verbatim from
-   shell.css — no overrides needed. The plugin tag inside the title
+   shell.css, no overrides needed. The plugin tag inside the title
    reads as secondary. */
 .cell-card-plugin { font-weight: 500; color: var(--t-fg-soft); }
 
@@ -725,7 +725,7 @@
 /* Snap-to-grid controls live below the board + hint. The dashed
    gridline overlay is painted by the JS directly on
    .layout-editor-board via repeating linear gradients. The inputs
-   themselves reuse the standard ``.field`` styling — they should look
+   themselves reuse the standard ``.field`` styling, they should look
    identical to every other form input in the editor. */
 .layout-snap {
   margin-top: var(--t-space-3);
@@ -750,7 +750,7 @@
   background: color-mix(in oklab, var(--t-accent) 14%, var(--t-surface));
 }
 
-/* Long-press to delete — the cell fills with the danger colour over
+/* Long-press to delete, the cell fills with the danger colour over
    the long-press window (~600ms). When it completes, the press
    handler fires the delete confirm. Cancels (move / lift) drop the
    class and remove the fill. */
@@ -777,7 +777,7 @@
   text-overflow: ellipsis;
 }
 
-/* Delete X — top-right corner, only visible on hover. */
+/* Delete X, top-right corner, only visible on hover. */
 .le-cell-delete {
   position: absolute;
   top: 4px;
@@ -802,7 +802,7 @@
 }
 .le-cell-delete .ph { font-size: 13px; }
 
-/* Insert affordances — thin invisible strips on each side that show a
+/* Insert affordances, thin invisible strips on each side that show a
    "+ insert here" hint on hover. Click splits the cell along the
    perpendicular axis. */
 .le-insert {
@@ -882,7 +882,7 @@
   width: 2px;
 }
 
-/* Custom layout editor — collapsed under the preset grid by default. */
+/* Custom layout editor, collapsed under the preset grid by default. */
 .custom-layout {
   margin-top: var(--t-space-4);
   border-top: 1px solid var(--t-border);

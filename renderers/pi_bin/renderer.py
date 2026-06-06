@@ -18,7 +18,7 @@ from app.state.page_store import Panel
 
 DEFAULTS: dict[str, Any] = {
     "dither": "floyd-steinberg",
-    # Match renderer.json — Spectra 6's tiny palette needs a boost
+    # Match renderer.json, Spectra 6's tiny palette needs a boost
     # before quantise to avoid washed-out output.
     "saturation": 1.4,
     "contrast": 1.0,
@@ -36,7 +36,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     The Inky / Waveshare E6 panels are always landscape-native (the
     pixel grid is W>H). Even when the user wants their dashboard
     displayed portrait, the buffer the firmware reads back has to be
-    laid out in landscape — same byte count either way, but a portrait
+    laid out in landscape, same byte count either way, but a portrait
     layout has the wrong row stride and the panel prints rotated +
     ghosted scanlines.
 
@@ -50,12 +50,12 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     native_w = max(panel.w, panel.h)
     native_h = min(panel.w, panel.h)
     if panel.w < panel.h:
-        # Panel mounted portrait — the composition (portrait or square)
+        # Panel mounted portrait, the composition (portrait or square)
         # needs a 90° CCW pre-rotation so its top maps to the left edge
         # of the landscape buffer the firmware reads.
         img = img.rotate(90, expand=True)
     if panel.flip:
-        # Upside-down physical mount — turn the whole thing 180° so it
+        # Upside-down physical mount, turn the whole thing 180° so it
         # reads upright on the wall.
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):

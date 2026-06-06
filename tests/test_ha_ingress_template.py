@@ -42,7 +42,7 @@ def test_url_prefix_empty_without_ingress_header(app: Flask) -> None:
 def test_ingress_request_does_not_capture_ha_frontend_port(app: Flask) -> None:
     """Under HA Ingress the request comes through HA's frontend
     (homeassistant.local:8123). The before-request port capture must
-    skip those — otherwise every panel payload pings :8123, where HA
+    skip those, otherwise every panel payload pings :8123, where HA
     serves its own UI and 404s on /renders/."""
     client = app.test_client()
     _sign_in(client)
@@ -106,7 +106,7 @@ def test_transport_rebuild_logs_when_ignoring_embedded_under_ha(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """Belt-and-suspenders: a legacy install with ``embedded_enabled=true``
-    saved must not bring up amqtt under HA — it would clash with the
+    saved must not bring up amqtt under HA, it would clash with the
     host's Mosquitto. The runtime guard logs an info line and falls
     through to the external-broker code path."""
     a = create_app(testing=True, data_root=tmp_path, devices_dir=REPO_ROOT / "devices")

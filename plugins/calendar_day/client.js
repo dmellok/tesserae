@@ -1,4 +1,4 @@
-// calendar_day — Spectra timetable. Big display header (WEEKDAY +
+// calendar_day, Spectra timetable. Big display header (WEEKDAY +
 // day number, with the month/year as right-aligned meta + a thin
 // accent rule), sparse 2-hour axis, events as positioned blocks
 // auto-fit to the day's actual range with one hour of padding.
@@ -42,9 +42,9 @@ function parseTime(iso) {
 }
 
 function fmtHm(iso) {
-  if (typeof iso !== "string") return "—";
+  if (typeof iso !== "string") return "-";
   const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "—";
+  if (!Number.isFinite(d.getTime())) return "-";
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
@@ -209,7 +209,7 @@ export default function render(shadow, ctx) {
   // Inline layout for the visual-pass additions (density strip, sun-
   // cycle icons in the hour gutter, location pin row inside events).
   const layout = `
-    /* Time-of-day icon swap in the hour gutter — keeps the existing
+    /* Time-of-day icon swap in the hour gutter, keeps the existing
        column layout (one row per hour) and just replaces the text
        label with a glyph at the canonical solar transitions. */
     .tt-hours-icon {
@@ -221,7 +221,7 @@ export default function render(shadow, ctx) {
     }
     .tt-hours-icon .ph-bold { line-height: 1; }
 
-    /* Event-density strip — slim row of per-hour cells above the
+    /* Event-density strip, slim row of per-hour cells above the
        lane. Sits in the timetable's column-1 / row-1 slot above the
        hour gutter so its cell widths align with the lane width. */
     .tt-density {
@@ -244,7 +244,7 @@ export default function render(shadow, ctx) {
       display: block;
     }
 
-    /* Location row inside event blocks — pin glyph + location text,
+    /* Location row inside event blocks, pin glyph + location text,
        truncates with ellipsis when the block is narrow. */
     .tt-event .tt-loc {
       display: inline-flex;

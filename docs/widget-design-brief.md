@@ -1,4 +1,4 @@
-# Widget design brief — handoff template
+# Widget design brief, handoff template
 
 Paste this template into your Claude Design conversation and ask it to
 fill out one copy per widget you want built. The output is what gets
@@ -10,7 +10,7 @@ contract) and [`docs/widget-design-system.md`](widget-design-system.md)
 Design should read both before drafting.
 
 Every section is required unless marked **(optional)**. Omitting a
-required section forces Claude Code to either guess or stop to ask —
+required section forces Claude Code to either guess or stop to ask -
 worth filling in even if the answer feels obvious.
 
 ---
@@ -27,7 +27,7 @@ and sun times. Data from Open-Meteo (no API key).*
 
 ## 1. Identity
 
-- **id**: `<lowercase_snake_case>` — the folder name and URL slug. The
+- **id**: `<lowercase_snake_case>`, the folder name and URL slug. The
   loader only skips `.`/`_`-prefixed folders; lowercase `[a-z0-9_]` is
   convention. Use `<family>_<role>` (e.g. `weather_now`, `news_headlines`).
 - **name**: short display name as it'll show in the widget picker.
@@ -43,10 +43,10 @@ Subset of `["xs", "sm", "md", "lg"]`. Justify exclusions.
 
 Cell dimensions: xs = 180×180 · sm = 380×240 · md = 640×400 · lg = 1200×800.
 
-Example: *xs, sm, md, lg — supports the full range; xs collapses to
+Example: *xs, sm, md, lg, supports the full range; xs collapses to
 just the temp + condition icon.*
 
-Example: *sm, md, lg — skipping xs because the chart needs at least
+Example: *sm, md, lg, skipping xs because the chart needs at least
 ~280 px of vertical space for axis labels to be legible.*
 
 ---
@@ -58,15 +58,15 @@ The form fields the editor will render. Types: `string` · `textarea` ·
 
 | name | type | default | label | choices |
 |------|------|---------|-------|---------|
-| `latitude` | `number` | `-37.8136` | Latitude | — |
-| `longitude` | `number` | `144.9631` | Longitude | — |
-| `label` | `string` | `Melbourne` | Place label | — |
+| `latitude` | `number` | `-37.8136` | Latitude |, |
+| `longitude` | `number` | `144.9631` | Longitude |, |
+| `label` | `string` | `Melbourne` | Place label |, |
 | `units` | `select` | `metric` | Units | `metric` (Metric °C) · `imperial` (Imperial °F) |
 
 !!! note "No `variant` option for visual direction"
     Pre-Spectra widgets shipped multiple visual "directions" behind a
     `variant` select (Refined / Geometric / Swiss / Data). Spectra
-    replaced that with the `data-style` axis at page level — widgets
+    replaced that with the `data-style` axis at page level, widgets
     now render **one** shape. Don't add a `variant` option for
     direction; if your widget legitimately needs a layout shape choice
     (e.g. spotify_now_playing's `stack` vs `side`), name it
@@ -83,7 +83,7 @@ sensitive fields with `secret: true`.
 
 | name | type | default | label | secret? |
 |------|------|---------|-------|---------|
-| `api_key` | `string` | — | API key | ✓ |
+| `api_key` | `string` |, | API key | ✓ |
 
 ---
 
@@ -120,7 +120,7 @@ origin fetches; **B** for purely computed widgets (time of day, etc.).
 ## 6. `ctx.data` shape
 
 The JSON `server.py` returns (or `null` if client-side). The contract
-between server.py and client.js — be explicit about units and types.
+between server.py and client.js, be explicit about units and types.
 
 ```json
 {
@@ -147,11 +147,11 @@ For error: `{"error": "<message>"}`.
 
 ## 7. Layout mockups
 
-One block per supported size — ASCII mockup + a numbered annotation
+One block per supported size, ASCII mockup + a numbered annotation
 list. Don't worry about pixel-perfection; communicate hierarchy,
 grouping, and which theme token / icon goes where.
 
-### lg (1200×800) — full feature
+### lg (1200×800), full feature
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -166,13 +166,13 @@ grouping, and which theme token / icon goes where.
 │  └──────────────┘                                                 │
 └──────────────────────────────────────────────────────────────────┘
 
-[1] place label — uppercase, weight 700, fgSoft. ph-map-pin (regular,
+[1] place label, uppercase, weight 700, fgSoft. ph-map-pin (regular,
     accent) before the text.
-[2] stats — 4 columns. label uppercase muted; value weight 700.
+[2] stats, 4 columns. label uppercase muted; value weight 700.
     Icons (left of each value): ph-thermometer-simple at bold weight (warn),
     ph-drop-half at bold (accent), ph-wind at bold (fgSoft), ph-sun-dim at bold
     (tone by UV band).
-[3] sun row — ph-duotone-sun-horizon + ph-duotone-moon-stars (accent).
+[3] sun row, ph-duotone-sun-horizon + ph-duotone-moon-stars (accent).
 ```
 
 ### md (640×400)
@@ -214,8 +214,8 @@ stylesheets get `<link>`-ed inside the shadow root.
 | `warning-circle`      | regular  | error state            |
 
 Weights needed: `regular`, `bold`, `duotone`. (Each weight adds one
-`<link>` and ~250 KB font — only ship what you use.) **Default to
-`bold` for prominent / hero icons** — `fill` quantises into solid
+`<link>` and ~250 KB font, only ship what you use.) **Default to
+`bold` for prominent / hero icons**, `fill` quantises into solid
 blobs on Spectra 6 and reads heavier than intended; `bold` is the
 outline-with-presence the design language calls for.
 
@@ -224,7 +224,7 @@ outline-with-presence the design language calls for.
 ## 9. Tone rules (semantic colour)
 
 If element colour depends on data, table it. Output is **always** a
-Spectra semantic token — paint from `--accent-1..6` (reach by **role**,
+Spectra semantic token, paint from `--accent-1..6` (reach by **role**,
 not by hue), `--text-primary` / `--text-secondary` / `--text-muted`,
 `--surface` / `--surface-sunken`. The active theme provides whatever
 colour the role carries.
@@ -244,17 +244,17 @@ Example (weather_now):
 
 | element         | data value             | token         | role |
 |-----------------|------------------------|---------------|------|
-| hero icon       | code 0–1 (clear)       | `--accent-2`  | warm sunny day — categorical, slot 2 |
+| hero icon       | code 0–1 (clear)       | `--accent-2`  | warm sunny day, categorical, slot 2 |
 | hero icon       | code 2 (partly cloudy) | `--accent-2`  | categorical |
 | hero icon       | code 3/45/48 (overcast)| `--text-muted`| drained / overcast |
 | hero icon       | code 51–82 (rain)      | `--accent-4`  | cool primary |
 | hero icon       | code 71–86 (snow)      | `--accent-5`  | cool secondary |
-| hero icon       | code 95–99 (storm)     | `--accent-1`  | **alert** — severe storm |
+| hero icon       | code 95–99 (storm)     | `--accent-1`  | **alert**, severe storm |
 | UV value        | uv < 3                 | `--accent-3`  | positive / safe band |
 | UV value        | uv 3–7.9               | `--accent-2`  | warning band |
-| UV value        | uv ≥ 8                 | `--accent-1`  | alert — burn risk |
-| range high arrow| —                      | `--accent-1`  | peak |
-| range low arrow | —                      | `--accent-5`  | secondary |
+| UV value        | uv ≥ 8                 | `--accent-1`  | alert, burn risk |
+| range high arrow|,                      | `--accent-1`  | peak |
+| range low arrow |,                      | `--accent-5`  | secondary |
 | rain pill       | rain ≥ 30%             | `--accent-4`  | primary water |
 
 ---
@@ -278,7 +278,7 @@ What gets hidden / shrunk as the cell gets smaller. Be specific.
 |-----------------------|--------------------------------------------------------|
 | `ctx.data.error` set  | render error card with `ph-warning-circle` + message  |
 | `ctx.data.points` empty | render `state-empty` block: "No data available"     |
-| field is `null`       | show `—` (em-dash)                                     |
+| field is `null`       | show `-` (em-dash)                                     |
 | temp out of range     | clamp to int + ° suffix (e.g. `45°`)                   |
 
 ---
@@ -287,19 +287,19 @@ What gets hidden / shrunk as the cell gets smaller. Be specific.
 
 Anything that doesn't fit above. Examples:
 
-- "Bias toward `warn` for hot temps on the Spectra 6 panel — the
+- "Bias toward `warn` for hot temps on the Spectra 6 panel, the
   yellow primary is the most attention-grabbing."
 - "Chart.js: enable the `tension: 0.35` smoothing; disable
   animations (`animation: false`)."
-- "Default saturation should be 1.4 — Spectra 6 quantises pale
+- "Default saturation should be 1.4, Spectra 6 quantises pale
   colours into white otherwise."
 
 ---
 
 # Minimal example brief
 
-Below is what a brief for a **`year_progress`** widget — a single
-horizontal bar showing how much of the year is done — would look
+Below is what a brief for a **`year_progress`** widget, a single
+horizontal bar showing how much of the year is done, would look
 like. It's intentionally short because the widget is small; longer
 widgets (charts, multi-section dashboards) need proportionally more
 detail in sections 6, 7, 9, 10.
@@ -320,13 +320,13 @@ current calendar year we are.
 
 ## 2. Sizes supported
 
-xs, sm, md, lg — bar collapses gracefully at xs.
+xs, sm, md, lg, bar collapses gracefully at xs.
 
 ## 3. Cell options
 
 | name | type | default | label | choices |
 |------|------|---------|-------|---------|
-| `show_percent` | `boolean` | `true` | Show % number | — |
+| `show_percent` | `boolean` | `true` | Show % number |, |
 
 ## 4. Plugin settings
 
@@ -338,7 +338,7 @@ Client-side only. Compute `pct = (today - jan_1) / (dec_31 - jan_1)`.
 
 ## 6. `ctx.data` shape
 
-`null` — widget is fully client-side.
+`null`, widget is fully client-side.
 
 ## 7. Layout mockups
 
@@ -355,18 +355,18 @@ Client-side only. Compute `pct = (today - jan_1) / (dec_31 - jan_1)`.
 └──────────────────────────────────────────────┘
 ```
 
-[1] head — uppercase title (`--text-muted`), year (`--accent-4`) on
+[1] head, uppercase title (`--text-muted`), year (`--accent-4`) on
     the right. `.w-title` shell, h3 + `.w-title-meta`.
-[2] bar — full-width, height 14cqh. Fill: `var(--accent-4)`. Track:
+[2] bar, full-width, height 14cqh. Fill: `var(--accent-4)`. Track:
     `var(--surface-sunken)`. Rounded corners: `border-radius: 999px`
-    (stadium pill — for an editorial-only widget you'd use
+    (stadium pill, for an editorial-only widget you'd use
     `var(--pill-radius)` instead).
-[3] percent — right-aligned, weight `var(--fw-bold)`, `--text-primary`,
+[3] percent, right-aligned, weight `var(--fw-bold)`, `--text-primary`,
     clamp(20px, 4cqw, 36px).
-[4] footer — `--text-muted`, regular weight, single line.
+[4] footer, `--text-muted`, regular weight, single line.
 
-### sm (380×240) — same, smaller type
-### xs (180×180) — just the bar + percent, drop head + footer
+### sm (380×240), same, smaller type
+### xs (180×180), just the bar + percent, drop head + footer
 
 ## 8. Icon manifest
 
@@ -381,9 +381,9 @@ Weights: `regular` only.
 
 | element | data value | token | role |
 |---------|------------|-------|------|
-| bar fill | <50%      | `--accent-4` | primary — progress, not alert |
+| bar fill | <50%      | `--accent-4` | primary, progress, not alert |
 | bar fill | 50–80%    | `--accent-4` | primary |
-| bar fill | >80%      | `--accent-2` | warning — running out of year |
+| bar fill | >80%      | `--accent-2` | warning, running out of year |
 
 ## 10. Size adaptations
 
@@ -395,7 +395,7 @@ Weights: `regular` only.
 
 ## 11. Edge cases
 
-None — purely computed from today's date.
+None, purely computed from today's date.
 
 ## 12. Notes
 

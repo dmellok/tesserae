@@ -1,4 +1,4 @@
-"""ha_core smoke: config gating, entity_choices shaping, error coercion —
+"""ha_core smoke: config gating, entity_choices shaping, error coercion -
 no network (get_states is monkeypatched)."""
 
 from __future__ import annotations

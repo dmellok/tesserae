@@ -2,7 +2,7 @@
 
 Same upstream as f1_next (Jolpica /current/next.json) but kept in its
 own plugin so each widget has independent caching + cell options. One
-HTTP call per plugin per hour — the calendar barely changes.
+HTTP call per plugin per hour, the calendar barely changes.
 """
 
 from __future__ import annotations

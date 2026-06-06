@@ -38,7 +38,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Stable bump — release: published + workflow_dispatch.
+  # Stable bump, release: published + workflow_dispatch.
   bump-stable:
     if: github.event_name != 'push'
     runs-on: ubuntu-latest
@@ -85,7 +85,7 @@ jobs:
           fi
 
           date_iso="$(date -u +'%Y-%m-%d')"
-          entry="## ${VERSION} — ${date_iso}
+          entry="## ${VERSION}, ${date_iso}
 
           - Tracks Tesserae [${TAG}](https://github.com/dmellok/tesserae/releases/tag/${TAG}).
 
@@ -118,7 +118,7 @@ jobs:
           git add tesserae/config.yaml tesserae/CHANGELOG.md
           [ -f tesserae/Dockerfile ] && git add tesserae/Dockerfile || true
           if git diff --cached --quiet; then
-              echo "Add-on already at version ${VERSION} — nothing to commit."
+              echo "Add-on already at version ${VERSION}, nothing to commit."
               exit 0
           fi
           git commit -m "Track Tesserae ${TAG}
@@ -128,7 +128,7 @@ jobs:
           git push
           echo "Bumped stable add-on to ${VERSION}."
 
-  # Edge bump — push: branches: [main]. Tracks every main commit.
+  # Edge bump, push: branches: [main]. Tracks every main commit.
   bump-edge:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -136,7 +136,7 @@ jobs:
       - name: Check out tesserae core (for pyproject.toml + log subject)
         uses: actions/checkout@v6
         with:
-          # Just the tip commit — we only need pyproject.toml + the
+          # Just the tip commit, we only need pyproject.toml + the
           # commit subject for the CHANGELOG entry.
           fetch-depth: 2
 
@@ -146,14 +146,14 @@ jobs:
           GITHUB_SHA_FULL: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # Pyproject version is the "base" of the edge version string —
+          # Pyproject version is the "base" of the edge version string -
           # so an edge of 0.11.14-era main pushes resolves to
           # 0.11.14-edge.<sha7>. Matches the docker.yml edge-tag step.
           base="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
           sha="$(echo "${GITHUB_SHA_FULL}" | cut -c1-7)"
           edge_version="${base}-edge.${sha}"
           subject="$(git log -1 --pretty=format:'%s' "${GITHUB_SHA_FULL}")"
-          # Escape backticks / quotes for safety later — leave most punctuation.
+          # Escape backticks / quotes for safety later, leave most punctuation.
           echo "version=${edge_version}" >> "$GITHUB_OUTPUT"
           echo "sha=${sha}" >> "$GITHUB_OUTPUT"
           {
@@ -180,11 +180,11 @@ jobs:
           FULL_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          # If the edge directory doesn't exist yet, give up loudly —
+          # If the edge directory doesn't exist yet, give up loudly -
           # we scaffold it manually once; the workflow doesn't try to
           # create it.
           if [ ! -d tesserae-edge ]; then
-              echo "::warning::tesserae-edge/ not present on the add-on repo — skipping. Scaffold it first."
+              echo "::warning::tesserae-edge/ not present on the add-on repo, skipping. Scaffold it first."
               exit 0
           fi
 
@@ -193,7 +193,7 @@ jobs:
           date_iso="$(date -u +'%Y-%m-%d')"
           # Single-line subject keeps the entry compact since edge ships
           # many commits per day.
-          entry="## ${VERSION} — ${date_iso}
+          entry="## ${VERSION}, ${date_iso}
 
           - [\`${SHA}\`](https://github.com/dmellok/tesserae/commit/${FULL_SHA}) ${SUBJECT}
 
@@ -222,14 +222,14 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -d tesserae-edge ]; then
-              echo "No edge dir to commit — exiting cleanly."
+              echo "No edge dir to commit, exiting cleanly."
               exit 0
           fi
           git config user.name "tesserae-bot"
           git config user.email "[email protected]"
           git add tesserae-edge/config.yaml tesserae-edge/CHANGELOG.md
           if git diff --cached --quiet; then
-              echo "Edge add-on already at ${VERSION} — nothing to commit."
+              echo "Edge add-on already at ${VERSION}, nothing to commit."
               exit 0
           fi
           git commit -m "edge: track Tesserae main @ ${SHA}

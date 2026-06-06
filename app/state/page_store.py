@@ -1,10 +1,10 @@
 """File-backed store for saved dashboards.
 
-A page is a Pydantic model — a panel grid plus N positioned cells, each cell
+A page is a Pydantic model, a panel grid plus N positioned cells, each cell
 naming a plugin and carrying its options. The store is a JSON file at
 ``data/core/pages.json`` keyed by page id.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class Panel(BaseModel):
     ``w``/``h`` are the canvas the composer renders at, already in the
     chosen aspect (portrait = tall). Each renderer maps that canvas onto
     its client's fixed native buffer. ``flip`` adds a 180° turn for an
-    upside-down physical mount — the only mount detail the renderer can't
+    upside-down physical mount, the only mount detail the renderer can't
     infer from aspect alone.
 
     ``gamut`` is the physical panel's colour gamut; the .bin packer keys
@@ -46,13 +46,13 @@ class Panel(BaseModel):
     gamut: str = "waveshare_e6"
     underscan: int = Field(default=0, ge=0)
     # Firmware-native row stride. The panel hardware fixes its (w, h)
-    # regardless of how the user has the composition oriented — the
+    # regardless of how the user has the composition oriented, the
     # renderer must pack at these dims (firmware streams straight to
     # SPI / the device's display buffer). Optional: populated from
     # PANEL_PRESETS or a device manifest's ``native_w``/``native_h``
     # block at resolution time. Renderers fall back to (w, h) when
     # absent, matching pre-v0.19.19 behaviour for custom / unknown
-    # panels. Not persisted on pages — pages serialize their own
+    # panels. Not persisted on pages, pages serialize their own
     # ``panel`` optional override but native dims are a hardware fact,
     # not a per-page choice.
     native_w: int | None = Field(default=None, gt=0)
@@ -105,12 +105,12 @@ class Page(BaseModel):
 
     ``device_ids`` ties the page to one or more devices. When non-empty:
 
-    * the editor sizes the layout against those devices' panels — one
+    * the editor sizes the layout against those devices' panels, one
       preview per distinct aspect ratio
     * the push pipeline renders once per distinct panel and fans out
       each frame only to that panel's devices' renderers
 
-    Empty means "no specific home" — the page uses the global settings
+    Empty means "no specific home", the page uses the global settings
     panel and fans out to every loaded renderer (legacy single-head).
     """
 
@@ -120,18 +120,18 @@ class Page(BaseModel):
     device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)
     font: str | None = None
-    # Spectra theme id — picks one of the self-contained semantic blocks
+    # Spectra theme id, picks one of the self-contained semantic blocks
     # defined in static/style/spectra-tokens.css (light, dark, high-contrast,
     # sepia, nord, cool-gray, bauhaus, destijl, brutalist). Renders as
     # ``data-theme=<id>`` on the composer body; unknown ids fall back to
     # the :root defaults (light).
     theme: str = "light"
-    # Spectra style id — the orthogonal typography/density/shape axis defined
+    # Spectra style id, the orthogonal typography/density/shape axis defined
     # in static/style/spectra-styles.css (standard, display, editorial, mono,
     # elegant, condensed, bauhaus, destijl, brutalist). Renders as
     # ``data-style=<id>`` on the composer body; unknown ids fall back to
     # ``standard``. The style controls font + scale + edges; the theme controls
-    # colour — any pair composes.
+    # colour, any pair composes.
     style: str = "standard"
     gap: int = 0
     corner_radius: int = 0
@@ -155,7 +155,7 @@ class Page(BaseModel):
         """Store Phosphor icon names bare (e.g. ``house``). Templates add
         the ``ph ph-`` class prefix themselves, so a stored ``ph-house``
         would render as ``ph-ph-house`` (no icon). Normalise on the way
-        in — fixes legacy data on load and any future prefixed input."""
+        in, fixes legacy data on load and any future prefixed input."""
         if isinstance(value, str):
             cleaned = value.strip().removeprefix("ph-")
             return cleaned or None
@@ -165,7 +165,7 @@ class Page(BaseModel):
 class PageStore:
     """Thread-safe, file-backed dictionary of pages.
 
-    The file is rewritten whole on every save — pages are small (a handful of
+    The file is rewritten whole on every save, pages are small (a handful of
     KB at most) and human-editable. No journaling; the OS-atomic rename keeps
     the file consistent if the process dies mid-write.
     """

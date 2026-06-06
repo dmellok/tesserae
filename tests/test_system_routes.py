@@ -1,7 +1,7 @@
 """Settings → System: page renders + backup action routes round-trip.
 
 The update routes (check / apply / rollback) hit ``git``/``pip`` against
-the real repo, so they're covered by ``tests/test_updater.py`` instead —
+the real repo, so they're covered by ``tests/test_updater.py`` instead -
 exercising them through the test client would mutate the working tree.
 """
 
@@ -42,7 +42,7 @@ def test_settings_system_page_renders(app: Flask) -> None:
     assert resp.status_code == 200
     assert "Updates" in body
     assert "Backups" in body
-    # The Updater's current_state() resolves against the real repo — the
+    # The Updater's current_state() resolves against the real repo, the
     # version string from pyproject should appear.
     assert "v0." in body  # e.g. "v0.2.0"
 
@@ -88,7 +88,7 @@ def test_system_page_swaps_update_card_under_docker(
 ) -> None:
     """Under the official Docker image (``TESSERAE_IN_DOCKER=1``) the
     in-app self-update card is hidden and replaced by a ``docker
-    compose pull`` hint — a ``git pull`` inside a layered filesystem
+    compose pull`` hint, a ``git pull`` inside a layered filesystem
     would lose changes on the next image rebuild."""
     monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
     client = app.test_client()
@@ -113,7 +113,7 @@ def test_update_apply_refused_under_docker(app: Flask, monkeypatch: pytest.Monke
 
 
 def test_telemetry_test_button_is_dev_only(app: Flask) -> None:
-    """The "Send test event" button is dev-only — the card is hidden in
+    """The "Send test event" button is dev-only, the card is hidden in
     production builds and the route is gated to ``current_app.debug``.
     Hitting it without debug should be a silent no-op redirect, not a
     flash that admits the route exists."""

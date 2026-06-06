@@ -1,4 +1,4 @@
-// ha_energy — Spectra status archetype with a Chart.js Sankey as
+// ha_energy, Spectra status archetype with a Chart.js Sankey as
 // the centrepiece. Source rails on the left (Solar / Battery
 // discharge / Grid import) carry proportional flow ribbons across
 // to sink rails on the right (House / Battery charge / Grid export).
@@ -20,9 +20,9 @@ function escapeHtml(s) {
 }
 
 function fmtW(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   const n = Number(v);
-  if (Number.isNaN(n)) return "—";
+  if (Number.isNaN(n)) return "-";
   if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)} kW`;
   return `${Math.round(n)} W`;
 }
@@ -83,7 +83,7 @@ function comparisonSparklineSvg({ today, yesterday, nowHour, accent }) {
     </svg>`;
 }
 
-// Phase-of-day glyph for the title bar — same vocabulary as the
+// Phase-of-day glyph for the title bar, same vocabulary as the
 // clock_world widget so the family stays consistent.
 function sunGlyph(hour) {
   if (!Number.isFinite(hour)) return { icon: "ph-sun", color: "var(--accent-2)" };
@@ -95,7 +95,7 @@ function sunGlyph(hour) {
 }
 
 // Decompose live power readings into Sankey flows. Sign conventions:
-//   solar > 0           — production
+//   solar > 0          , production
 //   grid  > 0 import,  < 0 export
 //   battery > 0 charge, < 0 discharge
 //
@@ -175,7 +175,7 @@ export default function render(shadow, ctx) {
     accent,
   });
 
-  // Per-rail labels — what watts are flowing through each named rail.
+  // Per-rail labels, what watts are flowing through each named rail.
   // Used for the chip strip beside the chart.
   const railTotals = (() => {
     const sum = {};
@@ -211,7 +211,7 @@ export default function render(shadow, ctx) {
       background: color-mix(in oklab, var(--accent-2) 12%, var(--surface));
       color: var(--accent-2);
     }
-    /* Sankey container — taller still so the 120px nodePadding has
+    /* Sankey container, taller still so the 120px nodePadding has
        room to push the three sink rails apart while still leaving
        the bands a sensible thickness. clamp(11em, 38cqh, 20em) gives
        a tall channel that scales with cell size. */
@@ -375,7 +375,7 @@ export default function render(shadow, ctx) {
       labelSize: 12,
     });
   } else {
-    // No active flows — paint a muted message in the chart area
+    // No active flows, paint a muted message in the chart area
     // so the cell doesn't look broken.
     const ctx2d = sankeyCanvas.getContext("2d");
     sankeyCanvas.width = sankeyCanvas.offsetWidth;

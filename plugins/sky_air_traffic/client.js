@@ -1,4 +1,4 @@
-// sky_air_traffic — Spectra status archetype with a radar-style
+// sky_air_traffic, Spectra status archetype with a radar-style
 // hero. SVG dial with concentric range rings, the user at the
 // centre, and each nearby flight plotted by its bearing + distance.
 // Below the radar, the flight list carries an altitude bar per row
@@ -12,9 +12,9 @@ function escapeHtml(s) {
 }
 
 function fmtAlt(m) {
-  if (m == null) return "—";
+  if (m == null) return "-";
   const v = Number(m);
-  if (!Number.isFinite(v)) return "—";
+  if (!Number.isFinite(v)) return "-";
   return `${(v / 1000).toFixed(1)}km`;
 }
 
@@ -66,7 +66,7 @@ function radarSvg({ centerLat, centerLon, radius, flights }) {
             text-anchor="middle" font-size="12" font-weight="900"
             fill="var(--text-primary)" font-family="var(--font-family)">${label}</text>`;
   }).join("");
-  // Centre pin — chunky concentric rings so "you are here" reads
+  // Centre pin, chunky concentric rings so "you are here" reads
   // unambiguously even against the radar's coloured plane dots.
   const centre = `
     <circle cx="${cx}" cy="${cy}" r="5" fill="var(--accent-1)"/>
@@ -79,7 +79,7 @@ function radarSvg({ centerLat, centerLon, radius, flights }) {
       ? bearingDeg(centerLat, centerLon, f.lat, f.lon)
       : 0;
     const r = (dist / radius) * R;
-    // SVG y is flipped — turn the bearing into screen coords with -90 offset.
+    // SVG y is flipped, turn the bearing into screen coords with -90 offset.
     const θ = ((bearing - 90) * Math.PI) / 180;
     const x = cx + Math.cos(θ) * r;
     const y = cy + Math.sin(θ) * r;
@@ -150,7 +150,7 @@ export default function render(shadow, ctx) {
       <div class="at-row ${i % 2 ? "is-zebra" : ""}">
         <div class="list-lead at-row-lead">
           <i class="ph-bold ${ph}" style="color:${accent};transform:rotate(${rot}deg)"></i>
-          <span class="list-title">${escapeHtml(f.callsign || "—")}<small class="at-country">${escapeHtml(f.country || "")}</small></span>
+          <span class="list-title">${escapeHtml(f.callsign || "-")}<small class="at-country">${escapeHtml(f.country || "")}</small></span>
         </div>
         <div class="at-meta">
           <span class="at-alt-bar" title="${escapeHtml(fmtAlt(f.altitude))}">

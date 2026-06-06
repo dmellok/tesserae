@@ -1,4 +1,4 @@
-"""picture_apod — NASA Astronomy Picture of the Day.
+"""picture_apod, NASA Astronomy Picture of the Day.
 
 Ported from inky-dash's apod plugin. Walks back day-by-day if today's
 entry is a video, capped at LOOKBACK_DAYS so a long video streak can't

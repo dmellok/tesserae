@@ -2,7 +2,7 @@
 
 Seeds an "already onboarded" Tesserae (admin password set, onboarding
 flag flipped, one device registered) before launching, so the recording
-opens on the Dashboards list and is purely about composing — no wizard
+opens on the Dashboards list and is purely about composing, no wizard
 pre-roll. Then drives Playwright through:
 
   1. /login
@@ -33,8 +33,8 @@ from _recording import REPO_ROOT, CursorDriver, add_common_cli_args, run_scenari
 # ----- Per-step hold pacing -------------------------------------------
 #
 # Each step's hold is scaled to its visual density. The editor is the
-# most info-dense screen Tesserae has — layout grid, cells, sidebar,
-# preview — so it gets the longest holds.
+# most info-dense screen Tesserae has, layout grid, cells, sidebar,
+# preview, so it gets the longest holds.
 HOLD_LOGIN = 2.5
 HOLD_LIST = 3.0
 HOLD_EDITOR_INTRO = 4.5
@@ -43,7 +43,7 @@ HOLD_CELL_PICK = 2.8
 HOLD_AFTER_WIDGET = 3.0
 HOLD_CUSTOM_OPEN = 2.5  # the Custom-layout details expanded
 HOLD_AFTER_INSERT = 3.0  # let the new cell settle into the board
-HOLD_PREVIEW = 5.5  # the payoff frame — give it room
+HOLD_PREVIEW = 5.5  # the payoff frame, give it room
 HOLD_DONE = 1.0
 BEAT_S = 0.5
 READ_PAUSE_S = 1.2
@@ -103,7 +103,7 @@ def prepare_onboarded_state(data_root: Path) -> None:
 async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> None:
     # ---- /login ----------------------------------------------------
     # ``?next=/pages`` parks us on the Dashboards list straight after
-    # signing in — the default redirect target is /send, which isn't
+    # signing in, the default redirect target is /send, which isn't
     # what this scenario is about.
     await page.goto(f"{base_url}/login?next=/pages")
     await page.wait_for_load_state("domcontentloaded")
@@ -121,7 +121,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await asyncio.sleep(BEAT_S)
     await cursor.click(page.locator(".dashboard-create-btn"))
 
-    # ---- /pages/<id> editor — bind the device, pick a layout -------
+    # ---- /pages/<id> editor, bind the device, pick a layout -------
     await page.wait_for_url(
         lambda url: "/pages/" in url and not url.endswith("/pages"),
         timeout=10_000,
@@ -130,7 +130,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await asyncio.sleep(HOLD_EDITOR_INTRO)
 
     # Tick the Hallway device. The native checkbox is hidden under a
-    # styled <label> — clicking the label triggers the input via the
+    # styled <label>, clicking the label triggers the input via the
     # browser's built-in label-for-input wiring AND lets the label's
     # own focus/hover styling animate in the recording, which clicking
     # the bare input wouldn't.
@@ -143,7 +143,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
 
     # Apply the 2-columns preset. The smooth scroll in ``focus_on``
     # centres the button in the viewport so the sticky topbar isn't
-    # in the way — no force-click needed.
+    # in the way, no force-click needed.
     await cursor.click(
         page.locator('button.layout-card[aria-label="Apply 2 columns"]'),
     )
@@ -151,7 +151,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await cursor.park_centre()
     await asyncio.sleep(HOLD_AFTER_LAYOUT)
 
-    # ---- Fill cell 1 with Weather — Now -----------------------------
+    # ---- Fill cell 1 with Weather, Now -----------------------------
     cells = page.locator("section.cell-card")
     cell1_id = await cells.nth(0).get_attribute("data-cell-id")
     await cursor.select_visibly(
@@ -159,13 +159,13 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
         "weather_now",
         hold_s=HOLD_CELL_PICK,
     )
-    # The plugin select has data-reload-on-change — wait for the editor
+    # The plugin select has data-reload-on-change, wait for the editor
     # to re-render with the chosen widget's option fields visible.
     await page.wait_for_load_state("networkidle", timeout=10_000)
     await cursor.park_centre()
     await asyncio.sleep(HOLD_AFTER_WIDGET)
 
-    # ---- Fill cell 2 with Clock — Word ------------------------------
+    # ---- Fill cell 2 with Clock, Word ------------------------------
     cells = page.locator("section.cell-card")
     cell2_id = await cells.nth(1).get_attribute("data-cell-id")
     await cursor.select_visibly(
@@ -197,7 +197,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await right_board_cell.hover()
     await asyncio.sleep(0.3)
     await cursor.click(right_board_cell.locator(".le-insert--bottom"))
-    # The insert posts to /pages/<id>/cells/batch in-place — no nav, so
+    # The insert posts to /pages/<id>/cells/batch in-place, no nav, so
     # wait for the board's DOM to reflect three cells before continuing.
     await page.wait_for_function(
         "() => document.querySelectorAll('[data-layout-board] .le-cell').length === 3",
@@ -221,7 +221,7 @@ async def drive_dashboard(page: Any, base_url: str, cursor: CursorDriver) -> Non
     await cursor.park_centre()
     await asyncio.sleep(HOLD_AFTER_WIDGET)
 
-    # ---- Hold on the live preview — the payoff frame ---------------
+    # ---- Hold on the live preview, the payoff frame ---------------
     # The preview card renders server-side as cells change, so by now
     # it shows the composed dashboard. Glide the cursor onto it so the
     # viewer's eye lands there too.

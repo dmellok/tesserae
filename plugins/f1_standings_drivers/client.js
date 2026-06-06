@@ -1,4 +1,4 @@
-// f1_standings_drivers — Spectra list archetype, championship-led.
+// f1_standings_drivers, Spectra list archetype, championship-led.
 //
 // Each driver is a row: position icon + driver code + team chip on
 // the left, points + delta arrow on the right, plus a points-gap
@@ -123,7 +123,7 @@ export default function render(shadow, ctx) {
         </span>
         <div class="standings-body">
           <div class="standings-head">
-            <span class="standings-code">${escapeHtml(s.code || s.family || "—")}</span>
+            <span class="standings-code">${escapeHtml(s.code || s.family || "-")}</span>
             ${s.constructor ? `<span class="standings-team" style="color:${team}">${escapeHtml(s.constructor)}</span>` : ""}
             ${delta}
             <span class="standings-points">
@@ -211,7 +211,7 @@ export default function render(shadow, ctx) {
       margin-left: 0.2em;
       letter-spacing: var(--ls-label);
     }
-    /* Position-change chip — up arrow + count for gains, down arrow +
+    /* Position-change chip, up arrow + count for gains, down arrow +
        count for losses, dash for "held". Coloured by direction so a
        scan picks out who moved without reading the number. */
     .standings-delta {
@@ -240,7 +240,7 @@ export default function render(shadow, ctx) {
       color: var(--text-muted);
       background: color-mix(in oklab, var(--text-muted) 12%, transparent);
     }
-    /* Points-gap micro-bar — leader paints full width in their team
+    /* Points-gap micro-bar, leader paints full width in their team
        colour; everyone else's bar scales to their share of the
        leader's points so a glance reads the championship gap. */
     .standings-bar {

@@ -8,7 +8,7 @@ broker (**Settings → Server → MQTT broker**), and you've
 ## Register an MQTT client (Pi / ESP32)
 
 1. **Flash a client** for your hardware (see [Install a client](clients.md)). On first run it publishes a heartbeat on `tesserae/<device-id>/status`.
-2. **Settings → Devices → Discovered.** A client that announced itself shows up here with its kind and panel size pre-filled — click **Register** to turn it into a device instance.
+2. **Settings → Devices → Discovered.** A client that announced itself shows up here with its kind and panel size pre-filled, click **Register** to turn it into a device instance.
 
     !!! note "No heartbeat yet?"
         Use **Add device** to create one by hand. Check the broker host in
@@ -22,12 +22,12 @@ broker (**Settings → Server → MQTT broker**), and you've
 
 1. **Settings → Devices → Add device → TRMNL.** Tesserae generates a short 5-character access token and prints it on the card.
 2. **Type the token into your TRMNL device or Kindle's KOReader `trmnl-display` plugin.** It calls `/api/setup`, exchanges the token for a permanent device-id + access token, and starts polling `/api/display` on the cadence you configure.
-3. **Calibrate + bind a dashboard** exactly as above — the device appears in the Devices list the moment it completes setup.
+3. **Calibrate + bind a dashboard** exactly as above, the device appears in the Devices list the moment it completes setup.
 
 ## Per-device settings
 
-Each registered device carries its own panel block — width, height, orientation,
-colour gamut, and underscan (inset content to clear a physical mat/bezel) —
+Each registered device carries its own panel block, width, height, orientation,
+colour gamut, and underscan (inset content to clear a physical mat/bezel) -
 plus picture-quality controls (dither algorithm, saturation, contrast) that tune
 the output for the specific panel. These live on the device, not on the
 renderer, so two panels driven by the same renderer can differ. For TRMNL /
@@ -40,7 +40,7 @@ The page editor models a dashboard as **one page → one layout preset → one
 widget per cell**.
 
 1. **Settings → Pages → New page** (or pick an existing one). Set its panel
-   block to the size the dashboard targets — usually the size of the device
+   block to the size the dashboard targets, usually the size of the device
    you're binding to.
 2. **Pick a layout preset.** Ten built-in presets are exposed as cards: one
    cell, two columns, two rows, three rows, 2×2 grid, hero top / bottom /
@@ -53,9 +53,9 @@ widget per cell**.
    gallery sidebar; the per-cell form rewrites itself from the widget's
    `cell_options`.
 4. **Tweak the cell.** A zoom slider per cell scales widget content up
-   or down without changing the cell's footprint on the panel —
+   or down without changing the cell's footprint on the panel -
    useful for a "make this number bigger" pass without resizing.
-5. **Bind devices.** Drop devices into the page's **devices** block —
+5. **Bind devices.** Drop devices into the page's **devices** block -
    one or many. A page bound to several differently-sized panels
    renders once per distinct panel size and fans each frame out.
 6. **Send.** Hit Send to push immediately, or let the scheduler do it
@@ -72,5 +72,5 @@ out only to the displays that share it.
 ## Next steps
 
 - [Browse the widget gallery](../widgets/gallery.md) and start composing
-- [Screens & compatibility](../compatibility.md) — panel presets, renderers, and what's tested
-- [Home Assistant integration](home-assistant.md) — surface every device as HA entities via MQTT discovery, or run Tesserae as an HA Add-on
+- [Screens & compatibility](../compatibility.md), panel presets, renderers, and what's tested
+- [Home Assistant integration](home-assistant.md), surface every device as HA entities via MQTT discovery, or run Tesserae as an HA Add-on

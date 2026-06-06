@@ -46,7 +46,7 @@
         location.reload();
       }
     } catch (e) {
-      /* broker/transport hiccup — try again next tick */
+      /* broker/transport hiccup, try again next tick */
     }
   }
 

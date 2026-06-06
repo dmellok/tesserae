@@ -1,4 +1,4 @@
-"""ha_locks — door / window / garage / lock security overview.
+"""ha_locks, door / window / garage / lock security overview.
 
 Auto-discovers everything in one ``get_states`` pass:
 
@@ -29,7 +29,7 @@ The variants paint from this shape::
     }
 
 The cell stays drawing even when HA is unreachable or no matching
-entities exist — the variants render an "ALL SECURED" / "NOTHING TO
+entities exist, the variants render an "ALL SECURED" / "NOTHING TO
 WATCH" panel in those cases.
 """
 
@@ -59,7 +59,7 @@ def _core() -> Any:
 
 
 def choices(name: str) -> list[dict[str, str]]:
-    """Entity picker — surfaces ``lock.*`` and the door/window/garage
+    """Entity picker, surfaces ``lock.*`` and the door/window/garage
     binary sensors. The user can narrow further if they want to drop a
     noisy garage-door sensor from a "front of house" widget."""
     core = _core()
@@ -163,7 +163,7 @@ def fetch(
     except Exception as err:
         return {"error": core.coerce_error(err)}
 
-    # User-picked entities skip the kind/include_* filtering — if you
+    # User-picked entities skip the kind/include_* filtering, if you
     # asked for it you get it. Auto-discovery still honours the include
     # toggles for noisy household sensors.
     picked_raw = options.get("entities") or []

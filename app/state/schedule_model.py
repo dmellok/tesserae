@@ -2,16 +2,16 @@
 
 Two kinds of schedule:
 
-* ``interval`` — fires every ``interval_minutes``, optionally bounded by
+* ``interval``, fires every ``interval_minutes``, optionally bounded by
   a time-of-day window and/or a day-of-week mask. ``every 15 minutes
   between 06:00 and 22:00 on weekdays``.
-* ``daily``    — fires once per day at the time in ``fires_at`` (the date
+* ``daily``   , fires once per day at the time in ``fires_at`` (the date
   portion is ignored). Day-of-week filter still applies; the time-of-day
   window does not.
 
 Higher ``priority`` schedules win when two are due at the same tick. Per-
 renderer dither / saturation / etc. live on the renderer's own settings
-section — schedules don't carry render-tuning knobs, they only decide
+section, schedules don't carry render-tuning knobs, they only decide
 **when** to fire a push.
 
 mypy --strict applies via re-export through app.state.
@@ -41,10 +41,10 @@ class Schedule(BaseModel):
     # interval-only
     interval_minutes: int | None = Field(default=None, ge=1, le=10_080)
 
-    # daily-only — only the time portion is used; date is ignored.
+    # daily-only, only the time portion is used; date is ignored.
     fires_at: datetime | None = None
 
-    # Common windowing (interval only — daily ignores the window and only
+    # Common windowing (interval only, daily ignores the window and only
     # honours days_of_week).
     days_of_week: list[int] = Field(default_factory=lambda: list(DAYS_OF_WEEK_FULL))
     time_of_day_start: str | None = None  # "HH:MM"

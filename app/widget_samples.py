@@ -9,11 +9,11 @@ instead of calling the widget's own ``fetch()``.
 
 Widgets that already talk to a public API in their default config
 (weather → Open-Meteo, news → reddit/HN, F1 → Ergast, etc.) don't
-need an entry here — their normal ``fetch()`` produces useful output
+need an entry here, their normal ``fetch()`` produces useful output
 in the gallery already. Only add a sample when the widget would
 otherwise be blank or error-stating in the gallery.
 
-The payload shape must match the widget's ``fetch()`` return — same
+The payload shape must match the widget's ``fetch()`` return, same
 keys, same nesting. If you change a widget's data contract, update
 its sample too or the gallery will render a stale frame that masks
 the regression.
@@ -118,14 +118,14 @@ def _ha_battery() -> dict[str, Any]:
     ]
     # The client reads ``low`` / ``critical`` as booleans (statusAccent
     # returns red/yellow/green from them), so the sample has to compute
-    # them against the thresholds the same way the real server does —
+    # them against the thresholds the same way the real server does -
     # otherwise every tile renders as "ok" green.
     items: list[dict[str, Any]] = [
         {"name": name, "level": level, "low": level < low_t, "critical": level < crit_t}
         for name, level in raw
     ]
     levels: list[int] = [level for _name, level in raw]
-    # 10 buckets of 10 % each — that's what the d4 Data view paints
+    # 10 buckets of 10 % each, that's what the d4 Data view paints
     # as its histogram. Without it the chart area stays blank.
     histogram = [0] * 10
     for lvl in levels:
@@ -163,7 +163,7 @@ _CAMERA_SAMPLE_DATA_URL = (
 
 def _ha_camera() -> dict[str, Any]:
     # Matches the server shape: ``{label, items: [{...}, ...]}``. The
-    # client unwraps ``items[0]`` to drive the hero — multi-camera
+    # client unwraps ``items[0]`` to drive the hero, multi-camera
     # rendering is a future iteration.
     return {
         "label": "Cameras",
@@ -761,7 +761,7 @@ def _weather_pollen_count() -> dict[str, Any]:
 
 
 def _glances_status() -> dict[str, Any]:
-    """Healthy server snapshot — CPU + RAM + disk in the safe zone so
+    """Healthy server snapshot, CPU + RAM + disk in the safe zone so
     the state pill paints `OK`. ``uptime`` is multi-day to exercise
     the ``Nd`` formatting branch in the client."""
     return {

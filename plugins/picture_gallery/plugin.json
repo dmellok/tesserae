@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Picture — Gallery",
+  "name": "Gallery Core",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Plugins → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",

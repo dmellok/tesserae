@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tesserae installer — macOS / Linux / Raspberry Pi.
+# Tesserae installer, macOS / Linux / Raspberry Pi.
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash
@@ -57,7 +57,7 @@ PYTHON="${PYTHON:-python3}"
 PORT="${TESSERAE_PORT:-}"
 
 # Pick a tty for prompts. When piped from curl (`curl ... | bash`)
-# stdin is the script body, not the terminal — /dev/tty still works.
+# stdin is the script body, not the terminal, /dev/tty still works.
 TTY=""
 if [[ -t 0 ]]; then
   TTY=/dev/stdin
@@ -109,7 +109,7 @@ info "Port: $PORT"
 # ---------- clone / update ----------
 step "Source"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-  info "Existing checkout at $INSTALL_DIR — pulling $BRANCH"
+  info "Existing checkout at $INSTALL_DIR, pulling $BRANCH"
   git -C "$INSTALL_DIR" fetch --quiet origin "$BRANCH"
   git -C "$INSTALL_DIR" checkout --quiet "$BRANCH"
   git -C "$INSTALL_DIR" pull --quiet --ff-only origin "$BRANCH"
@@ -140,7 +140,7 @@ ok "Dependencies installed"
 # ---------- Chromium for the webpage renderer ----------
 step "Chromium (webpage rendering)"
 if [[ "${SKIP_PLAYWRIGHT:-0}" == "1" ]]; then
-  warn "SKIP_PLAYWRIGHT=1 set — skipping Chromium setup."
+  warn "SKIP_PLAYWRIGHT=1 set, skipping Chromium setup."
   warn "The Send → Webpage tab and any webpage widgets won't render."
 else
   if playwright install chromium 2>/dev/null; then
@@ -164,7 +164,7 @@ else
       warn "    Debian / Pi OS:  sudo apt install chromium-browser"
       warn "    macOS:           brew install --cask chromium"
       warn "  Then re-run this installer, OR set TESSERAE_CHROMIUM_PATH yourself."
-      warn "  Until then, webpage rendering won't work — the rest does."
+      warn "  Until then, webpage rendering won't work, the rest does."
     fi
   fi
 fi

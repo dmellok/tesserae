@@ -1,6 +1,6 @@
 """Quantizer: packing layout, dither-mode dispatch, fit-to-panel scale modes.
 
-We don't assert on visual quality — that's curated manually with the
+We don't assert on visual quality, that's curated manually with the
 /calibrate page (later milestone). These check the byte-level invariants
 the firmware contract relies on."""
 
@@ -57,7 +57,7 @@ def test_pack_size_mismatch_rejected(red_panel: Image.Image) -> None:
 
 
 def test_pack_red_panel_maps_to_palette_red_nibble(red_panel: Image.Image) -> None:
-    """The 4th E6 palette entry (red) packs to firmware nibble 0x3 — the
+    """The 4th E6 palette entry (red) packs to firmware nibble 0x3, the
     invariant the firmware contract depends on. The red_panel fixture is
     filled with that entry's exact RGB so it round-trips cleanly through
     quantize regardless of whether the palette is nominal or calibrated."""
@@ -77,10 +77,10 @@ def test_pack_dispatches_every_dither_mode(red_panel: Image.Image, dither: str) 
 
 def test_pack_inky_7colour_orange_maps_to_nibble_six() -> None:
     """Orange exists only in the 7-colour gamut: palette index 6, LUT is
-    identity, so a panel filled with that exact calibrated orange packs
-    to 0x66 bytes. (Pure sRGB orange would dither across orange + yellow
-    on the calibrated palette, which is exactly what we want on hardware
-    — but unhelpful for a byte-level invariant test.)"""
+     identity, so a panel filled with that exact calibrated orange packs
+     to 0x66 bytes. (Pure sRGB orange would dither across orange + yellow
+     on the calibrated palette, which is exactly what we want on hardware
+    , but unhelpful for a byte-level invariant test.)"""
     orange = Image.new("RGB", (100, 80), INKY_7COLOUR_PALETTE[6])
     packed = pack_to_panel_bin(orange, width=100, height=80, dither="none", gamut="inky_7colour")
     assert all(b == 0x66 for b in packed)
@@ -101,8 +101,8 @@ def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:
 
 def test_calibrated_palette_constants_are_dustier_than_nominal() -> None:
     """The opt-in calibration constants describe the panel's measured
-    colours, not pure sRGB. Pin the qualitative claim — red dim, blue
-    navy, yellow mustard — so a future "let's normalize the palette
+    colours, not pure sRGB. Pin the qualitative claim, red dim, blue
+    navy, yellow mustard, so a future "let's normalize the palette
     tables" refactor can't silently revert them to primaries and break
     the calibrated path."""
     _black, _white, yellow, red, blue, _green = (
@@ -111,7 +111,7 @@ def test_calibrated_palette_constants_are_dustier_than_nominal() -> None:
     assert red != (255, 0, 0), "calibrated red should be the panel's dusty red"
     assert yellow != (255, 255, 0)
     assert blue != (0, 0, 255)
-    # Each entry still belongs to its colour family — red dominates red,
+    # Each entry still belongs to its colour family, red dominates red,
     # blue dominates blue. A reordering bug would catch on these.
     assert red[0] > red[1] and red[0] > red[2]
     assert blue[2] > blue[0] and blue[2] > blue[1]
@@ -128,7 +128,7 @@ def test_pack_calibrated_off_matches_nominal(red_panel: Image.Image) -> None:
 
 def test_pack_calibrated_on_uses_calibrated_palette_for_solid_panel() -> None:
     """A panel filled with the calibrated red still packs to nibble 0x3
-    when the calibrated toggle is on — the on-wire byte contract is
+    when the calibrated toggle is on, the on-wire byte contract is
     unchanged, only the dither target moves. After tone mapping the
     input is rescaled into the calibrated black/white band, then
     quantize maps that against the calibrated palette; pure calibrated
@@ -162,24 +162,24 @@ def test_pack_calibrated_dithers_midtone_grey() -> None:
         grey, width=100, height=80, dither="floyd-steinberg", calibrated=True
     )
     nibbles_calibrated = {b >> 4 for b in calibrated} | {b & 0xF for b in calibrated}
-    # We don't pin nominal to "one nibble" — at this exact brightness
-    # FS might happen to dither too — but calibrated must definitely
+    # We don't pin nominal to "one nibble", at this exact brightness
+    # FS might happen to dither too, but calibrated must definitely
     # have at least two, proving the tone-mapped dither is active.
     assert len(nibbles_calibrated) >= 2, (
         f"calibrated mid-grey should dither, got nibbles {nibbles_calibrated!r}"
     )
-    # And the two paths must produce different bytes — if they didn't,
+    # And the two paths must produce different bytes, if they didn't,
     # the toggle would be doing nothing.
     assert nominal != calibrated
 
 
 def test_pack_calibrated_falls_back_to_nominal_for_unknown_gamut() -> None:
     """Calibrated palettes only exist for the gamuts in _CALIBRATED_PALETTES.
-    For anything else (custom, future panels) the toggle is a no-op —
+    For anything else (custom, future panels) the toggle is a no-op -
     the renderer falls back to the nominal palette and the on-wire
     bytes match the calibrated=False path."""
     red = Image.new("RGB", (100, 80), (255, 0, 0))
-    # A gamut string the calibration table doesn't know — pack_to_panel_bin
+    # A gamut string the calibration table doesn't know, pack_to_panel_bin
     # falls back to waveshare_e6 nominal in both branches.
     nominal = pack_to_panel_bin(red, width=100, height=80, dither="none", gamut="not-a-gamut")
     calibrated = pack_to_panel_bin(

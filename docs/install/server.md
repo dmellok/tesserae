@@ -5,12 +5,12 @@ publishes frames out to your panels. It runs on macOS, Linux, Raspberry Pi,
 and Windows. Most clients (Pi / ESP32) consume frames via MQTT, so for those
 you'll want an **MQTT broker** (e.g. Mosquitto, or the one built into Home
 Assistant) and at least one [client](clients.md) to paint a panel. TRMNL /
-KOReader devices poll the server over HTTP instead — no broker required.
+KOReader devices poll the server over HTTP instead, no broker required.
 
 !!! tip "Or use Docker (or Home Assistant)"
     If you'd rather not touch Python, the [Docker install path](docker.md)
     has you running with one `docker compose up -d`. Running Home Assistant?
-    See the [Home Assistant integration](home-assistant.md) page — Tesserae
+    See the [Home Assistant integration](home-assistant.md) page, Tesserae
     can install as an HA Add-on (Ingress-tabbed inside HA's sidebar) and
     publish MQTT discovery so every device shows up as an HA entity.
 
@@ -34,7 +34,7 @@ The installer:
 - Clones the repo (default `~/tesserae`, override with `TESSERAE_DIR`)
 - Creates a venv and installs the project
 - Asks for a port (default `8765`)
-- Installs Chromium via Playwright for webpage rendering (with a system-browser fallback — see below)
+- Installs Chromium via Playwright for webpage rendering (with a system-browser fallback, see below)
 - Writes a `run.sh` (or `run.ps1`) shortcut in the install dir
 
 When it finishes, start the server with `./run.sh` (or `.\run.ps1`) from the
@@ -56,7 +56,7 @@ python3 -m venv .venv
 
 `python -m app.main` runs under
 [waitress](https://docs.pylonsproject.org/projects/waitress/), a pure-Python
-production WSGI server — the same command works on a Raspberry Pi appliance, no
+production WSGI server, the same command works on a Raspberry Pi appliance, no
 nginx required for a single-user install. `--dev` opts into Flask's dev server
 when you're hacking on the admin.
 
@@ -67,8 +67,8 @@ when you're hacking on the admin.
 
 ## First run
 
-1. Open `http://127.0.0.1:8765/` — on first boot you're sent to `/setup` to pick an admin password.
-2. Sign in at `/login`. The onboarding wizard walks you through pointing Tesserae at your **MQTT broker** (if any), registering your first **device**, and composing your first **dashboard** — the same screens you'd reach via Settings if you skipped it.
+1. Open `http://127.0.0.1:8765/`, on first boot you're sent to `/setup` to pick an admin password.
+2. Sign in at `/login`. The onboarding wizard walks you through pointing Tesserae at your **MQTT broker** (if any), registering your first **device**, and composing your first **dashboard**, the same screens you'd reach via Settings if you skipped it.
 3. **Settings → Server** holds the post-onboarding knobs: broker host / credentials, **base URL** the panel uses to fetch frames, optional **mDNS** broadcast of `tesserae.local`, and Chromium fallback for webpage rendering.
 4. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
 
@@ -76,7 +76,7 @@ To preview a single widget without composing a dashboard, run `--dev`, sign
 in, then open
 `http://127.0.0.1:8765/_test/render?plugin=clock_analog&size=md` in your
 browser. `/_test/render` needs the dev (or test) server **and** a logged-in
-session — it isn't loopback-exempt. The loopback bypass is only for
+session, it isn't loopback-exempt. The loopback bypass is only for
 `/compose/`, `/renders/`, and `/plugins/<id>/<asset>`, which the in-process
 Playwright renderer fetches without a session.
 
@@ -132,7 +132,7 @@ suitable for moving to another install or restoring after a wipe.
 - **Export:** clicks straight to a `tesserae-export-<timestamp>.zip`
   download. The ZIP includes every page JSON, theme definition, font
   pick, device registration, and per-plugin settings (with secrets
-  embedded — treat the file like a credential).
+  embedded, treat the file like a credential).
 - **Import:** upload a ZIP from another install. The server validates
   every file against the matching JSON Schema before writing, then
   replaces state atomically. On Docker / HA Add-on installs the
@@ -142,11 +142,11 @@ suitable for moving to another install or restoring after a wipe.
 The two endpoints land under `/settings/system/data/export` and
 `/settings/system/data/import`; they're admin-only.
 
-## mDNS — `tesserae.local`
+## mDNS, `tesserae.local`
 
 `tesserae.local` is the friendly hostname Tesserae can broadcast on
 your LAN so panels and clients don't need a hard-coded IP. Toggle it
-via **Settings → Server → mDNS** (off by default — the broadcast
+via **Settings → Server → mDNS** (off by default, the broadcast
 needs UDP multicast on port 5353, which some hosting setups disallow).
 When enabled, both the admin UI and the panel-side `/compose/` /
 `/renders/` routes are reachable at `http://tesserae.local:8765/`.
@@ -169,6 +169,6 @@ with no broker or Chromium dependency.
 ## Next steps
 
 - [Install a client](clients.md) for your panel hardware
-- [Set up a device](devices.md) — register it, calibrate orientation, bind a dashboard
-- [Home Assistant integration](home-assistant.md) — HA Add-on install + MQTT auto-discovery
+- [Set up a device](devices.md), register it, calibrate orientation, bind a dashboard
+- [Home Assistant integration](home-assistant.md), HA Add-on install + MQTT auto-discovery
 - [Browse the widgets](../widgets/gallery.md) you can place on a dashboard

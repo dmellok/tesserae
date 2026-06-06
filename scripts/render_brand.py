@@ -6,7 +6,7 @@ some Apple devices still want a PNG fallback. This script bakes both
 from the same canonical shape definition the SVG file describes so the
 nav mark, the favicon, and the add-on sidebar all stay in sync.
 
-Run when you change ``static/brand/icon.svg`` — or when the brand colour
+Run when you change ``static/brand/icon.svg``, or when the brand colour
 moves. Commits the PNGs alongside the SVG.
 
   python scripts/render_brand.py
@@ -63,7 +63,7 @@ def render(size: int = BASE_SIZE) -> Image.Image:
     bg[..., 3] = np.array(outer_mask)
     canvas = Image.fromarray(bg)
 
-    # Inner quadrant overlay — two filled white squares clipped to the
+    # Inner quadrant overlay, two filled white squares clipped to the
     # rounded inner rect (matches the conic-gradient pattern in shell.css).
     scale = size / BASE_SIZE
     inset = int(INNER_INSET * scale)
@@ -89,7 +89,7 @@ def render(size: int = BASE_SIZE) -> Image.Image:
     return Image.alpha_composite(canvas, overlay)
 
 
-# Firmware splash bakes — square PNGs with a transparent backdrop the
+# Firmware splash bakes, square PNGs with a transparent backdrop the
 # client can composite over whatever paper-white / dithered background
 # the panel uses. The brand mark itself stays opaque (the rounded
 # square + white tessellation pattern); only the corners outside the
@@ -101,19 +101,19 @@ FIRMWARE_SIZES: tuple[int, ...] = (64, 96, 128, 192, 256, 384, 512, 768, 1024)
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    # 128×128 — HA add-on standard sidebar icon.
+    # 128×128, HA add-on standard sidebar icon.
     render(BASE_SIZE).resize((128, 128), Image.LANCZOS).save(OUT_DIR / "icon.png", optimize=True)
-    # 512×512 — social cards, README, og:image.
+    # 512×512, social cards, README, og:image.
     render(BASE_SIZE).resize((512, 512), Image.LANCZOS).save(
         OUT_DIR / "icon-512.png", optimize=True
     )
-    # 32×32 — PNG favicon fallback for Safari + older browsers.
+    # 32×32, PNG favicon fallback for Safari + older browsers.
     render(BASE_SIZE).resize((32, 32), Image.LANCZOS).save(
         OUT_DIR / "favicon-32.png", optimize=True
     )
     print(f"Wrote PNGs into {OUT_DIR.relative_to(REPO_ROOT)}")
 
-    # Firmware splash bakes — keep them in their own subdir so the
+    # Firmware splash bakes, keep them in their own subdir so the
     # `find / | xargs` workflows that pick up brand assets for the
     # admin UI don't accidentally hoover up the splash sizes.
     fw_dir = OUT_DIR / "firmware"

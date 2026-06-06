@@ -1,4 +1,4 @@
-// news_wikipedia_otd — Spectra list archetype. Wikipedia "On This
+// news_wikipedia_otd, Spectra list archetype. Wikipedia "On This
 // Day" events. Each row leads with an era glyph (antiquity →
 // medieval → renaissance → industrial → modern), the historical
 // text, the page name as a sub-line, and an inline thumbnail when
@@ -48,7 +48,7 @@ function eraGlyph(year) {
   return { icon: "ph-broadcast", label: "Modern" };
 }
 
-// Year-timeline strip — HTML/CSS rather than SVG so the labels stay
+// Year-timeline strip, HTML/CSS rather than SVG so the labels stay
 // proportional regardless of container width. Container has a 1px
 // axis line via background, pips are absolutely positioned at
 // percentage offsets, and min/mid/max year labels sit beneath.
@@ -131,14 +131,14 @@ export default function render(shadow, ctx) {
           </div>
           ${thumb}
         </div>
-        <span class="otd-year" style="color:${accent}">${escapeHtml(String(it.year || "—"))}</span>
+        <span class="otd-year" style="color:${accent}">${escapeHtml(String(it.year || "-"))}</span>
       </div>`;
   }).join("");
 
   const timeline = timelineHtml(items, accent);
 
   const layout = `
-    /* Year-timeline strip — HTML/CSS so the labels never get
+    /* Year-timeline strip, HTML/CSS so the labels never get
        smooshed by SVG's preserveAspectRatio="none" trick. Axis is a
        1.5px background bar at y=50%; pips sit at percentage offsets
        above the axis; year labels (min / mid / max) sit beneath the

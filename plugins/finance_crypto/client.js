@@ -1,4 +1,4 @@
-// finance_crypto — Spectra stat archetype with a Chart.js sparkline.
+// finance_crypto, Spectra stat archetype with a Chart.js sparkline.
 // Hero is the price; the 24h delta wears an up/down badge (moss
 // rising, terracotta falling) with a chunky arrow + percentage.
 // Market cap appears in the title meta with a rank chip when
@@ -14,9 +14,9 @@ function escapeHtml(s) {
 }
 
 function fmtPrice(n, vs) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n);
-  if (Number.isNaN(v)) return "—";
+  if (Number.isNaN(v)) return "-";
   const sym = (vs === "usd" ? "$" : vs === "eur" ? "€" : vs === "gbp" ? "£" : "");
   if (v >= 10000) return `${sym}${Math.round(v).toLocaleString()}`;
   if (v >= 1) return `${sym}${v.toFixed(2)}`;
@@ -48,7 +48,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const coin = String(data.coin || "—").toUpperCase();
+  const coin = String(data.coin || "-").toUpperCase();
   const vs = String(data.vs || "usd").toLowerCase();
   const price = fmtPrice(data.price, vs);
   const change = data.change_24h;
@@ -57,10 +57,10 @@ export default function render(shadow, ctx) {
   const up = change != null && change >= 0;
   const deltaAccent = up ? "var(--accent-3)" : "var(--accent-1)";
   const deltaPh = up ? "ph-trend-up" : "ph-trend-down";
-  const deltaText = change == null ? "—" : `${Math.abs(change).toFixed(2)}%`;
+  const deltaText = change == null ? "-" : `${Math.abs(change).toFixed(2)}%`;
 
   const layout = `
-    /* Delta-pill — the 24h change as a colored badge so the
+    /* Delta-pill, the 24h change as a colored badge so the
        up/down direction reads from the colour alone, not just the
        arrow. Sits inline with the "24h" caption beside the hero. */
     .crypto-delta {

@@ -2,7 +2,7 @@
 
 The endpoint is the new external surface for the v0.6.x feature
 bundle, so the tests deliberately cover every status the response
-can take — not just the happy 200 path."""
+can take, not just the happy 200 path."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _set_token(app: Flask, token: str) -> None:
 
 def test_webhook_returns_503_when_no_token_set(app: Flask) -> None:
     """Until the user generates (or pastes) a token, webhooks are
-    effectively disabled — a 503 with a clear ``status="disabled"`` so
+    effectively disabled, a 503 with a clear ``status="disabled"`` so
     automation tools can branch on it."""
     resp = app.test_client().post(
         "/api/v1/push",
@@ -132,7 +132,7 @@ def test_webhook_device_ids_restricts_fanout(app: Flask) -> None:
 
 
 def test_webhook_quiet_status_returns_202(app: Flask) -> None:
-    """``quiet`` is a successful skip, not a failure — the user's "no
+    """``quiet`` is a successful skip, not a failure, the user's "no
     pushes overnight" intent was honoured. 202 Accepted lets callers
     distinguish from a real 200 sent."""
     _set_token(app, "t")
@@ -166,7 +166,7 @@ def test_webhook_busy_returns_409(app: Flask) -> None:
 
 
 def test_webhook_form_body_works_alongside_json(app: Flask) -> None:
-    """Form-encoded bodies are accepted too — many automation tools
+    """Form-encoded bodies are accepted too, many automation tools
     can't easily switch their Content-Type."""
     _set_token(app, "t")
     pm = MagicMock()
@@ -217,7 +217,7 @@ def test_regenerate_token_endpoint_persists_a_new_value(app: Flask) -> None:
     # masking in the admin UI); ``get_section`` returns raw keys.
     stored = app.config["SETTINGS_STORE"].get_section("app").get("webhook_token_secret")
     assert stored == token
-    # Reload the System page — the session-stashed reveal is popped on
+    # Reload the System page, the session-stashed reveal is popped on
     # first GET, so a refresh must NOT re-show the token.
     refresh = client.get("/settings/system").get_data(as_text=True)
     assert token not in refresh
@@ -241,7 +241,7 @@ def test_set_endpoint_saves_a_custom_token(app: Flask) -> None:
 
 def test_set_endpoint_clear_wipes_the_token(app: Flask) -> None:
     """The Clear button on the Webhook card POSTs the same endpoint
-    with ``clear=1`` and the on-disk secret is wiped — POST /api/v1/push
+    with ``clear=1`` and the on-disk secret is wiped, POST /api/v1/push
     returns 503 again."""
     client = app.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

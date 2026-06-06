@@ -1,5 +1,5 @@
 """weather_air_quality smoke: composer renders cells across every
-supported size with mocked Open-Meteo data — no network call."""
+supported size with mocked Open-Meteo data, no network call."""
 
 from __future__ import annotations
 

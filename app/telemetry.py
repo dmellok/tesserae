@@ -3,18 +3,18 @@
 When enabled, posts a small set of events to the maintainer's analytics
 backend (running the open-source ``aptabase/aptabase``):
 
-* ``app.started`` — once per process start (Tesserae version, Python
+* ``app.started``, once per process start (Tesserae version, Python
   version, platform are in ``systemProps``; no custom props).
-* ``app.heartbeat`` — every hour while the process is running. Props
+* ``app.heartbeat``, every hour while the process is running. Props
   carry fleet-shape counts (``n_devices``, ``device_kinds``, ``n_pages``,
   ``n_user_themes``) and activity counters since the previous heartbeat
   (``n_pushes_since_last``, ``n_push_failures_since_last``,
   ``n_widget_errors_since_last``). The provider closure is registered
   by ``app_factory`` so the telemetry module stays free of any direct
   knowledge of devices / pages / push internals.
-* ``update.applied`` — when the in-app updater successfully applies a
+* ``update.applied``, when the in-app updater successfully applies a
   new revision; props carry the from/to short SHAs and channel.
-* ``theme.user_created`` — first time the user persists a custom theme.
+* ``theme.user_created``, first time the user persists a custom theme.
   Fires once per instance, so the maintainer sees how often the theme
   builder is actually reached. Props carry no theme content.
 
@@ -25,7 +25,7 @@ random UUID generated on first run and persisted to
 ``data/core/.instance_id`` so the same install counts as one across
 restarts.
 
-The endpoint and app key are **baked into this module** — users cannot
+The endpoint and app key are **baked into this module**, users cannot
 re-aim Tesserae's telemetry at a different server. That's deliberate:
 the whole point is so the maintainer can count installs, which only
 works if every opted-in instance reports to the same place.
@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 # --- Baked-in endpoint ------------------------------------------------
 # The maintainer's self-hosted Aptabase deployment. Users cannot re-aim
 # Tesserae's telemetry; the toggle controls whether to send, not where it
-# goes — that way opted-in installs add up to a real total. The App-Key
+# goes, that way opted-in installs add up to a real total. The App-Key
 # is a write-only routing identifier intended to ship in clients, not a
 # secret. Empty strings disable telemetry even if the toggle is on.
 APTABASE_HOST: str = "https://aptabase.dmello.io"
@@ -80,7 +80,7 @@ APTABASE_APP_KEY: str = "A-SH-4940410345"
 
 INSTANCE_ID_FILE = "core/.instance_id"
 SEND_TIMEOUT_S = 4.0
-QUEUE_CAPACITY = 64  # Bounded — drop new events when backlogged.
+QUEUE_CAPACITY = 64  # Bounded, drop new events when backlogged.
 # Match Aptabase's default session timeout so each heartbeat keeps the
 # current session alive for the full time the user has Tesserae running.
 # Cheap (~24 events/day per install); valuable: lets the maintainer see
@@ -110,7 +110,7 @@ def _ensure_instance_id(data_root: Path) -> str:
 
 def _env_off() -> bool:
     """``TESSERAE_TELEMETRY=0`` (or any falsy value) is a hard kill switch
-    regardless of stored settings — for unattended installs, CI, etc."""
+    regardless of stored settings, for unattended installs, CI, etc."""
     raw = os.environ.get("TESSERAE_TELEMETRY", "").strip().lower()
     return raw in {"0", "false", "no", "off"}
 
@@ -140,7 +140,7 @@ class TelemetryConfig:
 
 def _system_props(app_version: str, *, is_debug: bool) -> dict[str, object]:
     """Aptabase's required ``systemProps`` block. Field set mirrors the
-    JS SDK's ``sendEvent`` payload exactly — locale, isDebug,
+    JS SDK's ``sendEvent`` payload exactly, locale, isDebug,
     appVersion, sdkVersion. The Python SDK adds osName / osVersion /
     deviceModel but the Aptabase server doesn't actually require them,
     and extras have historically tripped server-side schema validation.
@@ -155,7 +155,7 @@ def _system_props(app_version: str, *, is_debug: bool) -> dict[str, object]:
 
 def _user_agent(app_version: str) -> str:
     """Aptabase's server requires a Mozilla-like User-Agent for non-
-    browser clients — see the JS SDK's ``getUserAgent``. A plain
+    browser clients, see the JS SDK's ``getUserAgent``. A plain
     ``tesserae/<version>`` UA returns 2xx but never indexes."""
     platform_map = {"Darwin": "Macintosh", "Windows": "Windows", "Linux": "Linux"}
     name = platform_map.get(_platform.system(), _platform.system() or "Unknown")
@@ -199,7 +199,7 @@ class Telemetry:
 
         Host / app key come from the baked-in :data:`APTABASE_HOST` and
         :data:`APTABASE_APP_KEY`. ``TESSERAE_TELEMETRY_HOST`` and
-        ``TESSERAE_TELEMETRY_APP_KEY`` override them — these exist only
+        ``TESSERAE_TELEMETRY_APP_KEY`` override them, these exist only
         as a dev convenience for the maintainer, not as a public
         re-aiming knob. ``TESSERAE_TELEMETRY=0`` kills it hard.
 
@@ -228,7 +228,7 @@ class Telemetry:
 
     @classmethod
     def disabled(cls) -> Telemetry:
-        """Inert client for tests / ``--testing`` mode — never sends, never
+        """Inert client for tests / ``--testing`` mode, never sends, never
         creates an instance-id file."""
         return cls(
             TelemetryConfig(
@@ -256,7 +256,7 @@ class Telemetry:
 
     def send(self, event_name: str, props: dict[str, str] | None = None) -> None:
         """Enqueue an event. Drops silently if disabled or the queue is
-        full — never blocks the caller."""
+        full, never blocks the caller."""
         if not self.enabled:
             return
         try:
@@ -267,7 +267,7 @@ class Telemetry:
     def set_heartbeat_props_provider(self, fn: Callable[[], dict[str, str]] | None) -> None:
         """Register a closure that contributes fleet-shape + activity
         props to each ``app.heartbeat``. ``None`` removes the provider.
-        Errors thrown inside the provider are logged + ignored — a bad
+        Errors thrown inside the provider are logged + ignored, a bad
         provider must never silence the heartbeat itself, since the
         heartbeat doubles as a liveness signal."""
         self._heartbeat_props_fn = fn
@@ -301,7 +301,7 @@ class Telemetry:
 
     def test_send(self) -> str | None:
         """Synchronous send for immediate UI feedback when a user flips
-        the toggle on. Fires the canonical ``app.started`` event — the
+        the toggle on. Fires the canonical ``app.started`` event, the
         same one that would otherwise fire on next process start, so
         the maintainer's dashboard sees this install right away.
         Returns ``None`` on a 2xx response, or a short error string."""
@@ -356,7 +356,7 @@ class Telemetry:
         Records a ``type="telemetry"`` row in the event log either way so
         the Events tab can show success / failure side-by-side with push
         history."""
-        # Singular ``/api/v0/event`` takes a bare object — see JS SDK.
+        # Singular ``/api/v0/event`` takes a bare object, see JS SDK.
         body = {
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
             "sessionId": self._cfg.instance_id,
@@ -391,11 +391,11 @@ class Telemetry:
             logger.debug("telemetry: send error (%s): %s", event_name, err_msg)
         if self._event_log is not None:
             with contextlib.suppress(Exception):
-                # Logging is best-effort — never let an event-log issue
+                # Logging is best-effort, never let an event-log issue
                 # take down the worker thread or the request thread.
                 # We stash the exact JSON body in ``extra`` so the Events
                 # tab can show the user what we shipped (or tried to
-                # ship) — handy for diagnosing 400s like the
+                # ship), handy for diagnosing 400s like the
                 # isDebug/sdkVersion shape one. sessionId is the only
                 # identifier and it's anonymous (instance UUID), so
                 # surfacing it is fine.

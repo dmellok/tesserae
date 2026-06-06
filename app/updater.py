@@ -3,8 +3,8 @@ re-exec the process. Includes a rollback path to the previous revision.
 
 Two channels:
 
-* ``edge``   — track ``origin/<default-branch>`` (typically ``main``).
-* ``stable`` — pin to the most recent annotated tag on the remote.
+* ``edge``  , track ``origin/<default-branch>`` (typically ``main``).
+* ``stable``, pin to the most recent annotated tag on the remote.
 
 The flow on apply:
 
@@ -16,13 +16,13 @@ The flow on apply:
 5. If ``pyproject.toml`` changed between the old and new SHA, run
    ``pip install -e .`` so newly-added base deps land.
 6. Record the transition under ``data/core/.update_history.json``.
-7. Schedule :py:meth:`Updater.restart` — ``os.execv`` replaces the process
+7. Schedule :py:meth:`Updater.restart`, ``os.execv`` replaces the process
    image so the running Python re-imports every ``app.*`` module from the
    freshly-pulled files. Brief blip (~1 s); in-flight requests drop.
 
 The system is **remote-code-execution by design** (pulling and installing
 code from a remote). It is gated behind admin auth + the push lock and is
-deliberately user-initiated — there is no silent auto-update path here.
+deliberately user-initiated, there is no silent auto-update path here.
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ class Updater:
         self._last_check: RemoteCheck | None = None
         # Cached GitHub-API release check for the Docker case (no .git
         # in the image, so check_remote can't run). TTL'd to avoid
-        # hammering the API on every Settings → System render — 60/hr
+        # hammering the API on every Settings → System render, 60/hr
         # unauth'd limit is plenty for one self-hosted instance but a
         # multi-tab user would burn through it quickly without caching.
         self._latest_release: ReleaseCheck | None = None
@@ -196,7 +196,7 @@ class Updater:
         err_msg: str | None = None
         # Prefer ``/releases/latest`` (published Releases with notes).
         # Fall back to ``/tags`` so a project that's pushed tags but hasn't
-        # published Releases yet still gets a meaningful answer — GitHub
+        # published Releases yet still gets a meaningful answer, GitHub
         # returns the tag list in commit-date order, newest first.
         try:
             payload = _fetch_json("/releases/latest")
@@ -237,7 +237,7 @@ class Updater:
 
     def has_git_repo(self) -> bool:
         """Whether the install is a git checkout (the in-app updater
-        needs one — ``current_state`` / ``check_remote`` / ``apply`` all
+        needs one, ``current_state`` / ``check_remote`` / ``apply`` all
         shell out to git). False for pip-installed wheels, release
         tarballs, and any other install method that doesn't carry a
         ``.git`` directory. The controller branches on this so the
@@ -342,7 +342,7 @@ class Updater:
     def apply_update(
         self, channel: Channel, *, force: bool = False, push_lock: object | None = None
     ) -> UpdateResult:
-        """Pull + (maybe) reinstall + record history. Does NOT restart —
+        """Pull + (maybe) reinstall + record history. Does NOT restart -
         the caller schedules :py:meth:`restart` once it's done flushing
         a UI response. ``push_lock`` (when provided) must be a
         :class:`threading.Lock` we hold for the duration so a frame push
@@ -353,7 +353,7 @@ class Updater:
         if push_lock is not None:
             held = bool(push_lock.acquire(blocking=True, timeout=10))  # type: ignore[attr-defined]
             if not held:
-                raise UpdaterError("another push is in flight — try again in a moment")
+                raise UpdaterError("another push is in flight, try again in a moment")
         try:
             check = self.check_remote(channel)
             if not check.available and not force:
@@ -434,7 +434,7 @@ class Updater:
         if push_lock is not None:
             held = bool(push_lock.acquire(blocking=True, timeout=10))  # type: ignore[attr-defined]
             if not held:
-                raise UpdaterError("another push is in flight — try again in a moment")
+                raise UpdaterError("another push is in flight, try again in a moment")
         try:
             current_sha = self._git("rev-parse", "HEAD")
             try:
@@ -453,7 +453,7 @@ class Updater:
                     _backup.restore(self._data, last.backup_id)
             if last.pip_changed:
                 # The previous revision may have older deps installed
-                # against newer pyproject — reinstall to align.
+                # against newer pyproject, reinstall to align.
                 self._pip_install()
             return UpdateResult(
                 ok=True,
@@ -475,11 +475,11 @@ class Updater:
 
         Implementation differs by OS:
 
-        * **POSIX**: ``os.execv`` replaces the current process image —
+        * **POSIX**: ``os.execv`` replaces the current process image -
           the kernel hands the listening socket FD straight to the new
           Python, which re-imports everything from the new files. Clean
           and atomic.
-        * **Windows**: ``os.execv`` is *not* a real exec — CPython
+        * **Windows**: ``os.execv`` is *not* a real exec, CPython
           implements it as spawn + exit, which (a) tangles console
           handles so the new process can die when the parent's console
           closes, and (b) races the listening socket's TIME_WAIT release
@@ -498,7 +498,7 @@ class Updater:
                 # CREATE_NEW_PROCESS_GROUP: the child ignores any
                 # CTRL_C aimed at us, so it survives the parent's exit
                 # cleanly. We deliberately don't pass DETACHED_PROCESS
-                # — keeping the inherited console means startup logs
+                # , keeping the inherited console means startup logs
                 # continue to flow into the user's terminal.
                 CREATE_NEW_PROCESS_GROUP = 0x00000200
                 subprocess.Popen(
@@ -565,7 +565,7 @@ class Updater:
             return ""
 
     def _pip_install(self) -> None:
-        # Base deps only — extras ([dev]/[docs]) are install-time choices
+        # Base deps only, extras ([dev]/[docs]) are install-time choices
         # and we don't know which the user picked. If a new extra's dep
         # is needed, the UI nudge says to re-pip with the same extras.
         try:
@@ -607,7 +607,7 @@ def wait_for_parent_exit() -> None:
     to bind it. No-op on POSIX (``os.execv`` already gave us the FD).
 
     Bounded by :data:`_PARENT_WAIT_TIMEOUT_S` so a stuck parent can't
-    deadlock the relaunch — after that we proceed and accept the small
+    deadlock the relaunch, after that we proceed and accept the small
     chance of an ``EADDRINUSE``."""
     parent_pid = os.environ.pop(PARENT_PID_ENV, None)
     if not parent_pid or not _is_windows():
@@ -624,7 +624,7 @@ def wait_for_parent_exit() -> None:
     kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
     handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
     if not handle:
-        return  # parent already gone — go.
+        return  # parent already gone, go.
     try:
         deadline = time.monotonic() + _PARENT_WAIT_TIMEOUT_S
         code = ctypes.c_ulong(STILL_ACTIVE)

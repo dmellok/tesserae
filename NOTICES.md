@@ -18,8 +18,8 @@ specifically the `spectra6` and `acep` profiles in
 The upstream project is licensed under the Apache License 2.0. The
 calibration measurements characterise how Spectra 6 and ACeP panels
 reproduce the nominal sRGB primaries under normal viewing light.
-Tesserae uses them — gated by the per-device `calibrated` toggle in
-the `esp32_bin` and `pi_bin` renderer settings — as the target colour
+Tesserae uses them, gated by the per-device `calibrated` toggle in
+the `esp32_bin` and `pi_bin` renderer settings, as the target colour
 set during dithering, paired with a linear tone-mapping pre-pass that
 squeezes the source range into the calibrated black/white band so
 Floyd-Steinberg has somewhere to spread its error. The on-the-wire

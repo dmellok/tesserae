@@ -1,4 +1,4 @@
-"""ha_entities — a status grid of several Home Assistant entities.
+"""ha_entities, a status grid of several Home Assistant entities.
 
 Thin widget over ha_core. One ``get_states`` call covers the whole list,
 so the cell costs a single request no matter how many entities it shows.
@@ -120,7 +120,7 @@ _DEVICE_CLASS_ICONS: dict[str, str] = {
     "connectivity": "wifi-high",
     "battery_charging": "battery-charging",
     "update": "arrow-circle-up",
-    # Door / window / opening — used as a fallback for the door-aware
+    # Door / window / opening, used as a fallback for the door-aware
     # icon switch below.
     "door": "door",
     "window": "frame-corners",

@@ -1,4 +1,4 @@
-"""sky_aurora — Kp index + visibility hint via NOAA SWPC."""
+"""sky_aurora, Kp index + visibility hint via NOAA SWPC."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-CACHE_TTL_S = 900  # 15 min — Kp updates roughly every 3 hours
+CACHE_TTL_S = 900  # 15 min, Kp updates roughly every 3 hours
 HTTP_TIMEOUT_S = 12
 USER_AGENT = "tesserae/0.1 (+sky_aurora)"
 
 # https://services.swpc.noaa.gov/json/planetary_k_index_1m.json
-# Array of {"time_tag", "kp_index", "estimated_kp", ...} — most recent last.
+# Array of {"time_tag", "kp_index", "estimated_kp", ...}, most recent last.
 KP_NOWCAST_URL = "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json"
 
-# https://services.swpc.noaa.gov/text/3-day-forecast.txt — text-format,
+# https://services.swpc.noaa.gov/text/3-day-forecast.txt, text-format,
 # we'll grab the structured forecast JSON instead:
 KP_FORECAST_URL = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json"
 
@@ -75,7 +75,7 @@ def fetch(
     latest = now[-1]
     current_kp = float(latest.get("kp_index") or latest.get("estimated_kp") or 0)
 
-    # 3-day forecast — NOAA returns a list of dicts:
+    # 3-day forecast, NOAA returns a list of dicts:
     # [{"time_tag": ..., "kp": ..., "observed": "observed|predicted",
     #   "noaa_scale": ...}, ...]. Earlier the endpoint shipped a
     # list-of-lists with a header row; we accept both shapes so an

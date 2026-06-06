@@ -1,4 +1,4 @@
-"""news_hacker_news — top HN stories via the free Firebase API."""
+"""news_hacker_news, top HN stories via the free Firebase API."""
 
 from __future__ import annotations
 

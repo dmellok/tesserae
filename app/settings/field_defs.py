@@ -7,7 +7,7 @@ auto-field path.
 
 Kept in their own module (rather than the route handlers) because they
 are also imported by tests and were referenced from the original
-``app.settings_routes`` module path — the ``app.settings_routes`` shim
+``app.settings_routes`` module path, the ``app.settings_routes`` shim
 re-exports ``APP_FIELDS`` for that reason.
 """
 
@@ -21,7 +21,7 @@ from app.panel import DEFAULT_PRESET, PANEL_PRESET_CHOICES
 # Canonical Area/City zones only, plus a "system" sentinel and explicit UTC.
 # ``zoneinfo.available_timezones()`` also returns legacy/compat buckets
 # (Etc/* fixed offsets, SystemV/*, country aliases like US/* and Brazil/*,
-# and single-word names like GMT or Japan) that just clutter a picker — we
+# and single-word names like GMT or Japan) that just clutter a picker, we
 # drop those and keep the modern ``Area/City`` form most pickers show.
 # ``tzdata`` is a dependency so the list is complete regardless of host OS.
 _LEGACY_TZ_PREFIXES = ("Etc/", "SystemV/", "US/", "Canada/", "Brazil/", "Mexico/", "Chile/")
@@ -53,7 +53,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "number",
         "label": "Latitude",
         "default": "",
-        "step": "any",  # decimal degrees — a default step of 1 rejects e.g. -37.8136
+        "step": "any",  # decimal degrees, a default step of 1 rejects e.g. -37.8136
         "help": (
             "Default location for weather / sky / sunrise widgets, so you don't "
             "re-enter coordinates per widget. A widget can still override it with "
@@ -97,7 +97,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "default": False,
         "help": (
             "Suppress automated pushes (scheduler firings, webhook calls) during "
-            "a daily time window — typical use is to stop the panel waking the room "
+            "a daily time window, typical use is to stop the panel waking the room "
             "overnight. Manual pushes from the Send page or Push-now buttons still go "
             "through; quiet hours filter automation, not deliberate user intent. "
             "Each device can override the window in Settings → Devices."
@@ -121,6 +121,21 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "mobile_zoom_lock",
+        "type": "switch",
+        "label": "Lock mobile zoom",
+        "default": True,
+        "help": (
+            "Prevents pinch-to-zoom and double-tap-to-zoom on the admin UI "
+            "when accessed from a phone. iOS Safari ignores the standard "
+            "viewport `user-scalable=no`, so this also installs a JS "
+            "gesture blocker that catches Safari-specific gesturestart "
+            "events. Turn off if you rely on browser zoom for "
+            "accessibility, the page already scales fluidly with CSS, but "
+            "browser zoom adds magnification beyond that."
+        ),
+    },
+    {
         "name": "keep_browser_warm",
         "type": "switch",
         "label": "Keep the renderer browser warm",
@@ -128,7 +143,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "help": (
             "Holds a single Chromium process resident between renders, so each "
             "push reuses it rather than launching cold. Cuts per-push render time "
-            "from ~1–2 s to ~200 ms — noticeable on schedule fires and the editor. "
+            "from ~1–2 s to ~200 ms, noticeable on schedule fires and the editor. "
             "Costs ~150 MB of idle RAM; turn off if you're on a constrained host "
             "(1 GB Pi, tight VM). Each render still runs in a fresh browser context "
             "so cookies / localStorage never leak between dashboards."
@@ -140,12 +155,12 @@ APP_FIELDS: list[dict[str, Any]] = [
         "label": "Send anonymous usage telemetry",
         "default": False,
         "help": (
-            "Two events to the project's analytics backend — app.started "
+            "Two events to the project's analytics backend, app.started "
             "(version + platform) and update.applied (from/to short SHA + "
             "channel). Identified only by a random instance UUID; no IPs, "
             "paths, settings, secrets, or push contents. Suggested on during "
             "onboarding so the maintainer can see how many people are running "
-            "Tesserae and what versions they're on — flip it off here if "
+            "Tesserae and what versions they're on, flip it off here if "
             "you'd rather not. TESSERAE_TELEMETRY=0 also disables."
         ),
     },
@@ -209,7 +224,7 @@ BROKER_FIELDS: list[dict[str, Any]] = [
             "Heads-up: amqtt only speaks MQTT v3.1.1. Tesserae's own Pi / "
             "ESP32 clients are fine (paho-mqtt defaults to 3.1.1), but if "
             "you connect with MQTT Explorer / MQTTX / Home Assistant / "
-            "Node-RED you'll need to set their protocol version to 3.1.1 — "
+            "Node-RED you'll need to set their protocol version to 3.1.1, "
             'v5 clients get rejected with "Invalid protocol". Need full '
             "v5 support? Install Mosquitto (apt/brew) and point Tesserae "
             "at it via the Host / Port fields below."
@@ -244,7 +259,7 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "help": (
             "127.0.0.1 keeps the broker loopback-only (only this host can "
             "reach it). Set to 0.0.0.0 to accept connections from any LAN "
-            "client — set a username + password below if you do."
+            "client, set a username + password below if you do."
         ),
     },
     {
@@ -281,7 +296,7 @@ BROKER_FIELDS: list[dict[str, Any]] = [
         "label": "MQTT client id",
         "default": "",
         "help": (
-            "Must be unique per instance — a broker evicts a duplicate client "
+            "Must be unique per instance, a broker evicts a duplicate client "
             "id the moment another connects with it, which causes an endless "
             "reconnect loop. Leave blank to auto-use 'tesserae-<hostname>'; the "
             "--dev server appends '-dev'."

@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Home Assistant — Media",
+  "name": "Home Assistant, Media",
   "version": "0.1.3",
   "kind": "widget",
-  "description": "Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art, progress bar with elapsed / remaining stamps, and a track-deterministic SVG waveform glyph. A blurred copy of the album art bleeds behind the body so the cell picks up the album's palette. Requires the Home Assistant Core plugin.",
+  "description": "Now-playing tile for a Home Assistant media_player entity, title, artist, album, album art, progress bar with elapsed / remaining stamps, and a track-deterministic SVG waveform glyph. A blurred copy of the album art bleeds behind the body so the cell picks up the album's palette. Requires the Home Assistant Core plugin.",
   "icon": "ph-play-circle",
   "supports": {
     "sizes": [

@@ -104,7 +104,7 @@ def test_publish_propagates_paho_rc(fakes) -> None:
     t.connect()
 
     def failing_publish(topic, payload, qos, retain):
-        return _FakePublish(rc=2)  # MQTT_ERR_PROTOCOL — actually broken
+        return _FakePublish(rc=2)  # MQTT_ERR_PROTOCOL, actually broken
 
     holder["client"].publish = failing_publish  # type: ignore[method-assign]
     with pytest.raises(RuntimeError, match="rc=2"):
@@ -113,7 +113,7 @@ def test_publish_propagates_paho_rc(fakes) -> None:
 
 def test_publish_no_conn_at_qos1_is_queued_not_raised(fakes) -> None:
     """rc=4 on qos>=1 means paho queued the message for replay on
-    reconnect — surface as a warning, not an exception."""
+    reconnect, surface as a warning, not an exception."""
     holder, factory = fakes
     t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
     t.connect()
@@ -127,7 +127,7 @@ def test_publish_no_conn_at_qos1_is_queued_not_raised(fakes) -> None:
 
 
 def test_publish_no_conn_at_qos0_still_raises(fakes) -> None:
-    """qos=0 is fire-and-forget — paho doesn't queue, so rc=4 means lost."""
+    """qos=0 is fire-and-forget, paho doesn't queue, so rc=4 means lost."""
     holder, factory = fakes
     t = MqttTransport(BrokerConfig(host="b"), client_factory=factory)
     t.connect()
@@ -187,7 +187,7 @@ def test_subscriptions_replayed_on_reconnect(fakes) -> None:
     # Live subscribe call is recorded.
     assert ("tesserae/pi/#", 1) in holder["client"].subscribed
     holder["client"].subscribed.clear()
-    # Simulate a reconnect — paho fires on_connect; we re-subscribe.
+    # Simulate a reconnect, paho fires on_connect; we re-subscribe.
     t._on_connect(holder["client"], None, None, 0)  # type: ignore[arg-type]
     assert holder["client"].subscribed == [("tesserae/pi/#", 1)]
 

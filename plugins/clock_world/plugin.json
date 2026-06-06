@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Clock — World",
+  "name": "Clock, World",
   "version": "0.1.2",
   "kind": "widget",
-  "description": "Multiple cities in one cell, each with its current time in the configured IANA timezone. Pure client-side — uses the browser's Intl.DateTimeFormat with the cell's timezone list.",
+  "description": "Multiple cities in one cell, each with its current time in the configured IANA timezone. Pure client-side, uses the browser's Intl.DateTimeFormat with the cell's timezone list.",
   "icon": "ph-globe",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [

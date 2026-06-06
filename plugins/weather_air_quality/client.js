@@ -1,4 +1,4 @@
-// weather_air_quality — Spectra status archetype, AQI band as state.
+// weather_air_quality, Spectra status archetype, AQI band as state.
 //
 // Hero is a half-circle gauge that arcs through the 6 EAQI bands (green
 // → yellow → ochre → terracotta → plum → red) with a marker at the
@@ -10,12 +10,12 @@
 // Band index → accent: 0 Good → moss, 1 Fair → teal, 2 Moderate → ochre,
 // 3 Poor → terracotta, 4 Very poor → plum, 5 Extreme → terracotta.
 const BAND_ACCENT_RAW = [
-  "var(--accent-3)", // Good — moss
-  "var(--accent-4)", // Fair — teal
-  "var(--accent-2)", // Moderate — ochre
-  "var(--accent-1)", // Poor — terracotta
-  "var(--accent-6)", // Very poor — plum
-  "var(--accent-1)", // Extreme — terracotta
+  "var(--accent-3)", // Good, moss
+  "var(--accent-4)", // Fair, teal
+  "var(--accent-2)", // Moderate, ochre
+  "var(--accent-1)", // Poor, terracotta
+  "var(--accent-6)", // Very poor, plum
+  "var(--accent-1)", // Extreme, terracotta
 ];
 
 const POLLUTANT_PH = {
@@ -134,7 +134,7 @@ export default function render(shadow, ctx) {
 
   const label = data.label || "";
   const eaqi = data.eaqi ?? data.european_aqi;
-  const band = data.band || "—";
+  const band = data.band || "-";
   const bandIdx = Number.isFinite(data.bandIndex) ? data.bandIndex : 0;
   const accent = bandAccent(bandIdx);
   const dominant = data.dominant || "";
@@ -148,7 +148,7 @@ export default function render(shadow, ctx) {
         <span class="aq-cell-label">${escapeHtml(p.label)}</span>
         <span class="aq-cell-value" style="color:${accentP}">
           <i class="ph-bold ${ph}"></i>
-          <span>${escapeHtml(p.value ?? "—")}<small> ${escapeHtml(p.unit ?? "")}</small></span>
+          <span>${escapeHtml(p.value ?? "-")}<small> ${escapeHtml(p.unit ?? "")}</small></span>
         </span>
         ${microBar(p)}
       </div>`;
@@ -162,7 +162,7 @@ export default function render(shadow, ctx) {
       flex-direction: column;
       gap: var(--space-4);
     }
-    /* Gauge — half-circle SVG with overlay text. The overlay sits in
+    /* Gauge, half-circle SVG with overlay text. The overlay sits in
        the lower half of the SVG's viewBox area so the number + band
        label centre under the arc's apex. max-width caps how wide the
        gauge can grow on a tall cell so it doesn't blow up past the
@@ -204,13 +204,13 @@ export default function render(shadow, ctx) {
       margin-top: 0.2em;
     }
 
-    /* Pollutant grid — 3 columns on md+, 2 on sm, hidden on xs. Each
+    /* Pollutant grid, 3 columns on md+, 2 on sm, hidden on xs. Each
        cell holds 3 stacked items (label, value-with-icon, micro-bar)
        and participates in the parent grid via subgrid so the three
        sub-rows stay synchronised across every cell in the same row.
        That way, if PM10's value wraps to two lines, every cell in the
        same row picks up the taller value row and their micro-bars
-       all land on the same horizontal — instead of one bar falling
+       all land on the same horizontal, instead of one bar falling
        below its neighbours. */
     .aq-grid {
       display: grid;
@@ -275,7 +275,7 @@ export default function render(shadow, ctx) {
       transition: none;
     }
 
-    /* xs: drop the pollutant grid entirely — the gauge carries the
+    /* xs: drop the pollutant grid entirely, the gauge carries the
        headline and there's no room for six tiny cells with bars. */
     @container (max-width: 280px) {
       .aq-grid { display: none; }
@@ -316,7 +316,7 @@ export default function render(shadow, ctx) {
   `;
 
   const valueDisplay = (eaqi == null || eaqi === "" || Number.isNaN(Number(eaqi)))
-    ? "—"
+    ? "-"
     : String(Math.round(Number(eaqi)));
 
   shadow.innerHTML = `

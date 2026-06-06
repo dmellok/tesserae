@@ -4,21 +4,21 @@ Wraps Playwright's sync API. The composer route ``/compose/<id>`` is what
 Chromium points at; the screenshot of that URL is the composition-orientation
 PNG that every renderer plugin's ``transform()`` then takes as input.
 
-The screenshot is always at the panel's exact pixel size — no resampling, no
+The screenshot is always at the panel's exact pixel size, no resampling, no
 DPR scaling. ``device_scale_factor=1`` is load-bearing.
 
 Two execution paths:
 
-* **Cold path** (``render_to_png(request)``) — spins up a fresh ``sync_playwright``
+* **Cold path** (``render_to_png(request)``), spins up a fresh ``sync_playwright``
   + Chromium per call. ~1–2 s overhead per render. Used when the
   ``keep_browser_warm`` toggle is off (low-memory deployments).
-* **Warm path** (``render_to_png(request, pool=BrowserPool)``) — reuses a
+* **Warm path** (``render_to_png(request, pool=BrowserPool)``), reuses a
   long-lived browser owned by a dedicated worker thread, creating a fresh
   ``context`` per render so state never leaks between pushes. ~200 ms per
   render after the first warm-up. The dedicated thread is required because
   Playwright's sync API isn't thread-safe.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -86,7 +86,7 @@ def to_loopback_url(url: str) -> str:
     parts = urlsplit(url)
     # Prefer the actual bind port the server is listening on internally,
     # since under HA the URL's port is the *host* mapping (e.g. 8766 for
-    # edge) and nothing is listening on it inside the container — the
+    # edge) and nothing is listening on it inside the container, the
     # add-on always binds 8765 internally. ``TESSERAE_BIND_PORT`` is set
     # by the add-on config; fall back to the URL's port otherwise so a
     # bare-metal install with ``tesserae --port 5050`` keeps working.
@@ -113,14 +113,14 @@ class RenderRequest:
     # a transient slow goto / Chromium hiccup doesn't sink the whole push.
     # The intermittent failure mode this exists for is HA-driven pushes
     # where a Playwright ``Page.goto: Timeout 15000ms exceeded`` surfaces
-    # under no obvious cause — most commonly a brief loopback contention
+    # under no obvious cause, most commonly a brief loopback contention
     # or a background-thread GC pause that ate the navigation window.
     max_attempts: int = 3
 
 
 @dataclass(frozen=True)
 class FetchRequest:
-    """An out-of-band fetch through Chromium's network stack — used by
+    """An out-of-band fetch through Chromium's network stack, used by
     widgets whose upstream blocks vanilla ``urllib`` (Reddit, CDNs
     behind JA3 / TLS-fingerprint gates). A fresh context per fetch keeps
     cookies from leaking between widgets / sites; the browser is the
@@ -142,7 +142,7 @@ _IMAGE_WAIT_JS: Final[str] = """async () => {
     // their download by the time the composer signals "mounted",
     // and the screenshot captured an empty / broken-image frame.
     // Capped at 5 s so a single hung CDN doesn't block the whole
-    // render — we ship the best frame we have.
+    // render, we ship the best frame we have.
     function* allImages(root) {
         for (const img of root.querySelectorAll('img')) yield img;
         for (const el of root.querySelectorAll('*')) {
@@ -218,7 +218,7 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
     retry. Only Playwright ``TimeoutError`` triggers a retry (the
     typical mode: ``Page.goto: Timeout 15000ms exceeded``). Other
     Playwright errors (invalid URL, browser-side crash, etc.) surface
-    immediately — retrying them just wastes the deadline."""
+    immediately, retrying them just wastes the deadline."""
     last_err: PlaywrightTimeoutError | None = None
     for attempt in range(1, request.max_attempts + 1):
         try:
@@ -240,14 +240,14 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
                 err,
                 request.url,
             )
-    # Unreachable — the loop either returns on success or raises on the
+    # Unreachable, the loop either returns on success or raises on the
     # last attempt. The assert keeps mypy honest about the bound.
     assert last_err is not None
     raise last_err
 
 
 def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) -> bytes:
-    """A single render pass — opens a fresh context on ``browser``,
+    """A single render pass, opens a fresh context on ``browser``,
     navigates, screenshots, and disposes. Reused by both cold and warm
     paths so the ``networkidle`` timeout / font-load / pixel-exact viewport
     behaviour stays identical regardless of which path the caller took.
@@ -264,22 +264,22 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         page = context.new_page()
         page.set_default_timeout(request.timeout_ms)
         # ``set_default_timeout`` covers actions (evaluate, click, …) but
-        # NOT navigation — ``goto`` uses Playwright's 30s default unless
+        # NOT navigation, ``goto`` uses Playwright's 30s default unless
         # we override it. Without this, ``goto + fallback + evaluate +
         # screenshot`` can sum to ~75s, which races the BrowserPool's
         # outer 75s deadline and surfaces as an empty-message TimeoutError.
         page.set_default_navigation_timeout(request.timeout_ms)
-        # Per-phase timing — surfaces in the add-on log so a future
+        # Per-phase timing, surfaces in the add-on log so a future
         # "render took 70s" investigation can point at the specific
         # Playwright stage that timed out instead of guessing.
         t0 = time.monotonic()
         # ``load`` fires when the main document + critical subresources
-        # have downloaded — fast and deterministic. ``networkidle`` was
+        # have downloaded, fast and deterministic. ``networkidle`` was
         # the previous default but routinely timed out (widget client.js
         # imports, font fetches, and Phosphor CSS keep network busy long
         # after the page is visually ready). When goto's networkidle
         # timed out, Playwright aborted the navigation and the next
-        # ``page.evaluate`` stalled for ~60s waiting for stability —
+        # ``page.evaluate`` stalled for ~60s waiting for stability -
         # which is how a normal render ballooned to 73s.
         if request.wait_until == "networkidle":
             page.goto(request.url, wait_until="load")
@@ -302,7 +302,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         # Block on every <img> the page (including shadow roots) has
         # already issued a request for, capped at 5 s. The compose-
         # done signal only proves widget JS finished writing markup
-        # — slow remote images (HA cameras, Spotify art, Unsplash
+        # , slow remote images (HA cameras, Spotify art, Unsplash
         # CDN) keep downloading after that, and the screenshot would
         # otherwise capture a half-loaded / broken-image frame.
         try:
@@ -344,7 +344,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         return png
     finally:
         # Closing the context tears down the page, cookies, localStorage,
-        # font cache — so the next render starts clean even though the
+        # font cache, so the next render starts clean even though the
         # browser itself stays alive on the warm path.
         try:
             context.close()
@@ -354,7 +354,7 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
 
 def _fetch_one(browser: Browser, request: FetchRequest) -> str:
     """One-shot fetch through a fresh incognito context's APIRequest
-    pipeline. We don't navigate a page (Reddit serves RSS as XML — the
+    pipeline. We don't navigate a page (Reddit serves RSS as XML, the
     browser would render a tree but the response body is the only thing
     we want), we just use the context's network stack to GET the URL.
 
@@ -419,7 +419,7 @@ class BrowserPool:
 
     Each render still uses a fresh ``context``, so cookies / localStorage /
     runtime font cache never leak between dashboards. Only the browser
-    process is reused — which is where the ~1.5 s of cold-start lives.
+    process is reused, which is where the ~1.5 s of cold-start lives.
 
     Crash recovery: if Chromium dies under us, the next render relaunches
     it. The worker thread itself survives until ``stop()`` is called."""
@@ -462,7 +462,7 @@ class BrowserPool:
             logger.warning("browser pool worker did not exit within %.1fs", timeout)
 
     def render(self, request: RenderRequest) -> bytes:
-        # Lazy start on first request — the App settings toggle decides
+        # Lazy start on first request, the App settings toggle decides
         # whether the caller routes here at all, so the pool stays cold
         # (no Chromium spawned) if it's never asked.
         if self._thread is None:
@@ -478,10 +478,10 @@ class BrowserPool:
 
     def fetch_text(self, request: FetchRequest) -> str:
         """Fetch a URL through the pooled Chromium's network stack.
-        Returns the response body as text. Each call spawns a fresh
-        incognito context so cookies don't carry between widgets / sites
-        — important for Reddit, which keys its rate-limit / challenge on
-        the cookie jar."""
+         Returns the response body as text. Each call spawns a fresh
+         incognito context so cookies don't carry between widgets / sites
+        , important for Reddit, which keys its rate-limit / challenge on
+         the cookie jar."""
         if self._thread is None:
             self.start()
         if self._stopped:
@@ -499,7 +499,7 @@ class BrowserPool:
                 item = self._q.get()
                 if item == self._SENTINEL:
                     break
-                # Narrow the type — non-sentinel items are always
+                # Narrow the type, non-sentinel items are always
                 # (request, future) tuples per the put() contract.
                 request, fut = item  # type: ignore[misc]
                 try:
@@ -526,7 +526,7 @@ class BrowserPool:
                     fut.set_exception(exc)
                     # Force a relaunch if the browser is actually dead, OR
                     # if Playwright reported "Execution context was
-                    # destroyed" — that error indicates the page-level
+                    # destroyed", that error indicates the page-level
                     # state is corrupted in ways the next ``new_context``
                     # might not recover from. ``is_connected()`` returns
                     # True on a dead-but-still-attached Chromium, so we

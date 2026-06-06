@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Spotify — Album Art",
+  "name": "Spotify, Album Art",
   "version": "0.1.0",
   "kind": "widget",
   "description": "Full-bleed album art of your currently-playing Spotify track. Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",

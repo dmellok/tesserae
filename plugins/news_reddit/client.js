@@ -1,4 +1,4 @@
-// news_reddit — Spectra list archetype. Title bar carries the
+// news_reddit, Spectra list archetype. Title bar carries the
 // subreddit + sort/window meta; each row has a post-type lead glyph
 // (image / link / video / text-post / github / youtube …), the
 // title, and author + age on the meta side. The widget itself wears
@@ -12,7 +12,7 @@ function escapeHtml(s) {
 }
 
 function fmtScore(n) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n) || 0;
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
   return String(v);
@@ -109,7 +109,7 @@ export default function render(shadow, ctx) {
   }).join("");
 
   const layout = `
-    /* Subreddit-coloured left stripe — a 3px accent border via
+    /* Subreddit-coloured left stripe, a 3px accent border via
        box-shadow inset, so the widget itself wears the subreddit's
        colour identity. Two r/programming + r/eink cells side by side
        are immediately distinguishable without reading the heading. */

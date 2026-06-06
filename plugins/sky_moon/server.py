@@ -1,8 +1,8 @@
-"""sky_moon — sun arc + moon phase, with rise/set/length/noon.
+"""sky_moon, sun arc + moon phase, with rise/set/length/noon.
 
 Phase + illumination are computed locally from the synodic-month length
 anchored to a known new-moon epoch (2000-01-06 18:14 UTC). Accuracy is
-better than ±0.5 day for centuries either side of the epoch — plenty
+better than ±0.5 day for centuries either side of the epoch, plenty
 for a "what does the moon look like tonight" widget.
 
 Sunrise / sunset and moonrise / moonset come from Open-Meteo when
@@ -140,7 +140,7 @@ def fetch(
     solar_noon = _hhmm_mid(rise_min, set_min)
 
     # Pre-compute the "next major phase" name + ISO for the SUNMOON
-    # ``moon.next`` field — this is what the design's compact moon
+    # ``moon.next`` field, this is what the design's compact moon
     # block renders. Picks whichever of the four major phases lands
     # soonest from now.
     upcoming = [
@@ -206,14 +206,14 @@ def fetch(
 
 
 # ----------------------------------------------------------------------
-# Helpers — same pattern as weather_now's _iso_to_min / _hhmm / _now_min,
+# Helpers, same pattern as weather_now's _iso_to_min / _hhmm / _now_min,
 # adapted to also produce day-length + solar-noon strings.
 # ----------------------------------------------------------------------
 
 
 def _iso_to_min(iso: Any) -> int | None:
     """Open-Meteo returns ISO timestamps like ``2026-06-03T06:45`` (no
-    seconds, no tz — the API treats them as local once we pass
+    seconds, no tz, the API treats them as local once we pass
     ``timezone=auto``). Parse just the hour/minute and convert to
     minutes-since-midnight for the sun-arc charts."""
     if not isinstance(iso, str) or "T" not in iso:

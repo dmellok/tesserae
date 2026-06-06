@@ -33,7 +33,7 @@ class Theme:
 
     ``id`` is the literal value of ``data-theme="..."``; the CSS cascade
     is keyed off it. ``family`` drives filtering on the browse page and
-    is the only piece of taxonomy we keep — anything beyond that is
+    is the only piece of taxonomy we keep, anything beyond that is
     expressible by reading the CSS variables off a probe element.
 
     ``tagline`` is the short flavour line shown beneath the name in
@@ -63,26 +63,30 @@ class Theme:
         return self.name
 
 
-# Bundled themes, in the order they appear in the Spectra stylesheet —
+# Bundled themes, in the order they appear in the Spectra stylesheet -
 # kept stable so the picker isn't reshuffled by alphabetic sorts. Add a
 # new theme here AND in the matching CSS block; the guard test will
 # fail loudly if you forget either half.
 BUNDLED_THEMES: tuple[Theme, ...] = (
-    # Light family — warm-undertone Spectra defaults.
+    # Light family, warm-undertone Spectra defaults.
     Theme(id="light", name="Light", family="light", tagline="warm paper"),
     Theme(id="sepia", name="Sepia", family="light", tagline="book paper"),
     Theme(id="cool-gray", name="Cool gray", family="light", tagline="neutral slate"),
     Theme(id="high-contrast", name="High contrast", family="light"),
+    # Vivid light variants, chunky bg → surface contrast + saturated accents.
+    Theme(id="vivid-light", name="Vivid", family="light", tagline="bold paper"),
+    Theme(id="citrus-light", name="Citrus", family="light", tagline="cream pop"),
+    Theme(id="arctic-light", name="Arctic", family="light", tagline="cool jewel"),
     # Dark family.
     Theme(id="dark", name="Dark", family="dark", tagline="warm charcoal"),
     Theme(id="nord", name="Nord", family="dark", tagline="cool blue night"),
-    # Movement themes — palettes for matching movement styles. Tagline
+    # Movement themes, palettes for matching movement styles. Tagline
     # signals the colour-only nature so users pair with the same-named
     # Style for the full design-movement look.
     Theme(id="bauhaus", name="Bauhaus", family="movement", tagline="palette only"),
     Theme(id="destijl", name="De Stijl", family="movement", tagline="palette only"),
     Theme(id="brutalist", name="Brutalist", family="movement", tagline="palette only"),
-    # base16 themes — popular code-editor palettes adapted for dashboards.
+    # base16 themes, popular code-editor palettes adapted for dashboards.
     Theme(id="base16-gruvbox-dark", name="Gruvbox", family="base16", tagline="dark"),
     Theme(id="base16-gruvbox-light", name="Gruvbox", family="base16", tagline="light"),
     Theme(id="base16-solarized-dark", name="Solarized", family="base16", tagline="dark"),
@@ -167,7 +171,7 @@ def picker_options(themes: list[Theme]) -> list[dict[str, str]]:
 # -- bundled theme colour lookup --------------------------------------
 #
 # The Spectra CSS files are the source of truth for what each bundled
-# theme actually paints. The builder needs those colours too — when a
+# theme actually paints. The builder needs those colours too, when a
 # user clicks Duplicate on Nord we want the new user theme to carry
 # Nord's actual ``bg`` / ``surface`` / ``accent-*`` values, not the
 # UserTheme dataclass defaults (which mirror Light). Parsing the CSS

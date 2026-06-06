@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "GitHub — Releases",
+  "name": "GitHub, Releases",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Latest releases from a list of watched repos. Each row carries a SemVer bump chip (MAJOR / MINOR / PATCH, computed by comparing the tag to the previous release) and, for the most recent release per repo, a +N commits tail counting unreleased commits on the default branch. Useful for tracking your dependencies' versions.",

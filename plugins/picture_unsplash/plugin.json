@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Picture — Unsplash",
+  "name": "Picture, Unsplash",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.",

@@ -2,13 +2,13 @@
 routes.
 
 The ``auth`` blueprint is constructed exactly once here and re-imported
-by every route module — keeping the blueprint name stable means every
+by every route module, keeping the blueprint name stable means every
 ``url_for("auth.xxx")`` reference across the templates keeps working
 after the split. ``register()`` (in ``app.settings.__init__``) imports
 each route module to trigger its decorators, then registers ``bp``
 with the Flask app.
 
-Everything in this module is module-private to ``app.settings`` —
+Everything in this module is module-private to ``app.settings`` -
 external callers should use the symbols re-exported from
 ``app.settings_routes`` instead so the split stays an implementation
 detail.
@@ -37,12 +37,12 @@ from app.transport import MqttTransport
 
 # How fresh a heartbeat has to be to read as "ok" in the UI. Past this it
 # decays through "warn" (2x) into "stale". Tuned for the typical Pi client
-# 60s heartbeat — esp32_client wakes far less often but the broker-retained
+# 60s heartbeat, esp32_client wakes far less often but the broker-retained
 # last value is still informative.
 STATUS_FRESH_S: int = 90
 STATUS_WARN_S: int = 5 * 60
 
-# Blueprint name is "auth" for backward compatibility — 71+ templates
+# Blueprint name is "auth" for backward compatibility, 71+ templates
 # reference url_for("auth.xxx"). Renaming would be a mass rename across
 # every settings / onboarding / devices template; the split keeps the
 # endpoint surface stable.
@@ -61,7 +61,7 @@ AREAS: tuple[tuple[str, str], ...] = (
 )
 
 # Map area → section kinds that belong on that page. The "system" page
-# is hand-built (updates + backups) — no manifest-driven sections.
+# is hand-built (updates + backups), no manifest-driven sections.
 AREA_KINDS: dict[str, set[str]] = {
     "server": {"app", "panel", "broker"},
     "renderers": {"renderer"},
@@ -85,7 +85,7 @@ _ORIENTATION_DEGREES: dict[str, str] = {
 
 # -- registry accessors -------------------------------------------------
 # Each thin wrapper exists so the route modules can stay decoupled from
-# the Flask config-dict key names — change a key in one place if it ever
+# the Flask config-dict key names, change a key in one place if it ever
 # needs to move.
 
 
@@ -151,7 +151,7 @@ def device_kinds() -> list[Device]:
 
 def log_auth(action: str, status: str, error: str | None = None) -> None:
     """Record an auth event. Target is always 'session' since we have one
-    shared admin login — no per-user concept."""
+    shared admin login, no per-user concept."""
     events().record(
         type="auth",
         source=action,
@@ -220,7 +220,7 @@ def values_from_form(fields: list[dict[str, Any]]) -> dict[str, Any]:
         name = str(field["name"])
         if field.get("type") in ("boolean", "switch"):
             # Unchecked checkboxes are absent from the form, present ones
-            # send "on" — bare presence is what we use.
+            # send "on", bare presence is what we use.
             values[name] = field["name"] in request.form
         else:
             values[name] = coerce_form_value(field, request.form.get(name))
@@ -266,7 +266,7 @@ def system_redirect() -> Response:
 def refuse_in_dev() -> Response | None:
     if current_app.debug:
         flash(
-            "Updates and restores only run on the production (waitress) server — "
+            "Updates and restores only run on the production (waitress) server, "
             "the --dev reloader owns restarts.",
             "error",
         )
@@ -279,12 +279,12 @@ def refuse_in_container() -> Response | None:
     inside the official Docker image. A ``git pull`` against a layered
     filesystem would lose the next image rebuild, and restarts go
     through the container manager rather than ``os.execv``. Users
-    upgrade via ``docker compose pull`` instead — the Settings →
+    upgrade via ``docker compose pull`` instead, the Settings →
     System tab shows that hint when ``TESSERAE_IN_DOCKER=1`` is set.
     Gated server-side too so a hand-crafted POST can't sneak through."""
     if os.environ.get("TESSERAE_IN_DOCKER"):
         flash(
-            "Updates and restores aren't supported in the Docker image — "
+            "Updates and restores aren't supported in the Docker image, "
             "use `docker compose pull && docker compose up -d` to upgrade.",
             "error",
         )
@@ -312,7 +312,7 @@ def format_relative(seconds: float) -> str:
 
 
 def format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
-    """Shape DiscoveredDevice records for the template — flatten to plain
+    """Shape DiscoveredDevice records for the template, flatten to plain
     dicts so Jinja doesn't trip over @property access, and pre-compute
     the relative-time string."""
     now = time.time()

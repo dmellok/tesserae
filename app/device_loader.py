@@ -12,7 +12,7 @@ Devices are the consumer side of one or more renderers:
 * If a ``config_topic`` is declared, the device's ``validate_config()`` is
   called before each publish so the broker never sees a malformed payload.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -50,10 +50,10 @@ class Device:
 
     Two flavours coexist in one registry:
 
-    * **Kinds** (loaded from ``devices/<id>/device.json``) — the
+    * **Kinds** (loaded from ``devices/<id>/device.json``), the
       built-in device manifests that ship with the app. ``kind_of`` is
       None: a kind IS its own kind.
-    * **Instances** (loaded from ``data/devices/<id>.json``) — user-
+    * **Instances** (loaded from ``data/devices/<id>.json``), user-
       created devices that pick a kind for the parse/validate hooks
       and config schema, then override id / name / topics / panel /
       config. Multi-head installs use instances so each physical
@@ -75,9 +75,9 @@ class Device:
     def display_name(self) -> str:
         """Short label for device pickers. When the user didn't set a
         custom name, ``name`` is the auto-generated ``"Kind (id)"``
-        default — which duplicates the id. Collapse that case to just
+        default, which duplicates the id. Collapse that case to just
         the id so the picker reads ``lounge_frame`` instead of
-        ``Pi BIN client (lounge_frame) — lounge_frame``."""
+        ``Pi BIN client (lounge_frame), lounge_frame``."""
         if self.name.endswith(f"({self.id})"):
             return self.id
         return self.name
@@ -85,7 +85,7 @@ class Device:
     @property
     def icon(self) -> str:
         """Phosphor icon slug (no ``ph-`` prefix) for device pickers and the
-        settings card. Comes from the manifest — kinds declare a sensible
+        settings card. Comes from the manifest, kinds declare a sensible
         default in ``device.json`` and instances inherit it until the user
         picks their own. Falls back to a generic display glyph."""
         raw = self.manifest.get("icon")
@@ -100,7 +100,7 @@ class Device:
     @property
     def status_topic(self) -> str | None:
         """MQTT topic for status heartbeats. ``None`` for devices that
-        don't use MQTT — e.g. TRMNL clients poll ``/api/display`` and
+        don't use MQTT, e.g. TRMNL clients poll ``/api/display`` and
         their status comes from HTTP request headers, parsed by
         ``app.trmnl_api`` rather than a transport subscription."""
         topic = self.manifest.get("status_topic")
@@ -150,7 +150,7 @@ class Device:
         # the startup backfill in app.device_service patches existing
         # esp32 instance manifests). Without this passthrough the dict
         # arrives at device_panel() missing the keys and the dims-only
-        # preset-matching fallback wins — for a 1200×1600 Waveshare
+        # preset-matching fallback wins, for a 1200×1600 Waveshare
         # 13.3" it picks Inky 13.3" (1600×1200) by dict order and the
         # renderer packs at the wrong stride.
         for stride_key in ("native_w", "native_h"):
@@ -184,7 +184,7 @@ class Device:
         ESP32 / Pi clients) and before stashing config for the next
         non-MQTT exchange (HTTP-polled TRMNL clients embed the saved
         values in the next ``/api/display`` response). Independent of
-        the transport — the validator decides validity, the caller
+        the transport, the validator decides validity, the caller
         decides what to do with the bytes."""
         validate_fn = getattr(self.module, "validate_config", None)
         if not callable(validate_fn):
@@ -431,7 +431,7 @@ def load_instance_file(
     # absent or empty means fall back to the app-level setting.
     if isinstance(raw_inst.get("quiet_hours"), dict):
         inst_manifest["quiet_hours"] = dict(raw_inst["quiet_hours"])
-    # Per-device access token — currently only TRMNL devices use this
+    # Per-device access token, currently only TRMNL devices use this
     # (HTTP-polled clients identify themselves by token in lieu of MQTT
     # topics). Carry it through so app.trmnl_api can look up the
     # device on incoming /api/display requests.

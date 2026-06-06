@@ -14,7 +14,7 @@ fields it covers. The matching Tesserae UI fields are hidden under HA
 so the user has one place to manage broker connection details.
 
 Anything else (telemetry consent, HA discovery toggle, mDNS, browser
-warmup, theme, …) is intentionally NOT mirrored here — it'd create
+warmup, theme, …) is intentionally NOT mirrored here, it'd create
 two sources of truth for fields the user can already edit in
 Tesserae's UI. Add to the allow-list only when there's a strong
 "HA is the right place" argument.
@@ -55,7 +55,7 @@ def load_options(path: Path = DEFAULT_OPTIONS_PATH) -> dict[str, Any] | None:
 
     Returns ``None`` when the file doesn't exist (we're not under HA, or
     the user hasn't saved their Configuration tab yet) or is malformed
-    (Supervisor would normally reject that upstream, so we don't crash —
+    (Supervisor would normally reject that upstream, so we don't crash -
     just skip the wiring)."""
     if not path.exists():
         return None
@@ -82,7 +82,7 @@ def apply_log_level(options: dict[str, Any]) -> None:
 def _broker_patch_from_options(options: dict[str, Any]) -> dict[str, Any]:
     """Translate the four ``mqtt_*`` options into ``broker`` keys.
 
-    Each option is only included when explicitly present — that way a
+    Each option is only included when explicitly present, that way a
     missing key from a sparse options.json doesn't blank out an
     existing setting. Empty strings ARE forwarded, because that's how
     a user clears the field on HA's Configuration form."""

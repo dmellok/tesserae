@@ -1,4 +1,4 @@
-// f1_last_race — Spectra status archetype with a proper F1 podium as
+// f1_last_race, Spectra status archetype with a proper F1 podium as
 // the visual centrepiece. Three coloured steps in P2-P1-P3 visual
 // order, heights stepping up to the middle (P1 tallest), each tinted
 // by the driver's constructor colour. Driver code + team + race
@@ -46,7 +46,7 @@ function teamColor(id) {
 // centre, P3 right) so the row lands in the iconic podium shape.
 function podiumBlock(p, place) {
   if (!p) return `<div class="podium-block podium-block--empty" data-place="${place}"></div>`;
-  const code = p.code || `${(p.given || "")[0] || ""}${(p.family || "")[0] || ""}` || "—";
+  const code = p.code || `${(p.given || "")[0] || ""}${(p.family || "")[0] || ""}` || "-";
   const team = p.constructor || "";
   const time = p.time || "";
   const color = teamColor(p.constructorId);
@@ -107,7 +107,7 @@ export default async function render(shadow, ctx) {
   let track = null;
   try { track = await getCircuit(data.circuitId); } catch { track = null; }
 
-  // Visual order P2-P1-P3 via grid order — the actual podium shape.
+  // Visual order P2-P1-P3 via grid order, the actual podium shape.
   // podiumBlock handles missing entries (returns an empty cell so the
   // grid stays balanced).
   const p1 = podium.find((p) => Number(p.position) === 1) || podium[0];
@@ -153,7 +153,7 @@ export default async function render(shadow, ctx) {
       display: block;
     }
 
-    /* Podium proper — three flex-column blocks in P2 / P1 / P3 visual
+    /* Podium proper, three flex-column blocks in P2 / P1 / P3 visual
        order. Block uses justify-content: flex-end so the driver +
        step + meta stack push to the bottom of the cell, giving the
        iconic "tallest block centre, lower blocks flanking" silhouette
@@ -219,7 +219,7 @@ export default async function render(shadow, ctx) {
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
     }
-    /* The step — a coloured bar whose height varies by place so the
+    /* The step, a coloured bar whose height varies by place so the
        three form the podium silhouette. Heights against cqmin keep
        all three scaling uniformly on small cells. */
     .podium-step {
@@ -241,7 +241,7 @@ export default async function render(shadow, ctx) {
       text-transform: var(--label-transform, uppercase);
     }
 
-    /* Location meta line — pin icon + circuit / locality / country.
+    /* Location meta line, pin icon + circuit / locality / country.
        Built as a flex row with a text wrapper that absorbs ellipsis
        overflow, plus container-query rules below that drop the less
        essential bits at narrower cells so the line doesn't keep

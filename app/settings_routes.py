@@ -4,9 +4,9 @@ The routes that used to live here now span :mod:`app.settings`. This
 shim re-exports the symbols the rest of the codebase still imports by
 the original name:
 
-* ``register`` — called by :mod:`app.main` to attach the blueprint.
-* ``bp``       — the shared ``Blueprint("auth", ...)`` object.
-* ``APP_FIELDS`` — imported by ``tests/test_mdns.py``.
+* ``register``, called by :mod:`app.main` to attach the blueprint.
+* ``bp``      , the shared ``Blueprint("auth", ...)`` object.
+* ``APP_FIELDS``, imported by ``tests/test_mdns.py``.
 
 New code should import from ``app.settings`` directly.
 """

@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Clock — Word grid",
+  "name": "Clock, Word grid",
   "version": "0.1.2",
   "kind": "widget",
   "description": "QLOCKTWO-inspired letter-grid clock. An 11×10 matrix of letters where the words for the current time light up; everything else stays dim. Pure client-side, no fetch. Rounds to the nearest 5 minutes.",

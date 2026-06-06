@@ -1,4 +1,4 @@
-// glances_status — Spectra status archetype. Three big ring gauges
+// glances_status, Spectra status archetype. Three big ring gauges
 // (CPU / RAM / Disk) are the focal element; a tone-coded state
 // pill names the overall health; load + uptime sit beneath as a
 // compact footer. xs drops the rings + footer for a single-pill
@@ -25,21 +25,21 @@ const TONE_ICON = {
 };
 
 function fmtPct(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   const n = Number(v);
-  if (!Number.isFinite(n)) return "—";
+  if (!Number.isFinite(n)) return "-";
   return `${Math.round(n)}%`;
 }
 
 function fmtLoad(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   const n = Number(v);
-  if (!Number.isFinite(n)) return "—";
+  if (!Number.isFinite(n)) return "-";
   return n < 10 ? n.toFixed(2) : n.toFixed(1);
 }
 
 function fmtUptime(secs) {
-  if (!Number.isFinite(secs) || secs <= 0) return "—";
+  if (!Number.isFinite(secs) || secs <= 0) return "-";
   const days = Math.floor(secs / 86400);
   const hours = Math.floor((secs % 86400) / 3600);
   const mins = Math.floor((secs % 3600) / 60);
@@ -90,7 +90,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const state = data.state || { text: "—", tone: "ok" };
+  const state = data.state || { text: "-", tone: "ok" };
   const tone = state.tone || "ok";
   const accent = TONE_ACCENT[tone] || "var(--text-secondary)";
   const stateIcon = TONE_ICON[tone] || "ph-pulse";

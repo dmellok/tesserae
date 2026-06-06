@@ -1,4 +1,4 @@
-// sky_bom_warnings — Spectra list archetype, severity-led.
+// sky_bom_warnings, Spectra list archetype, severity-led.
 //
 // Each Bureau of Meteorology warning paints as a row with a vertical
 // colour-band on the left (severity → accent), a category icon, the
@@ -21,7 +21,7 @@ const SEV_ACCENT = {
   blue: "var(--accent-5)",
 };
 
-// color-mix soft tints — produced inline rather than relying on the
+// color-mix soft tints, produced inline rather than relying on the
 // design system's --accent-N-soft tokens because not every theme
 // defines a -soft variant for every accent, and we want the chip to
 // degrade gracefully on themes that don't.
@@ -113,7 +113,7 @@ export default function render(shadow, ctx) {
       gap: var(--space-2);
       overflow: hidden;
     }
-    /* All-clear card — moss-tinted block with a big shield-check icon.
+    /* All-clear card, moss-tinted block with a big shield-check icon.
        Replaces the previous quiet "No active warnings." text so the
        reassuring case reads as a confident state, not blank space. */
     .bom-clear {
@@ -162,7 +162,7 @@ export default function render(shadow, ctx) {
           <div class="bom-clear">
             <i class="ph-bold ph-shield-check"></i>
             <span class="bom-clear-title">All clear</span>
-            <span class="bom-clear-sub">${escapeHtml(region || "—")} · No active warnings</span>
+            <span class="bom-clear-sub">${escapeHtml(region || "-")} · No active warnings</span>
           </div>
         </div>
       </div>`;
@@ -272,7 +272,7 @@ export default function render(shadow, ctx) {
       min-width: 0;
     }
     /* Tag chip in the severity's soft tint with the matching accent
-       foreground — same chip idiom the weather_wind Beaufort badge
+       foreground, same chip idiom the weather_wind Beaufort badge
        uses, scaled down to fit inline beside the title. */
     .bom-row-tag {
       display: inline-flex;

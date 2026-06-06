@@ -4,25 +4,25 @@ TRMNL clients (jailbroken Kindles running the KOReader trmnl-display
 plugin, native TRMNL hardware, any BYOS-compatible client) poll
 ``GET /api/display`` on a fixed cadence and paint whatever PNG the
 server hands back. Authentication is a per-device ``access-token``
-header — the user generates it in Tesserae's Settings → Devices and
+header, the user generates it in Tesserae's Settings → Devices and
 pastes it into the client's config. No MAC, no pairing flow, no MQTT.
 
 Three endpoints:
 
-* ``GET /api/display`` — polled by every client on every wake. Returns
+* ``GET /api/display``, polled by every client on every wake. Returns
   ``{image_url, filename, refresh_rate, ...}`` pointing at the latest
   rendered frame for the device. Also captures the client's status
   headers (battery, RSSI, panel dims, firmware version) into the same
   ``DEVICE_STATUS`` cache the MQTT devices feed, so Settings → Devices
   shows freshness + battery uniformly.
 
-* ``GET /api/setup/`` — first-boot flow. Native TRMNL clients call it
+* ``GET /api/setup/``, first-boot flow. Native TRMNL clients call it
   to exchange a MAC for a token; the KOReader plugin skips it. We
   respond with whatever token the request brought (or a generated one
   if pairing-style discovery makes sense later) so the client doesn't
   give up.
 
-* ``POST /api/log/`` — optional client-side diagnostics. Native TRMNLs
+* ``POST /api/log/``, optional client-side diagnostics. Native TRMNLs
   use it; the KOReader plugin doesn't. We accept anything, log the
   body, and return 200.
 
@@ -89,7 +89,7 @@ def _device_by_token(token: str) -> Device | None:
             continue
         if secrets.compare_digest(stored, token):
             matched = dev
-            # Don't break — finish the scan so timing leaks nothing.
+            # Don't break, finish the scan so timing leaks nothing.
     return matched
 
 
@@ -102,7 +102,7 @@ def _request_token() -> str:
     for k in ("access-token", "Access-Token", "Authorization"):
         v = request.headers.get(k)
         if v:
-            # Authorization: Bearer <token> — strip the scheme if present.
+            # Authorization: Bearer <token>, strip the scheme if present.
             return v.removeprefix("Bearer ").strip()
     return ""
 
@@ -119,7 +119,7 @@ def _requested_panel_dims(device: Device) -> tuple[int, int]:
     KOReader, ``Width`` / ``Height`` for native TRMNL) before falling
     back to the device's manifest panel block. Lets a single TRMNL
     instance drive multiple physical panels of different sizes if the
-    user paastes the same token into more than one client — each
+    user paastes the same token into more than one client, each
     client tells us what size it wants and the server obliges."""
     for w_key, h_key in (("png-width", "png-height"), ("Width", "Height")):
         raw_w = request.headers.get(w_key)
@@ -143,8 +143,8 @@ def _update_status_from_headers(device: Device) -> dict[str, Any]:
 
     Mirrors ``transport_wiring._subscribe_device_status``: parsed fields
     are merged over the prior cached dict (so a header-light poll doesn't
-    blank the last-known battery / RSSI), and the HA discovery instance —
-    if running — is notified so TRMNL clients show up in Home Assistant
+    blank the last-known battery / RSSI), and the HA discovery instance -
+    if running, is notified so TRMNL clients show up in Home Assistant
     alongside MQTT devices with the same Battery / Signal / IP sensors."""
     from app.transport_wiring import merge_status_parsed
 
@@ -185,7 +185,7 @@ def display() -> Response | tuple[Response, int]:
         )
         # Drop the unknown token into the discovery cache so the
         # Settings → Devices → Discovered strip can offer one-click
-        # pairing — same UX as MQTT-side auto-discovery, just with
+        # pairing, same UX as MQTT-side auto-discovery, just with
         # the token preserved (the user already has it on their
         # device; making them re-paste a fresh one would be silly).
         if token:
@@ -216,8 +216,8 @@ def display() -> Response | tuple[Response, int]:
     # publish per device. Serve that artifact (already on disk under
     # /renders/<digest>.<ext>) so the client paints exactly what the
     # composer last produced. Falls back to the size-matched placeholder
-    # when nothing's been rendered yet — fresh install, post-restart
-    # before the first scheduled push, etc. — so the client still has
+    # when nothing's been rendered yet, fresh install, post-restart
+    # before the first scheduled push, etc., so the client still has
     # something to paint instead of looping on an error.
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
@@ -254,13 +254,13 @@ def setup() -> Response:
     """First-boot / pairing endpoint.
 
     Native TRMNL firmware calls this on first wake to exchange its MAC
-    for a server-issued ``api_key``. The KOReader plugin doesn't —
+    for a server-issued ``api_key``. The KOReader plugin doesn't -
     its user pastes the token in directly. We respond with whatever
     token the client brought (or a placeholder) so any client looking
     for a setup ACK gets one.
 
-    Real pairing — recognising a new MAC, creating a pending device,
-    surfacing it in Settings → Devices for one-click register — is a
+    Real pairing, recognising a new MAC, creating a pending device,
+    surfacing it in Settings → Devices for one-click register, is a
     follow-up. For now the user pre-creates the device + token in
     Tesserae and pastes the token into the client."""
     token = _request_token()
@@ -354,7 +354,7 @@ def placeholder_png(device_id: str, width: int, height: int) -> Response:
     # "this is YOUR device", not a generic test pattern.
     draw.text(
         (border + 8, border + 8),
-        f"{device_id}\n{width} x {height}\nplaceholder — awaiting first render",
+        f"{device_id}\n{width} x {height}\nplaceholder, awaiting first render",
         fill=0,
     )
 

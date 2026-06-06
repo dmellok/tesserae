@@ -1,4 +1,4 @@
-"""spotify_album_art — full-bleed album art of the current track.
+"""spotify_album_art, full-bleed album art of the current track.
 
 Thin widget: all the OAuth + API work lives in spotify_core; we just
 reach in via the registry and shape the now-playing result for the

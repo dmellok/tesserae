@@ -8,14 +8,14 @@
    single iframe loading /_test/preview/page at the chosen panel
    dimensions, scaled down to fit.
 
-   Reach this directly at /_test/preview. Dev-only — the backend route
+   Reach this directly at /_test/preview. Dev-only, the backend route
    guards on ``debug or testing`` like the rest of /_test/. #}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Widget preview — {{ widget.name }} — Tesserae</title>
+  <title>Widget preview, {{ widget.name }}, Tesserae</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <style>
@@ -260,7 +260,7 @@
            reloads the preview without hunting for an Apply button.
            The JS at the bottom of the page wires the change event to
            ``form.requestSubmit()`` so the existing submit handler
-           still runs — which is what bundles the cell_options form
+           still runs, which is what bundles the cell_options form
            fields into ``?opts=<json>``. Plain ``form.submit()`` would
            skip the handler and lose the typed-but-not-yet-applied
            option values. #}
@@ -322,8 +322,8 @@
       <h2>Cell options</h2>
       {# JS reads each field via the name attribute and bundles them
          into the ?opts JSON parameter on submit. Native form
-         serialisation can't do that — we'd lose the nested-dict shape
-         — so the form intercept lives at the bottom of this template. #}
+         serialisation can't do that, we'd lose the nested-dict shape
+        , so the form intercept lives at the bottom of this template. #}
       {% for spec in schema %}
         {% set name = spec.name %}
         {% set type = spec.type or 'string' %}
@@ -349,7 +349,7 @@
           <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="json">
             <label for="opt-{{ name }}">{{ label }}</label>
             <textarea id="opt-{{ name }}" data-opt-input>{% if val is mapping or val is iterable and val is not string %}{{ val|tojson }}{% elif val is not none %}{{ val }}{% endif %}</textarea>
-            <span class="hint">{{ 'JSON value' if type != 'textarea' else 'Plain text — newlines OK' }}</span>
+            <span class="hint">{{ 'JSON value' if type != 'textarea' else 'Plain text, newlines OK' }}</span>
           </div>
         {% elif type == 'number' %}
           <div class="field" data-opt-field data-opt-name="{{ name }}" data-opt-type="number">
@@ -363,7 +363,7 @@
                    type="{% if spec.secret %}password{% else %}text{% endif %}"
                    data-opt-input
                    value="{{ val if val is not none else '' }}">
-            {% if spec.secret %}<span class="hint">Stored as plain text in the URL while previewing — paste a throwaway key.</span>{% endif %}
+            {% if spec.secret %}<span class="hint">Stored as plain text in the URL while previewing, paste a throwaway key.</span>{% endif %}
           </div>
         {% endif %}
       {% endfor %}
@@ -386,7 +386,7 @@
     <header class="stage-head">
       <div>
         <h1>{{ widget.name }}</h1>
-        <p class="lede">7 cells across xs / sm / md / lg + one unassigned slot — laid out on a real panel for context.</p>
+        <p class="lede">7 cells across xs / sm / md / lg + one unassigned slot, laid out on a real panel for context.</p>
       </div>
       <div class="chips">
         <span class="chip">panel <strong>{{ panel_w }}×{{ panel_h }}</strong></span>
@@ -412,7 +412,7 @@
 
 <script>
   // Bundle every [data-opt-field] into ?opts=<json>, then submit.
-  // Browser-native form serialisation can't do this — the cell_options
+  // Browser-native form serialisation can't do this, the cell_options
   // schema is a nested dict, not a flat URL-encoded blob.
   (function () {
     const form = document.getElementById('preview-form');
@@ -451,7 +451,7 @@
       const opts = buildOpts();
       hidden.value = Object.keys(opts).length ? JSON.stringify(opts) : '';
       // Drop the per-field inputs from submission so the URL only
-      // carries widget, panel, theme, style, sample, opts — clean and
+      // carries widget, panel, theme, style, sample, opts, clean and
       // bookmarkable. The chrome pickers aren't tagged with
       // data-opt-field so they go through normally.
       document.querySelectorAll('[data-opt-input]').forEach((inp) => { inp.disabled = true; });

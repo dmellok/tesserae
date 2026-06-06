@@ -5,7 +5,7 @@ Returns one row per day: ISO date, day-of-week index, high/low temps,
 WMO weather code, and max precipitation probability.
 
 The new visual directions (r1/g2/s3/d4 from the design handoff) paint
-from extra structured fields layered on top of the legacy shape — see
+from extra structured fields layered on top of the legacy shape, see
 the ``days[*].day``/``icon``/``cond``/``today`` block, plus the
 top-level ``rangeLo`` / ``rangeHi`` / ``time``. Legacy keeps reading
 the original flat fields, so both render paths stay alive.
@@ -86,7 +86,7 @@ def fetch(
             weekday = -1
 
         code = _safe_get(daily.get("weather_code"), i)
-        # Forecast cells render the daytime glyph — there's no per-day
+        # Forecast cells render the daytime glyph, there's no per-day
         # is_day in the daily endpoint, so we trust the day side of the
         # WMO map for all five entries.
         cond, icon = _condition(code, True)
@@ -103,11 +103,11 @@ def fetch(
         elif i == 1:
             day_label = "Tom"
         else:
-            day_label = DAY_NAMES[weekday] if 0 <= weekday < 7 else "—"
+            day_label = DAY_NAMES[weekday] if 0 <= weekday < 7 else "-"
 
         days.append(
             {
-                # Legacy fields — original client.js still reads these.
+                # Legacy fields, original client.js still reads these.
                 "date": date_iso,
                 "weekday": weekday,
                 "high": high,
@@ -176,7 +176,7 @@ def _now_hhmm() -> str:
     return f"{n.hour:02d}:{n.minute:02d}"
 
 
-# WMO weather codes — see https://open-meteo.com/en/docs#weathervariables
+# WMO weather codes, see https://open-meteo.com/en/docs#weathervariables
 # Mirrors the dict in weather_now/server.py so the two widgets agree
 # on label + icon glyph for the same code.
 _WMO: dict[int, tuple[str, str, str]] = {

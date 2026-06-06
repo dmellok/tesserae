@@ -1,4 +1,4 @@
-"""ha_media — now-playing tile for a Home Assistant media_player entity.
+"""ha_media, now-playing tile for a Home Assistant media_player entity.
 
 Thin widget over ha_core. Reads a single ``media_player.*`` entity and
 shapes its state + attributes for the four visual directions in

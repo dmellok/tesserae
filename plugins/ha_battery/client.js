@@ -1,10 +1,10 @@
-// ha_battery — Spectra list archetype. One zebra row per battery,
+// ha_battery, Spectra list archetype. One zebra row per battery,
 // each leading with a device-type Phosphor glyph (phone / watch /
 // keyboard / mouse / remote / vacuum / sensor / camera / tracker by
 // name pattern, fallback ph-circuitry) so the row reads "which
 // thing" at a glance. The level lives in a tiny SVG battery shape
 // with a fill bar so you see the exact percentage as height, not
-// just a step-quantized icon — fill colour tracks the severity
+// just a step-quantized icon, fill colour tracks the severity
 // (critical → terracotta, low → ochre, healthy → moss). Items
 // crossing the low / critical threshold also wear a pill chip.
 
@@ -60,7 +60,7 @@ function levelAccent(item) {
   return "var(--accent-3)";
 }
 
-// SVG mini battery — rounded body + nub, fill bar inside. The fill
+// SVG mini battery, rounded body + nub, fill bar inside. The fill
 // always has at least a 1px sliver so 0% still reads as "empty
 // battery shape" rather than "no battery at all". Used twice: as a
 // row-level indicator and as the title-bar icon.
@@ -122,7 +122,7 @@ export default function render(shadow, ctx) {
   const rows = items.map((it, i) => {
     const accent = levelAccent(it);
     const devPh = deviceIcon(it.name);
-    const lvl = it.level == null ? "—" : `${it.level}%`;
+    const lvl = it.level == null ? "-" : `${it.level}%`;
     const batSvg = it.level == null ? "" : batterySvg(it.level, accent);
     return `
       <div class="bat-row ${i % 2 ? "is-zebra" : ""}">

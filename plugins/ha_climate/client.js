@@ -1,4 +1,4 @@
-// ha_climate — Spectra status archetype with a radial thermostat
+// ha_climate, Spectra status archetype with a radial thermostat
 // dial as the centrepiece. Single entity → one big dial with the
 // current temp at the centre, the target marked on the arc, and
 // mode/action/humidity chips below. Multiple entities → a responsive
@@ -49,7 +49,7 @@ function modeAccent(mode) {
 }
 
 function tempStr(v, unit) {
-  if (v == null || v === "") return "—";
+  if (v == null || v === "") return "-";
   return `${escapeHtml(v)}${unit ? escapeHtml(unit) : "°"}`;
 }
 
@@ -74,7 +74,7 @@ function polarSvg(cx, cy, angleDeg, radius) {
   return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
 }
 
-// Radial thermostat dial — 240° arc, gap at the bottom. Track in
+// Radial thermostat dial, 240° arc, gap at the bottom. Track in
 // surface-sunken; the filled arc grows from min → current temp in the
 // mode accent. Target temp shown as a chunky perpendicular tick that
 // crosses the arc. Setpoint range (target_low → target_high) shown as
@@ -111,7 +111,7 @@ function thermostatDial(item, opts = {}) {
     return polarSvg(cx, cy, tToAngle(t), radius);
   }
 
-  // Track — sunken arc the gauge sits in.
+  // Track, sunken arc the gauge sits in.
   const trackPath =
     `M ${startPt.x.toFixed(2)} ${startPt.y.toFixed(2)} ` +
     `A ${r} ${r} 0 1 1 ${endPt.x.toFixed(2)} ${endPt.y.toFixed(2)}`;
@@ -146,7 +146,7 @@ function thermostatDial(item, opts = {}) {
       `A ${r} ${r} 0 ${largeArc} 1 ${hiPt.x.toFixed(2)} ${hiPt.y.toFixed(2)}`;
   }
 
-  // Target marker — a perpendicular tick crossing the arc.
+  // Target marker, a perpendicular tick crossing the arc.
   const targetT = Number.parseFloat(item.target);
   let targetTick = "";
   if (Number.isFinite(targetT)) {
@@ -186,7 +186,7 @@ function thermostatDial(item, opts = {}) {
   const fontLabel = big ? 13 : 11;
   const fontUnit = big ? 22 : 18;
   const modeLabel = (item.mode_label || "").toUpperCase();
-  const currentLabel = Number.isFinite(currentT) ? Math.round(currentT) : "—";
+  const currentLabel = Number.isFinite(currentT) ? Math.round(currentT) : "-";
   const unitTxt = item.unit || "°";
 
   return `
@@ -406,7 +406,7 @@ export default function render(shadow, ctx) {
     .climate-humidity-val small {
       font-size: .7em;
     }
-    /* Multi-entity grid — every entity gets a compact dial card.
+    /* Multi-entity grid, every entity gets a compact dial card.
        Tiles are 200px+ each so the dial inside has room to breathe;
        on lg cells the grid fits more columns and each dial stays
        a generous size. */

@@ -119,7 +119,7 @@ def test_setup_locked_out_after_password_set(app_with_gate: Flask) -> None:
 
 def test_compose_loopback_bypass(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
-    # No session, no password set yet — the gate would normally redirect
+    # No session, no password set yet, the gate would normally redirect
     # to /setup. /compose should still be reachable from loopback.
     resp = client.get("/compose/nonexistent", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     # The compose route 404s on unknown page, but it must reach the route
@@ -135,7 +135,7 @@ def test_compose_blocked_from_non_loopback(app_with_gate: Flask) -> None:
 
 def test_plugin_asset_loopback_bypass(app_with_gate: Flask) -> None:
     """The Playwright renderer pulls /plugins/<id>/client.js while it
-    renders /compose/<id> — no session is available, so this path must
+    renders /compose/<id>, no session is available, so this path must
     bypass the gate from loopback (same as /compose/). Without this,
     dynamic imports inside the composer fail and the panel push errors
     with 'failed to fetch dynamically imported module'."""
@@ -145,7 +145,7 @@ def test_plugin_asset_loopback_bypass(app_with_gate: Flask) -> None:
         environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
     )
     # fonts_core has no client.js, so the asset route should 404. The
-    # important thing is we hit the route — not a 302 to /login or /setup.
+    # important thing is we hit the route, not a 302 to /login or /setup.
     assert resp.status_code in (200, 404)
 
 
@@ -159,7 +159,7 @@ def test_plugin_asset_blocked_from_non_loopback(app_with_gate: Flask) -> None:
 
 
 def test_plugin_index_still_gated(app_with_gate: Flask) -> None:
-    """/plugins/ (admin index) lists plugin internals and loader errors —
+    """/plugins/ (admin index) lists plugin internals and loader errors -
     must stay behind auth, even from loopback."""
     client = app_with_gate.test_client()
     resp = client.get("/plugins/", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
@@ -249,7 +249,7 @@ def test_broker_password_resubmit_masked_keeps_existing(
             "client_id": "tesserae",
         },
     )
-    # Re-submit with the mask in the password field — the original must stay.
+    # Re-submit with the mask in the password field, the original must stay.
     client.post(
         "/settings/broker",
         data={
@@ -270,7 +270,7 @@ def test_renderer_save_ignores_device_settings(app_with_gate: Flask, tmp_path: P
     """All of pi_png's settings (rotate / scale / bg / saturation) are
     per-display and live on the device card now. The renderer save
     endpoint filters ``device_setting`` fields out so a hand-crafted
-    POST to the renderer endpoint can't override per-device tuning —
+    POST to the renderer endpoint can't override per-device tuning -
     the stored values stay at the manifest defaults."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
@@ -499,7 +499,7 @@ def test_combined_save_persists_panel_and_quiet_hours_in_one_post(
 
 def test_renderer_card_hides_device_settings(app_with_gate: Flask) -> None:
     """Fields flagged ``device_setting: true`` belong on the device
-    card. The renderer card must drop them — and surface a hint in the
+    card. The renderer card must drop them, and surface a hint in the
     blurb that those settings live under Devices."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
@@ -538,7 +538,7 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
 
 def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
     """Pi PNG client devices get rotate / scale / bg / saturation on
-    the device card — none of those are renderer-wide any more."""
+    the device card, none of those are renderer-wide any more."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post(
@@ -559,7 +559,7 @@ def test_combined_save_persists_picture_quality_on_clone(
     """Picture-quality submitted through the combined save handler
     lands in the *clone's* renderer-settings namespace
     (``renderers.pi_bin__<id>``), not on the base renderer. The base
-    keeps whatever it had — devices override independently."""
+    keeps whatever it had, devices override independently."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post(
@@ -593,7 +593,7 @@ def test_combined_save_refuses_picture_quality_for_other_devices(
     app_with_gate: Flask, tmp_path: Path
 ) -> None:
     """An attempt to write to another device's clone (``<base>__<other>``)
-    through this device's save endpoint is silently dropped — the card
+    through this device's save endpoint is silently dropped, the card
     is only the source of truth for its own clones."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
@@ -629,7 +629,7 @@ def test_combined_save_skips_subsections_with_no_fields(app_with_gate: Flask) ->
     dev_before = app_with_gate.config["DEVICE_REGISTRY"].get("esp32_lab")
     assert dev_before is not None and dev_before.panel is not None
     panel_before = dict(dev_before.panel)
-    # Only quiet-hours fields submitted — panel untouched.
+    # Only quiet-hours fields submitted, panel untouched.
     resp = client.post(
         "/settings/devices/esp32_lab/save",
         data={

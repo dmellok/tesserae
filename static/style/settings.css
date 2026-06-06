@@ -60,7 +60,7 @@
   padding-left: var(--t-space-4);
 }
 
-/* Backups disclosure — collapsed by default so the System page leads
+/* Backups disclosure, collapsed by default so the System page leads
    with "create a backup" rather than a wall of old snapshots. */
 .backups-disclosure {
   margin-top: var(--t-space-3);
@@ -91,7 +91,7 @@
   margin-top: var(--t-space-3);
 }
 
-/* Recent-updates disclosure — same pattern as backups. Wraps the
+/* Recent-updates disclosure, same pattern as backups. Wraps the
    history-list so the SHA log doesn't fill the System page by
    default. Summary names the count + flips the caret on open. */
 .history-disclosure { margin: var(--t-space-2) 0 var(--t-space-3); }
@@ -147,7 +147,7 @@
   border-radius: var(--t-radius-sm);
   border: 1px solid var(--t-border);
 }
-/* Inline (in the device-card summary) — just the heartbeat dot + a
+/* Inline (in the device-card summary), just the heartbeat dot + a
    relative time. No frame, no padding, sits flush so the closed
    card stays compact. */
 .device-status--summary {
@@ -157,7 +157,7 @@
   border: 0;
   border-radius: 0;
 }
-/* In the expanded body — keep the framed look, but give it a
+/* In the expanded body, keep the framed look, but give it a
    subhead-style label and sit at the top of the body so the user
    sees diagnostics immediately on expand. */
 .device-status--body {
@@ -281,21 +281,21 @@
 }
 
 /* ----- Device card: grouped sections -------------------------------
-   The device card stacks distinct blocks — heartbeat status, an
+   The device card stacks distinct blocks, heartbeat status, an
    editable "Panel & orientation" group, and a footer toolbar of
    secondary/destructive actions. Divider lines + a small section
    label keep the groups legible instead of one long form. */
 
 .device-subsection {
   /* Bumped from space-4 to space-6 so the divider has real breathing
-   * room between sections — previously the slider value badge / last
+   * room between sections, previously the slider value badge / last
    * input sat right against the next section's caps-lock subhead. */
   margin-top: var(--t-space-6);
   padding-top: var(--t-space-6);
   border-top: 1px solid var(--t-border);
 }
 /* Each subsection's first field also needs space below the subhead
- * label — the cascade isn't enough since some fields are macros that
+ * label, the cascade isn't enough since some fields are macros that
  * own their top margin. */
 .device-subsection > .field,
 .device-subsection > .field-grid,
@@ -304,7 +304,7 @@
 .device-subsection > .actions {
   margin-top: var(--t-space-3);
 }
-/* Vertical rhythm between sibling fields within a subsection —
+/* Vertical rhythm between sibling fields within a subsection -
  * sliders especially were colliding with the next field's label. */
 .device-subsection .field + .field,
 .device-subsection .field-grid + .field,
@@ -321,12 +321,12 @@
   color: var(--t-muted);
 }
 /* When this heading isn't the first element of its section it stands
-   for a new sub-section — give it room from whatever came above so
+   for a new sub-section, give it room from whatever came above so
    the heading actually reads as a break rather than crowding the
    preceding paragraph. */
 * + .device-subhead { margin-top: var(--t-space-5); }
 
-/* Curated device-icon picker — a row of selectable glyph tiles. */
+/* Curated device-icon picker, a row of selectable glyph tiles. */
 .device-icon-grid {
   display: flex;
   flex-wrap: wrap;
@@ -400,7 +400,7 @@
   gap: var(--t-space-4);
 }
 
-/* Rotation timetable — the per-device read view of which schedules
+/* Rotation timetable, the per-device read view of which schedules
    target this panel. Three columns at desktop (when, what, edit),
    stacking under each other on phone. The .is-disabled state dims
    the row so a turned-off schedule reads as inactive without

@@ -151,7 +151,7 @@ def test_overrides_parser_tolerates_garbage() -> None:
 
     assert _parse_overrides("") == {}
     assert _parse_overrides(None) == {}
-    # No pipes — just an entity id, no override fields. Skipped.
+    # No pipes, just an entity id, no override fields. Skipped.
     assert _parse_overrides("sensor.bare") == {}
-    # Empty entity id (leading pipe) — skipped.
+    # Empty entity id (leading pipe), skipped.
     assert _parse_overrides("| Name | icon") == {}

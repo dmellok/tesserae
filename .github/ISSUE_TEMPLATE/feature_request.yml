@@ -34,4 +34,4 @@ body:
     id: context
     attributes:
       label: Additional context
-      description: Use cases, screenshots, links — anything that helps weigh whether this belongs in the core vs. as a plugin.
+      description: Use cases, screenshots, links, anything that helps weigh whether this belongs in the core vs. as a plugin.

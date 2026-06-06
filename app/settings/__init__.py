@@ -12,19 +12,19 @@ and ``APP_FIELDS`` from here.
 
 Layout:
 
-* ``_shared``       — blueprint object + ``current_app`` getters +
+* ``_shared``      , blueprint object + ``current_app`` getters +
                       small form / coercion / redirect helpers.
-* ``field_defs``    — hardcoded APP_FIELDS / PANEL_FIELDS / BROKER_FIELDS.
-* ``auth_routes``   — ``/setup``, ``/login``, ``/logout``.
-* ``index_routes``  — ``GET /settings`` + ``GET /settings/<area>``
+* ``field_defs``   , hardcoded APP_FIELDS / PANEL_FIELDS / BROKER_FIELDS.
+* ``auth_routes``  , ``/setup``, ``/login``, ``/logout``.
+* ``index_routes`` , ``GET /settings`` + ``GET /settings/<area>``
                       and the big ``_build_sections`` walker.
-* ``update_routes`` — generic ``POST /settings/<section_kind>`` save
+* ``update_routes``, generic ``POST /settings/<section_kind>`` save
                       handler for app / panel / broker / renderer-*
                       / plugin-* / device-*.
-* ``system_routes`` — ``/settings/system/*`` (updates, backups,
+* ``system_routes``, ``/settings/system/*`` (updates, backups,
                       webhook, telemetry).
-* ``devices_routes`` — ``/settings/devices/*`` (every device CRUD).
-* ``diagnostics_routes`` — ``/settings/diagnostics/*`` (test broker,
+* ``devices_routes``, ``/settings/devices/*`` (every device CRUD).
+* ``diagnostics_routes``, ``/settings/diagnostics/*`` (test broker,
                            test push).
 """
 
@@ -44,9 +44,9 @@ __all__ = ["APP_FIELDS", "BROKER_FIELDS", "PANEL_FIELDS", "bp", "register"]
 
 
 def register(app: Flask) -> None:
-    # Order doesn't matter — each module just adds routes to ``bp`` —
+    # Order doesn't matter, each module just adds routes to ``bp`` -
     # but listing them explicitly here makes the wiring discoverable.
-    from . import (  # noqa: F401 — imported for side effect (route registration)
+    from . import (  # noqa: F401, imported for side effect (route registration)
         auth_routes,
         devices_routes,
         diagnostics_routes,

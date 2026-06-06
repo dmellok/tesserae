@@ -60,7 +60,7 @@ def test_themes_index_renders_with_strip_and_builder(app: Flask) -> None:
     resp = client.get("/themes")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # Every bundled theme is reachable from the strip — anchor href is
+    # Every bundled theme is reachable from the strip, anchor href is
     # /themes/<id>, so any drift in the route names trips this.
     for theme in BUNDLED_THEMES:
         assert f"/themes/{theme.id}" in body, f"strip missing link for {theme.id}"
@@ -155,7 +155,7 @@ def test_user_theme_view_is_editable_with_save_button(app: Flask) -> None:
     assert "Update theme" in body
     # The form element must not carry the readonly marker. The JS code
     # below references the attribute name as a string, so a substring
-    # check would false-positive — match the actual ``<form...>``
+    # check would false-positive, match the actual ``<form...>``
     # opening tag instead.
     form_tag = re.search(r"<form[^>]*>", body)
     assert form_tag is not None
@@ -369,11 +369,11 @@ def test_extract_rejects_non_image_upload(app: Flask) -> None:
 
 def test_extract_honours_explicit_mode_override(app: Flask) -> None:
     """The form's mode dropdown overrides the extractor's luminance
-    heuristic when present — gives users an escape hatch when the
+    heuristic when present, gives users an escape hatch when the
     auto-detection picks the wrong side of the light/dark fence."""
     client = app.test_client()
     _sign_in(client)
-    # Bright image — auto-detect would say "light"; force "dark".
+    # Bright image, auto-detect would say "light"; force "dark".
     resp = client.post(
         "/themes/extract-palette",
         data={

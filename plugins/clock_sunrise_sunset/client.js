@@ -1,4 +1,4 @@
-// clock_sunrise_sunset — Spectra status archetype with a sun-path
+// clock_sunrise_sunset, Spectra status archetype with a sun-path
 // arc as the visual centrepiece. Hero number is today's daylight
 // duration; the arc paints the sun's trajectory across the sky with
 // golden-hour bands tinted at each end, twilight bands extending
@@ -17,8 +17,8 @@ function escapeHtml(s) {
 }
 
 function hhmmFromIso(iso) {
-  if (typeof iso !== "string" || !iso.includes("T")) return "—";
-  try { return iso.split("T", 2)[1].slice(0, 5); } catch { return "—"; }
+  if (typeof iso !== "string" || !iso.includes("T")) return "-";
+  try { return iso.split("T", 2)[1].slice(0, 5); } catch { return "-"; }
 }
 
 function fmtDaylight(seconds) {
@@ -55,7 +55,7 @@ function sunArcSvg({ riseMin, setMin, nowMin, isDay, opts }) {
   // t parameter: 0 at sunrise, 1 at sunset, clamped.
   const t = Math.max(0, Math.min(1, (nowMin - riseMin) / span));
 
-  // viewBox geometry — taller than the visible chord so a TRUE
+  // viewBox geometry, taller than the visible chord so a TRUE
   // semicircle apex (y = cy - archR) fits inside the box with a
   // little padding above. cy sits near the bottom; the viewBox
   // extends down to leave room for the twilight bands below the
@@ -137,14 +137,14 @@ function sunArcSvg({ riseMin, setMin, nowMin, isDay, opts }) {
     golden += bandRect(tGoldEnd, 1, "color-mix(in oklab, var(--accent-2) 22%, transparent)");
   }
 
-  // The dashed semicircle path — circular arc (rx === ry === archR)
+  // The dashed semicircle path, circular arc (rx === ry === archR)
   // so the SVG curve matches the parametric arcPoint() the marker
   // uses and the visual is the iconic "sun crosses the sky" arc.
   const archPath = `M ${archLeft} ${cy}
                     A ${archR} ${archR} 0 0 1 ${archRight} ${cy}`;
 
   // Sun / moon marker at the current position. During daylight the
-  // marker rides the arc; at night it hides — let the moon icon in
+  // marker rides the arc; at night it hides, let the moon icon in
   // the hero carry the night state.
   let marker = "";
   if (isDay) {
@@ -255,7 +255,7 @@ export default function render(shadow, ctx) {
         <div class="status-hero">
           <i class="ph-bold ${heroIcon}" style="color:${heroAccent}"></i>
           <div class="lockup">
-            <span class="status-state">${daylight ? `${daylight.h}<small style="font-size:.5em;color:var(--text-secondary)"> H </small>${daylight.m}<small style="font-size:.5em;color:var(--text-secondary)"> M</small>` : "—"}</span>
+            <span class="status-state">${daylight ? `${daylight.h}<small style="font-size:.5em;color:var(--text-secondary)"> H </small>${daylight.m}<small style="font-size:.5em;color:var(--text-secondary)"> M</small>` : "-"}</span>
             <span class="status-sub">Daylight</span>
           </div>
         </div>

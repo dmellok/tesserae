@@ -1,4 +1,4 @@
-"""Stable per-device preview alias — ``GET /preview/<device_id>.png``.
+"""Stable per-device preview alias, ``GET /preview/<device_id>.png``.
 
 The URL is invariant across pushes (no content-addressed digest in the
 path), so HA's generic camera + Grafana panels + wallboards can poll a
@@ -34,7 +34,7 @@ def _seed_latest_render(app: Flask, device_id: str, comp_digest: str, png_bytes:
 
 def test_preview_serves_latest_composition_png(app: Flask) -> None:
     """The endpoint serves the *composition* PNG (Playwright output)
-    even when the device's per-renderer artifact is a packed binary —
+    even when the device's per-renderer artifact is a packed binary -
     so the picture is always viewable."""
     png = b"\x89PNG\r\n\x1a\nfakepng-bytes"
     _seed_latest_render(app, "bin_mini", "abc123def4567890", png)
@@ -53,7 +53,7 @@ def test_preview_serves_latest_composition_png(app: Flask) -> None:
 
 
 def test_preview_returns_404_when_no_render_yet(app: Flask) -> None:
-    """A fresh device with no successful push should 404 — HA's camera
+    """A fresh device with no successful push should 404, HA's camera
     entity then shows 'unavailable' instead of a stale or fake frame."""
     client = app.test_client()
     resp = client.get("/preview/never_pushed.png")
@@ -65,7 +65,7 @@ def test_preview_rejects_invalid_device_ids(app: Flask) -> None:
     traversal attempts (../) and out-of-spec characters 404 cleanly."""
     client = app.test_client()
     assert client.get("/preview/A_BAD_ID.png").status_code == 404
-    # Path traversal — Flask's URL converter rejects the dot-slash but
+    # Path traversal, Flask's URL converter rejects the dot-slash but
     # the matcher's lowercase rule covers anything that gets through.
     assert client.get("/preview/dev/escape.png").status_code == 404
 
@@ -75,7 +75,7 @@ def test_preview_falls_back_to_per_renderer_artifact_when_no_comp_digest(
 ) -> None:
     """Latest-render entries written before 0.8.5 don't carry a
     composition_digest. Serve the per-renderer artifact in that case
-    rather than 404 — it's the right bytes, just not always a viewable
+    rather than 404, it's the right bytes, just not always a viewable
     image. The next push refreshes the entry with the new shape."""
     png = b"\x89PNGlegacyfallback"
     push_mgr = app.config["PUSH_MANAGER"]
@@ -88,7 +88,7 @@ def test_preview_falls_back_to_per_renderer_artifact_when_no_comp_digest(
         "filename": "legacy123.png",
         "renderer_id": "pi_png",
         "timestamp": 1.0,
-        # composition_digest absent — the pre-0.8.5 shape.
+        # composition_digest absent, the pre-0.8.5 shape.
     }
 
     with app.test_client() as client:

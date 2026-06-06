@@ -1,4 +1,4 @@
-"""octoprint_status — live print monitor for an OctoPrint instance.
+"""octoprint_status, live print monitor for an OctoPrint instance.
 
 Pulls two endpoints from the OctoPrint REST API (auth via ``X-Api-Key``):
 
@@ -26,7 +26,7 @@ and normalises them into the shape the four client variants paint from:
     }
 
 A printer that is powered down or has no serial link makes OctoPrint
-answer ``/api/printer`` with 409 — that is a normal *offline* state, not
+answer ``/api/printer`` with 409, that is a normal *offline* state, not
 an error, so we surface ``tone: "offline"`` and still render the card.
 Only genuine configuration problems (missing URL / key) return
 ``{"error": ...}`` for the client's error shell.
@@ -66,7 +66,7 @@ def _secs(value: Any) -> int | None:
 
 
 def _eta(remaining: int | None) -> str | None:
-    """Wall-clock time the print is projected to finish. Local time —
+    """Wall-clock time the print is projected to finish. Local time -
     server and panel share a TZ on a single-household install."""
     if not remaining or remaining <= 0:
         return None
@@ -110,7 +110,7 @@ def fetch(
 
     # --- printer state + temperatures -------------------------------
     # 409 (printer not operational) and connection errors both mean the
-    # machine is offline from OctoPrint's POV — render the offline card.
+    # machine is offline from OctoPrint's POV, render the offline card.
     reachable = True
     printer: dict[str, Any] = {}
     try:

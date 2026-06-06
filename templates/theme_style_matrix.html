@@ -1,7 +1,7 @@
 {# Dev-only theme × style coverage matrix.
 
    One widget rendered into 171 cells (19 themes × 9 styles). Iframes are
-   lazy-loaded so the page stays light until you scroll a row into view —
+   lazy-loaded so the page stays light until you scroll a row into view -
    browsers won't issue the request for an off-screen iframe with
    loading="lazy". Sticky header row + sticky left column let you scroll
    either axis without losing the labels.
@@ -13,7 +13,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Theme × style matrix — {{ widget.name }} — Tesserae</title>
+  <title>Theme × style matrix, {{ widget.name }}, Tesserae</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <style>
@@ -108,7 +108,7 @@
       gap: 0;
       border-collapse: separate;
     }
-    /* Column headers — sticky to the top so scrolling down keeps the
+    /* Column headers, sticky to the top so scrolling down keeps the
        style names in view. Sits below the topbar (which is also sticky)
        via a calculated top offset. */
     .matrix .col-head, .matrix .corner {
@@ -131,7 +131,7 @@
       color: var(--fgSoft);
       margin-top: 4px;
     }
-    /* Row labels — sticky to the left edge. */
+    /* Row labels, sticky to the left edge. */
     .matrix .row-head {
       position: sticky; left: 0; z-index: 5;
       background: var(--panel);
@@ -183,7 +183,7 @@
       transform: scale(var(--s));
       transform-origin: 0 0;
     }
-    /* Hover halo — call out a single cell when you're studying it. */
+    /* Hover halo, call out a single cell when you're studying it. */
     .matrix .frame:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 4; }
 
     /* Group divider rows between Spectra / Movement / base16. */
@@ -247,7 +247,7 @@
     {# Theme rows, grouped by category. Each group boundary emits a
        divider row first to visually separate Spectra / Movement / base16.
        The render URL is built via url_for so query params (including the
-       optional sample flag) compose correctly — manually appending
+       optional sample flag) compose correctly, manually appending
        ?sample=1 here would collide with the existing query string url_for
        emits for size / theme / style. #}
     {% set ns = namespace(prev_group='') %}

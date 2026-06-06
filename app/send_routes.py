@@ -5,10 +5,10 @@ redirects to ``/history`` so the result lands in the push log.
 
 Tabs:
 
-* **File** — multipart upload, pushed as an image
-* **Saved** — pick a saved dashboard, render through the composer
-* **URL**   — fetch an image URL, push the bytes
-* **Webpage** — Playwright-screenshot an arbitrary URL, push the bytes
+* **File**, multipart upload, pushed as an image
+* **Saved**, pick a saved dashboard, render through the composer
+* **URL**  , fetch an image URL, push the bytes
+* **Webpage**, Playwright-screenshot an arbitrary URL, push the bytes
 
 The standalone History page (``history_routes``) shows the push log and
 hosts resend / delete actions that POST back to ``/send/resend/...`` and
@@ -92,7 +92,7 @@ def _form_device_ids() -> list[str]:
     """Read + validate the multi-select target-device field. Unknown ids
     are dropped; an empty list means "no selection" (the caller is
     expected to reject the request via :func:`_require_target_devices`,
-    not silently fan out to every renderer — that path produced a
+    not silently fan out to every renderer, that path produced a
     frame rendered at the global panel preset and shipped it to every
     device, including ones whose actual panel didn't match)."""
     registry = _devices()
@@ -111,7 +111,7 @@ def _render_send_with_form(tab: str) -> Response:
 
     The Send routes used to ``redirect`` back to ``send.index`` on
     validation failure (no device ticked, blank URL, etc.), which
-    silently destroyed everything the user had typed — pasting the
+    silently destroyed everything the user had typed, pasting the
     URL again, re-selecting the fit, re-picking gallery folder/file
     was a frustration tax. Re-rendering instead surfaces the flash
     message AND keeps the form populated so the user can fix the one
@@ -128,7 +128,7 @@ def _render_send_with_form(tab: str) -> Response:
             tab=tab,
             gallery=_gallery_ref(),
             form_values=request.form.to_dict(flat=True),
-            # ``device_id`` is the only multi-value picker — flat
+            # ``device_id`` is the only multi-value picker, flat
             # ``to_dict`` loses every value except the last. Pass the
             # full list separately so the checklist re-ticks every
             # device the user picked, not just the last one.
@@ -143,7 +143,7 @@ def _require_target_devices(tab: str) -> list[str] | Response:
 
     The Send page's File / URL / Webpage / Gallery flows used to
     silently fall through to a "virtual panel" fan-out when no device
-    was selected — Tesserae rendered at the global panel preset and
+    was selected, Tesserae rendered at the global panel preset and
     blasted the same frame to every renderer in the registry. Devices
     with a different actual panel rejected the frame with a noisy
     ``ValueError: frame size X != expected Y`` in their heartbeat.
@@ -160,7 +160,7 @@ def _require_target_devices(tab: str) -> list[str] | Response:
     msg = (
         "Pick at least one device to push to."
         if have_any
-        else "No devices registered yet — add one in Settings → Devices."
+        else "No devices registered yet, add one in Settings → Devices."
     )
     flash(msg, "error")
     return _render_send_with_form(tab)
@@ -171,7 +171,7 @@ def _run_in_background(work: Callable[[], object], *, label: str) -> None:
     the render + transport round-trip (5–15 s for a 1600×1200 panel).
 
     The push manager already writes a ``type='push'`` event on success
-    or failure, and the History tab updates live via SSE — so the user
+    or failure, and the History tab updates live via SSE, so the user
     sees the result there instead of waiting for the form-POST to
     return. Failures inside ``work()`` get logged but never propagate
     (the request thread is already gone).
@@ -211,8 +211,8 @@ def _device_label(device_id: str | None) -> str:
 def _push_to_targets(
     label: str, targets: list[str], push: Callable[[str | None], PushResult]
 ) -> None:
-    """Queue a push once per selected device (or once with ``None`` — the
-    virtual-panel fan-out — when none are selected). Each call logs its
+    """Queue a push once per selected device (or once with ``None``, the
+    virtual-panel fan-out, when none are selected). Each call logs its
     own History row via the push manager, so the user sees per-target
     results stream into the History tab without the request thread
     waiting for the render + transport round-trip."""
@@ -250,7 +250,7 @@ def _gallery_module() -> Any:
 
 def _gallery_ref() -> dict[str, str] | None:
     """When opened from a gallery image (``?g_folder=&g_file=``), return
-    ``{folder, file, url}`` for the pre-loaded Gallery section — validating
+    ``{folder, file, url}`` for the pre-loaded Gallery section, validating
     the image exists via the picture_gallery plugin."""
     folder = (request.args.get("g_folder") or "").strip()
     filename = (request.args.get("g_file") or "").strip()
@@ -331,7 +331,7 @@ def _redirect_after_page_push(page_id: str, *, on_error: bool = False) -> Respon
     list or the editor doesn't yank the user into Send → History.
 
     Values are safelisted (``dashboards`` / ``editor``); anything else
-    falls back to the default Send-page-History landing — no open-redirect
+    falls back to the default Send-page-History landing, no open-redirect
     risk from a user-supplied path. ``page_id`` is needed to build the
     editor URL when ``return_to=editor``."""
     return_to = (request.form.get("return_to") or "").strip()

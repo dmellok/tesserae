@@ -1,12 +1,12 @@
 """Admin auth endpoints: first-run setup, sign-in, sign-out.
 
-* ``GET/POST /setup`` — first-run password set, only reachable while no
+* ``GET/POST /setup``, first-run password set, only reachable while no
   password is configured (otherwise it's a silent admin-takeover hole).
-* ``GET/POST /login`` — sign-in form. Redirects to ``/setup`` if no
+* ``GET/POST /login``, sign-in form. Redirects to ``/setup`` if no
   password is set yet; honours a ``?next=`` query param bounded by
   :func:`safe_next` so the post-login redirect can't be used as an open
   redirector.
-* ``POST /logout`` — drop the session and redirect to /login.
+* ``POST /logout``, drop the session and redirect to /login.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from ._shared import bp, log_auth, safe_next, settings_store
 @bp.route("/setup", methods=["GET", "POST"])
 def setup() -> Response | str:
     settings = settings_store()
-    # Setup only works while no password is set — otherwise it's a way to
+    # Setup only works while no password is set, otherwise it's a way to
     # silently take over the admin.
     if auth.password_is_set(settings):
         return redirect(url_for("auth.settings"))
@@ -38,7 +38,7 @@ def setup() -> Response | str:
             auth.login()
             log_auth("setup", "ok")
             # First run drops into the setup wizard, not straight to
-            # Settings — the wizard sequences broker → device → dashboard.
+            # Settings, the wizard sequences broker → device → dashboard.
             return redirect(url_for("onboarding.index"))
     return render_template("setup.html")
 
@@ -71,7 +71,7 @@ def logout_view() -> Response:
 # -- Settings → System → Authentication --------------------------------
 # Three endpoints for managing the admin password while logged in.
 # Disable requires ``confirmed=1`` so a stray POST can't silently drop
-# auth — the Settings switch sets it after a JS confirm() dialog. The
+# auth, the Settings switch sets it after a JS confirm() dialog. The
 # matching CLI escape hatch (``tesserae --reset-password``) lives in
 # ``app.main`` for when the user has lost the password entirely.
 
@@ -80,7 +80,7 @@ def logout_view() -> Response:
 def change_password() -> Response:
     settings = settings_store()
     if not auth.password_is_set(settings):
-        flash("No password is set — visit /setup first.", "error")
+        flash("No password is set, visit /setup first.", "error")
         return redirect(url_for("auth.settings_area", area="system"))
     current = request.form.get("current_password", "")
     new_pw = request.form.get("new_password", "")

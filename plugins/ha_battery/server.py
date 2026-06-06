@@ -1,4 +1,4 @@
-"""ha_battery — auto-discovered battery levels across HA.
+"""ha_battery, auto-discovered battery levels across HA.
 
 Asks HA for every entity, keeps the ones whose ``device_class`` is
 ``battery`` (which is HA's own convention for "this state is a 0-100
@@ -143,7 +143,7 @@ def fetch(
         level = _f_or_none(st.get("state"))
         if level is None:
             continue
-        # Clamp to 0-100 — some integrations briefly report >100 while
+        # Clamp to 0-100, some integrations briefly report >100 while
         # calibrating and the variants assume the canonical range.
         level = max(0.0, min(100.0, level))
         all_items.append(

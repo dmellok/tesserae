@@ -22,7 +22,7 @@ from app.state.theme_registry import (
     themes_by_family,
 )
 
-# Match a real CSS rule selector — ``[data-theme="..."]`` immediately
+# Match a real CSS rule selector, ``[data-theme="..."]`` immediately
 # followed by ``{`` (allowing whitespace + the optional ``:root,`` group).
 # Avoids picking up example values inside comments like the one at the
 # top of spectra-tokens.css.

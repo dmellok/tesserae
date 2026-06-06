@@ -24,7 +24,7 @@ docker compose up -d
 ```
 
 That's it. Open `http://<host-ip>:8765` (or
-`http://tesserae.local:8765` once mDNS comes up) — the first request
+`http://tesserae.local:8765` once mDNS comes up), the first request
 walks through password setup and the onboarding wizard.
 
 The default `docker-compose.yml` uses **host networking**, which is
@@ -37,7 +37,7 @@ the right choice for a self-hosted Pi / mini-PC / NAS appliance:
 - mDNS works, so `tesserae.local` resolves on the LAN.
 
 Linux only, though. Docker Desktop on Mac / Windows handles host
-networking differently — see [Bridge networking](#bridge-networking)
+networking differently, see [Bridge networking](#bridge-networking)
 below if you're testing there.
 
 ## What's in the image
@@ -49,7 +49,7 @@ below if you're testing there.
 - **Waitress** as the WSGI server. Production-tuned by default; no
   nginx required for a single-user install.
 - **Non-root user** (`tesserae`, uid 1001) for defence in depth. This
-  is not a widget sandbox — widgets still execute in the same Python
+  is not a widget sandbox, widgets still execute in the same Python
   process and can read anything this user can read (see
   [issue #3](https://github.com/dmellok/tesserae/issues/3)).
 
@@ -77,7 +77,7 @@ services:
 The built-in broker is amqtt, which speaks MQTT v3.1.1 only. Tesserae's
 own Pi / ESP32 clients are fine; if you connect with MQTT Explorer /
 MQTTX / Home Assistant / Node-RED you'll need to set their protocol
-version to 3.1.1 — v5 clients get rejected.
+version to 3.1.1, v5 clients get rejected.
 
 ### Point at Mosquitto (or HA's broker)
 
@@ -109,8 +109,8 @@ service name is the resolvable hostname inside the compose network).
 
 ## Bridge networking
 
-If you can't use host networking — typically Docker Desktop on Mac /
-Windows, or a setup with port conflicts on the host — switch to
+If you can't use host networking, typically Docker Desktop on Mac /
+Windows, or a setup with port conflicts on the host, switch to
 bridge networking. Two things break under bridge that host networking
 got for free, and **both need fixing** before your panels can talk to
 Tesserae:
@@ -122,7 +122,7 @@ Tesserae:
    reach. The fix: set `TESSERAE_HOST_IP` to your host's real LAN IP.
 2. mDNS multicast doesn't escape the bridge network, so
    `tesserae.local` won't resolve on the LAN. That one you can't
-   easily fix on bridge — use the host's IP directly, or run a
+   easily fix on bridge, use the host's IP directly, or run a
    separate mDNS reflector (out of scope here).
 
 The compose snippet:
@@ -145,7 +145,7 @@ services:
 
 Find your host's LAN IP with `hostname -I` (first address printed) or
 `ip addr show eth0`. Without `TESSERAE_HOST_IP` set, Tesserae logs a
-loud warning on startup and the admin UI flags the bad URL — but it
+loud warning on startup and the admin UI flags the bad URL, but it
 won't auto-fix itself, because the host's IP isn't introspectable
 from inside a bridge-networked container.
 
@@ -160,14 +160,14 @@ Your `./data` volume carries settings, pages, schedules, history, and
 the render cache across the upgrade.
 
 The in-app **Settings → System → Updates** card is hidden under
-Docker — a `git pull` inside a layered filesystem would lose changes
+Docker, a `git pull` inside a layered filesystem would lose changes
 on the next image rebuild, so upgrades go through `docker compose
 pull` instead. The Settings page surfaces a `docker compose` hint
 instead of the update form.
 
 ## Backups
 
-The **Settings → System → Backups** card still works — backups land
+The **Settings → System → Backups** card still works, backups land
 in `./data/core/backups/` on your host. Snapshotting `./data` with
 your normal backup tool (restic, borg, rsnapshot, or a plain cron'd
 tarball) covers everything Tesserae has, including those backups.
@@ -182,5 +182,5 @@ tarball) covers everything Tesserae has, including those backups.
   Playwright story; not currently in scope.
 - **The image is ~970 MB to pull**, ~2.5 GB on disk uncompressed.
   Most of that is Chromium and its sandboxes. There's no smaller
-  Tesserae image plan — the renderer fundamentally needs a real
+  Tesserae image plan, the renderer fundamentally needs a real
   browser.

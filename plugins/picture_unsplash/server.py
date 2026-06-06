@@ -1,4 +1,4 @@
-"""picture_unsplash — random photo from Unsplash, full bleed.
+"""picture_unsplash, random photo from Unsplash, full bleed.
 
 Ported from inky-dash's unsplash plugin. Cache key hashes the filter
 options so two cells with the same filters share an API call (saving

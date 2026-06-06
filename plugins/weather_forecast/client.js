@@ -1,4 +1,4 @@
-// weather_forecast — Spectra weather archetype, 5-day vertical stack.
+// weather_forecast, Spectra weather archetype, 5-day vertical stack.
 //
 // Each day is one row: ``[day] [icon] [Lo ─── Hi] [rain%]``. At lg the
 // body becomes a two-column grid with a Chart.js high-temp trend on
@@ -48,7 +48,7 @@ function escapeHtml(s) {
 }
 
 function fmtTemp(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   return Math.round(Number(v)) + "°";
 }
 
@@ -69,7 +69,7 @@ export default function render(shadow, ctx) {
   const label = data.place || data.label || "";
   const days = Array.isArray(data.days) ? data.days : [];
 
-  // Overall lo / hi across all days — every per-day range bar is
+  // Overall lo / hi across all days, every per-day range bar is
   // scaled into this window so a calm week reads as short slices and
   // a swingy week stretches edge to edge.
   const allHis = days.map((d) => Number(d.hi ?? d.high)).filter(Number.isFinite);
@@ -94,7 +94,7 @@ export default function render(shadow, ctx) {
     // so every row keeps the same column rhythm.
     // Icon sits AFTER the value so when the row right-aligns the
     // chip, the droplet glyph parks at the same x-position every row
-    // — the percentage value flexes leftward as digits grow ("5%" vs
+    //, the percentage value flexes leftward as digits grow ("5%" vs
     // "65%") without shifting the icon column.
     const rainBlock = rainPct == null
       ? '<span class="wxf-rain wxf-rain--unknown" aria-hidden="true"></span>'
@@ -125,7 +125,7 @@ export default function render(shadow, ctx) {
         : ""}
     </div>`;
 
-  // Layout — vertical day stack as the base; a 2-column grid at lg
+  // Layout, vertical day stack as the base; a 2-column grid at lg
   // with the Chart.js trend on the right. xs strips back to the
   // essentials (day, icon, hi) so cramped cells don't try to fit a
   // range bar that would compress to nothing.
@@ -271,7 +271,7 @@ export default function render(shadow, ctx) {
     }
 
     /* xs: drop the range bar + rain so the row stays readable at
-       180px wide. Just day, icon, hi — enough to scan tomorrow's
+       180px wide. Just day, icon, hi, enough to scan tomorrow's
        sky and tomorrow's temperature without a sliver of bar that
        can't show anything useful. */
     @container (max-width: 280px) {
@@ -310,7 +310,7 @@ export default function render(shadow, ctx) {
   if (chartReady) {
     const canvas = shadow.querySelector("canvas");
     const t = tokens(shadow.host);
-    // Filled line painted in accent-1 (terracotta) — vibrant enough
+    // Filled line painted in accent-1 (terracotta), vibrant enough
     // to stand out against the muted bauhaus surfaces and reads as
     // "warm / temperature" without competing with the rain droplets
     // (accent-4 teal) or the per-row range gradient

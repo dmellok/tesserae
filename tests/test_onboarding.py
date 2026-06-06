@@ -58,7 +58,7 @@ def test_wizard_steps_render(app: Flask) -> None:
 def test_telemetry_step_shows_a_pre_checked_consent_toggle(app: Flask) -> None:
     """Default-on at the consent screen: the checkbox is rendered pre-
     ticked so a user who just clicks Finish opts in. They can untick
-    it — the test below covers that path."""
+    it, the test below covers that path."""
     client = app.test_client()
     _sign_in(client)
     body = client.get("/onboarding/telemetry").get_data(as_text=True)
@@ -153,7 +153,7 @@ def test_broker_step_under_ha_hides_builtin_toggle_and_suggests_core_mosquitto(
 
 def test_broker_step_under_ha_ignores_stale_use_builtin_post(tmp_path: Path) -> None:
     """A stale form post with use_builtin=on must not re-enable the
-    embedded broker under HA — the runtime guard would skip it anyway,
+    embedded broker under HA, the runtime guard would skip it anyway,
     but settings still need to record host so onboarding completes."""
     a = create_app(testing=True, data_root=tmp_path, devices_dir=REPO_ROOT / "devices")
     a.config["TESTING"] = True

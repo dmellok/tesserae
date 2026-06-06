@@ -1,5 +1,5 @@
 """f1_standings_drivers smoke: composer renders cells across every
-supported size with mocked Jolpica data — no network call."""
+supported size with mocked Jolpica data, no network call."""
 
 from __future__ import annotations
 

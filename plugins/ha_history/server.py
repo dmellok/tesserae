@@ -1,4 +1,4 @@
-"""ha_history — one or more numeric HA sensors over time as sparklines.
+"""ha_history, one or more numeric HA sensors over time as sparklines.
 
 Thin widget over ha_core. ``get_states`` gives each entity's current
 value + unit + name in one call; ``history`` gives each series. We coerce
@@ -57,7 +57,7 @@ def _clamp_hours(raw: Any) -> int:
 
     Accepts either the new ``window`` select (preset string-of-int from
     the plugin.json choices) or the legacy ``hours`` number field that
-    earlier cells were saved with. Clamps 1 hour ≤ window ≤ 3 months —
+    earlier cells were saved with. Clamps 1 hour ≤ window ≤ 3 months -
     HA's history API can technically span longer but the widget would
     spend most of its time downsampling for a chart that won't read
     meaningfully on an e-ink panel anyway."""
@@ -115,7 +115,7 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
         return {
             "name": eid,
             "unit": "",
-            "current": "—",
+            "current": "-",
             "values": [],
             "sparse": True,
             "trend": "flat",
@@ -142,7 +142,7 @@ def _series_for(core: Any, eid: str, by_id: dict[str, Any], hours: int) -> dict[
             "sparse": True,
             "trend": "flat",
         }
-    # Compute hourly profile BEFORE downsampling — it needs the raw
+    # Compute hourly profile BEFORE downsampling, it needs the raw
     # timestamps. Only emit a profile when the window is at least
     # three days, otherwise the per-hour averages are too noisy to
     # carry meaning.

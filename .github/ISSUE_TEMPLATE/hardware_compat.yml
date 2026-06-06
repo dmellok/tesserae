@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        These reports feed the [compatibility matrix](https://dmellok.github.io/tesserae/compatibility/) so other people can buy with confidence. Even "it just works" reports are worth filing — that's how panels move from ❔ to ✅ in the README.
+        These reports feed the [compatibility matrix](https://dmellok.github.io/tesserae/compatibility/) so other people can buy with confidence. Even "it just works" reports are worth filing, that's how panels move from ❔ to ✅ in the README.
 
   - type: input
     id: panel

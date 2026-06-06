@@ -1,4 +1,4 @@
-# Tesserae CI — runs ruff + pytest on every push and PR.
+# Tesserae CI, runs ruff + pytest on every push and PR.
 #
 # We don't install Playwright's browsers here. Tests that need the
 # headless renderer should mock it (the renderer module imports fine

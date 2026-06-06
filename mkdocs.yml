@@ -1,5 +1,5 @@
 site_name: Tesserae
-site_description: Self-hosted e-ink dashboard companion — compose tile dashboards, render headless, push frames over MQTT.
+site_description: Self-hosted e-ink dashboard companion, compose tile dashboards, render headless, push frames over MQTT.
 site_url: https://dmellok.github.io/tesserae/
 repo_url: https://github.com/dmellok/tesserae
 repo_name: dmellok/tesserae

@@ -2,7 +2,7 @@
 
 The Settings routes are thin wrappers over these; testing the service
 directly locks down the behaviour that used to be duplicated (and had
-drifted) across the Add-device and Discovered-register routes — most
+drifted) across the Add-device and Discovered-register routes, most
 importantly that both create paths derive topics the same way.
 """
 
@@ -247,7 +247,7 @@ def test_create_instance_rejects_bad_id_and_unknown_kind(registries) -> None:
 
 def test_update_panel_normalises_dims_to_orientation(registries) -> None:
     """``update_instance_panel`` swaps w/h to match the chosen orientation
-    when they're inconsistent — portrait must end up tall, landscape
+    when they're inconsistent, portrait must end up tall, landscape
     wide. The renderers derive rotation from ``panel.w < panel.h``, so
     a mismatch silently keeps the panel rendering at the wrong
     orientation. The settings page's client-side JS swaps the form's
@@ -292,7 +292,7 @@ def test_update_panel_leaves_dims_when_already_consistent(registries) -> None:
         instance_id="esp32_lab",
         kind_id="esp32_client",
     )
-    # Portrait dims (448 < 600) + portrait orientation — no swap.
+    # Portrait dims (448 < 600) + portrait orientation, no swap.
     result = device_service.update_instance_panel(
         devices=devices,
         renderers=renderers,

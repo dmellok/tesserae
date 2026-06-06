@@ -1,4 +1,4 @@
-"""Smoke test for glances_status — render the widget at every size
+"""Smoke test for glances_status, render the widget at every size
 via ``?sample=1`` (so the canned payload skips the real Glances
 HTTP fetch) plus a couple of unit tests against the server module's
 tone heuristic and uptime parser.
@@ -69,7 +69,7 @@ def test_tone_thresholds(
 
 def test_split_auth_from_url_no_creds_passes_through() -> None:
     """A bare URL must come back unchanged with no Authorization
-    header — the bulk-case for unauthed Glances installs shouldn't
+    header, the bulk-case for unauthed Glances installs shouldn't
     pay any cost."""
     cleaned, headers = _split_auth_from_url("http://nas.local:61208")
     assert cleaned == "http://nas.local:61208"
@@ -90,7 +90,7 @@ def test_split_auth_from_url_extracts_basic_auth() -> None:
 
 
 def test_split_auth_from_url_handles_empty_password() -> None:
-    """Some users set a username with no password — the encoder must
+    """Some users set a username with no password, the encoder must
     still produce a valid ``user:`` Basic token instead of crashing."""
     cleaned, headers = _split_auth_from_url("http://watcher@nas:61208")
     assert cleaned == "http://nas:61208"

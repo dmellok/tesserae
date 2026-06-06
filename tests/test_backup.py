@@ -84,7 +84,7 @@ def test_create_then_restore_round_trips_everything(tmp_path: Path) -> None:
 
 
 def test_backups_directory_is_excluded_from_snapshot(tmp_path: Path) -> None:
-    """A backup must not bundle prior backups — that would grow O(n²)."""
+    """A backup must not bundle prior backups, that would grow O(n²)."""
     root = tmp_path / "data"
     _seed(root)
     first = bk.create(root, label="manual")
@@ -151,7 +151,7 @@ def test_gallery_images_are_excluded_but_config_is_kept(tmp_path: Path) -> None:
         names = set(zf.namelist())
     # The small config rides along.
     assert "plugins/picture_gallery/.folders.json" in names
-    # The image files are excluded — both nested and root-level.
+    # The image files are excluded, both nested and root-level.
     assert "plugins/picture_gallery/holidays/sunset.jpg" not in names
     assert "plugins/picture_gallery/root_photo.png" not in names
     # And the backup is dramatically smaller than the gallery footprint.
@@ -176,7 +176,7 @@ def test_excluded_subpaths_recorded_in_metadata(tmp_path: Path) -> None:
 
 
 def test_render_cache_artifacts_are_excluded(tmp_path: Path) -> None:
-    """core/renders is the content-addressed push cache — regenerable
+    """core/renders is the content-addressed push cache, regenerable
     and potentially large, so it shouldn't ride along in backups."""
     import zipfile
 
@@ -197,7 +197,7 @@ def test_render_cache_artifacts_are_excluded(tmp_path: Path) -> None:
 
 def test_restore_preserves_users_gallery_photos(tmp_path: Path) -> None:
     """Restoring a backup that excluded the gallery must NOT delete the
-    user's current photos on disk — they're not in the backup."""
+    user's current photos on disk, they're not in the backup."""
     root = tmp_path / "data"
     _seed_with_gallery(root)
     backup = bk.create(root)

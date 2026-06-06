@@ -4,8 +4,8 @@ A single ``/schedules`` page lists every schedule plus an inline 'new'
 form. ``/schedules/<id>/edit`` is an in-page form for an existing row.
 Delete and fire-now are POST endpoints.
 
-Manual trigger ('fire now') bypasses every gate — the user is asking
-for a push, give them one — but it still goes through the same
+Manual trigger ('fire now') bypasses every gate, the user is asking
+for a push, give them one, but it still goes through the same
 PushManager.push() the scheduler uses, so single-flight and renderer
 fanout work the same way.
 """
@@ -92,7 +92,7 @@ def _unique_schedule_id(base: str) -> str:
 
 def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Schedule:
     """Build a Schedule from a form dict. Raises ValidationError on bad
-    input — the caller flashes and re-renders.
+    input, the caller flashes and re-renders.
 
     Auto-generates an id from the name when creating; existing schedules
     keep their id (pinned by the URL in the update route)."""
@@ -334,7 +334,7 @@ def fire(schedule_id: str) -> Response:
     elif result.status == "sent":
         flash(f"Fired {schedule_id!r}.", "ok")
     else:
-        flash(f"Fired {schedule_id!r}: {result.status} — {result.error or ''}", "error")
+        flash(f"Fired {schedule_id!r}: {result.status}, {result.error or ''}", "error")
     return redirect(url_for("schedules.index"))
 
 

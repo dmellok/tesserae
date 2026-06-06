@@ -1,4 +1,4 @@
-// f1_next — Spectra status archetype. Headline countdown to lights-out
+// f1_next, Spectra status archetype. Headline countdown to lights-out
 // in accent-1 (F1 red), country flag in the title row, and the entire
 // weekend schedule as a row of session mini-cards (FP1 / FP2 / FP3 /
 // Sprint / Quali / Race) colour-coded by session type. Circuit
@@ -129,7 +129,7 @@ export default async function render(shadow, ctx) {
   const sessions = data.sessions || {};
   const raceDt = combineDt(data.date, data.time);
   const now = Date.now();
-  const countdown = raceDt ? fmtCountdown(raceDt - now) : "—";
+  const countdown = raceDt ? fmtCountdown(raceDt - now) : "-";
 
   let countdownLabel = countdown;
   if (showSeconds && raceDt && raceDt - now < 3600000 && raceDt - now > 0) {
@@ -186,7 +186,7 @@ export default async function render(shadow, ctx) {
       min-width: 0;
       justify-content: center;
     }
-    /* Hero countdown — large accent-1 number with a small leading
+    /* Hero countdown, large accent-1 number with a small leading
        clock icon. Sub line lists circuit + locality below. */
     .next-hero {
       display: flex;
@@ -227,7 +227,7 @@ export default async function render(shadow, ctx) {
     }
     .next-sub .ph-bold { color: var(--text-muted); font-size: 0.85em; }
 
-    /* Schedule grid — 6 session cards (FP1, FP2, FP3, Sprint, Quali,
+    /* Schedule grid, 6 session cards (FP1, FP2, FP3, Sprint, Quali,
        Race). Each card has an icon-led head row + a date / time
        row. Accent is set per session type via the --accent CSS
        variable on the card's inline style. */
@@ -288,7 +288,7 @@ export default async function render(shadow, ctx) {
                    "Segoe UI Emoji", "Twemoji Mozilla", sans-serif;
     }
 
-    /* Circuit silhouette — hidden by default; only LG cells get it.
+    /* Circuit silhouette, hidden by default; only LG cells get it.
        SVG has no intrinsic dims so the container must provide both
        width + height with preserveAspectRatio handling the meet. */
     .f1-track {
@@ -341,7 +341,7 @@ export default async function render(shadow, ctx) {
        ("QUALI" was clipping to "QUA" at the previous 6-cards-in-one-
        row layout). 5 or 6 sessions takes 2 rows; the row dimension
        follows the data the calendar actually carries (Monaco skips
-       Sprint, etc.) — no empty cell because the grid auto-fills. */
+       Sprint, etc.), no empty cell because the grid auto-fills. */
     @container (min-width: 700px) {
       .f1-body { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); }
       .f1-track { display: flex; }

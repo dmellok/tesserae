@@ -1,4 +1,4 @@
-// picture_apod — Spectra full-bleed image. NASA's Astronomy Picture
+// picture_apod, Spectra full-bleed image. NASA's Astronomy Picture
 // of the Day fills the cell; a subtle bottom-gradient overlay
 // surfaces the title + date so a passer-by can read what the picture
 // is without crowding the photo.

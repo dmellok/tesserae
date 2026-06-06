@@ -1,6 +1,6 @@
 """BrowserPool routing + lifecycle.
 
-Real Chromium isn't launched here — that would be ~2 s of cold-start
+Real Chromium isn't launched here, that would be ~2 s of cold-start
 per case and pull Playwright into the lightweight test loop. We verify
 the contract:
 
@@ -31,7 +31,7 @@ def test_render_routes_to_pool_when_supplied() -> None:
 
 def test_render_falls_back_to_cold_path_without_pool() -> None:
     """Without a pool, render_to_png reaches for sync_playwright + Chromium
-    launch — the pre-pool behaviour. Patching at the module boundary so
+    launch, the pre-pool behaviour. Patching at the module boundary so
     no real browser is spawned."""
     req = RenderRequest(url="http://x/y")
     with (

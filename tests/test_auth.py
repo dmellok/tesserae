@@ -51,7 +51,7 @@ def test_clear_password_wipes_section(tmp_path: Path) -> None:
     assert auth.password_is_set(store)
     auth.clear_password(store)
     assert not auth.password_is_set(store)
-    # Section is wiped, not just blanked — verify on disk.
+    # Section is wiped, not just blanked, verify on disk.
     assert store.get_section("auth") == {}
 
 
@@ -65,7 +65,7 @@ def test_set_password_disabled_toggles_required(tmp_path: Path) -> None:
     auth.set_password(store, "secretpass")
     auth.set_password_disabled(store, True)
     assert auth.password_required(store) is False
-    # The stored hash survives the toggle — re-enabling restores the same
+    # The stored hash survives the toggle, re-enabling restores the same
     # password without forcing the user to pick a new one.
     assert auth.verify_password(store, "secretpass")
     auth.set_password_disabled(store, False)

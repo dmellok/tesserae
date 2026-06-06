@@ -124,7 +124,7 @@ def test_push_image_writes_composition_thumbnail(tmp_path: Path, panel_png: byte
     result = manager.push_image(panel_png, source_label="hello.png")
     assert result.status == "sent"
     assert result.composition_digest is not None
-    # Composition PNG is the thumbnail — must land on disk.
+    # Composition PNG is the thumbnail, must land on disk.
     assert (renders_dir / f"{result.composition_digest}.png").exists()
     # Event log row recorded with source='file'.
     rows = event_log.list(type="push")

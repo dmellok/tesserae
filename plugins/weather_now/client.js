@@ -1,4 +1,4 @@
-// weather_now — Spectra weather archetype.
+// weather_now, Spectra weather archetype.
 //
 // Renders ``.w`` → optional ``.w-title`` → ``.w-body.wx-body`` with a
 // hero (icon + temp + condition) and a 4-cell metric strip pulled from
@@ -42,7 +42,7 @@ const COND_ACCENT = {
   "rain-heavy": "var(--accent-4)",
   showers: "var(--accent-4)",
   snow: "var(--accent-5)",
-  storm: "var(--accent-1)",          // terracotta — alert
+  storm: "var(--accent-1)",          // terracotta, alert
   fog: "var(--text-muted)",
 };
 
@@ -57,7 +57,7 @@ const METRIC_PH = {
   cloud: "ph-cloud",
 };
 
-// Metric icon accent — water-themed metrics teal, sun-themed ochre,
+// Metric icon accent, water-themed metrics teal, sun-themed ochre,
 // neutral measurements stay text-secondary so the grid keeps a steady
 // rhythm rather than every cell shouting for attention.
 const METRIC_ACCENT = {
@@ -78,12 +78,12 @@ function escapeHtml(s) {
 }
 
 function fmtTemp(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   return Math.round(Number(v)) + "°";
 }
 
 function fmtMetric(m) {
-  if (m == null || m.value == null) return "—";
+  if (m == null || m.value == null) return "-";
   const v = m.value;
   if (typeof v === "number") {
     return (v >= 100 ? Math.round(v) : v).toString();
@@ -91,7 +91,7 @@ function fmtMetric(m) {
   return String(v);
 }
 
-// Sunrise / sunset arc — painted at md-tall + lg. Plots a semicircle
+// Sunrise / sunset arc, painted at md-tall + lg. Plots a semicircle
 // from rise to set with a marker at the current wall-clock position.
 // viewBox 100x60 keeps the arc a true semicircle (rx=ry=40) so it
 // reads well in both the wide horizontal band below the metrics (md
@@ -185,7 +185,7 @@ export default function render(shadow, ctx) {
   //   xs (<=280px)  drop the metric strip entirely; hero claims the
   //                 whole body and stacks vertically so the icon +
   //                 temp lockup centres in the cell.
-  //   sm (281-440)  show only 2 metrics, hide labels — icon + value
+  //   sm (281-440)  show only 2 metrics, hide labels, icon + value
   //                 is enough at this size and removing labels saves
   //                 the cramped truncation we used to get ("HUMID...").
   //   lg (>=700)    grow the hero icon + temp to actually fill a
@@ -232,7 +232,7 @@ export default function render(shadow, ctx) {
        labels squeeze the icons + values past the cell. Drop the
        labels and stack icon + value tighter toward the top so the
        row never gets cut off at the bottom. Height-only query so the
-       browser parses it independently of width — the combined
+       browser parses it independently of width, the combined
        width+height shape was silently failing in some engines. */
     @container (max-height: 449px) {
       .wx-cell .d { display: none; }

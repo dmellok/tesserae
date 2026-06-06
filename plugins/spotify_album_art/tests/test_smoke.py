@@ -1,5 +1,5 @@
 """spotify_album_art smoke: composer renders with spotify_core.now_playing
-mocked — no OAuth, no network."""
+mocked, no OAuth, no network."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""spotify_now_playing — current track title/artist/album + progress.
+"""spotify_now_playing, current track title/artist/album + progress.
 
 Thin widget over spotify_core: it owns the OAuth + API; we shape the
 now-playing result for the client.

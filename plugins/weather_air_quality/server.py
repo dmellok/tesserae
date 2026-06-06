@@ -1,7 +1,7 @@
 """Air-quality fetch for the weather_air_quality widget.
 
 Open-Meteo CAMS air-quality endpoint, no API key. Caches per
-``(lat, lon)`` for 30 minutes — AQI numbers update hourly upstream and
+``(lat, lon)`` for 30 minutes, AQI numbers update hourly upstream and
 the dashboard re-renders constantly, so keeping a short cache stops us
 from hammering the API.
 """
@@ -45,7 +45,7 @@ def fetch(
     cache_path = data_dir / f"aqi_{lat:.3f}_{lon:.3f}.json"
     cached = _cached(cache_path)
     if cached is not None:
-        # Re-apply current scale choice from options — cached payload has
+        # Re-apply current scale choice from options, cached payload has
         # both EAQI and US AQI, only the surfaced one depends on options.
         cached["scale"] = scale
         return cached
@@ -71,7 +71,7 @@ def fetch(
     result: dict[str, Any] = {
         "label": options.get("label", ""),
         "scale": scale,
-        # Legacy fields — the old client.js render path still uses these.
+        # Legacy fields, the old client.js render path still uses these.
         "european_aqi": eaqi,
         "us_aqi": current.get("us_aqi"),
         "pm2_5": current.get("pm2_5"),
@@ -115,7 +115,7 @@ _POLLUTANT_BANDS: dict[str, tuple[float, ...]] = {
     "co": (4400, 9400, 12400, 15400, 30400),
 }
 
-# Display metadata for each pollutant — label, unit, icon name (wx-common
+# Display metadata for each pollutant, label, unit, icon name (wx-common
 # vocabulary) and accent. Order matches the design handoff's 6-tile grid.
 _POLLUTANT_META = (
     ("pm2_5", "PM2.5", "μg/m³", "pm2", "ink"),
@@ -130,7 +130,7 @@ _POLLUTANT_META = (
 def _eaqi_band(value: Any) -> tuple[str, int]:
     """Map an overall EAQI 0–100+ to (band name, band index 0..5)."""
     if not isinstance(value, (int, float)):
-        return ("—", 0)
+        return ("-", 0)
     for i, edge in enumerate(_EAQI_EDGES):
         if value <= edge:
             return (_EAQI_NAMES[i], i)
@@ -140,12 +140,12 @@ def _eaqi_band(value: Any) -> tuple[str, int]:
 def _pollutant_band(key: str, value: Any) -> tuple[str, int, float]:
     """For a pollutant, return (band name, band index 0..5, band max).
 
-    ``band max`` is the upper bound of the *active* band — used by the
+    ``band max`` is the upper bound of the *active* band, used by the
     D4 bar so the bar fills to "your band's ceiling" rather than the
     chart-wide max, which would compress every reading near zero."""
     edges = _POLLUTANT_BANDS.get(key)
     if edges is None or not isinstance(value, (int, float)):
-        return ("—", 0, 1.0)
+        return ("-", 0, 1.0)
     for i, edge in enumerate(edges):
         if value <= edge:
             return (_EAQI_NAMES[i], i, float(edge))
@@ -174,7 +174,7 @@ def _pollutants(current: dict[str, Any]) -> list[dict[str, Any]]:
                 "label": label,
                 "value": rounded,
                 "unit": unit,
-                # ``level`` mirrors ``value`` numerically — kept separate so
+                # ``level`` mirrors ``value`` numerically, kept separate so
                 # the D4 bar always reads from a numeric field even if value
                 # is a string placeholder.
                 "level": v if isinstance(v, (int, float)) else 0,
@@ -189,14 +189,14 @@ def _pollutants(current: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _dominant(pollutants: list[dict[str, Any]]) -> str:
-    """Return the label of the pollutant with the highest band index —
+    """Return the label of the pollutant with the highest band index -
     the design's "dominant" call-out. Ties break to whichever appears
     first in the list (PM2.5 / PM10 lead the order intentionally)."""
     best = -1
-    name = "—"
+    name = "-"
     for p in pollutants:
         idx = p.get("bandIndex", 0)
         if isinstance(idx, int) and idx > best:
             best = idx
-            name = p.get("label", "—")
+            name = p.get("label", "-")
     return name

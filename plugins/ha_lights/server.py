@@ -1,4 +1,4 @@
-"""ha_lights — overview of a set of Home Assistant ``light.*`` entities.
+"""ha_lights, overview of a set of Home Assistant ``light.*`` entities.
 
 Takes a newline-separated list of entity IDs from the cell options,
 looks each one up in a single ``get_states`` call, and returns a clean
@@ -19,7 +19,7 @@ per-light shape plus a top-level summary the four variants render:
       ]
     }
 
-The widget is defensive on purpose — an offline entity, a missing one,
+The widget is defensive on purpose, an offline entity, a missing one,
 or HA being unreachable all keep the cell drawing. Anything we can't
 resolve gets ``on=False`` and ``brightness_pct=None`` so the variants
 have something coherent to paint.
@@ -41,7 +41,7 @@ def _core() -> Any:
 
 
 def choices(name: str) -> list[dict[str, str]]:
-    """Entity picker for the editor — restricted to ``light.*``."""
+    """Entity picker for the editor, restricted to ``light.*``."""
     core = _core()
     if name == "entity" and core is not None:
         return core.entity_choices(domains=("light",))
@@ -93,7 +93,7 @@ def _icon_hint(attrs: dict[str, Any]) -> str:
     raw = str(attrs.get("icon") or "").strip().lower()
     if not raw:
         return "lightbulb"
-    # HA icons look like "mdi:ceiling-light" — keep the suffix only.
+    # HA icons look like "mdi:ceiling-light", keep the suffix only.
     if ":" in raw:
         raw = raw.split(":", 1)[1]
     # Phosphor doesn't carry every MDI glyph; the variants only use the
@@ -164,7 +164,7 @@ def fetch(
         if on:
             on_count += 1
         brightness = _brightness_pct(attrs.get("brightness")) if on else None
-        # Colour information — HA reports either color_temp_kelvin
+        # Colour information, HA reports either color_temp_kelvin
         # (direct), color_temp (mireds, legacy), or hs_color (when
         # the bulb is in colour mode). We forward whatever's there;
         # the client picks one to render as a tiny swatch dot.

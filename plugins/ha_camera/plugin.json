@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Home Assistant — Camera",
+  "name": "Home Assistant, Camera",
   "version": "0.1.3",
   "kind": "widget",
-  "description": "Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display. Multi-camera grids auto-fit; every tile carries a corner timestamp chip and a motion pip when relevant.",
+  "description": "Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame, perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display. Multi-camera grids auto-fit; every tile carries a corner timestamp chip and a motion pip when relevant.",
   "icon": "ph-video-camera",
   "supports": {
     "sizes": [

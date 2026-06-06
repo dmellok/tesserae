@@ -5,11 +5,11 @@ Settings → Server → MQTT broker and Tesserae will run a Python broker
 in a background thread. The transport then points at ``localhost`` on
 the configured port and everything else stays the same.
 
-Disabled by default — for any non-trivial deployment a real Mosquitto
+Disabled by default, for any non-trivial deployment a real Mosquitto
 host is preferable; the embedded broker is a single-host
 out-of-the-box convenience.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ class EmbeddedBroker:
     Auth: pass ``username`` + ``password`` to require credentials. A
     SHA-512 password file is written to ``passwd_path`` (or a temp file
     next to it) for amqtt's file auth plugin to consume. With no
-    creds, the broker accepts anonymous connections — combine that
+    creds, the broker accepts anonymous connections, combine that
     with the default ``127.0.0.1`` bind to keep the broker safe."""
 
     def __init__(
@@ -111,13 +111,13 @@ class EmbeddedBroker:
         set).
 
         amqtt 0.11.x verifies passwords via
-        ``passlib.apps.custom_app_context.verify`` — that means the hash
+        ``passlib.apps.custom_app_context.verify``, that means the hash
         must be in a passlib-recognised format (``$pbkdf2-sha256$...``,
         ``$6$...``, etc.), not a raw SHA-512 hex digest. The old
         ``hashlib.sha512().hexdigest()`` we used to write produced a
         string passlib couldn't identify, so every authenticated
         connection was silently rejected with "hash could not be
-        identified" in the broker thread — the user just saw "can't
+        identified" in the broker thread, the user just saw "can't
         connect" client-side."""
         if not (self._username and self._password):
             return None
@@ -153,7 +153,7 @@ class EmbeddedBroker:
         # the sys plugin's interval, which surfaced as
         #   * "Configuration parameter 'password-file' not found"
         #   * TypeError: '>' not supported between NoneType and int
-        # — and as a broker that listened but rejected every client.
+        # , and as a broker that listened but rejected every client.
         # See amqtt/contexts.py:default_broker_plugins for the canonical
         # shape. Config keys are underscore-separated, not hyphen.
         plugins: dict[str, dict[str, Any]] = {

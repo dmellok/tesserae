@@ -1,4 +1,4 @@
-// github_contributions — Spectra contributions-heatmap. 53-week ×
+// github_contributions, Spectra contributions-heatmap. 53-week ×
 // 7-day grid of activity cells (level 0-4 mapped onto a moss-accent
 // gradient). Above the heatmap sits a paired streak hero (current +
 // longest, each with its own glyph + accent); below the heatmap a
@@ -116,7 +116,7 @@ export default function render(shadow, ctx) {
     (acc, w) => acc + (w || []).filter((d) => (d?.count || 0) > 0).length,
     0,
   );
-  const busiestDate = data.busiest_date ? data.busiest_date.slice(5) : "—";
+  const busiestDate = data.busiest_date ? data.busiest_date.slice(5) : "-";
   const grid = [
     ["This week", `${data.this_week ?? 0}`, "var(--accent-3)"],
     ["This month", `${data.this_month ?? 0}`, "var(--accent-3)"],

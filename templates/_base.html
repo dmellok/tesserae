@@ -2,7 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  {# Viewport meta. With the mobile-zoom lock on (default), pin
+     initial-scale + maximum-scale + user-scalable=no so the admin UI
+     can't be pinch-zoomed and iOS Safari can't auto-zoom on input
+     focus. The shell scales fluidly with CSS, the browser zoom layer
+     just gets in the way. The setting at Settings → Server → App
+     turns the lock off (also drops the gesture blocker below) for
+     anyone who relies on browser zoom for accessibility. #}
+  {% if app_settings is defined and app_settings.get('mobile_zoom_lock', True) %}
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  {% else %}
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% endif %}
   <title>{% block title %}Tesserae{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
   <link rel="alternate icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
@@ -16,16 +27,35 @@
       } catch (e) { /* localStorage unavailable */ }
     })();
     // SCRIPT_NAME under HA Ingress (e.g. /api/hassio_ingress/<token>), empty
-    // otherwise. JS that builds absolute paths must prepend this — root-
+    // otherwise. JS that builds absolute paths must prepend this, root-
     // relative URLs from inside the ingress iframe would otherwise resolve
     // to the HA host root, not the add-on.
     window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
   </script>
+  {% if app_settings is defined and app_settings.get('mobile_zoom_lock', True) %}
+  <script>
+    // iOS Safari deliberately ignores user-scalable=no in the viewport
+    // meta (Apple's accessibility override). Catch its custom
+    // gesturestart/change/end events and block them so the admin UI
+    // doesn't get pinch-zoomed out of layout. Settings → Server → App
+    // has a switch that omits this whole snippet.
+    document.addEventListener('gesturestart', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturechange', function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener('gestureend', function (e) { e.preventDefault(); }, { passive: false });
+  </script>
+  <style>
+    /* touch-action: manipulation suppresses the double-tap-to-zoom
+       behaviour on every modern mobile browser while leaving tap +
+       scroll + swipe intact. Disable in tandem with the JS above via
+       the mobile_zoom_lock setting. */
+    html, body { touch-action: manipulation; }
+  </style>
+  {% endif %}
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
-  {# Admin stylesheet — split by concern. Foundation files first so later
+  {# Admin stylesheet, split by concern. Foundation files first so later
      files can override; page-specific files at the end. Cascade order
      matches the legacy single-file admin.css (verified byte-identical at
      the split commit). #}
@@ -54,17 +84,17 @@
          class="{% if request.blueprint == 'send' %}is-active{% endif %}">
          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Send</span>
       </a>
-      <a href="{{ url_for('history.index') }}"
-         class="{% if request.blueprint == 'history' %}is-active{% endif %}">
-         <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
-      </a>
       <a href="{{ url_for('pages.index') }}"
          class="{% if request.blueprint == 'pages' %}is-active{% endif %}">
          <i class="ph ph-squares-four" aria-hidden="true"></i><span>Dashboards</span>
       </a>
       <a href="{{ url_for('schedules.index') }}"
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
-         <i class="ph ph-clock-clockwise" aria-hidden="true"></i><span>Schedules</span>
+         <i class="ph ph-calendar-dots" aria-hidden="true"></i><span>Schedules</span>
+      </a>
+      <a href="{{ url_for('history.index') }}"
+         class="{% if request.blueprint == 'history' %}is-active{% endif %}">
+         <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>
       </a>
       <a href="{{ url_for('themes.index') }}"
          class="{% if request.blueprint == 'themes' %}is-active{% endif %}">
@@ -92,7 +122,7 @@
         </div>
       </details>
       {% if config.DEV_MODE %}
-      {# Dev-only review surfaces — every widget at every supported size
+      {# Dev-only review surfaces, every widget at every supported size
          iframed via /_test/render (Widget gallery), plus the
          theme × style matrix that paints one widget across every
          theme + style combination. Both underlying routes are gated on

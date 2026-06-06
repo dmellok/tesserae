@@ -1,4 +1,4 @@
-// picture_unsplash — Spectra full-bleed image with a small photographer-
+// picture_unsplash, Spectra full-bleed image with a small photographer-
 // credit overlay (Unsplash terms ask for attribution).
 
 function escapeHtml(s) {
@@ -10,7 +10,7 @@ function escapeHtml(s) {
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
-  const showCredit = opts.show_credit !== false; // default true — Unsplash terms
+  const showCredit = opts.show_credit !== false; // default true, Unsplash terms
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {

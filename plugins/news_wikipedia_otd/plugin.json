@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "News — Wikipedia On This Day",
+  "name": "News, Wikipedia On This Day",
   "version": "0.2.3",
   "kind": "widget",
-  "description": "Wikipedia 'On this day' — featured historical events for today's date. Uses the free Wikimedia REST API (no key).",
+  "description": "Wikipedia 'On this day', featured historical events for today's date. Uses the free Wikimedia REST API (no key).",
   "icon": "ph-book-open",
   "supports": {
     "sizes": [

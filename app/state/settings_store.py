@@ -1,14 +1,14 @@
 """File-backed settings store.
 
 One JSON file at ``data/core/settings.json`` holds every persisted setting
-the app cares about — segmented into named sections:
+the app cares about, segmented into named sections:
 
-* ``app``     — base_url, session secret, anything app-wide
-* ``auth``    — password hash + salt (PBKDF2-HMAC-SHA256)
-* ``broker``  — MQTT host/port/credentials
-* ``plugins.<id>`` — per-plugin settings declared in plugin.json's ``settings``
-* ``renderers.<id>`` — per-renderer settings declared in renderer.json
-* ``devices.<id>``   — per-device settings (M5)
+* ``app``    , base_url, session secret, anything app-wide
+* ``auth``   , password hash + salt (PBKDF2-HMAC-SHA256)
+* ``broker`` , MQTT host/port/credentials
+* ``plugins.<id>``, per-plugin settings declared in plugin.json's ``settings``
+* ``renderers.<id>``, per-renderer settings declared in renderer.json
+* ``devices.<id>``  , per-device settings (M5)
 
 Secret handling: when a setting field declares ``secret: true`` in its
 manifest, the value is stored on disk under ``<name>_secret`` instead of
@@ -21,7 +21,7 @@ makes every sensitive value visually obvious. The store exposes two reads:
 * ``get_for_admin(...)`` returns the same but with secret values masked.
   Used when shipping settings back to the editor / settings page.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ class SettingsStore:
     """Thread-safe, file-backed settings store.
 
     Atomicity: every save rewrites the whole file via tmp + rename. The file
-    is small (kilobytes) and writes are infrequent — no journaling needed.
+    is small (kilobytes) and writes are infrequent, no journaling needed.
     """
 
     def __init__(self, path: Path) -> None:
@@ -73,7 +73,7 @@ class SettingsStore:
     def get_section(self, section: str) -> dict[str, Any]:
         """Return the raw, on-disk contents of a section (with ``_secret``
         keys intact). Most callers want ``get_for_runtime`` / ``get_for_admin``
-        instead — this is the raw access used by tests and the auth module."""
+        instead, this is the raw access used by tests and the auth module."""
         with self._lock:
             section_data = self._data.get(section, {})
             return dict(section_data) if isinstance(section_data, dict) else {}
@@ -155,7 +155,7 @@ class SettingsStore:
         ``namespace.item_id``, applying the secret-rename convention.
 
         Quietly drops any incoming key that isn't declared in
-        ``manifest_settings`` — the UI can post extras (CSRF token, etc.)
+        ``manifest_settings``, the UI can post extras (CSRF token, etc.)
         without polluting on-disk state.
 
         Secret fields whose incoming value is ``SECRET_MASK`` are kept as
@@ -178,7 +178,7 @@ class SettingsStore:
                 is_secret = bool(field.get("secret"))
                 disk = _disk_key(name, secret=is_secret)
                 if is_secret and value == SECRET_MASK:
-                    # User left the masked value alone — don't overwrite.
+                    # User left the masked value alone, don't overwrite.
                     continue
                 merged[disk] = value
             ns[item_id] = merged

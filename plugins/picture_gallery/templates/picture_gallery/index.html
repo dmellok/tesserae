@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button, empty_state %}
-{% block title %}Gallery — Tesserae{% endblock %}
+{% block title %}Gallery, Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
@@ -48,7 +48,7 @@
   </ul>
   {% else %}
   {{ empty_state('images', 'No folders yet',
-                 blurb='Create one above. Then add the Picture — Gallery widget to a dashboard cell and pick it from the cell editor.') }}
+                 blurb='Create one above. Then add the Picture, Gallery widget to a dashboard cell and pick it from the cell editor.') }}
   {% endif %}
 </section>
 

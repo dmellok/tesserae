@@ -1,4 +1,4 @@
-// Info-pop popovers — click-to-open contextual help icons.
+// Info-pop popovers, click-to-open contextual help icons.
 //
 // Per design: click only (no hover, so touch + accidental brush-by work
 // correctly), one popover open at a time, click-away or Escape closes.
@@ -38,7 +38,7 @@
     });
   }
 
-  // One delegated click handler at the document level — buttons added
+  // One delegated click handler at the document level, buttons added
   // dynamically (e.g. by editor.js after a preview reload) all work
   // without re-binding.
   document.addEventListener("click", (ev) => {

@@ -1,4 +1,4 @@
-// sky_aurora — Spectra status archetype with a half-circle Kp
+// sky_aurora, Spectra status archetype with a half-circle Kp
 // gauge as the hero. The gauge arc sweeps 0-9, the needle marks
 // the current value, and a colour band ramps from quiet → severe
 // across the dial. Below: a band pill + status grid, then the
@@ -34,7 +34,7 @@ function tokenKey(kp) {
   return "accent6";
 }
 
-// Half-circle Kp gauge — standard dome (∩) shape with the centre
+// Half-circle Kp gauge, standard dome (∩) shape with the centre
 // near the bottom and the arc curving UP through the top of the
 // SVG. Kp 0 at lower-left horizon, Kp 9 at lower-right horizon,
 // apex at top-centre. Coloured band ramps quiet → severe; a heavy
@@ -83,7 +83,7 @@ function kpGaugeSvg(kp) {
             fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="butt"/>`;
   }).join("");
 
-  // Tick marks at integer Kp values — sit just OUTSIDE the band
+  // Tick marks at integer Kp values, sit just OUTSIDE the band
   // pointing radially outward. Major ticks at 0 and 9 carry labels.
   const ticks = [];
   for (let v = 0; v <= 9; v++) {
@@ -103,7 +103,7 @@ function kpGaugeSvg(kp) {
     }
   }
 
-  // Needle — pivots at the centre (near the bottom of the SVG) and
+  // Needle, pivots at the centre (near the bottom of the SVG) and
   // points UP toward the current Kp's position on the band arc.
   let needle = "";
   const v = Number(kp);
@@ -146,7 +146,7 @@ export default function render(shadow, ctx) {
 
   const kp = data.current_kp;
   const accent = bandAccent(kp);
-  const band = data.band_label || "—";
+  const band = data.band_label || "-";
   const forecastBand = data.forecast_band || "";
   const visibleNow = data.visible_now === true;
   const visibleSoon = data.visible_soon === true;
@@ -199,18 +199,18 @@ export default function render(shadow, ctx) {
         <h3>Aurora</h3>
         ${visibleNow ? `<span class="w-title-meta" style="color:var(--accent-3)">VISIBLE</span>`
           : visibleSoon ? `<span class="w-title-meta" style="color:var(--accent-2)">SOON</span>`
-          : `<span class="w-title-meta">Kp ${escapeHtml(String(kp ?? "—"))}</span>`}
+          : `<span class="w-title-meta">Kp ${escapeHtml(String(kp ?? "-"))}</span>`}
       </div>
       <div class="w-body status-body">
         <div class="aurora-gauge">${kpGaugeSvg(kp)}</div>
         <div class="aurora-hero">
-          <span class="aurora-hero-value">${escapeHtml(String(kp ?? "—"))}</span>
+          <span class="aurora-hero-value">${escapeHtml(String(kp ?? "-"))}</span>
           <div style="display:flex;flex-direction:column;line-height:1.1">
             <span class="aurora-hero-sub">Kp index</span>
             <span class="pill" style="background:${accent};align-self:flex-start;margin-top:2px">${escapeHtml(band)}</span>
           </div>
         </div>
-        ${forecastBand ? `<div class="status-grid"><div class="status-cell"><span class="u-label">3-day</span><span class="v">${escapeHtml(forecastBand)}</span></div><div class="status-cell"><span class="u-label">Oval</span><span class="v">${escapeHtml(String(data.forecast_oval ?? "—"))}°</span></div></div>` : ""}
+        ${forecastBand ? `<div class="status-grid"><div class="status-cell"><span class="u-label">3-day</span><span class="v">${escapeHtml(forecastBand)}</span></div><div class="status-cell"><span class="u-label">Oval</span><span class="v">${escapeHtml(String(data.forecast_oval ?? "-"))}°</span></div></div>` : ""}
         ${series.length >= 2 ? `<div style="flex:1 1 auto;min-height:2em;position:relative"><canvas></canvas></div>` : ""}
       </div>
     </div>`;

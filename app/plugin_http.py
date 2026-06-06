@@ -6,7 +6,7 @@ retry with backoff so a brief TLS handshake timeout or DNS blip doesn't
 flash an error in the cell on every refresh tick.
 
 Plugins remain free to use ``urllib`` directly when they need something
-more specific (cookies, streaming, multipart) — this is just the common
+more specific (cookies, streaming, multipart), this is just the common
 case made one line.
 """
 
@@ -21,7 +21,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Conservative defaults — open-meteo, alpha-vantage, etc. are usually
+# Conservative defaults, open-meteo, alpha-vantage, etc. are usually
 # sub-second but occasionally hang on TLS handshake under flaky LAN.
 DEFAULT_TIMEOUT_S: float = 15.0
 DEFAULT_USER_AGENT: str = "tesserae/widget (+https://github.com/dmellok/tesserae)"
@@ -40,7 +40,7 @@ def fetch_text(
     Same retry semantics as ``fetch_json`` but for non-JSON endpoints
     (HTML scrapes, RSS, etc.). Default ``retries=0`` because text
     scrape fallbacks tend to be slow / unreliable upstreams the caller
-    is already treating as best-effort — they shouldn't keep the
+    is already treating as best-effort, they shouldn't keep the
     dashboard waiting.
     """
     req_headers = {"User-Agent": DEFAULT_USER_AGENT}
@@ -74,7 +74,7 @@ def fetch_json(
 ) -> Any:
     """GET ``url`` and decode the response as JSON.
 
-    Retries on ``URLError``/``HTTPError``/``TimeoutError``/``OSError`` —
+    Retries on ``URLError``/``HTTPError``/``TimeoutError``/``OSError`` -
     the categories that cover transient TLS handshake failures, DNS
     blips, and 5xx-from-the-upstream. ``retries=1`` means at most two
     total attempts (initial + one retry); the call still raises on the

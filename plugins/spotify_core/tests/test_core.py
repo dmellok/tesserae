@@ -100,7 +100,7 @@ def test_now_playing_idle_when_item_is_not_a_track(
 
 
 def test_store_token_response_keeps_prior_refresh_token(app: Flask, core: ModuleType) -> None:
-    # Spotify omits refresh_token on a refresh — the prior one must survive.
+    # Spotify omits refresh_token on a refresh, the prior one must survive.
     with app.app_context():
         tokens = core._store_token_response(
             {"access_token": "fresh", "expires_in": 3600, "scope": "x"},

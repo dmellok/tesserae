@@ -45,7 +45,7 @@ def test_pi_png_manifest_fields(pi_png) -> None:
 
 
 def test_pi_png_landscape_panel_is_identity(pi_png, composition_png) -> None:
-    # Landscape panel (w > h): no rotation — matches pi_bin, which only
+    # Landscape panel (w > h): no rotation, matches pi_bin, which only
     # turns when the panel is portrait. (Was a fixed 270° before; that
     # left landscape pages sideways.)
     panel = Panel(w=200, h=100)

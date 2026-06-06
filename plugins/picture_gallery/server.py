@@ -1,9 +1,9 @@
-"""picture_gallery — folder-based image rotation + admin.
+"""picture_gallery, folder-based image rotation + admin.
 
 Ported from inky-dash's gallery plugin. A "folder" is either:
-  * **Internal** — a subdirectory inside the plugin's data_dir. Images
+  * **Internal**, a subdirectory inside the plugin's data_dir. Images
     are uploaded via the admin UI.
-  * **External** — a metadata pointer to an arbitrary host path. The
+  * **External**, a metadata pointer to an arbitrary host path. The
     plugin reads + serves images from there but never writes to it;
     uploads / deletes are rejected for external folders so we can't
     accidentally trash a user's actual photo library.
@@ -371,7 +371,7 @@ def blueprint() -> Blueprint:
         thumb = _thumb_path(data_dir, folder, filename, source)
         result = _ensure_thumbnail(source, thumb)
         if result is None:
-            # Thumbnail generation failed — unreadable file (locked, or a
+            # Thumbnail generation failed, unreadable file (locked, or a
             # OneDrive/cloud "online-only" placeholder), or a format Pillow
             # won't decode. Try the original, but never 500 on a single bad
             # image: a thumbnail that won't load is fine, the gallery just
@@ -382,7 +382,7 @@ def blueprint() -> Blueprint:
                 abort(404)
         response = send_file(result, mimetype="image/jpeg", conditional=True)
         # The thumbnail URL embeds the source mtime, so the browser can
-        # cache aggressively — a re-upload will hit a different URL.
+        # cache aggressively, a re-upload will hit a different URL.
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return response
 

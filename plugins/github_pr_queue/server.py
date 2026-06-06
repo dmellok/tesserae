@@ -1,4 +1,4 @@
-"""github_pr_queue — your open PRs + PRs awaiting your review."""
+"""github_pr_queue, your open PRs + PRs awaiting your review."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ def fetch(
     user = (options.get("user") or "").strip() or core.get_username()
     if not user:
         return {
-            "error": "Set a GitHub username — here or as github_core default.",
+            "error": "Set a GitHub username, here or as github_core default.",
             "yours": [],
             "review": [],
         }

@@ -1,4 +1,4 @@
-"""calendar_month — fetch events for the current month."""
+"""calendar_month, fetch events for the current month."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def fetch(
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
         # Derive a date key from the start ISO. All-day events have a
-        # plain YYYY-MM-DD; timed events have a UTC ISO — we'll let
+        # plain YYYY-MM-DD; timed events have a UTC ISO, we'll let
         # the client localise the time; for date-bucketing we use the
         # UTC date as a stable key.
         s = ev["start"]

@@ -10,7 +10,7 @@ The browse page enumerates them through :func:`UserThemeStore.list_all`
 which returns ``Theme`` records compatible with the bundled-theme
 registry so both render through the same template path. The CSS for
 each user theme is emitted at ``GET /themes/user.css`` by
-:func:`emit_css` — that route is the only place that walks the token
+:func:`emit_css`, that route is the only place that walks the token
 dict, so any token-list change ripples through one function instead
 of N templates.
 
@@ -18,7 +18,7 @@ The store is process-local and synchronous (single-user appliance);
 no DB, no migrations. Atomic write via tmp + ``Path.replace`` so a
 crash mid-save can't corrupt the file.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ from app.state.theme_registry import Theme
 
 # Slug prefix for every user theme id. Picked so user themes can never
 # shadow a bundled id (``light`` / ``dark`` / ``base16-*``) by accident
-# — the form-side slug sanitizer adds this prefix after stripping it
+# , the form-side slug sanitizer adds this prefix after stripping it
 # if the user re-entered it.
 USER_THEME_PREFIX = "user-"
 
@@ -67,7 +67,7 @@ class UserTheme:
     into the dataclass for an easy form round-trip; the CSS emitter
     re-pairs them on output.
 
-    ``mode`` is informational only — it doesn't change the cascade,
+    ``mode`` is informational only, it doesn't change the cascade,
     but the builder seeds different defaults for light vs dark and the
     browse page can filter on it later.
     """
@@ -106,7 +106,7 @@ class UserTheme:
     # ``accent_*_soft`` from its base accent + bg whenever the user
     # edits either, and shows the soft inputs as read-only. Persisted
     # so the preference survives page reloads. Doesn't affect the CSS
-    # output — the soft fields still emit normally; this flag only
+    # output, the soft fields still emit normally; this flag only
     # changes how the builder treats them.
     auto_soft_tints: bool = False
 
@@ -152,7 +152,7 @@ class UserTheme:
         replacing ``_`` with ``-`` and prefixing ``--``."""
         lines = [f'[data-theme="{self.id}"]{{']
         if self.font_family:
-            # Quote the user-supplied font family verbatim — Spectra's
+            # Quote the user-supplied font family verbatim, Spectra's
             # other themes use a comma-separated stack starting with the
             # specific family, so the user is responsible for that shape.
             lines.append(f"  --font-family: {self.font_family};")
@@ -173,7 +173,7 @@ def slugify_name(name: str) -> str:
 
     Capped at :data:`_SLUG_MAX` chars to keep CSS selectors, URL
     paths, and dropdown labels readable. A trailing hyphen left by
-    the truncation gets stripped — slugs always end on an
+    the truncation gets stripped, slugs always end on an
     alphanumeric so the matching ``valid_slug`` regex accepts them.
     """
     slug = _SLUG_SAFE_NAME.sub("-", name.lower()).strip("-")
@@ -312,7 +312,7 @@ def emit_css(store: UserThemeStore) -> str:
     on disk without a Python round-trip per render."""
     blocks = [t.emit_css() for t in store.list_all()]
     if not blocks:
-        # Empty file is fine — browsers handle 200 + empty body cleanly
+        # Empty file is fine, browsers handle 200 + empty body cleanly
         # and the conditional <link> tag in templates can stay
         # unconditional this way.
         return "/* No user themes saved. */\n"

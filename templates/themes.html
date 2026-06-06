@@ -1,8 +1,8 @@
 {% extends "_base.html" %}
 {% from "_components.html" import button, text_input, select_field, color_input, switch %}
 {% block title %}
-{% if is_new %}New theme — Themes — Tesserae
-{% else %}{{ theme.name }} — Themes — Tesserae
+{% if is_new %}New theme, Themes, Tesserae
+{% else %}{{ theme.name }}, Themes, Tesserae
 {% endif %}
 {% endblock %}
 {% block head_extra %}
@@ -20,7 +20,7 @@
     <h1><i class="ph ph-palette"></i> Themes</h1>
     <p class="lede">
       Click any theme in the strip to load it. Bundled themes are
-      read-only — duplicate one to start your own. Upload a photo at
+      read-only, duplicate one to start your own. Upload a photo at
       the top of the builder to seed a palette from it.
     </p>
   </div>
@@ -71,7 +71,7 @@
     <div class="themes-builder-head">
       <h2>
         {% if is_new %}New theme
-        {% elif is_bundled %}{{ theme.name }} <span class="muted">— bundled, read-only</span>
+        {% elif is_bundled %}{{ theme.name }} <span class="muted">- bundled, read-only</span>
         {% else %}Editing {{ theme.name }}
         {% endif %}
       </h2>
@@ -103,7 +103,7 @@
     <form method="post" action="{{ action_url }}" class="theme-builder"
           {% if is_bundled %}data-builder-readonly{% endif %}>
 
-      {# Image-to-theme — sits at the top so users iterate
+      {# Image-to-theme, sits at the top so users iterate
          upload → tweak → save. Hidden form pane handles the multipart
          upload via fetch so the rest of the form state survives. #}
       {% if not is_bundled %}
@@ -220,7 +220,7 @@
         </div>
       </div>
       <p class="theme-preview-hint">
-        Preview tracks the form state — click <em>Save theme</em> to commit it.
+        Preview tracks the form state, click <em>Save theme</em> to commit it.
       </p>
     </div>
   </aside>
@@ -228,7 +228,7 @@
 </div>
 
 <script>
-// Builder wiring — three jobs, all client-side so users keep their
+// Builder wiring, three jobs, all client-side so users keep their
 // scroll position and half-typed values across changes:
 //
 // 1. Live preview tracks form input changes (overrides CSS variables
@@ -263,7 +263,7 @@
   }
   // ---- Auto-derive soft tints ---------------------------------------
   // When the checkbox is on, every accent_N_soft = mix(accent_N, bg, 0.78)
-  // — the same ratio the Python extractor uses, so an extracted theme
+  //, the same ratio the Python extractor uses, so an extracted theme
   // matches whatever the toggle later produces. Soft inputs go
   // read-only while the toggle is on so the user can't fight the
   // automation (or rather, can't fight it without unchecking).
@@ -340,7 +340,7 @@
   if (!readOnly) {
     // Seed the inline overrides from the form's initial state so the
     // preview matches what the user is editing. Skipped for bundled
-    // themes — their form values are the seed defaults (Light), not
+    // themes, their form values are the seed defaults (Light), not
     // the actual bundled colours, so painting them would overwrite
     // the data-theme cascade with stale defaults and leave the
     // preview locked on Light no matter which strip card is clicked.

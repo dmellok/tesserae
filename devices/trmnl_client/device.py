@@ -3,7 +3,7 @@
 HTTP-polled e-paper client implementing the TRMNL BYOS protocol. The
 device polls ``GET /api/display`` on its configured cadence; Tesserae
 hands back the URL of the latest render artifact. The device identifies
-itself by an ``access-token`` header — the user generates that in
+itself by an ``access-token`` header, the user generates that in
 Tesserae and pastes it into the client config (no MAC, no pairing flow).
 
 Status reaches Tesserae via headers on every ``/api/display`` request
@@ -13,7 +13,7 @@ JSON object and hands it to ``parse_status`` below. The resulting
 dict feeds the same device-status cache + Settings → Devices freshness
 display as the MQTT-based clients.
 
-There is no ``config_topic`` — config (refresh rate, etc.) is pushed
+There is no ``config_topic``, config (refresh rate, etc.) is pushed
 to the device by embedding it in the ``/api/display`` JSON response,
 not by publishing to a separate broker topic. ``validate_config`` is
 still exported so the admin UI's config form has its server-side
@@ -27,14 +27,14 @@ from typing import Any
 
 # Bounds match config_schema in device.json. Duplicated here on
 # purpose: the manifest lives next to the form (UI affordance),
-# the constants live next to validate_config (server-side guard) —
+# the constants live next to validate_config (server-side guard) -
 # neither one trusts the other.
 REFRESH_RATE_MIN_S = 30
 REFRESH_RATE_MAX_S = 24 * 60 * 60
 
 
 # Header names the TRMNL BYOS protocol uses for status fields. Different
-# implementations of the client use slightly different spellings —
+# implementations of the client use slightly different spellings -
 # notably the KOReader plugin sends ``Percent-Charged`` and
 # ``Png-Width``/``Png-Height``, while native TRMNL firmware sends
 # ``Battery-Voltage`` and ``Width``/``Height``. Lookup is case-insensitive
@@ -52,7 +52,7 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     shape the MQTT-based devices produce.
 
     ``payload`` is a JSON object of headers preserved as-sent by the
-    client — ``app.trmnl_api`` builds it from Flask ``request.headers``.
+    client, ``app.trmnl_api`` builds it from Flask ``request.headers``.
     Different BYOS clients use different cases (``percent-charged``,
     ``Percent-Charged``, ``PERCENT_CHARGED``), so header lookup is
     case-insensitive. Always returns a dict with the well-known keys

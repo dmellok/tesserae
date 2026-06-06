@@ -6,17 +6,17 @@ a single panel) updates every saved page without per-page edits.
 
 Resolution order:
 
-1. ``app.panel_preset`` (e.g. ``inky_13_3``) — if it's a known preset,
+1. ``app.panel_preset`` (e.g. ``inky_13_3``), if it's a known preset,
    take its native landscape dims.
 2. Otherwise (``custom`` or unknown): fall back to ``app.panel_w`` /
    ``app.panel_h``.
 3. If ``app.panel_orientation`` is ``portrait``, swap width and height.
 
 A Page can still set its own ``panel`` (Pydantic field stays optional)
-to override — useful if you ever want one dashboard at a different
-size — but the UI doesn't expose that knob for v1.
+to override, useful if you ever want one dashboard at a different
+size, but the UI doesn't expose that knob for v1.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 class PanelPreset:
     """A panel preset's intrinsic facts.
 
-    ``w`` / ``h`` are the firmware-native row stride — what the panel's
+    ``w`` / ``h`` are the firmware-native row stride, what the panel's
     on-device firmware expects to feed SPI / its own composite buffer.
     The user can mount the panel in any orientation; the composer
     handles the rotation upstream, but the renderer must always pack at
@@ -61,29 +61,29 @@ class PanelPreset:
 
 PANEL_PRESETS: dict[str, PanelPreset] = {
     "inky_13_3": PanelPreset(
-        1600, 1200, label='Inky Impression 13.3" — 1600x1200'
-    ),  # Pimoroni Inky Impression 13.3" (Spectra 6) — landscape native
+        1600, 1200, label='Inky Impression 13.3", 1600x1200'
+    ),  # Pimoroni Inky Impression 13.3" (Spectra 6), landscape native
     "inky_7_3": PanelPreset(
-        800, 480, label='Inky Impression 7.3" — 800x480'
-    ),  # Pimoroni Inky Impression 7.3" (Spectra 6) — landscape native
+        800, 480, label='Inky Impression 7.3", 800x480'
+    ),  # Pimoroni Inky Impression 7.3" (Spectra 6), landscape native
     "inky_5_7": PanelPreset(
-        600, 448, label='Inky Impression 5.7" — 600x448'
-    ),  # Pimoroni Inky Impression 5.7" (7-colour legacy) — landscape native
+        600, 448, label='Inky Impression 5.7", 600x448'
+    ),  # Pimoroni Inky Impression 5.7" (7-colour legacy), landscape native
     "inky_4": PanelPreset(
-        640, 400, label='Inky Impression 4" — 640x400'
-    ),  # Pimoroni Inky Impression 4" (Spectra 6) — landscape native
+        640, 400, label='Inky Impression 4", 640x400'
+    ),  # Pimoroni Inky Impression 4" (Spectra 6), landscape native
     "waveshare_e6_7_5": PanelPreset(
-        800, 480, label='Waveshare E6 7.5" — 800x480'
-    ),  # Waveshare E6 7.5" — landscape native
+        800, 480, label='Waveshare E6 7.5", 800x480'
+    ),  # Waveshare E6 7.5", landscape native
     "waveshare_photopainter_7_3": PanelPreset(
-        800, 480, label='Waveshare 7.3" PhotoPainter (ESP32-S3) — 800x480'
-    ),  # Waveshare 7.3" PhotoPainter (ESP32-S3 Spectra 6) — landscape native
+        800, 480, label='Waveshare 7.3" PhotoPainter (ESP32-S3), 800x480'
+    ),  # Waveshare 7.3" PhotoPainter (ESP32-S3 Spectra 6), landscape native
     "waveshare_e6_13_3": PanelPreset(
         1200,
         1600,
-        label='Waveshare 13.3" Spectra 6 (ESP32) — 1200x1600',
+        label='Waveshare 13.3" Spectra 6 (ESP32), 1200x1600',
         native_landscape=False,
-    ),  # ESP32 Waveshare 13.3" — portrait-native (firmware reads 1200×1600 portrait)
+    ),  # ESP32 Waveshare 13.3", portrait-native (firmware reads 1200×1600 portrait)
 }
 
 PANEL_PRESET_CHOICES: list[dict[str, str]] = [
@@ -114,12 +114,12 @@ def panel_overrides_from_form(form: Any) -> dict[str, Any]:
     used (ignored if non-numeric). Shared between Settings → Devices
     and the onboarding wizard's manual-add form.
 
-    ``w``/``h`` are the panel's **landscape composition dims** — the
+    ``w``/``h`` are the panel's **landscape composition dims**, the
     legacy convention every downstream caller (onboarding, device
     routes, page hydration) already expects. The orientation pick is
     applied separately and rounds out the composition orientation.
 
-    ``native_w``/``native_h`` are the **firmware-native row stride** —
+    ``native_w``/``native_h`` are the **firmware-native row stride** -
     populated only when a preset is chosen, because custom panels
     can't tell us their hardware orientation without an extra UI
     knob. Downstream callers pass them through to the renderer."""
@@ -173,7 +173,7 @@ def resolve_settings_panel(settings: SettingsStore) -> Panel:
 def resolve_page_panel(page_panel: Panel | None, settings: SettingsStore) -> Panel:
     """Resolve the panel from raw page-panel dims + settings.
 
-    Multi-head dispatch lives in ``resolve_panel_for_page`` — use that
+    Multi-head dispatch lives in ``resolve_panel_for_page``, use that
     when you have the full Page (it can look up the device's declared
     panel). This entry point is kept for callers that only have the
     optional Panel field handy."""
@@ -190,7 +190,7 @@ def device_panel(device: Device) -> Panel | None:
     falls back to the matching preset's native dims if the device's
     declared (w, h) matches a known preset's landscape composition.
     Custom panels with no preset hit and no manifest hint leave
-    ``native_w / native_h`` as None — the renderer packs at (w, h)
+    ``native_w / native_h`` as None, the renderer packs at (w, h)
     directly in that case."""
     block = device.panel
     if block is None:
@@ -249,7 +249,7 @@ def resolve_panel_for_page(
     devices: DeviceRegistry | None,
     settings: SettingsStore,
 ) -> Panel:
-    """The page's primary panel — for single-panel contexts (the editor's
+    """The page's primary panel, for single-panel contexts (the editor's
     layout grid, the default compose render). Uses the first targeted
     device's panel, else ``page.panel``, else the global settings panel."""
     panels = _selected_device_panels(page, devices)
@@ -264,10 +264,10 @@ def panel_groups_for_push(
     settings: SettingsStore,
 ) -> list[tuple[Panel, list[str]]]:
     """Distinct panels the page must be rendered at, each paired with the
-    device ids that share it. Devices are grouped by exact dims + flip, so
-    a 4:3 and a portrait panel render separately while two identical
-    panels render once. An empty device-id list means "no targeted device"
-    — render at the virtual panel and fan out to every renderer."""
+     device ids that share it. Devices are grouped by exact dims + flip, so
+     a 4:3 and a portrait panel render separately while two identical
+     panels render once. An empty device-id list means "no targeted device"
+    , render at the virtual panel and fan out to every renderer."""
     panels = _selected_device_panels(page, devices)
     if not panels:
         return [(resolve_page_panel(page.panel, settings), [])]
@@ -290,7 +290,7 @@ def preview_groups_for_page(
     settings: SettingsStore,
 ) -> list[dict[str, Any]]:
     """One entry per distinct aspect ratio among the page's targeted
-    devices — the editor renders a preview card for each. Same aspect =
+    devices, the editor renders a preview card for each. Same aspect =
     same layout, so devices that differ only in resolution share a card.
     No targeted device → a single virtual-panel card."""
     panels = _selected_device_panels(page, devices)
@@ -341,7 +341,7 @@ def fit_cells_to_panel(
       regardless of exact panel size differences (e.g. 1600x1200 →
       800x600).
 
-    Pure function — no Cell objects, no I/O — so this is cheap to call
+    Pure function, no Cell objects, no I/O, so this is cheap to call
     at every render/preview tick."""
     if not cells:
         return []

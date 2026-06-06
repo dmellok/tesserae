@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Home Assistant — History",
+  "name": "Home Assistant, History",
   "version": "0.3.1",
   "kind": "widget",
   "description": "A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.",

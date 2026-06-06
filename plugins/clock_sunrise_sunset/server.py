@@ -1,4 +1,4 @@
-"""clock_sunrise_sunset — today's sun + golden hour via Open-Meteo."""
+"""clock_sunrise_sunset, today's sun + golden hour via Open-Meteo."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-// Reusable Phosphor icon picker — searchable popover that swaps a
+// Reusable Phosphor icon picker, searchable popover that swaps a
 // hidden form input. Used by the page editor (where it also triggers
 // editor.js's setDirty + schedulePreview through standard 'input'
 // events) and the device card in Settings.
@@ -18,14 +18,14 @@
 //   </div>
 //
 // The hidden input is paired with its picker via matching
-// data-icon-picker-id attributes — that way multiple pickers can
+// data-icon-picker-id attributes, that way multiple pickers can
 // coexist on the same page (e.g. a per-cell picker + a per-page one
 // in the editor, or the device-card picker in settings). When the id
 // is absent, the picker uses the nearest hidden input in the same
 // form, the same way the editor originally wired its single picker.
 
 (function () {
-  // Shared icon manifest — fetched once per page, cached for the life
+  // Shared icon manifest, fetched once per page, cached for the life
   // of the page. Every picker shares the same promise so opening N
   // pickers triggers exactly one network request.
   let iconsPromise = null;
@@ -43,11 +43,11 @@
 
   // Single document-level click/keydown handlers, bound once for the
   // whole page. Per-picker handlers would closure-capture the picker
-  // DOM node — and if the picker is later removed (e.g. the HA entity
+  // DOM node, and if the picker is later removed (e.g. the HA entity
   // overrides list re-renders when a user toggles entities), document
   // would still hold the closure, pinning the detached subtree and
   // leaking memory. The delegated form keeps no references to any
-  // individual picker — it queries the live DOM each time.
+  // individual picker, it queries the live DOM each time.
   let docHandlersBound = false;
   function bindDocumentHandlers() {
     if (docHandlersBound) return;
@@ -199,7 +199,7 @@
   // Exposed so modules that inject pickers after page load (e.g.
   // entity-overrides.js, which renders one per ticked HA entity) can
   // bind the new nodes. bindOne is idempotent so calling bindAll again
-  // is cheap — already-bound pickers short-circuit.
+  // is cheap, already-bound pickers short-circuit.
   window.tesseraeIconPickerBindAll = bindAll;
 
   if (document.readyState === "loading") {

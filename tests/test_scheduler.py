@@ -63,10 +63,10 @@ def test_interval_respects_window(scheduler: Scheduler, store: ScheduleStore) ->
         time_of_day_end="17:00",
     )
     store.upsert(s)
-    # 03:00 local — outside the window.
+    # 03:00 local, outside the window.
     early = datetime.now().astimezone().replace(hour=3, minute=0).astimezone(UTC)
     assert scheduler.find_due(early) == []
-    # 10:00 local — inside.
+    # 10:00 local, inside.
     midmorning = datetime.now().astimezone().replace(hour=10, minute=0).astimezone(UTC)
     assert [s.id for s in scheduler.find_due(midmorning)] == ["a"]
 
@@ -157,7 +157,7 @@ def test_factory_returns_current_push_manager(store: ScheduleStore, push_manager
     store.upsert(Schedule(id="a", name="A", page_id="home", type="interval", interval_minutes=15))
     sched.run_due_once(datetime(2026, 6, 1, 10, tzinfo=UTC))
     assert holder["pm"].push.call_count == 1
-    # Swap the push manager — the scheduler's next fire targets the new one.
+    # Swap the push manager, the scheduler's next fire targets the new one.
     new_pm = MagicMock()
     new_pm.push.return_value = PushResult(status="sent", page_id="home")
     holder["pm"] = new_pm

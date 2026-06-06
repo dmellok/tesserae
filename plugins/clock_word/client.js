@@ -1,8 +1,8 @@
-// clock_word — Spectra stat archetype. The English-text reading of
+// clock_word, Spectra stat archetype. The English-text reading of
 // the current time as a big jumbo number-style hero (e.g. "Twenty
 // past three"). The hero sits on a phase-of-day tone (a soft tinted
 // background that warms / cools by time of day) and is paired with a
-// phase badge — Phosphor glyph + label — that reads "morning /
+// phase badge, Phosphor glyph + label, that reads "morning /
 // afternoon / evening / night". Pulse-dot for seconds is just a
 // static --accent-4 indicator since the spec forbids animation.
 
@@ -68,7 +68,7 @@ export default function render(shadow, ctx) {
   const text = spelledTime(now);
   const phase = phaseFor(now.getHours());
 
-  // Day/night tone — a soft radial gradient anchored at top-left
+  // Day/night tone, a soft radial gradient anchored at top-left
   // (where the sun would sit for that phase) that tracks the phase
   // accent. Stays subtle so the text remains the focal element; we
   // mix the accent into the surface at the phase's `tint` percent and

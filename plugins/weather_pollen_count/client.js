@@ -1,4 +1,4 @@
-// weather_pollen_count — Spectra status archetype, one tile per pollen
+// weather_pollen_count, Spectra status archetype, one tile per pollen
 // type. Each tile carries: a botanical icon sized by severity (a
 // "Very High" weed tile dwarfs a "Low" grass tile so the row reads
 // "weed is the worst today" before you scan any text), the pollen
@@ -16,10 +16,10 @@
 const LEVEL_ORDER = ["Low", "Moderate", "High", "Very high"];
 
 const LEVEL_ACCENT = {
-  Low: "var(--accent-3)",         // moss — quiet good
-  Moderate: "var(--accent-2)",    // ochre — caution
-  High: "var(--accent-1)",        // terracotta — alert
-  "Very high": "var(--accent-6)", // plum — extreme
+  Low: "var(--accent-3)",         // moss, quiet good
+  Moderate: "var(--accent-2)",    // ochre, caution
+  High: "var(--accent-1)",        // terracotta, alert
+  "Very high": "var(--accent-6)", // plum, extreme
 };
 const LEVEL_SOFT = {
   Low: "var(--accent-3-soft)",
@@ -63,7 +63,7 @@ function levelSoft(level) {
   return LEVEL_SOFT[level] || "var(--surface-sunken)";
 }
 function levelShort(level) {
-  return LEVEL_SHORT[level] || "—";
+  return LEVEL_SHORT[level] || "-";
 }
 
 // 30 / 100 / 300 grams-per-m³ band thresholds match the server's
@@ -120,7 +120,7 @@ export default function render(shadow, ctx) {
     // headline uses. null means the upstream had no reading.
     const levelWord = levelWordFromValue(item.value);
     const hasData = levelWord != null;
-    const displayLevel = levelWord || "—";
+    const displayLevel = levelWord || "-";
     const accent = levelAccent(displayLevel);
     const soft = levelSoft(displayLevel);
     const short = levelShort(displayLevel);
@@ -192,7 +192,7 @@ export default function render(shadow, ctx) {
       color: var(--text-primary);
       font-variant-numeric: tabular-nums;
     }
-    /* 4-segment bar — same step-bar idiom the AQI widget uses. The
+    /* 4-segment bar, same step-bar idiom the AQI widget uses. The
        height jumps up to 0.5em so the bar reads as a row of chunky
        blocks instead of a hairline; the previous --stroke-3 (~3px)
        was indistinguishable from a single em-dash, especially on a
@@ -216,7 +216,7 @@ export default function render(shadow, ctx) {
       text-transform: var(--label-transform, uppercase);
       line-height: 1;
     }
-    /* No-data glyph — single centered ph-minus-circle in muted grey.
+    /* No-data glyph, single centered ph-minus-circle in muted grey.
        Reads as "no data" without competing with the bar tints for
        attention. */
     .pollen-no-data {
@@ -227,7 +227,7 @@ export default function render(shadow, ctx) {
     }
 
     /* xs: drop the numeric value + bar, keep just icon / name / level
-       — three tiny tiles trying to fit five lockup elements get
+      , three tiny tiles trying to fit five lockup elements get
        illegible fast. */
     @container (max-width: 280px) {
       .pollen-value { display: none; }
@@ -236,7 +236,7 @@ export default function render(shadow, ctx) {
     }
 
     /* Tall portrait cells: stack the three tiles vertically (1
-       column) and lay each tile out as a horizontal row — icon on
+       column) and lay each tile out as a horizontal row, icon on
        the left, name + bar + value + level word as a lockup on the
        right. Keeps the tile's vertical footprint compact when a 3-
        tile column would otherwise crush each tile to a sliver. */
@@ -264,7 +264,7 @@ export default function render(shadow, ctx) {
       .pollen-level { grid-area: level; text-align: right; }
     }
 
-    /* lg: more breathing room — bigger bars + no-data glyph scales
+    /* lg: more breathing room, bigger bars + no-data glyph scales
        up so a missing-data tile doesn't look empty against neighbours
        carrying full data. */
     @container (min-width: 700px) {

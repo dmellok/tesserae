@@ -1,4 +1,4 @@
-// github_actions — Spectra list archetype. Each workflow row leads
+// github_actions, Spectra list archetype. Each workflow row leads
 // with its conclusion icon (success → moss check, failure →
 // terracotta x, in_progress → ochre arrow), carries the workflow
 // name + repo + branch as the title, and below the title paints a
@@ -81,7 +81,7 @@ function formatDuration(secs) {
   return `${h}h ${m % 60}m`;
 }
 
-// Mini timeline strip — up to 8 vertical bars, height ∝ run duration
+// Mini timeline strip, up to 8 vertical bars, height ∝ run duration
 // relative to the row's max, colour = run conclusion. Tooltip on
 // hover carries the run number + status + duration so you can still
 // drill down to a specific run without leaving the dashboard.

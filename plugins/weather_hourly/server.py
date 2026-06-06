@@ -35,7 +35,7 @@ def _cached(path: Path) -> dict[str, Any] | None:
 
 def _window_start_index(times: list[str], now_iso: str | None) -> int:
     """Find the first index in ``times`` whose hour is >= now. Falls back
-    to 0 if the parse fails — the chart will then start at midnight."""
+    to 0 if the parse fails, the chart will then start at midnight."""
     if not now_iso:
         return 0
     try:
@@ -74,7 +74,7 @@ def fetch(
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"
-    # forecast_days=3 gives ~72 hourly slots — enough to cover a 48h
+    # forecast_days=3 gives ~72 hourly slots, enough to cover a 48h
     # window starting from late in the current day.
     url = (
         "https://api.open-meteo.com/v1/forecast"
@@ -123,7 +123,7 @@ def fetch(
             continue
         max_t = t_val if max_t is None else max(max_t, t_val)
         min_t = t_val if min_t is None else min(min_t, t_val)
-        # Approximate day/night from local hour — Open-Meteo's `is_day`
+        # Approximate day/night from local hour, Open-Meteo's `is_day`
         # is only on the `current` reading, not per-hour. 6-18 = day,
         # otherwise night.
         is_day = 6 <= hour_int < 18 if hour_int >= 0 else True
@@ -140,7 +140,7 @@ def fetch(
 
     # Structured 24-slot arrays the new variants (r1/g2/s3/d4) paint
     # from. The handoff design always reads 24 hours regardless of the
-    # ``hours`` option — the option only affects the legacy renderer's
+    # ``hours`` option, the option only affects the legacy renderer's
     # window length. We slice off the front of ``points`` (already
     # trimmed to start at the current local hour) and pad if upstream
     # came up short.

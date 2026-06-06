@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather — Now",
+  "name": "Weather, Now",
   "version": "0.1.8",
   "kind": "widget",
   "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",

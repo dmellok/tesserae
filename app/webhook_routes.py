@@ -87,7 +87,7 @@ def _presented_token(req: Any) -> str | None:
 
 
 def _body() -> dict[str, Any]:
-    """Accept either JSON or form-encoded — many automation tools
+    """Accept either JSON or form-encoded, many automation tools
     can't easily switch their content type."""
     if request.is_json:
         data = request.get_json(silent=True) or {}
@@ -105,7 +105,7 @@ def push() -> tuple[Response, int] | Response:
         return jsonify({"status": "disabled", "error": "webhook token not generated"}), 503
     presented = _presented_token(request)
     if not presented or not secrets.compare_digest(presented, stored):
-        # Generic 401 — the response shouldn't help an attacker work
+        # Generic 401, the response shouldn't help an attacker work
         # out whether they're hitting the right host with the wrong
         # token, vs hitting the wrong host entirely.
         return jsonify({"status": "unauthorized"}), 401

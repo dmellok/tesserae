@@ -1,4 +1,4 @@
-// ha_zones — Spectra list archetype. One row per person/device
+// ha_zones, Spectra list archetype. One row per person/device
 // tracker. Lead is either the person's profile picture (when HA
 // exposes one) or a coloured-initials circle keyed to the person's
 // name so each housemate has a stable avatar. Right-aligned meta
@@ -21,13 +21,13 @@ function stateAccent(state) {
 }
 
 function stateLabel(state) {
-  if (!state) return "—";
+  if (!state) return "-";
   if (state === "not_home") return "Away";
   if (state === "home") return "Home";
   return state;
 }
 
-// Zone-type glyph — pattern-matched against the zone label so
+// Zone-type glyph, pattern-matched against the zone label so
 // `home/work/school/gym/parents/grandma/...` each pick up a
 // recognisable icon. Falls back to ph-map-pin for unmatched zones.
 const ZONE_ICONS = [

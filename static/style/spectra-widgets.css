@@ -1,13 +1,13 @@
 /* ============================================================================
-   SPECTRA — Widget shell anatomy + the 6 demonstration widgets
+   SPECTRA, Widget shell anatomy + the 6 demonstration widgets
    All color comes from semantic tokens; all size from the fluid base + em.
-   NO internal borders anywhere — hierarchy is spacing + weight + surface tint.
+   NO internal borders anywhere, hierarchy is spacing + weight + surface tint.
    ============================================================================ */
 
-/* Phosphor (bold weight) — pulled into every shadow root that links this
+/* Phosphor (bold weight), pulled into every shadow root that links this
    file. The font-face declaration on the compose document is enough for
    the browser to *load* the font, but the .ph-bold class rules live in
-   light-DOM scope and don't pierce shadow boundaries — without this
+   light-DOM scope and don't pierce shadow boundaries, without this
    @import the widget icons render as bare squares. */
 @import url("../icons/phosphor/bold/style.css");
 
@@ -59,7 +59,7 @@
   /* Lock the title-bar size against per-cell content zoom. The body
      uses ``--w-font-base`` which floors at 14px, so zoom > 1 grows the
      visible content (intended). For the title we want the size you'd
-     get at zoom=1 regardless — small chrome should stay small chrome
+     get at zoom=1 regardless, small chrome should stay small chrome
      when the body is dialled up. Trick: multiply the cqmin term by
      --c-zoom (cancels cell-content's inverse-sized container query)
      then divide the clamped result by --c-zoom (counters the
@@ -67,7 +67,7 @@
      min-height) all stay locked off the title's font-size. */
   font-size: calc(clamp(14px, calc(7cqmin * var(--c-zoom, 1)), 28px) / var(--c-zoom, 1));
 }
-/* Accent eyebrow tick — toggled by style. ``--title-marker: none`` (the
+/* Accent eyebrow tick, toggled by style. ``--title-marker: none`` (the
    default) hides it; ``block`` shows it. Movement styles like Bauhaus
    switch to a circle via --marker-radius: 999px and a coloured accent
    via --marker-color. Sits inline at the start of the title row so its
@@ -171,7 +171,7 @@
   border-radius: var(--radius-0);
 }
 .list-row.is-zebra{ background: var(--zebra-bg, var(--surface-sunken)); }
-/* Optional divider between rows — styles like ``mono`` / ``condensed`` /
+/* Optional divider between rows, styles like ``mono`` / ``condensed`` /
    ``destijl`` / ``brutalist`` switch this on; default 0 preserves the
    zebra-only look of standard. */
 .list-row + .list-row{ border-top: var(--row-rule-w, 0px) solid var(--edge); }
@@ -182,7 +182,7 @@
 .list-meta.is-accent{ color: var(--accent-4); }
 
 /* ============================================================================
-   WIDGET 3 · CHART  (bar)  — bars are solid fills, min stroke respected
+   WIDGET 3 · CHART  (bar) , bars are solid fills, min stroke respected
    ============================================================================ */
 .chart-body{ justify-content: flex-end; gap: var(--space-3); }
 .chart-figure{
@@ -264,7 +264,7 @@
   grid-auto-columns: 1fr;
   gap: var(--space-3);
   /* Fill the remaining body height instead of sitting at the natural
-     stack height — without this the cells crowd to the top of a
+     stack height, without this the cells crowd to the top of a
      wide-short widget and leave a beige band underneath. */
   flex: 1 1 auto;
   min-height: 0;
@@ -293,7 +293,7 @@
 /* Icon uses --icon-md (1.5em) instead of --icon-lg (2.2em). The old
    2.2em was pushing the stack past the cell at zoom > 1 because the
    per-cell font-size hit its 14px floor while the icon held its em
-   multiple — meaning the icon scaled but the label/value didn't. The
+   multiple, meaning the icon scaled but the label/value didn't. The
    smaller multiplier keeps the stack inside the cell at any zoom. */
 .wx-cell .ph-bold{ font-size: var(--icon-md); color: var(--icon); }
 .wx-cell .d{
@@ -313,7 +313,7 @@
 .wx-cell .t{
   font-size: var(--fs-body);
   font-weight: var(--fw-bold);
-  /* Same nowrap pattern — and the unit beside the value goes to a
+  /* Same nowrap pattern, and the unit beside the value goes to a
      smaller weight so a long pair like "16.8 km/h" doesn't push the
      unit onto a new line. */
   white-space: nowrap;
@@ -399,7 +399,7 @@
 }
 
 /* ============================================================================
-   WIDGET 6b · TIMETABLE  (calendar day / week — vertical hour axis +
+   WIDGET 6b · TIMETABLE  (calendar day / week, vertical hour axis +
    positioned event blocks). No banding lines: hours read from the
    sparse left-axis labels alone, like the reference design.
    ============================================================================ */
@@ -480,7 +480,7 @@
   letter-spacing: 0.04em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* "Now" line — thin accent-1 stroke spanning the lane at the
+/* "Now" line, thin accent-1 stroke spanning the lane at the
    current local time. A small filled dot at the left edge picks the
    line out from the event blocks. Renders above events (z-index)
    but stays pointer-events:none so hover targets aren't blocked. */
@@ -594,7 +594,7 @@
   border-radius: var(--radius-0);
 }
 
-/* Side-by-side variant — album art / camera frame as a square on the
+/* Side-by-side variant, album art / camera frame as a square on the
    left, the meta lockup on the right. Lets a now-playing tile read
    like a player chrome rather than a stacked card. */
 .img-body.is-side{
@@ -616,7 +616,7 @@
   gap: var(--space-2);
 }
 .img-body.is-side .img-meta .title{
-  /* The title can run two lines in side mode — there's room. */
+  /* The title can run two lines in side mode, there's room. */
   white-space: normal;
   line-height: var(--lh-snug);
   font-size: var(--fs-lead);
@@ -637,7 +637,7 @@
 }
 .img-progress-track{
   /* Thicker bar so the fill reads as a chunky data stroke rather than
-     a hairline. Per Spectra "data strokes 3px+" — going to 0.4em
+     a hairline. Per Spectra "data strokes 3px+", going to 0.4em
      keeps it proportional to the surrounding type. */
   height: 0.4em;
   background: var(--surface-sunken);
@@ -804,7 +804,7 @@
 }
 /* Hide the track strip on cells too narrow to show it as anything
    other than a sliver. ``360px`` is the Spectra "compact" breakpoint
-   used by other widgets in this file — keeps the trim line consistent. */
+   used by other widgets in this file, keeps the trim line consistent. */
 @container (max-width: 360px){
   .f1-track{ display: none; }
   .f1-data{ flex: 1 1 100%; }

@@ -1,4 +1,4 @@
-// octoprint_status — Spectra status archetype. The hero is replaced
+// octoprint_status, Spectra status archetype. The hero is replaced
 // by a large radial ring showing the job's completion percentage,
 // with the percent number at the centre and elapsed / ETA captions
 // underneath. Temperature row sits below as a status-grid. When no
@@ -29,20 +29,20 @@ const TONE_ICON = {
 };
 
 function fmtSecs(s) {
-  if (!Number.isFinite(s) || s < 0) return "—";
+  if (!Number.isFinite(s) || s < 0) return "-";
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   return h > 0 ? `${h}h${m}m` : `${m}m`;
 }
 
 function fmtTemp(t) {
-  if (t == null) return "—";
+  if (t == null) return "-";
   const v = Number(t);
-  if (!Number.isFinite(v)) return "—";
+  if (!Number.isFinite(v)) return "-";
   return `${Math.round(v)}°`;
 }
 
-// Job completion ring — big SVG circle with the percentage at the
+// Job completion ring, big SVG circle with the percentage at the
 // centre, an outer halo at the active accent tinted by tone, and
 // the print state glyph in the dead-centre middle of the percent
 // number's ascender height for a small visual rest.
@@ -84,7 +84,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const state = data.state || { text: "—", tone: "idle" };
+  const state = data.state || { text: "-", tone: "idle" };
   const tone = state.tone || "idle";
   const accent = TONE_ACCENT[tone] || "var(--text-secondary)";
   const stateIcon = TONE_ICON[tone] || "ph-printer";

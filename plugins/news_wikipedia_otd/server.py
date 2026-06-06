@@ -1,4 +1,4 @@
-"""news_wikipedia_otd — Wikipedia 'On this day' for today's date."""
+"""news_wikipedia_otd, Wikipedia 'On this day' for today's date."""
 
 from __future__ import annotations
 

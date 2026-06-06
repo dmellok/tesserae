@@ -37,7 +37,7 @@ LABEL_MANUAL = "manual"
 LABEL_PRE_UPDATE = "pre-update"
 
 # Subpaths under data_root whose **regular files are excluded** from a
-# snapshot — dotfiles (config like ``.folders.json``) inside them are still
+# snapshot, dotfiles (config like ``.folders.json``) inside them are still
 # included so plugin metadata survives a restore.
 #
 # - ``plugins/picture_gallery`` hosts user-uploaded photos (tens of MB each).
@@ -47,7 +47,7 @@ LABEL_PRE_UPDATE = "pre-update"
 #   handles the "PNG evicted from disk" case for old history entries.
 #
 # Restoring a backup that excluded a subpath does NOT wipe the user's
-# current files there — the photos / render cache persist across restores.
+# current files there, the photos / render cache persist across restores.
 DEFAULT_EXCLUDED_SUBPATHS: tuple[str, ...] = (
     "plugins/picture_gallery",
     "core/renders",
@@ -114,7 +114,7 @@ def create(
     first and renames on success so a crash never leaves a partial.
 
     Regular files under ``excluded_subpaths`` are skipped (picture gallery
-    images by default) — dotfiles inside those paths are still included
+    images by default), dotfiles inside those paths are still included
     so plugin config survives. The exclusion list is embedded in the
     backup's metadata so :func:`restore` knows to preserve the user's
     current files there rather than wiping them."""
@@ -222,11 +222,11 @@ def restore(data_root: Path, backup_id: str) -> None:
 
     * the backups dir itself (deleting the snapshot we're restoring from
       mid-restore would be bad),
-    * any file inside an excluded subpath the backup recorded — those
+    * any file inside an excluded subpath the backup recorded, those
       represent on-disk data the snapshot deliberately skipped (e.g.
       gallery photos), so the user's current files stay put.
 
-    The caller is expected to restart the server right after — open
+    The caller is expected to restart the server right after, open
     SQLite handles on the old ``events.db`` keep writing to the orphaned
     inode until the process restarts (Linux/macOS); on Windows the live
     handle blocks the replace, so do this with the server stopped or via

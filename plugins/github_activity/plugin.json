@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "GitHub — Activity",
+  "name": "GitHub, Activity",
   "version": "0.2.1",
   "kind": "widget",
   "description": "Recent public activity for a GitHub user. Pushes / PRs / issues / releases broken out as type-coloured tiles; a 7-day stacked-bar histogram segments each day's events by type and centres a Phosphor glyph on the dominant kind; an activity-streak pill counts consecutive days back from today. Defaults to the username in Plugins → GitHub Core.",

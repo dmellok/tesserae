@@ -1,5 +1,5 @@
 """mDNS advertiser: builds the right ServiceInfo (tesserae.local + LAN IP)
-and registers / unregisters through an injected Zeroconf — no network."""
+and registers / unregisters through an injected Zeroconf, no network."""
 
 from __future__ import annotations
 

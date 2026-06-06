@@ -1,6 +1,6 @@
 """Driver-standings fetch for the f1_standings_drivers widget.
 
-Jolpica-F1, no API key. Caches for 3 hours — standings only change
+Jolpica-F1, no API key. Caches for 3 hours, standings only change
 after a race, and a slightly-stale view between race-end and the next
 cache rebuild is fine.
 
@@ -75,7 +75,7 @@ def _fetch_prev_positions(round_num: int) -> dict[str, int]:
     Best-effort: returns {} on any error so the position-delta column
     just degrades to neutral instead of failing the whole widget. We
     pull from /current/{round-1}/driverStandings.json so the delta is
-    "vs immediately previous race" — over the season the deltas
+    "vs immediately previous race", over the season the deltas
     aggregate naturally as the user watches the season progress."""
     if round_num <= 1:
         return {}

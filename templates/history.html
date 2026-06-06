@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head %}
-{% block title %}History — Tesserae{% endblock %}
+{% block title %}History, Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
 {% macro pill_status(status) %}
@@ -20,7 +20,7 @@
   'file':           ('File',           'image-square',         'accent-teal'),
   'url':            ('URL',            'link-simple',          'accent-teal'),
   'webpage':        ('Webpage',        'globe',                'accent-teal'),
-  'scheduler':      ('Schedule',       'clock-clockwise',      'accent-ochre'),
+  'scheduler':      ('Schedule',       'calendar-dots',        'accent-ochre'),
   'webhook':        ('Webhook',        'arrow-square-in',      'accent-terracotta'),
   'home_assistant': ('Home Assistant', 'house',                'accent-slate'),
   'manual':         ('Manual',         'cursor-click',         'accent-slate'),
@@ -43,12 +43,49 @@
   {% endif %}
 {% endmacro %}
 
+{# Filter chip, matches the events page's .event-type-filter .chip
+   vocabulary so the two pages feel like the same product. Neutral
+   pill bg, accent-soft when active, glyph + label + a muted count
+   sub-pill at the tail. The "All" entry has source='' and resets
+   the filter. Per-source icon comes from SOURCE_META; unknown
+   sources fall through to the question mark. #}
+{% macro filter_chip(chip) %}
+  {% if chip.source == '' %}
+    <a href="{{ url_for('history.index') }}" role="tab"
+       class="chip {% if chip.active %}is-active{% endif %}"
+       title="All pushes">
+      <i class="ph ph-list-bullets" aria-hidden="true"></i>
+      <span>All</span><span class="muted">{{ chip.count }}</span>
+    </a>
+  {% else %}
+    {% set meta = SOURCE_META.get(chip.source) %}
+    <a href="{{ url_for('history.index', source=chip.source) }}" role="tab"
+       class="chip {% if chip.active %}is-active{% endif %}"
+       title="Filter to: {{ meta[0] if meta else chip.source }}">
+      <i class="ph ph-{{ meta[1] if meta else 'question' }}" aria-hidden="true"></i>
+      <span>{{ meta[0] if meta else chip.source }}</span><span class="muted">{{ chip.count }}</span>
+    </a>
+  {% endif %}
+{% endmacro %}
+
 {% block main %}
 <section class="card">
   {{ card_head('History', icon_name='clock-counter-clockwise',
                blurb='Last ' ~ history|length ~ ' push attempts across every trigger. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
+  {% if chips %}
+  <nav class="event-type-filter event-type-filter--standalone" role="tablist" aria-label="Filter by source">
+    {% for chip in chips %}{{ filter_chip(chip) }}{% endfor %}
+  </nav>
+  {% endif %}
   {% if not history %}
-  <p class="lede" data-history-empty>No pushes yet.</p>
+  <p class="lede" data-history-empty>
+    {% if active_source %}
+      No pushes with source <strong>{{ active_source }}</strong>.
+      <a href="{{ url_for('history.index') }}">Clear filter</a>.
+    {% else %}
+      No pushes yet.
+    {% endif %}
+  </p>
   {% else %}
   <ul class="history">
     {% for ev in history %}
@@ -65,7 +102,7 @@
       <div class="history-meta">
         <div class="history-top">
           {{ pill_source(ev.source) }}
-          {# Only flag the exceptions — a green "sent" on every row is noise. #}
+          {# Only flag the exceptions, a green "sent" on every row is noise. #}
           {% if ev.status != 'sent' %}{{ pill_status(ev.status) }}{% endif %}
           <span class="history-target">{{ ev.target }}</span>
         </div>

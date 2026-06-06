@@ -1,12 +1,12 @@
 {% extends "_base.html" %}
-{% block title %}Todo — Tesserae{% endblock %}
+{% block title %}Todo, Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
   <h1><i class="ph-bold ph-list-checks" aria-hidden="true"></i> Todo</h1>
 </div>
 
-{# List tabs — one chip per list, plus an inline "new list" field. #}
+{# List tabs, one chip per list, plus an inline "new list" field. #}
 <div class="td-tabs">
   {% for l in lists %}
   <a class="td-tab {% if selected and l.id == selected.id %}is-active{% endif %}"
@@ -78,12 +78,12 @@
   {% endfor %}
 </ul>
 {% else %}
-<p class="td-empty">Nothing here yet — add something above.</p>
+<p class="td-empty">Nothing here yet, add something above.</p>
 {% endif %}
 
 <p class="td-foot">Completed items linger for {{ prune_hours }} hours, then prune themselves.</p>
 {% else %}
-<p class="td-empty">No lists yet — name one above and hit Add list.</p>
+<p class="td-empty">No lists yet, name one above and hit Add list.</p>
 {% endif %}
 
 <style>

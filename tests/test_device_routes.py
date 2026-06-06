@@ -54,7 +54,7 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     resp = client.get("/settings/devices")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # Built-in kind cards are hidden — only instances appear.
+    # Built-in kind cards are hidden, only instances appear.
     assert "Device: Pi BIN client</span>" not in body
     assert "Device: Pi PNG client</span>" not in body
     assert "Device: ESP32 client</span>" not in body
@@ -66,7 +66,7 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     # interval form lives on the instance card.
     assert "Sleep interval" in body
     assert 'name="sleep_interval_s"' in body
-    # Pi instances inherit no config_topic — no config form on theirs.
+    # Pi instances inherit no config_topic, no config form on theirs.
     # Slice the Pi card by its deterministic anchor id (card order isn't
     # guaranteed alphabetical).
     pi_start = body.index('id="device-pi_bin_kitchen"')
@@ -119,7 +119,7 @@ def test_merge_takes_new_values_when_present() -> None:
     assert merged["battery_pct"] == 55
     assert merged["rssi"] == -60
     # Keys absent from new are preserved (state lingers until something
-    # overwrites it — accepted limitation; firmware can re-publish state).
+    # overwrites it, accepted limitation; firmware can re-publish state).
     assert merged["state"] == "offline"
 
 
@@ -195,7 +195,7 @@ def test_device_status_subscription_dispatches_to_cache(app: Flask) -> None:
 def test_instance_status_subscriptions_replayed_on_broker_rebuild(app: Flask) -> None:
     # Trigger a broker rebuild (via the same callable settings_routes uses
     # on save) and verify the instance subscription is re-installed on
-    # the new transport instance. Kinds are not subscribed — their
+    # the new transport instance. Kinds are not subscribed, their
     # heartbeats flow to discovery instead.
     client = app.test_client()
     _sign_in(client)

@@ -1,4 +1,4 @@
-"""finance_stock — single stock via Yahoo Finance's public chart endpoint.
+"""finance_stock, single stock via Yahoo Finance's public chart endpoint.
 
 Yahoo's /v8/finance/chart endpoint isn't officially documented but has
 been stable for many years and is what most "free stock API" libraries
@@ -76,7 +76,7 @@ def fetch(
     closes_raw = indicators[0].get("close") or []
     series = [round(float(v), 4) for v in closes_raw if v is not None]
 
-    # Volume series — paired with the close samples so the bars line
+    # Volume series, paired with the close samples so the bars line
     # up under the line. Nulls are emitted as 0 so a sparse bar
     # doesn't leave a gap in the chart.
     volume_raw = indicators[0].get("volume") or []

@@ -5,7 +5,7 @@
 // and renders one row per ticked entity: a "display name" text input,
 // an inline icon picker (powered by static/icon-picker.js), and a
 // drag handle. The hidden textarea inside [data-entity-overrides] is
-// the source of truth for the name/icon — JS keeps it in the legacy
+// the source of truth for the name/icon, JS keeps it in the legacy
 // pipe-separated format
 //
 //     entity_id | name | icon
@@ -15,7 +15,7 @@
 //
 // Drag-to-reorder: rows are HTML5-draggable. On drop, the matching
 // .multiselect-opt elements in the linked multiselect are reordered
-// too — that's how the entities[] form submission ends up in the new
+// too, that's how the entities[] form submission ends up in the new
 // order (FormData encodes inputs in DOM order, and the widget's
 // fetch() iterates the wanted list in order).
 //
@@ -122,7 +122,7 @@
       row.draggable = true;
       const dragHandle = row.querySelector(".entity-override-drag");
       if (dragHandle) {
-        // Pointer-cursor while hovering the handle — the handle is
+        // Pointer-cursor while hovering the handle, the handle is
         // the only place the row is intended to be grabbed, but the
         // whole row is draggable so the keyboard-fallback flow works.
         dragHandle.addEventListener("mousedown", () => {
@@ -247,7 +247,7 @@
       );
       const msList = multiselect.querySelector("[data-ms-list]");
       if (!msList) return;
-      // Walk in reverse and insert each at the top — that ends with
+      // Walk in reverse and insert each at the top, that ends with
       // them in user order, ahead of any unticked options.
       newOrder
         .slice()

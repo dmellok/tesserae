@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "News — RSS / Atom",
+  "name": "News, RSS / Atom",
   "version": "0.2.2",
   "kind": "widget",
   "description": "Latest N headlines from any RSS 2.0 or Atom 1.0 feed. Paste a feed URL; the widget parses both formats with the stdlib XML parser (no extra deps).",

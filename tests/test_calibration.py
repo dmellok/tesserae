@@ -28,7 +28,7 @@ def test_card_is_not_blank() -> None:
 
 
 def test_upright_answer_keeps_pushed_orientation() -> None:
-    # If ① is already in the top-left, the card is upright — keep whatever
+    # If ① is already in the top-left, the card is upright, keep whatever
     # it was pushed with, for every starting orientation.
     for o in ORIENTATION_CYCLE:
         assert target_orientation(o, top_left_number=1) == o

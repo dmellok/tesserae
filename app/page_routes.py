@@ -1,11 +1,11 @@
-"""Dashboard editor — single-page form-driven editor with auto-save.
+"""Dashboard editor, single-page form-driven editor with auto-save.
 
 The /pages/<id> endpoint serves the whole editor: page metadata, layout
 picker, every cell's options, and the live preview iframe. The client
 auto-saves any form change via fetch POST to the same endpoints used
 for full-page submits, then asks the preview iframe to reload.
 
-Cells whose ``plugin`` is None are valid — they're slots a layout
+Cells whose ``plugin`` is None are valid, they're slots a layout
 template created that the user hasn't filled in yet. The composer
 renders them as a placeholder; the editor shows a plugin dropdown.
 
@@ -101,7 +101,7 @@ def _clean_device_ids(raw: list[str]) -> list[str]:
 
 def _random_page_id(taken: set[str]) -> str:
     """An opaque random id for a new page. Decoupled from the name on
-    purpose — the id is a stable storage key + URL + schedule target, so
+    purpose, the id is a stable storage key + URL + schedule target, so
     it must never change when the user renames. It's hidden from the UI,
     so there's nothing to gain from a readable slug (and a name-derived
     slug just goes stale, e.g. 'untitled_dashboard_2')."""
@@ -240,7 +240,7 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
     calling the plugin's ``choices(name)`` function.
 
     Plugins that don't expose ``choices`` (or that raise) get an empty
-    list — the editor will render an empty dropdown rather than break."""
+    list, the editor will render an empty dropdown rather than break."""
     out: dict[str, list[dict[str, Any]]] = {}
     for plugin in plugins:
         options = list(plugin.manifest.get("cell_options", []))
@@ -295,7 +295,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         {"id": c.id, "x": c.x, "y": c.y, "w": c.w, "h": c.h, "plugin": c.plugin} for c in page.cells
     ]
 
-    # Device picker options. Only user-registered instances qualify —
+    # Device picker options. Only user-registered instances qualify -
     # binding a page to a built-in kind is ambiguous (the kind is a
     # template, not a physical display) and instances are also the
     # only thing the user explicitly created in Settings → Devices.
@@ -307,7 +307,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
     if device_registry is not None:
         for dev in sorted(device_registry.devices.values(), key=lambda d: d.name.lower()):
             if dev.kind_of is None:
-                continue  # built-in kind — not a bindable target
+                continue  # built-in kind, not a bindable target
             if dev.panel is None:
                 continue
             device_options.append(
@@ -338,8 +338,8 @@ def _editor_context(page: Page) -> dict[str, Any]:
     # Theme picker options come from the central registry so the page
     # editor's "Theme" dropdown stays in lockstep with what's actually
     # available (bundled + later, user-saved). Previously hardcoded
-    # twice in the template — once for the page-level picker and once
-    # for the per-cell override — which drifted on every theme add.
+    # twice in the template, once for the page-level picker and once
+    # for the per-cell override, which drifted on every theme add.
     from app.state.theme_registry import build_registry, picker_options
 
     theme_options = picker_options(build_registry(user_themes=None))
@@ -414,11 +414,11 @@ def create() -> Response:
 
     The id is auto-generated from the name (slug + numeric suffix on
     collision); the user never sees it as a form input. The form is
-    optional — if no fields are POSTed (e.g. the "New dashboard" button
+    optional, if no fields are POSTed (e.g. the "New dashboard" button
     in the nav) we seed an "Untitled" 1-cell dashboard so the editor is
     the only place the user has to think.
 
-    Panel dims come from app settings — pages aren't panel-specific."""
+    Panel dims come from app settings, pages aren't panel-specific."""
     form = request.form
     name = (form.get("name") or "").strip() or "Untitled dashboard"
 
@@ -437,7 +437,7 @@ def create() -> Response:
         page = Page(
             id=page_id,
             name=name,
-            # panel left None on purpose — derived from settings at render
+            # panel left None on purpose, derived from settings at render
             # time so changing the panel in settings updates every page.
             cells=initial_cells,
             font=(form.get("font") or None),
@@ -466,11 +466,11 @@ def edit(page_id: str) -> str:
 @bp.post("/<page_id>")
 def update(page_id: str) -> Response:
     """Update page metadata. Panel dims come from settings, not from
-    the form — the editor no longer exposes them.
+    the form, the editor no longer exposes them.
 
     Merge, don't replace: only fields actually present in the POST are
     updated; absent fields keep their stored value. The editor posts two
-    *separate* forms to this endpoint — the header rename form (just
+    *separate* forms to this endpoint, the header rename form (just
     ``name``) and the dashboard form (font / icon / device_ids / …). If
     absent fields were reset to defaults, the rename form would wipe the
     device bindings (and vice-versa), so each must touch only what it
@@ -591,8 +591,8 @@ def preview(page_id: str) -> Response:
 
     Form field convention (set by editor.js):
       ``name``, ``font``, ``bleed_color``, ``gap``,
-      ``corner_radius`` — page-level overrides.
-      ``cell_<id>__<field>`` — per-cell overrides (double-underscore
+      ``corner_radius``, page-level overrides.
+      ``cell_<id>__<field>``, per-cell overrides (double-underscore
       separates the cell id from the field name to disambiguate cell
       ids containing underscores)."""
     page = _store().get(page_id)
@@ -611,7 +611,7 @@ def preview(page_id: str) -> Response:
                 continue
             bucket = cell_buckets.setdefault(cid, {})
             bucket[field] = form.get(key)
-    # multi-value form fields (e.g. <select multiple>) — pick up lists
+    # multi-value form fields (e.g. <select multiple>), pick up lists
     for cid, bucket in cell_buckets.items():
         for field in list(bucket.keys()):
             values = form.getlist(f"cell_{cid}__{field}")
@@ -654,7 +654,7 @@ def preview(page_id: str) -> Response:
     # Hydrate the draft for each panel size the editor's iframes care
     # about. The client uses these to compute postMessage patches so a
     # gentle edit (gap nudge, single-cell option) doesn't require a full
-    # iframe reload — see static/pages/editor.js.
+    # iframe reload, see static/pages/editor.js.
     # ``panels`` form field carries one or more ``WxH`` strings; missing
     # ⇒ no hydrated state returned and the client falls back to full
     # iframe reload, same behaviour as before this change.
@@ -677,7 +677,7 @@ def preview(page_id: str) -> Response:
             continue
         hydrated_groups.append({"w": pw, "h": ph, "state": hydrated})
 
-    # AJAX caller (the editor) wants JSON; non-AJAX (rare — direct curl
+    # AJAX caller (the editor) wants JSON; non-AJAX (rare, direct curl
     # for debugging) keeps the existing flash-redirect behaviour.
     if request.headers.get("X-Requested-With") == "fetch":
         return jsonify({"ok": True, "groups": hydrated_groups})
@@ -707,7 +707,7 @@ def update_cell(page_id: str, cell_id: str) -> Response:
     _store().save(page.model_copy(update={"cells": new_cells}))
     # Persisted page is now authoritative; drop any draft preview.
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
-    msg = "Plugin changed — options reset." if plugin_changed and plugin else "Cell saved."
+    msg = "Plugin changed, options reset." if plugin_changed and plugin else "Cell saved."
     return _flash_save(True, msg)
 
 
@@ -738,7 +738,7 @@ def batch_cells(page_id: str) -> Response:
         "deletes": ["cell_id_1", "cell_id_2"]
       }
 
-    Only x/y/w/h are mutable here — plugin assignment / options stay on
+    Only x/y/w/h are mutable here, plugin assignment / options stay on
     the per-cell form path. Returns JSON {ok, cells: [...]} so the
     client can refresh without a full page reload.
     """
@@ -779,7 +779,7 @@ def batch_cells(page_id: str) -> Response:
         remaining.append(_new_cell(**geom))
 
     _store().save(page.model_copy(update={"cells": remaining}))
-    # Drop any stale draft preview — the layout is now persisted.
+    # Drop any stale draft preview, the layout is now persisted.
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return jsonify(
         {

@@ -1,4 +1,4 @@
-// news_hacker_news — Spectra list archetype.
+// news_hacker_news, Spectra list archetype.
 //
 // Each row carries a story-type chip (Show / Ask / Job / Story
 // derived from title prefix), the headline, and a right column with
@@ -21,7 +21,7 @@ function escapeHtml(s) {
 }
 
 function fmtScore(n) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n) || 0;
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
   return String(v);
@@ -102,7 +102,7 @@ export default function render(shadow, ctx) {
   }
 
   // Score-strength bar uses the feed's max score so the ratio is
-  // honest within this widget instance — a quiet new-stories feed
+  // honest within this widget instance, a quiet new-stories feed
   // and a peak top-stories feed both scale to their own context.
   const maxScore = Math.max(1, ...stories.map((s) => Number(s.score) || 0));
 
@@ -213,7 +213,7 @@ export default function render(shadow, ctx) {
     .hn-sub-item i {
       font-size: .9em;
     }
-    /* Score-strength bar — thin track + filled portion proportional
+    /* Score-strength bar, thin track + filled portion proportional
        to the story's score vs the feed's max. Sits at the bottom of
        the row as a tertiary signal. */
     .hn-bar-track {

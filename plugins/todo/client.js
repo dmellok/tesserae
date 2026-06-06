@@ -1,4 +1,4 @@
-// todo — Spectra list archetype. Each item is a zebra row: empty
+// todo, Spectra list archetype. Each item is a zebra row: empty
 // checkbox + accent-4 for active items, struck-through with a muted
 // check for completed ones. A completion progress bar sits beneath
 // the title so the overall list progress reads at a glance, plus
@@ -51,7 +51,7 @@ export default function render(shadow, ctx) {
       </div>`;
   }).join("");
 
-  // Completion bar — overall progress through the list. Reads as a
+  // Completion bar, overall progress through the list. Reads as a
   // calm horizontal rule with a moss accent fill so a "you're 60%
   // through this list" sense lands before you scan the row text.
   const progressBar = total > 0

@@ -137,6 +137,14 @@
   flex-wrap: wrap;
   gap: var(--t-space-2);
 }
+/* Standalone variant, when the chip nav isn't wrapped in an
+   .events-toolbar (e.g. the History page), claim our own breathing
+   room above + below so the chip row doesn't crowd the heading or
+   collide with the first row. */
+.event-type-filter--standalone {
+  display: flex;
+  margin: var(--t-space-3) 0 var(--t-space-4);
+}
 .event-type-filter .chip {
   display: inline-flex;
   align-items: center;

@@ -3,7 +3,7 @@
 Primary source is Open-Meteo's CAMS Air Quality endpoint, which only
 returns pollen for Europe (CAMS Europe coverage). When the upstream
 returns nulls AND the coordinates fall inside Australia, fall back to a
-HTML scrape of melbournepollen.com.au — it only carries grass pollen
+HTML scrape of melbournepollen.com.au, it only carries grass pollen
 and only at a Low/Moderate/High level (no numeric count), so the
 fallback fills in `grass_label` instead of grams/m³.
 
@@ -26,7 +26,7 @@ CACHE_TTL_S = 1800
 HTTP_TIMEOUT_S = 15
 USER_AGENT = "tesserae/0.1 (+weather_pollen_count)"
 
-# Australia bounding box — used to decide whether the MPC fallback is
+# Australia bounding box, used to decide whether the MPC fallback is
 # even worth attempting. Loose box; the scrape itself will return None
 # off-season anyway.
 AU_LAT = (-45.0, -10.0)
@@ -47,7 +47,7 @@ MPC_LEVEL_TO_COUNT = {
     "Extreme": 400,
 }
 
-# Overall-band thresholds — applied to the max of (tree, grass, weed) so
+# Overall-band thresholds, applied to the max of (tree, grass, weed) so
 # the headline level word matches whichever species is worst. Aligned
 # with the per-species bands the legacy widget already paints.
 OVERALL_BANDS: list[tuple[float, str]] = [
@@ -113,7 +113,7 @@ def _open_meteo(lat: float, lon: float) -> dict[str, Any] | None:
 
 
 def _scrape_melbourne_pollen() -> dict[str, Any] | None:
-    # Best-effort fallback — short timeout, no retries. melbournepollen
+    # Best-effort fallback, short timeout, no retries. melbournepollen
     # is third-party and not reliably fast; the upstream open-meteo
     # data is the canonical source. A slow scrape can't be allowed to
     # blow past the page hydration budget.
@@ -153,11 +153,11 @@ def _is_australia(lat: float, lon: float) -> bool:
 
 def _overall_level(values: list[float | None]) -> str:
     """Pick the overall headline level from the worst species reading.
-    Returns "—" when nothing numeric is available so the variant
+    Returns "-" when nothing numeric is available so the variant
     renderers can still print something legible."""
     nums = [v for v in values if isinstance(v, (int, float))]
     if not nums:
-        return "—"
+        return "-"
     worst = max(nums)
     for ceiling, name in OVERALL_BANDS:
         if worst <= ceiling:
@@ -166,7 +166,7 @@ def _overall_level(values: list[float | None]) -> str:
 
 
 def _dominant_type(values: dict[str, float | None]) -> str:
-    """The species driving the headline level — used by Refined/Geometric
+    """The species driving the headline level, used by Refined/Geometric
     variants as the sub-title under the level word."""
     nums = {k: v for k, v in values.items() if isinstance(v, (int, float))}
     if not nums:
@@ -176,7 +176,7 @@ def _dominant_type(values: dict[str, float | None]) -> str:
 
 
 def _hhmm_now() -> str:
-    """Local wall-clock HH:MM — matches the headers on weather_now."""
+    """Local wall-clock HH:MM, matches the headers on weather_now."""
     from datetime import datetime as _dt
 
     return _dt.now().strftime("%H:%M")
@@ -203,7 +203,7 @@ def _build_breakdown(values: dict[str, float | None], scale_max: float) -> list[
             display = round(raw)
             level = max(0.0, min(100.0, (raw / scale_max) * 100.0)) if scale_max else 0.0
         else:
-            display = "—"
+            display = "-"
             level = 0
         rows.append(
             {
@@ -235,7 +235,7 @@ def fetch(
     if primary is None and _is_australia(lat, lon):
         primary = _scrape_melbourne_pollen()
     if primary is None:
-        # No upstream returned anything — surface a friendly empty state
+        # No upstream returned anything, surface a friendly empty state
         # so the cell still renders the widget shell.
         primary = {
             "grass": None,

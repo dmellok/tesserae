@@ -2,26 +2,26 @@
 
 A Tesserae widget is a small, self-contained plugin: a manifest, a `client.js`
 that renders into a Shadow DOM, a `client.css`, and an optional `server.py` for
-data. That shape — **a tight, documented contract with a fast feedback loop** —
+data. That shape, **a tight, documented contract with a fast feedback loop** -
 makes widgets an unusually good fit for AI-assisted coding. You describe what
 you want, the model writes the files against the contract, and you watch it
 render in the browser in seconds.
 
 This page is the AI workflow. The authoritative spec lives in
-[the widget contract & design system](../widgets.md) — keep it open; the model
+[the widget contract & design system](../widgets.md), keep it open; the model
 should read it too.
 
 !!! tip "Works with any capable coding assistant"
     The examples assume [Claude Code](https://claude.com/claude-code) or a
     similar agentic tool that can read files and run commands, but the prompts
-    work in any chat model — just paste the contract doc in alongside them.
+    work in any chat model, just paste the contract doc in alongside them.
 
 ## Why this works well
 
 - **The contract is small and explicit.** [`docs/widgets.md`](../widgets.md) defines the whole surface: the `render(shadow, ctx)` signature, the `ctx` shape, the Spectra semantic tokens (`--bg`, `--surface`, `--text-primary`, `--accent-1..6`, etc.) and the orthogonal `data-style` axis, container queries, the e-ink rules. A model that reads it has everything it needs.
 - **There are 58 worked examples** in `plugins/`. "Model your widget on `weather_now`" is a one-line instruction that carries an enormous amount of design and structure.
 - **The feedback loop is seconds.** `/_test/render?plugin=<id>&size=md` renders a single widget with no dashboard. The dev server auto-reloads; refresh to see edits.
-- **Every widget ships a smoke test.** The model can write it and you can run it — objective "did it work" rather than vibes.
+- **Every widget ships a smoke test.** The model can write it and you can run it, objective "did it work" rather than vibes.
 
 ## Setup
 
@@ -33,7 +33,7 @@ python3 -m venv .venv
 .venv/bin/python -m app.main --dev      # auto-reload + /_test/render enabled
 ```
 
-Sign in once (these routes need the dev server **and** a session — they
+Sign in once (these routes need the dev server **and** a session, they
 aren't loopback-exempt), then iterate at
 `http://127.0.0.1:8765/_test/render?plugin=<id>&size=md` (also
 `size=xs|sm|lg`). The whole-gallery review page is at
@@ -41,10 +41,10 @@ aren't loopback-exempt), then iterate at
 
 ## The loop
 
-1. **Orient the model** — point it at the contract + a reference widget.
-2. **Describe the widget** — data source, what each size shows, the layout.
+1. **Orient the model**, point it at the contract + a reference widget.
+2. **Describe the widget**, data source, what each size shows, the layout.
 3. **Let it scaffold** the four files under `plugins/<id>/`.
-4. **Render and critique** — open `/_test/render`, paste back a screenshot or describe what's off.
+4. **Render and critique**, open `/_test/render`, paste back a screenshot or describe what's off.
 5. **Write the smoke test** and run `pytest plugins/<id>/`.
 6. **Check the constraints** (below) and open a PR.
 
@@ -61,19 +61,19 @@ A widget is a drop-a-folder plugin under plugins/<id>/ with:
   - server.py    (optional, server-side data fetch -> ctx.data)
 
 Before writing anything, read docs/widgets.md and
-docs/widget-design-system.md end to end — together they're the full
+docs/widget-design-system.md end to end, together they're the full
 contract: the ctx shape; the Spectra token layers (paint from the
 semantic layer: --bg, --surface, --surface-sunken, --text-primary /
 --text-secondary / --text-muted, --accent-1..6 plus their
---accent-*-soft pairs, --on-accent — never hard-coded hex except the
+--accent-*-soft pairs, --on-accent, never hard-coded hex except the
 documented data-identity colours like team/brand/flag); the orthogonal
---data-style axis (typography / spacing / shape — never colour) and
+--data-style axis (typography / spacing / shape, never colour) and
 the style-tunable tokens it exposes (--edge-weight, --label-transform,
 --pill-radius, etc.); the seven archetype body classes (.stat-body,
 .list-body, .chart-body, .status-body, .cal-body, .wx-body, .img-body);
 container queries (cqw/cqh); Phosphor icon usage (bold for big icons,
 never fill); and the e-ink constraints (no drawn borders, no
-animations, no client-side fetch — use server.py).
+animations, no client-side fetch, use server.py).
 
 Then read these three shipped widgets as the canonical patterns:
 plugins/weather_now, plugins/weather_hourly, plugins/weather_forecast.
@@ -84,13 +84,13 @@ before we design anything.
 
 ### 2. Describe the widget to build
 
-Fill in the blanks — the more specific the data source and per-size layout, the
+Fill in the blanks, the more specific the data source and per-size layout, the
 better the first pass:
 
 ```text
 Build a widget: <id> ("<Display Name>").
 
-Purpose: <one sentence — who's it for, why is it better than glancing at a phone>
+Purpose: <one sentence, who's it for, why is it better than glancing at a phone>
 
 Data source: <public API URL with no key, or which Core plugin's settings it
 needs>. If it needs server-side data, write server.py with a urllib request,
@@ -105,17 +105,17 @@ Sizes + layout:
   - lg (1200x800): <what shows>
 
 Visual style: follow the no-borders, bold-block design language from the weather
-widgets — colour blocks from --accent-1 / --accent-2 / --accent-3 (their
+widgets, colour blocks from --accent-1 / --accent-2 / --accent-3 (their
 --accent-N-soft pairs for tinted backgrounds) plus --surface-sunken for
 neutral chips, heavy type, one big bold Phosphor hero icon. Use ctx.cell.size
 to drop non-essential sections at xs/sm.
 
 Pick a body archetype (.stat-body for a hero metric, .list-body for rows,
-.chart-body for charts, etc.) — the archetypes already carry the font-size
+.chart-body for charts, etc.), the archetypes already carry the font-size
 cascade and gap rhythm, don't roll your own.
 
 Write client.js + plugin.json (+ server.py if data-fetched) under
-plugins/<id>/. Spectra widgets don't ship a client.css — paint inside
+plugins/<id>/. Spectra widgets don't ship a client.css, paint inside
 shadow.innerHTML via a <style> block. Don't hard-code hex except for the
 documented data-identity cases in docs/widgets.md.
 ```
@@ -127,7 +127,7 @@ Open `/_test/render?plugin=<id>&size=md`, then:
 ```text
 Here's how it renders at md and xs [paste screenshots or describe]. Issues:
 - <e.g. the hero number overflows at xs>
-- <e.g. the rain block uses danger red — switch to accent2/accent3, danger is
+- <e.g. the rain block uses danger red, switch to accent2/accent3, danger is
   reserved for semantic states per docs/widgets.md>
 Fix these and keep it within the contract. Don't add borders or animations.
 ```
@@ -148,29 +148,29 @@ These are the things AI most often gets wrong on e-ink. Call them out explicitly
 (they're all in [the contract](../widgets.md), but worth repeating):
 
 - [ ] **Spectra semantic tokens only.** Paint from `var(--bg)`, `var(--surface)`, `var(--surface-sunken)`, `var(--text-primary/-secondary/-muted)`, `var(--accent-1..6)` (and `--accent-1-soft..6-soft` for tinted backgrounds), `var(--on-accent)` for text on accent backgrounds. Never hard-coded hex except the documented data-identity carve-out (team/brand/flag colours; see docs/widgets.md).
-- [ ] **Pick an archetype body class.** `.stat-body` / `.list-body` / `.chart-body` / `.status-body` / `.cal-body` / `.wx-body` / `.img-body` — the seven archetypes carry the font-size cascade, gap rhythm, and zoom-aware sizing that keep widgets consistent next to each other on a panel. Don't roll your own body layout.
-- [ ] **Consume style-tunable tokens with fallbacks.** Use `var(--edge-weight, 1px)`, `var(--label-transform, uppercase)`, `var(--pill-radius, 999px)`, etc. — defaults live on `:root` (the Standard look); styles override on `[data-style]`. The fallback means an unstyled widget still renders.
+- [ ] **Pick an archetype body class.** `.stat-body` / `.list-body` / `.chart-body` / `.status-body` / `.cal-body` / `.wx-body` / `.img-body`, the seven archetypes carry the font-size cascade, gap rhythm, and zoom-aware sizing that keep widgets consistent next to each other on a panel. Don't roll your own body layout.
+- [ ] **Consume style-tunable tokens with fallbacks.** Use `var(--edge-weight, 1px)`, `var(--label-transform, uppercase)`, `var(--pill-radius, 999px)`, etc., defaults live on `:root` (the Standard look); styles override on `[data-style]`. The fallback means an unstyled widget still renders.
 - [ ] **No drawn borders.** Card shapes come from `--bg` vs `--surface` contrast and spacing, not `border:` rules. They dither into invisibility on Spectra 6 anyway.
 - [ ] **Bold, not fill, for big icons.** `ph-bold` reads clean at size; `ph-fill` quantises into blobs.
 - [ ] **No animations / transitions / `requestAnimationFrame`.** The frame is screenshotted; anything mid-flight gets caught half-rendered. `animation: false` on Chart.js too.
-- [ ] **No client-side `fetch`.** Use `server.py` — the renderer waits only for declared `<img>` loads + fonts, not arbitrary fetches, so a client fetch will screenshot before its data arrives. Don't assume internet on the panel side either.
+- [ ] **No client-side `fetch`.** Use `server.py`, the renderer waits only for declared `<img>` loads + fonts, not arbitrary fetches, so a client fetch will screenshot before its data arrives. Don't assume internet on the panel side either.
 - [ ] **Idempotent render.** Overwrite `shadow.innerHTML`; don't append (the renderer may call you twice).
 - [ ] **Don't load fonts.** `font-family: inherit` on `:host`; the page font arrives via `--font-family` and `ctx.font.family`.
-- [ ] **No `variant` cell option.** The Spectra rebuild replaced per-widget variants with the orthogonal `data-theme` × `data-style` axes — one widget should compose with every theme and every style instead of shipping N visual directions. If you find yourself reaching for variants, you probably want a new style or a new theme.
+- [ ] **No `variant` cell option.** The Spectra rebuild replaced per-widget variants with the orthogonal `data-theme` × `data-style` axes, one widget should compose with every theme and every style instead of shipping N visual directions. If you find yourself reaching for variants, you probably want a new style or a new theme.
 
 ## Structured design first (optional)
 
 For a more involved widget, have the model produce a **filled-in design brief**
 before any code, using the template in
-[`docs/widget-design-brief.md`](../widget-design-brief.md) — ASCII mockups per
+[`docs/widget-design-brief.md`](../widget-design-brief.md), ASCII mockups per
 size, an icon manifest, a tone-rules table. It front-loads the layout decisions
 and makes the build pass cleaner.
 
 ## Submitting
 
 - Run the smoke test and `.venv/bin/ruff check plugins/<id>/`.
-- Open a PR. New widgets are welcome — especially ones backed by a documented, key-free public API (those land in the **Stable** tier; see [Screens & compatibility](../compatibility.md)).
-- If your widget hits an undocumented or scraped endpoint, say so in the PR — it'll be tiered **Best-effort** or **Fragile** so users know what to expect.
+- Open a PR. New widgets are welcome, especially ones backed by a documented, key-free public API (those land in the **Stable** tier; see [Screens & compatibility](../compatibility.md)).
+- If your widget hits an undocumented or scraped endpoint, say so in the PR, it'll be tiered **Best-effort** or **Fragile** so users know what to expect.
 
 Once it's merged and you've captured screenshots, it shows up automatically
 in the [widget gallery](../widgets/gallery.md):
@@ -181,9 +181,9 @@ python scripts/capture_widget_shots.py    # single hero shot per widget
 
 That refreshes `docs/screenshots/widgets/<id>.png` (the gallery's
 default hero image). For visual-regression spot-checks across themes
-or styles, hit `/_test/matrix` in the dev server — it renders one
+or styles, hit `/_test/matrix` in the dev server, it renders one
 widget across the full theme × style grid in a single page.
 
 For ongoing design work, `python scripts/widget_contact_sheet.py` builds a
-single PNG showing your widget at all four sizes side-by-side — the easiest
+single PNG showing your widget at all four sizes side-by-side, the easiest
 "did anything regress?" loop while iterating on a polish pass.

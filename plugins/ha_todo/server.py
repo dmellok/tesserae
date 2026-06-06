@@ -1,4 +1,4 @@
-"""ha_todo — items from a Home Assistant todo entity.
+"""ha_todo, items from a Home Assistant todo entity.
 
 Thin widget over ha_core. Calls the ``todo.get_items`` service via
 ``call_service_with_response`` (HA 2024.5+) and shapes the result for
@@ -58,7 +58,7 @@ def fetch(
         return {"error": "Install the Home Assistant Core plugin to use this widget."}
     if not core.is_configured():
         return {
-            "error": "Home Assistant is not configured — set URL + token in Plugins → Home Assistant Core."
+            "error": "Home Assistant is not configured, set URL + token in Plugins → Home Assistant Core."
         }
 
     entity_id = (options.get("entity_id") or "").strip()
@@ -82,7 +82,7 @@ def fetch(
 
     list_title = user_title or core.friendly_name(state) or entity_id
 
-    # Items live behind a service call — todo.get_items with the entity
+    # Items live behind a service call, todo.get_items with the entity
     # as target. ``return_response`` makes HA echo the items back rather
     # than just emitting state changes.
     try:

@@ -1,12 +1,12 @@
 """Settings → diagnostics: one-shot tests that verify config without
 touching the running transport.
 
-* ``test_broker`` — opens a fresh MQTT connection with the currently-
+* ``test_broker``, opens a fresh MQTT connection with the currently-
   saved broker settings and publishes a no-op probe. Mirrors the
   built-in-vs-external resolution logic in ``app.main._rebuild_transport``
   so the button works the same whether the user runs the built-in
   broker or points at Mosquitto.
-* ``test_push`` — generates a small synthetic PNG and runs it through
+* ``test_push``, generates a small synthetic PNG and runs it through
   ``PushManager.push_image``, exercising every loaded renderer end-to-
   end + the event-log path without needing a saved dashboard.
 """
@@ -39,7 +39,7 @@ def diagnostics_test_broker() -> Response:
 
     Used to bail with "no host configured" whenever the built-in broker
     was enabled, because the user typically leaves the external ``host``
-    field blank in that mode — which made the button useless for the
+    field blank in that mode, which made the button useless for the
     most common single-machine setup."""
     raw = settings_store().get_section("broker")
     host = str(raw.get("host") or "").strip()
@@ -56,7 +56,7 @@ def diagnostics_test_broker() -> Response:
             return redirect(url_for("auth.settings_area", area="server"))
         # Mirror app.main's "connect to ourselves on loopback" logic: the
         # embedded bind may be 0.0.0.0 for clients on the LAN, but that's
-        # not a connectable address — use 127.0.0.1.
+        # not a connectable address, use 127.0.0.1.
         host = "127.0.0.1"
         port = int(raw.get("embedded_port") or 1883)
         embedded_user = str(raw.get("embedded_username") or "").strip() or None

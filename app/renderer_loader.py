@@ -5,11 +5,11 @@ and a ``renderer.py`` exporting ``transform()`` and ``payload()``. Mirrors the
 plugin loader's drop-a-folder pattern so adding a new wire format / device
 family is a contained change.
 
-The loader runs once at app startup. Errors don't raise — they're collected
+The loader runs once at app startup. Errors don't raise, they're collected
 on the registry so the admin UI can surface them while the rest of the system
 keeps working.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
     """For each device instance (a user-created copy of a built-in kind),
     add a cloned Renderer record per renderer the kind consumes. The
     clone overrides ``device`` so its ``topic_pattern`` resolves against
-    the instance's id — each physical device gets its own MQTT topics
+    the instance's id, each physical device gets its own MQTT topics
     without changes to the rendering core.
 
     The link between an instance and its renderers is the **kind's**
@@ -152,7 +152,7 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
     for dev in get_all():
         kind_id = getattr(dev, "kind_of", None)
         if kind_id is None:
-            continue  # built-in kind — already has its own renderers
+            continue  # built-in kind, already has its own renderers
         kind = get_one(kind_id)
         if kind is None:
             continue
@@ -184,7 +184,7 @@ def seed_device_settings_from_base(renderers: RendererRegistry, settings_store: 
     A user upgrading mid-flight has, say, ``renderers.pi_bin.saturation
     = 1.6`` on disk but no clone-level value, and the Devices tab would
     otherwise show the manifest default (1.4). One-shot seed each clone
-    that has no stored value yet so the upgrade is invisible — and the
+    that has no stored value yet so the upgrade is invisible, and the
     same path gives newly-added devices the same defaults as the rest
     of the fleet rather than a fresh manifest default.
 

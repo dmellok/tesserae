@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather — Air Quality",
+  "name": "Weather, Air Quality",
   "version": "0.1.3",
   "kind": "widget",
   "description": "Air Quality Index (European or US scale) plus PM2.5, PM10, O3, NO2 readings. Data from Open-Meteo CAMS (no API key). Colour-coded panel block reflects the AQI band.",

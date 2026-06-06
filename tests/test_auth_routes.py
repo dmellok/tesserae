@@ -104,7 +104,7 @@ def test_change_password_rotates_hash(app: Flask) -> None:
 
 
 def test_disable_password_requires_confirmation(app: Flask) -> None:
-    """A POST without ``confirmed=1`` must not flip the gate — guards
+    """A POST without ``confirmed=1`` must not flip the gate, guards
     against a stray click / hand-crafted form silently dropping auth."""
     client = app.test_client()
     _sign_in(client)
@@ -128,8 +128,8 @@ def test_disabled_password_lets_loopback_caller_through(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     client.post("/settings/system/auth/disable", data={"confirmed": "1"})
-    # Drop the session so we know it's the disable flag — not a leftover
-    # auth cookie — letting us through.
+    # Drop the session so we know it's the disable flag, not a leftover
+    # auth cookie, letting us through.
     with client.session_transaction() as sess:
         sess.clear()
     resp = client.get("/settings/system")
@@ -137,7 +137,7 @@ def test_disabled_password_lets_loopback_caller_through(app: Flask) -> None:
 
 
 def test_enable_password_restores_existing_hash(app: Flask) -> None:
-    """Disabling then re-enabling preserves the original password — the
+    """Disabling then re-enabling preserves the original password, the
     stored hash is untouched by the toggle, so users don't have to pick a
     new password just to flip the gate back on."""
     client = app.test_client()
@@ -153,7 +153,7 @@ def test_enable_password_restores_existing_hash(app: Flask) -> None:
 def test_enable_password_with_no_hash_redirects_to_setup(app: Flask) -> None:
     """If auth was disabled AND the stored hash was cleared (e.g. by the
     reset CLI) and the user re-enables in the UI, they need to set a
-    password — the handler bounces them to /setup."""
+    password, the handler bounces them to /setup."""
     client = app.test_client()
     _sign_in(client)
     client.post("/settings/system/auth/disable", data={"confirmed": "1"})

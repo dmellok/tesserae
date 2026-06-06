@@ -1,4 +1,4 @@
-"""github_contributions — the year's contribution heatmap."""
+"""github_contributions, the year's contribution heatmap."""
 
 from __future__ import annotations
 
@@ -56,11 +56,11 @@ def fetch(
         }
     user = (options.get("user") or "").strip() or core.get_username()
     if not user:
-        return {"error": "Set a GitHub username — here or as github_core default.", "weeks": []}
+        return {"error": "Set a GitHub username, here or as github_core default.", "weeks": []}
 
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)
-    # v2 cache key — bump when the payload shape changes so a stale
+    # v2 cache key, bump when the payload shape changes so a stale
     # cached v1 file (without the streak/busiest fields) doesn't keep
     # serving until the TTL expires.
     cache = data_dir / f"contrib_v2_{user}.json"
@@ -101,7 +101,7 @@ def fetch(
             )
         weeks.append(days)
 
-    # Derived stats — current streak (consecutive days with count > 0,
+    # Derived stats, current streak (consecutive days with count > 0,
     # ending today), longest streak in the year, busiest day, this week
     # / month totals. All from the flat sorted day list.
     flat = sorted(
@@ -121,7 +121,7 @@ def fetch(
         if c > busiest["count"]:
             busiest = {"date": d.get("date") or "", "count": c}
 
-    # Current streak — walk backward from today over days with > 0,
+    # Current streak, walk backward from today over days with > 0,
     # tolerate today being zero (still-early-in-day) by skipping it
     # when counting; the streak only breaks on a confirmed past-day zero.
     current_streak = 0

@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "F1 — Last Race",
+  "name": "F1, Last Race",
   "version": "0.1.4",
   "kind": "widget",
   "description": "Podium from the most recently completed F1 race: P1/P2/P3 with driver, team, time/gap, fastest-lap badge, plus the circuit silhouette. Data from Jolpica-F1 (no API key).",

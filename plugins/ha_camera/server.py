@@ -1,8 +1,8 @@
-"""ha_camera — snapshot from one or more HA ``camera.*`` entities.
+"""ha_camera, snapshot from one or more HA ``camera.*`` entities.
 
 Thin widget over ha_core. Each camera entity exposes an
-``entity_picture`` attribute — a relative path like
-``/api/camera_proxy/camera.front_door?token=…`` — which we resolve to an
+``entity_picture`` attribute, a relative path like
+``/api/camera_proxy/camera.front_door?token=…``, which we resolve to an
 absolute URL by prepending HA's configured base URL so the panel (which
 renders headlessly via Tesserae's loopback) can actually fetch the
 bytes.
@@ -32,7 +32,7 @@ def _core() -> Any:
 
 
 def choices(name: str) -> list[dict[str, str]]:
-    """Entity picker for the editor — restricted to ``camera.*``."""
+    """Entity picker for the editor, restricted to ``camera.*``."""
     core = _core()
     if name == "entity" and core is not None:
         return core.entity_choices(domains=("camera",))

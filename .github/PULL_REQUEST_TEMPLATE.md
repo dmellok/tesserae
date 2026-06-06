@@ -13,7 +13,7 @@ Closes #
 
 <!-- The commands you ran and what you verified. Reviewers should be
 able to repeat this. Skip the obvious (don't say "ran the tests") and
-call out what's *not* covered by automated tests — UI, hardware,
+call out what's *not* covered by automated tests, UI, hardware,
 manual flows. -->
 
 - [ ] `pytest -q`

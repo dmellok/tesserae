@@ -1,4 +1,4 @@
-// github_repo — Spectra status archetype with a richer payload. Hero
+// github_repo, Spectra status archetype with a richer payload. Hero
 // = star count, description as the hero sub. Below: language pill +
 // latest-release tag, a six-cell status-grid for forks / issues /
 // watchers / commits-this-year / license / last-push, a horizontal
@@ -14,7 +14,7 @@ function escapeHtml(s) {
 }
 
 function fmtCount(n) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n) || 0;
   if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
   if (v >= 1000) return `${(v / 1000).toFixed(1)}k`;
@@ -22,9 +22,9 @@ function fmtCount(n) {
 }
 
 function fmtAgo(iso) {
-  if (typeof iso !== "string" || !iso) return "—";
+  if (typeof iso !== "string" || !iso) return "-";
   const t = new Date(iso).getTime();
-  if (!Number.isFinite(t)) return "—";
+  if (!Number.isFinite(t)) return "-";
   const secs = Math.max(0, (Date.now() - t) / 1000);
   if (secs < 3600) return `${Math.max(1, Math.floor(secs / 60))}m`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h`;
@@ -38,7 +38,7 @@ function fmtAgo(iso) {
 // reads as distinct slices. "Other" rolls up the long tail and
 // always lands on --text-muted so the dominant languages stand out.
 const LANG_ACCENTS = [
-  "var(--accent-5)", // slate blue — usually the top language
+  "var(--accent-5)", // slate blue, usually the top language
   "var(--accent-4)", // teal
   "var(--accent-3)", // moss
   "var(--accent-2)", // ochre
@@ -84,7 +84,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const repo = data.repo || "—";
+  const repo = data.repo || "-";
   const stars = fmtCount(data.stars);
   const description = data.description || "";
   const language = data.language || "";
@@ -96,14 +96,14 @@ export default function render(shadow, ctx) {
   const langs = Array.isArray(data.languages) ? data.languages : [];
   const contributors = Array.isArray(data.contributors) ? data.contributors : [];
 
-  // Six headline counters — laid out by the status-grid as 2 columns
+  // Six headline counters, laid out by the status-grid as 2 columns
   // × 3 rows. Counters everyone glances for in a repo card.
   const cells = [
     ["Forks", fmtCount(data.forks), "var(--accent-4)"],
     ["Issues", fmtCount(data.issues), "var(--accent-1)"],
     ["Watchers", fmtCount(data.watchers), "var(--accent-5)"],
     ["Year", fmtCount(data.commits_year), "var(--accent-3)"],
-    ["License", license || "—", "var(--text-secondary)"],
+    ["License", license || "-", "var(--text-secondary)"],
     ["Pushed", fmtAgo(data.pushed_at), "var(--text-secondary)"],
   ];
 
@@ -121,7 +121,7 @@ export default function render(shadow, ctx) {
       ${branch ? `<span class="u-label" style="font-size:var(--fs-caption)">${escapeHtml(branch)}</span>` : ""}
     </div>`;
 
-  // Top-contributors strip — up to 5 leading committers with their
+  // Top-contributors strip, up to 5 leading committers with their
   // avatar, login, and contribution count. Renders below the language
   // bar at md+ sizes; hidden at xs/sm via the container query below.
   const contribStrip = contributors.length

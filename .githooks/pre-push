@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tesserae pre-push hook — nudges to bump pyproject.toml + create a
+# Tesserae pre-push hook, nudges to bump pyproject.toml + create a
 # vX.Y.Z tag when shippable code has changed since the last tag. Bypass
 # with `git push --no-verify` for docs-only / WIP pushes.
 #
@@ -9,7 +9,7 @@ set -eu
 
 last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
 if [ -z "$last_tag" ]; then
-    exit 0  # no tags yet — nothing to compare against
+    exit 0  # no tags yet, nothing to compare against
 fi
 
 version="$(awk -F'"' '/^version = / { print $2; exit }' pyproject.toml 2>/dev/null || true)"
@@ -22,18 +22,18 @@ if [ "$version" != "$tag_version" ]; then
     exit 0  # already bumped relative to last tag
 fi
 
-# Same version as last tag — has any shippable code changed since?
-# (docs/, tests/, scripts/, .github/, README are excluded — they don't
+# Same version as last tag, has any shippable code changed since?
+# (docs/, tests/, scripts/, .github/, README are excluded, they don't
 # warrant a bump on their own.)
 code_paths='app plugins renderers devices static templates schema pyproject.toml install.sh install.ps1'
 # shellcheck disable=SC2086
 if ! git diff --name-only "$last_tag..HEAD" -- $code_paths 2>/dev/null | grep -q .; then
-    exit 0  # docs/tests-only changes — no bump needed
+    exit 0  # docs/tests-only changes, no bump needed
 fi
 
 cat <<EOF >&2
 
-  pre-push: pyproject.toml is still version "$version" — same as $last_tag,
+  pre-push: pyproject.toml is still version "$version", same as $last_tag,
             but shippable code has changed since that tag. Consider bumping
             and tagging before push:
 

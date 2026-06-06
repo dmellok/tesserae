@@ -1,7 +1,7 @@
 # Security policy
 
 Tesserae is a self-hosted hobby project. The threat model is "trusted
-LAN" — the admin UI is meant to sit behind your own network or a
+LAN", the admin UI is meant to sit behind your own network or a
 Tailscale-style overlay, not on the open internet. Within that scope,
 security reports are taken seriously.
 
@@ -39,7 +39,7 @@ Please include:
 - A fix timeline depends on severity and bandwidth. Critical issues are
   worked on the same day; lower-severity ones may take a few weeks.
 - You'll be credited in the release notes unless you ask not to be.
-- Coordinated disclosure preferred — please hold details until a fix is
+- Coordinated disclosure preferred, please hold details until a fix is
   out, or until 90 days have elapsed without progress.
 
 ## Scope
@@ -75,6 +75,6 @@ Please include:
 ### Always in scope (even if "out" above)
 
 If you find a way to compromise the server _without_ running a plugin
-or modifying code — an unauthenticated path on the admin UI, a crafted
+or modifying code, an unauthenticated path on the admin UI, a crafted
 HTTP request that escapes the renderer, a stored XSS that survives the
-auth check — please report it.
+auth check, please report it.

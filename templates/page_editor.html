@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import text_input, slider, switch, select_field, color_input, button, auto_field, card_head %}
-{% block title %}{{ page.name }} — Dashboard editor — Tesserae{% endblock %}
+{% block title %}{{ page.name }}, Dashboard editor, Tesserae{% endblock %}
 
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
@@ -17,13 +17,13 @@
         action="{{ url_for('pages.update_cell', page_id=page.id, cell_id=cell.id) }}"
         class="form" data-editor-form data-cell-id="{{ cell.id }}">
     {# Group widgets by category for the picker. Names follow the
-       "Category — Item" convention; everything without a "—" lands
+       "Category, Item" convention; everything without a "-" lands
        in an "Other" bucket. Within a group, show just the trailing
        item name so the dropdown stays scannable. #}
     {% set plugin_groups = namespace(items={}) %}
     {% for p in plugins %}
-      {% if ' — ' in p.name %}
-        {% set _parts = p.name.split(' — ', 1) %}
+      {% if ', ' in p.name %}
+        {% set _parts = p.name.split(', ', 1) %}
         {% set _grp = _parts[0] %}
         {% set _label = _parts[1] %}
       {% else %}
@@ -92,16 +92,16 @@
                       value=cell.font or '', options=font_options,
                       blank_label='Inherit page') }}
     </div>
-    {# Content zoom — inverse-sized at render time. 1.0 == native; >1
+    {# Content zoom, inverse-sized at render time. 1.0 == native; >1
        paints the widget into a smaller virtual container then scales it
        up so text/icons grow without breaking layout. Persisted on the
        cell so the zoom rides through to the panel push. #}
     {{ slider('cell-' ~ cell.id ~ '-zoom', 'zoom', 'Content zoom',
               value=cell.zoom, min=0.7, max=2.0, step=0.05, unit='×',
-              help='Pretends the cell is smaller, then scales the widget back up — text and icons grow without breaking layout. Persists through to the panel.') }}
+              help='Pretends the cell is smaller, then scales the widget back up, text and icons grow without breaking layout. Persists through to the panel.') }}
 
     {# Geometry is owned by the layout editor (drag handles + presets)
-       and persisted via /cells/batch. Don't send x/y/w/h from here —
+       and persisted via /cells/batch. Don't send x/y/w/h from here -
        update_cell defaults to the cell's current geometry when these
        fields are absent, so the layout survives a cell-option save. #}
 
@@ -157,7 +157,7 @@
     {% set _push_disabled = device_options and not _bound_count %}
     <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
       <input type="hidden" name="page_id" value="{{ page.id }}">
-      {# Stay in the editor after pushing — the default lands on Send →
+      {# Stay in the editor after pushing, the default lands on Send →
          History, which yanks the user out of the page they're actively
          working on. #}
       <input type="hidden" name="return_to" value="editor">
@@ -215,7 +215,7 @@
     <section class="card">
       {{ card_head('Dashboard', icon_name='note-pencil', blurb='Font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-editor-form>
-        {# No `name` here — the header rename form owns it. A stale hidden
+        {# No `name` here, the header rename form owns it. A stale hidden
            name would clobber a rename on save (both forms POST here). #}
         <input type="hidden" name="icon" value="{{ page.icon or '' }}" data-icon-value>
         {# Sentinel so update() knows this form owns device_ids even when
@@ -243,7 +243,7 @@
           </div>
         </div>
 
-        {# Device picker — lists user-registered instances (built-in
+        {# Device picker, lists user-registered instances (built-in
            kinds aren't bindable; they're templates). Tick one or more
            instances to bind the page to those displays: the editor
            previews each distinct aspect ratio, and pushes render once
@@ -253,7 +253,7 @@
         <div class="field">
           <label>Target devices</label>
           {% if device_options %}
-          {# Reload on change — (un)ticking a device changes the bound
+          {# Reload on change, (un)ticking a device changes the bound
              panels, which the layout editor + preview iframes both need
              to recompute against. data-reload-on-change saves first so
              the new selection survives the reload. #}
@@ -281,12 +281,12 @@
           {% endif %}
         </div>
 
-        {# Page-level theme picker — same source as the per-cell
+        {# Page-level theme picker, same source as the per-cell
            override above (theme_options comes from the editor context,
            sourced from app.state.theme_registry). Adding or renaming a
            theme touches that registry and the matching CSS block, and
            both pickers update automatically. #}
-        {# Spectra styles — orthogonal typographic / scale / shape axis in
+        {# Spectra styles, orthogonal typographic / scale / shape axis in
            static/style/spectra-styles.css. Styles never set colour; they
            compose with any theme. The three movement styles pair with the
            matching movement themes above for the full look. #}
@@ -353,7 +353,7 @@
             Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.
           </p>
           {# Optional snap-to-grid editing aid. The dashed N×M overlay
-             on the board makes it easy to size cells consistently —
+             on the board makes it easy to size cells consistently -
              every drag rounds to the nearest gridline. Persisted to
              sessionStorage per page so different dashboards can have
              different grids without stepping on each other. #}
@@ -388,7 +388,7 @@
   </div>
 </div>
 
-{# Floating "back to top" button — appears only on small viewports
+{# Floating "back to top" button, appears only on small viewports
    where the preview stacks above the cell forms (the layout's reactive
    mode). Tap = smooth scroll to the top of the page. Press-and-drag
    along the bottom edge moves it to the other side; the side
@@ -478,7 +478,7 @@
       localStorage.setItem(SIDE_KEY, side);
       requestAnimationFrame(() => btn.classList.remove("is-dragging"));
     } else {
-      // No drag — treat as tap. The transform was never applied so
+      // No drag, treat as tap. The transform was never applied so
       // there's nothing to clear besides the (never-added) class.
       window.scrollTo({ top: 0, behavior: "smooth" });
     }

@@ -1,4 +1,4 @@
-// news_rss — Spectra list archetype. Title bar shows the feed's own
+// news_rss, Spectra list archetype. Title bar shows the feed's own
 // title with an "RSS" identifier. Each row carries a source-host chip
 // (host initial + hash-stable accent tint) on the left + a published
 // chip on the right, plus a type-aware lead glyph (video / audio /

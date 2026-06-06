@@ -1,10 +1,10 @@
-# Tesserae — minimal docker-compose example.
+# Tesserae, minimal docker-compose example.
 #
 # Copy this file next to where you want to keep your data, then:
 #
 #     docker compose up -d
 #
-# The admin UI lands at http://<host-ip>:8765 — the first request
+# The admin UI lands at http://<host-ip>:8765, the first request
 # walks through password setup and the onboarding wizard.
 #
 # Pin to a specific tag (not :latest) in any setup you care about so
@@ -14,7 +14,7 @@
 # default for a self-hosted Pi / mini-PC / NAS appliance because:
 #
 #   * The render-frame URL Tesserae embeds in MQTT pushes points at
-#     the host's actual LAN IP — your panels can reach it. (Bridge
+#     the host's actual LAN IP, your panels can reach it. (Bridge
 #     networking gives the container a 172.x.x.x address LAN clients
 #     can't see, which breaks both frame fetching and the built-in
 #     MQTT broker URL.)
@@ -24,7 +24,7 @@
 #     publishing it from a `ports:` block.
 #
 # Docker Desktop on Mac / Windows handles host networking differently
-# (it's still in beta there) — if you're testing on Mac or Windows,
+# (it's still in beta there), if you're testing on Mac or Windows,
 # switch to bridge networking by deleting the `network_mode: host`
 # line and uncommenting the `ports:` + `TESSERAE_HOST_IP` block at the
 # bottom. See `docs/install/docker.md` for the bridge variant and the
@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
 
     # Linux: share the host's network namespace. Tesserae binds 8765
-    # directly on the host — same as if you `pip install`'d it on the
+    # directly on the host, same as if you `pip install`'d it on the
     # box. Auto-fixes the bridge IP problem, lets mDNS work, exposes
     # the built-in MQTT broker on 1883 without `ports:`.
     network_mode: host
@@ -45,7 +45,7 @@ services:
     volumes:
       # Settings, pages, schedules, event log, render cache, gallery
       # photos, backups. Replace `./data` with a host path you back
-      # up (or a named volume) — losing this loses everything.
+      # up (or a named volume), losing this loses everything.
       - ./data:/app/data
 
     environment:
@@ -64,4 +64,4 @@ services:
     #   - "1883:1883"          # only if using the built-in MQTT broker
     # environment:
     #   TESSERAE_IN_DOCKER: "1"
-    #   TESSERAE_HOST_IP: "192.168.1.50"   # **required** — your host's LAN IP
+    #   TESSERAE_HOST_IP: "192.168.1.50"   # **required**, your host's LAN IP

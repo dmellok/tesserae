@@ -1,4 +1,4 @@
-"""spotify_queue smoke: composer renders with spotify_core.queue mocked —
+"""spotify_queue smoke: composer renders with spotify_core.queue mocked -
 no OAuth, no network."""
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def test_queue_renders_lede_and_list(
 
 
 def test_queue_idle(app: Flask, client: FlaskClient, monkeypatch) -> None:
-    """An idle queue returns ``{"idle": True}`` — the client renders the
+    """An idle queue returns ``{"idle": True}``, the client renders the
     empty-state shell from JS, so nothing from the queue payload (track
     titles etc.) lands in the server-side HTML."""
     monkeypatch.setattr(_core(app), "queue", lambda: {"connected": True, "idle": True})

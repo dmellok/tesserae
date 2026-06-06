@@ -1,4 +1,4 @@
-// picture_apple_album — Spectra full-bleed image. Renders one signed
+// picture_apple_album, Spectra full-bleed image. Renders one signed
 // Apple Photos shared-album asset filling the cell. No overlay; the
 // stream's vibe is the whole point.
 
@@ -10,14 +10,14 @@ function escapeHtml(s) {
 
 function fmtDate(iso) {
   if (typeof iso !== "string" || !iso) return "";
-  // Apple gives ISO "2024-05-12T13:45:00.123Z" — slice to date only.
+  // Apple gives ISO "2024-05-12T13:45:00.123Z", slice to date only.
   return iso.slice(0, 10);
 }
 
 export default function render(shadow, ctx) {
   const data = ctx?.data ?? {};
   const opts = ctx?.cell?.options || {};
-  const showCaption = opts.show_caption === true; // default false — pictures are the point
+  const showCaption = opts.show_caption === true; // default false, pictures are the point
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;
 
   if (data.error) {

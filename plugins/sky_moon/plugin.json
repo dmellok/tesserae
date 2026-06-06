@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Sky — Sun & Moon",
+  "name": "Sky, Sun & Moon",
   "version": "0.2.1",
   "kind": "widget",
   "description": "Sun arc + moon phase disc. Sunrise / sunset / day length / solar noon, plus moon phase, illumination, age, moonrise / moonset and upcoming new / first-quarter / full / last-quarter dates. Sun + moon times come from Open-Meteo when latitude / longitude are set; phase + age are computed locally from the synodic month.",

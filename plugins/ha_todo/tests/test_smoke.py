@@ -1,5 +1,5 @@
 """ha_todo smoke: composer renders for all 4 variants with ha_core mocked
-— no HA connection, no network."""
+- no HA connection, no network."""
 
 from __future__ import annotations
 
@@ -49,7 +49,7 @@ def _patch_core(monkeypatch, core):
 def test_todo_renders_items_per_variant(client: FlaskClient, variant: str, size: str) -> None:
     """Use ``?sample=1`` to short-circuit the widget's fetch() and let
     the gallery's widget_samples fixture provide the data. That's the
-    same path /_test/widgets uses — exercises the full render shell
+    same path /_test/widgets uses, exercises the full render shell
     without needing to mock HA service-call responses.
 
     The cell payload JSON (data-data attribute) carries each item's

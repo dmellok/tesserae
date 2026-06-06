@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button %}
-{% block title %}Spotify — Tesserae{% endblock %}
+{% block title %}Spotify, Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
@@ -25,7 +25,7 @@
     <input type="text" readonly value="{{ redirect_uri }}" onclick="this.select()" data-mono>
     <p class="field-help">
       Paste this exact value into your Spotify app's <em>Redirect URIs</em>, then save.
-      Spotify only accepts <code>http</code> for the loopback host <code>127.0.0.1</code> —
+      Spotify only accepts <code>http</code> for the loopback host <code>127.0.0.1</code> -
       so open this page at <code>http://127.0.0.1:8765/plugins/spotify_core/</code>
       (on the appliance itself) before connecting, not via the LAN address.
     </p>
@@ -41,7 +41,7 @@
   {% elif now.idle %}
   <p class="field-help">Nothing playing right now.</p>
   {% elif now.ok %}
-  <p class="field-help">Now playing: <strong>{{ now.track }}</strong>{% if now.artist %} — {{ now.artist }}{% endif %}</p>
+  <p class="field-help">Now playing: <strong>{{ now.track }}</strong>{% if now.artist %}, {{ now.artist }}{% endif %}</p>
   {% endif %}
   <form method="post" action="{{ url_for('spotify_core_admin.disconnect') }}" class="form form--inline"
         onsubmit="return confirm('Disconnect Spotify? The widgets will stop updating until you reconnect.');">

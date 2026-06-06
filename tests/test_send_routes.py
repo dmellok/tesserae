@@ -34,7 +34,7 @@ def _sign_in(client) -> None:
 def _register_device(client, device_id: str = "esp32_demo", kind: str = "esp32_client") -> str:
     """Register an instance so the Send page's target-device picker has
     something to tick. ``send_routes`` now refuses image-sends without
-    a chosen device — calling this once at the top of each test that
+    a chosen device, calling this once at the top of each test that
     posts to /send/file|url|webpage|gallery keeps the tests honest."""
     resp = client.post(
         "/settings/devices/add",
@@ -69,7 +69,7 @@ def test_file_upload_invokes_push_image(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     dev = _register_device(client)
-    # Mock must be installed AFTER device registration — devices_add
+    # Mock must be installed AFTER device registration, devices_add
     # calls _rebuild_transport_fn() which constructs a fresh PushManager
     # and overwrites whatever was in app.config["PUSH_MANAGER"].
     pm = MagicMock()
@@ -242,7 +242,7 @@ def test_nav_links_to_send(app: Flask) -> None:
 def test_root_redirects_to_send(app: Flask) -> None:
     """Once onboarded, the brand logo + a bare URL hit / and land on
     Send, the most common post-login destination. (Before onboarding,
-    / lands in the setup wizard — covered in test_onboarding.)"""
+    / lands in the setup wizard, covered in test_onboarding.)"""
     client = app.test_client()
     _sign_in(client)
     client.post("/onboarding/finish")  # mark setup complete

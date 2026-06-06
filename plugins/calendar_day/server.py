@@ -1,4 +1,4 @@
-"""calendar_day — today's agenda."""
+"""calendar_day, today's agenda."""
 
 from __future__ import annotations
 

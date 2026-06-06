@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Spotify — Queue",
+  "name": "Spotify, Queue",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Currently-playing Spotify track + the next few items in your queue. Pulls from /v1/me/player/queue via the shared spotify_core OAuth. Requires Spotify Premium — the queue endpoint is gated to paid accounts.",
+  "description": "Currently-playing Spotify track + the next few items in your queue. Pulls from /v1/me/player/queue via the shared spotify_core OAuth. Requires Spotify Premium, the queue endpoint is gated to paid accounts.",
   "icon": "ph-queue",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [

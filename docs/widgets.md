@@ -15,7 +15,7 @@ below is enforced by code; values come straight from the source.
 
 The composer uses these dims when rendering a single widget via
 `/_test/render?plugin=<id>&size=<size>`. Real dashboards can place a
-widget at any (w, h) — the size token is derived from the longer side:
+widget at any (w, h), the size token is derived from the longer side:
 
 | size | dims      | trigger (longer side) | typical role                  |
 |------|-----------|-----------------------|-------------------------------|
@@ -29,7 +29,7 @@ Source: [`app/composer.py`](https://github.com/dmellok/tesserae/blob/main/app/co
 
 Design at all four sizes. The same widget should hide non-essential
 sections at `xs`/`sm` (use `.size-xs` / `.size-sm` class on your root
-element — `ctx.cell.size` gives you the token, you stamp the class).
+element, `ctx.cell.size` gives you the token, you stamp the class).
 
 ---
 
@@ -66,19 +66,19 @@ plugins/<id>/
   tests/test_smoke.py smoke test (optional but recommended)
 ```
 
-`<id>` is the folder name — it doubles as the URL slug and the disk path.
+`<id>` is the folder name, it doubles as the URL slug and the disk path.
 The loader skips any folder starting with `.` or `_`; beyond that,
 lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
-— e.g. `weather_now`, `weather_hourly`.
+- e.g. `weather_now`, `weather_hourly`.
 
 ---
 
-## Manifest — `plugin.json`
+## Manifest, `plugin.json`
 
 ```json
 {
   "tesserae_compat": "1.x",
-  "name": "Weather — Now",
+  "name": "Weather, Now",
   "version": "0.1.0",
   "kind": "widget",
   "description": "Current conditions...",
@@ -102,24 +102,24 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
 }
 ```
 
-* **`supports.sizes`** — which test-render sizes you've designed for.
+* **`supports.sizes`**, which test-render sizes you've designed for.
   Omit ones you don't support; the editor will skip your widget on
   cells that exceed them.
-* **`cell_options`** — per-cell knobs. The editor renders one form
+* **`cell_options`**, per-cell knobs. The editor renders one form
   field per option. Types: `string`, `textarea`, `number`, `select`
   (needs `choices`), `multiselect` (needs `choices`), `boolean`,
   `color`. The user's values land in `ctx.cell.options` at render
-  time. Don't ship a `variant` option for visual direction — that
+  time. Don't ship a `variant` option for visual direction, that
   model is gone; the `data-style` axis at page level provides
   cross-widget shape selection. If a widget needs a genuine layout
   shape choice (e.g. `stack` vs `side`), name the option `layout` and
   use shape-describing values.
-* **`settings`** — plugin-wide knobs (one set across all cells using
+* **`settings`**, plugin-wide knobs (one set across all cells using
   this widget). Surfaces in `/settings/plugins/<id>`. `secret: true`
   stores under `<name>_secret` in `settings.json` so an on-disk grep
   for `secret` reveals every sensitive value.
-* **`icon`** — Phosphor name used in the editor's widget picker.
-* **`render.needs_network`** — hint for the renderer (not enforced).
+* **`icon`**, Phosphor name used in the editor's widget picker.
+* **`render.needs_network`**, hint for the renderer (not enforced).
 
 Full schema: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json).
 
@@ -171,7 +171,7 @@ so canvas can read `t.accent1` / `t.surface` / `t.fontFamily` as
 resolved colour strings.
 
 * **Be idempotent**: the renderer may invoke you twice on a slow
-  reload — overwrite `shadow.innerHTML` rather than appending.
+  reload, overwrite `shadow.innerHTML` rather than appending.
 * **`async` allowed**: the renderer awaits your default export before
   screenshotting. Don't kick off work that finishes off-Promise (the
   screenshot will fire while it's still pending).
@@ -200,29 +200,29 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
     Return ANY JSON-serializable value (usually a dict). On error,
     return {"error": "..."} so client.js can render an error state.
     """
-    # Cache in data_dir for politeness — Open-Meteo, news APIs, etc.
+    # Cache in data_dir for politeness, Open-Meteo, news APIs, etc.
     # See plugins/weather_now/server.py for the 10-minute cache pattern.
     return {"temp": 22.4, "label": options["label"]}
 ```
 
 * Called fresh on every render. Cache yourself if rate-limited.
-* `data_dir` is `data/plugins/<id>/` — gitignored, persisted across
+* `data_dir` is `data/plugins/<id>/`, gitignored, persisted across
   restarts.
 * Network calls: use `urllib.request` with a timeout + a `User-Agent`
   header naming the widget (e.g. `tesserae/0.1 (+weather_now)`).
-* Don't raise — return `{"error": "..."}`. Uncaught exceptions get
+* Don't raise, return `{"error": "..."}`. Uncaught exceptions get
   caught upstream but produce uglier diagnostics.
 
 ---
 
-## Tokens — the Spectra design system
+## Tokens, the Spectra design system
 
 Spectra has three token layers. Widgets paint from the upper two; never
 from primitives. The full source is in
 [`static/style/spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css);
 this is the cheat sheet.
 
-### 1. Primitives — theme-independent raw values on `:root`
+### 1. Primitives, theme-independent raw values on `:root`
 
 Scales (don't redefine):
 
@@ -236,7 +236,7 @@ Scales (don't redefine):
 | Icons | `--icon-sm 1.1em` · `--icon-md 1.5em` · `--icon-lg 2.2em` |
 | Fluid base | `--w-font-base: clamp(14px, 7cqmin, 28px)` (every widget element sizes from this) |
 
-### 2. Semantic — what the active theme provides
+### 2. Semantic, what the active theme provides
 
 Set per-theme on `[data-theme="<id>"]`. These are what widgets read.
 
@@ -267,10 +267,10 @@ The 6 accents have **fixed roles by position**:
 In light theme the hues are terracotta / ochre / moss / teal / slate-blue
 / plum; in dark they shift; in Dracula they're red / peach / mint /
 lavender / cyan / pink. The hexes change; the roles don't. **Reach by
-role, not by hue.** "I want red" is the wrong instinct — pick the slot
+role, not by hue.** "I want red" is the wrong instinct, pick the slot
 whose meaning matches; the theme provides the colour.
 
-### 3. Style-tunable — what the active style overrides
+### 3. Style-tunable, what the active style overrides
 
 Defaults on `:root` (the "standard" look); styles override on
 `[data-style="<id>"]`. Consume via `var(--name, fallback)`.
@@ -306,12 +306,12 @@ Vendored locally under `/static/icons/phosphor/`. Six weights:
 | weight   | usage                                            |
 |----------|---------------------------------------------------|
 | regular  | inline icons, small icons that need to flow with text |
-| bold     | **default for prominent icons** — hero icons, big condition markers, anything that should "read big". Outline-with-presence rather than solid shape. |
+| bold     | **default for prominent icons**, hero icons, big condition markers, anything that should "read big". Outline-with-presence rather than solid shape. |
 | duotone  | two-tone accent moments (sun-horizon, moon-stars). Use sparingly. |
-| fill     | **avoid in new widgets** — solid shapes can quantise into blobs on Spectra 6 and read heavier than they should. Bold reads cleaner. |
+| fill     | **avoid in new widgets**, solid shapes can quantise into blobs on Spectra 6 and read heavier than they should. Bold reads cleaner. |
 | light, thin | special design needs; rare. |
 
-Make prominent icons **big and bold** — that's the design language. A
+Make prominent icons **big and bold**, that's the design language. A
 hero condition icon at clamp(72px, 20cqw, 160px) in `ph-bold` reads as
 a confident graphic; the same icon at the same size in `ph-fill` reads
 as a blob.
@@ -326,7 +326,7 @@ Markup:
 
 The class form is **compound**: a weight class (`ph-bold`, `ph-fill`,
 `ph-duotone`) **plus** the bare icon-name class (`ph-cloud-sun`,
-`ph-warning-circle`). Both carry the bare icon name — `ph-bold-cloud-sun`
+`ph-warning-circle`). Both carry the bare icon name, `ph-bold-cloud-sun`
 as a single class does NOT exist and won't render.
 
 Inside Shadow DOM you must load the weights you use:
@@ -339,28 +339,28 @@ shadow.innerHTML = `
 ```
 
 Each `<link>` is ~10 KB CSS + a ~250 KB woff2 font. Only load the
-weights you actually use — `regular` is almost always required;
+weights you actually use, `regular` is almost always required;
 `bold` is the next most useful; everything else is opt-in.
 
 Icon name reference: <https://phosphoricons.com/>.
 
 ---
 
-## Custom colours — escape hatch
+## Custom colours, escape hatch
 
 The "always paint from semantic tokens" rule has a narrow carve-out:
 when the data you're rendering has an **inherent visual identity that
 the user expects to see**, you can hard-code hex values. Examples:
 
-* **F1 team colours** — Ferrari `#E80020`, Mercedes `#27F4D2`, Red Bull
+* **F1 team colours**, Ferrari `#E80020`, Mercedes `#27F4D2`, Red Bull
   `#3671C6`. Painting Ferrari in `--accent-1` reads wrong; the data
   carries its own colour. See [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
   for the canonical implementation (constructor → hex map, fallback to
   `var(--surface-sunken)` for unknown teams).
-* **Brand logos and indicators** — Spotify green, GitHub black,
+* **Brand logos and indicators**, Spotify green, GitHub black,
   particular calendar-tag colours.
-* **Real-world flag colours** — country flags on race countdowns.
-* **Established conventions** — gold / silver / bronze on podiums
+* **Real-world flag colours**, country flags on race countdowns.
+* **Established conventions**, gold / silver / bronze on podiums
   (though even those usually map cleanly to `--accent-2` / `--text-secondary` /
   `--accent-1`).
 
@@ -386,7 +386,7 @@ Fall back to a semantic token (`--surface-sunken` for neutral chips,
 `--accent-5` for unknown series) so the widget never produces a
 blank / pure-black square.
 
-Most brand colours read fine on every Spectra theme — the modern F1
+Most brand colours read fine on every Spectra theme, the modern F1
 liveries (Mercedes mint, McLaren papaya, Alpine pink) sit comfortably
 on both light and dark surfaces. If a colour genuinely doesn't work
 in dark themes, define both variants in the lookup and switch via the
@@ -397,7 +397,7 @@ brief.
 
 ## Plugin static assets
 
-Widgets can ship arbitrary static files alongside the source — useful
+Widgets can ship arbitrary static files alongside the source, useful
 for things the icon font doesn't cover: race-track SVGs, team logos,
 country flags, calendar service logos.
 
@@ -427,7 +427,7 @@ shadow.innerHTML = `
 
 Conventions:
 
-* **SVG preferred over raster** — scales cleanly, ditches well on
+* **SVG preferred over raster**, scales cleanly, ditches well on
   Spectra 6, no woff2-weight cost.
 * **Monochrome SVGs that pick up `currentColor`** if you want them to
   theme automatically: `<svg fill="currentColor" stroke="currentColor">`
@@ -435,19 +435,19 @@ Conventions:
   accent) on the parent.
 * **Bake brand colours into the SVG** when the data IS the colour
   (team logo, flag).
-* **Keep files small** — under 10 KB each ideally. The renderer waits
+* **Keep files small**, under 10 KB each ideally. The renderer waits
   for every cell's `<img>` to load (with a 5 s cap), so large remote
   images stretch the screenshot phase.
-* **Phosphor first** — if there's a Phosphor icon for what you want,
+* **Phosphor first**, if there's a Phosphor icon for what you want,
   use that. Custom SVG is for things Phosphor doesn't have: circuit
   outlines, team logos, country flags.
 
-The asset route is loopback-bypassed (same gate as `/compose/`) — so
+The asset route is loopback-bypassed (same gate as `/compose/`), so
 the Playwright renderer can fetch them without a session.
 
 ---
 
-## Responsive sizing — container queries
+## Responsive sizing, container queries
 
 The cell host has `container-type: size` set by the composer, so
 `cqw` / `cqh` / `cqmin` units work inside your shadow:
@@ -459,7 +459,7 @@ The cell host has `container-type: size` set by the composer, so
 
 * `cqw` = 1% of the cell's width (not the panel, not the viewport).
 * `cqh` = 1% of the cell's height.
-* `cqmin` = 1% of the cell's smaller side — useful for square-ish
+* `cqmin` = 1% of the cell's smaller side, useful for square-ish
   scaling.
 
 Pair with explicit `.size-xs` / `.size-sm` / `.size-md` / `.size-lg`
@@ -476,7 +476,7 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 
 ---
 
-## Shared baseline — `spectra-widgets.css` (+ `spectra-tokens.css`, `spectra-styles.css`)
+## Shared baseline, `spectra-widgets.css` (+ `spectra-tokens.css`, `spectra-styles.css`)
 
 Every Spectra widget links
 [`static/style/spectra-widgets.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-widgets.css)
@@ -515,14 +515,14 @@ root via the cascade:
 | [`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css) | 9 styles (`[data-style="..."]`) + @font-face for the vendored families |
 | [`spectra-base16.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-base16.css) | 10 base16 colour palettes |
 
-Widgets don't link these — the document does it once. Custom
+Widgets don't link these, the document does it once. Custom
 properties cascade through the shadow boundary, so widgets just read
 `var(--accent-1)` / `var(--surface)` / etc. as if the tokens were
 defined inside their own shadow.
 
 ---
 
-## Per-cell content zoom — `--c-zoom`
+## Per-cell content zoom, `--c-zoom`
 
 Every cell host exposes a `--c-zoom` CSS variable (default `1`) that
 the user can adjust via the page-editor zoom slider on each cell.
@@ -545,7 +545,7 @@ This is what `spectra-widgets.css` does for `.w-title`: the title's
 `font-size` is a `calc(clamp(...) / var(--c-zoom, 1))` so the bar
 stays at its natural physical pixel size at every zoom level.
 Everything else (body text, hero icons, charts) should scale with the
-slider — that's the whole point of the zoom.
+slider, that's the whole point of the zoom.
 
 `ctx.cell.size` does NOT change when zoom changes; the size token
 reflects the cell's true dimensions on the panel. Zoom is a viewing
@@ -553,7 +553,7 @@ adjustment, not a layout one.
 
 ---
 
-## Font cascade — `--font-family`
+## Font cascade, `--font-family`
 
 The active style sets `--font-family` on `<body>` (see
 [`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css)),
@@ -587,7 +587,7 @@ and use `--font-family` as the fallback:
 The RHS references the property being defined; CSS treats this as
 invalid-at-computed-value-time and the property reverts to the
 guaranteed-invalid sentinel. Every descendant `var(--font-family, …)`
-falls through to its fallback — including the chart helpers, so
+falls through to its fallback, including the chart helpers, so
 charts paint in Helvetica regardless of style. Use a non-recursive
 fallback (`system-ui, sans-serif`) when overriding inline, or leave
 the cascade alone and let the style set the family.
@@ -599,7 +599,7 @@ the cascade alone and let the style set the family.
 The Spectra 6 / Waveshare E6 panel has **6 colours**: black, white,
 yellow, red, blue, green.
 
-* Use the Spectra semantic tokens — every theme's accent palette is
+* Use the Spectra semantic tokens, every theme's accent palette is
   tuned to quantise cleanly into the panel's 6-ink range. Don't sample
   colours outside the token set.
 * **The widget shell carries a single outer edge** (`--edge-weight`
@@ -624,26 +624,26 @@ yellow, red, blue, green.
 Pattern reference for new widgets. Read each `client.js` to see how
 the conventions land in practice.
 
-**By archetype** — pick the closest information shape:
+**By archetype**, pick the closest information shape:
 
-* `.stat-body` — [`plugins/finance_stock`](https://github.com/dmellok/tesserae/tree/main/plugins/finance_stock),
+* `.stat-body`, [`plugins/finance_stock`](https://github.com/dmellok/tesserae/tree/main/plugins/finance_stock),
   [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now)
-* `.list-body` — [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
+* `.list-body`, [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
   [`plugins/ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities),
   [`plugins/github_pr_queue`](https://github.com/dmellok/tesserae/tree/main/plugins/github_pr_queue),
   [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
-* `.chart-body` — [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),
+* `.chart-body`, [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),
   [`plugins/ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history),
   [`plugins/ha_energy`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_energy)
-* `.status-body` — [`plugins/f1_next`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_next),
+* `.status-body`, [`plugins/f1_next`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_next),
   [`plugins/f1_last_race`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_last_race),
   [`plugins/sky_moon`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_moon)
-* `.cal-body` — [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day),
+* `.cal-body`, [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day),
   [`plugins/calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week),
   [`plugins/calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)
-* `.wx-body` — [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
+* `.wx-body`, [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
   [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast)
-* `.img-body` — [`plugins/spotify_now_playing`](https://github.com/dmellok/tesserae/tree/main/plugins/spotify_now_playing),
+* `.img-body`, [`plugins/spotify_now_playing`](https://github.com/dmellok/tesserae/tree/main/plugins/spotify_now_playing),
   [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera),
   [`plugins/picture_apod`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_apod)
 
@@ -696,19 +696,19 @@ Run: `./.venv/bin/python -m pytest plugins/<id>/ -q`
 
 ---
 
-## Building the widget — checklist
+## Building the widget, checklist
 
-1. `plugins/<id>/plugin.json` — manifest (start by copying from a
+1. `plugins/<id>/plugin.json`, manifest (start by copying from a
    widget in the same archetype, e.g. `plugins/weather_now/plugin.json`).
-2. `plugins/<id>/client.js` — render function. Link
+2. `plugins/<id>/client.js`, render function. Link
    `/static/style/spectra-widgets.css` first, then render the `.w`
    shell with one archetype body class. Use `ctx.cell.size` /
    `ctx.cell.options` / `ctx.data`. For charts, `import { tokens, … }
    from "../../static/spectra-chart.js"`.
-3. `plugins/<id>/server.py` — optional, if you need server-side data.
-4. `plugins/<id>/tests/test_smoke.py` — parametrised over sizes.
+3. `plugins/<id>/server.py`, optional, if you need server-side data.
+4. `plugins/<id>/tests/test_smoke.py`, parametrised over sizes.
 
-No `client.css` needed in most cases — Spectra's archetypes carry the
+No `client.css` needed in most cases, Spectra's archetypes carry the
 shell + body layout. Add a `client.css` only if your widget has rules
 that don't belong in the shared stylesheet (e.g. one-off positioning,
 SVG-specific tweaks).
@@ -726,19 +726,19 @@ changes; refresh the page to see updates.
   `var(--text-*)`). For canvas / Chart.js, use the `tokens()` probe
   from [`spectra-chart.js`](https://github.com/dmellok/tesserae/blob/main/static/spectra-chart.js)
   rather than naming hexes inline. Brand colours (F1 teams, Spotify
-  green, etc.) are the documented carve-out — see "Custom colours" above.
-* Don't reach into the parent document — you're sandboxed in a
+  green, etc.) are the documented carve-out, see "Custom colours" above.
+* Don't reach into the parent document, you're sandboxed in a
   Shadow DOM. The composer expects that.
 * Don't kick off intervals / animations / async work that finishes
-  after your default-export resolves — the screenshot fires then.
+  after your default-export resolves, the screenshot fires then.
 * Don't load fonts. The composer's renderer already waits for
   `document.fonts.ready` and the page-level font is propagated as
   `ctx.font.family`. Setting `font-family: inherit` in `:host` is the
   right move.
-* Don't fetch from your client.js. Use server.py — the renderer
+* Don't fetch from your client.js. Use server.py, the renderer
   doesn't wait for arbitrary in-page fetches (only for declared
   `<img>` loads + fonts), so a client-side fetch will screenshot
   before its data arrives.
-* Don't assume internet from server.py either, on the panel side —
+* Don't assume internet from server.py either, on the panel side -
   it's the Tesserae host that runs `fetch()`, and the panel may be
   reading the rendered .bin offline.

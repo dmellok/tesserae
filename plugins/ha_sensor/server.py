@@ -1,4 +1,4 @@
-"""ha_sensor — one or more HA entities as bold Bauhaus value blocks.
+"""ha_sensor, one or more HA entities as bold Bauhaus value blocks.
 
 Thin widget over ha_core. One ``get_states`` call covers the whole list,
 so the cell costs a single request no matter how many entities it shows.
@@ -211,7 +211,7 @@ def fetch(
             items.append(
                 {
                     "name": ov.get("name") or eid,
-                    "value": "—",
+                    "value": "-",
                     "unit": "",
                     "icon": ov.get("icon") or "question",
                     "unavailable": True,

@@ -1,4 +1,4 @@
-// Dashboard editor — explicit save with live preview.
+// Dashboard editor, explicit save with live preview.
 //
 // Each editor-form is left unsaved until the user clicks Save in the
 // header. As the user makes changes we debounce-POST the aggregated
@@ -11,7 +11,7 @@
 // each persist clears the preview cache so the saved version becomes
 // authoritative again.
 //
-// The plugin <select> on a cell is still a special case — when it
+// The plugin <select> on a cell is still a special case, when it
 // changes we POST it immediately so the option schema can re-render
 // against the new plugin.
 
@@ -49,7 +49,7 @@
   // Cache of the last hydrated state we know each iframe is rendering,
   // keyed by the iframe element. Used to compute postMessage patches so
   // a theme nudge / gap tweak / single-cell option change doesn't tear
-  // down the whole iframe DOM — see applyPreviewGroups below.
+  // down the whole iframe DOM, see applyPreviewGroups below.
   const lastStateByFrame = new WeakMap();
 
   // Reload the preview iframe in place. A short opacity fade hides
@@ -68,7 +68,7 @@
         "load",
         () => {
           iframe.style.opacity = "1";
-          // The iframe's contents are fresh — drop the cached state so
+          // The iframe's contents are fresh, drop the cached state so
           // the next preview cycle diffs against what's actually painted.
           lastStateByFrame.delete(iframe);
         },
@@ -81,14 +81,14 @@
   // Bounded-lifetime preview iframes.
   //
   // The composer iframe is mounted once when the editor opens, then
-  // runs forever — each widget's setInterval ticks (clock, F1
+  // runs forever, each widget's setInterval ticks (clock, F1
   // countdown, public-transport refresh) accumulate small allocations
   // every minute, and the webpage widget's auto-refresh swaps a
   // foreign document in repeatedly. Over a long idle session those
   // compound into multi-GB tab memory (saw 6.5 GB in the wild, then
   // a "page was reloaded because it was using significant memory"
   // warning even after the 4-hour reset was added). A hard reset
-  // every hour discards all accumulated state — the user sees the
+  // every hour discards all accumulated state, the user sees the
   // same brief opacity fade as a normal save-driven reload, but
   // about:blank in between forces the browser to fully release the
   // previous document instead of cache-keeping it.
@@ -167,7 +167,7 @@
 
   // Build the postMessage patch the iframe applies. We always send the
   // full next-state (the iframe walks it and updates anything that
-  // changed) — simpler than a true JSON-diff and the payload is small.
+  // changed), simpler than a true JSON-diff and the payload is small.
   function buildPatch(next) {
     return {
       type: "tesserae-patch",
@@ -176,7 +176,7 @@
         style: next.style,
         // Carry both the raw picker value (`font`) and the resolved
         // family name (`font_family`). The iframe needs `font` to decide
-        // whether to write an inline --font-family override on body —
+        // whether to write an inline --font-family override on body -
         // see composer.js applyPagePatch for the rationale.
         font: next.font || "",
         font_family: next.font_family,
@@ -202,7 +202,7 @@
     };
   }
 
-  // Hand each /preview group off to its matching iframe — patch if we
+  // Hand each /preview group off to its matching iframe, patch if we
   // can, otherwise full reload. If the response carries no groups (server
   // didn't get a panels[] hint, or hydration failed) we fall back to a
   // blanket reload so we never silently desync.
@@ -307,7 +307,7 @@
         });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         // Server returns the hydrated state per requested panel size when
-        // the request was AJAX (it is here — see X-Requested-With). Hand
+        // the request was AJAX (it is here, see X-Requested-With). Hand
         // each group to its matching iframe; the patch path postMessages
         // CSS / cell updates in place, the fallback path full-reloads.
         const body = await resp.json().catch(() => null);
@@ -364,7 +364,7 @@
         const field = ev.target;
         // A reload-on-change field (cell plugin picker, device checkboxes)
         // reshapes the page server-side, so we persist then reload. Save
-        // EVERY form first — not just this one — or unsaved edits
+        // EVERY form first, not just this one, or unsaved edits
         // elsewhere (e.g. a theme override on another cell) get discarded
         // when the page re-renders from disk.
         if (field && field.dataset && field.dataset.reloadOnChange) {
@@ -390,7 +390,7 @@
     });
   }
 
-  // Layout picker — apply server-side (it reshapes cells), then reload
+  // Layout picker, apply server-side (it reshapes cells), then reload
   // the page so the cell list reflects the new layout. The iframe
   // refreshes naturally on reload.
   function watchLayoutForms() {
@@ -412,7 +412,7 @@
   }
 
   // Icon picker lives in static/icon-picker.js as a reusable shared
-  // module — it auto-binds every [data-icon-picker] on page load. The
+  // module, it auto-binds every [data-icon-picker] on page load. The
   // editor's only contribution is the existing 'input' listener on the
   // hidden value field, which already fires setDirty + schedulePreview
   // because watchForms() listens on the whole form for 'input' events.
@@ -446,7 +446,7 @@
         if (emptyEl) emptyEl.hidden = shown > 0;
       }
       if (filter) {
-        // Keep filter keystrokes local — don't dirty the form or trigger
+        // Keep filter keystrokes local, don't dirty the form or trigger
         // a preview POST (the filter isn't part of the saved value).
         ["input", "change", "keyup", "keydown"].forEach((evt) =>
           filter.addEventListener(evt, (e) => e.stopPropagation()),
@@ -460,8 +460,8 @@
 
   // Live preview -> editor: the preview iframe (compose.html) posts
   // {type:'tesserae-cell-clicked', cellId} when a cell is clicked. Focus
-  // that cell's card here — scroll it into view, highlight it, focus its
-  // first control — and echo 'tesserae-focus-cell' back so the preview
+  // that cell's card here, scroll it into view, highlight it, focus its
+  // first control, and echo 'tesserae-focus-cell' back so the preview
   // outlines the same cell.
   function focusCellCard(cellId) {
     let target = null;
@@ -472,7 +472,7 @@
     });
     if (!target) return;
     // ``block: "nearest"`` only scrolls when the card is actually out of
-    // view — previously ``"center"`` would jump the page whenever the
+    // view, previously ``"center"`` would jump the page whenever the
     // user clicked any cell-area item, which was disorienting on long
     // list widgets (ha_entities, ha_history) where the user clicked an
     // entity row to inspect it.

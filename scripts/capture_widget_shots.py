@@ -2,7 +2,7 @@
 """Capture one screenshot per widget for the docs gallery.
 
 Drives a *running* Tesserae instance's ``/_test/render`` route with
-Playwright — the same headless-Chromium path the renderer uses — and saves
+Playwright, the same headless-Chromium path the renderer uses, and saves
 ``docs/screenshots/widgets/<id>.png`` for every ``kind == "widget"`` plugin.
 
 The instance must be running in dev or testing mode (``/_test/render`` is
@@ -118,7 +118,7 @@ def main() -> int:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("playwright not installed — run: .venv/bin/python -m pip install -e '.[dev]'")
+        print("playwright not installed, run: .venv/bin/python -m pip install -e '.[dev]'")
         return 1
 
     session_cookie = _login(BASE_URL, args.password)
@@ -161,13 +161,13 @@ def main() -> int:
                 size_kb = dest.stat().st_size / 1024
                 if size_kb < 1.5:  # essentially empty render
                     blank += 1
-                    print(f"  ~ {plugin_id} ({size}) — looks blank ({size_kb:.1f} KB)")
+                    print(f"  ~ {plugin_id} ({size}), looks blank ({size_kb:.1f} KB)")
                 else:
                     ok += 1
                     print(f"  ✓ {plugin_id} ({size})")
             except Exception as err:
                 failed += 1
-                print(f"  ✗ {plugin_id} ({size}) — {type(err).__name__}: {err}")
+                print(f"  ✗ {plugin_id} ({size}), {type(err).__name__}: {err}")
             finally:
                 page.close()
         context.close()

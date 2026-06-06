@@ -124,14 +124,14 @@ def create_app(
     # Home Assistant Add-on / Ingress support is split in two:
     #
     # * The URL-prefix middleware always wraps the WSGI app. It only
-    #   acts when ``X-Ingress-Path`` is present on a request — a no-op
-    #   for every non-HA install — so wrapping unconditionally is safe
+    #   acts when ``X-Ingress-Path`` is present on a request, a no-op
+    #   for every non-HA install, so wrapping unconditionally is safe
     #   and avoids the "I set the env var but URLs still 404" footgun
     #   when only one of the two knobs is configured.
     #
     # * The auth-gate bypass requires the ``TESSERAE_HA_INGRESS=1`` env
     #   var AS WELL AS the header on the live request. The env var is
-    #   the security knob — a stray header from a misconfigured reverse
+    #   the security knob, a stray header from a misconfigured reverse
     #   proxy on a non-ingress install can't bypass auth without it.
     app.config["HA_INGRESS_MODE"] = os.environ.get("TESSERAE_HA_INGRESS", "").strip() in {
         "1",
@@ -258,7 +258,7 @@ def create_app(
         data_root=plugin_data_root,
     )
     for perr in plugins.errors:
-        logger.warning("plugin loader: %s — %s", perr.plugin_id, perr.message)
+        logger.warning("plugin loader: %s, %s", perr.plugin_id, perr.message)
 
     renderers = renderer_loader.discover(
         renderers_dir,
@@ -266,14 +266,14 @@ def create_app(
         data_root=renderer_data_root,
     )
     for rerr in renderers.errors:
-        logger.warning("renderer loader: %s — %s", rerr.renderer_id, rerr.message)
+        logger.warning("renderer loader: %s, %s", rerr.renderer_id, rerr.message)
 
     # Backfill firmware-native panel dims on ESP32 instance manifests
     # that predate the v0.20.x PanelPreset refactor. Without this, a
     # Waveshare 13.3" added before the refactor (which has no
     # native_w / native_h on disk) gets misclassified at runtime as an
     # Inky 13.3" by the dims-only matching loop, packs at the wrong row
-    # stride, and prints a distorted-looking frame. Idempotent — does
+    # stride, and prints a distorted-looking frame. Idempotent, does
     # nothing on a fresh install or for already-migrated manifests.
     from app.device_service import backfill_native_panel_dims
 
@@ -290,7 +290,7 @@ def create_app(
         data_root=device_data_root,
     )
     for derr in devices.errors:
-        logger.warning("device loader: %s — %s", derr.device_id, derr.message)
+        logger.warning("device loader: %s, %s", derr.device_id, derr.message)
 
     # Multi-head: for each user-created device instance, clone the
     # renderers of its kind with the instance's id substituted into
@@ -298,7 +298,7 @@ def create_app(
     # MQTT topics even when it inherits from a shared kind. The seed
     # call carries legacy renderer-wide values for ``device_setting``
     # fields (dither/saturation/contrast) into the clone if it hasn't
-    # been tuned yet — keeps upgrades invisible and gives new devices
+    # been tuned yet, keeps upgrades invisible and gives new devices
     # the same defaults as the rest of the fleet.
     renderer_loader.clone_for_instances(renderers, devices)
     renderer_loader.seed_device_settings_from_base(renderers, settings)
@@ -319,7 +319,7 @@ def create_app(
 
     # Cache of the most recent parsed status heartbeat per device. The
     # MQTT subscription updates it; the settings page reads it. Plain dict
-    # — single-writer (the broker dispatcher) so no lock needed for reads.
+    # , single-writer (the broker dispatcher) so no lock needed for reads.
     status_cache: dict[str, dict[str, Any]] = {}
     # Wildcard listener on tesserae/+/status feeds this cache for every
     # device id we don't yet know about; the Settings → Devices page
@@ -347,7 +347,7 @@ def create_app(
 
     app.config["UPDATER"] = _Updater(REPO_ROOT, data_root)
 
-    # Anonymous, opt-in telemetry — disabled by default; configure in
+    # Anonymous, opt-in telemetry, disabled by default; configure in
     # Settings → Server → App. Tests skip it entirely so no test run can
     # accidentally hit a real endpoint.
     from app.telemetry import Telemetry as _Telemetry
@@ -386,7 +386,7 @@ def create_app(
 
     # Long-running Chromium owned by a dedicated thread. The pool is
     # *created* unconditionally but only *started* when something calls
-    # .render() on it — see ``_current_browser_pool`` in transport_wiring
+    # .render() on it, see ``_current_browser_pool`` in transport_wiring
     # for the App-settings toggle that gates routing. Tests + the dev
     # reloader parent skip it; the cold per-render path still works.
     from app.renderer import BrowserPool as _BrowserPool
@@ -489,7 +489,7 @@ def create_app(
     if not testing:
         auth.install_gate(app, settings)
 
-    # Heartbeat enrichment — fleet shape + activity counters since the
+    # Heartbeat enrichment, fleet shape + activity counters since the
     # previous heartbeat. The provider is a closure so app_factory keeps
     # ownership of the registries; telemetry.py stays free of any direct
     # dependency on them. Everything here is a count or a kind id; no
@@ -517,16 +517,16 @@ def create_app(
         def _heartbeat_props() -> dict[str, str]:
             now = _time.time()
             since = _heartbeat_baseline["ts"]
-            # Fleet shape — current state, not deltas.
+            # Fleet shape, current state, not deltas.
             instances = [d for d in devices.all() if d.kind_of is not None]
             kinds = sorted({str(d.kind_of) for d in instances if d.kind_of})
             n_pages = len(page_store.list())
-            # Themes shape — number of user-saved themes signals
+            # Themes shape, number of user-saved themes signals
             # whether the builder is actually getting used. Telemetry
             # docstring listed this as a planned prop pre-v0.27; wire
             # it now that the UserThemeStore is in app.config.
             n_user_themes = len(user_themes_store.list_all())
-            # Activity counters — events recorded since the previous
+            # Activity counters, events recorded since the previous
             # heartbeat. event_log.list() returns most-recent-first; we
             # paginate by 500 and stop once we cross the baseline so
             # large logs stay cheap.
@@ -585,7 +585,7 @@ def create_app(
         from flask import request
 
         # Inside HA Ingress, ``request.host`` is the HA host's address
-        # (e.g. ``homeassistant.local:8123``) — that's HA's port, not
+        # (e.g. ``homeassistant.local:8123``), that's HA's port, not
         # Tesserae's. Capturing it would emit panel URLs pointing at
         # ``http://<lan-ip>:8123/renders/…`` which 404s at HA. Fall
         # back to TESSERAE_HTTP_PORT / the default instead.
@@ -600,7 +600,7 @@ def create_app(
             return
         app.config["DETECTED_HTTP_PORT"] = port_n
         # HA's stored entity configs include image_url / configuration_url
-        # which embed the URL — re-publish if discovery is running.
+        # which embed the URL, re-publish if discovery is running.
         ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
         if ha is not None:
             try:
@@ -611,19 +611,30 @@ def create_app(
     @app.context_processor
     def _inject_nav_data() -> dict[str, Any]:
         """Make the list of admin-equipped plugins available to every
-        template — the top-nav Plugins dropdown enumerates them."""
+        template, the top-nav Plugins dropdown enumerates them. Also
+        forwards the ``app`` settings section so per-toggle UI knobs
+        (e.g. mobile-zoom lock) can render conditional snippets in the
+        base template without each route having to pass them in."""
         registry = app.config["PLUGIN_REGISTRY"]
+        store = app.config.get("SETTINGS_STORE")
+        app_settings: dict[str, Any] = {}
+        if store is not None:
+            try:
+                app_settings = dict(store.get_section("app") or {})
+            except Exception:
+                app_settings = {}
         return {
             "nav_admin_plugins": sorted(
                 (p for p in registry.plugins.values() if p.has_admin),
                 key=lambda p: p.name.lower(),
             ),
+            "app_settings": app_settings,
         }
 
     @app.get("/")
     def index() -> Response:
         # First run (password set, but setup not finished) lands in the
-        # wizard. Once onboarded, Send is the default destination — link
+        # wizard. Once onboarded, Send is the default destination, link
         # clicks from HA etc. all want to push something.
         if not onboarding.is_onboarded(settings):
             return redirect(url_for("onboarding.index"))
@@ -638,7 +649,7 @@ def create_app(
             abort(404)
         # Thumbnail mode: ``?w=<width>`` returns a downscaled cached
         # variant. The admin's History / Events pages display each push
-        # at ~160 px wide, but the source is a 1600x1200 panel render —
+        # at ~160 px wide, but the source is a 1600x1200 panel render -
         # that decodes to ~7.7 MB per IMG element in Chromium's bitmap
         # cache. Leaving an admin tab open overnight with frequent
         # push events accumulated multi-GB tabs in the wild. Thumbnails
@@ -660,7 +671,7 @@ def create_app(
 
         Unlike ``/renders/<digest>.png`` (where the URL changes every push
         because it's content-addressed), this URL stays the same as long
-        as the device exists — drop it into Home Assistant's `generic`
+        as the device exists, drop it into Home Assistant's `generic`
         camera, a Grafana panel, or any wallboard and you get a
         self-updating preview without subscribing to MQTT.
 
@@ -676,7 +687,7 @@ def create_app(
             abort(503)
         latest = push_mgr.latest_render_for(device_id)
         if not latest:
-            # No render yet for this device — return 404 rather than a
+            # No render yet for this device, return 404 rather than a
             # placeholder so HA's camera entity shows "unavailable",
             # which matches reality.
             abort(404)
@@ -693,7 +704,7 @@ def create_app(
             resp = send_from_directory(renders_dir, f"{comp_digest}.{ext}")
         else:
             resp = send_from_directory(renders_dir, f"{comp_digest}.png")
-        # The URL is stable but the bytes change every push — make sure
+        # The URL is stable but the bytes change every push, make sure
         # HA / browsers refetch instead of serving a cached frame.
         resp.headers["Cache-Control"] = "no-store, max-age=0"
         return resp

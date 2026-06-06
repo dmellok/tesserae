@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Clock — Sunrise / Sunset",
+  "name": "Clock, Sunrise / Sunset",
   "version": "0.1.4",
   "kind": "widget",
   "description": "Today's sunrise, sunset, golden hour, and day length for a chosen lat/lon. The hero shows a sun-arc visualisation with the current position marked. Data from Open-Meteo (no key).",

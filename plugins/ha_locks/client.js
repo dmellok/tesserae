@@ -1,6 +1,6 @@
-// ha_locks — Spectra list archetype. Lock / door / window / garage
+// ha_locks, Spectra list archetype. Lock / door / window / garage
 // entries with a stateful kind icon (swaps open ↔ closed glyph), a
-// secured/unsecured chip, and — for entries that aren't secured —
+// secured/unsecured chip, and, for entries that aren't secured -
 // an "unsecured for Xm" timer chip computed from the entity's
 // last_changed timestamp. Unsecured rows wear a soft terracotta
 // wash so the queue of "stuff needing attention" pops at a glance.

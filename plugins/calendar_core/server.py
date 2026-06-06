@@ -1,16 +1,16 @@
-"""calendar_core — iCal feed registry + admin page.
+"""calendar_core, iCal feed registry + admin page.
 
 Plugins can't import each other's Python modules through normal
 package paths, but they can reach into another plugin's server_module
 via the live PluginRegistry (current_app.config["PLUGIN_REGISTRY"]).
-The three calendar widgets do exactly that — they call
+The three calendar widgets do exactly that, they call
 ``load_events()`` here so feed-fetching, caching, and recurring-event
 expansion live in one place.
 
 Feeds are stored in ``feeds.json`` inside the plugin's data_dir:
   {"feeds": [{"id": "..", "name": "..", "url": "..", "colour": "#..", "enabled": true}]}
 The admin page (mounted at /plugins/calendar_core/) provides CRUD for
-this list — same shape as the todo plugin.
+this list, same shape as the todo plugin.
 
 Per-feed caching:
   feed_<id>.ics      raw .ics bytes, 15 minute TTL
@@ -186,7 +186,7 @@ def load_events(
     *,
     data_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Public API for the calendar_* widgets — returns events from the
+    """Public API for the calendar_* widgets, returns events from the
     requested feeds inside [start, end), tagged with the feed's
     name + colour. Pass ``None`` for ``feed_ids`` to include every
     enabled feed."""
@@ -295,7 +295,7 @@ def blueprint() -> Blueprint:
 
     @bp.post("/feeds/<feed_id>/refresh")
     def refresh_feed(feed_id: str) -> Response:
-        # Force a refetch by deleting the cached blob — next call to
+        # Force a refetch by deleting the cached blob, next call to
         # _fetch_ics will re-download.
         with contextlib.suppress(OSError):
             _ics_cache_path(_data_dir(), feed_id).unlink(missing_ok=True)

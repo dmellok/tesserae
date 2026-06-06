@@ -1,4 +1,4 @@
-// sky_moon — Spectra status archetype with an inline SVG of the
+// sky_moon, Spectra status archetype with an inline SVG of the
 // current moon disc. The disc has fixed craters masked to only the
 // lit side (so the unlit side reads as truly dark), a phase-progress
 // arc circling the disc to show how far through the synodic cycle
@@ -13,7 +13,7 @@ function escapeHtml(s) {
 }
 
 function fmtTime(iso) {
-  if (typeof iso !== "string" || !iso) return "—";
+  if (typeof iso !== "string" || !iso) return "-";
   if (iso.includes("T")) return iso.split("T")[1].slice(0, 5);
   return iso;
 }
@@ -40,7 +40,7 @@ function moonSvg(fraction, waxing, accent) {
 
   const shadowPath = `M 0 -${r} A ${r} ${r} 0 1 ${flag} 0 ${r} A ${Math.abs(k * r)} ${r} 0 1 ${k >= 0 ? flag : 1 - flag} 0 -${r} Z`;
 
-  // Progress ring — a circle stroked with dasharray tuned to the
+  // Progress ring, a circle stroked with dasharray tuned to the
   // cycle fraction. circumference = 2πr at radius 14.5.
   const ringR = 14.5;
   const circ = 2 * Math.PI * ringR;
@@ -57,7 +57,7 @@ function moonSvg(fraction, waxing, accent) {
                    ${shadowPath}" clip-rule="evenodd"/>
         </clipPath>
       </defs>
-      <!-- Progress ring around the disc — full circle in muted, with
+      <!-- Progress ring around the disc, full circle in muted, with
            the cycle progress overlaid in the active accent. Rotated
            -90deg so 0% sits at the top (12 o'clock). -->
       <g transform="rotate(-90)">
@@ -131,7 +131,7 @@ export default function render(shadow, ctx) {
   }
 
   const place = data.place || data.label || "Sun & Moon";
-  const phase = data.phase_name || "—";
+  const phase = data.phase_name || "-";
   const illum = data.illumination;
   const fraction = data.fraction != null ? Number(data.fraction) : 0;
   const waxing = data.waxing !== false;

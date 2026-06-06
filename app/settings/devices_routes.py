@@ -1,4 +1,4 @@
-"""Settings → Devices endpoints — every CRUD action for multi-head devices.
+"""Settings → Devices endpoints, every CRUD action for multi-head devices.
 
 The lifecycle (validate → write JSON → load → clone renderers) lives in
 :mod:`app.device_service` so the Add-device form and the Discovered
@@ -48,7 +48,7 @@ from ._shared import (
 @bp.post("/settings/devices/add")
 def devices_add() -> Response:
     """Create a new device instance from the Devices-tab form. No restart
-    needed — the new device shows up immediately in the page editor's
+    needed, the new device shows up immediately in the page editor's
     Target-device dropdown."""
     form = request.form
     result = device_service.create_instance(
@@ -112,7 +112,7 @@ def devices_regenerate_token(instance_id: str) -> Response:
     in the wrong notebook, or otherwise needs invalidating. The new
     token replaces the stored one and gets stashed in the session so
     the next Settings → Devices render pops the same one-shot modal as
-    the add-device flow. The old token stops working immediately —
+    the add-device flow. The old token stops working immediately -
     the client will fail its next poll and need its config updated."""
     anchor = f"device-{instance_id}"
     redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
@@ -164,7 +164,7 @@ def devices_discovered_json() -> Response:
 
 @bp.post("/settings/devices/discovery/<discovered_id>/register")
 def devices_register_discovered(discovered_id: str) -> Response:
-    """One-click register a discovered device — same lifecycle as the
+    """One-click register a discovered device, same lifecycle as the
     Add-device form, but kind / panel / id default from the cached
     heartbeat (the form may override any of them)."""
     cache = discovery_cache()
@@ -190,7 +190,7 @@ def devices_register_discovered(discovered_id: str) -> Response:
         panel_overrides["h"] = entry.panel_h
 
     # TRMNL discoveries carry the original access_token in the cache
-    # entry's parsed payload so create_instance can preserve it — the
+    # entry's parsed payload so create_instance can preserve it, the
     # user already has it pasted into their client config, and the
     # whole point of one-click pairing is not making them re-paste a
     # freshly-generated one.
@@ -231,7 +231,7 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
     the broker so it stays gone.
 
     A client publishes its heartbeat retained, so the broker replays it to
-    the discovery wildcard on every connect — dismissing only the
+    the discovery wildcard on every connect, dismissing only the
     in-memory cache lets a stale/renamed device (e.g. one reflashed to a
     new id) pop straight back. Publishing an empty retained payload to its
     status topic clears the retention; ``DiscoveryCache.record`` ignores
@@ -241,7 +241,7 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
     try:
         transport().publish(f"tesserae/{discovered_id}/status", b"", qos=1, retain=True)
         flash(f"Dismissed {discovered_id!r} and cleared its retained heartbeat.", "ok")
-    except Exception as exc:  # transport offline — cache is still cleared
+    except Exception as exc:  # transport offline, cache is still cleared
         if cache_had:
             flash(
                 f"Dismissed {discovered_id!r}, but couldn't clear the retained "
@@ -351,14 +351,14 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
 def devices_update_combined(instance_id: str) -> Response:
     """One-shot save for the whole device card.
 
-    The card composes three independent subsections — renderer-defined
+    The card composes three independent subsections, renderer-defined
     config fields, panel (orientation/dims/gamut/icon/underscan), and
     per-device quiet-hours override. The template now wraps them in
     one form posting here; this handler fans out to the same service
     helpers the per-subsection endpoints (``/panel``, ``/quiet-hours``,
     and ``/settings/device-<id>``) call so behaviour matches one-for-
     one. Each subsection is detected by presence of its inputs and
-    runs independently — an error in one is flashed but doesn't block
+    runs independently, an error in one is flashed but doesn't block
     the others. Transport rebuild happens once at the end."""
     anchor = f"device-{instance_id}"
     redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
@@ -396,7 +396,7 @@ def devices_update_combined(instance_id: str) -> Response:
 
     # 1. Renderer-defined config fields. Mirror settings_update("device-<id>").
     # Two paths: MQTT publish (when ``config_topic`` is set) and
-    # save-only (when it isn't — HTTP-polled TRMNL clients pick up
+    # save-only (when it isn't, HTTP-polled TRMNL clients pick up
     # config from the next /api/display response).
     schema_fields = config_fields_from_schema(device.config_schema)
     if schema_fields:
@@ -528,7 +528,7 @@ def devices_update_combined(instance_id: str) -> Response:
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
-    refused — they ship with the app."""
+    refused, they ship with the app."""
     result = device_service.delete_instance(
         devices=devices(),
         renderers=renderers(),
@@ -557,7 +557,7 @@ def devices_calibrate(instance_id: str) -> Response:
         card, source_label=f"calibration:{instance_id}", device_id=instance_id
     )
     if result.status == "sent":
-        flash("Calibration card sent — look at your panel, then answer below.", "ok")
+        flash("Calibration card sent, look at your panel, then answer below.", "ok")
     else:
         flash(f"Calibration push {result.status}: {result.error or '(no detail)'}", "error")
     # ?calibrating=<id> makes the device card render the answer form.
@@ -617,7 +617,7 @@ def devices_calibrate_apply(instance_id: str) -> Response:
             card, source_label=f"calibration:{instance_id}", device_id=instance_id
         )
     flash(
-        f"Set {result.device.name!r} to {orientation_label(target)} — your dashboard now reads "
+        f"Set {result.device.name!r} to {orientation_label(target)}, your dashboard now reads "
         "upright in that orientation. Re-sent the card to confirm; adjust Rotation below if needed.",
         "ok",
     )

@@ -4,19 +4,19 @@ pushes (scheduler firings, webhook calls) are suppressed.
 Two layers:
 
 * **App-level** (Settings → Server → App): a single window for the
-  whole install — *"the house goes quiet 22:00 → 07:00"*.
+  whole install, *"the house goes quiet 22:00 → 07:00"*.
 * **Per-device override** (Settings → Devices, panel block): a
-  device can declare its own window — useful when a panel lives in
+  device can declare its own window, useful when a panel lives in
   a kid's room or a workshop with different rhythms.
 
-Manual pushes — the Send page, the Push-now buttons — **bypass** quiet
+Manual pushes, the Send page, the Push-now buttons, **bypass** quiet
 hours by design. Quiet hours filter *automation*, not deliberate user
 intent. The relevant callers (``Scheduler._fire``, the webhook route)
 pass ``respect_quiet_hours=True`` into :func:`app.push.PushManager.push`,
 which filters the bound-device set against this module before render.
 
 Windows that wrap midnight (start ≥ end) are treated as one logical
-window crossing the date boundary — same semantics the scheduler's
+window crossing the date boundary, same semantics the scheduler's
 ``_matches_window`` already uses for time-of-day schedule windows.
 """
 

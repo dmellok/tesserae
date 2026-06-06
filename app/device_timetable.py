@@ -1,4 +1,4 @@
-"""Per-device rotation view — UI sugar over existing Schedules.
+"""Per-device rotation view, UI sugar over existing Schedules.
 
 Settings → Devices wants to answer "what plays on this panel, and when?"
 without forcing the user to grep through the Schedules page and
@@ -8,7 +8,7 @@ device card.
 This module computes that join: for each instance device, find every
 Schedule whose target Page is bound to the device, and present the set
 as an ordered timetable. The data underneath stays plain old
-``Schedule`` rows — no new model, no new tick path, no two sources of
+``Schedule`` rows, no new model, no new tick path, no two sources of
 truth. The card on the device just deep-links each entry to the
 Schedules editor.
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from app.state.schedule_store import ScheduleStore
 
 
-# Mon-Sun lookup — matches Schedule.days_of_week values (0=Mon, 6=Sun)
+# Mon-Sun lookup, matches Schedule.days_of_week values (0=Mon, 6=Sun)
 # and the labels the existing schedules UI uses.
 DAY_LABELS: tuple[str, ...] = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
@@ -96,7 +96,7 @@ def timetable_for_device(
     The join is: pages whose ``device_ids`` include this device →
     schedules whose ``page_id`` matches one of those pages → one
     TimetableEntry per schedule. Pages bound to no device at all (the
-    virtual-panel fan-out path) are also included on every device —
+    virtual-panel fan-out path) are also included on every device -
     they fire everywhere, so they belong on every device's timetable.
 
     Returns entries sorted by window start so a glance at the card

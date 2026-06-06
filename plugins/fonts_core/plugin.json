@@ -3,7 +3,7 @@
   "name": "Core fonts",
   "version": "0.4.0",
   "kind": "font",
-  "description": "Curated open-source font set vendored locally. 18 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible — designed for low-vision and works great on e-ink), geometric (Space Grotesk, Jost), heavy display (Archivo Black, Anton, Bebas Neue), narrow (Archivo Narrow), monospace (JetBrains Mono, IBM Plex Mono, Space Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora, Bodoni Moda). All Latin subset, woff2.",
+  "description": "Curated open-source font set vendored locally. 18 families covering modern sans (Inter, Manrope, Outfit, IBM Plex Sans, Public-Sans-ish), accessible sans (Atkinson Hyperlegible, designed for low-vision and works great on e-ink), geometric (Space Grotesk, Jost), heavy display (Archivo Black, Anton, Bebas Neue), narrow (Archivo Narrow), monospace (JetBrains Mono, IBM Plex Mono, Space Mono), and serif body / display (DM Serif Display, IBM Plex Serif, Crimson Pro, Lora, Bodoni Moda). All Latin subset, woff2.",
   "supports": {
     "sizes": ["xs", "sm", "md", "lg"]
   },

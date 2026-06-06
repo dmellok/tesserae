@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "OctoPrint — Status",
+  "name": "OctoPrint, Status",
   "version": "0.1.3",
   "kind": "widget",
   "description": "Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures.",

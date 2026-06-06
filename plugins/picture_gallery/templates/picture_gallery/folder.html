@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button %}
-{% block title %}{{ folder_name }} — Gallery — Tesserae{% endblock %}
+{% block title %}{{ folder_name }}, Gallery, Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
@@ -66,7 +66,7 @@
 {% if folder_id != '_root' %}
 <section class="card">
   {{ card_head('Danger zone', icon_name='trash', level=2,
-               blurb='External folders unlink only — the host files are never touched.' if external else 'Permanently removes the folder and all its images.') }}
+               blurb='External folders unlink only, the host files are never touched.' if external else 'Permanently removes the folder and all its images.') }}
   <form method="post" action="{{ url_for('picture_gallery_admin.delete_folder', folder=folder_id) }}"
         onsubmit="return confirm('Delete folder {{ folder_name }}{% if not external %} and all its images{% endif %}?');">
     {{ button('Delete folder' if not external else 'Unlink folder', icon='trash', variant='ghost danger') }}

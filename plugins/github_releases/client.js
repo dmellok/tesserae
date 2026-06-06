@@ -1,11 +1,11 @@
-// github_releases — Spectra list archetype. Each row leads with a
+// github_releases, Spectra list archetype. Each row leads with a
 // version-tag icon (accent-2 stable / muted prerelease / accent-1
 // draft), the release name + repo as the title, and the tag as
 // right-aligned meta. Two server-derived chips per row light up the
 // release's character: a SemVer bump-type pill (MAJOR / MINOR / PATCH
 // computed by comparing the tag to the previous release) and, for
 // the most recent release of each repo, a "+N COMMITS" tail counting
-// unreleased commits on the default branch — so a glance reads
+// unreleased commits on the default branch, so a glance reads
 // "this dep has 12 commits waiting" without leaving the dashboard.
 
 function escapeHtml(s) {

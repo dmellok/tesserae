@@ -1,7 +1,7 @@
 """Device-instance lifecycle: create / update-panel / delete.
 
 A thin service layer over the device + renderer registries and the
-``data/devices/<id>.json`` instance files. Flask routes stay thin —
+``data/devices/<id>.json`` instance files. Flask routes stay thin -
 parse the form, call one of these, flash + redirect on the result.
 
 Keeping topic derivation and the write → load → clone dance in one
@@ -10,11 +10,11 @@ one-click register used to inline near-identical logic and had already
 drifted (one swapped the kind's topic prefix, the other hardcoded
 ``tesserae/<id>/status``). Both now go through ``create_instance``.
 
-Transport re-subscription is deliberately NOT done here — it needs
+Transport re-subscription is deliberately NOT done here, it needs
 ``app.config`` and is the caller's job after a successful mutation, so
 this module stays free of Flask.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -70,14 +70,14 @@ def generate_access_token(devices: DeviceRegistry) -> str:
     """Generate a short access token that isn't already in use.
 
     Five characters from a 30-char typeable alphabet gives ~25 bits
-    of entropy — fine for a Tesserae that's only reachable on the
+    of entropy, fine for a Tesserae that's only reachable on the
     LAN (homelab + firewall + Tailscale are the typical setup), NOT
     fine for a publicly-exposed instance. The tradeoff is deliberate:
     TRMNL clients are paired by entering the token on a Kindle
     on-screen keyboard or button-by-button on the native hardware,
     and a 32-hex-character token there is brutal. If you're putting
     Tesserae on the public internet, stack additional access control
-    (reverse-proxy auth, Tailscale, etc.) on top — the token alone
+    (reverse-proxy auth, Tailscale, etc.) on top, the token alone
     is not sufficient at this length.
 
     Uniqueness within the registry is checked so a regenerate can't
@@ -96,7 +96,7 @@ def generate_access_token(devices: DeviceRegistry) -> str:
         if token not in existing:
             return token
     # Astronomically unlikely (would need millions of TRMNL devices
-    # already registered). Raise loudly rather than recurse — the
+    # already registered). Raise loudly rather than recurse, the
     # caller will see the error and bump _TOKEN_LENGTH.
     raise RuntimeError(
         f"could not generate a unique {_TOKEN_LENGTH}-char access token after 64 attempts"
@@ -184,7 +184,7 @@ def create_instance(
     #    user copies the new token from the reveal modal into their
     #    client config.
     #  * Discovered register: caller hands us the token the client is
-    #    already polling with — preserve it so the user doesn't have
+    #    already polling with, preserve it so the user doesn't have
     #    to update the client config after registering.
     if _kind_uses_access_token(kind):
         manifest["access_token"] = access_token or generate_access_token(devices)
@@ -306,7 +306,7 @@ def update_instance_panel(
     # (or the JS not having fired before submit) can land here with a
     # mismatch. The renderers derive the rotation from ``panel.w <
     # panel.h``, so a mismatch silently keeps the panel rendering at
-    # the wrong orientation — exactly the bug the user hits when
+    # the wrong orientation, exactly the bug the user hits when
     # "even after setting rotation" the frame stays landscape.
     is_portrait = o.startswith("portrait")
     if (is_portrait and w > h) or (not is_portrait and h > w):
@@ -376,7 +376,7 @@ def update_instance_quiet_hours(
     clean_start = (start or "").strip()
     clean_end = (end or "").strip()
     if not enabled and not clean_start and not clean_end:
-        # Fully cleared — drop the block entirely so the next reload
+        # Fully cleared, drop the block entirely so the next reload
         # sees a manifest with no override and uses the app setting.
         raw.pop("quiet_hours", None)
     else:

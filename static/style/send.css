@@ -62,7 +62,7 @@
   color: var(--t-muted);
   /* Subtle checkerboard so the preview canvas reads as a designer's
      transparent surface rather than a flat fill. The squares are
-     tinted with the soft surface tokens so they barely register —
+     tinted with the soft surface tokens so they barely register -
      they're texture, not pattern. */
   background:
     conic-gradient(from 90deg at 1px 1px,
@@ -172,7 +172,7 @@
   font-weight: 700;
 }
 
-/* Source/trigger chip on history rows — at-a-glance "what triggered
+/* Source/trigger chip on history rows, at-a-glance "what triggered
    this push": Send page, scheduler, webhook, Home Assistant. The
    colour is a faint tint of the accent so the eye can group like-
    triggered rows on a busy History without the page becoming a
@@ -224,9 +224,10 @@
 :root[data-theme="dark"] .src-chip--accent-terracotta { color: #f29170; border-color: color-mix(in oklab, #f29170 35%, transparent); }
 :root[data-theme="dark"] .src-chip--accent-slate { color: #a4b4c4; border-color: color-mix(in oklab, #a4b4c4 35%, transparent); }
 
+
 .history-target {
   /* The dashboard / target name is the row's headline now (was a
-     monospace slug chip) — give it weight over the source tag. */
+     monospace slug chip), give it weight over the source tag. */
   font-size: var(--t-size-base);
   color: var(--t-fg);
   font-weight: 600;

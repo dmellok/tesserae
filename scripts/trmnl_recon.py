@@ -14,7 +14,7 @@ We use it to discover:
 * What the request cadence looks like for ``/api/display`` polling.
 * Whether the client honours ``refresh_rate`` we hand back, and how
   it interprets ``reset_firmware`` / ``update_firmware`` / others.
-* What the ``/api/log/`` POST body looks like in practice — the BYOS
+* What the ``/api/log/`` POST body looks like in practice, the BYOS
   docs sketch it but each implementation has its own quirks.
 
 Not part of the runtime app. Stays under ``scripts/`` because it is a
@@ -23,7 +23,7 @@ development-time tool the maintainer runs by hand.
 Usage
 -----
 
-Standard library only — no venv or pip needed. Runs anywhere with
+Standard library only, no venv or pip needed. Runs anywhere with
 Python 3.11+::
 
     python3 scripts/trmnl_recon.py
@@ -33,7 +33,7 @@ Then point the TRMNL client at ``http://<your-dev-ip>:8765/`` and watch
 the logs. The default 0.0.0.0 bind makes the server reachable from any
 device on the LAN.
 
-Hello images are generated on demand at any panel dimensions —
+Hello images are generated on demand at any panel dimensions -
 ``/img/hello-<W>x<H>.png`` returns a 1-bit greyscale (or 8-bit if
 ``--bit-depth 8`` is set) PNG with a thick border, a corner-to-corner
 diagonal X, centre crosshairs, and L-shaped corner brackets so a
@@ -52,7 +52,7 @@ from datetime import datetime
 
 
 class ReconHandler(http.server.BaseHTTPRequestHandler):
-    # Quiet the default per-request line — we print our own richer log
+    # Quiet the default per-request line, we print our own richer log
     # block in ``_log_request`` below.
     def log_message(self, format: str, *args: object) -> None:
         return
@@ -70,7 +70,7 @@ class ReconHandler(http.server.BaseHTTPRequestHandler):
                 print(f"  {body.decode('utf-8')}")
             except UnicodeDecodeError:
                 # Some clients POST form-encoded blobs that aren't valid
-                # UTF-8 — fall back to a hex dump of the first 256 bytes
+                # UTF-8, fall back to a hex dump of the first 256 bytes
                 # so we can still eyeball the shape.
                 print(f"  <binary> {body[:256].hex()}")
         sys.stdout.flush()
@@ -138,7 +138,7 @@ class ReconHandler(http.server.BaseHTTPRequestHandler):
                 },
             )
         elif self.path.startswith("/img/hello-") and self.path.endswith(".png"):
-            # /img/hello-<W>x<H>.png — parse the dims and generate.
+            # /img/hello-<W>x<H>.png, parse the dims and generate.
             stem = self.path[len("/img/hello-") : -len(".png")]
             try:
                 w_s, h_s = stem.split("x", 1)
@@ -151,7 +151,7 @@ class ReconHandler(http.server.BaseHTTPRequestHandler):
                 return
             self._png(w, h)
         elif self.path == "/img/hello.png":
-            # Legacy URL — clients that ignore ``image_url`` and probe
+            # Legacy URL, clients that ignore ``image_url`` and probe
             # this path directly get the stock 800×480 TRMNL panel size.
             self._png(800, 480)
         else:
@@ -193,7 +193,7 @@ class ReconHandler(http.server.BaseHTTPRequestHandler):
 # Some clients (KOReader plugin) tell the server the dims they want
 # via ``png-width`` / ``png-height`` headers and reject PNGs that
 # don't match. Generate at any size on demand. Stdlib-only (struct +
-# zlib) because we deliberately don't depend on Pillow — the recon
+# zlib) because we deliberately don't depend on Pillow, the recon
 # script is supposed to run on any vanilla Python 3 install.
 
 _PNG_CACHE: dict[tuple[int, int, int], bytes] = {}
@@ -208,15 +208,15 @@ def _size_matched_png(width: int, height: int) -> bytes:
     """Build a greyscale PNG at exactly the requested dims.
 
     Visible content is a thick border, a diagonal X across the whole
-    panel, centre crosshairs, and L-shaped corner brackets — enough
+    panel, centre crosshairs, and L-shaped corner brackets, enough
     visual structure that a successful end-to-end fetch is unmistakable
     on any panel size. Cached per (w,h) so repeated polls skip the
     zlib pass.
 
     Bit depth is controlled by the global ``_BIT_DEPTH``: 1-bit by
     default (smallest, what spec-compliant readers expect), 8-bit when
-    the client garbles 1-bit output. Some readers — including some
-    KOReader builds — assume 8-bit greyscale regardless of the IHDR
+    the client garbles 1-bit output. Some readers, including some
+    KOReader builds, assume 8-bit greyscale regardless of the IHDR
     bit depth and produce diagonal-noise garbage for 1-bit PNGs."""
     key = (width, height, _BIT_DEPTH)
     cached = _PNG_CACHE.get(key)
@@ -225,7 +225,7 @@ def _size_matched_png(width: int, height: int) -> bytes:
 
     # We build the image as a flat (width × height) byte buffer where
     # 0 = black, 1 = white, then pack to 1 bit per pixel at the end.
-    # That keeps the drawing helpers obvious — bit-fiddling per pixel
+    # That keeps the drawing helpers obvious, bit-fiddling per pixel
     # would obscure the geometry.
     pixels = bytearray(b"\xff" * (width * height))
 
@@ -250,7 +250,7 @@ def _size_matched_png(width: int, height: int) -> bytes:
             pixels[y * width + x] = 0
 
     def thick_line(x1: int, y1: int, x2: int, y2: int, t: int = 3) -> None:
-        """Bresenham with a square thickness — good enough for a recon
+        """Bresenham with a square thickness, good enough for a recon
         marker."""
         dx, dy = abs(x2 - x1), abs(y2 - y1)
         sx = 1 if x1 < x2 else -1
@@ -291,7 +291,7 @@ def _size_matched_png(width: int, height: int) -> bytes:
     hline(0, width - 1, cy)
     vline(cx, 0, height - 1)
 
-    # Corner brackets — L-shapes inset from the border so they read
+    # Corner brackets, L-shapes inset from the border so they read
     # as framing marks. Length is 1/8 of the smaller dim.
     bracket = max(20, min(width, height) // 8)
     bt = max(2, border // 2)  # bracket thickness
@@ -325,7 +325,7 @@ def _size_matched_png(width: int, height: int) -> bytes:
             raw.extend(row)
     else:
         # 8-bit: one byte per pixel. 0 = black, 255 = white. No
-        # packing, no MSB/LSB ambiguity — the bulletproof option when
+        # packing, no MSB/LSB ambiguity, the bulletproof option when
         # a client's PNG decoder mishandles 1-bit.
         for y in range(height):
             raw.append(0)  # filter: None

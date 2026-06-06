@@ -5,9 +5,9 @@
   carry the same shape.
 
   Geometry (256×256 viewBox, scaled from the 28×28 nav mark):
-    * Outer rounded square — radius 72, gradient #0d8c7e → #0a6f63
+    * Outer rounded square, radius 72, gradient #0d8c7e → #0a6f63
       (CSS --t-accent → --t-accent-hover, 135deg).
-    * Inner block — 146×146 at (55, 55), rx 27, masking two 73×73
+    * Inner block, 146×146 at (55, 55), rx 27, masking two 73×73
       quadrants painted in white at 0.85 alpha. The quadrant pattern is
       top-right + bottom-left filled (the conic-gradient stops in
       shell.css), which reads as a tessellated mosaic on the diagonal.

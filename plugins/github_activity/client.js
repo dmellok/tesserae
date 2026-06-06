@@ -1,8 +1,8 @@
-// github_activity — Spectra status archetype. Hero = total events
+// github_activity, Spectra status archetype. Hero = total events
 // over the window; pill names the user + the current activity streak
 // in days; status-grid breaks out the activity type counts (commits
 // / PRs / issues / releases); a hand-rolled SVG stacked histogram
-// of the last 7 days sits at the bottom — each bar is segmented by
+// of the last 7 days sits at the bottom, each bar is segmented by
 // event type (commits = moss, PRs = teal, issues = terracotta,
 // releases = ochre, other = muted) with a dominant-type Phosphor
 // glyph centred inside the bar so a glance reads "Wednesday was
@@ -84,7 +84,7 @@ function stackedHistogram({ days, labels, todayIdx, w, h }) {
       // baseline pip so empty days don't disappear
       rects.push(`<rect x="${x.toFixed(2)}" y="${(innerH - 2).toFixed(2)}" width="${barW.toFixed(2)}" height="2" fill="var(--text-muted)" opacity="0.4" rx="1"/>`);
     }
-    // Dominant-type glyph centred in the bar — only when the bar is
+    // Dominant-type glyph centred in the bar, only when the bar is
     // tall enough to fit (≥18px) so we don't squash a tiny glyph.
     let glyph = "";
     const domKey = dominantType(d);
@@ -159,7 +159,7 @@ export default function render(shadow, ctx) {
     return DOW_SHORT[dow];
   });
 
-  // Streak pill — only shown when ≥ 2 days so a single-day streak
+  // Streak pill, only shown when ≥ 2 days so a single-day streak
   // doesn't read as a brag. Sits in the title meta row beside REPOS.
   const streakPill = streak >= 2
     ? `<span class="w-title-meta" style="color:var(--accent-2)">

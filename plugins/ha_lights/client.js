@@ -1,4 +1,4 @@
-// ha_lights — Spectra list archetype. One row per light with a
+// ha_lights, Spectra list archetype. One row per light with a
 // filled-bulb icon when on (accent-2 ochre) and an empty bulb
 // otherwise (text-muted). Each row carries a brightness mini-bar
 // (track + filled portion ∝ brightness%) and a tiny colour swatch
@@ -43,7 +43,7 @@ function clamp255(v) {
   return Math.max(0, Math.min(255, v));
 }
 
-// Per-light swatch — either an RGB dot (hs mode) or a kelvin dot
+// Per-light swatch, either an RGB dot (hs mode) or a kelvin dot
 // (color_temp mode). Falls back to an ochre dot for lights that
 // don't expose either attribute (most ON/OFF-only smart switches).
 function swatchFor(light) {
@@ -88,14 +88,14 @@ export default function render(shadow, ctx) {
     const swatchColor = swatchFor(l);
     const brightnessPct = Number.isFinite(l.brightness_pct) ? l.brightness_pct : null;
 
-    // Brightness bar — track + filled portion. Empty bar for off
+    // Brightness bar, track + filled portion. Empty bar for off
     // lights so the alignment of the % text stays consistent across
     // rows. Filled portion uses the light's colour swatch so a
     // warm-white bulb's bar reads warm and a cool-white bulb's reads
-    // cool — small visual cue but reads as "this is the colour"
+    // cool, small visual cue but reads as "this is the colour"
     // without needing a separate swatch dot to take space.
     const brightnessBar = isOn ? `
-      <span class="bri-wrap" title="${brightnessPct != null ? brightnessPct : "—"}%">
+      <span class="bri-wrap" title="${brightnessPct != null ? brightnessPct : "-"}%">
         <span class="bri-track"></span>
         <span class="bri-fill" style="width:${brightnessPct != null ? brightnessPct : 100}%;background:${swatchColor}"></span>
       </span>` : `<span class="bri-wrap is-off"><span class="bri-track"></span></span>`;

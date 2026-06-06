@@ -1,5 +1,5 @@
 """public_transport_times smoke: signing, composer render, missing-cred
-error path — all with mocked PTV API."""
+error path, all with mocked PTV API."""
 
 from __future__ import annotations
 
@@ -105,7 +105,7 @@ class _FakeResp:
 
 
 def test_fetch_returns_slim_departures(tmp_path) -> None:
-    """fetch() against a mocked PTV response — covers the happy path
+    """fetch() against a mocked PTV response, covers the happy path
     end-to-end including the signing helper."""
     server = _load_server()
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
@@ -124,7 +124,7 @@ def test_fetch_returns_slim_departures(tmp_path) -> None:
 @pytest.mark.parametrize("size", ["xs", "sm", "md", "lg"])
 def test_ptv_renders_error_state_when_creds_missing(client: FlaskClient, size: str) -> None:
     """The composer's test render endpoint doesn't accept cell options,
-    so stop_id is 0 — but the upstream error path should still produce
+    so stop_id is 0, but the upstream error path should still produce
     a rendered shell rather than 500ing."""
     resp = client.get(f"/_test/render?plugin=public_transport_times&size={size}")
     assert resp.status_code == 200

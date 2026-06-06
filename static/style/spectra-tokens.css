@@ -1,5 +1,5 @@
 /* ============================================================================
-   SPECTRA — E6 E‑Ink Widget System
+   SPECTRA, E6 E‑Ink Widget System
    Token layer: PRIMITIVES → SEMANTIC (per theme) → COMPONENT
    ----------------------------------------------------------------------------
    Editing model:
@@ -7,7 +7,7 @@
    • Each named theme is ONE self-contained block: [data-theme="name"]{ ... }.
      Override colors / accents / font there and nothing else. To add a theme,
      copy a block, rename it, change values. Widgets never reference primitives
-     for color — only semantic tokens — so a theme swap is total.
+     for color, only semantic tokens, so a theme swap is total.
    • Component tokens fall back to semantic/primitive values; override per widget
      with a [data-widget="..."] block or inline style.
    ============================================================================ */
@@ -16,7 +16,7 @@
    1 · PRIMITIVES  (theme-independent raw values)
 ---------------------------------------------------------------------------- */
 :root{
-  /* Type scale — expressed in em so it rides the fluid container base.
+  /* Type scale, expressed in em so it rides the fluid container base.
      Bold/large by default: body is semibold, values & display are heavy. */
   --fs-display: 3em;     /* hero numbers on stat tiles            */
   --fs-jumbo:   2.5em;   /* large values                          */
@@ -26,7 +26,7 @@
   --fs-label:   0.8em;   /* uppercase section labels              */
   --fs-caption: 0.72em;  /* smallest permissible text             */
 
-  /* Weights — heavy baseline */
+  /* Weights, heavy baseline */
   --fw-regular: 500;
   --fw-medium:  600;
   --fw-semi:    700;
@@ -42,7 +42,7 @@
   --ls-label:   0.08em;   /* tracked uppercase labels */
   --ls-tight:  -0.01em;
 
-  /* Spacing scale — em-based, rides the fluid base. */
+  /* Spacing scale, em-based, rides the fluid base. */
   --space-1: 0.25em;
   --space-2: 0.5em;
   --space-3: 0.75em;
@@ -51,22 +51,22 @@
   --space-6: 2em;
   --space-7: 3em;
 
-  /* Radii — sharp by default for crisp e-ink edges */
+  /* Radii, sharp by default for crisp e-ink edges */
   --radius-0: 0px;     /* default widget shell        */
   --radius-1: 2px;
   --radius-2: 4px;
 
-  /* Stroke weights — detail floor. Never below 2px; bars/lines 3px+. */
+  /* Stroke weights, detail floor. Never below 2px; bars/lines 3px+. */
   --stroke-1: 2px;     /* outer edge minimum          */
   --stroke-2: 3px;     /* data strokes, chart lines   */
   --stroke-3: 4px;     /* heavy emphasis              */
 
-  /* Icon sizes (em) — Phosphor BOLD weight only */
+  /* Icon sizes (em), Phosphor BOLD weight only */
   --icon-sm: 1.1em;
   --icon-md: 1.5em;
   --icon-lg: 2.2em;
 
-  /* Fluid base — every widget element sizes from this single value.
+  /* Fluid base, every widget element sizes from this single value.
      Resolves against the widget's container (cell sets container-type:size).
      Clamped so widgets stay legible when tiny and never look sparse when huge. */
   --w-font-base: clamp(14px, 7cqmin, 28px);
@@ -76,7 +76,7 @@
   --pad: clamp(0.9em, 9cqmin, 1.4em);  /* widget inner padding, fluid */
   --row-gap: var(--space-3);
 
-  /* Style-tunable shape/structure tokens — styles (spectra-styles.css)
+  /* Style-tunable shape/structure tokens, styles (spectra-styles.css)
      reshape these. Defaults below = the "standard" look, so an unstyled
      widget renders unchanged. A style block flips these; the widget shell
      consumes them via var(--name, fallback) so we never need a style-aware
@@ -94,7 +94,7 @@
   --marker-h: 1.05em;
   --marker-radius: var(--radius-0);
   --marker-color: var(--accent-4);
-  /* Optional dividers — OFF by default. A style may switch these on when
+  /* Optional dividers, OFF by default. A style may switch these on when
      a rule is core to its identity (Mono console, Display masthead,
      Condensed timetable, De Stijl grid). */
   --title-rule-w: 0px;                  /* divider under the title bar         */
@@ -105,13 +105,13 @@
 }
 
 /* ----------------------------------------------------------------------------
-   2 · SEMANTIC TOKENS — one self-contained block per named theme
+   2 · SEMANTIC TOKENS, one self-contained block per named theme
    Roles widgets consume: bg / surface / surface-sunken / text-* / icon /
    edge / accent-1..6 (+ -soft tint) / on-accent / font-family
    Near-black & near-white used everywhere (true #000/#fff ghost on E6).
 ---------------------------------------------------------------------------- */
 
-/* ---- LIGHT (default) — warm paper ---------------------------------------- */
+/* ---- LIGHT (default), warm paper ---------------------------------------- */
 :root,
 [data-theme="light"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -134,7 +134,7 @@
   --on-accent:#F7F5F0;
 }
 
-/* ---- DARK — warm charcoal ------------------------------------------------ */
+/* ---- DARK, warm charcoal ------------------------------------------------ */
 [data-theme="dark"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -156,7 +156,7 @@
   --on-accent:#141310;
 }
 
-/* ---- HIGH-CONTRAST — max legibility -------------------------------------- */
+/* ---- HIGH-CONTRAST, max legibility -------------------------------------- */
 [data-theme="high-contrast"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -178,7 +178,7 @@
   --on-accent:#FFFFFF;
 }
 
-/* ---- SEPIA — warm book paper --------------------------------------------- */
+/* ---- SEPIA, warm book paper --------------------------------------------- */
 [data-theme="sepia"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -200,7 +200,7 @@
   --on-accent:#F2E9D5;
 }
 
-/* ---- NORD — cool blue night ---------------------------------------------- */
+/* ---- NORD, cool blue night ---------------------------------------------- */
 [data-theme="nord"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -222,7 +222,7 @@
   --on-accent:#2E3440;
 }
 
-/* ---- COOL GRAY — neutral slate ------------------------------------------- */
+/* ---- COOL GRAY, neutral slate ------------------------------------------- */
 [data-theme="cool-gray"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -244,14 +244,93 @@
   --on-accent:#F5F6F7;
 }
 
+/* ---- VIVID, saturated accents on warm canvas, surface lifts cleanly ---- */
+/* Built for an admin UI where the user wanted a clearly visible step from
+   page → card surface. The bg is a chunky #D6D2C7 stone tone; surfaces
+   pop to a near-white #FBFAF6 paper (~22% L* delta vs. bg, much more
+   than the 4% default Light). Accents bump saturation +15% across the
+   board so chips and active selectors land with punch. */
+[data-theme="vivid-light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #D6D2C7;
+  --surface:        #FBFAF6;
+  --surface-sunken: #C6C2B5;
+  --text-primary:   #1A1714;
+  --text-secondary: #4D4A42;
+  --text-muted:     #7A7569;
+  --icon:           var(--text-primary);
+  --edge:           #9A9486;
+
+  --accent-1:#D14318; --accent-1-soft:#F4D2C5;  /* hot terracotta */
+  --accent-2:#C28A04; --accent-2-soft:#F2E2B4;  /* sunflower      */
+  --accent-3:#5E883C; --accent-3-soft:#D4E5C2;  /* spring moss    */
+  --accent-4:#048783; --accent-4-soft:#B8E3DF;  /* lagoon teal    */
+  --accent-5:#3B5FC6; --accent-5-soft:#C9D5F4;  /* cobalt         */
+  --accent-6:#9C2E7A; --accent-6-soft:#EBC8DE;  /* magenta plum   */
+  --on-accent:#FBFAF6;
+}
+
+/* ---- CITRUS, bright cream canvas, electric accent palette --------------- */
+/* Cream-and-citrus take on a punchy light theme: bg is a warm wheat
+   tone, surface is pure paper white. Accents lean candy-bright with
+   high chroma greens / blues / pinks so dashboard rings, chips, and
+   selectors read at a glance against the cream. */
+[data-theme="citrus-light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #ECDFC6;
+  --surface:        #FDFBF4;
+  --surface-sunken: #DDCFB1;
+  --text-primary:   #1F1A12;
+  --text-secondary: #5A4F36;
+  --text-muted:     #8E7F60;
+  --icon:           var(--text-primary);
+  --edge:           #B49E73;
+
+  --accent-1:#E0451B; --accent-1-soft:#FACFC0;  /* persimmon  */
+  --accent-2:#E5A100; --accent-2-soft:#FAE5B0;  /* amber      */
+  --accent-3:#4FA336; --accent-3-soft:#D2EAC4;  /* lime       */
+  --accent-4:#1095A4; --accent-4-soft:#BCE5EB;  /* aqua       */
+  --accent-5:#3450D8; --accent-5-soft:#C9D2F7;  /* azure      */
+  --accent-6:#B81F73; --accent-6-soft:#F4C7DD;  /* fuschia    */
+  --on-accent:#FDFBF4;
+}
+
+/* ---- ARCTIC, cool slate canvas, electric jewel accents ----------------- */
+/* Cool counterpart to vivid-light: bg is a desaturated steel-blue,
+   surface is bright cool white. Accent palette leans jewel: ruby,
+   amber, emerald, cyan, ultramarine, fuchsia, all with high chroma
+   so they sing against the cool surface. */
+[data-theme="arctic-light"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #CCD2DA;
+  --surface:        #FBFCFD;
+  --surface-sunken: #B8BFC9;
+  --text-primary:   #0E1117;
+  --text-secondary: #2E3540;
+  --text-muted:     #6A7280;
+  --icon:           var(--text-primary);
+  --edge:           #8C95A3;
+
+  --accent-1:#D32D3C; --accent-1-soft:#F6C9CE;  /* ruby       */
+  --accent-2:#DC9100; --accent-2-soft:#F8DDA8;  /* amber      */
+  --accent-3:#208649; --accent-3-soft:#BFE3CD;  /* emerald    */
+  --accent-4:#008CB1; --accent-4-soft:#BCE3EF;  /* cyan       */
+  --accent-5:#2A40B7; --accent-5-soft:#C5CDED;  /* ultramarine*/
+  --accent-6:#A5258A; --accent-6-soft:#F0C5E4;  /* fuchsia    */
+  --on-accent:#FBFCFD;
+}
+
 /* ============================================================================
-   MOVEMENT THEMES — palettes for the matching movement styles. Pair
+   MOVEMENT THEMES, palettes for the matching movement styles. Pair
    data-theme="X" with data-style="X" for the full look (palette + forms);
    either half mixes with any other theme/style. These are ordinary themes
-   (color only) — the *style* sets type/shape independently.
+   (color only), the *style* sets type/shape independently.
    ============================================================================ */
 
-/* ---- BAUHAUS — primary red / blue / yellow on warm cream ----------------- */
+/* ---- BAUHAUS, primary red / blue / yellow on warm cream ----------------- */
 [data-theme="bauhaus"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -273,7 +352,7 @@
   --on-accent:#F4EFE3;
 }
 
-/* ---- DE STIJL — primaries + ink on white (Mondrian) ---------------------- */
+/* ---- DE STIJL, primaries + ink on white (Mondrian) ---------------------- */
 [data-theme="destijl"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -295,7 +374,7 @@
   --on-accent:#FBFBF8;
 }
 
-/* ---- BRUTALIST — concrete, ink, hazard orange --------------------------- */
+/* ---- BRUTALIST, concrete, ink, hazard orange --------------------------- */
 [data-theme="brutalist"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 

@@ -222,7 +222,7 @@ def extract_palette() -> Response | tuple[Response, int]:
     mode_hint = request.form.get("mode") or None
     tokens = assign_to_tokens(colors, mode=mode_hint)
     # Include the detected mode so the JS can flip the mode dropdown
-    # too — gives users the same "light vs dark" heuristic the
+    # too, gives users the same "light vs dark" heuristic the
     # extractor itself used to assign tokens.
     detected_mode = "dark" if colors and colors[0].luminance < 0.4 else "light"
     return jsonify({"tokens": tokens, "mode": detected_mode})
@@ -249,7 +249,7 @@ def update(theme_id: str) -> Response:
     if existing is None:
         abort(404)
     theme = _theme_from_form(request.form, fallback_id=existing.id)
-    # Keep the id stable even if the name has changed — renaming
+    # Keep the id stable even if the name has changed, renaming
     # shouldn't reshuffle every page bound to this theme.
     theme.id = existing.id
     store.save(theme)
@@ -270,7 +270,7 @@ def delete(theme_id: str) -> Response:
 
 @bp.post("/<theme_id>/duplicate")
 def duplicate(theme_id: str) -> Response:
-    """Make a user-editable copy of any theme — bundled or user. The
+    """Make a user-editable copy of any theme, bundled or user. The
     bundled-theme copy seeds from the Spectra CSS defaults (whatever
     ``_seed_from_template`` can read); copying an existing user theme
     just clones the in-memory record."""
@@ -287,7 +287,7 @@ def duplicate(theme_id: str) -> Response:
         cloned["name"] = f"{existing.name} copy"
         src = UserTheme(**cloned)
     else:
-        # Bundled theme — synthesize a new UserTheme from defaults.
+        # Bundled theme, synthesize a new UserTheme from defaults.
         src = _seed_from_template(theme_id)
         src.name = f"{src.name} copy"
     new_id = store.unique_id_for(src.name, reserved=_bundled_id_set())
@@ -313,7 +313,7 @@ def _theme_from_form(form: Any, *, fallback_id: str) -> UserTheme:
         "name": name,
         "mode": mode if mode in ("light", "dark") else "light",
         "font_family": font_family,
-        # Checkbox-style boolean — present in form data only when the
+        # Checkbox-style boolean, present in form data only when the
         # box is checked. Persist the preference so toggling survives
         # reloads.
         "auto_soft_tints": form.get("auto_soft_tints") == "on",
@@ -334,7 +334,7 @@ def _seed_from_template(theme_id: str) -> UserTheme:
     the matching theme's actual ``bg`` / ``surface`` / ``accent-*``
     values into the seed so a Duplicate from Nord produces a Nord-
     coloured copy, not the UserTheme dataclass defaults (which mirror
-    Light). Unknown ids — and any tokens the CSS leaves out — fall
+    Light). Unknown ids, and any tokens the CSS leaves out, fall
     through to the dataclass defaults so the form is always fully
     populated.
     """

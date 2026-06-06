@@ -6,6 +6,161 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.31.0], 2026-06-06
+
+Whole-catalogue widget visual pass (59 widgets, every family) plus an
+admin-UI refresh on top, vivid light themes, a Glances instance
+registry, history page filtering, and a slate of mobile polish.
+
+### Widget visual pass — every family
+
+Family-by-family visual pass that landed across v0.30.0-v0.30.3 and is
+now formally cut. Every bundled widget got the same treatment: turn
+paragraphs of numbers into visual anchors that scale cleanly across
+cell sizes (xs/sm/md/lg).
+
+- **Calendar** (`calendar_day`, `calendar_week`, `calendar_month`):
+  time-of-day icons in the day gutter, event-density strips, weekend
+  column tints, today-marker chips, per-feed micro-strips, heat-tint
+  backgrounds, UTC → local TZ fixes. `calendar_week` server forwards
+  event end times so multi-hour events span properly.
+- **Clocks** (`clock_analog`, `clock_qlock`, `clock_sunrise_sunset`,
+  `clock_word`, `clock_world`): five analog face styles + AM/PM sun
+  indicator + date plate + roman/arabic/dots numerals; QLOCK gets
+  vignette + paper-texture backgrounds; sun-arc widget gains twilight
+  bands, golden-hour tints, full sun-path arc; word clock gets phase
+  badges; world clock adds five-phase sun glyphs + 24-hour day/night
+  strip per city.
+- **GitHub** (6 widgets): per-workflow-type icons + 8-bar timeline +
+  duration sparkline; stacked-by-type 7-day histogram with dominant-
+  type glyph in each bar; paired streak hero chips + 12-month summary
+  bars; PR-age tier chips + draft/ready icons + comment bubbles;
+  SemVer bump pill + commits-since-release tail; top-contributors
+  strip with avatars.
+- **Home Assistant** (12 widgets): per-device-type lead glyph + SVG
+  battery with fill bar + CRITICAL/LOW pills (ha_battery); corner
+  timestamp + multi-camera grid (ha_camera); radial thermostat dial
+  with grid for multi-entity (ha_climate); Chart.js Sankey for power
+  flow with sun-position glyph + comparison sparkline (ha_energy);
+  expanded device-class glyph table + recent-change wash + timer
+  badge (ha_entities); threshold line + min/max markers + hourly-
+  profile ghost overlay (ha_history); per-light brightness mini-bar
+  tinted by colour + kelvin/RGB swatch (ha_lights); stateful kind
+  glyphs + unsecured-since timer (ha_locks); blurred album-art bleed
+  + track-deterministic waveform glyph (ha_media); expanded device-
+  class glyphs + 24h trend arrow + inline sparkline (ha_sensor);
+  due-date proximity colour chips + iCal priority dot + OVERDUE
+  title bar (ha_todo); coloured-initials avatar fallback + zone-name
+  glyph (ha_zones).
+- **News** (4): story-type chips + score-strength bars (HN); post-
+  type lead glyph + subreddit-coloured stripe (Reddit); source-host
+  chip with initial (RSS); era glyph + thumbnail + HTML/CSS year-
+  timeline strip (Wikipedia OTD).
+- **Sky** (3 of 4, plus `sky_bom_warnings` from the weather pass):
+  radar dial with bearing+distance plotting per flight + altitude
+  bar + bolder rings (`sky_air_traffic`); half-circle Kp gauge with
+  banded segments + needle (`sky_aurora`); progress ring around the
+  moon disc + craters clipped to lit side + next-phase chip
+  (`sky_moon`).
+- **Finance** (3): up/down delta pills (crypto); country flag pair
+  in title + Chart.js sparkline with 7-day rolling-average overlay
+  (currency); day-range track with current-price pip (stock).
+- **Spotify** (2): track-deterministic SVG waveform glyph under the
+  progress bar (`spotify_now_playing`); circular progress ring around
+  now-playing thumbnail + per-track duration mini-bar
+  (`spotify_queue`).
+- **Public transport** (`public_transport_times`): route-number
+  colour chip + countdown ring around the next-departure glyph.
+- **Other** (`glances_status`, `octoprint_status`, `todo`): per-metric
+  ring gauges + load/uptime footer (glances); radial print-completion
+  ring + percent centre (octoprint); completion progress bar at top
+  of list (todo).
+
+### Chart helpers
+
+- `static/spectra-chart.js`: added `sankey()` helper backed by the
+  vendored `chartjs-chart-sankey` UMD; `lineChart()` gained
+  `threshold` / `markers` / `overlay` params for ha_history's
+  threshold line + min/max marker dots + hourly-profile ghost;
+  `sparkline()` gained an `overlay` param for finance_currency's
+  rolling-average dashed line.
+- `static/vendor/chartjs-chart-sankey.min.js` (10 KB UMD) loaded in
+  `templates/compose.html` so the Sankey controller registers
+  globally.
+
+### Glances Core (new plugin)
+
+- New **glances_core** data plugin with an admin page at
+  `/plugins/glances_core/` that persists a list of Glances server
+  instances (name + URL) to its `data_dir/instances.json`. Exposes
+  `get_instance(id)` + `list_instances()` + `choices(name)`.
+- `glances_status` cell now offers a dropdown that picks from saved
+  instances; falls back to an inline URL for cells configured before
+  the instance registry existed.
+- Admin page restyled to match the schedules/themes admin vocabulary
+  (`<section class="card">` + `card_head` macro + `.form` + `.field-
+  grid` + `.button.primary`).
+
+### Vivid light themes
+
+- Three new bundled light themes with greater bg → surface contrast +
+  more saturated accents than the default Light: `vivid-light` (warm
+  stone canvas, ~22% L* delta), `citrus-light` (cream canvas, candy-
+  bright accents), `arctic-light` (cool steel-blue canvas, jewel-tone
+  accents). All three pass the theme-registry guard test.
+
+### History page
+
+- `/history` gained a chip-based source filter that scopes the log to
+  one trigger (scheduler / webhook / page / Home Assistant / etc.).
+  Chips use the same `.event-type-filter .chip` vocabulary as
+  `/events/` so the two pages feel like the same product. Per-source
+  count badges, with the active chip inverting to the accent. New
+  `EventLog.list(source=)` + `EventLog.source_counts()` powers it.
+- Scheduler row chip + nav icon swapped from `ph-clock-clockwise` to
+  `ph-calendar-dots` (was too easily confused with History's
+  `ph-clock-counter-clockwise`).
+- Top-nav order: History moved after Schedules so the destructive +
+  read-only views aren't adjacent.
+
+### Mobile zoom lock
+
+- New `mobile_zoom_lock` switch under Settings → Server → App
+  (default ON). When ON, the viewport meta pins `maximum-scale=1,
+  user-scalable=no` and a small JS gesture blocker catches iOS
+  Safari's `gesturestart` events (which deliberately ignore the
+  meta). `touch-action: manipulation` on html/body kills double-tap-
+  to-zoom across all mobile browsers. Turn OFF to restore the
+  browser zoom layer for accessibility.
+- `app_settings` now forwarded to every template via
+  `app_factory.py`'s context processor.
+
+### Em-dash sweep
+
+- Replaced every em-dash (U+2014) across the repo with the standard
+  prose substitutes (3179 replacements across 431 files): `" — "` →
+  `, `; bare `—` → `-`. Aligns with the project's "no em-dashes in
+  prose" guideline. Doesn't touch en-dashes (U+2013), still used for
+  numeric ranges.
+
+### Glances ring sizing + picture chip cleanup
+
+- `glances_status` 0.2.3: ring row claims flex space; rings scale
+  with cell up to 14em; redundant CPU hero number dropped in favour
+  of the rings.
+- Picture widgets (`picture_apod`, `picture_apple_album`,
+  `picture_gallery`, `picture_unsplash`): removed the day-badge /
+  sequence pill / folder + count chips / credit-avatar chip after
+  user feedback that they didn't render well. Original captions
+  retained where they existed.
+
+### Docs
+
+- Gallery PNGs recaptured at `lg` (1200×800) for the docs site, so
+  every widget card in `docs/widgets/gallery.md` shows the new
+  visuals at full-detail size. Generated via
+  `scripts/capture_widget_shots.py SIZE=lg`.
+
 ### F1 family visual pass
 
 Continued the widget visual pass through the four F1 widgets. Same goal as
@@ -23,7 +178,7 @@ adapt cleanly across cell sizes.
   the right column only at LG; SVG sized to `100% × 100%` with the
   `preserveAspectRatio` from f1_core's `trackSvg` doing the letterboxing.
 - **f1_next** (0.1.0 → 0.1.3). Country flag emoji in the title (Canada →
-  🇨🇦, Bahrain → 🇧🇭, etc.) — every host on the current calendar plus a
+  🇨🇦, Bahrain → 🇧🇭, etc.), every host on the current calendar plus a
   few historical venues mapped. Six session mini-cards (FP1 / FP2 / FP3 /
   Sprint / Quali / **Race**) replace the status-grid; the Race card was
   previously missing entirely. Each card has icon + label + `Sat 14` date
@@ -35,7 +190,7 @@ adapt cleanly across cell sizes.
 - **f1_standings_drivers** (0.1.0 → 0.1.1). `server.py` now fetches the
   previous round's standings (`/current/{round-1}/driverStandings.json`)
   and computes a per-driver `delta` field so the client can render
-  position-change chips (`↑3` accent-3, `↓1` accent-1, `—` muted,
+  position-change chips (`↑3` accent-3, `↓1` accent-1, `-` muted,
   omitted when no previous-round data). Points-gap micro-bar under each
   row scales to `points / leader_points`, filled in the driver's team
   livery colour. Crown glyph (`ph-crown`) marks the championship leader
@@ -61,7 +216,7 @@ which is conceptually weather even though it lives under `sky_*`). Goal: give
 each widget a real visual anchor instead of paragraphs of numbers, and make
 the layout adapt cleanly across xs / sm / md / lg cells.
 
-- **weather_now** (0.1.5 → 0.1.8). LG is now a 2-column grid — hero +
+- **weather_now** (0.1.5 → 0.1.8). LG is now a 2-column grid, hero +
   4-metric strip on the left, full-height sunrise/sunset arc strip on the
   right (was a thin band crammed under the metrics). MD-tall (height ≥ 600)
   shows the arc band below the metrics; MD-tight (height ≤ 449) drops the
@@ -82,12 +237,12 @@ the layout adapt cleanly across xs / sm / md / lg cells.
   culls by cell width (24 lg / 18 md / 12 sm / 6 xs); axis tick font
   auto-scales 10–20px so wide cells paint legible numbers.
 - **weather_air_quality** (0.1.1 → 0.1.3). Hero replaced with a
-  half-circle gauge — 6 EAQI band segments (moss → teal → ochre →
+  half-circle gauge, 6 EAQI band segments (moss → teal → ochre →
   terracotta → plum → red) with a marker pip at the current value;
   number reads inside the arc, band label below. Per-pollutant grid
   cells gain a micro-bar showing `value / band_max`, tinted by the
   pollutant's own band. Cells participate in the grid via subgrid so
-  every row's label / value / bar tracks stay synchronised — a wrapped
+  every row's label / value / bar tracks stay synchronised, a wrapped
   "4.2 μg/m³" no longer drops one bar below its neighbours.
 - **weather_pollen_count** (0.1.1 → 0.1.7). 4-step severity bar per tile
   (Low / Moderate / High / Very High). Icons scale by severity
@@ -118,8 +273,8 @@ the layout adapt cleanly across xs / sm / md / lg cells.
 
 - The dev `/_test/preview` page is now a **single composed page** in one
   iframe instead of four separate cards. Cells lay out as a recursive
-  halving spiral — cell 1 takes half the panel, cell 2 takes half the
-  remainder, etc. — so the same widget paints at LG → MD → MD → SM →
+  halving spiral, cell 1 takes half the panel, cell 2 takes half the
+  remainder, etc., so the same widget paints at LG → MD → MD → SM →
   SM → XS → XS-unassigned in a single render at panel native dimensions.
 - **Panel-size dropdown** drives the synthetic page's dimensions (Inky
   / Waveshare presets), so the same widget can be eyeballed at every
@@ -152,7 +307,7 @@ the layout adapt cleanly across xs / sm / md / lg cells.
   single grid, with a left rail for the controls: widget picker,
   theme picker, style picker, sample-data toggle, and a form-builder
   generated from the plugin's `cell_options` schema. Useful when
-  iterating on a widget's layout — you can tweak a place label or
+  iterating on a widget's layout, you can tweak a place label or
   unit and see all four sizes reflow without composing a dashboard
   first. Dev-only, gated behind `debug or testing` like the rest of
   `/_test/`.
@@ -168,7 +323,7 @@ the layout adapt cleanly across xs / sm / md / lg cells.
   the sun's current position between rise and set). Fixes the
   "feels empty at lg, cramped at sm" complaint from the visual pass.
 
-## [0.29.0] — 2026-06-05
+## [0.29.0], 2026-06-05
 
 Theme system rebuilt end-to-end, calibrated dither path landed,
 admin password management filled in, plus a long tail of editor /
@@ -176,9 +331,9 @@ device-pipeline polish. Eighty-eight commits aggregated since
 v0.16.26; the intermediate tags v0.16.27 through v0.28.2 carry the
 incremental history.
 
-### Themes — the headline rebuild
+### Themes, the headline rebuild
 
-- **Spectra design system** — orthogonal `data-theme` × `data-style`
+- **Spectra design system**, orthogonal `data-theme` × `data-style`
   axes, set on `<body>` and overridable per cell. Theme controls
   colour only; style controls typography / spacing / shape, never
   colour. Any of the 19 bundled themes composes with any of the 9
@@ -188,7 +343,7 @@ incremental history.
   Movement (bauhaus / destijl / brutalist palettes), and base16 (10
   popular code-editor palettes: Gruvbox, Solarized, Dracula,
   Catppuccin Mocha, Monokai, Tomorrow, One Dark).
-- **Themes page** at top-nav → Themes — a vertical strip of every
+- **Themes page** at top-nav → Themes, a vertical strip of every
   theme on the left, the builder pane in the middle, and a sticky
   preview on the right. Click any theme to load it; bundled themes
   show a "Duplicate to edit" CTA, user themes are editable +
@@ -197,14 +352,14 @@ incremental history.
   + 6 accents × 2 (base + soft) + 1 on-accent), plus mode
   (light/dark) and an optional font-family. Live preview tracks
   every input via inline CSS-variable overrides on the preview pane.
-- **Image-to-theme** — upload a photo or poster, k-means picks
+- **Image-to-theme**, upload a photo or poster, k-means picks
   dominant colours, the assignment heuristic spreads them across the
   Spectra tokens (light/dark mode auto-detected from the modal
   cluster's luminance). One click fills the form. Calibration data
   ported from
   [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)
   (Apache 2.0).
-- **Auto-derive soft tints switch** — when on, every
+- **Auto-derive soft tints switch**, when on, every
   `accent_N_soft` becomes a mix of its accent with the page
   background, recomputed live as either edits. Persists on the
   user theme.
@@ -213,7 +368,7 @@ incremental history.
   Served as a single `[data-theme="user-<slug>"]` stylesheet from
   `/themes/user.css`; loaded alongside the bundled Spectra cascade
   on every composed page.
-- **Bundled-colour parsing** — the builder lifts each bundled
+- **Bundled-colour parsing**, the builder lifts each bundled
   theme's actual `bg / surface / accent-*` values straight from the
   Spectra CSS at import time, so duplicating Nord (or any other
   bundled theme) produces a copy carrying that theme's real colours
@@ -221,7 +376,7 @@ incremental history.
 
 ### Quantizer / colour pipeline
 
-- **Opt-in calibrated palette + tone mapping** — per-device toggle on
+- **Opt-in calibrated palette + tone mapping**, per-device toggle on
   the `esp32_bin` and `pi_bin` renderers. Dithers Floyd-Steinberg
   against the panel's measured Spectra 6 / ACeP colours instead of
   nominal sRGB primaries, and runs a linear tone-map pre-pass that
@@ -235,7 +390,7 @@ incremental history.
   panel preset (`PanelPreset.native_landscape`); the renderer packs
   at the firmware's actual row stride regardless of how the user
   mounts the panel.
-- **Pre-v0.20 ESP32 manifest backfill** — startup migration adds
+- **Pre-v0.20 ESP32 manifest backfill**, startup migration adds
   `native_w` / `native_h` to existing `esp32_client` instance
   manifests so legacy installs don't paint at the wrong stride.
 
@@ -261,7 +416,7 @@ incremental history.
   the new cascade actually paints instead of inheriting stale
   variables.
 - **Multiselect search box actually filters now** (composer regression).
-- **Single-card palette** in the theme builder — surfaces, text, and
+- **Single-card palette** in the theme builder, surfaces, text, and
   the six accent pairs collapsed into one card with sub-group
   headings.
 - **F1 widget pass**: track outline moved + bolder stroke, backing
@@ -295,7 +450,7 @@ incremental history.
 
 - README + wiki refreshed against current state (widget count,
   theme tally, palette token count, removed-feature scrub).
-- `dev/writing-a-plugin.md` refreshed for Spectra — drops the dead
+- `dev/writing-a-plugin.md` refreshed for Spectra, drops the dead
   `--c-*` / `--theme-*` / variant-cell-option doctrine; replaces
   with the semantic-token list, the `data-style` axis, and the
   seven body archetypes.
@@ -319,29 +474,29 @@ incremental history.
 - `variant` cell option from widget manifests. The orthogonal
   `data-theme` × `data-style` axes mean one widget composes with
   every (theme, style) pair instead of shipping N visual directions.
-- `plugins/themes_core/` plugin — themes now live in
+- `plugins/themes_core/` plugin, themes now live in
   `static/style/spectra-*.css` + a Python registry, not the plugin
   tree.
-- `scripts/capture_widget_variants.py` — the per-widget variant
+- `scripts/capture_widget_variants.py`, the per-widget variant
   composite generator. `scripts/capture_widget_shots.py` still
   refreshes the gallery hero shot; cross-theme / cross-style
   comparison lives at `/_test/matrix`.
 
-## [0.16.10] — 2026-06-04
+## [0.16.10], 2026-06-04
 
 ### Fixed
 
 - **The "bare install" upgrade hint in Settings → System no longer
-  suggests `pip install --upgrade tesserae`** — Tesserae isn't on
+  suggests `pip install --upgrade tesserae`**, Tesserae isn't on
   PyPI yet, so that command does nothing useful. Replaced with the
   canonical install path (the `install.sh` curl one-liner, or a
   manual `git clone` + `pip install -e ".[dev]"`) and a note that
   the in-app pull-and-restart flow specifically needs a git
   checkout as the source dir. Canonical installs (which keep `.git`
   via install.sh's `git clone` + editable pip install) are
-  unchanged — they still see the full Check / Apply / Rollback UI.
+  unchanged, they still see the full Check / Apply / Rollback UI.
 
-## [0.16.9] — 2026-06-04
+## [0.16.9], 2026-06-04
 
 ### Fixed
 
@@ -352,7 +507,7 @@ incremental history.
   release bumps both to the correct values; functionally identical
   to v0.16.8.
 
-## [0.16.8] — 2026-06-04
+## [0.16.8], 2026-06-04
 
 ### Added
 
@@ -360,7 +515,7 @@ incremental history.
   New `overrides` textarea on each widget's cell-options form lets you
   rename and reicon any entity in the picker without renaming it in
   Home Assistant. Format is one entity per line:
-  `entity_id | name | icon` — either name or icon can be left empty
+  `entity_id | name | icon`, either name or icon can be left empty
   to keep the auto value (HA's friendly_name and the device-class /
   domain icon respectively). Icon is a Phosphor name (see
   phosphoricons.com) without the `ph-` prefix. Lines starting with
@@ -374,10 +529,10 @@ incremental history.
   ```
 
   Both widget plugins bumped to 0.4.0 to reflect the new manifest
-  field. Existing saved dashboards continue to work — the default is
+  field. Existing saved dashboards continue to work, the default is
   empty and falls through to auto.
 
-## [0.16.7] — 2026-06-04
+## [0.16.7], 2026-06-04
 
 ### Fixed
 
@@ -390,11 +545,11 @@ incremental history.
   the Settings → System controller route those installs through the
   same GitHub release-API view it already used for Docker installs;
   the template gained a third-arm message ("upgrade via your install
-  method — `pip install --upgrade tesserae` for venv installs,
+  method, `pip install --upgrade tesserae` for venv installs,
   re-download the tarball otherwise") for the bare case. Docker
   installs and git checkouts are unchanged.
 
-## [0.16.6] — 2026-06-04
+## [0.16.6], 2026-06-04
 
 ### Fixed
 
@@ -405,12 +560,12 @@ incremental history.
   jarring when the user was triaging dashboards or actively editing a
   page. Forms on `/pages` and `/pages/<id>` now post a hidden
   `return_to` field (`dashboards` / `editor`) the route honours via a
-  safelist — the Send-page Saved tab and any other caller without a
+  safelist, the Send-page Saved tab and any other caller without a
   `return_to` keep the legacy redirect-to-History behaviour. Flash
   message also shortened when the user isn't about to see the History
   tab (no point telling them to watch a tab they're not on).
 
-## [0.16.5] — 2026-06-04
+## [0.16.5], 2026-06-04
 
 ### Fixed
 
@@ -422,14 +577,14 @@ incremental history.
   the misaligned edge lost their resize handles entirely. Replaced
   `findSharedEdges` with per-cell edge handles that detect aligned
   neighbours at pointerdown via exact perpendicular-range matching
-  — aligned grid cases still resize the matched pair together
+ , aligned grid cases still resize the matched pair together
   (e.g. dragging a column edge that spans one row affects both
   cells in that row), but cells whose neighbours don't line up
   resize independently into the void (gap or overlap allowed).
   Dedup by edge-position key so shared edges aren't double-rendered
   in the aligned case.
 
-## [0.16.4] — 2026-06-04
+## [0.16.4], 2026-06-04
 
 ### Fixed
 
@@ -448,7 +603,7 @@ incremental history.
   wide-but-short cells (e.g. 1200×420) the auto rows + minimum hero
   exceeded the cell height and `overflow: hidden` clipped the bottom.
   Added a container query (`max-height: 420px`) that drops the sun
-  row in that case — the size class was deciding on the longer side
+  row in that case, the size class was deciding on the longer side
   so a 1200×420 cell stayed `lg` and kept the sun row even when there
   wasn't room.
 
@@ -461,18 +616,18 @@ incremental history.
   the same container-query fix can be applied per-widget if the bug
   reappears there too.
 
-## [0.16.3] — 2026-06-04
+## [0.16.3], 2026-06-04
 
 ### Fixed
 
 - **Dashboard editor preview iframe now auto-resets every 4 hours.**
   The composer iframe is mounted once when the editor opens, then
-  runs forever — widget setInterval timers (clock, F1 countdown,
+  runs forever, widget setInterval timers (clock, F1 countdown,
   public-transport refresh) accumulate small allocations every
   minute, and the webpage widget's auto-refresh swaps a foreign
   document in repeatedly. Over an overnight idle session those
   compound into multi-GB tab memory (saw 6.5 GB in the wild). A
-  hard reset every 4 hours discards all accumulated state — the
+  hard reset every 4 hours discards all accumulated state, the
   user sees nothing more than the same brief opacity fade as a
   normal save-driven reload.
 - **`/renders/<digest>.png?w=<width>` thumbnail endpoint** with disk
@@ -490,13 +645,13 @@ incremental history.
 
 ### Added
 
-- **`octoprint_status` widget** — live 3D-print monitor for an
+- **`octoprint_status` widget**, live 3D-print monitor for an
   OctoPrint instance. Four canonical directions (r1 Refined, g2
   Geometric, s3 Swiss, d4 Data) pull printer state, job progress
   with ETA, and hotend/bed temperatures via OctoPrint's REST API.
   Includes a sample fixture for the dev gallery.
 
-## [0.16.2] — 2026-06-04
+## [0.16.2], 2026-06-04
 
 ### Changed
 
@@ -522,7 +677,7 @@ incremental history.
   retained.
 - **`spotify_now_playing` dropdown label** "Layout" → "Style"
   (the five variant ids `split/cover/minimal/vinyl/stack` retained
-  as a per-widget layout picker — see rulebook).
+  as a per-widget layout picker, see rulebook).
 
 ### Fixed
 
@@ -554,11 +709,11 @@ incremental history.
   remediation status and the user-preference overrides applied
   during the v0.16.2 pass.
 
-## [0.16.1] — 2026-06-03
+## [0.16.1], 2026-06-03
 
 ### Added
 
-- **`docs/widget-design-system.md`** — the cross-widget rulebook.
+- **`docs/widget-design-system.md`**, the cross-widget rulebook.
   Codifies variant naming (`r1/g2/s3/d4` canonical), title-bar
   discipline (`--wb-bar-h` mandatory for refined bars), font cascade
   (`--theme-font` wins), colour discipline (semantic vs categorical
@@ -570,34 +725,34 @@ incremental history.
 - Quick-lint checklist at the end so a widget author can score their
   finished widget in 30 seconds against the rulebook.
 
-No widget code changed — the rulebook describes what the best
+No widget code changed, the rulebook describes what the best
 current widgets already do. A separate audit (gitignored at
 `notes/widget-audit.md`) catalogues per-widget deviations for a
 post-launch cleanup pass.
 
-## [0.16.0] — 2026-06-03
+## [0.16.0], 2026-06-03
 
 ### Added
 
-- **`ha_todo` widget** — items from a Home Assistant todo list
+- **`ha_todo` widget**, items from a Home Assistant todo list
   (built-in shopping list, Google Tasks, Microsoft To-Do, CalDAV,
   anything exposed as a `todo.*` entity). Four selectable visual
   directions matching the HA family convention:
-  - `r1` Bauhaus Refined — dark header + numbered list with due dates
-  - `g2` Bauhaus Geometric — colour-block tiles with status colour band
-  - `s3` Swiss / International — hairline header + tabular rows
-  - `d4` Data forward — big stat block (X open / Y done) + compact list
+  - `r1` Bauhaus Refined, dark header + numbered list with due dates
+  - `g2` Bauhaus Geometric, colour-block tiles with status colour band
+  - `s3` Swiss / International, hairline header + tabular rows
+  - `d4` Data forward, big stat block (X open / Y done) + compact list
   Cell options: `entity_id` (picker filtered to `todo.*` entities),
   `title`, `max_items` (1–20), `include_completed`. Due-date tone
-  reflects state — OVERDUE renders danger, TODAY warn, future muted.
+  reflects state, OVERDUE renders danger, TODAY warn, future muted.
   Total widget count: **57**.
-- **`ha_core.call_service_with_response()`** — POST helper for HA's
+- **`ha_core.call_service_with_response()`**, POST helper for HA's
   service calls that need a payload back (HA 2024.5+ `return_response`).
   General-purpose, not just todo: any service that supports
   `return_response` (e.g. weather forecasts, conversation agent
   responses) can now be called from widgets.
 
-## [0.15.1] — 2026-06-03
+## [0.15.1], 2026-06-03
 
 ### Fixed
 
@@ -609,16 +764,16 @@ post-launch cleanup pass.
   checklist auto-saves + reloads on change, so ticking a device
   re-enables Push without an extra save step. Pages with no devices
   registered at all (legacy single-head install) keep the enabled
-  button — the virtual-panel fan-out is intentional there.
+  button, the virtual-panel fan-out is intentional there.
 - **Send page Send buttons mirror the same guard.** Each tab's Send
   button (File / URL / Webpage / Gallery) is disabled until at least
-  one target device is ticked — surfaces the missing pick before the
+  one target device is ticked, surfaces the missing pick before the
   user clicks instead of after a POST round-trip. The Saved-page tab
   is unaffected since it inherits the picked-page's bindings.
 - **Send page validation failure preserves form input.** Posting
   with no device ticked, a missing URL, or invalid viewport dims
   used to redirect to ``/send`` and destroy everything the user had
-  typed — paste the URL again, re-pick fit, re-pick gallery file.
+  typed, paste the URL again, re-pick fit, re-pick gallery file.
   The Send routes now re-render in place via a new
   ``_render_send_with_form`` helper that round-trips the form
   values + the picked device IDs through the template, so a fix is
@@ -626,7 +781,7 @@ post-launch cleanup pass.
 
 ### Added
 
-- **`spotify_queue` widget** — current track + next few items from
+- **`spotify_queue` widget**, current track + next few items from
   your Spotify queue. Refined Bauhaus shell with the standard
   `--wb-bar-h` header, accent-band lede showing now-playing + album
   art, and a numbered list of upcoming tracks (title / artist /
@@ -635,35 +790,35 @@ post-launch cleanup pass.
   Total widget count: **56**.
 - **`spotify_core.queue()`** wraps `GET /v1/me/player/queue` with the
   same OAuth + token-refresh dance as `now_playing()`. The endpoint
-  is Premium-only — a 403 surfaces as a clear *"Spotify Premium is
+  is Premium-only, a 403 surfaces as a clear *"Spotify Premium is
   required to read the queue."* error, not a bare HTTP code. No
   re-auth needed: the existing `user-read-playback-state` scope
   already covers the queue endpoint.
 
-## [0.14.4] — 2026-06-03
+## [0.14.4], 2026-06-03
 
 ### Fixed
 
 - **news_reddit no longer deadlocks the renderer during a push.** The
   widget's fetch used to submit a `FetchRequest` to the same
-  `BrowserPool` that was currently running the screenshot — the
+  `BrowserPool` that was currently running the screenshot, the
   pool's single worker was busy with the render, so reddit's fetch
   blocked behind its own render until the hydration overall cap
   fired (~12 s). On a dashboard that includes reddit, that ate most
   of the renderer's 15 s `goto` budget, leaving only ~3 s for the
-  `load` event + post-load image / font wait — enough margin under
+  `load` event + post-load image / font wait, enough margin under
   light load, but the trigger for the intermittent
   ``Page.goto: Timeout 15000ms exceeded`` errors users hit on
   HA-driven pushes (cold widget caches at random hours of the day).
 
   The fetch path is now context-aware:
 
-  * **Editor / dev gallery** (``ctx["preview"]=True``) — urllib
+  * **Editor / dev gallery** (``ctx["preview"]=True``), urllib
     against ``old.reddit.com`` first (less aggressively filtered
     than ``www.reddit.com``), falling through to the BrowserPool
     only if urllib fails. The pool's Chromium TLS/JA3 fingerprint
     is still available as a backstop when needed.
-  * **Push render** (``ctx["preview"]=False``) — the pool path is
+  * **Push render** (``ctx["preview"]=False``), the pool path is
     skipped entirely; urllib only. If urllib 403s the composer's
     last-good fallback ([app/composer.py:163](app/composer.py#L163))
     serves the prior payload so the cell still renders.
@@ -672,7 +827,7 @@ post-launch cleanup pass.
   (Accept-Language, Sec-Fetch-*, ``Cookie: over18=1``) so the
   Reddit bot filter accepts it more often.
 
-## [0.14.3] — 2026-06-03
+## [0.14.3], 2026-06-03
 
 ### Added
 
@@ -680,14 +835,14 @@ post-launch cleanup pass.
   `TimeoutError`.** ``RenderRequest.max_attempts`` (default 3)
   controls how many fresh-context attempts each render gets. Each
   retry tears down the half-loaded page + context so the next try
-  starts clean. Only timeouts retry — other Playwright errors
+  starts clean. Only timeouts retry, other Playwright errors
   (invalid URL, browser-side crash, frame detached) surface
   immediately so we don't burn the deadline on something that
   won't recover. The browser pool's outer deadline scales with
   ``max_attempts`` so the worst-case 3×15s retry fits. The
   intermittent failure mode this fixes: HA-driven pushes that
   surfaced as ``Page.goto: Timeout 15000ms exceeded`` under no
-  obvious cause — usually a brief loopback contention or a
+  obvious cause, usually a brief loopback contention or a
   background-thread GC pause that ate the navigation window.
 
 ### Fixed
@@ -706,7 +861,7 @@ post-launch cleanup pass.
   `--wb-bar-bg` / `--wb-bar-fg` so dark themes don't render the
   bar as "dark on dark".
 
-## [0.14.2] — 2026-06-03
+## [0.14.2], 2026-06-03
 
 ### Changed
 
@@ -718,7 +873,7 @@ post-launch cleanup pass.
   Removed. Matching line in `app/telemetry.py`'s module docstring
   removed too for consistency.
 
-## [0.14.1] — 2026-06-03
+## [0.14.1], 2026-06-03
 
 ### Added
 
@@ -737,18 +892,18 @@ post-launch cleanup pass.
   `--theme-font` / `--theme-font-mono` cascade so widgets respect
   the font picker.
 - **`variant` cell-option pattern** documented in both
-  `docs/widgets.md` and `docs/dev/writing-a-plugin.md` — the
+  `docs/widgets.md` and `docs/dev/writing-a-plugin.md`, the
   convention 28 shipped widgets use to ship multiple visual
   directions (Refined / Geometric / Swiss / Data / etc.) through a
   single dropdown.
 - **TRMNL HTTP-pull pipeline** documented across
   `docs/install/clients.md`, `docs/install/devices.md`,
   `docs/install/server.md`, `docs/dev/architecture.md`, and
-  `docs/compatibility.md` — pairing flow, the `/api/setup`,
+  `docs/compatibility.md`, pairing flow, the `/api/setup`,
   `/api/display`, `/api/log` endpoints, and the `trmnl_png`
   renderer's dither options.
 - **Composition workflow walkthrough** in
-  `docs/install/devices.md` — pick a layout preset, assign widgets
+  `docs/install/devices.md`, pick a layout preset, assign widgets
   per cell, tune via the per-cell zoom slider, bind devices.
 
 ### Changed
@@ -794,7 +949,7 @@ post-launch cleanup pass.
   styling, with the 8 new HA / weather widgets that landed in 0.13 /
   0.14 captured for the first time.
 
-## [0.14.0] — 2026-06-03
+## [0.14.0], 2026-06-03
 
 ### Added
 
@@ -806,7 +961,7 @@ post-launch cleanup pass.
   screenshot on every cell's `<img>` finishing its load (5 s cap,
   walks every shadow root). Fixes HA camera snapshots, Spotify album
   art, Unsplash CDN images, and any other widget that fetches via a
-  plain `<img src>` — previously the screenshot fired during the
+  plain `<img src>`, previously the screenshot fired during the
   download and captured a half-loaded / broken-image frame. New
   `images=N.NN` phase appears in the render-timing log.
 
@@ -829,7 +984,7 @@ post-launch cleanup pass.
   `widget-bauhaus-wx.css`.** `ha_sensor`, `ha_climate`, `ha_history`,
   and `ha_entities` now link both shared stylesheets so the
   `--wb-bar-*` and `--wx-*` tokens resolve consistently with the
-  weather widgets — refined title bars across the whole family land
+  weather widgets, refined title bars across the whole family land
   at the same physical pixel size at every zoom level.
 
 ### Fixed
@@ -838,13 +993,13 @@ post-launch cleanup pass.
   checkbox inside `.multiselect-opt` was clipped to a 1×1 footprint
   via `clip-path: inset(50%)`, which made the browser's auto-focus
   `scrollIntoView` think the focused element was at the parent
-  label's position — clicking an option further down the scrollable
+  label's position, clicking an option further down the scrollable
   list bubbled up to the document and scrolled the whole page. Now
   the checkbox is `opacity: 0` and sized to fill the option label
   (which is `position: relative`), so the auto-focus scroll target is
   already in view and the page stays put.
 
-## [0.13.2] — 2026-06-03
+## [0.13.2], 2026-06-03
 
 ### Added
 
@@ -852,15 +1007,15 @@ post-launch cleanup pass.
   `--wb-bar-h` / `--wb-bar-px` / `--wb-bar-fs` / `--wb-bar-icon-sz` /
   `--wb-mark-sz` CSS vars on `:host` in `widget-bauhaus.css`
   counter-scale by `var(--c-zoom, 1)` so every refined title bar
-  lands at the same 36 physical pixels at every zoom level —
+  lands at the same 36 physical pixels at every zoom level -
   consistent across `.wb-bar`, `.wx-header-dark`, and every
   per-widget header in the HA family.
 - **Dev-mode data import.** `Settings → System → Data → Import`
-  is callable in `--dev` mode — previously it refused; now it
+  is callable in `--dev` mode, previously it refused; now it
   flashes a "stop and restart manually" hint instead of trying to
   `os.execv` the dev process.
 
-## [0.13.1] — 2026-06-03
+## [0.13.1], 2026-06-03
 
 ### Fixed
 
@@ -870,7 +1025,7 @@ post-launch cleanup pass.
   list and a `copy.deepcopy` result captured in a typed local before
   return.
 
-## [0.13.0] — 2026-06-03
+## [0.13.0], 2026-06-03
 
 ### Added
 
@@ -887,7 +1042,7 @@ post-launch cleanup pass.
   to `--theme-accent` when a theme omits it.
 - **Snap-to-grid layout editor.** The "Custom layout" disclosure on
   the page editor gains a snap-to-grid toggle with adjustable cols /
-  rows — useful when a preset doesn't quite fit but you don't want
+  rows, useful when a preset doesn't quite fit but you don't want
   fractional drag-resize.
 - **8 new weather + sky widget variants.** Each of the existing 8
   weather widgets gains 4 visual directions (Refined / Geometric /
@@ -904,7 +1059,7 @@ post-launch cleanup pass.
 ### Changed
 
 - **Decorative vs status colour discipline.** Audit pass across every
-  bundled widget — every decorative use of `--c-ok` / `--c-warn` /
+  bundled widget, every decorative use of `--c-ok` / `--c-warn` /
   `--c-danger` got rerouted through `--c-data-*` (categorical) so the
   status hues are reserved for genuine advisories / hazards / errors
   only. Themes can now retune status colours without warping weather
@@ -914,18 +1069,18 @@ post-launch cleanup pass.
   switched over to the shared `--wb-bar-*` tokens; every refined
   header in the bundle now reads identically.
 
-## [0.12.14] — 2026-06-02
+## [0.12.14], 2026-06-02
 
 ### Fixed
 
 - **`github_repo` widget showed "No commit activity" on active
-  repos.** GitHub's `/stats/commit_activity` endpoint is async — the
+  repos.** GitHub's `/stats/commit_activity` endpoint is async, the
   first request returns HTTP 202 with an empty body while GitHub
   builds the stats; subsequent requests get the real data. Our
   `request_json` was crashing on the empty body
   (`json.loads("")` → `JSONDecodeError`), the widget caught the
   exception, set `activity = []`, and **cached that empty result for
-  10 minutes** — so even after GitHub finished computing, the widget
+  10 minutes**, so even after GitHub finished computing, the widget
   kept rendering empty until the cache expired.
   - `github_core.request_json` now raises a dedicated
     `GithubAcceptedError` on 202 responses instead of choking on an
@@ -935,10 +1090,10 @@ post-launch cleanup pass.
     picks up the real data.
   - For already-cached empty results (the ones currently sticking
     around for users hit by this), the widget now ignores a cached
-    entry whose `commit_weeks` is empty and refetches — self-heals
+    entry whose `commit_weeks` is empty and refetches, self-heals
     without waiting for the 10-minute TTL.
 
-## [0.12.13] — 2026-06-02
+## [0.12.13], 2026-06-02
 
 ### Fixed
 
@@ -955,7 +1110,7 @@ post-launch cleanup pass.
   stale-but-real data, not red error text. Cleared on process restart
   (a fresh install has no fallback to serve anyway).
 
-## [0.12.12] — 2026-06-02
+## [0.12.12], 2026-06-02
 
 ### Fixed
 
@@ -965,7 +1120,7 @@ post-launch cleanup pass.
   Widget client.js imports, font fetches, and the Phosphor icon CSS
   keep the network busy long after the page is visually ready, so
   `networkidle` timed out on every render. When that timed out,
-  Playwright aborted the navigation — putting the page in a
+  Playwright aborted the navigation, putting the page in a
   half-aborted state where the next `page.evaluate` stalled for
   ~60s waiting for stability. Two changes to fix:
   * `page.goto` now waits for `load` (deterministic, fast).
@@ -977,14 +1132,14 @@ post-launch cleanup pass.
   so a stuck-widget mount can be diagnosed independently from a slow
   page-load.
 
-## [0.12.11] — 2026-06-02
+## [0.12.11], 2026-06-02
 
 ### Fixed
 
 - **Hydration timeouts (45s overall / 35s per widget) blew past the
   renderer's 15s `page.goto` budget.** Caught by the per-phase render
   log added in v0.12.8: a Weather dashboard push showed
-  `goto=15.02s evaluate=57.44s screenshot=0.19s` — total 73s — with a
+  `goto=15.02s evaluate=57.44s screenshot=0.19s`, total 73s, with a
   matching `page hydration overall timeout (45.0s)` warning. The
   server was still computing the response when Playwright timed out,
   so the browser saw a delayed/aborted navigation and the `evaluate`
@@ -997,32 +1152,32 @@ post-launch cleanup pass.
 - **`weather_pollen_count` blocked hydration with a slow Melbourne
   scrape.** The fallback HTML scrape of `melbournepollen.com.au`
   still used bare `urllib.request.urlopen` with the 15s widget-level
-  timeout, on top of the open-meteo fetch — worst case 46s for that
+  timeout, on top of the open-meteo fetch, worst case 46s for that
   one widget alone, blowing the new hydration cap. Switched to a new
-  `app.plugin_http.fetch_text` helper (5s timeout, no retries —
+  `app.plugin_http.fetch_text` helper (5s timeout, no retries -
   it's an explicitly-best-effort fallback).
 
 ### Added
 
-- **`fetch_text()` in `app.plugin_http`** — sibling to `fetch_json`
+- **`fetch_text()` in `app.plugin_http`**, sibling to `fetch_json`
   for non-JSON endpoints (HTML scrapes, RSS feeds). Same retry +
   backoff machinery; defaults to zero retries since text-scrape
   fallbacks shouldn't be retried into hydration timeouts.
 
-## [0.12.10] — 2026-06-02
+## [0.12.10], 2026-06-02
 
 ### Fixed
 
 - **F1 widgets surface `TimeoutError` when the Jolpica F1 API blips.**
   The four F1 plugins (`f1_next`, `f1_last_race`, `f1_weekend`,
   `f1_standings_drivers`) still used bare `urllib.request.urlopen`
-  with a 10s timeout — same fragile pattern v0.12.5 fixed in the
+  with a 10s timeout, same fragile pattern v0.12.5 fixed in the
   weather widgets but never propagated to F1. Switched them to
   `app.plugin_http.fetch_json` (15s timeout, one retry, 1s backoff),
   so a transient SSL handshake hang on jolpi.ca no longer paints
   "TimeoutError: the read operation timed out" into the cell.
 
-## [0.12.9] — 2026-06-02
+## [0.12.9], 2026-06-02
 
 ### Fixed
 
@@ -1034,12 +1189,12 @@ post-launch cleanup pass.
   the read operation timed out" rendered into the cell. Hydration now
   uses a `ThreadPoolExecutor` (max 8 workers), so a dashboard's
   render time is bound by the slowest single widget rather than
-  their sum. Two safety caps: per-widget 35s, overall 45s — beyond
+  their sum. Two safety caps: per-widget 35s, overall 45s, beyond
   those an unfinished cell gets a synthetic `{"error": …}` so the
   widget template renders a clean failure state rather than blocking
   the whole page.
 
-## [0.12.8] — 2026-06-02
+## [0.12.8], 2026-06-02
 
 ### Fixed
 
@@ -1062,7 +1217,7 @@ post-launch cleanup pass.
   composed URL. "Why is this push taking 70s?" investigations get a
   concrete breadcrumb instead of guesswork.
 
-## [0.12.7] — 2026-06-02
+## [0.12.7], 2026-06-02
 
 ### Fixed
 
@@ -1075,10 +1230,10 @@ post-launch cleanup pass.
   best-effort (a missed font wait beats a whole-render fail), and the
   BrowserPool's exception handler now treats "Execution context was
   destroyed" / "target … has been closed" the same as a dead browser
-  — drops the handle so the next render relaunches Chromium cleanly,
+ , drops the handle so the next render relaunches Chromium cleanly,
   even when `is_connected()` still returns True.
 
-## [0.12.6] — 2026-06-02
+## [0.12.6], 2026-06-02
 
 ### Added
 
@@ -1091,14 +1246,14 @@ post-launch cleanup pass.
   Safari favicon fallback, 512 for future social cards). The HA stable
   + edge add-on directories now ship the 128 PNG as `icon.png`.
 
-## [0.12.5] — 2026-06-02
+## [0.12.5], 2026-06-02
 
 ### Fixed
 
 - **Chart.js 404'd under HA Ingress on the four chart-using widgets.**
   `finance_currency`, `finance_crypto`, `finance_stock`, and
   `weather_hourly` all loaded Chart.js by creating a `<script>` and
-  setting `src = "/static/vendor/chart.umd.min.js"` — and because
+  setting `src = "/static/vendor/chart.umd.min.js"`, and because
   that script lives in `document.head`, not in the widget's shadow
   root, v0.12.4's shadow-DOM URL sweep didn't touch it. Patched the
   four widgets to prepend `window.TESSERAE_URL_PREFIX` themselves.
@@ -1111,7 +1266,7 @@ post-launch cleanup pass.
   instead of bare `urllib.request.urlopen`. A blip on the first try
   no longer surfaces an error in the cell.
 
-## [0.12.4] — 2026-06-02
+## [0.12.4], 2026-06-02
 
 ### Fixed
 
@@ -1122,13 +1277,13 @@ post-launch cleanup pass.
   to the HA host root and 404'd, so each shadow DOM rendered with
   default user-agent styles. `composer.js` now walks the freshly-
   rendered shadow root and prepends `TESSERAE_URL_PREFIX` to root-
-  relative `href` / `src` attributes — one place, catches all 51
+  relative `href` / `src` attributes, one place, catches all 51
   widget files without touching them.
 - **Inter / JetBrains Mono fonts missing under HA Ingress.** The
   `@font-face` rules in `static/style/base.css` used absolute
   `url("/plugins/fonts_core/…")` which resolved against the HA host
   root. Switched to CSS-relative `url("../../plugins/fonts_core/…")` so
-  the browser resolves them against `base.css`'s own URL — works with
+  the browser resolves them against `base.css`'s own URL, works with
   or without an ingress prefix without runtime substitution.
 - **Tesserae nav logo took users back to the HA dashboard.** The brand
   link in `_base.html` was a hardcoded `href="/"` which inside the
@@ -1139,21 +1294,21 @@ post-launch cleanup pass.
   ingress prefix. All switched to `url_for(...)` or
   `request.script_root + …`.
 - **Headless renderer hit the wrong loopback port on Edge.** The Edge
-  add-on publishes its API on host port 8766, container 8765 — but
+  add-on publishes its API on host port 8766, container 8765, but
   `to_loopback_url` preserved the URL's port (8766), so it tried
   `http://127.0.0.1:8766` inside the container where nothing was
   listening. A new `TESSERAE_BIND_PORT` env var (set in both add-on
   configs) tells the renderer which internal port the server actually
   binds, independent of the host-side mapping.
 
-## [0.12.3] — 2026-06-02
+## [0.12.3], 2026-06-02
 
 ### Added
 
 - **HA Add-on Configuration tab now actually wires through.** The
   `log_level`, `mqtt_host`, `mqtt_port`, `mqtt_username`, and
   `mqtt_password` options were declared in `config.yaml` but went
-  nowhere — users had to set the same values twice (once in HA's
+  nowhere, users had to set the same values twice (once in HA's
   form, once in Tesserae's Settings → MQTT broker page). A new
   `app/ha_options.py` reads `/data/options.json` on every container
   start (HA mode only) and applies log level to the root logger and
@@ -1163,10 +1318,10 @@ post-launch cleanup pass.
   and shows a "managed in the add-on's Configuration tab" blurb. The
   card keeps `keepalive` and `client_id` editable since they have no
   HA equivalent. Telemetry / mDNS / HA discovery / browser warmup
-  intentionally stay Tesserae-side — those are user-tunable consent
+  intentionally stay Tesserae-side, those are user-tunable consent
   or runtime knobs, not connection config.
 
-## [0.12.2] — 2026-06-02
+## [0.12.2], 2026-06-02
 
 ### Fixed
 
@@ -1174,19 +1329,19 @@ post-launch cleanup pass.
   Tesserae's.** `_capture_http_port` read `request.host` on every
   request and stashed the port. Inside Ingress that host is the HA
   frontend (`homeassistant.local:8123`), so every MQTT push payload
-  ended up with `http://<lan-ip>:8123/renders/…` — devices 404'd at
+  ended up with `http://<lan-ip>:8123/renders/…`, devices 404'd at
   HA. The before-request hook now short-circuits when
   `X-Ingress-Path` is present; under Ingress we fall back to
   `TESSERAE_HTTP_PORT` / the default 8765 instead, matching the
   add-on's actual host port mapping.
 
-## [0.12.1] — 2026-06-02
+## [0.12.1], 2026-06-02
 
 ### Fixed
 
 - **"Importing a module script failed." on every widget under HA
   Ingress.** `composer.js` did `import("/plugins/<id>/client.js")`
-  with an absolute path — inside the ingress iframe that resolves to
+  with an absolute path, inside the ingress iframe that resolves to
   the HA host root and 404s with an HTML response, which the browser
   reports as a module-import failure. The compose page now exposes
   `window.TESSERAE_URL_PREFIX` the same way `_base.html` does, and the
@@ -1195,7 +1350,7 @@ post-launch cleanup pass.
   `f1_core/static/circuits.js` helper now use a relative import so
   they're prefix-independent.
 
-## [0.12.0] — 2026-06-02
+## [0.12.0], 2026-06-02
 
 ### Breaking
 
@@ -1203,7 +1358,7 @@ post-launch cleanup pass.
   pile of dev tooling that owns 8000 (Django runserver, `python -m
   http.server`, generic admin UIs) so a fresh `docker compose up`
   doesn't immediately collide with whatever else the user has. Affects
-  every entry point — `tesserae --port`, the Dockerfile EXPOSE, the
+  every entry point, `tesserae --port`, the Dockerfile EXPOSE, the
   compose example, the install.sh / install.ps1 prompt default, mDNS,
   and `TESSERAE_HTTP_PORT`'s fallback. ESP32 / Pi firmware images with
   `:8000` baked into the saved base URL will need their Tesserae URL
@@ -1217,7 +1372,7 @@ post-launch cleanup pass.
 - **Built-in broker disabled under the HA Add-on.** Home Assistant's
   bundled Mosquitto add-on already owns port 1883 on the host, so
   running Tesserae's embedded amqtt alongside it creates two brokers
-  on the same address — devices end up talking to whichever one their
+  on the same address, devices end up talking to whichever one their
   client happens to hit, and nothing reliable works. Inside an HA
   install the Settings → MQTT broker card hides every `embedded_*`
   field (toggle included) and the onboarding wizard skips the
@@ -1236,27 +1391,27 @@ post-launch cleanup pass.
   offline even though SSE / MQTT were both fine. The same bug affected
   the icon picker's Phosphor manifest fetch and the editor preview
   fetch. The base template now exposes `window.TESSERAE_URL_PREFIX`
-  (Flask's `request.script_root` — the ingress prefix the WSGI
+  (Flask's `request.script_root`, the ingress prefix the WSGI
   middleware extracted from `X-Ingress-Path`, empty otherwise), and the
   four affected JS sites prepend it.
 - **Noisy `ha_discovery` tracebacks during broker reconnect / shutdown.**
   When the MQTT transport is explicitly disconnected (settings swap,
   process exit), the discovery publishers used to fire a full
-  `RuntimeError` stack trace per retained config — dozens of them per
+  `RuntimeError` stack trace per retained config, dozens of them per
   shutdown. Discovery configs are already retained on the broker and
   get re-published when discovery next starts, so we now skip publishes
   silently when the transport is disconnected and log any in-flight
   disconnect race at `debug` instead of `warning` with `exc_info`.
   Other publish failures still log loudly with a traceback.
 
-## [0.11.17] — 2026-06-02
+## [0.11.17], 2026-06-02
 
 ### Fixed
 
 - **MQTT client-id collisions between two installs sharing one
   broker.** A bare-metal Tesserae and the HA Add-on Tesserae both
   pointing at HA's bundled `core-mosquitto` saw "MQTT disconnected:
-  Unspecified error" every couple of seconds — the broker evicted
+  Unspecified error" every couple of seconds, the broker evicted
   whichever client connected second the moment its duplicate
   client-id was already in use. The default client-id resolver now
   appends a 6-character hex suffix persisted to
@@ -1264,11 +1419,11 @@ post-launch cleanup pass.
   coordinate between hosts; persistent so MQTT subscriptions stay
   attached to a stable id across restarts; one-shot so existing
   installs don't get a new id and lose their retained-message
-  bindings on upgrade — they'll generate one on first restart and
+  bindings on upgrade, they'll generate one on first restart and
   hold it from then on. Settings → Broker → MQTT client id still
   overrides everything.
 
-## [0.11.16] — 2026-06-02
+## [0.11.16], 2026-06-02
 
 ### Fixed
 
@@ -1280,7 +1435,7 @@ post-launch cleanup pass.
   MQTT push frames or polling the TRMNL BYOS endpoint at that URL
   would silently fail. Resolution order is now:
   1. `TESSERAE_HOST_IP` env var (unchanged, always wins).
-  2. HA Supervisor's `/network/info` API — picks the primary
+  2. HA Supervisor's `/network/info` API, picks the primary
      interface's IPv4 address. Only reachable when
      `hassio_api: true` is set on the add-on (both add-on definitions
      bump that in the companion repo).
@@ -1290,7 +1445,7 @@ post-launch cleanup pass.
   Supervisor API on every `detect_local_ip()` call (multiple admin
   routes / page renders use it).
 
-## [0.11.15] — 2026-06-02
+## [0.11.15], 2026-06-02
 
 ### Added
 
@@ -1300,9 +1455,9 @@ post-launch cleanup pass.
   to the existing `:main` and `:latest`). The companion add-on repo
   gained a parallel `tesserae-edge/` add-on definition that tracks
   those tags via the sync-addon workflow, which now has two jobs:
-  - `bump-stable` — fires on `release: published`, edits
+  - `bump-stable`, fires on `release: published`, edits
     `tesserae/config.yaml`.
-  - `bump-edge` — fires on `push: branches: [main]`, edits
+  - `bump-edge`, fires on `push: branches: [main]`, edits
     `tesserae-edge/config.yaml` to the per-commit edge version.
   HA users see two add-ons in the store. Stable installs the
   released Tesserae; edge installs whatever's on `main` right now.
@@ -1310,7 +1465,7 @@ post-launch cleanup pass.
   persistent `/data` volume); edge intentionally doesn't expose
   port 8000 on the host so it can coexist with stable.
 
-## [0.11.14] — 2026-06-02
+## [0.11.14], 2026-06-02
 
 ### Fixed
 
@@ -1322,7 +1477,7 @@ post-launch cleanup pass.
   process EPERM'd on the first `mkdir`. Entrypoint now also chowns
   `TESSERAE_DATA_ROOT` when set and different from `/app/data`.
 
-## [0.11.13] — 2026-06-02
+## [0.11.13], 2026-06-02
 
 ### Added
 
@@ -1331,12 +1486,12 @@ post-launch cleanup pass.
   `TESSERAE_HA_INGRESS=1` env var is set (the companion HA Add-on
   exports it via its `config.yaml` `environment:` section). Lets the
   maintainer see the HA-Add-on subset of the installed fleet as it
-  grows. No content sent — just a single `true` / `false` deployment
+  grows. No content sent, just a single `true` / `false` deployment
   flag, same shape as `is_docker`.
 - **`TESSERAE_DATA_ROOT` env var** to override the data directory. The
   HA Add-on sets this to `/data` so Tesserae's settings, dashboards,
   schedules and event log land on HA Supervisor's per-add-on
-  persistent volume — which Supervisor automatically backs up across
+  persistent volume, which Supervisor automatically backs up across
   add-on upgrades.
 
 ### Fixed
@@ -1350,10 +1505,10 @@ post-launch cleanup pass.
   itself 404'd. The middleware now always wraps (it's a no-op when
   there's no `X-Ingress-Path` header), and the add-on's `config.yaml`
   uses `environment:` to set the env var directly. The auth-gate
-  bypass still requires both env var + header — that part stays
+  bypass still requires both env var + header, that part stays
   belt-and-braces.
 
-## [0.11.12] — 2026-06-02
+## [0.11.12], 2026-06-02
 
 ### Added
 
@@ -1367,7 +1522,7 @@ post-launch cleanup pass.
   with Contents: read+write on the add-on repo only). Patch tags
   without a matching GitHub Release do NOT churn the add-on.
 
-## [0.11.11] — 2026-06-02
+## [0.11.11], 2026-06-02
 
 ### Added
 
@@ -1388,7 +1543,7 @@ post-launch cleanup pass.
   The companion add-on lives at
   [dmellok/homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
 
-## [0.11.10] — 2026-06-02
+## [0.11.10], 2026-06-02
 
 ### Added
 
@@ -1398,7 +1553,7 @@ post-launch cleanup pass.
   "Tesserae v0.11.10". 60% opacity by default, brightens to 95% on
   hover. Pure cosmetic; no layout impact above the fold.
 
-## [0.11.9] — 2026-06-02
+## [0.11.9], 2026-06-02
 
 ### Added
 
@@ -1420,7 +1575,7 @@ post-launch cleanup pass.
   came through under the SSE endpoint's actual name (``log``) and
   were silently dropped. Listener corrected to ``log``.
 
-## [0.11.8] — 2026-06-02
+## [0.11.8], 2026-06-02
 
 ### Changed
 
@@ -1431,7 +1586,7 @@ post-launch cleanup pass.
   on each push event, the tab refreshes the history list in place
   (debounced 300 ms to collapse multi-target fan-outs into one swap).
 
-## [0.11.7] — 2026-06-02
+## [0.11.7], 2026-06-02
 
 ### Changed
 
@@ -1445,7 +1600,7 @@ post-launch cleanup pass.
 - Tests run the bg path synchronously (under `app.testing`) so
   ``assert_called_with`` patterns stay deterministic.
 
-## [0.11.6] — 2026-06-01
+## [0.11.6], 2026-06-01
 
 ### Fixed
 
@@ -1454,13 +1609,13 @@ post-launch cleanup pass.
   didn't narrow when `request` was narrowed by `isinstance(request,
   FetchRequest)`. Cast the future explicitly on each branch.
 
-## [0.11.5] — 2026-06-01
+## [0.11.5], 2026-06-01
 
 ### Changed
 
 - **`news_reddit` widget gets a Chromium-fingerprinted fetch path.**
   Reddit's public RSS feed intermittently blocks plain `urllib`
-  requests regardless of User-Agent — the bot-shape filter
+  requests regardless of User-Agent, the bot-shape filter
   fingerprints on TLS / JA3 / HTTP/2 framing, not just the UA. The
   widget now prefers the warm `BrowserPool`'s `fetch_text` (Chromium's
   real fingerprint) and falls back to `urllib` only when the pool is
@@ -1470,7 +1625,7 @@ post-launch cleanup pass.
   alongside `render(RenderRequest)` so other widgets hitting flaky
   upstreams can opt in without touching the renderer code.
 
-## [0.11.4] — 2026-06-01
+## [0.11.4], 2026-06-01
 
 ### Added
 
@@ -1483,7 +1638,7 @@ post-launch cleanup pass.
   for an hour to stay under GitHub's 60/hr anonymous rate limit. Source
   installs keep the existing git-pull / re-exec self-updater.
 
-## [0.11.3] — 2026-06-01
+## [0.11.3], 2026-06-01
 
 ### Changed
 
@@ -1499,13 +1654,13 @@ post-launch cleanup pass.
   `importlib.metadata` (the source-checkout vs. installed-wheel split
   already shipped in 0.11.2).
 
-## [0.11.2] — 2026-06-01
+## [0.11.2], 2026-06-01
 
 ### Fixed
 
 - **Telemetry was reporting the wrong version.** The app version sent in
   `appVersion` / `sdkVersion` came from `importlib.metadata.version("tesserae")`,
-  which reads frozen wheel metadata — so an `-e .` install kept reporting
+  which reads frozen wheel metadata, so an `-e .` install kept reporting
   whatever pyproject.toml said at the last `pip install`, even if the
   version got bumped on disk after. Source checkouts now read
   `pyproject.toml` directly; installed wheels still fall back to
@@ -1515,11 +1670,11 @@ post-launch cleanup pass.
   The machine-readable ISO timestamp stays in the `<time datetime="…">`
   attribute for accessibility.
 
-## [0.11.1] — 2026-06-01
+## [0.11.1], 2026-06-01
 
 ### Changed
 
-- `github_repo` — tightened the four directions to match an updated
+- `github_repo`, tightened the four directions to match an updated
   handoff for the repo card specifically:
   - RE1 (Refined): repo name stays lowercase; stat row is hairlines now
     (no solid-colour tiles), and description carries inline lang +
@@ -1533,7 +1688,7 @@ post-launch cleanup pass.
     language list (row per language, distributed to fill the column)
     instead of a wrapped legend.
 
-## [0.11.0] — 2026-06-01
+## [0.11.0], 2026-06-01
 
 ### Added
 
@@ -1549,19 +1704,19 @@ post-launch cleanup pass.
 
 - GitHub widgets map the design's categorical accent palette (green /
   red / yellow / blue / ink / muted) to `--c-data-2` / `--c-accent` /
-  `--c-data-3` / `--c-data-4` / `--c-text` / `--c-text-soft` —
+  `--c-data-3` / `--c-data-4` / `--c-text` / `--c-text-soft` -
   intentionally NOT `--c-ok` / `--c-warn` / `--c-danger`, since the
   GitHub accents code identity, not semantic status.
 
-## [0.10.1] — 2026-06-01
+## [0.10.1], 2026-06-01
 
 ### Changed
 
 - `ha_climate`: dropped a dead `transparent` fallback on
-  `var(--c-bg)` — the semantic token is always defined on the cell
+  `var(--c-bg)`, the semantic token is always defined on the cell
   host, so the fallback never fired. Cosmetic; no behaviour change.
 
-## [0.10.0] — 2026-06-01
+## [0.10.0], 2026-06-01
 
 ### Added
 
@@ -1575,7 +1730,7 @@ post-launch cleanup pass.
   theme's `--c-*` semantic tokens, so every Tesserae theme restyles
   cleanly across colour, mono, and neon.
 
-## [0.9.0] — 2026-06-01
+## [0.9.0], 2026-06-01
 
 ### Added
 
@@ -1589,27 +1744,27 @@ post-launch cleanup pass.
   hard-coded hex. Per-event colour comes from the feed configured in
   *Plugins → Calendar Feeds*.
 
-## [0.8.3] — 2026-05-31
+## [0.8.3], 2026-05-31
 
 ### Added
 
 - **Six monochrome themes** for 1-bit panels (Paper, Carbon, Newsprint,
   Halftone, Ash, Graphite). Designed for the Kindle / native TRMNL
-  rendering pipeline — Paper / Carbon are flat for sharp text, Newsprint
+  rendering pipeline, Paper / Carbon are flat for sharp text, Newsprint
   / Halftone are halftone-friendly for printed-page texture, Ash /
   Graphite sit between as softer alternatives.
 - **`tags` field on themes** to support family grouping. The theme
   picker on the page editor now groups by family in `<optgroup>`s, so
-  the six mono themes cluster together — someone setting up a Kindle
+  the six mono themes cluster together, someone setting up a Kindle
   dashboard can spot them without scrolling past 20 colour themes.
 
-## [0.8.2] — 2026-05-31
+## [0.8.2], 2026-05-31
 
 ### Fixed
 
 - TRMNL discovery headers are case-insensitive, so KOReader's
   `Png-Width` / `Png-Height` (Title-case) land as `panel_w` / `panel_h`
-  in the cache and pre-fill the Register form — previously they only
+  in the cache and pre-fill the Register form, previously they only
   matched the lowercase / native-TRMNL spellings and were silently
   dropped.
 
@@ -1619,7 +1774,7 @@ post-launch cleanup pass.
   Kindle Paperwhite 2 (jailbroken, KOReader trmnl-display plugin) listed
   as tested.
 
-## [0.8.1] — 2026-05-31
+## [0.8.1], 2026-05-31
 
 ### Fixed
 
@@ -1630,7 +1785,7 @@ post-launch cleanup pass.
 - Schedules editor flags stale schedules with a red "page deleted" pill
   + a subtle row tint, so the user can rebind or delete them.
 
-## [0.8.0] — 2026-05-31
+## [0.8.0], 2026-05-31
 
 TRMNL HTTP-pull compatibility lets a jailbroken Kindle (running the
 KOReader trmnl-display plugin) or any native TRMNL hardware paint a
@@ -1661,11 +1816,11 @@ tiles stop ghosting Home Assistant.
 
 ### Fixed
 
-- HA discovery orphan sweep on start — retained discovery configs for
+- HA discovery orphan sweep on start, retained discovery configs for
   devices deleted while Tesserae was offline get blanked, so HA stops
   showing ghost device tiles forever.
 
-## [0.7.0] — 2026-05-30
+## [0.7.0], 2026-05-30
 
 Docker shipped, Settings got a refactor + a complete picture-quality
 control surface, and themes were curated down from a sprawl to 25
@@ -1680,7 +1835,7 @@ deliberate variants.
 - **Per-device picture quality** controls (dither / saturation /
   contrast) on the device card; per-device renderer clones inherit
   their fleet's averaged defaults on creation.
-- **Curated theme set** — 25 named themes across light, dark, and neon
+- **Curated theme set**, 25 named themes across light, dark, and neon
   families, with a dev-only widget-gallery theme picker.
 
 ### Changed
@@ -1696,18 +1851,18 @@ deliberate variants.
   `gosu`.
 - Safari login auto-save works (hidden username field on setup + login).
 
-## [0.6.0] — 2026-05-30
+## [0.6.0], 2026-05-30
 
 Quiet hours, webhooks, per-device timetable, and a stack of embedded-
 broker fixes.
 
 ### Added
 
-- **Quiet hours** — suppress automated pushes during a configurable
+- **Quiet hours**, suppress automated pushes during a configurable
   window, with a per-device override in Settings → Devices.
-- **Webhook push API** — `POST /api/v1/push` for external automation
+- **Webhook push API**, `POST /api/v1/push` for external automation
   (Home Assistant, n8n, etc.).
-- **Per-device Timetable card** — read-only view of which schedules
+- **Per-device Timetable card**, read-only view of which schedules
   reach this display, sorted by next-fire.
 - **Modal webhook-token reveal** so the secret isn't pasted into the
   Settings form.
@@ -1726,7 +1881,7 @@ broker fixes.
 - Send page auto-ticks the only registered device instead of erroring
   on submit.
 
-## [0.5.0] — 2026-05-30
+## [0.5.0], 2026-05-30
 
 Onboarding polish + recording infrastructure for the docs.
 
@@ -1740,7 +1895,7 @@ Onboarding polish + recording infrastructure for the docs.
 
 - Telemetry consent copy softened on the onboarding step.
 
-## [0.4.0] — 2026-05-30
+## [0.4.0], 2026-05-30
 
 Anonymous opt-in telemetry (Aptabase) and the Windows port. Several
 quick follow-ups to align with Aptabase's wire format and fix Windows
@@ -1759,14 +1914,14 @@ self-restart.
 
 - Aptabase wire format: `isDebug` must be a bool, SDK version must be
   `name@version` (0.4.3).
-- Windows self-restart no longer hangs — replaces `os.execv` with
+- Windows self-restart no longer hangs, replaces `os.execv` with
   `Popen + os._exit + parent-pid handshake` (0.4.4).
 - Every `Path.read_text` / `Path.write_text` pinned to
   `encoding="utf-8"` so Windows doesn't mangle em-dashes (0.4.8).
 - Reloader-watcher process no longer double-inits MQTT, scheduler, and
   telemetry in dev mode (0.4.8).
 
-## [0.3.0] — 2026-05-30
+## [0.3.0], 2026-05-30
 
 A System tab (self-update + backup/restore), the `--c-*` semantic theme
 token layer used by every widget, an event-log dedup, and the MkDocs
@@ -1774,12 +1929,12 @@ wiki scaffold.
 
 ### Added
 
-- **Settings → System** — self-update from a GitHub tag, full data
+- **Settings → System**, self-update from a GitHub tag, full data
   backup/restore (zips `data/` minus user-controlled exclusions like
   the picture-gallery cache).
 - **MkDocs wiki** under `docs/` with auto-generated widget gallery and
   compatibility tables; deploys to GitHub Pages.
-- **mDNS advertiser** — opt-in `tesserae.local` (and
+- **mDNS advertiser**, opt-in `tesserae.local` (and
   `tesserae-dev.local` in `--dev`).
 - **Per-push image-fit picker** on the Send page with an accurate live
   preview.
@@ -1798,10 +1953,10 @@ wiki scaffold.
 
 ### Fixed
 
-- `news_reddit` widget reads the RSS feed — Reddit's `.json` endpoint
+- `news_reddit` widget reads the RSS feed, Reddit's `.json` endpoint
   now 403-blocks unauthenticated clients.
 
-## [0.2.0] — 2026-05-28
+## [0.2.0], 2026-05-28
 
 First release aimed at fellow hobbyists: multi-panel support is built
 in throughout, the widget catalogue is broad, and a fresh clone of each
@@ -1813,7 +1968,7 @@ editing.
 - **Device instances.** Register multiple physical panels in
   Settings → Devices, each with its own id, MQTT topics, and panel size.
   A built-in *kind* is a template; each panel you add is an *instance* of
-  a kind. Per-instance add / edit-panel / delete, all hot-reloaded — no
+  a kind. Per-instance add / edit-panel / delete, all hot-reloaded, no
   restart.
 - **Per-page targeting.** Bind a dashboard to a specific device; it sizes
   to that panel and pushes only to its renderers. Unbound pages fan out
@@ -1843,7 +1998,7 @@ editing.
 ### Widgets
 
 - ~40 widgets across weather, F1, calendar, news, finance, GitHub,
-  clocks, sky, pictures, todo, and Melbourne public transport — each with
+  clocks, sky, pictures, todo, and Melbourne public transport, each with
   a documented [stability tier](README.md#widget-stability-tiers).
 - New since 0.1.0 include the full weather / news / finance / GitHub /
   calendar / sky / pictures families, analog & word clocks, and a
@@ -1871,16 +2026,16 @@ editing.
 ### Reference clients (separate repos)
 
 - [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client)
-  — default id `pi_bin`.
+ , default id `pi_bin`.
 - [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client)
-  — default id `pi_png`.
+ , default id `pi_png`.
 - [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client)
-  — default id `esp32`, device id set via captive portal.
+ , default id `esp32`, device id set via captive portal.
 
 All three publish discovery hints (`kind`, `panel_w`, `panel_h`,
 `fw_version`) so they auto-register on the server.
 
-## [0.1.0] — 2026-05-26
+## [0.1.0], 2026-05-26
 
 Initial milestone build: plugin / renderer / device loaders, composer,
 MQTT transport + push pipeline, manifest-driven settings with an auth

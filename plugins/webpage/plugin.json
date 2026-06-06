@@ -3,7 +3,7 @@
   "name": "Webpage",
   "version": "0.1.0",
   "kind": "widget",
-  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders — handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
+  "description": "Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.",
   "icon": "ph-globe",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [
@@ -11,7 +11,7 @@
       "name": "url",
       "type": "string",
       "label": "URL",
-      "help": "https://… — page to render inside the cell. Must support iframe embedding.",
+      "help": "https://…, page to render inside the cell. Must support iframe embedding.",
       "default": ""
     },
     {

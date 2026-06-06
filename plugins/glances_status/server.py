@@ -1,4 +1,4 @@
-"""glances_status — system stats from a Glances REST instance.
+"""glances_status, system stats from a Glances REST instance.
 
 Hits Glances' v4 ``/api/4/all`` endpoint (with a v3 fallback so older
 installs keep working), normalises the relevant bits into the shape
@@ -22,7 +22,7 @@ the client paints from:
 Tone heuristic collapses three thresholds into one designed colour:
 any of CPU > 90 / RAM > 90 / disk > 95 → danger; CPU > 70 / RAM > 75 /
 disk > 85 → warn; otherwise ok. An unreachable Glances becomes the
-``offline`` tone — same fall-through pattern as octoprint_status so a
+``offline`` tone, same fall-through pattern as octoprint_status so a
 powered-down box renders as a card, not an error.
 """
 
@@ -33,6 +33,8 @@ import re
 from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
+
+from flask import current_app
 
 from app.plugin_http import fetch_json
 
@@ -83,7 +85,7 @@ def _uptime_seconds(value: Any) -> int | None:
 def _pick_disk(filesystems: Any) -> dict[str, Any] | None:
     """Pick the most useful filesystem from Glances' ``fs`` list.
 
-    Prefer rootfs (``/``) — that's the metric most users actually care
+    Prefer rootfs (``/``), that's the metric most users actually care
     about. Fall back to the highest-usage filesystem so a Docker host
     where ``/`` is read-only still surfaces a meaningful number.
     """
@@ -159,8 +161,8 @@ def _split_auth_from_url(url: str) -> tuple[str, dict[str, str]]:
     and return the cleaned URL plus an ``Authorization`` header dict.
 
     Lets the user paste ``http://admin:hunter2@nas:61208`` straight
-    into a cell-options field — same auth shape as every other tool
-    that talks HTTP — without needing per-cell secret inputs (which
+    into a cell-options field, same auth shape as every other tool
+    that talks HTTP, without needing per-cell secret inputs (which
     cell options don't mask on the editor form anyway). For un-authed
     Glances installs the returned dict is empty and the URL is
     returned unchanged.
@@ -181,16 +183,72 @@ def _split_auth_from_url(url: str) -> tuple[str, dict[str, str]]:
     return cleaned, {"Authorization": f"Basic {token}"}
 
 
+def _core() -> Any:
+    """Look up glances_core's server_module via the plugin registry.
+    Returns None when the plugin isn't loaded (older install / plugin
+    disabled), so callers can fall through to backwards-compat paths."""
+    try:
+        registry = current_app.config["PLUGIN_REGISTRY"]
+    except (KeyError, RuntimeError):
+        return None
+    plugin = registry.get("glances_core") if registry is not None else None
+    return getattr(plugin, "server_module", None)
+
+
+def choices(name: str) -> list[dict[str, str]]:
+    """Powers the cell_options `instance_id` dropdown via
+    ``choices_from: "instances"``. Delegates to glances_core so the
+    saved instances list flows through to the cell editor."""
+    if name != "instances":
+        return []
+    core = _core()
+    if core is None:
+        return []
+    return [
+        {"value": inst["id"], "label": inst.get("name") or inst["id"]}
+        for inst in core.list_instances()
+    ]
+
+
+def _resolve_instance(instance_id: str) -> tuple[str, str]:
+    """Look up a saved glances_core instance and return ``(base_url,
+    name)``. Returns ``("", "")`` if the id is empty, the glances_core
+    plugin isn't registered (older install / plugin disabled), or the
+    saved instance has since been deleted."""
+    if not instance_id:
+        return "", ""
+    core = _core()
+    if core is None:
+        return "", ""
+    inst = core.get_instance(instance_id)
+    if not inst:
+        return "", ""
+    return str(inst.get("base_url") or "").strip().rstrip("/"), str(inst.get("name") or "")
+
+
 def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
     del settings, ctx
-    base = str(options.get("base_url", "")).strip().rstrip("/")
+    instance_id = str(options.get("instance_id") or "").strip()
+    inline_url = str(options.get("base_url", "")).strip().rstrip("/")
     label = (options.get("label") or "").strip()
     now = datetime.now().strftime("%H:%M")
 
+    # Saved-instance lookup wins when an id is set. Fall back to the
+    # inline URL field for cells configured before instances existed,
+    # OR when the user deliberately wants a one-off URL without saving.
+    base, instance_name = _resolve_instance(instance_id)
     if not base:
-        return {"error": "Set the Glances URL on this cell."}
+        base = inline_url
+
+    if not base:
+        return {
+            "error": (
+                "Pick a saved Glances instance or set an inline URL. "
+                "Manage saved instances at Plugins → Glances Core."
+            )
+        }
 
     base, auth_headers = _split_auth_from_url(base)
     headers: dict[str, str] = {"User-Agent": USER_AGENT, "Accept": "application/json"}
@@ -198,12 +256,12 @@ def fetch(
 
     payload = _fetch_all(base, headers)
     if payload is None:
-        # Unreachable / non-JSON / 401 — surface as an offline card,
+        # Unreachable / non-JSON / 401, surface as an offline card,
         # not an error shell. The user gets visual continuity on the
         # panel when the host briefly drops; persistent outage is
         # obvious from the Offline pill.
         return {
-            "label": label or "Server",
+            "label": label or instance_name or "Server",
             "time": now,
             "hostname": None,
             "cpu": None,
@@ -225,7 +283,7 @@ def fetch(
     tone = _tone(cpu, mem, disk_pct)
 
     return {
-        "label": label or hostname or "Server",
+        "label": label or instance_name or hostname or "Server",
         "time": now,
         "hostname": hostname,
         "cpu": cpu,

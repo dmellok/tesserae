@@ -11,7 +11,7 @@
 // * Mutations bundle into a single POST to /pages/<id>/cells/batch so
 //   resize (which touches >= 2 cells) is atomic.
 // * After a structural change (insert / delete) we re-render the whole
-//   board from the server's response — no DOM patching gymnastics.
+//   board from the server's response, no DOM patching gymnastics.
 
 (function () {
   const root = document.querySelector("[data-layout-editor]");
@@ -24,7 +24,7 @@
   const pageId = root.dataset.pageId;
 
   // Persist the surrounding <details class="custom-layout"> open state
-  // across reloads — insert / delete trigger a full reload to refresh
+  // across reloads, insert / delete trigger a full reload to refresh
   // the per-cell forms, and re-collapsing the editor every time would
   // make those flows annoying.
   const details = root.closest("details.custom-layout");
@@ -52,10 +52,10 @@
   // ---------------------------------------------------------------
   // Geometry helpers
   // ---------------------------------------------------------------
-  const FREEFORM_SNAP = 8; // px on panel scale — keeps drags from going subpixel
+  const FREEFORM_SNAP = 8; // px on panel scale, keeps drags from going subpixel
 
   // Snap-to-grid editing aid. The dashed N×M overlay on the board
-  // makes it easy to size cells consistently — every drag rounds to
+  // makes it easy to size cells consistently, every drag rounds to
   // the nearest gridline. State lives in the toggle/inputs at the
   // bottom of the editor; reading it lazily on each drag lets the
   // user retune the grid without picking up the cell first.
@@ -85,11 +85,11 @@
   // / right / bottom / left, minus any on the panel boundary). At
   // pointerdown, find the cells touching the dragged edge whose
   // perpendicular range overlaps the dragged cell's perpendicular
-  // range — those are the "neighbors" that move with the edge so the
+  // range, those are the "neighbors" that move with the edge so the
   // layout stays tight where it lines up. Cells in OTHER rows / columns
   // that don't touch the dragged cell are unaffected. If there's no
   // neighbor on the other side, the cell simply grows / shrinks into
-  // the void (gap appears) — which is what the user wants when cells
+  // the void (gap appears), which is what the user wants when cells
   // aren't aligned.
   //
   // Returns an ``edge`` object compatible with the rest of the drag
@@ -101,7 +101,7 @@
       side === "right" ? cell.x + cell.w :
       side === "bottom" ? cell.y + cell.h :
       cell.x;
-    // The dragged cell's perpendicular range — neighbours must match
+    // The dragged cell's perpendicular range, neighbours must match
     // it EXACTLY to be moved by the drag. Loose "any overlap" caught
     // too many cells in irregular layouts: a cell that extends a bit
     // past the dragged cell on one side would get its full height
@@ -189,20 +189,20 @@
       board.appendChild(el);
     });
 
-    // Per-cell resize handles — one per non-panel-boundary edge of
+    // Per-cell resize handles, one per non-panel-boundary edge of
     // each cell. Each handle is independent so a cell stays resizable
     // even when its neighbours don't line up edge-to-edge (the previous
     // findSharedEdges-only model required exact alignment across the
     // full edge length, which left cells stranded as soon as rows /
     // columns were resized to different widths). Neighbour detection
-    // happens in ``buildEdgeFor`` at pointerdown — cells that actually
+    // happens in ``buildEdgeFor`` at pointerdown, cells that actually
     // touch the dragged edge come along; everything else stays put.
     //
     // Dedup: when two cells share an edge with matching perpendicular
     // range (the common grid case, e.g. cell A's right at x=600 y=[0,400]
     // and cell B's left at x=600 y=[0,400]), both cells' loops would
     // want to render a handle at the exact same spot. ``seen`` skips
-    // the second one — whichever cell iterates first owns the handle,
+    // the second one, whichever cell iterates first owns the handle,
     // and buildEdgeFor at drag time picks up the other side as a
     // neighbour. Cells whose edges only partially overlap still each
     // render their own handle (with the overlap visually doubled);
@@ -272,7 +272,7 @@
       }));
     }
     if (opts.reload) {
-      // Structural change — full reload so the per-cell forms refresh.
+      // Structural change, full reload so the per-cell forms refresh.
       window.location.reload();
     } else {
       render();
@@ -415,7 +415,7 @@
 
   // Find cells that can absorb the gap left by a deletion. Looks for a
   // direction whose neighbour(s) collectively share the deleted cell's
-  // entire edge — those cells get extended to fill the gap. Returns
+  // entire edge, those cells get extended to fill the gap. Returns
   // null if no clean absorption is possible (the user gets a true gap
   // they can resize manually).
   function findAbsorbers(deleted) {
@@ -489,14 +489,14 @@
     }
     // Absorption needs a neighbour (or a row/column of neighbours) that
     // tiles the deleted cell's edge exactly. If no direction qualifies
-    // we'd leave a literal hole in the panel partition — and any edge
+    // we'd leave a literal hole in the panel partition, and any edge
     // that *was* shared with the deleted cell is no longer shared with
     // anything, so the user can't resize the cells on either side. Bail
     // out with a clear hint instead of silently breaking the layout.
     const updates = findAbsorbers(cell);
     if (updates === null) {
       alert(
-        "Can't delete this cell — no neighbour can absorb the gap.\n\n" +
+        "Can't delete this cell, no neighbour can absorb the gap.\n\n" +
           "Resize or delete one of the adjacent cells first so a single " +
           "row or column lines up with this one's edge.",
       );
@@ -534,7 +534,7 @@
     }
   });
 
-  // Long-press to delete — the 22px X icon is hard to hit on touch.
+  // Long-press to delete, the 22px X icon is hard to hit on touch.
   // Pressing anywhere on a cell (not on its insert zones or resize
   // handles) for 600ms triggers the same delete confirm.
   const LONG_PRESS_MS = 600;
@@ -552,7 +552,7 @@
     }
   }
   board.addEventListener("pointerdown", (e) => {
-    // Skip if the press starts on an interactive child — resize
+    // Skip if the press starts on an interactive child, resize
     // handles, insert zones, the explicit delete X.
     if (e.target.closest("[data-insert], [data-delete-cell], .le-edge")) return;
     const cellEl = e.target.closest(".le-cell");
@@ -563,7 +563,7 @@
     lpCellEl = cellEl;
     cellEl.classList.add("is-pressing");
     lpTimer = setTimeout(() => {
-      // Visual feedback at fire moment — the css animation already
+      // Visual feedback at fire moment, the css animation already
       // showed the pulse; clean it up + run the same delete path.
       cellEl.classList.remove("is-pressing");
       lpTimer = null;

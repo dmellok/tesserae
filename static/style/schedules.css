@@ -6,7 +6,7 @@
   gap: var(--t-space-4);
 }
 
-/* New/edit schedule form — every row shares one 3-column grid so the
+/* New/edit schedule form, every row shares one 3-column grid so the
    fields line up across rows (Row 1 was thirds, Rows 2/3 were halves, so
    the edges didn't match). The active-window control spans the two right
    columns; the enabled toggle bottom-aligns with the priority input. */
@@ -97,7 +97,7 @@
   text-align: left;
   padding: var(--t-space-3);
   border-bottom: 1px solid var(--t-border);
-  /* Middle-align so every cell in a row lines up on one baseline —
+  /* Middle-align so every cell in a row lines up on one baseline -
      rows mix single-line (page, state) and two-line (cadence window)
      content, and top-align made them look ragged. */
   vertical-align: middle;
@@ -138,7 +138,7 @@
 button.ghost.danger { color: var(--t-danger); }
 button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; }
 
-/* Schedules table — progressively drop columns as the viewport
+/* Schedules table, progressively drop columns as the viewport
    narrows so the table fits without horizontal scroll. The Name +
    Cadence + Actions columns are the essentials; everything else
    gets hidden first. */
@@ -193,7 +193,7 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   position: relative;
 }
 
-/* "Now" line — vertical accent stripe spanning every row's track.
+/* "Now" line, vertical accent stripe spanning every row's track.
    Positioned via --now-pct (set inline on .timeline). The line lives
    in a strip that mirrors the track lane: the 180px label column is
    skipped by offsetting `left` past the gutter + gap, and width then

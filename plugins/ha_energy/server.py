@@ -1,4 +1,4 @@
-"""ha_energy — solar / grid / battery / house-consumption snapshot.
+"""ha_energy, solar / grid / battery / house-consumption snapshot.
 
 Reads the same ``sensor.*`` entities you've already configured for HA's
 Energy panel and produces the structured shape four selectable variants
@@ -59,7 +59,7 @@ def _f(value: Any) -> float:
 
 
 def _f_or_none(value: Any) -> float | None:
-    """Same as ``_f`` but returns ``None`` for unparseable inputs — used
+    """Same as ``_f`` but returns ``None`` for unparseable inputs, used
     for optional fields where ``0`` would be misleading (battery SoC)."""
     if value in (None, "", "unavailable", "unknown"):
         return None

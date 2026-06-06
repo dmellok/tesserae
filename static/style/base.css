@@ -1,13 +1,13 @@
 /*
  * Tesserae admin design system.
  *
- * Tokens first — colours, spacing, radius, shadow, typography. Swap
+ * Tokens first, colours, spacing, radius, shadow, typography. Swap
  * --t-accent to retint the whole admin (nav, buttons, focus ring,
  * brand mark, slider thumb, switch on-state, link hover).
  *
  * Neutrals follow a zinc-ish 50→900 scale, lightly warm-tinted so the
  * surface layers read as paper-warm rather than clinical grey. The
- * Phosphor icon font is loaded by _base.html — every <i class="ph
+ * Phosphor icon font is loaded by _base.html, every <i class="ph
  * ph-xxx"> tag inside the admin shell picks up the styles below.
  *
  * Inter (UI) + JetBrains Mono (monospace) are loaded from fonts_core
@@ -65,14 +65,14 @@
 }
 
 :root {
-  /* Accent — deep teal that reads as both serious and warm. */
+  /* Accent, deep teal that reads as both serious and warm. */
   --t-accent: #0d8c7e;
   --t-accent-hover: #0a6f63;
   --t-accent-soft: #e6f3f1;
   --t-accent-fg: #ffffff;
   --t-accent-ink: #064a42; /* darker variant for type on accent-soft */
 
-  /* Neutral scale — warm-zinc; values are ~2% warmer than pure zinc
+  /* Neutral scale, warm-zinc; values are ~2% warmer than pure zinc
      so surfaces read as paper rather than clinical. */
   --t-50:  #fafaf9;
   --t-100: #f4f4f2;
@@ -85,7 +85,7 @@
   --t-800: #27272a;
   --t-900: #18181b;
 
-  /* Surface layers — three depths so cards lift above the page bg
+  /* Surface layers, three depths so cards lift above the page bg
      without harsh borders. Background is the deepest tint, surfaces
      step up toward pure white. */
   --t-bg:            #f1f0ec;
@@ -106,7 +106,7 @@
   --t-ok:        #16a34a;
   --t-ok-bg:     #f0fdf4;
 
-  /* Typography — Inter for UI, JetBrains Mono for code / IDs /
+  /* Typography, Inter for UI, JetBrains Mono for code / IDs /
      dimensions. Both prefer the bundled fonts_core woff2s and fall
      back to native system stacks while loading. */
   --t-font:      "Inter", ui-sans-serif, system-ui, -apple-system,
@@ -127,7 +127,7 @@
   --t-size-3xl: 28px;
   --t-size-4xl: 36px;
 
-  /* Spacing — 4px base, 8px stride */
+  /* Spacing, 4px base, 8px stride */
   --t-space-1: 4px;
   --t-space-2: 8px;
   --t-space-3: 12px;
@@ -146,7 +146,7 @@
   --t-radius-xl:  20px;
   --t-radius-pill: 999px;
 
-  /* Shadow scale — softer / layered so cards feel like paper on paper.
+  /* Shadow scale, softer / layered so cards feel like paper on paper.
      Each step adds depth + a slightly longer cast. */
   --t-shadow-xs: 0 1px 0 rgba(16,12,8,.04);
   --t-shadow-sm: 0 1px 2px rgba(16,12,8,.05),
@@ -166,7 +166,7 @@
   --t-ring:      0 0 0 3px color-mix(in oklab, var(--t-accent) 25%, transparent);
   --t-ring-soft: 0 0 0 4px color-mix(in oklab, var(--t-accent) 14%, transparent);
 
-  /* Motion — two ease curves: snappy for press/click, spring for
+  /* Motion, two ease curves: snappy for press/click, spring for
      hover/lift/state changes that should feel buoyant. */
   --t-ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
   --t-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -176,7 +176,7 @@
   color-scheme: light;
 }
 
-/* Dark theme — toggled via <html data-theme="dark">. Slate-leaning
+/* Dark theme, toggled via <html data-theme="dark">. Slate-leaning
    neutrals (cool, not pure black) so the teal accent reads as warm
    contrast rather than competing with a charcoal bg. */
 :root[data-theme="dark"] {
@@ -258,7 +258,7 @@ body.admin {
      read as a single flat fill. Two stacked radial gradients (one warm
      near the top, one cooler near the bottom) and a 24px square grid
      drawn with two thin lines of the border colour. The grid is at
-     0.4% opacity — invisible up close, gives the page faint texture
+     0.4% opacity, invisible up close, gives the page faint texture
      when you scan past it. */
   background-image:
     radial-gradient(ellipse 800px 400px at 50% -200px,
@@ -393,7 +393,7 @@ a:hover { color: var(--t-accent-hover); }
 }
 
 
-/* App footer — version + GitHub link, subtle link-only style.
+/* App footer, version + GitHub link, subtle link-only style.
    Sits below every page's <main> so it's always reachable but never
    demands attention. Only the version text is the link; no surrounding
    chrome. */

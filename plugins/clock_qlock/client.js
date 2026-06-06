@@ -1,4 +1,4 @@
-// clock_qlock — Spectra-styled QLOCKTWO-inspired letter clock. Renders
+// clock_qlock, Spectra-styled QLOCKTWO-inspired letter clock. Renders
 // an 11-column letter grid; the words for the current time light up at
 // --text-primary (or the chosen accent), unlit letters use --text-muted.
 // Optional corner dots add per-minute precision (1-4 minutes past the
@@ -82,7 +82,7 @@ export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
   const litColor = ACCENT_TOKEN[opts.lit_color] || ACCENT_TOKEN.fg;
   const showCorners = opts.show_corners !== false;
-  // Background treatment — clean / vignette / paper. Vignette gives a
+  // Background treatment, clean / vignette / paper. Vignette gives a
   // soft radial darkening around the edges (the QLOCKTWO display has
   // a slight border darkening from its acrylic face); paper adds a
   // faint repeating noise tint on top for a card-stock feel. Both
@@ -126,7 +126,7 @@ export default function render(shadow, ctx) {
       </div>`
     : "";
 
-  // Background treatments — CSS gradient layered over the surface
+  // Background treatments, CSS gradient layered over the surface
   // token, applied to the .w shell itself so it fills the full cell
   // (not just .w-body which sits inside .w's padding). Paper variant
   // adds a tiny SVG-noise pattern on top via an absolute overlay.
@@ -145,7 +145,7 @@ export default function render(shadow, ctx) {
   } else if (bgStyle === "paper") {
     widgetBackground = vignetteGradient;
     // SVG noise tile, single-quoted URL with %22 for the inner SVG
-    // attribute quotes — keeps the data URI inside the style attr
+    // attribute quotes, keeps the data URI inside the style attr
     // without escape gymnastics.
     const noiseUri = "data:image/svg+xml;utf8,"
       + "<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22>"

@@ -1,7 +1,7 @@
 """SQLite-backed event log.
 
 A single ``events`` table records anything worth surfacing in the admin
-timeline: push attempts (this milestone), and — in M8 — renderer events,
+timeline: push attempts (this milestone), and, in M8, renderer events,
 device heartbeats, scheduler ticks. Designed for that future generalisation
 from day one: the row shape is generic so M8 only adds new ``type`` values
 rather than reshaping the schema.
@@ -10,7 +10,7 @@ The log is append-mostly. Deletes happen only via explicit user action
 ("forget this row") and from the cap-evictor (oldest beyond ``cap`` rows
 get removed on insert).
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class EventRow:
     """One event. ``extra`` is the kind-specific payload dict.
 
     Common columns:
-      type:      event kind — currently only ``"push"``; M8 adds more
+      type:      event kind, currently only ``"push"``; M8 adds more
       source:    who triggered it (``page``, ``file``, ``url``, ``webpage``,
                  ``scheduler``, ``webhook``, ``home_assistant``, ``manual``,
                  ``resend``)
@@ -61,7 +61,7 @@ class EventRow:
 class EventLog:
     """Thread-safe SQLite event store.
 
-    SQLite is plenty for a single-process admin tool — pages.json and
+    SQLite is plenty for a single-process admin tool, pages.json and
     settings.json are JSON because they're hand-editable; the event log
     isn't, so the slightly faster (and indexable) SQLite wins.
     """
@@ -91,7 +91,7 @@ class EventLog:
         # crowd push / scheduler / auth history out of the global ``cap``.
         self._device_cap = device_cap
         self._lock = threading.Lock()
-        # Per-row listeners — used by the SSE /events/stream endpoint.
+        # Per-row listeners, used by the SSE /events/stream endpoint.
         # Fired after each successful insert, outside the DB lock.
         self._listener_lock = threading.Lock()
         self._listeners: list[Callable[[EventRow], None]] = []
@@ -125,7 +125,7 @@ class EventLog:
         used as context managers commit/rollback but do NOT close, so
         we'd leak file descriptors. ``check_same_thread=False`` lets the
         scheduler / MQTT dispatcher threads share the same EventLog
-        instance — the lock around this helper serialises access."""
+        instance, the lock around this helper serialises access."""
         conn = sqlite3.connect(self._path, check_same_thread=False)
         conn.row_factory = sqlite3.Row
         try:
@@ -250,13 +250,20 @@ class EventLog:
         self,
         *,
         type: str | None = None,
+        source: str | None = None,
         limit: int = 100,
     ) -> list[EventRow]:
         sql = "SELECT * FROM events"
+        clauses: list[str] = []
         params: list[Any] = []
         if type is not None:
-            sql += " WHERE type = ?"
+            clauses.append("type = ?")
             params.append(type)
+        if source is not None:
+            clauses.append("source = ?")
+            params.append(source)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY id DESC LIMIT ?"
         params.append(limit)
         with self._lock, self._conn() as conn:
@@ -273,6 +280,20 @@ class EventLog:
         with self._lock, self._conn() as conn:
             row = conn.execute(sql, params).fetchone()
         return int(row[0])
+
+    def source_counts(self, *, type: str | None = None) -> dict[str, int]:
+        """Return ``{source: count}`` for events matching ``type`` (or all
+        types when ``type`` is None). Used by the history page to render
+        filter chips with live counts beside each label."""
+        if type is None:
+            sql = "SELECT source, COUNT(*) FROM events GROUP BY source"
+            params: tuple[Any, ...] = ()
+        else:
+            sql = "SELECT source, COUNT(*) FROM events WHERE type = ? GROUP BY source"
+            params = (type,)
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return {str(r[0]): int(r[1]) for r in rows}
 
 
 def _row_to_event(row: sqlite3.Row) -> EventRow:

@@ -1,4 +1,4 @@
-// ha_sensor — Spectra stat (single) or list (multi).
+// ha_sensor, Spectra stat (single) or list (multi).
 //
 // One sensor → hero number (stat archetype) with the unit as a small
 // trailing label, a trend arrow next to the unit, and a mini SVG
@@ -73,7 +73,7 @@ function sensorAccent(icon) {
 
 // SVG sparkline. Accepts a series + colour + dimensions. Uses
 // preserveAspectRatio="none" so the curve stretches to fill the
-// container in both axes — perfect for inline strips of varying
+// container in both axes, perfect for inline strips of varying
 // aspect ratios.
 function sparklineSvg(series, color, opts = {}) {
   if (!Array.isArray(series) || series.length < 2) return "";
@@ -123,7 +123,7 @@ function renderStat(item, title) {
     </div>
     <div class="w-body stat-body" style="gap:var(--space-2)">
       <div class="stat-value">
-        ${escapeHtml(item.value ?? "—")}
+        ${escapeHtml(item.value ?? "-")}
         ${item.unit ? `<span class="unit">${escapeHtml(item.unit)}</span>` : ""}
         ${trendBit}
       </div>
@@ -152,7 +152,7 @@ function renderList(items, title) {
         <div class="sensor-row-meta">
           ${spark}
           ${trendBit}
-          <span class="sensor-row-value" style="color:${accent}">${escapeHtml(it.value ?? "—")}${unit}</span>
+          <span class="sensor-row-value" style="color:${accent}">${escapeHtml(it.value ?? "-")}${unit}</span>
         </div>
       </div>`;
   }).join("");

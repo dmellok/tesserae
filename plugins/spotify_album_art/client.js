@@ -1,4 +1,4 @@
-// spotify_album_art — Spectra full-bleed image. Just the current
+// spotify_album_art, Spectra full-bleed image. Just the current
 // album art at full size; a tiny bottom-overlay surfaces the track
 // + artist when something is playing, fades to a "Not playing"
 // placeholder when idle.
@@ -14,8 +14,8 @@ export default function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
   const dimWhenPaused = opts.dim_when_paused !== false; // default true
   const showInfo = opts.show_track_info !== false;      // default true
-  // ``scale`` flips the img between object-fit:cover (default — fills
-  // the cell, crops to aspect) and contain (letterbox — keeps the
+  // ``scale`` flips the img between object-fit:cover (default, fills
+  // the cell, crops to aspect) and contain (letterbox, keeps the
   // album art square). Anything else falls back to cover.
   const fit = opts.scale === "contain" ? "contain" : "cover";
   const css = `<link rel="stylesheet" href="/static/style/spectra-widgets.css">`;

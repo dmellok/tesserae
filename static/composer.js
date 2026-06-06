@@ -113,7 +113,7 @@ function applyPagePatch(page) {
     const panelEl = document.querySelector(".panel");
     if (panelEl) panelEl.style.background = bg;
   }
-  // Page-level theme — flips data-theme on body so every cell that
+  // Page-level theme, flips data-theme on body so every cell that
   // doesn't have its own override re-binds the Spectra tokens.
   let needsRemount = false;
   if (typeof page.theme === "string" && page.theme) {
@@ -128,7 +128,7 @@ function applyPagePatch(page) {
     document.body.setAttribute("data-style", page.style);
   }
   // Page-level font picker. Set --font-family on body inline ONLY when
-  // the page has its own font pick — same reasoning as the cell-level
+  // the page has its own font pick, same reasoning as the cell-level
   // path. When the page is inheriting (data-style controls the font),
   // we must NOT set the inline custom property, otherwise we'd override
   // the style's font with the page default and the style picker would
@@ -173,7 +173,7 @@ function ctxFingerprint(cell) {
 // Re-render every mounted cell using its current dataset + cached data.
 // Triggered when the page-level theme / style / font changes, because
 // those flip CSS variables on body but DON'T change the per-cell
-// fingerprint — so charts (Chart.js bakes colours into the canvas
+// fingerprint, so charts (Chart.js bakes colours into the canvas
 // rather than reading CSS at paint time) silently keep their old
 // palette until the user nudges some other cell field. After this the
 // theme/style picker re-paints charts immediately, matching the way
@@ -234,7 +234,7 @@ async function applyCellPatch(patch) {
     // empty when inheriting from the page). The "always set" form with
     // a `var(--font-family, …)` fallback self-references and CSS
     // invalidates the whole declaration, breaking every chart probe
-    // inside the shadow — so we either set a real override or leave
+    // inside the shadow, so we either set a real override or leave
     // the inherited cascade intact.
     if (patch.font) {
       cell.style.setProperty(
@@ -245,13 +245,13 @@ async function applyCellPatch(patch) {
       cell.style.removeProperty("--font-family");
     }
   }
-  // Per-cell theme override — empty / null clears it so the cell falls
+  // Per-cell theme override, empty / null clears it so the cell falls
   // back to the page theme on body.
   if (Object.prototype.hasOwnProperty.call(patch, "theme")) {
     if (patch.theme) cell.setAttribute("data-theme", patch.theme);
     else cell.removeAttribute("data-theme");
   }
-  // Per-cell style override — mirrors the theme behaviour exactly. A
+  // Per-cell style override, mirrors the theme behaviour exactly. A
   // missing/empty value clears the override and the cell inherits the
   // page-level data-style from body.
   if (Object.prototype.hasOwnProperty.call(patch, "style")) {

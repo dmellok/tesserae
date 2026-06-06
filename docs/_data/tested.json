@@ -4,12 +4,12 @@
     "esp32_bin": {
       "status": "Tested",
       "hardware": "Waveshare 13.3\" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3\" PhotoPainter (ESP32-S3)",
-      "notes": "Primary daily driver — battery-powered, deep-sleep. The 13.3\" client lives at tesserae-esp32-bin-client; the 7.3\" PhotoPainter client at tesserae-photopainter-7.3-bin-client. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride."
+      "notes": "Primary daily driver, battery-powered, deep-sleep. The 13.3\" client lives at tesserae-esp32-bin-client; the 7.3\" PhotoPainter client at tesserae-photopainter-7.3-bin-client. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride."
     },
     "pi_bin": {
       "status": "Tested",
       "hardware": "Pimoroni Inky Impression (Spectra 6 / Waveshare E6)",
-      "notes": "Fastest Pi path — packed buffer written straight to inky's _buf."
+      "notes": "Fastest Pi path, packed buffer written straight to inky's _buf."
     },
     "pi_png": {
       "status": "Tested",

@@ -1,4 +1,4 @@
-// weather_wind — Spectra stat archetype with a compass rose that
+// weather_wind, Spectra stat archetype with a compass rose that
 // telegraphs both the current wind direction (needle pointing FROM
 // the source) and the 24-hour directional distribution (petals sized
 // by the speed-weighted rose the server pre-computes). Right column
@@ -14,9 +14,9 @@ function escapeHtml(s) {
 }
 
 function fmtNum(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   const n = Number(v);
-  if (Number.isNaN(n)) return "—";
+  if (Number.isNaN(n)) return "-";
   return n >= 100 ? String(Math.round(n)) : String(Math.round(n * 10) / 10);
 }
 
@@ -26,10 +26,10 @@ function fmtNum(v) {
 function beaufortAccent(n) {
   if (!Number.isFinite(n) || n < 0) return "var(--text-muted)";
   if (n === 0) return "var(--text-secondary)";
-  if (n <= 3) return "var(--accent-3)"; // moss — light/gentle breezes
-  if (n <= 5) return "var(--accent-2)"; // ochre — moderate/fresh
-  if (n <= 7) return "var(--accent-1)"; // terracotta — strong/near gale
-  return "var(--accent-6)";              // plum — gale and worse
+  if (n <= 3) return "var(--accent-3)"; // moss, light/gentle breezes
+  if (n <= 5) return "var(--accent-2)"; // ochre, moderate/fresh
+  if (n <= 7) return "var(--accent-1)"; // terracotta, strong/near gale
+  return "var(--accent-6)";              // plum, gale and worse
 }
 
 // 8-point petal wind rose. Each cardinal+intercardinal direction gets
@@ -102,7 +102,7 @@ function roseSvg(bearing, rose) {
   };
   const ticks = intercardinals.map((deg) => tickAt(deg, 3, "var(--text-muted)", 1)).join("");
 
-  // Current direction needle — points OUTWARD at the bearing the wind
+  // Current direction needle, points OUTWARD at the bearing the wind
   // is coming FROM (meteorological convention). Outline form (no
   // fill) so the teal petals beneath remain visible through the
   // arrow's interior; the centre dot stays solid as the rotation
@@ -238,7 +238,7 @@ export default function render(shadow, ctx) {
       align-items: center;
       gap: var(--space-2) var(--space-3);
     }
-    /* Beaufort chip — number + descriptor pill in the band accent. The
+    /* Beaufort chip, number + descriptor pill in the band accent. The
        background uses color-mix so the chip works on every theme
        without per-band overrides. */
     .wind-beaufort {

@@ -86,7 +86,7 @@ def test_resolve_quiet_hours_device_override_wins() -> None:
 
 def test_resolve_quiet_hours_device_override_disabled_falls_back() -> None:
     """An override with ``enabled: false`` falls back to the app
-    setting — it's an explicit opt-out, not a silent toggle."""
+    setting, it's an explicit opt-out, not a silent toggle."""
     app = {
         "quiet_hours_enabled": True,
         "quiet_hours_start": "22:00",
@@ -117,19 +117,19 @@ def test_is_in_window_wraps_midnight() -> None:
     morning side, but NOT the middle of the day."""
     window = QuietHoursWindow(time(22, 0), time(7, 0))
     tz = ZoneInfo("UTC")
-    # Late evening — inside.
+    # Late evening, inside.
     assert is_in_window(window, datetime(2026, 1, 1, 23, 0, tzinfo=tz), tz)
-    # Just before midnight — inside.
+    # Just before midnight, inside.
     assert is_in_window(window, datetime(2026, 1, 1, 23, 59, tzinfo=tz), tz)
-    # Just after midnight (next "day" same window) — inside.
+    # Just after midnight (next "day" same window), inside.
     assert is_in_window(window, datetime(2026, 1, 2, 1, 0, tzinfo=tz), tz)
-    # End boundary — inside.
+    # End boundary, inside.
     assert is_in_window(window, datetime(2026, 1, 2, 7, 0, tzinfo=tz), tz)
-    # After end — outside.
+    # After end, outside.
     assert not is_in_window(window, datetime(2026, 1, 2, 7, 1, tzinfo=tz), tz)
-    # Middle of the day — outside.
+    # Middle of the day, outside.
     assert not is_in_window(window, datetime(2026, 1, 1, 14, 0, tzinfo=tz), tz)
-    # Just before start — outside.
+    # Just before start, outside.
     assert not is_in_window(window, datetime(2026, 1, 1, 21, 59, tzinfo=tz), tz)
 
 
@@ -138,10 +138,10 @@ def test_is_in_window_respects_timezone() -> None:
     13:00 UTC (= 00:00 next day Melbourne)."""
     window = QuietHoursWindow(time(22, 0), time(7, 0))
     melbourne = ZoneInfo("Australia/Melbourne")
-    # 13:00 UTC == 00:00 Melbourne (next day) — inside.
+    # 13:00 UTC == 00:00 Melbourne (next day), inside.
     utc_at_midnight = datetime(2026, 1, 1, 13, 0, tzinfo=ZoneInfo("UTC"))
     assert is_in_window(window, utc_at_midnight, melbourne)
-    # 03:00 UTC == 14:00 Melbourne — outside.
+    # 03:00 UTC == 14:00 Melbourne, outside.
     utc_afternoon = datetime(2026, 1, 1, 3, 0, tzinfo=ZoneInfo("UTC"))
     assert not is_in_window(window, utc_afternoon, melbourne)
 
@@ -194,7 +194,7 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
     from app.state.settings_store import SettingsStore
     from app.transport import BrokerConfig, MqttTransport
 
-    # Hard-disabled quiet hours don't accidentally fire — we need this
+    # Hard-disabled quiet hours don't accidentally fire, we need this
     # set so the helper sees the window and is_in_window evaluates True.
     # Pick a window guaranteed to be currently inside: 00:00 → 23:59.
     settings = SettingsStore(Path(tmp_path) / "settings.json")  # type: ignore[arg-type]
@@ -272,7 +272,7 @@ def test_push_with_respect_quiet_hours_skips_when_all_devices_quiet(
         devices=devices,
     )
 
-    # The render path mustn't be hit — assert via a patch that fails
+    # The render path mustn't be hit, assert via a patch that fails
     # loudly if it is.
     with patch("app.push.render_to_png") as rtp:
         rtp.side_effect = AssertionError("render should not be called when quiet")

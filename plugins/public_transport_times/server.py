@@ -3,7 +3,7 @@
 PTV Timetable API v3. Auth scheme: append ``devid=<id>`` to the query,
 HMAC-SHA1 the path-plus-query, append ``signature=<hex_upper>``.
 
-We cache for 60 seconds per (stop, mode) pair — PTV's rate limits are
+We cache for 60 seconds per (stop, mode) pair, PTV's rate limits are
 generous but a busy dashboard re-renders constantly and the timetable
 moves on a minute granularity anyway.
 """

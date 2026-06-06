@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Clock — Analog",
+  "name": "Clock, Analog",
   "version": "0.1.2",
   "kind": "widget",
-  "description": "Analog clock face. Pure SVG, no network. Five face styles — pick the one that suits the rest of your dashboard.",
+  "description": "Analog clock face. Pure SVG, no network. Five face styles, pick the one that suits the rest of your dashboard.",
   "icon": "ph-clock",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "cell_options": [
@@ -13,11 +13,11 @@
       "label": "Face style",
       "default": "minimalist",
       "choices": [
-        { "value": "minimalist", "label": "Minimalist — hour ticks only" },
-        { "value": "swiss",      "label": "Swiss railway — chunky red second hand" },
-        { "value": "bauhaus",    "label": "Bauhaus — geometric, primary triad" },
-        { "value": "brutalist",  "label": "Brutalist — heavy bars + numerals" },
-        { "value": "skeleton",   "label": "Skeleton — just the hands" }
+        { "value": "minimalist", "label": "Minimalist, hour ticks only" },
+        { "value": "swiss",      "label": "Swiss railway, chunky red second hand" },
+        { "value": "bauhaus",    "label": "Bauhaus, geometric, primary triad" },
+        { "value": "brutalist",  "label": "Brutalist, heavy bars + numerals" },
+        { "value": "skeleton",   "label": "Skeleton, just the hands" }
       ]
     },
     { "name": "show_seconds", "type": "boolean", "label": "Show second hand", "default": true },
@@ -27,8 +27,8 @@
       "label": "Numerals",
       "default": "arabic",
       "choices": [
-        { "value": "arabic", "label": "Arabic — 12 / 3 / 6 / 9" },
-        { "value": "roman", "label": "Roman — XII / III / VI / IX" },
+        { "value": "arabic", "label": "Arabic, 12 / 3 / 6 / 9" },
+        { "value": "roman", "label": "Roman, XII / III / VI / IX" },
         { "value": "dots", "label": "Dots only" }
       ]
     },

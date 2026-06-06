@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Home Assistant — Climate",
+  "name": "Home Assistant, Climate",
   "version": "0.3.3",
   "kind": "widget",
   "description": "One or more Home Assistant climate / thermostat entities Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.",

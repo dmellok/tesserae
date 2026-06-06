@@ -1,4 +1,4 @@
-"""sky_air_traffic — flights overhead via OpenSky."""
+"""sky_air_traffic, flights overhead via OpenSky."""
 
 from __future__ import annotations
 

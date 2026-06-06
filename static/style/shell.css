@@ -20,7 +20,7 @@
   z-index: 500;
   /* NOTE: backdrop-filter lives on ::before, NOT on .topbar itself.
      Putting it on .topbar makes the bar a containing block for
-     fixed-positioned descendants — which traps the mobile drawer
+     fixed-positioned descendants, which traps the mobile drawer
      inside the topbar's ~64px box. */
   isolation: isolate;
 }
@@ -71,7 +71,7 @@
     0 6px 16px color-mix(in oklab, var(--t-accent) 18%, transparent);
   transition: transform 220ms var(--t-ease-spring);
 }
-/* Tessellated dot pattern — pure CSS, no image. */
+/* Tessellated dot pattern, pure CSS, no image. */
 .brand-mark::before {
   content: "";
   position: absolute;
@@ -117,7 +117,7 @@
   background: color-mix(in oklab, var(--t-fg) 5%, transparent);
 }
 
-/* Active state — accent soft fill + thin underline anchor so the
+/* Active state, accent soft fill + thin underline anchor so the
    active page reads at a glance without overpowering the rest of
    the nav. */
 .topnav a.is-active,
@@ -140,7 +140,7 @@
   opacity: 0.85;
 }
 
-/* Plugin dropdown — anchored panel, not inline block. */
+/* Plugin dropdown, anchored panel, not inline block. */
 .nav-dropdown { position: relative; }
 .nav-dropdown summary {
   list-style: none;
@@ -187,7 +187,7 @@
   color: var(--t-muted);
 }
 
-/* Theme toggle — rendered twice. The .theme-toggle--topbar variant
+/* Theme toggle, rendered twice. The .theme-toggle--topbar variant
    is a compact icon square pinned to the far right of the topbar on
    desktop. The .theme-toggle--drawer variant is a full-width labelled
    row inside the responsive drawer. CSS hides whichever isn't
@@ -302,7 +302,7 @@
 
 /* ----- Layout -------------------------------------------------------- */
 
-/* Page column width — defined as a variable so the topbar can mirror
+/* Page column width, defined as a variable so the topbar can mirror
    it (see .topbar above). editor.css bumps this at ≥ 1100px because
    the editor needs the room and admin pages followed along. */
 :root { --t-page-max: 880px; }
@@ -315,7 +315,7 @@
 
 .page.page-wide { max-width: 1440px; }
 
-/* Phone-portrait tightening — the admin shell otherwise wastes a lot
+/* Phone-portrait tightening, the admin shell otherwise wastes a lot
    of the screen on edge padding + card chrome that's appropriate at
    desktop widths but not at 390px. */
 @media (max-width: 600px) {
@@ -329,7 +329,7 @@
   }
   .page-head { margin-bottom: var(--t-space-4); }
   .page-head h1 { font-size: var(--t-size-2xl); }
-  /* Touch targets — make buttons + selects at least 40px tall so
+  /* Touch targets, make buttons + selects at least 40px tall so
      they're tappable without zooming. */
   .form button,
   .form select,
@@ -375,7 +375,7 @@
   padding: var(--t-space-5) var(--t-space-6) var(--t-space-6);
   margin: 0 0 var(--t-space-4);
   scroll-margin-top: 80px;
-  /* Soft elevation — small ambient shadow + an inset highlight on the
+  /* Soft elevation, small ambient shadow + an inset highlight on the
      top edge so the card reads as paper lifted off the page bg rather
      than a flat rectangle drawn on top of it. */
   box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
@@ -514,7 +514,7 @@
   margin: 0 0 var(--t-space-4);
   border-bottom: 1px solid var(--t-border);
   /* Horizontal scroll fallback when the tab strip is wider than the
-     container (e.g. settings on a phone) — the underline acts as a
+     container (e.g. settings on a phone), the underline acts as a
      visible-area cue and the user can swipe to reach hidden tabs. */
   overflow-x: auto;
   scrollbar-width: none;
@@ -629,7 +629,7 @@ body.lightbox-open { overflow: hidden; }
 /* ----- Modal ------------------------------------------------------- */
 /* Generic centred modal for one-shot reveals (e.g. freshly-minted
    webhook tokens that won't ever be shown again). Driven by a small
-   inline script — open by inclusion in the rendered HTML, close via
+   inline script, open by inclusion in the rendered HTML, close via
    the [data-modal-close] buttons, ESC, or backdrop click. All colours
    reference the theme tokens in base.css so dark mode flips with the
    rest of the UI. */

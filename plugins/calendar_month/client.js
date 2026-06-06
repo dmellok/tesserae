@@ -1,9 +1,9 @@
-// calendar_month — Spectra month-grid. Each day cell carries:
+// calendar_month, Spectra month-grid. Each day cell carries:
 //
 //   - A heat tint on the cell background scaled by event count, so a
 //     glance over the grid reveals which days are stacked vs quiet.
-//   - Up to 4 feed-colour micro-strips at the bottom of the cell —
-//     one per unique feed that has events that day — so it reads
+//   - Up to 4 feed-colour micro-strips at the bottom of the cell -
+//     one per unique feed that has events that day, so it reads
 //     "this day has work + personal + bills" without spelling it out.
 //   - A +N chip when the day's event count exceeds what the visible
 //     strips / text rows could show.
@@ -23,7 +23,7 @@ const DOW_SUN = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Dedupe feed colours preserving first-seen order. The cell shows
 // one strip per unique colour rather than one per event, so a day
 // with three "work" meetings doesn't paint three identical blue
-// strips — it paints one wide blue strip alongside whatever other
+// strips, it paints one wide blue strip alongside whatever other
 // feeds the day touches.
 function uniqueColours(events) {
   const seen = new Set();
@@ -38,7 +38,7 @@ function uniqueColours(events) {
   return out;
 }
 
-// Heat-tint background — scales the cell's background from surface
+// Heat-tint background, scales the cell's background from surface
 // (0 events) up to a `color-mix` overlay of accent-4 (teal) at
 // increasing alpha. Capped at 5+ events so a single day with 20
 // meetings doesn't drown out the rest of the grid's distinctions.
@@ -100,7 +100,7 @@ export default function render(shadow, ctx) {
         }).join("")}
         ${remainder > 0 ? `<span class="mc-more">+${remainder}</span>` : ""}`;
     } else {
-      // bars mode (default) — strips per unique feed-colour. Cap at
+      // bars mode (default), strips per unique feed-colour. Cap at
       // 4 strips so a day with 7 distinct feeds doesn't paint a
       // rainbow stack that pushes the day number out of frame; the
       // rest are summarised by the +N chip.
@@ -147,7 +147,7 @@ export default function render(shadow, ctx) {
       flex-direction: column;
       gap: 0.15em;
     }
-    /* Refined +N chip — small numeric badge in the bottom-right of
+    /* Refined +N chip, small numeric badge in the bottom-right of
        cells with more events than the visible strips count. Sits
        inside .mc-dots so it stacks naturally above the strips when
        in bars mode and below the text rows when in text mode. */

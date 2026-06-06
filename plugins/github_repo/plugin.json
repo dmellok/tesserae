@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "GitHub — Repo Card",
+  "name": "GitHub, Repo Card",
   "version": "0.2.1",
   "kind": "widget",
   "description": "Single-repo card. Pairs the language split + stars / forks / issues / release stats with a 52-week commit activity sparkline and a top-contributors strip (up to 5, avatar + login + contribution count). Public repos work without a token.",

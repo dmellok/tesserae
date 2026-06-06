@@ -1,4 +1,4 @@
-"""Updater tests — git/pip are mocked so the suite never hits the network
+"""Updater tests, git/pip are mocked so the suite never hits the network
 or mutates the working tree. One integration test runs ``current_state``
 against the real repo for a sanity check."""
 
@@ -303,7 +303,7 @@ def test_rollback_with_no_history_raises(tmp_path: Path) -> None:
 
 def test_restart_posix_uses_execv(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """On POSIX the kernel hands the listening socket FD to the new
-    Python — ``os.execv`` is the right primitive."""
+    Python, ``os.execv`` is the right primitive."""
     monkeypatch.setattr("app.updater._is_windows", lambda: False)
     captured: dict[str, Any] = {}
 

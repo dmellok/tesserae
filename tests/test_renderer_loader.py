@@ -72,7 +72,7 @@ def test_seed_device_settings_copies_base_to_empty_clones(
     """Picture-quality (``device_setting: true``) fields used to live on
     the renderer card. ``seed_device_settings_from_base`` carries any
     legacy renderer-wide value forward into the per-device clone if the
-    clone hasn't been tuned yet — so upgrading is invisible and a newly-
+    clone hasn't been tuned yet, so upgrading is invisible and a newly-
     added device matches the rest of the fleet."""
     from app.state.settings_store import SettingsStore
 
@@ -162,7 +162,7 @@ def test_compat_mismatch_is_rejected(tmp_path: Path, schema_path: Path) -> None:
 def test_missing_export_is_caught(tmp_path: Path, schema_path: Path) -> None:
     plugins_dir = tmp_path / "renderers"
     plugins_dir.mkdir()
-    # transform-only — no payload export.
+    # transform-only, no payload export.
     body = "def transform(png_bytes, *, panel, settings):\n    return b''\n"
     _write_renderer(plugins_dir, "halfbaked", {}, body)
     registry = renderer_loader.discover(

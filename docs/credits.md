@@ -7,9 +7,9 @@ here is wrong or someone's missing, please [open an issue](https://github.com/dm
 
 | Project | Used for | Version | Licence |
 |---|---|---|---|
-| [Phosphor Icons](https://phosphoricons.com/) | Admin UI iconography (6 weights — regular, bold, fill, duotone, light, thin) | 2.x | MIT |
+| [Phosphor Icons](https://phosphoricons.com/) | Admin UI iconography (6 weights, regular, bold, fill, duotone, light, thin) | 2.x | MIT |
 | [Chart.js](https://chartjs.org/) | Finance / weather / forecast / stats charts | 4.4.0 | MIT |
-| [`widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css) + [`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css) | Shared widget design system: refined title bars, `--c-*` semantic tokens, `--wx-*` decorative tokens for the weather/sky family | — | MIT (this repo) |
+| [`widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css) + [`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css) | Shared widget design system: refined title bars, `--c-*` semantic tokens, `--wx-*` decorative tokens for the weather/sky family |, | MIT (this repo) |
 
 ## Bundled fonts
 
@@ -36,28 +36,28 @@ live in `plugins/fonts_core/static/`.
 
 ## Upstream protocols and reference clients
 
-- **[KOReader trmnl-display plugin](https://github.com/koreader/koreader)** —
+- **[KOReader trmnl-display plugin](https://github.com/koreader/koreader)** -
   Lua plugin running on jailbroken Kindles that paints frames over the
   TRMNL BYOS protocol. The Kindle Paperwhite 2 testing on Tesserae's
   TRMNL HTTP path leans entirely on this work.
-- **[TRMNL BYOS specification](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)** —
+- **[TRMNL BYOS specification](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)** -
   usetrmnl.com's documented protocol that the `trmnl_png` renderer +
   `/api/display` blueprint implement.
 
 ## Python dependencies
 
-Pip dependencies aren't enumerated here — their licences travel with the
+Pip dependencies aren't enumerated here, their licences travel with the
 wheels and `pyproject.toml` is the authoritative source. The main ones,
 for context:
 
-- [Flask](https://flask.palletsprojects.com/) — web framework (BSD)
-- [Pillow](https://python-pillow.org/) — image rendering pipeline (HPND)
-- [paho-mqtt](https://www.eclipse.org/paho/) — MQTT client (EPL / EDL)
-- [amqtt](https://github.com/Yakifo/amqtt) — embedded broker (MIT)
-- [Playwright](https://playwright.dev/) — headless Chromium for the
+- [Flask](https://flask.palletsprojects.com/), web framework (BSD)
+- [Pillow](https://python-pillow.org/), image rendering pipeline (HPND)
+- [paho-mqtt](https://www.eclipse.org/paho/), MQTT client (EPL / EDL)
+- [amqtt](https://github.com/Yakifo/amqtt), embedded broker (MIT)
+- [Playwright](https://playwright.dev/), headless Chromium for the
   webpage / screenshot widget (Apache 2.0)
-- [waitress](https://docs.pylonsproject.org/projects/waitress/) —
+- [waitress](https://docs.pylonsproject.org/projects/waitress/) -
   production WSGI server (ZPL)
-- [pydantic](https://docs.pydantic.dev/) — schema models (MIT)
-- [zeroconf](https://github.com/python-zeroconf/python-zeroconf) — mDNS
+- [pydantic](https://docs.pydantic.dev/), schema models (MIT)
+- [zeroconf](https://github.com/python-zeroconf/python-zeroconf), mDNS
   advertiser (LGPL 2.1)

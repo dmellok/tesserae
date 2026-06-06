@@ -1,6 +1,6 @@
 """Per-device rotation view tests.
 
-Rotation in v0.6.3 is pure presentation — a join of pages → schedules
+Rotation in v0.6.3 is pure presentation, a join of pages → schedules
 keyed by which device(s) each page is bound to. These tests pin the
 join + the day-label compression so the device-card UI doesn't drift
 silently when the schedule model evolves."""
@@ -127,7 +127,7 @@ def test_rotation_sorted_by_window_start(wiring) -> None:
 
 def test_rotation_empty_for_kind_not_an_instance(wiring) -> None:
     """Built-in kinds (e.g. ``esp32_client`` itself, not an instance)
-    return an empty rotation — kinds aren't bindable, so they can't
+    return an empty rotation, kinds aren't bindable, so they can't
     appear on any page's device list."""
     devices, pages, schedules = wiring
     rows = timetable_for_device("esp32_client", devices=devices, pages=pages, schedules=schedules)

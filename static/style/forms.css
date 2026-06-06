@@ -433,7 +433,7 @@ code {
    from the linked multiselect's ticked entities. */
 
 .entity-overrides-storage {
-  /* Off-screen but still focusable as a form field — the JS bumps
+  /* Off-screen but still focusable as a form field, the JS bumps
      'input' on it for the editor's dirty/preview watcher. */
   position: absolute;
   width: 1px;
@@ -506,7 +506,7 @@ code {
   font-size: 16px;
 }
 @media (max-width: 640px) {
-  /* Stack on narrow screens — the inline icon picker needs full row
+  /* Stack on narrow screens, the inline icon picker needs full row
      width for its popover not to clip out of the cell card. */
   .entity-override-row {
     grid-template-columns: auto 1fr;
@@ -657,7 +657,7 @@ code {
   align-items: center;
   width: 100%;
 }
-/* The HTML `hidden` attribute should win over `display: grid` above —
+/* The HTML `hidden` attribute should win over `display: grid` above -
    browsers map it to `display: none` only when no other display rule
    targets the element, so spell it out. */
 .dropzone-preview[hidden],
@@ -842,14 +842,14 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .panel-custom-fields { display: none; }
 .panel-section.is-custom .panel-custom-fields { display: contents; }
 
-/* Broker fields — the master switch swaps which set shows: built-in
+/* Broker fields, the master switch swaps which set shows: built-in
    fields when on, external host/auth fields when off. */
 .embedded-broker-fields,
 .external-broker-fields { display: contents; }
 .embedded-broker-fields.is-collapsed,
 .external-broker-fields.is-collapsed { display: none; }
 
-/* ----- Device checklist — selectable icon tiles -------------------- *
+/* ----- Device checklist, selectable icon tiles -------------------- *
  * Shared by the dashboard editor (multi-bind a page) and the Send page
  * (multi-target a one-off push). Each row is a card; the native control
  * (checkbox or radio) is visually hidden and the card reflects state via
@@ -971,7 +971,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
      checkbox doesn't take up space in the row layout. Anchoring its
      containing block to the option label means the auto-focus
      ``scrollIntoView`` the browser fires on click stays bounded to
-     the option's own bounding rect — the click target is already in
+     the option's own bounding rect, the click target is already in
      view, so no jump occurs. Without this the input's nearest
      positioned ancestor is the document, and Chrome computes the
      "scroll to make visible" against (0, 0) of the page. */
@@ -979,7 +979,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
 }
 .multiselect-opt:first-of-type { border-top: 0; }
 /* The class rule above sets ``display: flex``, which beats the UA
-   ``[hidden] { display: none }`` rule on specificity — so the
+   ``[hidden] { display: none }`` rule on specificity, so the
    filter's ``o.hidden = !match`` would visually do nothing without
    this explicit override. Without it the search box appears to do
    nothing because the filtered-out rows stay visible. */
@@ -988,8 +988,8 @@ input[type="range"].slider:focus::-moz-range-thumb {
  * Clicking anywhere on the label hits the input directly, the input's
  * bounding box matches the option row's, and the browser's auto-
  * focus scroll lands on a target that's already at the click point
- * — so the page doesn't jump. ``pointer-events: none`` would defeat
- * this (clicks would skip the input) — we WANT the click to land on
+ *, so the page doesn't jump. ``pointer-events: none`` would defeat
+ * this (clicks would skip the input), we WANT the click to land on
  * the input here, unlike older visually-hidden patterns. */
 .multiselect-opt input {
   position: absolute;
@@ -1159,7 +1159,7 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .wizard-broker-url code { font-size: 1.05em; padding: 0.3rem 0.5rem; }
 
 /* ----- Check row -----------------------------------------------------
-   Full-width checkbox + label pair for "deliberate opt-in" choices —
+   Full-width checkbox + label pair for "deliberate opt-in" choices -
    originally lived in settings.css for the "discard local changes"
    toggle; promoted here so the onboarding flow and other forms can
    reuse it instead of inlining the same flex/gap pattern. */

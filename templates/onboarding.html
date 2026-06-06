@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import button, text_input, number_input, select_field %}
-{% block title %}Setup — Tesserae{% endblock %}
+{% block title %}Setup, Tesserae{% endblock %}
 {% block page_class %}page-narrow{% endblock %}
 
 {# Focused flow: hide the main nav so the wizard is the only thing to do. #}
@@ -24,9 +24,9 @@
     <h1>Welcome to Tesserae</h1>
     <p class="lede">Four quick steps to get a dashboard onto your first panel. You can skip any time and configure things later under Settings.</p>
     <ol class="wizard-overview">
-      <li><strong>Broker</strong> — where frames are published.</li>
-      <li><strong>Device</strong> — register the panel that paints them.</li>
-      <li><strong>Dashboard</strong> — a starter layout, pushed to the panel.</li>
+      <li><strong>Broker</strong>, where frames are published.</li>
+      <li><strong>Device</strong>, register the panel that paints them.</li>
+      <li><strong>Dashboard</strong>, a starter layout, pushed to the panel.</li>
     </ol>
     <div class="wizard-nav">
       <span></span>
@@ -37,7 +37,7 @@
     {% elif step == 'broker' %}
     <h1>Connect a broker</h1>
     {% if ha_ingress %}
-    <p class="lede">Point Tesserae at an MQTT broker. Home Assistant's Mosquitto add-on lives at <code>core-mosquitto</code> — that's filled in below, change it if you run a different broker.</p>
+    <p class="lede">Point Tesserae at an MQTT broker. Home Assistant's Mosquitto add-on lives at <code>core-mosquitto</code>, that's filled in below, change it if you run a different broker.</p>
     {% else %}
     <p class="lede">Tesserae publishes frames over MQTT. Use the built-in broker if you don't already run one, or point at an existing broker.</p>
     {% endif %}
@@ -56,7 +56,7 @@
           <label>Point your clients at</label>
           <p class="wizard-broker-url"><code>{{ builtin_url }}</code></p>
           {% if builtin_url_is_bridge %}
-          <p class="field-help wizard-broker-warning"><strong>That's a Docker bridge address — your panels won't reach it.</strong> Set <code>TESSERAE_HOST_IP</code> to your Docker host's LAN IP in your <code>docker-compose.yml</code>:
+          <p class="field-help wizard-broker-warning"><strong>That's a Docker bridge address, your panels won't reach it.</strong> Set <code>TESSERAE_HOST_IP</code> to your Docker host's LAN IP in your <code>docker-compose.yml</code>:
           <br><br>
           <code>environment:</code><br>
           &nbsp;&nbsp;<code>TESSERAE_HOST_IP: "192.168.1.50"</code> &nbsp;<em>(your host's actual LAN IP)</em>
@@ -65,7 +65,7 @@
           {% else %}
           <p class="field-help">The built-in broker binds all interfaces on port {{ builtin_port }}, so your Pi / ESP32 clients connect to this address. Set a username + password below to lock it down on your network.</p>
           {% endif %}
-          <p class="field-help"><strong>MQTT v3.1.1 only.</strong> Tesserae's own clients are fine (they speak 3.1.1), but external tools — MQTT Explorer, Home Assistant, Node-RED — default to v5 and will fail to connect. Either set their protocol version to 3.1.1, or install Mosquitto and point the External broker fields at it instead.</p>
+          <p class="field-help"><strong>MQTT v3.1.1 only.</strong> Tesserae's own clients are fine (they speak 3.1.1), but external tools, MQTT Explorer, Home Assistant, Node-RED, default to v5 and will fail to connect. Either set their protocol version to 3.1.1, or install Mosquitto and point the External broker fields at it instead.</p>
         </div>
         {{ text_input('builtin-user', 'builtin_username', 'Username (optional)', value=broker.get('embedded_username', '')) }}
         {{ text_input('builtin-pass', 'builtin_password', 'Password (optional)', value='', type='password') }}
@@ -87,7 +87,7 @@
     {# ---------- Device ---------- #}
     {% elif step == 'device' %}
     <h1>Register a device</h1>
-    <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration — or add one by hand.</p>
+    <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration, or add one by hand.</p>
     {# Live discovery: refresh when a client announces itself so the user
        doesn't have to reload while waiting for the first heartbeat. #}
     <span data-discovered-poll="{{ discovered_sig }}" hidden></span>
@@ -153,7 +153,7 @@
     {% elif step == 'dashboard' %}
     <h1>Your first dashboard</h1>
     {% if pages %}
-    <p class="lede">A starter dashboard is ready. Push it to your panel to confirm everything's wired up, then finish — or open the editor to make it yours.</p>
+    <p class="lede">A starter dashboard is ready. Push it to your panel to confirm everything's wired up, then finish, or open the editor to make it yours.</p>
     <ul class="wizard-pages">
       {% for p in pages %}
       <li>
@@ -172,7 +172,7 @@
       <a class="primary" href="{{ url_for('onboarding.step', step='telemetry') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
     {% else %}
-    <p class="lede">Create a ready-made dashboard — a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
+    <p class="lede">Create a ready-made dashboard, a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
     <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
       <div class="wizard-nav">
         <a class="ghost" href="{{ url_for('onboarding.step', step='device') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
@@ -184,15 +184,15 @@
     {# ---------- Telemetry consent ---------- #}
     {% elif step == 'telemetry' %}
     <h1>Help me build Tesserae</h1>
-    <p class="lede">Tesserae is a solo project. If you opt in to anonymous usage stats, I get a real picture of how many people are running it and what versions they're on — which helps me decide what to prioritise and when it's safe to break old behaviour. It's a small honest signal, not a vanity dashboard.</p>
+    <p class="lede">Tesserae is a solo project. If you opt in to anonymous usage stats, I get a real picture of how many people are running it and what versions they're on, which helps me decide what to prioritise and when it's safe to break old behaviour. It's a small honest signal, not a vanity dashboard.</p>
 
     <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
       <div class="card card--compact card--wizard-info">
         <p><strong>What gets sent (only when ticked):</strong></p>
         <ul>
-          <li><code>app.started</code> — once per process start, with the Tesserae version, Python version, and platform name.</li>
-          <li><code>app.heartbeat</code> — once an hour while the process is running, so I can tell live installs apart from "started once and crashed". Same fields as above.</li>
-          <li><code>update.applied</code> — when the in-app updater applies a new revision, with the from/to short SHAs, channel, and whether deps were reinstalled.</li>
+          <li><code>app.started</code>, once per process start, with the Tesserae version, Python version, and platform name.</li>
+          <li><code>app.heartbeat</code>, once an hour while the process is running, so I can tell live installs apart from "started once and crashed". Same fields as above.</li>
+          <li><code>update.applied</code>, when the in-app updater applies a new revision, with the from/to short SHAs, channel, and whether deps were reinstalled.</li>
         </ul>
         <p><strong>What it doesn't send:</strong> IP addresses, hostnames, paths, settings, secrets, push contents, dashboard layouts, or anything tied to a real-world identity. The only stable identifier is a random UUID generated on this install and stored in <code>data/core/.instance_id</code>.</p>
         <p class="muted card--wizard-info-footnote">Events go to my self-hosted Aptabase at <code>aptabase.dmello.io</code>.</p>

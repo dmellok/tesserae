@@ -1,4 +1,4 @@
-// calendar_week — Spectra timetable, seven columns. Display header
+// calendar_week, Spectra timetable, seven columns. Display header
 // shows the date range ("JUN 1 → 7 · 2026"), columns show DOW + day
 // number with today picked out via an inverse accent-1 chip and
 // weekend columns tinted to read distinct from weekdays. Each
@@ -149,7 +149,7 @@ export default function render(shadow, ctx) {
       const time = `${fmtHm(ev.start)}${ev.end ? `–${fmtHm(ev.end)}` : ""}`;
       // Mark very short blocks so the CSS can hide the text entirely
       // (an illegible string of letter-tops is worse than a clean bar
-      // — the title attr still carries the summary for any browser
+      //, the title attr still carries the summary for any browser
       // that surfaces tooltips). Threshold is generous because the
       // lane's height varies; 4% of a typical 12-hour span ~= 24-30 px.
       const isTiny = height < 4;
@@ -168,7 +168,7 @@ export default function render(shadow, ctx) {
   }).join("");
 
   const layout = `
-    /* Today marker — inverse-coloured chip instead of just an accent
+    /* Today marker, inverse-coloured chip instead of just an accent
        shift on the day number, so a quick scan locks on the current
        day. The DOW label drops to on-accent over a tinted backdrop,
        the day number becomes a filled circle. */
@@ -186,7 +186,7 @@ export default function render(shadow, ctx) {
       font-weight: var(--fw-black);
     }
 
-    /* Weekend tint — soft sunken background on column heads + lanes
+    /* Weekend tint, soft sunken background on column heads + lanes
        to set Sat/Sun off from weekdays without yelling. Inset
        background instead of border so the existing grid gutters
        stay clean. */
@@ -207,7 +207,7 @@ export default function render(shadow, ctx) {
       color-mix(in oklab, var(--text-primary) 3%, transparent);
     }
 
-    /* Per-column event-count chip — small numeric badge under the
+    /* Per-column event-count chip, small numeric badge under the
        day number. Hidden when count = 0 (handled in JS so the badge
        only renders when there are events). */
     .tt-col-head {
@@ -254,13 +254,13 @@ export default function render(shadow, ctx) {
       .tt-col-count { display: none; }
     }
 
-    /* Event blocks — week view squeezes events into narrow columns,
+    /* Event blocks, week view squeezes events into narrow columns,
        so the title needs a tighter line-height + minimal top
        padding to keep all the letters visible inside the block.
        The base .tt-event styles in spectra-widgets.css set
        line-height: 1.1 plus var(--space-1) vertical padding, which
        combined with the small font-size we want here pushed the
-       descender row past the overflow boundary — letters were
+       descender row past the overflow boundary, letters were
        clipping at the bottom.
 
        Title wraps for taller events via line-clamp (up to 3 lines),
@@ -297,7 +297,7 @@ export default function render(shadow, ctx) {
     .tt-event.is-tiny .tt-name { display: none; }
     .tt-event.is-tiny { padding-top: 0; padding-bottom: 0; }
 
-    /* hide_labels cell option — when on, every event block paints as
+    /* hide_labels cell option, when on, every event block paints as
        its colour bar only (same treatment as is-tiny). Reads as a
        glance-friendly heatmap of feed colours when the dashboard
        cares about "what kind of day is this" more than "what's the

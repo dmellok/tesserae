@@ -1,12 +1,12 @@
 name: Widget idea
-description: Pitch a new widget — your own to build, or one you'd like to see.
+description: Pitch a new widget, your own to build, or one you'd like to see.
 title: "[Widget]: "
 labels: ["widget", "enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        Widgets are drop-a-folder plugins — see [docs/dev/writing-a-plugin.md](https://github.com/dmellok/tesserae/blob/main/docs/dev/writing-a-plugin.md) if you want to build it yourself. This template is for sketching one out before code.
+        Widgets are drop-a-folder plugins, see [docs/dev/writing-a-plugin.md](https://github.com/dmellok/tesserae/blob/main/docs/dev/writing-a-plugin.md) if you want to build it yourself. This template is for sketching one out before code.
 
   - type: input
     id: name
@@ -29,7 +29,7 @@ body:
     attributes:
       label: Data source
       description: API name + URL, public/auth required, rate limits if you know them.
-      placeholder: "PTV Timetable API (Melbourne) — free, ~5 req/min per key"
+      placeholder: "PTV Timetable API (Melbourne), free, ~5 req/min per key"
     validations:
       required: true
 
@@ -64,8 +64,8 @@ body:
     attributes:
       label: Are you offering to build it?
       options:
-        - "Yes — I'll send a PR"
-        - "Maybe — if someone helps me get started"
-        - "No — pitching the idea"
+        - "Yes, I'll send a PR"
+        - "Maybe, if someone helps me get started"
+        - "No, pitching the idea"
     validations:
       required: true

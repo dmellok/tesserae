@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Weather — Forecast",
+  "name": "Weather, Forecast",
   "version": "0.1.5",
   "kind": "widget",
   "description": "5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).",

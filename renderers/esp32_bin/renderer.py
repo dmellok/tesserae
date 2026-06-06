@@ -5,7 +5,7 @@ ESP32 client sees the current frame on first wake.
 
 Wire contract:
 
-* Exactly ``width * height / 2`` bytes — 960000 for the 13.3" Waveshare,
+* Exactly ``width * height / 2`` bytes, 960000 for the 13.3" Waveshare,
   192000 for the 7.3" PhotoPainter.
 * Buffer is packed at the panel's firmware-native row stride
   (``panel.native_w × panel.native_h``), NOT at the composition
@@ -18,7 +18,7 @@ Wire contract:
   ``resolve_settings_panel`` / ``_device_panel`` from the panel preset
   or the device manifest. Custom / unknown panels leave them as None;
   the renderer then falls back to packing at ``(panel.w, panel.h)``
-  directly — matching pre-v0.19.19 behaviour for those cases.
+  directly, matching pre-v0.19.19 behaviour for those cases.
 
 * 4-bpp packed, scanline order, no row padding. High nibble = even
   column, low nibble = odd column.
@@ -78,12 +78,12 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     img_landscape = img.size[0] > img.size[1]
     if firmware_landscape != img_landscape:
         # Orientation mismatch (either input PNG or user-calibrated
-        # composition) — rotate 90° CW so the input's left edge lands
+        # composition), rotate 90° CW so the input's left edge lands
         # at the panel's top edge. PIL ``rotate(angle)`` is
         # counter-clockwise; ``-90`` gives CW.
         img = img.rotate(-90, expand=True)
     if panel.flip:
-        # Upside-down physical mount — turn 180° so it reads upright.
+        # Upside-down physical mount, turn 180° so it reads upright.
         img = img.rotate(180, expand=True)
     if img.size != (native_w, native_h):
         # Send-page per-push fit mode (fit/fill/stretch/center/blur).

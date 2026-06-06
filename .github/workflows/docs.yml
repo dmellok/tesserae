@@ -3,7 +3,7 @@
 # The widget gallery + compatibility pages are regenerated from the live
 # manifests on every build, so they can't drift. Widget *screenshots* are
 # committed artifacts (capture them locally with
-# scripts/capture_widget_shots.py against a --dev instance) — we don't run
+# scripts/capture_widget_shots.py against a --dev instance), we don't run
 # a browser in CI.
 #
 # One-time setup: repo Settings -> Pages -> Source = "GitHub Actions".

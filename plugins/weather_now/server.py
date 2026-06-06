@@ -104,7 +104,7 @@ def fetch(
     result: dict[str, Any] = {
         "label": options.get("label", ""),
         "units": units,
-        # Legacy fields — the old client.js render path still uses these.
+        # Legacy fields, the old client.js render path still uses these.
         "temp": current.get("temperature_2m"),
         "feels": current.get("apparent_temperature"),
         "humidity": current.get("relative_humidity_2m"),
@@ -175,7 +175,7 @@ def _round_div(value: Any, divisor: float) -> Any:
 
 def _iso_to_min(iso: Any) -> int | None:
     """Open-Meteo returns ISO timestamps like ``2026-06-03T06:45`` (no
-    seconds, no tz — the API treats them as local once we pass
+    seconds, no tz, the API treats them as local once we pass
     ``timezone=auto``). Parse just the hour/minute and convert to
     minutes-since-midnight for the sun-arc charts."""
     if not isinstance(iso, str) or "T" not in iso:
@@ -201,7 +201,7 @@ def _hhmm(iso: Any) -> str:
 def _now_min() -> int:
     """Wall-clock minutes-since-midnight. Open-Meteo with ``timezone=auto``
     aligns rise/set to the panel's local time, so we use system local
-    too — server and panel are typically in the same TZ for a
+    too, server and panel are typically in the same TZ for a
     single-household Tesserae install."""
     from datetime import datetime as _dt
 
@@ -209,7 +209,7 @@ def _now_min() -> int:
     return n.hour * 60 + n.minute
 
 
-# WMO weather codes — see https://open-meteo.com/en/docs#weathervariables
+# WMO weather codes, see https://open-meteo.com/en/docs#weathervariables
 # Each entry is (label, day-icon, night-icon). Night-icon is only used
 # for clear/partly conditions; rain/snow/storm read the same either way.
 _WMO: dict[int, tuple[str, str, str]] = {

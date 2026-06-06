@@ -3,16 +3,16 @@ write each artifact → publish.
 
 Four entry points share the same single-flight + log-the-event tail:
 
-* ``push(page_id)`` — render a saved Page through the composer.
-* ``push_image(image_bytes, source_label)`` — hand arbitrary bytes
+* ``push(page_id)``, render a saved Page through the composer.
+* ``push_image(image_bytes, source_label)``, hand arbitrary bytes
   directly to the renderers (Send-page file upload + image URL).
-* ``push_webpage(url)`` — screenshot an arbitrary URL via Playwright, then
+* ``push_webpage(url)``, screenshot an arbitrary URL via Playwright, then
   hand the bytes to the renderers (Send-page webpage tab).
-* ``republish(event_id)`` — re-publish a past push from history using the
+* ``republish(event_id)``, re-publish a past push from history using the
   stored composition PNG, no re-render.
 
 Concurrency: one push at a time. Concurrent attempts return
-``status="busy"`` instead of queueing — simple model, the UI shows what's
+``status="busy"`` instead of queueing, simple model, the UI shows what's
 actually happening.
 
 The composition PNG is always written to ``data/core/renders/<comp_digest>.png``
@@ -20,10 +20,10 @@ as the canonical thumbnail. Per-renderer artifacts go to
 ``<digest>.<extension>`` next to it (content-addressed, so two renderers
 producing identical output dedupe on disk).
 
-Every push attempt — success, failure, or busy — is logged to
+Every push attempt, success, failure, or busy, is logged to
 ``EventLog`` so the Send-page history tab can list / resend / delete.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -103,18 +103,18 @@ class PushManager:
     """Single-flight render -> transform -> publish loop with event logging.
 
     Constructor wiring:
-      * ``registry`` — RendererRegistry. Empty registry is allowed; in that
+      * ``registry``, RendererRegistry. Empty registry is allowed; in that
         case ``push()`` renders the PNG (and logs the event) but publishes
         nothing.
-      * ``page_store`` — for resolving a saved Page by id.
-      * ``transport`` — connected MqttTransport. ``push()`` raises clearly
+      * ``page_store``, for resolving a saved Page by id.
+      * ``transport``, connected MqttTransport. ``push()`` raises clearly
         if it's not connected and there are renderers to publish.
-      * ``settings`` — SettingsStore. Used to pick up per-renderer
+      * ``settings``, SettingsStore. Used to pick up per-renderer
         settings + the default panel dims (for non-page pushes).
-      * ``event_log`` — EventLog. Every push attempt writes a row.
-      * ``renders_dir`` — where to write composition PNGs + per-renderer
+      * ``event_log``, EventLog. Every push attempt writes a row.
+      * ``renders_dir``, where to write composition PNGs + per-renderer
         artifacts. Created if missing.
-      * ``base_url_fn`` — callable returning the current URL prefix the
+      * ``base_url_fn``, callable returning the current URL prefix the
         panel listener uses to fetch artifacts. Called on every push so
         the port can be captured from the first incoming HTTP request
         rather than hard-coded at construction time.
@@ -146,7 +146,7 @@ class PushManager:
         # Returning ``None`` falls back to the cold per-render Chromium
         # spin-up; returning a pool reuses the warm browser.
         self._browser_pool_fn = browser_pool_fn or (lambda: None)
-        # Optional — enables multi-head routing. When a page sets a
+        # Optional, enables multi-head routing. When a page sets a
         # device_id, the panel comes from that device's manifest and
         # only its renderers fire in _fan_out.
         self._devices = devices
@@ -157,7 +157,7 @@ class PushManager:
         self._renders_since_prune = 0
         # Listeners fire synchronously after every push attempt (success
         # or failure). HA discovery uses this to follow pushes. Slow
-        # listeners block the request — keep them fast. Exceptions are
+        # listeners block the request, keep them fast. Exceptions are
         # logged and swallowed so a buggy subscriber can't break a push.
         self._listener_lock = threading.Lock()
         self._listeners: list[Callable[[PushResult], None]] = []
@@ -197,13 +197,13 @@ class PushManager:
 
     def latest_render_for(self, device_id: str) -> dict[str, Any] | None:
         """The most recently published render for a device, or ``None``
-        if nothing has been pushed since startup.
+         if nothing has been pushed since startup.
 
-        Returns a dict ``{digest, ext, filename, timestamp, renderer_id}``
-        — same shape ``_fan_out`` writes into the in-memory map. Used
-        by pull-based transports (``app.trmnl_api.display``) so a TRMNL
-        client polling ``/api/display`` gets the URL of the actual
-        frame the renderer just wrote, not a stale guess."""
+         Returns a dict ``{digest, ext, filename, timestamp, renderer_id}``
+        , same shape ``_fan_out`` writes into the in-memory map. Used
+         by pull-based transports (``app.trmnl_api.display``) so a TRMNL
+         client polling ``/api/display`` gets the URL of the actual
+         frame the renderer just wrote, not a stale guess."""
         return self._latest_renders.get(device_id)
 
     def _load_latest_renders(self) -> dict[str, dict[str, Any]]:
@@ -213,7 +213,7 @@ class PushManager:
         client) gets the actual frame it should have, not a placeholder,
         on the first ``/api/display`` after a server reboot. Any read
         error (missing file, bad JSON, corrupt entry) silently falls
-        back to an empty map — the worst case is one placeholder
+        back to an empty map, the worst case is one placeholder
         render until the next push repopulates."""
         path = self._latest_renders_path
         if not path.exists():
@@ -244,7 +244,7 @@ class PushManager:
         Writes to a sibling temp file and renames so a crash mid-write
         can't corrupt the live file (one of the few times rename's
         cross-platform atomicity actually matters here). Errors are
-        logged but not raised — the cost of an out-of-disk write is
+        logged but not raised, the cost of an out-of-disk write is
         less than the cost of breaking a push because the disk filled."""
         path = self._latest_renders_path
         try:
@@ -269,7 +269,7 @@ class PushManager:
 
         ``device_ids`` (optional): restrict the fan-out to these devices.
         The page renders at each matching device's panel and only that
-        device's renderers fire — used to push a dashboard to one display
+        device's renderers fire, used to push a dashboard to one display
         even when it's bound to several. ``None`` keeps the default
         behaviour (every device the page is bound to).
 
@@ -314,7 +314,7 @@ class PushManager:
         bundled .bin renderers via ``fit_to_panel``).
 
         ``device_id`` (optional): when set, only that device's renderers
-        fire and its panel dims are used — same routing as a page bound
+        fire and its panel dims are used, same routing as a page bound
         to the device. ``fit`` (optional): the fit mode for non-panel-sized
         input (``fit``/``fill``/``stretch``/``center``/``blur``)."""
         if not self._lock.acquire(blocking=False):
@@ -485,7 +485,7 @@ class PushManager:
         # panels. Render once per distinct panel (a 4:3 and a portrait
         # panel need different compositions) and fan each frame out only
         # to the devices that share that panel. An empty device list means
-        # "no specific device" — render at the virtual panel and fan out
+        # "no specific device", render at the virtual panel and fan out
         # to every renderer (legacy single-head).
         groups = panel_groups_for_push(page, self._devices, self._settings)
         if device_ids is not None:
@@ -505,7 +505,7 @@ class PushManager:
             groups = self._filter_quiet_devices(groups)
             if not groups:
                 # Every bound device is currently quiet. Log a soft skip
-                # and return — not a failure (the user intent is
+                # and return, not a failure (the user intent is
                 # respected) but not a successful push either.
                 return self._log_quiet_skip(page_id, source=source)
         base_url = self._base_url_fn().rstrip("/")
@@ -601,7 +601,7 @@ class PushManager:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
         ``device_filters`` (multi-head): when set, only renderers whose
-        ``.device`` is in the set fire — so a frame rendered for one
+        ``.device`` is in the set fire, so a frame rendered for one
         panel lands only on the devices that share that panel. ``None``
         fans out to every renderer (legacy / virtual-panel). ``image_fit``
         (optional): fit mode for non-panel-sized input, passed through to
@@ -642,7 +642,7 @@ class PushManager:
             # instance id). HTTP-polled transports (TRMNL) read from
             # this map to answer "what's the latest frame for me?"
             # without subscribing to MQTT. MQTT-only devices still
-            # populate it harmlessly — useful for future debug / REST
+            # populate it harmlessly, useful for future debug / REST
             # access to a device's most recent frame.
             if result.error is None and result.digest:
                 self._latest_renders[renderer.device] = {
@@ -651,7 +651,7 @@ class PushManager:
                     "filename": f"{result.digest}.{renderer.extension}",
                     "renderer_id": renderer.id,
                     "timestamp": time.time(),
-                    # The composition PNG (always a viewable .png — what
+                    # The composition PNG (always a viewable .png, what
                     # Playwright wrote before the per-renderer transform).
                     # Used by /preview/<device>.png so HA's generic
                     # camera / dashboards / wallboards can poll a stable
@@ -781,7 +781,7 @@ class PushManager:
             device = self._devices.devices.get(device_id)
             if device is not None and device.panel is not None:
                 # device_panel handles the preset / manifest matching
-                # that lifts the firmware-native stride into Panel —
+                # that lifts the firmware-native stride into Panel -
                 # reuse it instead of rebuilding the dict by hand.
                 resolved = device_panel(device)
                 if resolved is not None:
@@ -865,7 +865,7 @@ class PushManager:
         """Drop devices currently in their effective quiet-hours window
         from each panel group, then drop any group that's now empty.
 
-        Resolves timezone the same way the scheduler does — from
+        Resolves timezone the same way the scheduler does, from
         ``app.timezone`` settings, falling back to host local time when
         unset or ``"system"``."""
         from datetime import datetime
@@ -894,8 +894,8 @@ class PushManager:
 
     def _log_quiet_skip(self, page_id: str, *, source: str = "page") -> PushResult:
         """Record a soft skip when every bound device is currently in
-        quiet hours. Not a failure — the user's "no pushes overnight"
-        intent is being honoured — but worth surfacing in the Events
+        quiet hours. Not a failure, the user's "no pushes overnight"
+        intent is being honoured, but worth surfacing in the Events
         tab so a head-scratching "why didn't this fire?" turns into a
         one-look answer."""
         event_id = self._event_log.record(

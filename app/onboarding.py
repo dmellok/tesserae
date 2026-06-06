@@ -2,7 +2,7 @@
 
 A guided four-step flow that takes a fresh install from "password set" to
 "a dashboard on a panel": welcome → broker → device → dashboard. It's a
-thin orchestration layer — each step reuses the real services
+thin orchestration layer, each step reuses the real services
 (``device_service`` for instances, the push manager, the settings store),
 so nothing here duplicates business logic.
 
@@ -10,7 +10,7 @@ The wizard is the landing page until ``app.onboarded`` is set (on Finish
 or Skip). After that ``/`` goes to the normal Send page. Every step has a
 Skip, so it guides without trapping anyone.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ STEP_LABELS: dict[str, str] = {
     "dashboard": "Dashboard",
     "telemetry": "Help out",
 }
-# Widget the starter dashboard drops into its single cell — a clock needs
+# Widget the starter dashboard drops into its single cell, a clock needs
 # no API keys or config, so it paints on the very first push.
 STARTER_PLUGIN = "clock_analog"
 
@@ -182,7 +182,7 @@ def step(step: str) -> Response | str:
         ctx["builtin_url"] = f"mqtt://{detect_local_ip()}:{port}"
         # Under the Docker image with bridge networking, ``detect_local_ip``
         # returns the container's bridge address (172.18.0.x or similar)
-        # — useless for LAN panels. Flag it so the wizard can show a hint
+        # , useless for LAN panels. Flag it so the wizard can show a hint
         # about ``TESSERAE_HOST_IP`` / host networking.
         ctx["builtin_url_is_bridge"] = docker_bridge_ip_warning()
         # Hide the built-in broker option under HA. The bundled Mosquitto
@@ -295,7 +295,7 @@ def register_discovered(discovered_id: str) -> Response:
     """One-click register a device the broker already heard from."""
     entry = _discovery().get(discovered_id)
     if entry is None or not entry.kind:
-        flash("That device is no longer announcing itself — add it by hand.", "error")
+        flash("That device is no longer announcing itself, add it by hand.", "error")
         return redirect(url_for("onboarding.step", step="device"))
     overrides: dict[str, Any] = {}
     if entry.panel_w is not None:
@@ -325,7 +325,7 @@ def create_starter() -> Response:
     bound to the first registered device so it sizes to that panel."""
     page = _build_starter_page(_pages(), _settings(), _devices())
     _pages().save(page)
-    flash("Starter dashboard created — push it to see it on your panel.", "ok")
+    flash("Starter dashboard created, push it to see it on your panel.", "ok")
     return redirect(url_for("onboarding.step", step="dashboard"))
 
 
@@ -333,7 +333,7 @@ def create_starter() -> Response:
 def push_starter(page_id: str) -> Response:
     result = _push().push(page_id)
     if result.status == "sent":
-        flash("Pushed — your panel should paint shortly.", "ok")
+        flash("Pushed, your panel should paint shortly.", "ok")
     else:
         flash(f"Push {result.status}: {result.error or '(no detail)'}", "error")
     return redirect(url_for("onboarding.step", step="dashboard"))
@@ -342,7 +342,7 @@ def push_starter(page_id: str) -> Response:
 @bp.post("/skip")
 def skip() -> Response:
     mark_onboarded(_settings())
-    flash("Setup skipped — you can configure everything under Settings.", "ok")
+    flash("Setup skipped, you can configure everything under Settings.", "ok")
     return redirect(url_for("send.index"))
 
 
@@ -363,7 +363,7 @@ def finish() -> Response:
     if telemetry is not None and now_on != was_telemetry_on:
         telemetry.set_enabled(now_on)
         if now_on:
-            telemetry.test_send()  # silent — onboarding shouldn't get loud
+            telemetry.test_send()  # silent, onboarding shouldn't get loud
     flash("You're all set.", "ok")
     return redirect(url_for("send.index"))
 

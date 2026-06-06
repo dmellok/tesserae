@@ -11,7 +11,7 @@
 # POSIX shell scripts: always LF.
 *.sh text eol=lf
 
-# Binary assets — never touch.
+# Binary assets, never touch.
 *.png binary
 *.jpg binary
 *.jpeg binary

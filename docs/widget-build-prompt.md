@@ -9,7 +9,7 @@ Output is a filled-in brief that
 
 ## Who you are
 
-You're designing a widget for **Tesserae** — a self-hosted e-ink
+You're designing a widget for **Tesserae**, a self-hosted e-ink
 dashboard system that renders bauhaus-styled "tiles" onto colour
 e-paper panels (Spectra 6, 600×448 → 1600×1200). Each widget is a
 self-contained plugin: a manifest, a `client.js` that renders into a
@@ -19,16 +19,16 @@ folder.
 Tesserae uses **Spectra**, a token-themed design system with two
 orthogonal axes:
 
-- **`data-theme`** — colour only. 19 themes shipped (light, dark,
+- **`data-theme`**, colour only. 19 themes shipped (light, dark,
   high-contrast, sepia, nord, cool-gray, three movement themes, and
   ten base16 palettes). Set on `<body>`, cascades into every widget.
-- **`data-style`** — typography, scale, density, shape (never colour).
+- **`data-style`**, typography, scale, density, shape (never colour).
   9 styles shipped (standard, display, editorial, mono, elegant,
   condensed, plus three movement styles).
 
 A widget designed under Spectra renders correctly under any theme ×
 style combination. The user picks the pair per dashboard; your widget
-doesn't need to know which they're using — it paints from semantic
+doesn't need to know which they're using, it paints from semantic
 tokens that the active theme + style flow through.
 
 ---
@@ -37,30 +37,30 @@ tokens that the active theme + style flow through.
 
 Three docs are the canonical contract. Read each before drafting:
 
-1. [`docs/widgets.md`](widgets.md) — the build contract: plugin folder
+1. [`docs/widgets.md`](widgets.md), the build contract: plugin folder
    layout, `client.js` / `server.py` signatures, the Spectra token
    layers (primitive / semantic / style-tunable), container queries,
    Phosphor icon vocabulary, e-ink considerations.
-2. [`docs/widget-design-system.md`](widget-design-system.md) — the
+2. [`docs/widget-design-system.md`](widget-design-system.md), the
    cross-widget rulebook: archetypes, the two axes, title-bar
    discipline, colour discipline, chart helpers, anti-patterns.
-3. [`docs/widget-design-brief.md`](widget-design-brief.md) — the
+3. [`docs/widget-design-brief.md`](widget-design-brief.md), the
    output template you'll fill in. **One filled brief per widget,
    sections 0 through the end.**
 4. Pick two existing widgets that share your information shape and
    read their `client.js` as reference. Good examples by archetype:
 
-   - **Status archetype** — [`plugins/f1_next`](../plugins/f1_next),
+   - **Status archetype**, [`plugins/f1_next`](../plugins/f1_next),
      [`plugins/sky_moon`](../plugins/sky_moon)
-   - **List archetype** — [`plugins/news_hacker_news`](../plugins/news_hacker_news),
+   - **List archetype**, [`plugins/news_hacker_news`](../plugins/news_hacker_news),
      [`plugins/ha_entities`](../plugins/ha_entities)
-   - **Chart archetype** — [`plugins/weather_hourly`](../plugins/weather_hourly),
+   - **Chart archetype**, [`plugins/weather_hourly`](../plugins/weather_hourly),
      [`plugins/ha_history`](../plugins/ha_history)
-   - **Stat archetype** — [`plugins/finance_stock`](../plugins/finance_stock),
+   - **Stat archetype**, [`plugins/finance_stock`](../plugins/finance_stock),
      [`plugins/weather_now`](../plugins/weather_now)
-   - **Calendar archetype** — [`plugins/calendar_day`](../plugins/calendar_day),
+   - **Calendar archetype**, [`plugins/calendar_day`](../plugins/calendar_day),
      [`plugins/calendar_week`](../plugins/calendar_week)
-   - **Image archetype** — [`plugins/spotify_now_playing`](../plugins/spotify_now_playing),
+   - **Image archetype**, [`plugins/spotify_now_playing`](../plugins/spotify_now_playing),
      [`plugins/ha_camera`](../plugins/ha_camera)
 
 ---
@@ -72,7 +72,7 @@ Three docs are the canonical contract. Read each before drafting:
 Every widget renders one of seven body archetypes (`.stat-body`,
 `.list-body`, `.chart-body`, `.status-body`, `.cal-body`, `.wx-body`,
 `.img-body`). Pick the one whose information shape matches yours. Don't
-roll a custom body layout — the archetypes carry the font-size cascade
+roll a custom body layout, the archetypes carry the font-size cascade
 and gap rhythm that make widgets read as a family.
 
 Two metric blocks side by side? Two `.stat-body` widgets, not one
@@ -102,7 +102,7 @@ The six accent slots have fixed **roles by position**:
 | `--accent-5` | secondary series |
 | `--accent-6` | third category |
 
-Reach by role, not by colour. "I want red" is the wrong instinct —
+Reach by role, not by colour. "I want red" is the wrong instinct -
 pick the slot whose meaning is right; the theme gives you the hue.
 
 ### 3. Icons are bold Phosphor
@@ -155,7 +155,7 @@ content at compact, leave only the hero metric + label at tiny.
 ### 6. Anti-patterns
 
 - **`text-transform: uppercase` hardcoded.** Use
-  `var(--label-transform, uppercase)` — Editorial style sets it to
+  `var(--label-transform, uppercase)`, Editorial style sets it to
   `none`.
 - **Hardcoded font family.** Inherit via the `.w` shell; widgets get
   `--font-family` automatically.
@@ -209,7 +209,7 @@ exposes `getCircuit()` + `trackSvg()` for every F1 widget).
 ## Hard constraints
 
 These consistently bite if ignored. Honour them without comment in the
-brief — the user knows them already.
+brief, the user knows them already.
 
 - **Static panels.** No animation, no transitions, no hover effects.
   E6 refreshes in seconds and ghosts.

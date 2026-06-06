@@ -217,7 +217,7 @@ def test_double_start_is_idempotent(tmp_path: Path) -> None:
     ha.start()
     first = len(client.published)
     ha.start()
-    # Second start() must not republish — guard against accidental
+    # Second start() must not republish, guard against accidental
     # double-init.
     assert len(client.published) == first
 
@@ -336,7 +336,7 @@ def test_push_result_updates_per_device_state(tmp_path: Path) -> None:
 
 def test_image_configs_omit_content_type(tmp_path: Path) -> None:
     """HA's MQTT image schema treats ``content_type`` and ``url_topic`` as
-    mutually exclusive — a discovery payload carrying both gets rejected
+    mutually exclusive, a discovery payload carrying both gets rejected
     with no entity created. The user observed thousands of these errors
     in HA's log; verify both hub-level + per-device image configs are
     free of the offending key."""
@@ -358,12 +358,12 @@ def test_non_page_push_does_not_publish_invalid_select_state(tmp_path: Path) -> 
     """File / URL / gallery pushes carry a page_id that's actually a
     source label (e.g. ``gallery:japanese_posters/72.jpg``). The HA
     select for current/active dashboard only accepts options that match
-    saved page names — publishing the source label drives HA's
+    saved page names, publishing the source label drives HA's
     "Invalid option" log warning. We now skip those writes; frame URL
     + last-updated still fire so the dashboard's image entity keeps
     refreshing."""
     ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
-    # No matching Page saved — simulating a non-page push.
+    # No matching Page saved, simulating a non-page push.
     ha.start()
     client.published.clear()
     ha._on_push_result(
@@ -390,7 +390,7 @@ def test_non_page_push_does_not_publish_invalid_select_state(tmp_path: Path) -> 
         or item[0] == "tesserae/ha/state/active_page"
     ]
     assert fresh == []
-    # But the frame image URL + last-update timestamp still fire — they're
+    # But the frame image URL + last-update timestamp still fire, they're
     # informational and not constrained to an options list.
     assert _payload_for(client, "tesserae/ha/dev/lounge/state/image_url") is not None
     assert _payload_for(client, "tesserae/ha/dev/lounge/state/last_update") is not None
@@ -398,7 +398,7 @@ def test_non_page_push_does_not_publish_invalid_select_state(tmp_path: Path) -> 
 
 def test_start_clears_stale_select_state(tmp_path: Path) -> None:
     """Older Tesserae versions published the raw page_id (digest or
-    source label) to the active_page topic — which then lived as a
+    source label) to the active_page topic, which then lived as a
     retained message HA replayed on every restart. ``start()`` clears
     those topics with an empty retained payload so the next valid push
     can repopulate them with a real name."""

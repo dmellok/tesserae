@@ -1,4 +1,4 @@
-"""github_releases — latest releases across watched repos."""
+"""github_releases, latest releases across watched repos."""
 
 from __future__ import annotations
 
@@ -52,7 +52,7 @@ def fetch(
     core = _core()
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)
-    # v2 cache key — bump because the payload shape grew (bump_type +
+    # v2 cache key, bump because the payload shape grew (bump_type +
     # commits_since fields). Without the bump, a stale v1 cache would
     # keep serving until TTL expires.
     key = re.sub(r"[^A-Za-z0-9]", "_", f"{','.join(repos)}_{max_per}")[:120]
@@ -76,7 +76,7 @@ def fetch(
             rels = []
         rels = list(rels or [])
 
-        # commits_since for the LATEST release only — that's the row
+        # commits_since for the LATEST release only, that's the row
         # the user actually scans for "do I need to update?". Computing
         # for older releases would burn the API rate limit for stale
         # info nobody reads.

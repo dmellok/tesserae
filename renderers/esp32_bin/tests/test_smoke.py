@@ -66,8 +66,8 @@ def test_esp32_bin_payload(registry) -> None:
 @pytest.mark.parametrize(
     "panel_w,panel_h",
     [
-        (1200, 1600),  # 13.3" Waveshare — portrait native
-        (800, 480),  # 7.3" PhotoPainter — landscape native
+        (1200, 1600),  # 13.3" Waveshare, portrait native
+        (800, 480),  # 7.3" PhotoPainter, landscape native
     ],
 )
 def test_matching_orientation_round_trip(registry, panel_w: int, panel_h: int) -> None:
@@ -99,12 +99,12 @@ def test_matching_orientation_round_trip(registry, panel_w: int, panel_h: int) -
     red_nibble = 0x3
     blue_nibble = 0x5
     if panel_w > panel_h:
-        # Landscape panel — red occupies the LEFT half, blue the RIGHT.
+        # Landscape panel, red occupies the LEFT half, blue the RIGHT.
         # Read mid-row from both halves to confirm orientation.
         assert _decode_pixel(out, panel_w // 4, panel_h // 2, panel_w) == red_nibble
         assert _decode_pixel(out, 3 * panel_w // 4, panel_h // 2, panel_w) == blue_nibble
     else:
-        # Portrait panel — red on TOP, blue on BOTTOM.
+        # Portrait panel, red on TOP, blue on BOTTOM.
         assert _decode_pixel(out, panel_w // 2, panel_h // 4, panel_w) == red_nibble
         assert _decode_pixel(out, panel_w // 2, 3 * panel_h // 4, panel_w) == blue_nibble
 
@@ -148,7 +148,7 @@ def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
     RIGHT, blue on the LEFT of the 800×480 landscape buffer.
 
     Without this, the firmware would feed the panel a 400-byte/row
-    stride against the renderer's 240-byte/row pack — paints garbled
+    stride against the renderer's 240-byte/row pack, paints garbled
     vertical ghosts (the reported PhotoPainter symptom)."""
     img = Image.new("RGB", (480, 800), "white")
     img.paste((255, 0, 0), (0, 0, 480, 400))
@@ -161,7 +161,7 @@ def test_portrait_source_to_landscape_panel_rotates_cw(registry) -> None:
         panel=Panel(w=800, h=480),  # landscape native
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
-    assert len(out) == 800 * 480 // 2  # 192000 bytes — matches the firmware report
+    assert len(out) == 800 * 480 // 2  # 192000 bytes, matches the firmware report
 
     red_nibble = 0x3
     blue_nibble = 0x5
@@ -177,7 +177,7 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
     PhotoPainter and picks the portrait option. The device record
     then has panel.w=480, panel.h=800 (portrait composition). The
     panel hardware is still landscape-native (800w × 480h fixed in
-    firmware) — packing at the panel arg's 480×800 stride puts the
+    firmware), packing at the panel arg's 480×800 stride puts the
     bytes back at 240 bytes/row vs the firmware's 400, the ghosts
     return.
 
@@ -196,13 +196,13 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        # PORTRAIT calibration on the PhotoPainter — native dims still
+        # PORTRAIT calibration on the PhotoPainter, native dims still
         # carry the landscape (800, 480) firmware stride.
         panel=Panel(w=480, h=800, native_w=800, native_h=480),
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
     )
-    # Output is the firmware-native 800×480 landscape buffer — 192000
-    # bytes at 400 bytes/row — regardless of which calibration the
+    # Output is the firmware-native 800×480 landscape buffer, 192000
+    # bytes at 400 bytes/row, regardless of which calibration the
     # user picked.
     assert len(out) == 800 * 480 // 2
 
@@ -230,7 +230,7 @@ def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     assert esp is not None
     out = esp.transform(
         _png_bytes(img),
-        # Landscape calibration on the Waveshare 13.3" — native dims
+        # Landscape calibration on the Waveshare 13.3", native dims
         # carry the portrait (1200, 1600) firmware stride.
         panel=Panel(w=1600, h=1200, native_w=1200, native_h=1600),
         settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},

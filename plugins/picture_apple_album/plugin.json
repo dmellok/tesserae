@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Picture — Apple Shared Album",
+  "name": "Picture, Apple Shared Album",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Rotates through photos in a public iCloud Shared Album, full bleed. Enable Public Website on the album in Photos, then paste its share link (https://www.icloud.com/sharedalbum/#B0xxxxxx) or just the token. NOTE: uses Apple's reverse-engineered shared-album endpoints — undocumented but stable for ~10 years.",
+  "description": "Rotates through photos in a public iCloud Shared Album, full bleed. Enable Public Website on the album in Photos, then paste its share link (https://www.icloud.com/sharedalbum/#B0xxxxxx) or just the token. NOTE: uses Apple's reverse-engineered shared-album endpoints, undocumented but stable for ~10 years.",
   "icon": "ph-cloud-arrow-down",
   "supports": { "sizes": ["sm", "md", "lg"] },
   "cell_options": [

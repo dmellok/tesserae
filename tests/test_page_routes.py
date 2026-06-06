@@ -131,7 +131,7 @@ def test_empty_list_renders_with_create_link(app: Flask) -> None:
 
 def _set_panel(app, w: int, h: int) -> None:
     """Force the panel dims for the test app. After M16 the page editor
-    no longer takes panel_w/h directly — both come from settings."""
+    no longer takes panel_w/h directly, both come from settings."""
     settings = app.config["SETTINGS_STORE"]
     settings.update_section("app", {"panel_preset": "custom", "panel_w": w, "panel_h": h})
 
@@ -171,7 +171,7 @@ def test_create_page_with_2x2_grid_layout(app: Flask, tmp_path: Path) -> None:
 
 def test_duplicate_names_get_distinct_random_ids(app: Flask, tmp_path: Path) -> None:
     """Ids are random + opaque (not name-derived, hidden from the UI), so
-    two dashboards with the same name coexist with distinct ids — no slug
+    two dashboards with the same name coexist with distinct ids, no slug
     collision handling needed."""
     client = app.test_client()
     _sign_in(client)
@@ -188,7 +188,7 @@ def test_duplicate_names_get_distinct_random_ids(app: Flask, tmp_path: Path) -> 
 
 def test_update_page_metadata_autosave_json(app: Flask, tmp_path: Path) -> None:
     """Autosave clients POST with X-Requested-With: fetch and get JSON
-    back. Panel dims aren't part of the page edit anymore — they come
+    back. Panel dims aren't part of the page edit anymore, they come
     from settings."""
     client = app.test_client()
     _sign_in(client)
@@ -362,7 +362,7 @@ def test_change_plugin_resets_options(app: Flask, tmp_path: Path) -> None:
     """In the editor, picking a plugin reloads the form so the new
     plugin's option fields are rendered before the user touches them.
     Server-side, any submit that changes the plugin resets options to
-    the new plugin's defaults — option keys from the old plugin would
+    the new plugin's defaults, option keys from the old plugin would
     be stale against the new schema."""
     client = app.test_client()
     _sign_in(client)
@@ -593,15 +593,15 @@ def test_multiselect_cell_option_coercion() -> None:
 
     field = {"name": "entities", "type": "multiselect", "default": []}
 
-    # Persist path — several checked boxes arrive as repeated keys.
+    # Persist path, several checked boxes arrive as repeated keys.
     md = MultiDict([("opt_entities", "light.a"), ("opt_entities", "light.b")])
     assert _coerce_cell_option(field, md.get("opt_entities"), md) == ["light.a", "light.b"]
 
-    # Preview path — demux already promoted >1 to a list.
+    # Preview path, demux already promoted >1 to a list.
     plain = {"opt_entities": ["light.a", "light.b"]}
     assert _coerce_cell_option(field, plain["opt_entities"], plain) == ["light.a", "light.b"]
 
-    # Preview path — a single check stays scalar; absent / blank → empty.
+    # Preview path, a single check stays scalar; absent / blank → empty.
     assert _coerce_cell_option(field, "light.a", {"opt_entities": "light.a"}) == ["light.a"]
     assert _coerce_cell_option(field, None, {}) == []
     assert _coerce_cell_option(field, "", {"opt_entities": ""}) == []

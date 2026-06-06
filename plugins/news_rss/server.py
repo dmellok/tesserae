@@ -1,4 +1,4 @@
-"""news_rss — minimal RSS 2.0 + Atom 1.0 feed reader.
+"""news_rss, minimal RSS 2.0 + Atom 1.0 feed reader.
 
 Pure stdlib XML parsing. Handles both formats by checking the root
 element. Doesn't pull feedparser since the requirements are small

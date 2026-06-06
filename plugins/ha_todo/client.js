@@ -1,4 +1,4 @@
-// ha_todo — Spectra list archetype. Pending items as zebra rows
+// ha_todo, Spectra list archetype. Pending items as zebra rows
 // with a leading checkbox icon, a due-proximity chip (overdue →
 // terracotta, today → ochre, tomorrow → moss, this week → slate,
 // later → muted), and an optional priority dot when the integration

@@ -5,7 +5,7 @@ the Pi client's landscape-native pixel grid, and publishes the v3-frozen
 ``{url, rotate, scale, bg, saturation}`` payload.
 
 The payload shape is byte-compatible with the long-standing
-``inky/update`` contract — a Pi listener built against inky-dash v3/v4 works
+``inky/update`` contract, a Pi listener built against inky-dash v3/v4 works
 against Tesserae unchanged, just by subscribing to a different topic.
 """
 
@@ -33,8 +33,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
 
     Derives the turn from the panel the same way ``pi_bin`` does, so the
     per-device Rotation control drives both renderers identically: a
-    portrait panel (taller than wide) gets a 90° CCW turn — ``3``
-    clockwise quarter-turns — to map its top edge onto the client's
+    portrait panel (taller than wide) gets a 90° CCW turn, ``3``
+    clockwise quarter-turns, to map its top edge onto the client's
     landscape buffer; landscape gets none. ``panel.flip`` adds 180° for
     an upside-down mount.
     """

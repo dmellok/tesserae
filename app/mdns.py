@@ -3,7 +3,7 @@
 Opt-in (Settings → App → "Advertise over mDNS"; default off). Publishes
 an ``_http._tcp`` service whose server name is ``<hostname>.local`` so the
 appliance is reachable as e.g. ``http://tesserae.local:<port>`` from any
-Bonjour / Avahi client — without changing the host machine's hostname.
+Bonjour / Avahi client, without changing the host machine's hostname.
 
 The trick: registering ``ServiceInfo`` with ``server="tesserae.local."``
 plus the host's LAN IP publishes the **A record** for that name alongside
@@ -12,7 +12,7 @@ resolution works for everything, not just service-discovery-aware clients.
 
 Runs alongside the OS resolver (Avahi on the Pi, mDNSResponder on macOS)
 on the shared 5353 multicast group. ``start()`` is idempotent; ``stop()``
-unregisters cleanly. Failures are non-fatal — the caller logs and carries
+unregisters cleanly. Failures are non-fatal, the caller logs and carries
 on with IP-based URLs.
 """
 

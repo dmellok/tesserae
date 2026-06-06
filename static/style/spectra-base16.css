@@ -1,5 +1,5 @@
 /* ============================================================================
-   SPECTRA — base16 theme pack
+   SPECTRA, base16 theme pack
    ----------------------------------------------------------------------------
    Ten well-known base16 palettes mapped onto Spectra's semantic tokens.
    These are colour-only themes; they compose with any data-style.
@@ -11,14 +11,14 @@
      base03 → --text-muted      (de-emphasised text, captions)
      base04 → --text-secondary  (subheads, axis labels)
      base05 → --text-primary    (default foreground)
-     base08 → --accent-1        (red — alerts / peaks)
-     base09 → --accent-2        (orange — warnings / capacity)
-     base0B → --accent-3        (green — positive / up)
-     base0D → --accent-4        (blue — primary / today / live)
-     base0C → --accent-5        (cyan — secondary series)
-     base0E → --accent-6        (purple/magenta — third category)
+     base08 → --accent-1        (red, alerts / peaks)
+     base09 → --accent-2        (orange, warnings / capacity)
+     base0B → --accent-3        (green, positive / up)
+     base0D → --accent-4        (blue, primary / today / live)
+     base0C → --accent-5        (cyan, secondary series)
+     base0E → --accent-6        (purple/magenta, third category)
    base16 also defines base06 (light fg), base07 (light bg), base0A
-   (yellow), base0F (brown/deprecated). We drop them — Spectra has six
+   (yellow), base0F (brown/deprecated). We drop them, Spectra has six
    accent slots, not eight, and 0A/0F's roles overlap 09/08 closely
    enough that the mapping above keeps the meaning right (alerts stay
    red, warnings stay orange, etc.).
@@ -32,7 +32,7 @@
    without 60 hex columns of hand-tuning.
    ============================================================================ */
 
-/* ---- Gruvbox dark, medium — warm earth tones on charcoal ----------------- */
+/* ---- Gruvbox dark, medium, warm earth tones on charcoal ----------------- */
 [data-theme="base16-gruvbox-dark"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -54,7 +54,7 @@
   --on-accent: #282828;
 }
 
-/* ---- Gruvbox light, medium — same palette, paper background -------------- */
+/* ---- Gruvbox light, medium, same palette, paper background -------------- */
 [data-theme="base16-gruvbox-light"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -76,7 +76,7 @@
   --on-accent: #fbf1c7;
 }
 
-/* ---- Solarized dark — Schoonover's selective-contrast classic ------------ */
+/* ---- Solarized dark, Schoonover's selective-contrast classic ------------ */
 [data-theme="base16-solarized-dark"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -98,7 +98,7 @@
   --on-accent: #002b36;
 }
 
-/* ---- Solarized light — same accents, paper background -------------------- */
+/* ---- Solarized light, same accents, paper background -------------------- */
 [data-theme="base16-solarized-light"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -120,7 +120,7 @@
   --on-accent: #eee8d5;
 }
 
-/* ---- Dracula — purple/cyan on near-black ---------------------------------- */
+/* ---- Dracula, purple/cyan on near-black ---------------------------------- */
 [data-theme="base16-dracula"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -142,7 +142,7 @@
   --on-accent: #282a36;
 }
 
-/* ---- Catppuccin Mocha — pastel-on-dark, modern -------------------------- */
+/* ---- Catppuccin Mocha, pastel-on-dark, modern -------------------------- */
 [data-theme="base16-catppuccin-mocha"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -164,7 +164,7 @@
   --on-accent: #1e1e2e;
 }
 
-/* ---- Monokai — Hazenberg's high-saturation original --------------------- */
+/* ---- Monokai, Hazenberg's high-saturation original --------------------- */
 [data-theme="base16-monokai"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -186,7 +186,7 @@
   --on-accent: #272822;
 }
 
-/* ---- Tomorrow Night — Chris Kempson's editor classic, dark variant ------ */
+/* ---- Tomorrow Night, Chris Kempson's editor classic, dark variant ------ */
 [data-theme="base16-tomorrow-night"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -208,7 +208,7 @@
   --on-accent: #1d1f21;
 }
 
-/* ---- Tomorrow — same palette, light variant ----------------------------- */
+/* ---- Tomorrow, same palette, light variant ----------------------------- */
 [data-theme="base16-tomorrow"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
@@ -230,7 +230,7 @@
   --on-accent: #e0e0e0;
 }
 
-/* ---- One Dark — Atom's flagship palette --------------------------------- */
+/* ---- One Dark, Atom's flagship palette --------------------------------- */
 [data-theme="base16-one-dark"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 

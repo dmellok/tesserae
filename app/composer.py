@@ -109,7 +109,7 @@ def _font_face_css(fonts: dict[str, Font]) -> str:
 
 
 # Hydration-time hard caps. These bound the page-render budget against
-# misbehaving widgets — a single hung fetch shouldn't sink the dashboard.
+# misbehaving widgets, a single hung fetch shouldn't sink the dashboard.
 # Sized to fit inside the renderer's 15s page.goto budget: if hydration
 # blows past goto's timeout, Playwright reports a broken navigation and
 # the screenshot captures an empty page. Per-widget cap is the safety
@@ -128,7 +128,7 @@ _HYDRATE_MAX_WORKERS: int = 8
 # this, the first push of a dashboard with a slow upstream paints a
 # "TimeoutError" into the cell; the second push (after the executor's
 # straggler completes and writes the on-disk cache) is the workaround
-# users found themselves doing manually. Now they don't have to —
+# users found themselves doing manually. Now they don't have to -
 # pushes after the first one show stale-but-real data instead of an
 # error state. Cleared on process restart, which is fine for fresh
 # installs (no fallback available either way).
@@ -191,7 +191,7 @@ def _parallel_fetch_plugin_data(
         return sample_results
 
     # Capture the live Flask app object so worker threads can push
-    # ``app.app_context()`` themselves — ``current_app`` is a thread-
+    # ``app.app_context()`` themselves, ``current_app`` is a thread-
     # local proxy and won't follow us off the request thread.
     app = current_app._get_current_object()  # type: ignore[attr-defined]
 
@@ -203,7 +203,7 @@ def _parallel_fetch_plugin_data(
     # Cells whose result was synthesised by US (executor caught an
     # exception, or the future never completed before the overall
     # timeout) rather than returned by the widget's own ``fetch()``.
-    # Only these are candidates for the last-good fallback — a widget
+    # Only these are candidates for the last-good fallback, a widget
     # that legitimately returns something error-shaped (e.g.
     # ``{"connected": false, "error": "Spotify not connected"}``) is
     # providing real data and must NOT get overridden by a stale prior
@@ -247,7 +247,7 @@ def _parallel_fetch_plugin_data(
             )
 
     # Last-good fallback. Walk each cell's result; if it came back from
-    # ``fetch()`` cleanly (whatever its shape — including widget-
+    # ``fetch()`` cleanly (whatever its shape, including widget-
     # returned error states), stash it under its (plugin, options,
     # panel) key. If we synthesised the error (executor exception or
     # overall timeout), try to serve the previous successful result.
@@ -315,7 +315,7 @@ def _hydrate_page(
     # template can render ``page.theme`` unconditionally.
     if not page_dict.get("theme"):
         page_dict = {**page_dict, "theme": "light"}
-    # Same for the orthogonal style axis — fall back to ``standard``
+    # Same for the orthogonal style axis, fall back to ``standard``
     # so the template can render ``page.style`` unconditionally.
     if not page_dict.get("style"):
         page_dict = {**page_dict, "style": "standard"}
@@ -348,7 +348,7 @@ def _hydrate_page(
 
     # First pass: assemble the layout, font, options for each cell
     # synchronously. These are all in-memory operations (registry
-    # lookups); the slow part — server-side widget data fetches — is
+    # lookups); the slow part, server-side widget data fetches, is
     # split out so it can run in parallel below.
     cells_meta: list[dict[str, Any]] = []
     for cell in page_dict["cells"]:
@@ -381,7 +381,7 @@ def _hydrate_page(
         )
 
     # Second pass: fetch widget data in parallel. Before this, slow
-    # upstreams (Open-Meteo, GitHub, …) added up — six 15s timeouts
+    # upstreams (Open-Meteo, GitHub, …) added up, six 15s timeouts
     # in series is 90s, blowing past Playwright's navigation budget
     # and surfacing as a blank/timeout PNG. Workers share the Flask
     # app context the caller holds so each fetch can still read
@@ -439,7 +439,7 @@ def compose(page_id: str) -> str:
         abort(404)
     for_push = request.args.get("for_push") == "1"
     preview_mode = request.args.get("preview") == "1" and not for_push
-    # Inject the resolved panel before hydrate — _hydrate_page expects
+    # Inject the resolved panel before hydrate, _hydrate_page expects
     # page_dict["panel"] to always be present. An explicit ?w=&h= override
     # wins (the editor's per-aspect previews and the per-panel push render
     # at a specific size); otherwise fall back to the page's primary panel.
@@ -463,7 +463,7 @@ def compose(page_id: str) -> str:
 
 @bp.get("/_test/render")
 def test_render() -> str:
-    """Mount one plugin into a known cell size — no Page needed.
+    """Mount one plugin into a known cell size, no Page needed.
 
     Available when the app is in debug or testing mode. Used by the per-plugin
     smoke tests that ship with every widget.
@@ -582,7 +582,7 @@ def test_theme_style_matrix() -> str:
     19 themes × 9 styles = 171 iframes, lazy-loaded, so opening this page
     doesn't fire 171 fetches up front. Each iframe drives ``/_test/render``
     with one ``(theme, style)`` pair so the combinations get eyeballed
-    instead of trusted on faith. Dev-only — guarded behind debug/testing
+    instead of trusted on faith. Dev-only, guarded behind debug/testing
     the same way ``/_test/widgets`` is.
 
     Query params:
@@ -651,7 +651,7 @@ def _spiral_halving_cells(n: int) -> list[tuple[float, float, float, float]]:
     cells: list[tuple[float, float, float, float]] = []
     # (x, y, w, h) of the still-unallocated region, as panel fractions.
     rx, ry, rw, rh = 0.0, 0.0, 1.0, 1.0
-    # Direction sequence — top first (the user's "half the page is used
+    # Direction sequence, top first (the user's "half the page is used
     # on the top"), then left (their "half of the left hand side"),
     # then continue the spiral with bottom + right so successive cells
     # tessellate cleanly around the centre.
@@ -711,7 +711,7 @@ def _build_preview_page(
     every size bucket (lg / md / sm / xs). Cell 7 has ``plugin=None`` so
     the composer paints the empty "pick a widget" placeholder beside the
     live cells. Coordinates round to integers because Page / Cell are
-    pydantic-typed for ``int`` — float fractions blow up at hydrate.
+    pydantic-typed for ``int``, float fractions blow up at hydrate.
     ``size_label`` rides along on each cell so compose.html's preview-
     mode tag can show the bucket the widget is actually rendering in."""
     cells: list[dict[str, Any]] = []
@@ -788,7 +788,7 @@ def test_widget_preview() -> str:
     the same widget can be eyeballed at every Tesserae-supported
     panel (Inky / Waveshare presets) without composing a real page.
 
-    Dev-only — guarded behind ``debug or testing`` like every other
+    Dev-only, guarded behind ``debug or testing`` like every other
     ``/_test/...`` route. Cell options post via ``?opts=<json>``;
     panel via ``?panel=<preset_id>``."""
     if not (current_app.debug or current_app.testing):
@@ -803,7 +803,7 @@ def test_widget_preview() -> str:
 
     # ``cell_options`` from the plugin manifest drive the form-builder.
     # Each entry shape: ``{name, type, label, default?, choices?, secret?}``
-    # — same schema the page editor reads. Defaults override URL-supplied
+    # , same schema the page editor reads. Defaults override URL-supplied
     # values only when the URL omits a field, so reloading the page with
     # an explicit blank still wins over the manifest default.
     schema = list(plugin.manifest.get("cell_options") or [])
@@ -845,12 +845,12 @@ def test_widget_preview_page() -> str:
     so the cells get their "1 · widget_id" tags. The parent
     ``widget_preview.html`` embeds this in a single iframe.
 
-    Dev-only — same gate as ``/_test/render``."""
+    Dev-only, same gate as ``/_test/render``."""
     if not (current_app.debug or current_app.testing):
         abort(404)
     parsed = _parse_preview_args()
     plugin = _registry().get(parsed["widget_id"])
-    # No widget picked yet — surface a blank synthetic page rather than
+    # No widget picked yet, surface a blank synthetic page rather than
     # 404. Cells stay unassigned so the reviewer sees seven empty
     # placeholders instead of an opaque error.
     widget_id = "" if plugin is None else plugin.id
@@ -874,7 +874,7 @@ def test_widget_preview_page() -> str:
 def test_widget_gallery() -> str:
     """All widgets at every supported size, iframed via /_test/render.
 
-    Dev-only review surface — lets you scan every widget's render in
+    Dev-only review surface, lets you scan every widget's render in
     one place so you can spot regressions or queue tweaks. Each iframe
     is lazy-loaded so opening the page doesn't fire 100+ widget fetches
     at once.

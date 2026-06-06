@@ -1,4 +1,4 @@
-"""Composer route shape — markup well-formedness."""
+"""Composer route shape, markup well-formedness."""
 
 from __future__ import annotations
 

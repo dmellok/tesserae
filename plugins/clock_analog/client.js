@@ -1,4 +1,4 @@
-// clock_analog — Spectra-styled analog face. Pure inline SVG so the
+// clock_analog, Spectra-styled analog face. Pure inline SVG so the
 // renderer can screenshot it without waiting on font / image loads.
 // Five face styles (minimalist / swiss / bauhaus / brutalist /
 // skeleton) tune the tick weight, numeral set, hand widths and
@@ -71,7 +71,7 @@ const FACE_CONFIGS = {
     centerSquare: true,
   },
   skeleton: {
-    // Nothing on the dial — just the hands floating in the cell.
+    // Nothing on the dial, just the hands floating in the cell.
     showTicks: false,
     showMinorTicks: false,
     cardinalsMode: "none",

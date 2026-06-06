@@ -18,16 +18,16 @@ shape.
 Every Spectra widget renders the same shell:
 
 ```
-.w                    — the widget container
-├── .w-title          — optional title bar (lead icon + label + right meta)
-└── .w-body           — body content, picks ONE archetype class
-    ├── .stat-body    — big-number tile (one hero metric)
-    ├── .list-body    — zebra row list (news, HA entities, PR queue, …)
-    ├── .chart-body   — bar / line chart + axis labels + legend
-    ├── .status-body  — state pill + hero + metric grid
-    ├── .cal-body     — agenda / day / week / month grid
-    ├── .wx-body      — weather (now block + forecast strip)
-    └── .img-body     — hero image + meta (album art, camera, …)
+.w                   , the widget container
+├── .w-title         , optional title bar (lead icon + label + right meta)
+└── .w-body          , body content, picks ONE archetype class
+    ├── .stat-body   , big-number tile (one hero metric)
+    ├── .list-body   , zebra row list (news, HA entities, PR queue, …)
+    ├── .chart-body  , bar / line chart + axis labels + legend
+    ├── .status-body , state pill + hero + metric grid
+    ├── .cal-body    , agenda / day / week / month grid
+    ├── .wx-body     , weather (now block + forecast strip)
+    └── .img-body    , hero image + meta (album art, camera, …)
 ```
 
 Pick the archetype that matches your widget's information shape. Two
@@ -97,23 +97,23 @@ non-negotiable behaviours:
 
 The optional bits:
 
-- **Lead icon** — `<i class="ph-bold ph-<name>">` before the `<h3>`,
+- **Lead icon**, `<i class="ph-bold ph-<name>">` before the `<h3>`,
   tinted with one of the `--accent-*` tokens. Echoes the widget's role
   colour (`accent-1` for alerts, `accent-3` for positive, etc.).
-- **Right meta** — `<span class="w-title-meta">` for a small count /
+- **Right meta**, `<span class="w-title-meta">` for a small count /
   timestamp / status pill.
-- **Eyebrow marker** — set `--title-marker: block` to show a coloured
+- **Eyebrow marker**, set `--title-marker: block` to show a coloured
   tick before the title. Styles like Mono and Bauhaus use this; widgets
   inherit when the style is active.
-- **Title rule** — `--title-rule-w` paints an accent line under the
+- **Title rule**, `--title-rule-w` paints an accent line under the
   title bar. Display style sets it to a 3px accent-1 rule.
 
 Anti-patterns:
 
-- Hardcoded `text-transform: uppercase` — breaks Editorial.
-- A custom title-bar background — Spectra widgets are flat; the
+- Hardcoded `text-transform: uppercase`, breaks Editorial.
+- A custom title-bar background, Spectra widgets are flat; the
   archetypes don't ship a tinted title strip.
-- Hardcoded font-family for the title — the style sets the family;
+- Hardcoded font-family for the title, the style sets the family;
   widgets inherit.
 
 ---
@@ -137,7 +137,7 @@ style (active data-style) → body / cell --font-family
 **Do not** set `--font-family` inline as `'<font>', var(--font-family, …)`.
 That's a self-reference. CSS treats it as invalid-at-computed-value-time,
 the property reverts to the guaranteed-invalid sentinel, and every
-descendant `var(--font-family, …)` falls through to its fallback — the
+descendant `var(--font-family, …)` falls through to its fallback, the
 chart helpers see this as "the font cascade is broken" and chart text
 ends up in Helvetica regardless of style. This bug burned us in v0.19.5;
 see the commit. Set inline `--font-family: '<font>', system-ui, sans-serif`
@@ -174,7 +174,7 @@ teal, slate-blue, plum. In Dracula they're red, peach, mint, lavender,
 cyan, pink. The hexes change; the roles don't.
 
 Every accent has a `-soft` companion (`--accent-1-soft` etc.) for
-low-saturation background tints — pill backgrounds, list-row highlights,
+low-saturation background tints, pill backgrounds, list-row highlights,
 chart area fills.
 
 `--on-accent` is the legible text colour to draw on an accent fill (e.g.
@@ -209,19 +209,19 @@ barChart(canvas, {
 `tokens(shadow.host)` resolves the live `--accent-*`, `--surface*`,
 `--text-*`, `--font-family` from the cell's cascade via a hidden probe
 element. Pass it to a chart helper and the chart's bars / line / axis
-text / grid lines bind to the active theme — flip the theme and the
+text / grid lines bind to the active theme, flip the theme and the
 chart repaints to match (composer remounts cells on theme/style change
 so the canvas re-draws, since Chart.js bakes colour into the canvas).
 
 Existing helpers:
 
-- `sparkline(canvas, values, color)` — no axes, no legend, area fill,
+- `sparkline(canvas, values, color)`, no axes, no legend, area fill,
   used by finance, weather, energy.
-- `barChart(canvas, { values, labels, color, highlightIdx, … })` — bars
+- `barChart(canvas, { values, labels, color, highlightIdx, … })`, bars
   with axis labels.
-- `lineChart(canvas, { values, labels, fill, … })` — line trace with
+- `lineChart(canvas, { values, labels, fill, … })`, line trace with
   axis labels, sparkline-styled area fill.
-- `hbar(canvas, { values, labels, color })` — horizontal bars for
+- `hbar(canvas, { values, labels, color })`, horizontal bars for
   battery / level lists.
 
 All helpers set `animation: false` (the renderer screenshots mid-frame
@@ -241,7 +241,7 @@ The icon font is loaded at document level by compose.html and
 `@import`ed inside every Spectra widget's shadow root (via
 `spectra-widgets.css`) so the glyphs render inside shadow scope.
 
-Don't use the regular / thin / fill / duotone weights — bold reads as a
+Don't use the regular / thin / fill / duotone weights, bold reads as a
 single confident block on E6, the others either dither or disappear.
 
 Pair icons with their colour role: a clock icon next to a countdown
@@ -262,7 +262,7 @@ breakpoint that matters:
 ```
 
 `spectra-widgets.css` already trims secondary content at these
-breakpoints — chart legends collapse, status grids hide P3+, weather
+breakpoints, chart legends collapse, status grids hide P3+, weather
 forecast trims to 3 cells, list rows cap at 4.
 
 Mirror those breakpoints in custom widget rules. New compact rules go
@@ -302,12 +302,12 @@ A consolidated list of things that quietly break the design system:
 
 ## See also
 
-- [`widgets.md`](widgets.md) — the per-widget authoring contract
-- [`widget-design-brief.md`](widget-design-brief.md) — fill-in-the-blanks
+- [`widgets.md`](widgets.md), the per-widget authoring contract
+- [`widget-design-brief.md`](widget-design-brief.md), fill-in-the-blanks
   brief for new widgets
-- [`widget-build-prompt.md`](widget-build-prompt.md) — LLM prompt for
+- [`widget-build-prompt.md`](widget-build-prompt.md), LLM prompt for
   scaffolding a widget end-to-end
 - [`spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css),
   [`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css),
   [`spectra-widgets.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-widgets.css)
-  — the design system source
+ , the design system source

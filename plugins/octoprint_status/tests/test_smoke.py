@@ -1,4 +1,4 @@
-"""Smoke test for octoprint_status — render every variant at every
+"""Smoke test for octoprint_status, render every variant at every
 supported size via ``?sample=1`` so we exercise the full cell-render
 shell without needing to mock the OctoPrint HTTP API. Mirrors the
 ha_todo / spotify_queue pattern."""
@@ -15,7 +15,7 @@ def test_widget_renders_per_variant(client: FlaskClient, variant: str, size: str
     """Each variant must render the sample's job filename without
     raising. The sample fixture (app/widget_samples.py:_octoprint_status)
     seeds a "benchy.gcode" job at 47% so the cell payload JSON carries
-    the filename — a substring grep on the response proves the data
+    the filename, a substring grep on the response proves the data
     reached the cell."""
     resp = client.get(
         f"/_test/render?plugin=octoprint_status&size={size}&variant={variant}"
@@ -33,7 +33,7 @@ def test_widget_renders_per_variant(client: FlaskClient, variant: str, size: str
 def test_widget_renders_error_when_no_url(client: FlaskClient) -> None:
     """Without ``?sample=1``, server.py finds no base_url in settings and
     returns ``{"error": ...}``. We just confirm the cell still renders
-    a 200 with the plugin attribute attached — the error string itself
+    a 200 with the plugin attribute attached, the error string itself
     lives in the cell's data-data JSON and is consumed by client.js."""
     resp = client.get("/_test/render?plugin=octoprint_status&size=md")
     assert resp.status_code == 200

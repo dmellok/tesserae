@@ -81,7 +81,7 @@ def test_valid_slug_enforces_id_shape(slug: str, ok: bool) -> None:
 def test_empty_store_lists_nothing(tmp_path: Path) -> None:
     store = UserThemeStore(tmp_path / "user.json")
     assert store.list_all() == []
-    # No file is written until something is saved — saves the user's
+    # No file is written until something is saved, saves the user's
     # data/ directory from a redundant empty file.
     assert not (tmp_path / "user.json").exists()
 
@@ -151,12 +151,12 @@ def test_corrupt_file_yields_empty_store(tmp_path: Path) -> None:
     bad.write_text("{ this isn't JSON", encoding="utf-8")
     store = UserThemeStore(bad)
     assert store.list_all() == []
-    # File contents untouched — no destructive auto-repair.
+    # File contents untouched, no destructive auto-repair.
     assert bad.read_text(encoding="utf-8") == "{ this isn't JSON"
 
 
 def test_on_disk_drops_token_fields_classvar(tmp_path: Path) -> None:
-    """``TOKEN_FIELDS`` is a class-level tuple, not an instance field —
+    """``TOKEN_FIELDS`` is a class-level tuple, not an instance field -
     it must never appear in the JSON payload (would just bloat the
     file and confuse manual editors)."""
     store = UserThemeStore(tmp_path / "user.json")
@@ -231,7 +231,7 @@ def test_emit_css_omits_font_family_when_blank(tmp_path: Path) -> None:
 
 def test_emit_css_order_matches_save_order(tmp_path: Path) -> None:
     """The browse page lists user themes in save order, so the CSS
-    cascade has to follow suit — otherwise an early save could clobber
+    cascade has to follow suit, otherwise an early save could clobber
     a later one through specificity surprises (currently unlikely
     since each theme block is selector-uniquely keyed, but worth
     keeping deterministic)."""
@@ -275,8 +275,8 @@ def test_auto_soft_tints_round_trips_through_store(tmp_path: Path) -> None:
 
 def test_emit_css_does_not_include_auto_soft_tints_flag(tmp_path: Path) -> None:
     """``auto_soft_tints`` is a builder preference, not a CSS variable
-    — the emitter must skip it so it doesn't leak into the stylesheet
-    as a meaningless ``--auto-soft-tints`` rule."""
+    , the emitter must skip it so it doesn't leak into the stylesheet
+     as a meaningless ``--auto-soft-tints`` rule."""
     store = UserThemeStore(tmp_path / "user.json")
     store.save(UserTheme(id=f"{USER_THEME_PREFIX}x", name="X", auto_soft_tints=True))
     css = emit_css(store)

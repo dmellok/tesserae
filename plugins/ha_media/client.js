@@ -1,4 +1,4 @@
-// ha_media — Spectra image archetype. Album art lives in two
+// ha_media, Spectra image archetype. Album art lives in two
 // layers: a blurred-bleed backdrop that fills the body, and the
 // crisp hero on top. The meta lockup sits below with title +
 // artist, the progress bar carries elapsed / remaining stamps, and
@@ -44,7 +44,7 @@ function fmtMmSs(seconds) {
 }
 
 // Stable seeded PRNG so the same string always produces the same
-// waveform glyph. Implements xmur3 + sfc32 — small, fast, good enough
+// waveform glyph. Implements xmur3 + sfc32, small, fast, good enough
 // for visual jitter.
 function seededRand(seedStr) {
   let h = 1779033703 ^ String(seedStr || "").length;
@@ -145,7 +145,7 @@ export default function render(shadow, ctx) {
     ? `<img src="${escapeHtml(art)}" alt="">`
     : `<i class="ph-bold ph-music-notes"></i>`;
 
-  // Album-art bleed — a stretched, blurred copy of the same image
+  // Album-art bleed, a stretched, blurred copy of the same image
   // sitting behind the body content. Adds atmospheric warmth to the
   // tile so the album palette informs the whole cell, not just the
   // small hero square. Skipped when there's no art or the user has

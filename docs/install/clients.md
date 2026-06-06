@@ -1,7 +1,7 @@
 # Install a client
 
 The Tesserae server publishes frames; a **client** on the other end paints your
-panel. Four reference clients live in their own repos — pick whichever matches
+panel. Four reference clients live in their own repos, pick whichever matches
 your hardware. Three of them subscribe to MQTT (Pi + ESP32); the fourth (TRMNL
 / KOReader-on-Kindle) polls the server over HTTP. All four use the same
 device-registration flow described in [Set up a device](devices.md).
@@ -41,7 +41,7 @@ LAN at `tesserae-<id>.local`).
 A Raspberry-Pi-side Python daemon. It subscribes to
 `tesserae/<device_id>/frame/bin` and writes the server's already-packed 4-bpp
 buffer straight into the [`inky`](https://github.com/pimoroni/inky) library's
-internal `_buf` — no PIL on the Pi paint path. This is the **fastest** path on a
+internal `_buf`, no PIL on the Pi paint path. This is the **fastest** path on a
 Pimoroni Inky Impression (Spectra 6 / Waveshare E6, any of the four sizes,
 auto-detected via the HAT EEPROM). The trade-off is a private-API dependency:
 the `inky` version is pinned exactly.
@@ -53,7 +53,7 @@ the `inky` version is pinned exactly.
 
 The same Pi-side daemon shape, but it subscribes to
 `tesserae/<device_id>/frame/png` and hands incoming PNGs to `inky`'s high-level
-`set_image()`. That makes it work on **every panel the inky library supports** —
+`set_image()`. That makes it work on **every panel the inky library supports** -
 pHAT, wHAT, Impression 4"/5.7"/7.3"/13.3", in 2/3/6/7 colour. Quantising on the
 Pi every frame makes it the slower of the two Pi paths, but it stays
 wire-compatible with the inky-dash v3/v4 listener protocol.
@@ -66,7 +66,7 @@ wire-compatible with the inky-dash v3/v4 listener protocol.
 For TRMNL hardware and Kindle e-readers running KOReader's
 `trmnl-display` plugin. Instead of subscribing to MQTT, the device polls
 `GET /api/display` on a schedule (the response carries the next frame
-URL and the next-poll interval). No broker required — handy when you
+URL and the next-poll interval). No broker required, handy when you
 want a panel that "just talks to the internet".
 
 Pairing flow: the device reads its MAC, hits `/api/setup`, and the
@@ -91,5 +91,5 @@ Head to [Set up a device](devices.md) to register it, calibrate the
 panel orientation, and bind a dashboard.
 
 Running more than one panel? Flash / pair each with a distinct
-`device-id` — every client gets its own topics or HTTP token, panel
+`device-id`, every client gets its own topics or HTTP token, panel
 size, and orientation.

@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button, info_pop %}
-{% block title %}Send — Tesserae{% endblock %}
+{% block title %}Send, Tesserae{% endblock %}
 {% block page_class %}page-wide{% endblock %}
 
 {# Defaults so the template stays safe whether render came from a GET
@@ -42,7 +42,7 @@
 
 {# Target-device picker shared by the File / URL / Webpage / Gallery tabs.
    Tick one or more displays; the push renders + fans out to each at that
-   display's panel size. Required — the routes reject the form if nothing's
+   display's panel size. Required, the routes reject the form if nothing's
    ticked (used to silently fan out at the global panel preset, which fed
    the wrong-sized frame to every other device). Mirrors the dashboard
    editor's device checklist. #}
@@ -60,7 +60,7 @@
 {% set sole_device = device_options[0].id if device_options|length == 1 else None %}
 <div class="field">
   <label>Target devices <span class="required-marker" aria-hidden="true">*</span></label>
-  {# data-send-device-checklist — picked up by send.js to enable/
+  {# data-send-device-checklist, picked up by send.js to enable/
      disable the form's Send button as checkboxes toggle, so the user
      gets the "no device picked" feedback upfront instead of after a
      POST round-trip. #}
@@ -83,22 +83,22 @@
 {% else %}
 <div class="field">
   <label>Target devices</label>
-  <p class="field-help">No devices registered yet — add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a> before sending.</p>
+  <p class="field-help">No devices registered yet, add one in <a href="{{ url_for('auth.settings_area', area='devices') }}">Settings → Devices</a> before sending.</p>
 </div>
 {% endif %}
 {% endmacro %}
 
-{# Image fit mode — how a non-panel-sized image maps onto the panel.
+{# Image fit mode, how a non-panel-sized image maps onto the panel.
    Shared by File / URL / Webpage / Gallery. #}
 {% macro fit_picker(field_id) %}
 {% set _selected_fit = form_values.get('fit', 'fit') %}
 <div class="field">
   <label for="{{ field_id }}">Image fit{{ info_pop("How the image maps onto the panel when it isn't already panel-sized.") }}</label>
   <select id="{{ field_id }}" name="fit">
-    <option value="fit"     {% if _selected_fit == 'fit' %}selected{% endif %}>Fit — letterbox (keep aspect)</option>
-    <option value="fill"    {% if _selected_fit == 'fill' %}selected{% endif %}>Fill — crop to cover</option>
-    <option value="stretch" {% if _selected_fit == 'stretch' %}selected{% endif %}>Stretch — squash to exact dims</option>
-    <option value="center"  {% if _selected_fit == 'center' %}selected{% endif %}>Center — no scaling</option>
+    <option value="fit"     {% if _selected_fit == 'fit' %}selected{% endif %}>Fit, letterbox (keep aspect)</option>
+    <option value="fill"    {% if _selected_fit == 'fill' %}selected{% endif %}>Fill, crop to cover</option>
+    <option value="stretch" {% if _selected_fit == 'stretch' %}selected{% endif %}>Stretch, squash to exact dims</option>
+    <option value="center"  {% if _selected_fit == 'center' %}selected{% endif %}>Center, no scaling</option>
     <option value="blur"    {% if _selected_fit == 'blur' %}selected{% endif %}>Center + blurred background</option>
   </select>
 </div>
@@ -158,7 +158,7 @@
         <div class="dropzone-body" data-dropzone-body>
           <span class="dropzone-icon"><i class="ph ph-image-square" aria-hidden="true"></i></span>
           <p class="dropzone-title">Drop an image here</p>
-          <p class="dropzone-hint">PNG, JPEG, GIF, or BMP — up to 16 MiB</p>
+          <p class="dropzone-hint">PNG, JPEG, GIF, or BMP, up to 16 MiB</p>
           <span class="dropzone-browse"><i class="ph ph-folder-open" aria-hidden="true"></i> or browse</span>
         </div>
         <div class="dropzone-preview" data-dropzone-preview hidden>
@@ -218,7 +218,7 @@
     {% else %}
     <div class="preview-placeholder">
       <i class="ph-duotone ph-squares-four" aria-hidden="true"></i>
-      <p>No saved dashboards yet — create one under Dashboards.</p>
+      <p>No saved dashboards yet, create one under Dashboards.</p>
     </div>
     {% endif %}
   {% endcall %}
@@ -244,7 +244,7 @@
       </div>
     </form>
   </section>
-  {% call preview_card('Live preview', blurb='Loaded directly in your browser — final fit happens server-side.') %}
+  {% call preview_card('Live preview', blurb='Loaded directly in your browser, final fit happens server-side.') %}
     <img data-url-preview-bg alt="" class="preview-bg" aria-hidden="true" hidden>
     <img data-url-preview alt="" class="preview-image" hidden>
     <div class="preview-placeholder" data-url-preview-placeholder>
@@ -286,7 +286,7 @@
       </div>
     </form>
   </section>
-  {% call preview_card('Live preview', blurb='Loaded in an iframe at your browser — the panel render uses headless Chromium server-side.') %}
+  {% call preview_card('Live preview', blurb='Loaded in an iframe at your browser, the panel render uses headless Chromium server-side.') %}
     <iframe data-webpage-preview-iframe
             sandbox="allow-scripts"
             referrerpolicy="no-referrer"

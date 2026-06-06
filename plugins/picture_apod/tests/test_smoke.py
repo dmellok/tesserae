@@ -1,5 +1,5 @@
 """picture_apod smoke: composer renders cells across every supported
-size with mocked NASA APOD data — no network call."""
+size with mocked NASA APOD data, no network call."""
 
 from __future__ import annotations
 

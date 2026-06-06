@@ -10,7 +10,7 @@ already a dep for the quantiser, and the algorithm fits in ~30 lines
 once vectorised. Avoiding the scikit dependency keeps the install
 small for the rest of the appliance (which doesn't need ML libs).
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from dataclasses import dataclass
 import numpy as np
 from PIL import Image, UnidentifiedImageError
 
-# Cap input size — k-means scales as N×K×iterations; quality plateaus
+# Cap input size, k-means scales as N×K×iterations; quality plateaus
 # past ~200px on a side because dominant clusters are stable well
 # before that. 200 also bounds memory: the pairwise distance matrix is
 # N×K floats, so 40k pixels × 10 clusters × 8 bytes ≈ 3.2 MB. Tolerable.
@@ -34,7 +34,7 @@ _RESIZE_MAX = 200
 # first match.
 _K_DEFAULT = 10
 
-# Cap upload size as an extra defence in depth — the route layer
+# Cap upload size as an extra defence in depth, the route layer
 # already enforces a content-length limit, but a malformed PNG that
 # decodes huge could still walk past the budget.
 MAX_UPLOAD_BYTES = 8 * 1024 * 1024
@@ -73,7 +73,7 @@ def _kmeans_np(pixels: np.ndarray, k: int, max_iter: int = 12) -> tuple[np.ndarr
     """Lloyd's algorithm, vectorised. ``pixels`` is shape (N, 3) uint8/float.
     Returns (centres (K, 3) float, counts (K,) int).
 
-    Deterministic — k-means++ init uses a fixed-seed RNG so the same
+    Deterministic, k-means++ init uses a fixed-seed RNG so the same
     image extracts the same palette across runs. That matters for the
     builder's "Apply" UX: re-uploading the same photo shouldn't shuffle
     every colour."""
@@ -170,7 +170,7 @@ def _pick_accent_set(colors: list[RGB], target: int = 6) -> list[RGB]:
     """Choose up to ``target`` accent colours that are saturated AND
     spread on the hue wheel. Falls back to synthesised hue rotations of
     the dominant accent if the image doesn't supply enough distinct
-    hues — better than serving six near-duplicates."""
+    hues, better than serving six near-duplicates."""
     saturated = sorted(
         (c for c in colors if c.hsv[1] >= 0.15),
         key=lambda c: c.hsv[1],
@@ -193,7 +193,7 @@ def _pick_accent_set(colors: list[RGB], target: int = 6) -> list[RGB]:
         if all(_hue_distance(h, p.hsv[0]) > min_gap for p in picked):
             picked.append(c)
     # Synthesise any remainders by rotating the dominant accent by
-    # even increments around the hue wheel — keeps the slot filled
+    # even increments around the hue wheel, keeps the slot filled
     # with a colour that feels related to the image's actual accent.
     if len(picked) < target:
         picked.extend(_synthesise_accent_ramp(picked[0], target - len(picked)))
@@ -226,7 +226,7 @@ def _neutral_pool(colors: list[RGB]) -> list[RGB]:
 def _detect_mode(colors: list[RGB]) -> str:
     """Guess light vs dark based on the dominant cluster's luminance.
     ``colors`` arrives sorted by population so colors[0] is the modal
-    pixel — a fair proxy for "the image's overall mood"."""
+    pixel, a fair proxy for "the image's overall mood"."""
     if not colors:
         return "light"
     return "dark" if colors[0].luminance < 0.4 else "light"
@@ -237,17 +237,17 @@ def assign_to_tokens(colors: list[RGB], mode: str | None = None) -> dict[str, st
 
     Heuristics:
 
-    * bg / surface / surface-sunken — neutral, light end in light mode,
+    * bg / surface / surface-sunken, neutral, light end in light mode,
       dark end in dark mode. Intermediates synthesised off bg toward
       the contrast end so they're always sensible.
-    * text-primary / -secondary / -muted — opposite-luminance neutral
+    * text-primary / -secondary / -muted, opposite-luminance neutral
       with progressive mix toward bg.
-    * edge — text mixed further toward bg (3/4 of the way) so it sits
+    * edge, text mixed further toward bg (3/4 of the way) so it sits
       between text-muted and surface-sunken in contrast.
-    * accent-1..6 — six most-saturated hue-spread colours.
-    * accent-*-soft — each accent mixed 80% with bg for a tinted pill
+    * accent-1..6, six most-saturated hue-spread colours.
+    * accent-*-soft, each accent mixed 80% with bg for a tinted pill
       background that pairs cleanly.
-    * on-accent — light surface in dark mode (text on accent reads on
+    * on-accent, light surface in dark mode (text on accent reads on
       the cool surface) and the dark text colour in light mode.
     """
     if mode is None:
@@ -255,7 +255,7 @@ def assign_to_tokens(colors: list[RGB], mode: str | None = None) -> dict[str, st
     mode = mode if mode in ("light", "dark") else "light"
 
     if not colors:
-        # No image / extract failed — degrade to the dataclass default
+        # No image / extract failed, degrade to the dataclass default
         # palette so the form is still useful.
         return _empty_palette(mode)
 
@@ -312,7 +312,7 @@ def assign_to_tokens(colors: list[RGB], mode: str | None = None) -> dict[str, st
 
 
 def _empty_palette(mode: str) -> dict[str, str]:
-    """Sane defaults when extraction returns nothing — light/dark
+    """Sane defaults when extraction returns nothing, light/dark
     variant of the bundled ``light`` / ``dark`` Spectra defaults."""
     if mode == "dark":
         return {

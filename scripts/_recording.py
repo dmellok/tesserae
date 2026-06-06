@@ -100,7 +100,7 @@ def _serve_in_thread(port: int, data_root: Path) -> threading.Thread:
 #
 # Movement is JS-driven (requestAnimationFrame over a quadratic Bezier
 # with a perpendicular control-point offset = the "parabolic" knob).
-# CSS transitions are deliberately *not* used on the cursor — they would
+# CSS transitions are deliberately *not* used on the cursor, they would
 # fight the per-frame JS updates and produce straight-line motion.
 
 CURSOR_INIT_SCRIPT = r"""
@@ -249,7 +249,7 @@ class CursorDriver:
 
     ``last_pos`` is tracked across navigations on the Python side so the
     cursor restores at the previous click position immediately after
-    every ``wait_for_url`` — avoids the blink-off-during-navigation
+    every ``wait_for_url``, avoids the blink-off-during-navigation
     that the JS-side closure can't fix on its own."""
 
     # Default pacing; scenarios can monkey-patch on the instance.
@@ -269,7 +269,7 @@ class CursorDriver:
     async def park_centre(self, viewport: dict[str, int] | None = None) -> None:
         """Park the cursor at the centre of the viewport on the current
         document. Use after navigation instead of restoring at the last
-        clicked position — the previous click's coordinates often map
+        clicked position, the previous click's coordinates often map
         onto nav links / buttons in the new document, which reads as
         the cursor hovering something it's about to click.
 
@@ -348,7 +348,7 @@ class CursorDriver:
         force: bool = False,
     ) -> None:
         """``force=True`` skips Playwright's "is this element clickable
-        right now" intercept check — useful for labels whose child
+        right now" intercept check, useful for labels whose child
         spans steal the pointer-events, or buttons partly under a
         sticky topbar that scroll_into_view_if_needed can't unstick."""
         cx, cy = await self.focus_on(locator, hold_s=hold_s)
@@ -357,7 +357,7 @@ class CursorDriver:
         await locator.click(force=force)
         # The click may trigger a navigation that tears down the JS
         # context before the blur evaluate lands. That's a cosmetic
-        # cleanup (drop the focus halo) — don't let it fail the run.
+        # cleanup (drop the focus halo), don't let it fail the run.
         with contextlib.suppress(Exception):
             await self.page.evaluate("() => window.__tesserae_blur()")
 
@@ -398,15 +398,15 @@ class CursorDriver:
 
         Native ``<select>`` opens an OS-level dropdown that Chromium's
         recording pipeline doesn't capture. We work around it by
-        temporarily promoting the select to ``size=N`` — which renders
-        as an in-document listbox the recorder *does* see — then
+        temporarily promoting the select to ``size=N``, which renders
+        as an in-document listbox the recorder *does* see, then
         gliding the cursor onto the target ``<option>`` and clicking
         it. The option click fires a real ``change`` event, which any
         ``data-reload-on-change`` handler on the page will pick up
         exactly as if the user had used the native dropdown.
 
         ``listbox_rows`` caps the listbox's visible height so a select
-        with 50 widgets doesn't push the whole page down — the option
+        with 50 widgets doesn't push the whole page down, the option
         scrolls into view inside the listbox before the click."""
         # Glide onto the control + ring it (so the recording reads as
         # "click the select").
@@ -454,7 +454,7 @@ class CursorDriver:
             await asyncio.sleep(option_hold_s)
             await self.page.evaluate("([x, y]) => window.__tesserae_click(x, y)", [ox, oy])
 
-        # Click the option for real — this fires ``change`` and any
+        # Click the option for real, this fires ``change`` and any
         # ``data-reload-on-change`` handler swaps the cell's contents.
         # The reload tears down the JS context, so don't bother
         # restoring ``size``; the new document gets a fresh select.
@@ -497,7 +497,7 @@ async def _record_with(
 def _need_ffmpeg(msg_for: str) -> None:
     if not shutil.which("ffmpeg"):
         raise RuntimeError(
-            f"ffmpeg not found on PATH — install it (`brew install ffmpeg`) or "
+            f"ffmpeg not found on PATH, install it (`brew install ffmpeg`) or "
             f"output a raw .webm instead of {msg_for}."
         )
 
@@ -541,7 +541,7 @@ def _transcode_to_gif(
     with a tiny dither produces a noticeably cleaner result at roughly
     half the file size.
 
-    ``fps`` 12 is a sweet spot for screen recordings — smooth enough
+    ``fps`` 12 is a sweet spot for screen recordings, smooth enough
     for cursor motion without inflating the file. ``width`` 800 keeps
     the README embed legible while staying well under the ~25 MB
     GitHub embed cap on a one-minute recording."""
@@ -549,7 +549,7 @@ def _transcode_to_gif(
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as palette:
         palette_path = Path(palette.name)
     try:
-        # Pass 1 — generate the palette.
+        # Pass 1, generate the palette.
         subprocess.run(
             [
                 "ffmpeg",
@@ -562,7 +562,7 @@ def _transcode_to_gif(
             ],
             check=True,
         )
-        # Pass 2 — apply it with a light Bayer dither.
+        # Pass 2, apply it with a light Bayer dither.
         subprocess.run(
             [
                 "ffmpeg",
@@ -652,15 +652,15 @@ def run_scenario(
         print(f"[record] spinning up Tesserae on http://127.0.0.1:{port}")
         _serve_in_thread(port, data_root)
         _wait_ready(port)
-        print("[record] ready — driving the scenario")
+        print("[record] ready, driving the scenario")
 
         asyncio.run(_record_with(port, video_dir, viewport, drive))
-        print("[record] scenario complete — flushing video")
+        print("[record] scenario complete, flushing video")
 
         webms = sorted(video_dir.glob("*.webm"))
         if not webms:
             raise RuntimeError(
-                "Playwright didn't write a .webm — check the chromium "
+                "Playwright didn't write a .webm, check the chromium "
                 "browser is installed (`playwright install chromium`)."
             )
         webm = webms[0]

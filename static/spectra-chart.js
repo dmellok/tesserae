@@ -6,7 +6,7 @@
 //
 // Chart.js is loaded as a regular `<script>` in compose.html so the
 // global Chart constructor is ready by the time these helpers run.
-// All chart instances get `animation: false` — the Spectra e-ink
+// All chart instances get `animation: false`, the Spectra e-ink
 // spec forbids motion, and the renderer screenshots mid-animation
 // otherwise.
 
@@ -23,7 +23,7 @@ const FALLBACK = {
 // override + page-level data-theme that the chart should be using),
 // apply the token to a real CSS property, then read the resolved style
 // back. ``transparent`` as the var() fallback computes to
-// ``rgba(0, 0, 0, 0)`` — a value no Spectra theme produces — so we can
+// ``rgba(0, 0, 0, 0)``, a value no Spectra theme produces, so we can
 // distinguish "the var resolved" from "the var was undefined."
 //
 // Why not `getComputedStyle(host).getPropertyValue('--accent-1')`?
@@ -45,7 +45,7 @@ function probeColor(parent, name) {
 }
 
 // Same trick for --font-family. A made-up family name as the var()
-// fallback is unique enough to detect — no real font ships with that
+// fallback is unique enough to detect, no real font ships with that
 // name, so finding it in the resolved string means the var was unset.
 function probeFontFamily(parent, name) {
   const SENTINEL = "__spectra_missing_family__";
@@ -62,7 +62,7 @@ function probeFontFamily(parent, name) {
 export function tokens(host) {
   if (!host) {
     console.warn(
-      "[spectra-chart] tokens(host=null) — pass the cell host (shadow.host) so charts inherit the cell's per-cell theme override."
+      "[spectra-chart] tokens(host=null), pass the cell host (shadow.host) so charts inherit the cell's per-cell theme override."
     );
   }
   // Probe under host.parentElement so per-cell data-theme overrides take
@@ -103,13 +103,13 @@ export function tokens(host) {
   if (missing.length) {
     console.warn(
       `[spectra-chart] Spectra tokens didn't resolve via cascade: ${missing.join(", ")}` +
-      " — falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
+      ", falling back to light-theme defaults. Check that spectra-tokens.css is linked from the page."
     );
   }
   // Opt-in diagnostic. Two ways to enable:
   //   1. paste ``window.__TESSERAE_CHART_DEBUG = true`` in DevTools, then
   //      trigger a re-render (a theme/style flip patches every cell).
-  //   2. append ``?chartdebug=1`` to the page URL — works from a cold
+  //   2. append ``?chartdebug=1`` to the page URL, works from a cold
   //      reload, useful when the page is loaded inside an iframe whose
   //      window object the parent can't touch.
   // Prints the resolved palette + the probe's ancestry every time a chart
@@ -149,7 +149,7 @@ function ensureChart(canvas) {
 // constants, plus any hex token a caller passes directly) and
 // ``rgb(...)`` / ``rgba(...)`` (the form ``probeColor`` returns,
 // since getComputedStyle resolves to rgba). Returns the input
-// untouched if it's neither — caller falls back to whatever Chart.js
+// untouched if it's neither, caller falls back to whatever Chart.js
 // makes of it.
 function withAlpha(color, alpha) {
   if (typeof color !== "string") return color;
@@ -168,7 +168,7 @@ function withAlpha(color, alpha) {
   return color;
 }
 
-// Minimal sparkline — no axes, no legend, no tooltip. Tension 0.3 so
+// Minimal sparkline, no axes, no legend, no tooltip. Tension 0.3 so
 // the line reads as a smooth trend rather than connected straight
 // segments. Stroke at 3px respects the Spectra data-stroke floor;
 // the area beneath is filled with the line colour at 18% alpha so
@@ -178,7 +178,7 @@ function withAlpha(color, alpha) {
 // Optional `opts` (third arg, when sparkline is called with the
 // three-arg form `sparkline(canvas, values, color)` the third can
 // instead be an options object). Supports:
-//   overlay: { values, color, dash } — a thin secondary series
+//   overlay: { values, color, dash }, a thin secondary series
 //     rendered behind the main line (e.g. rolling average).
 export function sparkline(canvas, values, colorOrOpts) {
   if (!ensureChart(canvas) || !Array.isArray(values) || values.length < 2) return null;
@@ -295,15 +295,15 @@ export function barChart(canvas, opts) {
 }
 
 // Line chart with axis labels. Used by ha_history (single sensor
-// time-series). Default styling matches the sparkline — 3px stroke
-// with the area filled at 18% alpha — so the chart reads as a
+// time-series). Default styling matches the sparkline, 3px stroke
+// with the area filled at 18% alpha, so the chart reads as a
 // confident bauhaus block, not a thin technical line. Pass
 // ``fill: false`` to opt out of the shaded area.
 //
 // Optional advanced features:
-//   threshold: { value, label, color } — draws a horizontal dashed line
-//   markers: [{ index, color, label, position }] — point markers on the line
-//   overlay: { values, color, label } — secondary series rendered behind
+//   threshold: { value, label, color }, draws a horizontal dashed line
+//   markers: [{ index, color, label, position }], point markers on the line
+//   overlay: { values, color, label }, secondary series rendered behind
 //     the main line as a thin dashed ghost
 export function lineChart(canvas, opts) {
   if (!ensureChart(canvas) || !opts || !Array.isArray(opts.values) || opts.values.length < 2) return null;
@@ -355,7 +355,7 @@ export function lineChart(canvas, opts) {
     });
   }
 
-  // Threshold-line plugin — draws a dashed horizontal line + a value
+  // Threshold-line plugin, draws a dashed horizontal line + a value
   // label at the threshold's y-coordinate. Defined inline because it
   // needs access to the per-call opts.
   const thresholdPlugin = opts.threshold && Number.isFinite(opts.threshold.value) ? {
@@ -392,7 +392,7 @@ export function lineChart(canvas, opts) {
     },
   } : null;
 
-  // Marker-label plugin — draws a small label next to each marker
+  // Marker-label plugin, draws a small label next to each marker
   // (e.g. "12.5" beside the min point).
   const markerLabelPlugin = markers.length > 0 ? {
     id: "tess_markers",
@@ -472,7 +472,7 @@ export function lineChart(canvas, opts) {
   return chart;
 }
 
-// Sankey diagram — flows between source rails (left) and sink rails
+// Sankey diagram, flows between source rails (left) and sink rails
 // (right) with proportional band thickness. Backed by
 // chartjs-chart-sankey, which adds a `sankey` controller to the
 // global Chart constructor when its script loads.
@@ -483,7 +483,7 @@ export function lineChart(canvas, opts) {
 //   tokens (optional, used for axis text colour)
 //
 // Each `from` and `to` key becomes a labelled rail. The library lays
-// the rails out automatically — heights ∝ summed flow through each
+// the rails out automatically, heights ∝ summed flow through each
 // node. `colors` keys must match the rail names exactly.
 export function sankey(canvas, opts) {
   if (!ensureChart(canvas) || !opts || !Array.isArray(opts.flows) || !opts.flows.length) return null;

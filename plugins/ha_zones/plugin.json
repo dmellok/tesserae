@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Home Assistant — Zones",
+  "name": "Home Assistant, Zones",
   "version": "0.1.3",
   "kind": "widget",
-  "description": "Who's home, who's away — auto-discovers every person.* entity in Home Assistant. Each row leads with the person's avatar (HA profile picture, or a coloured-initials circle keyed to their name when there's no picture) and right-aligns a zone-glyph (briefcase for work, graduation-cap for school, barbell for gym, etc.) + the zone label. One get_states call covers the whole household.",
+  "description": "Who's home, who's away, auto-discovers every person.* entity in Home Assistant. Each row leads with the person's avatar (HA profile picture, or a coloured-initials circle keyed to their name when there's no picture) and right-aligns a zone-glyph (briefcase for work, graduation-cap for school, barbell for gym, etc.) + the zone label. One get_states call covers the whole household.",
   "icon": "ph-house",
   "supports": {
     "sizes": [

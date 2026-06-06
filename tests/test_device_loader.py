@@ -106,7 +106,7 @@ def test_config_topic_requires_validate_config(tmp_path: Path, schema_path: Path
             "config_topic": "tesserae/no_validate/config",
             "config_schema": {"x": {"type": "int", "default": 1}},
         },
-        _PARSE_ONLY,  # parse_status only — no validate_config
+        _PARSE_ONLY,  # parse_status only, no validate_config
     )
     registry = device_loader.discover(devs, schema_path=schema_path, data_root=tmp_path / "data")
     assert "no_validate" not in registry.devices

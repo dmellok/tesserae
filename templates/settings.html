@@ -5,10 +5,10 @@
 {% set AREA_BLURBS = {
   'server':'Server-wide configuration: base URL, MQTT broker, Home Assistant discovery, virtual panel fallback.',
   'renderers':'Per-renderer transform + payload settings.',
-  'devices':'Latest heartbeat + outbound config for each loaded device. Add a second display below — each one gets its own MQTT topic and panel size.',
+  'devices':'Latest heartbeat + outbound config for each loaded device. Add a second display below, each one gets its own MQTT topic and panel size.',
   'plugins':'Settings declared by each widget plugin. Secrets stay masked between saves.',
 } %}
-{% block title %}Settings: {{ AREA_TITLES[active_area] }} — Tesserae{% endblock %}
+{% block title %}Settings: {{ AREA_TITLES[active_area] }}, Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-gear-six"></i> Settings</h1>
@@ -18,7 +18,7 @@
 {{ settings_tabs(active_area) }}
 
 {% if active_area == 'renderers' %}
-{# Renderers' diagnostic stays at top — it's the only thing on the
+{# Renderers' diagnostic stays at top, it's the only thing on the
    page besides the renderer settings cards themselves. #}
 <section class="card">
   {{ card_head('Diagnostics', icon_name='stethoscope', blurb='Push a small synthetic image through every loaded renderer. Lands in the Send-page history and the /events timeline.') }}
@@ -42,14 +42,14 @@
    in; the form here pre-fills from whatever the client advertised
    (kind, panel dims, fw version). #}
 <section class="card" id="discovered-devices">
-  {{ card_head('Discovered devices', icon_name='radar', blurb='Clients publishing heartbeats that aren’t registered yet. The values come from the client’s last heartbeat — confirm them and register, or dismiss if they’re not yours.') }}
+  {{ card_head('Discovered devices', icon_name='radar', blurb='Clients publishing heartbeats that aren’t registered yet. The values come from the client’s last heartbeat, confirm them and register, or dismiss if they’re not yours.') }}
   <ul class="discovery-list">
     {% for d in discovered_devices %}
     <li class="discovery-row">
       <div class="discovery-info">
         <div class="discovery-id"><code>{{ d.id }}</code></div>
         <dl class="discovery-meta">
-          <div><dt>Kind</dt><dd>{{ d.kind or '—' }}</dd></div>
+          <div><dt>Kind</dt><dd>{{ d.kind or '-' }}</dd></div>
           {% if d.parsed.access_token %}<div><dt>Access token</dt><dd><code>{{ d.parsed.access_token }}</code></dd></div>{% endif %}
           {% if d.panel_w and d.panel_h %}<div><dt>Panel</dt><dd>{{ d.panel_w }}×{{ d.panel_h }}</dd></div>{% endif %}
           {% if d.fw_version %}<div><dt>FW</dt><dd>{{ d.fw_version }}</dd></div>{% endif %}
@@ -63,7 +63,7 @@
           <div class="actions">{{ button('Register', icon='plus', variant='primary') }}</div>
         </form>
         {% else %}
-        <span class="discovery-hint">No <code>kind</code> in heartbeat — use Add-device below.</span>
+        <span class="discovery-hint">No <code>kind</code> in heartbeat, use Add-device below.</span>
         {% endif %}
         <form method="post" action="{{ url_for('auth.devices_dismiss_discovered', discovered_id=d.id) }}" class="form form--inline">
           <div class="actions">{{ button('Dismiss', icon='x', variant='ghost') }}</div>
@@ -137,7 +137,7 @@
           </dl>
           {% endif %}
         </header>
-        {# Heartbeat dot + relative time only — the parsed diagnostic
+        {# Heartbeat dot + relative time only, the parsed diagnostic
            fields (LAST_PAINT_AT, FW_VERSION, IP, …) moved down into
            the .device-card-body so the closed summary stays compact.
            Users who want the full diagnostic still see it the moment
@@ -166,7 +166,7 @@
         <p class="device-subhead">Diagnostics</p>
         <dl class="status-fields">
           {% for key, value in section.status.parsed.items() %}
-          <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '—' }}</dd></div>
+          <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '-' }}</dd></div>
           {% endfor %}
         </dl>
       </div>
@@ -188,7 +188,7 @@
   {% endif %}
 
   {% if section.kind == 'device' and section.combined_endpoint %}
-  {# Single form for the whole device card — renderer-config + panel
+  {# Single form for the whole device card, renderer-config + panel
      + quiet-hours. The handler at section.combined_endpoint fans out
      to the same service helpers the per-subsection endpoints
      (/panel, /quiet-hours, /settings/device-<id>) call, so behaviour
@@ -196,7 +196,7 @@
   <form method="post" action="{{ section.combined_endpoint }}" class="form device-combined-form">
 
     {% if section.device_name is not none %}
-    {# Display name — instance only (built-in kinds aren't editable).
+    {# Display name, instance only (built-in kinds aren't editable).
        Saved through the combined-save dispatch like the other
        subsections, so the global Save button at the bottom commits it
        alongside any other edits. #}
@@ -220,7 +220,7 @@
     {% endif %}
 
     {% for pq in section.picture_quality %}
-    {# Per-display renderer settings — fields the renderer manifest
+    {# Per-display renderer settings, fields the renderer manifest
        flagged as ``device_setting: true`` (e.g. pi_bin's dither /
        saturation / contrast, pi_png's rotate / scale / bg / saturation).
        Each clone targeting this device gets its own block named after
@@ -241,12 +241,12 @@
     {% endfor %}
 
     {% if section.panel %}
-    {# Panel edit — orientation + dims for a registered instance.
+    {# Panel edit, orientation + dims for a registered instance.
        The JS below swaps w/h live when the aspect (landscape↔portrait)
        changes so the form is WYSIWYG; the backend persists what's shown. #}
     <div class="device-subsection">
       <p class="device-subhead">Appearance &amp; panel</p>
-      {# Full Phosphor icon picker — same component the page editor uses.
+      {# Full Phosphor icon picker, same component the page editor uses.
          data-icon-picker-id pairs the hidden input with its picker so
          the reusable static/icon-picker.js can wire them without
          relying on form-level loose lookup. #}
@@ -299,7 +299,7 @@
 
     {% if section.quiet_hours_endpoint %}
     {# Per-device quiet-hours override. Resolves first in
-       app.quiet_hours.resolve_quiet_hours — when enabled here, this
+       app.quiet_hours.resolve_quiet_hours, when enabled here, this
        window takes priority over the global Settings → Server → App
        setting. Disabling (or clearing all fields) drops the block and
        the device falls back to the global default. #}
@@ -331,7 +331,7 @@
       {{ auto_field(section.id ~ '-enabled', '_enabled', {
           'type': 'switch',
           'label': 'Enabled',
-          'help': 'Push pipeline skips this renderer when off — settings stay saved.',
+          'help': 'Push pipeline skips this renderer when off, settings stay saved.',
       }, section.enabled) }}
     {% endif %}
     {# Broker card: wrap the external-broker fields and the built-in-broker
@@ -367,7 +367,7 @@
   {% endif %}
 
   {% if section.timetable_entries is defined and section.quiet_hours_endpoint %}
-  {# Per-device timetable view — the answer to "what plays on this
+  {# Per-device timetable view, the answer to "what plays on this
      panel, and when?" Reads off existing Schedules whose target Page
      binds to this device; each row deep-links back to the Schedules
      editor where the user actually changes it. No new data model
@@ -413,7 +413,7 @@
     {% else %}
     <p class="field-help">
       No dashboards are scheduled to play on this device yet.
-      Create a schedule in the <a href="{{ url_for('schedules.index') }}">Schedules</a> page —
+      Create a schedule in the <a href="{{ url_for('schedules.index') }}">Schedules</a> page -
       it'll appear here once it targets a dashboard bound to this device.
     </p>
     {% endif %}
@@ -425,7 +425,7 @@
   </details>
   {% endif %}
 
-  {# Footer toolbar — Calibrate + Delete on one row, OUTSIDE the
+  {# Footer toolbar, Calibrate + Delete on one row, OUTSIDE the
      collapsible <details> for device cards so a setup-time action
      like Calibrate isn't hidden behind the Configure toggle. Stays
      within the .card so it still reads as part of the device.
@@ -434,11 +434,11 @@
   {% if section.calibrate_endpoint or section.delete_endpoint or section.regenerate_token_endpoint %}
   <div class="device-footer">
     {% if section.regenerate_token_endpoint %}
-    {# Regenerate access token — present only on TRMNL-style devices.
+    {# Regenerate access token, present only on TRMNL-style devices.
        Old token stops working the moment this is clicked, so the
        confirm dialog spells out the consequence. #}
     <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form form--inline"
-          onsubmit="return confirm('Regenerate the access token? The current token stops working immediately — update the client config with the new one shown after.');">
+          onsubmit="return confirm('Regenerate the access token? The current token stops working immediately, update the client config with the new one shown after.');">
       <div class="actions">{{ button('Regenerate token', icon='arrows-clockwise', variant='ghost') }}</div>
     </form>
     {% endif %}
@@ -511,15 +511,15 @@
 
   {% if system_in_container or not system_git_available %}
   {# Running under the official Docker image OR a bare install method
-     (pip wheel, release tarball, etc.) — either way there's no .git
+     (pip wheel, release tarball, etc.), either way there's no .git
      directory, so the in-app updater's git-based check / apply /
      rollback flows can't run. Show the running version, ask GitHub
      for the latest release, surface the appropriate upgrade hint. #}
   <section class="card">
     {% if system_in_container %}
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull — but we still check GitHub for newer releases so you know when one is out.') }}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull, but we still check GitHub for newer releases so you know when one is out.') }}
     {% else %}
-    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="This install isn't a git checkout, so the in-app pull-and-restart flow can't run — but we still check GitHub for newer releases so you know when one is out.") }}
+    {{ card_head('Updates', icon_name='arrow-clockwise', blurb="This install isn't a git checkout, so the in-app pull-and-restart flow can't run, but we still check GitHub for newer releases so you know when one is out.") }}
     {% endif %}
 
     {% if system_release_check %}
@@ -545,11 +545,11 @@
     <p class="field-help">To upgrade, run this on the host the container is running on:</p>
     <pre class="code-snippet"><code>docker compose pull
 docker compose up -d</code></pre>
-    <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the recreate. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps. The container restarts on the new image — expect a ~1s blip.</p>
+    <p class="field-help">Your <code>/app/data</code> volume carries settings, pages, and history across the recreate. Pin the image tag (not <code>:latest</code>) if you want deliberate upgrade steps. The container restarts on the new image, expect a ~1s blip.</p>
     {% else %}
-    <p class="field-help">The in-app pull-and-restart flow needs a git checkout of the repo as the source dir Tesserae is running from. To enable it, re-run the installer from the install guide — it does <code>git clone</code> + <code>pip install -e</code> under one venv, which keeps the running code pointed at the source tree (and the <code>.git</code> directory that lets this card pull + apply updates).</p>
+    <p class="field-help">The in-app pull-and-restart flow needs a git checkout of the repo as the source dir Tesserae is running from. To enable it, re-run the installer from the install guide, it does <code>git clone</code> + <code>pip install -e</code> under one venv, which keeps the running code pointed at the source tree (and the <code>.git</code> directory that lets this card pull + apply updates).</p>
     <pre class="code-snippet"><code>curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash</code></pre>
-    <p class="field-help">Or by hand: <code>git clone https://github.com/dmellok/tesserae.git ~/tesserae</code> &middot; <code>cd ~/tesserae</code> &middot; <code>python -m venv .venv</code> &middot; <code>.venv/bin/pip install -e ".[dev]"</code>. Either way, copy <code>data/</code> across if you want to preserve your existing pages, settings, and history. There's no <code>pip install --upgrade tesserae</code> path — the package isn't on PyPI yet.</p>
+    <p class="field-help">Or by hand: <code>git clone https://github.com/dmellok/tesserae.git ~/tesserae</code> &middot; <code>cd ~/tesserae</code> &middot; <code>python -m venv .venv</code> &middot; <code>.venv/bin/pip install -e ".[dev]"</code>. Either way, copy <code>data/</code> across if you want to preserve your existing pages, settings, and history. There's no <code>pip install --upgrade tesserae</code> path, the package isn't on PyPI yet.</p>
     {% endif %}
   </section>
   {% else %}
@@ -579,7 +579,7 @@ docker compose up -d</code></pre>
     {% if system_last_check %}
     <section class="card card--compact">
       {% if system_last_check.available %}
-      <p><strong>Update available</strong> — {{ system_last_check.commits_behind }} commit{% if system_last_check.commits_behind != 1 %}s{% endif %} behind <code>{{ system_last_check.target_ref }}</code> ({{ system_last_check.target_sha[:7] }}).</p>
+      <p><strong>Update available</strong>, {{ system_last_check.commits_behind }} commit{% if system_last_check.commits_behind != 1 %}s{% endif %} behind <code>{{ system_last_check.target_ref }}</code> ({{ system_last_check.target_sha[:7] }}).</p>
       {% if system_last_check.changelog %}
       <details>
         <summary>Incoming changes</summary>
@@ -595,7 +595,7 @@ docker compose up -d</code></pre>
         <p class="field-help">Updating takes a pre-update backup of <code>data/</code>, pulls the new revision, reinstalls deps if <code>pyproject.toml</code> changed, and re-execs the server. In-flight requests drop ({{ '~1s' }} blip).</p>
         <label class="check-row">
           <input type="checkbox" name="force" value="1">
-          <span>Force — discard any local changes to tracked files before pulling.</span>
+          <span>Force, discard any local changes to tracked files before pulling.</span>
         </label>
         <div class="actions">
           {{ button('Update & restart', icon='download-simple', variant='primary', disabled=system_dev_mode) }}
@@ -615,7 +615,7 @@ docker compose up -d</code></pre>
           <button type="submit" class="button ghost"{% if system_dev_mode %} disabled{% endif %}><i class="ph ph-arrow-u-up-left"></i> Roll back to {{ system_history[0].from_sha[:7] }}</button>
         </form>
       </div>
-      {# Collapsed by default — every line is "X → Y (channel) · deps
+      {# Collapsed by default, every line is "X → Y (channel) · deps
          reinstalled" so the list reads as noise at a glance. The
          "Rollback to <last>" button above already names the most
          recent SHA so the user has what they need without expanding. #}
@@ -647,7 +647,7 @@ docker compose up -d</code></pre>
       Status:
       {% if not system_password_required %}
         <span class="pill is-warn">password disabled</span>
-        <span class="muted">— private-network clients reach the admin UI without a prompt.</span>
+        <span class="muted">- private-network clients reach the admin UI without a prompt.</span>
       {% elif system_password_set %}
         <span class="pill is-ok">password set</span>
       {% else %}
@@ -671,7 +671,7 @@ docker compose up -d</code></pre>
        auth; the server-side handler also requires confirmed=1 (a hand-
        crafted POST without the hidden field gets a flash + bounce). #}
     <form method="post" action="{{ url_for('auth.disable_password_view') }}" class="form"
-          onsubmit="return confirm('Disable the admin password?\n\nAnyone on your LAN will reach the admin UI without a prompt. Public IPs are still blocked. The stored hash is preserved — re-enable here to restore it.\n\nLocked out later? Run: tesserae --reset-password');">
+          onsubmit="return confirm('Disable the admin password?\n\nAnyone on your LAN will reach the admin UI without a prompt. Public IPs are still blocked. The stored hash is preserved, re-enable here to restore it.\n\nLocked out later? Run: tesserae --reset-password');">
       <input type="hidden" name="confirmed" value="1">
       <p class="field-help">Turn the gate off if you're on a trusted home network and the password prompt is in your way. Flipping it back on restores the same password.</p>
       <div class="actions">{{ button('Disable password', icon='lock-open', variant='ghost') }}</div>
@@ -689,7 +689,7 @@ docker compose up -d</code></pre>
   </section>
 
   <section class="card">
-    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth) — keep them somewhere safe.') }}
+    {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth), keep them somewhere safe.') }}
 
     <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">
       <div class="field">
@@ -742,7 +742,7 @@ docker compose up -d</code></pre>
         align-items: center;
         flex-wrap: wrap;
       }
-      /* Custom file picker — hides the browser default, exposes a
+      /* Custom file picker, hides the browser default, exposes a
          pill that matches the ghost-button visual language with the
          selected filename inline. */
       .migrate-file {
@@ -819,7 +819,7 @@ docker compose up -d</code></pre>
         &middot; <code>{{ system_telemetry_host }}</code>
       {% else %}
         <span class="pill">disabled</span>
-        <span class="muted">— tick <em>Send anonymous usage telemetry</em> in Settings → Server → App to turn it on.</span>
+        <span class="muted">- tick <em>Send anonymous usage telemetry</em> in Settings → Server → App to turn it on.</span>
       {% endif %}
     </p>
 
@@ -834,15 +834,15 @@ docker compose up -d</code></pre>
   {% endif %}
 
   <section class="card">
-    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP — Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
+    {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP, Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
 
     <p>
       Status: {% if system_webhook_token_set %}
         <span class="pill is-ok">token set</span>
-        <span class="muted">— masked. Regenerate to mint a new one, or paste a custom value below.</span>
+        <span class="muted">- masked. Regenerate to mint a new one, or paste a custom value below.</span>
       {% else %}
         <span class="pill">no token</span>
-        <span class="muted">— webhooks are disabled until you set one. Regenerate below, or paste your own.</span>
+        <span class="muted">- webhooks are disabled until you set one. Regenerate below, or paste your own.</span>
       {% endif %}
     </p>
 
@@ -852,7 +852,7 @@ docker compose up -d</code></pre>
   -H "Authorization: Bearer &lt;your-token&gt;" \
   -H "Content-Type: application/json" \
   -d '{"page_id": "hallway"}'</code></pre>
-      <p class="field-help"><code>device_ids</code> (optional array) restricts the fan-out; omit to push to every device the page is bound to. Quiet hours apply — a call hitting all-quiet devices returns 202 with <code>status: "quiet"</code>.</p>
+      <p class="field-help"><code>device_ids</code> (optional array) restricts the fan-out; omit to push to every device the page is bound to. Quiet hours apply, a call hitting all-quiet devices returns 202 with <code>status: "quiet"</code>.</p>
     </details>
 
     <form method="post" action="{{ url_for('auth.system_webhook_regenerate') }}" class="form" onsubmit="return confirm('Generate a new token? Any automation using the old token will stop working.');">
@@ -889,7 +889,7 @@ docker compose up -d</code></pre>
       </button>
     </header>
     <div class="modal-body">
-      <p class="lede">Copy this now — it won't be shown in plaintext again. Refresh and it's masked like any other secret.</p>
+      <p class="lede">Copy this now, it won't be shown in plaintext again. Refresh and it's masked like any other secret.</p>
       <div class="token-row">
         <input type="text" class="token-input" value="{{ system_webhook_reveal_token }}" readonly data-modal-token aria-label="Webhook token">
         <button type="button" class="button" data-modal-copy>
@@ -944,7 +944,7 @@ docker compose up -d</code></pre>
 {% endif %}
 
 {# One-shot access-token reveal after adding a TRMNL device. Pattern
-   mirrors the System → Webhook token reveal above — same modal CSS,
+   mirrors the System → Webhook token reveal above, same modal CSS,
    same close + copy JS, just a different label and a per-device
    token. Pop from session in app/settings/index_routes.py. #}
 {% if trmnl_token_reveal %}
@@ -957,7 +957,7 @@ docker compose up -d</code></pre>
       </button>
     </header>
     <div class="modal-body">
-      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings, or native TRMNL app config). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Copy it now — refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
+      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings, or native TRMNL app config). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Copy it now, refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
       <div class="token-row">
         <input type="text" class="token-input" value="{{ trmnl_token_reveal.token }}" readonly data-modal-token aria-label="TRMNL access token">
         <button type="button" class="button" data-modal-copy>
@@ -965,7 +965,7 @@ docker compose up -d</code></pre>
         </button>
       </div>
       <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
-      <p class="field-help"><strong>LAN-safe, not internet-safe.</strong> The short token is fine for a homelab Tesserae behind a firewall / Tailscale / VPN. If your instance is reachable from the public internet, stack additional auth in front (reverse proxy with HTTP basic auth, OAuth, Cloudflare Access — anything) — five characters won't survive a determined brute-force.</p>
+      <p class="field-help"><strong>LAN-safe, not internet-safe.</strong> The short token is fine for a homelab Tesserae behind a firewall / Tailscale / VPN. If your instance is reachable from the public internet, stack additional auth in front (reverse proxy with HTTP basic auth, OAuth, Cloudflare Access, anything), five characters won't survive a determined brute-force.</p>
     </div>
     <footer class="modal-foot">
       <button type="button" class="button ghost" data-modal-close>Done</button>
@@ -1014,7 +1014,7 @@ docker compose up -d</code></pre>
 
 <script>
   // Built-in broker switch: show the embedded bind/port/auth fields and
-  // hide the external host/port/auth fields when on — and vice versa.
+  // hide the external host/port/auth fields when on, and vice versa.
   // Both groups stay in the DOM (still POSTed) so flipping the switch
   // doesn't blow away previously-typed values.
   (function () {
@@ -1031,7 +1031,7 @@ docker compose up -d</code></pre>
   })();
 
   // Panel-preset dropdown hides the manual width/height sliders when a
-  // preset is selected — they're only meaningful for "Custom".
+  // preset is selected, they're only meaningful for "Custom".
   (function () {
     const card = document.querySelector('.panel-section');
     if (!card) return;
@@ -1207,7 +1207,7 @@ docker compose up -d</code></pre>
 
   function waitForServerDown(url, startedAt) {
     // Health endpoint returns 200 right up until os.execv fires. We want
-    // to observe it FAIL once before we start polling for "back up" —
+    // to observe it FAIL once before we start polling for "back up" -
     // otherwise we'd auto-reload while the old process is still alive
     // (which would just show the old version).
     return new Promise((resolve) => {
@@ -1247,7 +1247,7 @@ docker compose up -d</code></pre>
         .then((resp) => {
           // Whether 2xx or 3xx, the server has accepted the update and
           // scheduled restart(delay_s=1.5). It's also possible the body
-          // is a flash-error landing — but we can't easily detect that
+          // is a flash-error landing, but we can't easily detect that
           // distinct from "redirect to /settings/system OK" here without
           // parsing flashes out of the response body. Treat any returned
           // response as "server is about to restart" and poll for it.
@@ -1267,7 +1267,7 @@ docker compose up -d</code></pre>
           stopRotate();
           showError(
             "Couldn't confirm the server came back. " +
-              "It may have restarted anyway — reload the page manually to check. " +
+              "It may have restarted anyway, reload the page manually to check. " +
               "(" + (err && err.message ? err.message : "network error") + ")"
           );
         });

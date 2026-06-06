@@ -2,9 +2,9 @@
 
 Two responsibility groups:
 
-* **Pure transforms** — ``rotate_png``, ``apply_underscan``, ``fit_to_panel``.
+* **Pure transforms**, ``rotate_png``, ``apply_underscan``, ``fit_to_panel``.
   Composable, no panel/palette assumptions, used by any renderer.
-* **Spectra 6 / Waveshare E6 packing** — ``pack_to_panel_bin`` produces the
+* **Spectra 6 / Waveshare E6 packing**, ``pack_to_panel_bin`` produces the
   4-bpp panel-native buffer that ESP32 firmware streams to SPI and Pi-side
   binary listeners consume. Dither dispatch (Pillow's Floyd-Steinberg /
   none + our own numpy-backed atkinson / jarvis / stucki / bayer-8x8 /
@@ -41,7 +41,7 @@ DitherMode = Literal[
 
 
 # Spectra 6 7-colour palette. Nominal sRGB approximations of the panel's
-# ink primaries — the panel firmware does the actual gamut projection.
+# ink primaries, the panel firmware does the actual gamut projection.
 # Used by Pi-side PNG listeners that quantise their own buffer (the
 # inky library projects back to its own palette anyway, so calibrated
 # targets here would just feed two rounds of misprojection).
@@ -56,7 +56,7 @@ SPECTRA_6_PALETTE: tuple[tuple[int, int, int], ...] = (
 )
 
 
-# Waveshare E6 6-colour palette — the .bin packers' default target. No
+# Waveshare E6 6-colour palette, the .bin packers' default target. No
 # orange: the firmware reserves nibble 0x4 (we map blue to 0x5, green
 # to 0x6 via the LUT below) so the gamut is one colour smaller than
 # Spectra 6.
@@ -99,7 +99,7 @@ INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
 _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
 
 
-# Calibrated targets — what the panels actually reproduce under normal
+# Calibrated targets, what the panels actually reproduce under normal
 # viewing light. Used **only** when the per-device ``calibrated`` toggle
 # is on, and always paired with the ``_compress_to_calibrated_range``
 # tone-mapping pass below: the palette alone makes mid-tones collapse
@@ -141,7 +141,7 @@ PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour")
 # Look up the calibrated palette for a gamut, or None when no calibration
 # profile exists (custom panels, future gamuts). Both calibrated palettes
 # use the same nibble LUT as their nominal counterparts so the on-wire
-# bytes are unchanged — only the dither targets and the source tone
+# bytes are unchanged, only the dither targets and the source tone
 # mapping change.
 _CALIBRATED_PALETTES: dict[str, tuple[tuple[int, int, int], ...]] = {
     "waveshare_e6": WAVESHARE_E6_CALIBRATED_PALETTE,
@@ -162,7 +162,7 @@ def _compress_to_calibrated_range(
     Floyd-Steinberg sees zero error to diffuse and the panel paints a
     flat block of paper-grey. After compression, the same source pixel
     sits well into the upper end of the palette's range with real error
-    to spread — the dither field reappears and the panel reads as
+    to spread, the dither field reappears and the panel reads as
     properly bright.
 
     Linear per-channel rescale is the dumber-but-honest version of
@@ -213,7 +213,7 @@ def underscan_image(img: Image.Image, *, underscan: int, fill: str = "#ffffff") 
     """Inset ``img`` by ``underscan`` pixels on every edge, padding the
     border with ``fill``. Size is preserved: content is downscaled to
     (W-2u, H-2u) and pasted at (u, u). Compensates for a physical mat /
-    bezel covering the screen edge — the border sits under the mat, so its
+    bezel covering the screen edge, the border sits under the mat, so its
     colour is invisible in practice. No-op for ``underscan <= 0`` or when
     the inset would consume the whole image."""
     if underscan <= 0:
@@ -252,16 +252,16 @@ def fit_to_panel(
 ) -> Image.Image:
     """Resize ``img`` to (target_w, target_h) using the requested scale mode.
 
-    * ``fit``     — preserve aspect, letterbox with ``bg``.
-    * ``fill``    — preserve aspect, crop overflow.
-    * ``stretch`` — squash to exact dims.
-    * ``center``  — paste original at panel centre; clip overflow, ``bg``
+    * ``fit``    , preserve aspect, letterbox with ``bg``.
+    * ``fill``   , preserve aspect, crop overflow.
+    * ``stretch``, squash to exact dims.
+    * ``center`` , paste original at panel centre; clip overflow, ``bg``
                     elsewhere.
-    * ``blur``    — preserve aspect (as ``fit``) over a blurred, cover-cropped
+    * ``blur``   , preserve aspect (as ``fit``) over a blurred, cover-cropped
                     copy of the image so the letterbox area is filled.
 
     Used by the Send page when the uploaded image isn't already panel
-    sized. Dashboard renders skip this — the composer emits panel-exact PNGs."""
+    sized. Dashboard renders skip this, the composer emits panel-exact PNGs."""
     src = img.convert("RGB")
     if src.size == (target_w, target_h) and scale != "blur":
         return src
@@ -350,7 +350,7 @@ def quantize_to_png(
 
 
 def _nearest_palette_indices(pixels: np.ndarray, palette: np.ndarray) -> np.ndarray:
-    """Vectorised nearest-palette lookup. Squared euclidean in sRGB —
+    """Vectorised nearest-palette lookup. Squared euclidean in sRGB -
     cheap and good enough for a 6-colour gamut."""
     flat = pixels.reshape(-1, 3)
     diff = flat[:, None, :] - palette[None, :, :]
@@ -367,7 +367,7 @@ def _error_diffusion(
 
     Each pixel reads its predecessors' errors, so the per-pixel work has a
     fundamental sequential dependency. We feed numpy arrays into typed
-    ``array.array`` flat buffers — ~3x faster than indexing numpy in the
+    ``array.array`` flat buffers, ~3x faster than indexing numpy in the
     hot loop. Still slow at panel size (several seconds) but opt-in;
     FS / bayer remain the fast paths."""
     import array as _array
@@ -424,7 +424,7 @@ def _error_diffusion(
     return bytes(out)
 
 
-# Atkinson: 6 neighbours each at 1/8 — only 6/8 of the error propagates,
+# Atkinson: 6 neighbours each at 1/8, only 6/8 of the error propagates,
 # the rest is intentionally discarded for the classic Mac contrasty look.
 _ATKINSON_WEIGHTS: list[tuple[int, int, float]] = [
     (0, 1, 1 / 8),
@@ -451,7 +451,7 @@ _STUCKI_WEIGHTS: list[tuple[int, int, float]] = [
 
 
 # 8x8 Bayer threshold (recursive 2x expansion of [[0,2],[3,1]]) / 64.
-# Classic ordered-dither tile — deterministic crosshatch, no error
+# Classic ordered-dither tile, deterministic crosshatch, no error
 # propagation, vectorises trivially.
 _BAYER_8X8: np.ndarray = (
     np.array(
@@ -479,7 +479,7 @@ def _dither_ordered(
     strength: float = 64.0,
 ) -> bytes:
     """Generic ordered (threshold-matrix) dither. Vectorised across the
-    whole image — ~10x faster than the error-diffusion paths."""
+    whole image, ~10x faster than the error-diffusion paths."""
     arr = np.asarray(rgb, dtype=np.float32)
     H, W, _ = arr.shape
     mh, mw = matrix.shape
@@ -491,7 +491,7 @@ def _dither_ordered(
 
 
 def _make_halftone_matrix(size: int = 16) -> np.ndarray:
-    """Clustered-dot halftone — threshold grows radially from each cell
+    """Clustered-dot halftone, threshold grows radially from each cell
     centre, so darker pixels fill outward as circular dots."""
     cx = (size - 1) / 2
     cy = (size - 1) / 2
@@ -504,7 +504,7 @@ def _make_halftone_matrix(size: int = 16) -> np.ndarray:
 
 
 def _make_crosshatch_matrix(size: int = 8) -> np.ndarray:
-    """Pen-and-ink crosshatch — diagonals darken first as the image darkens."""
+    """Pen-and-ink crosshatch, diagonals darken first as the image darkens."""
     mat = np.zeros((size, size), dtype=np.float32)
     for i in range(size):
         for j in range(size):
@@ -536,7 +536,7 @@ def pack_to_panel_bin(
     = odd column. Matches the firmware's ``epd_display`` SPI stream.
 
     ``gamut`` selects the target palette + nibble LUT (see ``PANEL_GAMUTS``):
-    ``waveshare_e6`` (6 colours, the default — ESP32 firmware + Waveshare E6
+    ``waveshare_e6`` (6 colours, the default, ESP32 firmware + Waveshare E6
     Pi clients) or ``inky_7colour`` (7 colours incl. orange, indices matching
     the Pimoroni inky library so a Pi client writes them straight to the
     UC8159 buffer). An unknown value falls back to ``waveshare_e6``.
@@ -546,28 +546,28 @@ def pack_to_panel_bin(
     the source's [0, 255] range into the panel's reproducible band. Pair
     works as one: the palette alone makes mid-tones collapse without the
     tone mapping; the tone mapping alone darkens nothing because it
-    quantizes against the unchanged nominal targets. Off by default — turn
+    quantizes against the unchanged nominal targets. Off by default, turn
     it on per device once you've A/B'd a frame and decided the calibrated
     look beats the nominal one for that panel and that content.
 
     ``width`` must be even. The image must already be at
-    ``(width, height)`` — callers resize / orient first (the dashboard
+    ``(width, height)``, callers resize / orient first (the dashboard
     composer produces panel-sized output; the Send page uploads use
     ``fit_to_panel`` before reaching this point).
 
-    Quantisation knobs (only the .bin path runs them — the Pi PNG listener
+    Quantisation knobs (only the .bin path runs them, the Pi PNG listener
     owns gamut projection on its end):
 
-    * ``dither`` — ``floyd-steinberg`` (default), ``none``, ``atkinson``,
+    * ``dither``, ``floyd-steinberg`` (default), ``none``, ``atkinson``,
       ``jarvis``, ``stucki``, ``bayer-8x8``, ``halftone``, ``crosshatch``.
       FS is the fast smooth-gradient default. Bayer-8x8 is the fastest
       non-FS option. The error-diffusion alternatives run on a Python
-      hot loop — noticeably slower (several seconds at 1200x1600) but
+      hot loop, noticeably slower (several seconds at 1200x1600) but
       opt-in.
-    * ``saturation`` — pre-quantise multiplier (1.0 = no change). ~1.3-1.5
+    * ``saturation``, pre-quantise multiplier (1.0 = no change). ~1.3-1.5
       pushes near-saturated colours onto the palette before dither kicks
       in; kills the speck artefact on near-native solids.
-    * ``contrast`` — pre-quantise multiplier (1.0 = no change). Useful
+    * ``contrast``, pre-quantise multiplier (1.0 = no change). Useful
       when near-black / near-white regions are dithering noisily into
       grey equivalents on the panel.
     """
@@ -581,7 +581,7 @@ def pack_to_panel_bin(
     # calibrated palette for this gamut (if we have one) and compress the
     # source range into the calibrated [black, white] band so the dither
     # has somewhere to spread error to. Nibble LUT stays the rendered
-    # gamut's — on-wire bytes are unchanged.
+    # gamut's, on-wire bytes are unchanged.
     calibrated_active = calibrated and gamut in _CALIBRATED_PALETTES
     if calibrated_active:
         palette = _CALIBRATED_PALETTES[gamut]

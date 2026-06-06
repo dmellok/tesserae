@@ -1,9 +1,9 @@
-// clock_world — Spectra list archetype. One row per configured city
+// clock_world, Spectra list archetype. One row per configured city
 // with its current time in the specified IANA timezone. Times use
 // Intl.DateTimeFormat which respects the cell's chosen 12h/24h format.
 // Each row carries a sun-position glyph (deep night / dawn / day /
 // dusk) keyed to the city's local hour and a 24-hour day/night strip
-// with a marker pip at the current local time — so a glance at the
+// with a marker pip at the current local time, so a glance at the
 // row tells you whether Tokyo is asleep or eating breakfast without
 // having to parse the clock.
 
@@ -33,7 +33,7 @@ function formatTime(now, tz, format) {
       hour12: format === "12h",
     }).format(now);
   } catch {
-    return "—";
+    return "-";
   }
 }
 
@@ -132,7 +132,7 @@ export default function render(shadow, ctx) {
     const h = localHourFraction(now, c.tz);
     const phase = phaseFor(h);
     // Day-shift cue. Lives in its own slot to the LEFT of the time
-    // so the time itself stays in a single right-aligned column —
+    // so the time itself stays in a single right-aligned column -
     // adding "yesterday" inline used to push the time leftward and
     // break the column alignment across rows. ph-arrow-down for a
     // calendar day BEHIND the host; ph-arrow-up for AHEAD.
@@ -144,7 +144,7 @@ export default function render(shadow, ctx) {
     }
 
     // Day/night strip. Marker pip rides the gradient at the city's
-    // current local hour (h / 24) — for a city in deep night the pip
+    // current local hour (h / 24), for a city in deep night the pip
     // sits in the slate band, midday it sits in the bright band, etc.
     // We render the strip BELOW the row's title+time line so it
     // reads as a tertiary detail and the time column doesn't shift.
@@ -212,8 +212,8 @@ export default function render(shadow, ctx) {
     /* Now-indicator. A chunky accent-1 (terracotta) bar that bleeds
        above and below the track with a strong surface halo, plus a
        triangle pennant pointing down at the bar from above. Three
-       reinforcement cues — colour pop, height bleed, downward arrow
-       — so the marker reads as the row's focal element instead of
+       reinforcement cues, colour pop, height bleed, downward arrow
+      , so the marker reads as the row's focal element instead of
        a hairline that disappears against the gradient. */
     .day-strip-pip {
       position: absolute;

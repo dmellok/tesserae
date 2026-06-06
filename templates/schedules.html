@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button, empty_state, info_pop, switch %}
-{% block title %}Schedules — Tesserae{% endblock %}
+{% block title %}Schedules, Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
 
@@ -18,7 +18,7 @@
 {% macro schedule_form(s, edit_mode, pages) %}
 <form method="post" class="form schedule-form"
       action="{{ url_for('schedules.update', schedule_id=s.id) if edit_mode else url_for('schedules.create') }}">
-  {# Row 1 — what fires, which dashboard, how often. #}
+  {# Row 1, what fires, which dashboard, how often. #}
   <div class="field-grid sf-primary">
     <div class="field">
       <label for="sf-{{ s.id or 'new' }}-name">Name</label>
@@ -43,7 +43,7 @@
     </div>
   </div>
 
-  {# Row 2 — cadence detail. The type select toggles which set shows. #}
+  {# Row 2, cadence detail. The type select toggles which set shows. #}
   <div class="field-grid sf-cadence">
     <div class="field type-interval">
       <label for="sf-{{ s.id or 'new' }}-interval">Interval (minutes)</label>
@@ -67,7 +67,7 @@
     </div>
   </div>
 
-  {# Row 3 — modifiers. #}
+  {# Row 3, modifiers. #}
   <div class="field-grid sf-meta">
     <div class="field">
       <label for="sf-{{ s.id or 'new' }}-priority">Priority</label>
@@ -90,7 +90,7 @@
 
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-clock-clockwise"></i> Schedules
+  <h1><i class="ph ph-calendar-dots"></i> Schedules
     <button type="button" class="header-action" data-toggle-new-schedule>
       <i class="ph ph-plus" aria-hidden="true"></i><span>New schedule</span>
     </button>
@@ -105,7 +105,7 @@
 <section class="card timeline-card">
   {{ card_head('Next 24 hours', icon_name='timer', blurb='Projected fire times for every enabled schedule. Disabled schedules sit greyed out.') }}
   {% if not schedules %}
-  <p class="lede">No schedules to plot — add one with <strong>New schedule</strong>.</p>
+  <p class="lede">No schedules to plot, add one with <strong>New schedule</strong>.</p>
   {% elif not timeline.any_fires %}
   <p class="lede">Nothing scheduled to fire in the next 24 hours.</p>
   {% else %}
@@ -115,7 +115,7 @@
       <span class="timeline-tick" style="left: {{ '%.2f'|format(mark.pct) }}%;">{{ '%02d'|format(mark.hour) }}:00</span>
       {% endfor %}
     </div>
-    {# Vertical "now" line — spans the whole stack of timeline rows
+    {# Vertical "now" line, spans the whole stack of timeline rows
        so the eye can sight straight down from a row's upcoming fires
        to wall-clock now. The line uses absolute positioning relative
        to the timeline; its left coord comes from --now-pct. #}
@@ -161,7 +161,7 @@
 <section class="card">
   {{ card_head('Saved schedules', icon_name='list-bullets') }}
   {% if not schedules %}
-  <p class="lede">No schedules yet — create one above.</p>
+  <p class="lede">No schedules yet, create one above.</p>
   {% else %}
   <table class="data-table schedules-table">
     <thead>

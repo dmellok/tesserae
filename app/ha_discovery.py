@@ -7,11 +7,11 @@ registered display** (multi-head).
 
 Hub device entities:
 
-* **button** per saved dashboard — pressing it calls
+* **button** per saved dashboard, pressing it calls
   ``PushManager.push(page_id)`` (fans out to every display the dashboard
   is bound to).
-* **select** ``active dashboard`` — same, driven by a dropdown.
-* **image** ``last render`` — the composition PNG of the most-recent
+* **select** ``active dashboard``, same, driven by a dropdown.
+* **image** ``last render``, the composition PNG of the most-recent
   push (covers the legacy / virtual-panel case with no devices).
 * **sensor** + **binary_sensor** diagnostics: last push, pushes today,
   last error, busy.
@@ -19,21 +19,21 @@ Hub device entities:
 Per-display device entities (one HA device card each, linked to the hub
 via ``via_device``):
 
-* **image** ``Frame`` — the composition PNG currently published to that
+* **image** ``Frame``, the composition PNG currently published to that
   display (URL-only; HA fetches the bytes).
-* **sensor** ``Current dashboard`` — the dashboard on it right now.
-* **sensor** ``Last updated`` — when it last received a frame.
-* **sensor** ``Last seen`` — when it last sent a heartbeat.
-* **select** ``Dashboard`` — push one of the dashboards bound to *this*
+* **sensor** ``Current dashboard``, the dashboard on it right now.
+* **sensor** ``Last updated``, when it last received a frame.
+* **sensor** ``Last seen``, when it last sent a heartbeat.
+* **select** ``Dashboard``, push one of the dashboards bound to *this*
   display to *only* this display.
 * lazily, where the heartbeat provides them: **Battery**, **Signal**,
   **IP address**.
 
-The same MQTT broker the rest of Tesserae publishes to is reused — no
+The same MQTT broker the rest of Tesserae publishes to is reused, no
 second connection. Default-off in settings; users opt in by toggling
 ``ha_discovery_enabled`` in the App section.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ CMD_TOPIC_PUSH_PAGE = "tesserae/ha/cmd/push_page"
 CMD_TOPIC_ACTIVE_PAGE = "tesserae/ha/cmd/active_page"
 
 # Per-display heartbeat keys we surface as their own HA sensors, mapped to
-# the ESP32 firmware's field names. Published lazily — a display only gets
+# the ESP32 firmware's field names. Published lazily, a display only gets
 # the sensor once a heartbeat actually carries the key (so Pi clients,
 # which don't report battery/RSSI, stay uncluttered).
 _DYN_SENSORS: dict[str, dict[str, Any]] = {
@@ -180,7 +180,7 @@ def build_image_config(*, base_url: str) -> tuple[str, dict[str, Any]]:
     # mutually exclusive (``content_type`` is only valid with the bytes-
     # over-topic form, ``image_topic``). Setting both makes HA reject the
     # discovery config entirely, so the entity never appears. We're URL-
-    # based — the content type is inferred from the HTTP response.
+    # based, the content type is inferred from the HTTP response.
     payload = {
         "name": "Last render",
         "unique_id": "tesserae_last_render",
@@ -262,7 +262,7 @@ def build_device_configs(
     return [
         (
             _discovery_topic("image", f"dev_{device_id}_frame"),
-            # See note in build_image_config — ``content_type`` is invalid
+            # See note in build_image_config, ``content_type`` is invalid
             # alongside ``url_topic`` (HA infers it from the HTTP response).
             {
                 "name": "Frame",
@@ -352,7 +352,7 @@ class HomeAssistantDiscovery:
 
     Threading: command callbacks fire on the MQTT network thread; they
     hand off to PushManager.push() which has its own lock so reentry is
-    safe. State publishes are best-effort — broker outages just mean
+    safe. State publishes are best-effort, broker outages just mean
     stale HA sensors, not a crashed app.
     """
 
@@ -443,7 +443,7 @@ class HomeAssistantDiscovery:
         # Drop any stale current_page / active_page retained values left
         # over from older Tesserae versions that published the raw
         # page_id (a digest or source label) instead of the resolved
-        # name — those weren't in the select's options list, so HA
+        # name, those weren't in the select's options list, so HA
         # logged an "Invalid option" warning on every restart until the
         # next valid page push overwrote them. Empty retained payload
         # clears the retained message per MQTT spec; next valid push
@@ -472,7 +472,7 @@ class HomeAssistantDiscovery:
         self._publish_str(AVAILABILITY_TOPIC, "offline", retain=True)
 
     def refresh_entity_configs(self) -> None:
-        """Re-publish entity configs — after the base URL changed (HTTP
+        """Re-publish entity configs, after the base URL changed (HTTP
         port captured) or a device was added/removed."""
         if self._started:
             self._publish_entity_configs()
@@ -510,7 +510,7 @@ class HomeAssistantDiscovery:
         frame image, and last-updated timestamp.
 
         ``current_page`` and the hub-level ``active_page`` only get
-        written when the push corresponds to a saved Page — non-page
+        written when the push corresponds to a saved Page, non-page
         pushes (file uploads, ``push_image``, ``push_webpage``) carry a
         ``page_id`` that's actually a source label or URL, which would
         otherwise land on the select's state topic as an invalid option
@@ -630,7 +630,7 @@ class HomeAssistantDiscovery:
         and blanks the difference). But when a device is deleted while
         Tesserae is *not* running, the next session has no memory of
         previously publishing for that id, so the retained config sits
-        on the broker forever — HA keeps showing a ghost device with the
+        on the broker forever, HA keeps showing a ghost device with the
         old name. This sweep closes that gap by treating the broker
         itself as source-of-truth for what's already been published.
 
@@ -649,7 +649,7 @@ class HomeAssistantDiscovery:
             try:
                 cfg = json.loads(payload.decode("utf-8"))
             except (UnicodeDecodeError, json.JSONDecodeError):
-                # Corrupt payloads also count as stale — blank them.
+                # Corrupt payloads also count as stale, blank them.
                 to_blank.add(topic)
                 return
             if not isinstance(cfg, dict):
@@ -674,7 +674,7 @@ class HomeAssistantDiscovery:
                 if device_id not in live_device_ids:
                     to_blank.add(topic)
                 return
-            # Unknown identifier shape under our prefix — leave it; HA will
+            # Unknown identifier shape under our prefix, leave it; HA will
             # ignore it if it's not ours.
 
         wildcard = f"{DISCOVERY_PREFIX}/+/{NODE_ID}/+/config"
@@ -765,7 +765,7 @@ class HomeAssistantDiscovery:
                 self._publish_dynamic(device.id, parsed)
 
     def _every_object_id_kind(self) -> list[tuple[str, str]]:
-        """All (component, object_id) pairs we've published — used by stop()
+        """All (component, object_id) pairs we've published, used by stop()
         to blank every retained config so HA drops every entity cleanly."""
         out: list[tuple[str, str]] = []
         for page_id in self._published_button_ids:
@@ -789,7 +789,7 @@ class HomeAssistantDiscovery:
 
     def _publish_json(self, topic: str, payload: dict[str, Any], *, retain: bool = True) -> None:
         if not self._transport.connected:
-            # Discovery configs are retained — they'll re-publish on the
+            # Discovery configs are retained, they'll re-publish on the
             # next start()/refresh after reconnect. Dropping silently
             # keeps shutdown / settings-swap from dumping tracebacks.
             logger.debug("HA discovery: skipping publish to %s (broker disconnected)", topic)

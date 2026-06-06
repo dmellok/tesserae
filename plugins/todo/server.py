@@ -4,7 +4,7 @@ Persistence is a single JSON file (``lists.json``) inside the plugin's
 data_dir. The file is read-modify-write on every mutation; that's fine
 for a single-user dashboard where concurrent writes are vanishingly
 rare. The 24-hour auto-prune happens on every read so the file never
-grows unbounded — no background job needed.
+grows unbounded, no background job needed.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ PRUNE_AFTER_HOURS = 24
 
 def _data_dir() -> Path:
     """Path of this plugin's data_dir, looked up via the live registry.
-    Safe to call from any request handler — the loader populates the
+    Safe to call from any request handler, the loader populates the
     registry at app boot and we always run after it."""
     registry = current_app.config["PLUGIN_REGISTRY"]
     plugin = registry.get("todo")
@@ -185,7 +185,7 @@ def fetch(
 
     lst = _find_list(data, list_id) if list_id else None
     if lst is None:
-        # No list selected (or selected one was deleted) — surface a
+        # No list selected (or selected one was deleted), surface a
         # friendly empty state, NOT an error, so the widget shell still
         # renders. The cell editor explains how to choose a list.
         return {

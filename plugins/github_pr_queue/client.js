@@ -1,4 +1,4 @@
-// github_pr_queue — Spectra list archetype with two sub-sections.
+// github_pr_queue, Spectra list archetype with two sub-sections.
 // "Mine" (PRs you authored) leads with an accent-4 git-branch icon
 // for ready / a muted ph-pencil-circle for drafts; "Review requested"
 // leads with an accent-1 chat-circle. Each row carries a PR-age chip
@@ -32,7 +32,7 @@ function ageDays(iso) {
 // fresh (< 2d) → muted, days (2-7d) → ochre, > 1w → terracotta,
 // > 1mo → plum.
 function ageTier(days) {
-  if (!Number.isFinite(days)) return { label: "—", color: "var(--text-muted)", tint: 0 };
+  if (!Number.isFinite(days)) return { label: "-", color: "var(--text-muted)", tint: 0 };
   if (days < 1) return { label: `${Math.max(1, Math.round(days * 24))}h`, color: "var(--text-secondary)", tint: 0 };
   if (days < 2) return { label: `${Math.round(days)}d`, color: "var(--text-secondary)", tint: 0 };
   if (days < 7) return { label: `${Math.round(days)}d`, color: "var(--accent-2)", tint: 14 };
@@ -46,7 +46,7 @@ function ageChip(iso) {
   const bg = tier.tint > 0
     ? `background:color-mix(in oklab, ${tier.color} ${tier.tint}%, var(--surface));`
     : "background:color-mix(in oklab, var(--text-primary) 5%, transparent);";
-  return `<span class="pr-chip pr-age" style="color:${tier.color};${bg}" title="opened ${iso || "—"}">
+  return `<span class="pr-chip pr-age" style="color:${tier.color};${bg}" title="opened ${iso || "-"}">
     <i class="ph-bold ph-clock" style="font-size:.9em"></i>${escapeHtml(tier.label)}
   </span>`;
 }
@@ -131,7 +131,7 @@ export default function render(shadow, ctx) {
   }
 
   // Sort each section oldest-first so the most stale PR sits at the
-  // top — the one that most needs attention.
+  // top, the one that most needs attention.
   yours.sort((a, b) => Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0));
   review.sort((a, b) => Date.parse(a.created_at || 0) - Date.parse(b.created_at || 0));
 

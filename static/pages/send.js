@@ -6,7 +6,7 @@
 //
 // We do a full partial re-fetch rather than building the row client-
 // side: the row markup includes a thumbnail, friendly page name,
-// per-renderer status pills, and a duration — duplicating all of that
+// per-renderer status pills, and a duration, duplicating all of that
 // in JS would drift the moment the server-side template changes. One
 // extra GET per push is cheap.
 
@@ -37,12 +37,12 @@
         }
       })
       .catch(() => {
-        // Network blip is fine — EventSource will deliver the next
+        // Network blip is fine, EventSource will deliver the next
         // event and we'll try again then.
       });
   }
 
-  // Debounce — a one-off send fires a single push event but a fan-out
+  // Debounce, a one-off send fires a single push event but a fan-out
   // to multiple devices emits one per target. Collapse rapid bursts
   // into one re-fetch instead of N.
   let pending = null;
@@ -70,13 +70,13 @@
 // is ticked. The server-side ``_require_target_devices`` still catches
 // a missed pick (and re-renders with state preserved), but this gives
 // the user a clear "I forgot something" cue before they hit the
-// button — no round-trip, no flash banner, just a disabled control.
+// button, no round-trip, no flash banner, just a disabled control.
 (function () {
   function syncFormButtons(form) {
     const checklist = form.querySelector("[data-send-device-checklist]");
     const buttons = form.querySelectorAll("[data-requires-device-pick]");
     if (!buttons.length) return;
-    // No checklist in the form (e.g. Saved tab — that route picks the
+    // No checklist in the form (e.g. Saved tab, that route picks the
     // device through page bindings, not a checklist). Leave the
     // buttons as the server rendered them.
     if (!checklist) return;

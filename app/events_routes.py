@@ -1,6 +1,6 @@
 """Cross-cutting events timeline.
 
-A dedicated page that reads the same EventLog the Send-page history reads —
+A dedicated page that reads the same EventLog the Send-page history reads -
 but unfiltered. Chips at the top scope to one event type at a time.
 
 Types in v1: ``push``, ``renderer``, ``device``, ``scheduler``, ``auth``,
@@ -10,7 +10,7 @@ The ``/events/stream`` endpoint is a Server-Sent Events feed: every new
 row written to the EventLog is pushed to subscribed clients. Dev werkzeug
 supports streaming responses out of the box (threaded=True is Flask's
 default). In production behind a reverse proxy, set
-``proxy_buffering off`` (nginx) — otherwise the proxy will queue events
+``proxy_buffering off`` (nginx), otherwise the proxy will queue events
 and the page won't feel live.
 """
 
@@ -37,12 +37,12 @@ bp = Blueprint("events", __name__, url_prefix="/events")
 
 _KNOWN_TYPES: tuple[str, ...] = ("push", "renderer", "device", "scheduler", "auth", "telemetry")
 _MAX_LIMIT: int = 500
-# Default page size — keep tight so the IMG thumbnails on /events stay
+# Default page size, keep tight so the IMG thumbnails on /events stay
 # in a reasonable bitmap-cache footprint. Each push row's thumbnail
 # decodes to ~0.4 MB even with the ``?w=240`` variant; 100 rows ≈ 40 MB
 # of decoded images, which is fine. A flood of pushes would otherwise
 # trail off into the panel-PNG bitmap pile in Chromium's cache and
-# eat multi-GB of an idle admin tab — that was the v0.16.3 fix.
+# eat multi-GB of an idle admin tab, that was the v0.16.3 fix.
 _DEFAULT_LIMIT: int = 100
 
 
@@ -80,7 +80,7 @@ def index() -> str:
 
 
 # SSE knobs. Keepalives prove the connection is alive when the log is
-# idle — without them, nginx / browsers eventually close the connection
+# idle, without them, nginx / browsers eventually close the connection
 # and the page stops feeling live.
 _KEEPALIVE_INTERVAL_S: float = 15.0
 # Per-connection inbound queue. Generous because the page caps the DOM at

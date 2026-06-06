@@ -1,21 +1,21 @@
 """Panel orientation calibration.
 
 The user can't always reason about which way their panel is physically
-mounted. This generates a test card — a 2×2 grid numbered 1-4 with a
-``TOP`` arrow — that gets pushed through the device's real renderer, so
+mounted. This generates a test card, a 2×2 grid numbered 1-4 with a
+``TOP`` arrow, that gets pushed through the device's real renderer, so
 what lands on the glass is the true result of the current settings.
 
 The user reports which number ended up in the panel's top-left corner;
 ``target_orientation`` maps that to the display orientation that puts the
 card upright. Because the four orientations are exactly 90° apart, one
 answer is enough. A wrong guess (if a renderer turns the opposite way
-than assumed) lands 180° off — recoverable with a single flip, which the
+than assumed) lands 180° off, recoverable with a single flip, which the
 confirm re-push + the manual orientation dropdown both cover.
 
 Digits are drawn as seven-segment glyphs so the card needs no font files
-(none ship with the app — real rendering is HTML/Chromium).
+(none ship with the app, real rendering is HTML/Chromium).
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -133,7 +133,7 @@ def build_calibration_card(w: int, h: int) -> bytes:
     for digit, (ix, iy) in insets.items():
         _draw_digit(draw, digit, (ix, iy, dw, dh), quad_color[digit])
 
-    # "TOP" arrow — a filled triangle pointing up, centred on the top edge.
+    # "TOP" arrow, a filled triangle pointing up, centred on the top edge.
     aw = max(20, w // 12)
     ah = max(16, h // 16)
     cx = w // 2

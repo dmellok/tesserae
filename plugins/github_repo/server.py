@@ -1,4 +1,4 @@
-"""github_repo — single repository at a glance."""
+"""github_repo, single repository at a glance."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ def fetch(
         except Exception:
             langs = {}
         try:
-            # 52-week commit activity — list of {"week", "total", "days"}.
+            # 52-week commit activity, list of {"week", "total", "days"}.
             # First request often returns 202 (computing); the next hit
             # has the data.
             activity = core.request_json(
@@ -70,7 +70,7 @@ def fetch(
         except Exception:
             activity = []
         try:
-            # Top contributors — login + avatar + contribution count.
+            # Top contributors, login + avatar + contribution count.
             contributors = core.request_json(
                 f"https://api.github.com/repos/{repo}/contributors?per_page=6"
             )
@@ -79,7 +79,7 @@ def fetch(
     except Exception as err:
         return {"error": core.coerce_error(err)}
 
-    # Language breakdown — top-5 by byte count + an "Other" rollup so
+    # Language breakdown, top-5 by byte count + an "Other" rollup so
     # the bar sums to 100% without the long-tail dominating.
     lang_items: list[dict[str, Any]] = []
     if isinstance(langs, dict) and langs:
@@ -128,7 +128,7 @@ def fetch(
         "contributors": contrib_items,
     }
     # Don't cache while the commit_activity stats are still being
-    # computed by GitHub — that'd lock in an empty bars chart for
+    # computed by GitHub, that'd lock in an empty bars chart for
     # 10 minutes when the answer is on its way.
     if not activity_pending:
         with contextlib.suppress(OSError):

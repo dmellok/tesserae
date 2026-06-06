@@ -1,19 +1,19 @@
-"""news_reddit — top posts from a subreddit via Reddit's RSS/Atom feed.
+"""news_reddit, top posts from a subreddit via Reddit's RSS/Atom feed.
 
 Reddit firewall-blocks the public ``.json`` endpoint (HTTP 403 with an HTML
 challenge page) for server-side reads regardless of User-Agent. The per-
 subreddit RSS feed (``/r/<sub>/<sort>.rss``) is still served, so we parse
 that instead. The trade-off: RSS carries title / author / permalink / time
-but **not** score or comment counts — the client hides those when absent.
+but **not** score or comment counts, the client hides those when absent.
 
 Fetch strategy is context-aware:
 
-* **Editor / dev gallery** (``ctx["preview"]=True``) — try the warm
+* **Editor / dev gallery** (``ctx["preview"]=True``), try the warm
   BrowserPool's ``fetch_text`` first. Chromium's TLS/JA3 fingerprint slips
   past the bot-shape filter that catches plain ``urllib``. Fall through
   to ``urllib`` if the pool isn't running.
 
-* **Push render** (``ctx["preview"]=False``) — skip the pool entirely.
+* **Push render** (``ctx["preview"]=False``), skip the pool entirely.
   The pool's single worker is BUSY rendering the page that's currently
   hydrating us; submitting a fetch would block behind our own render,
   deadlock against the hydration overall cap, and produce a borderline
@@ -21,7 +21,7 @@ Fetch strategy is context-aware:
   with a richer header set. If urllib 403s, return an error and let the
   composer's last-good fallback serve the prior successful payload.
 
-Each pool fetch uses a fresh incognito context — no cookies carry between
+Each pool fetch uses a fresh incognito context, no cookies carry between
 widgets, so Reddit can't correlate this widget's fetches with anyone else's
 traffic going through the same Chromium.
 """
@@ -53,7 +53,7 @@ USER_AGENT = (
 )
 # Extra browser-like headers for the urllib path. Reddit fingerprints
 # TLS/JA3 first (which we can't fake from Python), but a Safari-shaped
-# request still gets through more often than a bare UA-only request —
+# request still gets through more often than a bare UA-only request -
 # especially for the RSS endpoint, which is less aggressively gated than
 # ``.json``. ``over18=1`` clears the age-gate interstitial that some
 # subreddits otherwise return as 403.
@@ -102,7 +102,7 @@ def _author(entry: ET.Element) -> str:
 def _fetch_via_pool(url: str) -> ET.Element | None:
     """Try the warm BrowserPool's ``fetch_text``. Returns the parsed feed
     on success, ``None`` when the pool isn't available (toggle off, tests,
-    pool not yet wired). Raises if the pool exists but the fetch failed —
+    pool not yet wired). Raises if the pool exists but the fetch failed -
     the caller catches and falls back to urllib."""
     try:
         pool = current_app.config.get("BROWSER_POOL")
@@ -138,7 +138,7 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
     ``www.reddit.com``. Returns the parsed feed on success, or an error
     string when every path failed.
 
-    ``allow_pool=False`` means we're inside a push render — the pool
+    ``allow_pool=False`` means we're inside a push render, the pool
     worker is currently busy with the screenshot that's hydrating us,
     so submitting a fetch would deadlock against the hydration overall
     cap. In that case urllib is the only option; if it 403s the
@@ -151,7 +151,7 @@ def _fetch_feed(url: str, *, allow_pool: bool) -> ET.Element | str:
     except Exception as err:
         logger.debug("news_reddit: old.reddit.com fetch failed (%s)", err)
     # Pass 2: BrowserPool (Chromium TLS fingerprint). Skipped during a
-    # push render — see the docstring.
+    # push render, see the docstring.
     if allow_pool:
         try:
             pooled = _fetch_via_pool(url)
@@ -173,7 +173,7 @@ def fetch(
 ) -> dict[str, Any]:
     del settings
     raw_sub = (options.get("subreddit") or "").strip()
-    # Tolerate "r/foo", "/r/foo", "/r/foo/" — strip leading paths and
+    # Tolerate "r/foo", "/r/foo", "/r/foo/", strip leading paths and
     # trailing slashes before validating the bare name.
     sub = raw_sub.strip("/")
     if sub.startswith("r/"):

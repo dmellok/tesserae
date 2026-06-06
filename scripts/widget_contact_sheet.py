@@ -1,4 +1,4 @@
-"""widget_contact_sheet.py — drive Playwright across every widget × variant
+"""widget_contact_sheet.py, drive Playwright across every widget × variant
 × size, saving a PNG per frame under ``screenshots/`` so a human (or an
 agent) can scan for layout regressions in one pass.
 
@@ -15,7 +15,7 @@ variant=…&sample=1`` endpoint so it matches what the gallery shows.
 Auth is via a one-shot POST to /login; the resulting session cookie
 flows through every render request via the Playwright context.
 
-The directory is gitignored — file names encode the frame:
+The directory is gitignored, file names encode the frame:
 
     {plugin_id}__{variant}__{size}.png
 """
@@ -32,7 +32,7 @@ from urllib.parse import urlencode
 import requests
 from playwright.sync_api import sync_playwright
 
-# Cell dims must match SIZE_DIMENSIONS in app/composer.py — we set the
+# Cell dims must match SIZE_DIMENSIONS in app/composer.py, we set the
 # Playwright viewport to the cell dims so the screenshot is pixel-exact.
 SIZES: dict[str, tuple[int, int]] = {
     "xs": (180, 180),
@@ -70,7 +70,7 @@ def login(base: str, password: str) -> str:
 def list_widgets(base: str, session_cookie: str) -> list[dict]:
     """Hit the gallery route's underlying registry and pull every widget's
     id, supported sizes, and variants. We do this by parsing the widget
-    list out of the gallery HTML — it already exposes everything we need
+    list out of the gallery HTML, it already exposes everything we need
     in data-* attrs and select options."""
     headers = {"Cookie": f"session={session_cookie}"}
     r = requests.get(f"{base}/_test/widgets", headers=headers, timeout=15)
@@ -80,7 +80,7 @@ def list_widgets(base: str, session_cookie: str) -> list[dict]:
     # Walk the gallery DOM cheap-and-cheerful via string ops. Each widget
     # card has ``data-widget-id="..."``; the per-card variant <select>
     # carries ``data-widget-variant data-widget-id="..."`` with one
-    # <option value="..."> per direction. No bs4 dep — keep it light.
+    # <option value="..."> per direction. No bs4 dep, keep it light.
     widgets: list[dict] = []
     import re
 
@@ -138,7 +138,7 @@ def run(
     print("[2/3] Listing widgets from gallery ...", flush=True)
     widgets = list_widgets(base, cookie)
     if not widgets:
-        raise SystemExit("No widgets found — is /_test/widgets reachable?")
+        raise SystemExit("No widgets found, is /_test/widgets reachable?")
 
     out_dir.mkdir(parents=True, exist_ok=True)
 

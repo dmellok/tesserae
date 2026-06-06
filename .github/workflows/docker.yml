@@ -1,14 +1,14 @@
 # Build + publish the official Docker image to GHCR.
 #
 # Triggers:
-#   * push of a v* tag — builds & publishes :<version> + :latest
-#   * manual dispatch — builds + publishes :latest (smoke test).
-#   * PR or push to main — builds without push so the Dockerfile
+#   * push of a v* tag, builds & publishes :<version> + :latest
+#   * manual dispatch, builds + publishes :latest (smoke test).
+#   * PR or push to main, builds without push so the Dockerfile
 #     stays correct without spamming the registry.
 #
 # Multi-arch: linux/amd64 + linux/arm64. arm64 covers Raspberry Pi 4/5,
 # the only ARM target most users will care about. arm/v7 (Pi 3 and
-# below) is intentionally not built — Playwright Chromium isn't
+# below) is intentionally not built, Playwright Chromium isn't
 # available there.
 
 name: docker
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Set up QEMU
-        # Needed for cross-arch builds — arm64 layer steps run under
+        # Needed for cross-arch builds, arm64 layer steps run under
         # emulation on the amd64 runner.
         uses: docker/setup-qemu-action@v3
 
@@ -95,7 +95,7 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          # PRs build but don't push — keeps Dockerfile drift caught
+          # PRs build but don't push, keeps Dockerfile drift caught
           # without polluting the registry.
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}

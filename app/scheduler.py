@@ -1,15 +1,15 @@
-"""Background scheduler — fires schedules whose time has come.
+"""Background scheduler, fires schedules whose time has come.
 
 Runs as a daemon thread (default tick 30 s). On each tick:
 
 1. Reads enabled schedules from the store
 2. Filters by type-specific rules:
-   * **interval** — respects the day-of-week mask AND the time-of-day window
+   * **interval**, respects the day-of-week mask AND the time-of-day window
      AND the per-schedule cooldown (last_fired + interval_minutes)
-   * **daily**   — respects the day-of-week mask, fires once per local day
+   * **daily**  , respects the day-of-week mask, fires once per local day
      once the wall-clock time passes ``fires_at``. The first_seen guard
      suppresses backfill: enabling a 07:00 daily schedule at 11:00 doesn't
-     fire today's missed 07:00 — the next fire is tomorrow at 07:00.
+     fire today's missed 07:00, the next fire is tomorrow at 07:00.
 3. Sorts by ``priority`` (high first) and hands each due schedule to the
    PushManager.
 
@@ -18,7 +18,7 @@ means a freshly-restarted Tesserae may fire an interval schedule "early"
 once and may skip a daily schedule whose target already passed today.
 Persisting them is the obvious upgrade if either becomes a problem.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ class Scheduler:
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
         currently-installed PushManager. We can't hold the instance because
-        broker setting changes rebuild it — see app.main._rebuild_transport.
+        broker setting changes rebuild it, see app.main._rebuild_transport.
         Tests pass ``lambda: my_pm`` for a fixed instance.
 
         ``event_log`` is optional so unit tests can construct a Scheduler
@@ -97,7 +97,7 @@ class Scheduler:
         skip schedules whose target dashboard was deleted, so the History
         view doesn't fill up with 0.00s "page not found" rows once a
         minute. When ``None`` the scheduler is permissive (every schedule
-        is dispatched and PushManager logs the miss itself) — that matches
+        is dispatched and PushManager logs the miss itself), that matches
         existing tests, which don't care about staleness."""
         self._store = store
         self._push_factory = push_manager
@@ -163,7 +163,7 @@ class Scheduler:
                     if s.id not in self._warned_missing_page:
                         self._warned_missing_page.add(s.id)
                         logger.warning(
-                            "schedule %r (%s) targets missing page %r — skipping "
+                            "schedule %r (%s) targets missing page %r, skipping "
                             "until it's rebound or deleted",
                             s.name,
                             s.id,
@@ -202,7 +202,7 @@ class Scheduler:
                     first_seen = self._first_seen.get(s.id)
                     last = self._last_fired.get(s.id)
                 # Backfill guard: if we weren't watching the schedule at
-                # the moment today's target would have fired, skip — the
+                # the moment today's target would have fired, skip, the
                 # user enabled it after the time had passed.
                 if first_seen is None or first_seen > target.timestamp():
                     continue
@@ -221,7 +221,7 @@ class Scheduler:
 
     def _observe(self, now: datetime) -> None:
         """Maintain ``_first_seen``. Drop entries for ids no longer enabled
-        so a disable+re-enable resets the window — exactly what the user
+        so a disable+re-enable resets the window, exactly what the user
         expects when they fix a typo and re-toggle a schedule."""
         enabled_ids = {s.id for s in self._store.all() if s.enabled}
         with self._lock:
@@ -239,7 +239,7 @@ class Scheduler:
         respect_quiet_hours: bool = False,
     ) -> PushResult:
         logger.info("Firing schedule %s -> page %s", schedule.id, schedule.page_id)
-        # Tick-driven firings (the background loop) are automation —
+        # Tick-driven firings (the background loop) are automation -
         # they should respect quiet hours so a 22:30 schedule doesn't
         # wake the room. fire_now() is the manual "Fire" button on the
         # Schedules page; user intent always goes through, so it leaves
@@ -251,7 +251,7 @@ class Scheduler:
         )
         # Successful fires bump last_fired so the daily / interval gates
         # work; a failed push doesn't update it (the next tick can retry).
-        # A ``quiet`` result also bumps it — every device was in quiet
+        # A ``quiet`` result also bumps it, every device was in quiet
         # hours, so the user's "no pushes overnight" intent is being
         # honoured. Treating it like a sent fire stops us from re-
         # attempting (and re-logging) on every tick through the quiet
@@ -281,7 +281,7 @@ class Scheduler:
     # -- helpers for tests / manual fire ---------------------------------
 
     def run_due_once(self, now: datetime | None = None) -> list[tuple[Schedule, PushResult]]:
-        """Synchronous one-pass fire-due — used by tests and manual triggers."""
+        """Synchronous one-pass fire-due, used by tests and manual triggers."""
         out: list[tuple[Schedule, PushResult]] = []
         when = now or datetime.now(UTC)
         self._observe(when)

@@ -80,7 +80,7 @@ def settings_update(section_kind: str) -> Response:
                             "warn",
                         )
                     else:
-                        flash("Telemetry enabled — test event delivered.", "ok")
+                        flash("Telemetry enabled, test event delivered.", "ok")
         # Broker / App / Panel changes need a transport + HA-discovery
         # refresh to take effect without a restart (base_url, panel dims,
         # ha_discovery_enabled all flow through there).
@@ -101,7 +101,7 @@ def settings_update(section_kind: str) -> Response:
         store.update_for_namespace("renderers", rid, values, fields)
         # Per-renderer Enabled toggle lives outside the manifest, so it's
         # stored in a sibling section keyed by id. Browsers don't submit
-        # unchecked checkboxes — treat the field's absence as "off".
+        # unchecked checkboxes, treat the field's absence as "off".
         enabled = coerce_form_value({"type": "switch"}, request.form.get("_enabled"))
         existing = store.get_section("renderers_enabled")
         store.patch_section("renderers_enabled", {**existing, rid: bool(enabled)})
@@ -126,7 +126,7 @@ def settings_update(section_kind: str) -> Response:
             return Response(f"unknown device {did!r}", status=404)
         fields = config_fields_from_schema(device.config_schema)
         if not fields:
-            # No config schema at all — nothing to save. Refuse rather
+            # No config schema at all, nothing to save. Refuse rather
             # than silently no-op so the route stays loud about misuse.
             return Response(f"device {did!r} has no configurable fields", status=400)
         values = values_from_form(fields)
@@ -138,7 +138,7 @@ def settings_update(section_kind: str) -> Response:
         if device.config_topic is None:
             # Non-MQTT device (e.g. HTTP-polled TRMNL). Config flows
             # back to the device via the next /api/display response,
-            # not a transport publish — the save itself is the action.
+            # not a transport publish, the save itself is the action.
             flash(f"{device.name} config saved.", "ok")
             return redirect_to_section(section_kind)
         tr = transport()
@@ -207,7 +207,7 @@ def _apply_broker_change() -> None:
             except Exception:
                 current_app.logger.exception("browser pool stop failed")
             # Replace with a fresh instance so a later re-enable can
-            # lazy-start cleanly — the stopped one is one-shot.
+            # lazy-start cleanly, the stopped one is one-shot.
             from app.renderer import BrowserPool
 
             current_app.config["BROWSER_POOL"] = BrowserPool()

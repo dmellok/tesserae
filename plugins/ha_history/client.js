@@ -1,4 +1,4 @@
-// ha_history — single sensor → full Chart.js line chart with axes
+// ha_history, single sensor → full Chart.js line chart with axes
 // (current value + trend arrow + min/max in the chart legend strip).
 // Multiple sensors → compact list with each row's current value.
 
@@ -50,8 +50,8 @@ function renderSingle(item, hours) {
           </span>
           <i class="ph-bold ${trendPh}" style="color:${trendAccent};font-size:1em"></i>
         </span>
-        <span class="chart-key"><span class="u-label">Low</span> ${escapeHtml(item.min || "—")}</span>
-        <span class="chart-key"><span class="u-label">High</span> ${escapeHtml(item.max || "—")}</span>
+        <span class="chart-key"><span class="u-label">Low</span> ${escapeHtml(item.min || "-")}</span>
+        <span class="chart-key"><span class="u-label">High</span> ${escapeHtml(item.max || "-")}</span>
       </div>
     </div>`;
 }
@@ -119,7 +119,7 @@ export default function render(shadow, ctx) {
       const t = tokens(shadow.host);
       const accent = t[TREND_ACCENT_TOKEN[item.trend] || "accent3"];
 
-      // Min/max point markers — only on if the user hasn't disabled
+      // Min/max point markers, only on if the user hasn't disabled
       // them via cell options. Min pip in slate, max in ochre, so
       // they read as cool/warm extremes at a glance.
       const markers = [];
@@ -142,7 +142,7 @@ export default function render(shadow, ctx) {
         });
       }
 
-      // Hourly-profile overlay — server already filters this to long
+      // Hourly-profile overlay, server already filters this to long
       // windows. Stretch the 24-point profile to match the main
       // series length so it tracks across the chart's x-axis rather
       // than bunching up at the start.

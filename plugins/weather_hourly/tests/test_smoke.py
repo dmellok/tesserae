@@ -47,7 +47,7 @@ def test_weather_hourly_renders(client: FlaskClient, size: str) -> None:
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_hourly"' in body
-    # 12-hour default window (bumped down from 24 in v0.2.0) — at least
+    # 12-hour default window (bumped down from 24 in v0.2.0), at least
     # one hour past the current 09:00 cutoff lands in data-data.
     assert "Melbourne" in body
     assert '"hours": 12' in body or '"hours":12' in body

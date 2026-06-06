@@ -1,4 +1,4 @@
-// finance_stock — Spectra stat archetype. Hero is the latest price;
+// finance_stock, Spectra stat archetype. Hero is the latest price;
 // the 24h delta wears an up/down badge with chunky arrow + percent.
 // A day-range track sits below showing the session's low → high
 // with the current price marked. Volume bars stack underneath the
@@ -13,9 +13,9 @@ function escapeHtml(s) {
 }
 
 function fmtPrice(n, ccy) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n);
-  if (Number.isNaN(v)) return "—";
+  if (Number.isNaN(v)) return "-";
   const sym = (ccy === "USD" ? "$" : ccy === "EUR" ? "€" : ccy === "GBP" ? "£" : ccy === "JPY" ? "¥" : "");
   if (v >= 1000) return `${sym}${v.toFixed(2)}`;
   if (v >= 1) return `${sym}${v.toFixed(2)}`;
@@ -23,13 +23,13 @@ function fmtPrice(n, ccy) {
 }
 
 function fmtRaw(n) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n);
-  if (Number.isNaN(v)) return "—";
+  if (Number.isNaN(v)) return "-";
   return v >= 100 ? v.toFixed(2) : v.toFixed(2);
 }
 
-// Day-range bar — a horizontal track with low on the left, high on
+// Day-range bar, a horizontal track with low on the left, high on
 // the right, and a marker pip at the current price's position.
 function dayRangeBar({ low, high, price, accent }) {
   if (!Number.isFinite(low) || !Number.isFinite(high) || !Number.isFinite(price)) return "";
@@ -61,7 +61,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const symbol = data.symbol || "—";
+  const symbol = data.symbol || "-";
   const name = data.name || "";
   const ccy = (data.currency || "USD").toUpperCase();
   const exchange = data.exchange || "";
@@ -72,7 +72,7 @@ export default function render(shadow, ctx) {
   const up = change != null && change >= 0;
   const deltaAccent = up ? "var(--accent-3)" : "var(--accent-1)";
   const deltaPh = up ? "ph-trend-up" : "ph-trend-down";
-  const deltaText = change == null ? "—" : `${Math.abs(change).toFixed(2)}%`;
+  const deltaText = change == null ? "-" : `${Math.abs(change).toFixed(2)}%`;
 
   const metaBits = [exchange, rng].filter(Boolean).join(" · ");
   const t = tokens(shadow.host);

@@ -146,7 +146,7 @@ def test_push_fans_out_to_every_renderer(tmp_path: Path, composition_png: bytes)
     assert any(name.endswith(".png") for name in written)
     assert any(name.endswith(".bin") for name in written)
 
-    # Two publishes — one per renderer, retention follows the manifest.
+    # Two publishes, one per renderer, retention follows the manifest.
     topics = [t for t, *_ in mqtt_client.published]
     assert "tesserae/pi_png/frame/png" in topics
     assert "tesserae/esp32/frame/bin" in topics
@@ -271,7 +271,7 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
         data_root=tmp_path / "rdata",
     )
-    # Landscape (800x480) + portrait (480x800) — two distinct panels.
+    # Landscape (800x480) + portrait (480x800), two distinct panels.
     device_service.create_instance(
         devices=devices,
         renderers=renderers,
@@ -317,7 +317,7 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         result = manager.push("multi")
 
     assert result.status == "sent"
-    # Rendered once per distinct panel — not once per device.
+    # Rendered once per distinct panel, not once per device.
     assert rtp.call_count == 2
     sizes = {(c.args[0].viewport_w, c.args[0].viewport_h) for c in rtp.call_args_list}
     assert sizes == {(800, 480), (480, 800)}
@@ -326,7 +326,7 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
     assert any("w=800&h=480" in u for u in urls)
     assert any("w=480&h=800" in u for u in urls)
 
-    # One publish per instance clone — each frame lands only on its device.
+    # One publish per instance clone, each frame lands only on its device.
     mqtt_client = fakes["client"]
     topics = [t for t, *_ in mqtt_client.published]
     assert sorted(topics) == [
@@ -395,7 +395,7 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
         result = manager.push("multi", device_ids={"esp32_land"})
 
     assert result.status == "sent"
-    # Only the landscape panel rendered — the portrait display was excluded.
+    # Only the landscape panel rendered, the portrait display was excluded.
     assert rtp.call_count == 1
     topics = [t for t, *_ in fakes["client"].published]
     assert topics == ["tesserae/esp32_land/frame/bin"]

@@ -1,7 +1,7 @@
 """Next-race fetch for the f1_next widget.
 
 Jolpica-F1, no API key. Caches the next-race lookup for an hour in the
-plugin's data_dir — the calendar barely changes, and every dashboard
+plugin's data_dir, the calendar barely changes, and every dashboard
 that mounts the widget would otherwise hit the API on every render.
 """
 

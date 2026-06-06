@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Spotify — Now Playing",
+  "name": "Spotify, Now Playing",
   "version": "0.2.1",
   "kind": "widget",
-  "description": "Currently-playing Spotify track — album art, title, artist, album and progress — in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",
+  "description": "Currently-playing Spotify track, album art, title, artist, album and progress, in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).",
   "icon": "ph-music-notes",
   "supports": {
     "sizes": [
@@ -19,8 +19,8 @@
       "label": "Layout",
       "default": "stack",
       "choices": [
-        { "value": "stack", "label": "Stack — art above info" },
-        { "value": "side",  "label": "Side — art square on the left" }
+        { "value": "stack", "label": "Stack, art above info" },
+        { "value": "side",  "label": "Side, art square on the left" }
       ]
     },
     {

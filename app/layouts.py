@@ -1,6 +1,6 @@
 """Editor layout templates.
 
-A layout is a named list of (x_frac, y_frac, w_frac, h_frac) tuples — cell
+A layout is a named list of (x_frac, y_frac, w_frac, h_frac) tuples, cell
 positions expressed as 0..1 fractions of the panel. Applying a layout
 scales the fractions to the page's panel dimensions and replaces the
 cell positions.
@@ -9,7 +9,7 @@ The fraction-based representation means the same layout works at any
 panel size; the editor just multiplies by panel.w / panel.h on apply.
 
 When applying a layout to an existing page, the editor preserves the
-first N cells' plugin + options where N = min(existing, new) — so picking
+first N cells' plugin + options where N = min(existing, new), so picking
 a different layout doesn't blow away your widget assignments. Extra
 cells (existing > new) are dropped; extra slots (new > existing) are
 added as unassigned (plugin=None) cells the user fills in.
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# (x_frac, y_frac, w_frac, h_frac) — all in [0, 1]. The layout's cells
+# (x_frac, y_frac, w_frac, h_frac), all in [0, 1]. The layout's cells
 # should tile the panel without gaps (the page-level matting gap is
 # applied separately by the composer).
 LayoutCell = tuple[float, float, float, float]
@@ -157,7 +157,7 @@ def detect_layout(
         if len(layout.cells) != len(cells):
             continue
         target = to_panel_pixels(layout, panel_w, panel_h)
-        # 4px tolerance on each side — accommodates the page-level
+        # 4px tolerance on each side, accommodates the page-level
         # matting gap, which the composer applies as inset padding.
         if all(
             abs(a[0] - b[0]) <= 4

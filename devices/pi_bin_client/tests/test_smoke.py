@@ -26,7 +26,7 @@ def test_manifest_fields(pi_bin_client) -> None:
     assert pi_bin_client.name == "Pi BIN client"
     assert pi_bin_client.renderer_ids == ["pi_bin"]
     assert pi_bin_client.status_topic == "tesserae/pi_bin/status"
-    # No config_topic declared — UI won't render a config form for this device.
+    # No config_topic declared, UI won't render a config form for this device.
     assert pi_bin_client.config_topic is None
 
 

@@ -1,4 +1,4 @@
-"""spotify_queue — current track + next few items from the user's queue.
+"""spotify_queue, current track + next few items from the user's queue.
 
 Thin widget over spotify_core: that plugin owns the OAuth + token refresh
 + /v1/me/player/queue call; we shape the result for the client.

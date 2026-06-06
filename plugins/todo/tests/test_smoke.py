@@ -2,7 +2,7 @@
 
 The cell renders deterministically from a JSON file in the plugin's
 data_dir, so we seed that file directly rather than driving the admin
-forms — much faster and avoids the need for authenticated requests
+forms, much faster and avoids the need for authenticated requests
 from the test client."""
 
 from __future__ import annotations
@@ -135,7 +135,7 @@ def test_todo_choices_returns_lists(app: Flask, client: FlaskClient) -> None:
         },
     )
     plugin = app.config["PLUGIN_REGISTRY"].get("todo")
-    # choices() reads from current_app — drive it inside a request ctx.
+    # choices() reads from current_app, drive it inside a request ctx.
     with app.test_request_context("/"):
         choices = plugin.server_module.choices("lists")
     assert {"value": "a", "label": "Alpha"} in choices

@@ -1,6 +1,6 @@
-// picture_gallery — Spectra full-bleed image. Pulls a random file
+// picture_gallery, Spectra full-bleed image. Pulls a random file
 // from a local folder under data/plugins/picture_gallery/. No
-// overlay — local photos rarely need captioning.
+// overlay, local photos rarely need captioning.
 
 function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({

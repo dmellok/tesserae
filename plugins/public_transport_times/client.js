@@ -1,4 +1,4 @@
-// public_transport_times — Spectra list archetype. Each upcoming
+// public_transport_times, Spectra list archetype. Each upcoming
 // departure is a row with a mode icon (train / tram / bus / V/Line /
 // night bus), a route-number colour chip (PTV line colour when the
 // server forwards one, else a hash-stable accent per route), the
@@ -46,7 +46,7 @@ function minsUntil(iso) {
 }
 
 function fmtMins(m) {
-  if (m == null) return "—";
+  if (m == null) return "-";
   if (m <= 0) return "NOW";
   if (m === 1) return "1m";
   if (m < 60) return `${m}m`;
@@ -58,7 +58,7 @@ function fmtMins(m) {
 // Countdown ring for the next departure. Renders a circle whose
 // stroke-dasharray shrinks as the time-until approaches 0. Caps the
 // "full" position at 30 minutes so a departure 90 minutes out doesn't
-// look identical to one 15 minutes out — both still register as
+// look identical to one 15 minutes out, both still register as
 // "soon enough" on the ring.
 function countdownRingSvg({ mins, color }) {
   if (!Number.isFinite(mins) || mins < 0) return "";
@@ -112,7 +112,7 @@ export default function render(shadow, ctx) {
     const mins = minsUntil(iso);
     const atPlatform = d.at_platform || mins === 0;
     const isNext = i === 0;
-    const routeName = d.route_number || d.route_name || "—";
+    const routeName = d.route_number || d.route_name || "-";
     // Server may include a `route_color` (e.g. PTV gives "#152C6B"
     // for the Frankston line). Use it when present; fall back to a
     // hash-stable accent token.

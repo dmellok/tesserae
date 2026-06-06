@@ -136,7 +136,7 @@ def test_update_preserves_id_even_if_form_attempts_rename(app: Flask, tmp_path: 
             "interval_minutes": "15",
         },
     )
-    # Try to rename via the update endpoint — the route force-pins to the
+    # Try to rename via the update endpoint, the route force-pins to the
     # URL id, so a typo'd 'id' field doesn't fork into a second record.
     client.post(
         "/schedules/stable/update",
@@ -179,7 +179,7 @@ def test_fire_now_invokes_push(app: Flask) -> None:
     )
     resp = client.post("/schedules/manual/fire", follow_redirects=True)
     assert resp.status_code == 200
-    # "Fire now" is a manual user action — quiet hours don't apply.
+    # "Fire now" is a manual user action, quiet hours don't apply.
     pm.push.assert_called_once_with("home", respect_quiet_hours=False, source="scheduler")
 
 

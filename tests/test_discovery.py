@@ -47,7 +47,7 @@ def test_cache_records_valid_payload() -> None:
 
 def test_cache_rejects_malformed_id() -> None:
     cache = DiscoveryCache()
-    # Same regex the add-device flow enforces — start with a letter,
+    # Same regex the add-device flow enforces, start with a letter,
     # 2–32 chars, lowercase + digits + underscore / hyphen.
     assert cache.record("Has-Caps", b"{}") is None
     assert cache.record("", b"{}") is None
@@ -167,7 +167,7 @@ def test_wildcard_caches_unknown_device(app: Flask) -> None:
 
 def test_wildcard_caches_kind_default_topics(app: Flask) -> None:
     """Heartbeats on a kind's default topic (e.g. fresh pi_bin install
-    publishing to tesserae/pi_bin/status) DO show up as discovered —
+    publishing to tesserae/pi_bin/status) DO show up as discovered -
     kinds are templates, not bindable devices, so anything publishing
     there is a not-yet-registered physical device."""
     transport = app.config["MQTT_TRANSPORT"]
@@ -236,7 +236,7 @@ def test_register_discovered_materialises_instance(app: Flask, tmp_path: Path) -
 
     # Renderer clone created.
     assert app.config["RENDERER_REGISTRY"].get("esp32_bin__esp32_attic") is not None
-    # Discovery entry removed once registered — no duplicate row.
+    # Discovery entry removed once registered, no duplicate row.
     assert cache.get("esp32_attic") is None
     # JSON file persisted.
     assert (tmp_path / "devices" / "esp32_attic.json").exists()
@@ -244,7 +244,7 @@ def test_register_discovered_materialises_instance(app: Flask, tmp_path: Path) -
 
 def test_register_refuses_without_kind(app: Flask) -> None:
     """A heartbeat with no 'kind' field can't be one-click registered
-    — the form falls back to the manual Add-device path."""
+    , the form falls back to the manual Add-device path."""
     cache = app.config["DISCOVERY_CACHE"]
     cache.record("mystery_box", b'{"battery_pct":50}')  # no kind field
     client = app.test_client()

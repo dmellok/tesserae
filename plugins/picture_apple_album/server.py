@@ -1,4 +1,4 @@
-"""picture_apple_album — public iCloud Shared Album rotation.
+"""picture_apple_album, public iCloud Shared Album rotation.
 
 Uses Apple's *undocumented* but long-stable shared-album endpoints:
   POST {base}/webstream      → manifest of photos in the album
@@ -12,9 +12,9 @@ different partition; we follow it once and cache the resolved host with
 the manifest.
 
 Two caches in data_dir:
-  manifest_<token>.json   — webstream payload (TTL 6h; album metadata
+  manifest_<token>.json  , webstream payload (TTL 6h; album metadata
                             rarely changes)
-  asset_<guid>.json       — signed URLs for one photo (TTL 50 min;
+  asset_<guid>.json      , signed URLs for one photo (TTL 50 min;
                             Apple's URLs expire at ~1 h)
 
 References (reverse-engineered, MIT):

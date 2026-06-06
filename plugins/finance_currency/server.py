@@ -1,4 +1,4 @@
-"""finance_currency — single FX pair via frankfurter.app (ECB-backed, free)."""
+"""finance_currency, single FX pair via frankfurter.app (ECB-backed, free)."""
 
 from __future__ import annotations
 

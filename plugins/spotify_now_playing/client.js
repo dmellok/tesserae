@@ -1,4 +1,4 @@
-// spotify_now_playing — Spectra image archetype. Album art is the
+// spotify_now_playing, Spectra image archetype. Album art is the
 // hero, title bar carries play/pause state + the "Spotify" identifier,
 // img-meta stacks the track + artist + album. A deterministic SVG
 // waveform glyph under the progress bar paints a track-specific
@@ -18,7 +18,7 @@ function fmtMmSs(ms) {
 }
 
 // Stable seeded PRNG so the same string always produces the same
-// waveform glyph. xmur3 + sfc32 — small, fast, good enough.
+// waveform glyph. xmur3 + sfc32, small, fast, good enough.
 function seededRand(seedStr) {
   let h = 1779033703 ^ String(seedStr || "").length;
   for (let i = 0; i < String(seedStr || "").length; i++) {

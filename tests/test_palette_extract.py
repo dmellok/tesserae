@@ -1,7 +1,7 @@
 """Palette extractor: k-means determinism, token assignment heuristics.
 
-These don't pin the exact suggested colours — k-means on a real photo
-is too noisy a signal to assert pixel-perfect — but they pin the
+These don't pin the exact suggested colours, k-means on a real photo
+is too noisy a signal to assert pixel-perfect, but they pin the
 structural guarantees the UI depends on: every token key lands in the
 output, hex codes are well-formed, light vs dark detection swings on
 the dominant cluster's luminance, and re-extracting the same input
@@ -69,7 +69,7 @@ def test_extract_dominant_returns_input_colour_for_solid_image() -> None:
 def test_extract_dominant_orders_by_cluster_size() -> None:
     """k=10 against a 6-band image gives 6 real clusters (the rest fold
     into the dominant ones). The first returned colour should match
-    the band with the most pixels — they're equal-sized here, so we
+    the band with the most pixels, they're equal-sized here, so we
     just check that each input band appears somewhere near the top."""
     bands = [
         (255, 0, 0),
@@ -93,7 +93,7 @@ def test_extract_dominant_orders_by_cluster_size() -> None:
 def test_extract_dominant_is_deterministic_for_same_input() -> None:
     """k-means++ seeds from a fixed RNG, so re-extracting the same
     image must yield identical output. The builder's "Apply" UX
-    depends on this — re-uploading shouldn't shuffle the form."""
+    depends on this, re-uploading shouldn't shuffle the form."""
     sample = _bands((30, 30, 60), (210, 70, 40), (240, 230, 200))
     a = extract_dominant(sample)
     b = extract_dominant(sample)
@@ -180,7 +180,7 @@ def test_assign_auto_detects_light_mode_from_bright_dominant() -> None:
     population is dominated by paper-white."""
     img = Image.new("RGB", (90, 30), (245, 244, 240))
     px = img.load()
-    # Carve out a small dark accent strip — not enough to flip the mode.
+    # Carve out a small dark accent strip, not enough to flip the mode.
     for x in range(10):
         for y in range(30):
             px[x, y] = (40, 40, 40)
@@ -205,14 +205,14 @@ def test_assign_synthesises_accents_for_monochrome_image() -> None:
     rotation) so the builder isn't fed six identical neutrals."""
     out = assign_to_tokens(extract_dominant(_solid((128, 128, 128))))
     accents = [out[f"accent_{i}"] for i in range(1, 7)]
-    # At least four distinct values — the synth rotation generates six
+    # At least four distinct values, the synth rotation generates six
     # from a slate-blue anchor, all near-unique.
     assert len(set(accents)) >= 4
 
 
 def test_assign_soft_accents_share_their_base_accent_hue() -> None:
     """Each ``accent_N_soft`` is the matching ``accent_N`` mixed with
-    bg. They should land close to bg with a tint of the accent — not
+    bg. They should land close to bg with a tint of the accent, not
     fully neutral, not fully saturated."""
     out = assign_to_tokens(extract_dominant(_bands((220, 40, 40), (40, 220, 60), (245, 245, 240))))
     for i in range(1, 7):

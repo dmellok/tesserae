@@ -4,7 +4,7 @@ A plugin is a folder under ``plugins/`` containing at minimum a ``plugin.json``
 manifest and a ``client.js``. Optional ``server.py`` provides server-side data
 fetching and admin pages.
 
-The loader runs once at app startup. Errors don't raise — they're collected on
+The loader runs once at app startup. Errors don't raise, they're collected on
 the registry so the admin UI can surface them and the rest of the app keeps
 working.
 
@@ -16,7 +16,7 @@ Differences from the v4 (inky-dash) loader:
   * Static ``cell_options[*].choices`` work without a server roundtrip;
     ``choices_from`` is the dynamic path.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -101,9 +101,9 @@ class Plugin:
     @property
     def has_admin(self) -> bool:
         """True when the plugin's server.py exports a Flask ``blueprint()``
-        — register_routes mounts it at /plugins/<id>/ as the plugin's
-        admin page. The top-nav Plugins dropdown uses this to enumerate
-        which plugins have a UI."""
+        , register_routes mounts it at /plugins/<id>/ as the plugin's
+         admin page. The top-nav Plugins dropdown uses this to enumerate
+         which plugins have a UI."""
         if self.server_module is None:
             return False
         return callable(getattr(self.server_module, "blueprint", None))

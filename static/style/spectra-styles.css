@@ -1,5 +1,5 @@
 /* ============================================================================
-   SPECTRA — STYLE PRESETS
+   SPECTRA, STYLE PRESETS
    ----------------------------------------------------------------------------
    A second token axis, orthogonal to color THEMES.
      • THEME  (data-theme)  → color only
@@ -14,7 +14,7 @@
 
    A style is much more than a font: it reshapes the type scale, corner
    radius, edge weight, padding/density, list grouping, pill shape and the
-   title marker — but never color, and never tries to introduce a divider
+   title marker, but never color, and never tries to introduce a divider
    line unless that rule is core to the style's identity (Mono console,
    Display masthead, Condensed timetable, De Stijl Mondrian).
    ============================================================================ */
@@ -26,7 +26,7 @@
    pick up the style font even when fonts_core's per-family @font-face
    emission only includes the page's chosen font.
 
-   All nine style families are vendored locally — no Google Fonts
+   All nine style families are vendored locally, no Google Fonts
    round-trip at render time. Five came from the original fonts_core
    set (Space Grotesk, IBM Plex Sans, JetBrains Mono, Archivo, Space
    Mono); Bodoni Moda, Archivo Narrow, and Jost were added under
@@ -120,7 +120,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   STANDARD (default) — Helvetica, sharp, even density.
+   STANDARD (default), Helvetica, sharp, even density.
    The neutral baseline; tracked uppercase labels, solid zebra rows.
 ---------------------------------------------------------------------------- */
 [data-style="standard"],
@@ -137,7 +137,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   DISPLAY — Space Grotesk, BIG & heavy, poster energy.
+   DISPLAY, Space Grotesk, BIG & heavy, poster energy.
    Outsized headline scale, tight tracking, thick edge, accent rule under
    the title (the "masthead" / poster cue). Lists drop zebra grouping
    so the loud headline rule reads as the focal point and rows
@@ -168,7 +168,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   EDITORIAL — IBM Plex Sans, airy & rounded, calm.
+   EDITORIAL, IBM Plex Sans, airy & rounded, calm.
    Sentence-case labels, soft corners, generous whitespace, NO zebra fill
    (groups by space alone), stadium pills, looser line height.
 ---------------------------------------------------------------------------- */
@@ -192,7 +192,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   MONO — JetBrains Mono, dense technical console.
+   MONO, JetBrains Mono, dense technical console.
    Thick edge, tight leading, compact padding, accent title tick,
    title + row dividers (terminal table feel).
 ---------------------------------------------------------------------------- */
@@ -219,9 +219,9 @@
 }
 
 /* ----------------------------------------------------------------------------
-   ELEGANT — Bodoni Moda, high-contrast fashion serif, masthead.
+   ELEGANT, Bodoni Moda, high-contrast fashion serif, masthead.
    Wide tracked serif caps, a thin rule under the title, generous
-   whitespace. NOTE: serif hairlines read best on larger widgets — fine
+   whitespace. NOTE: serif hairlines read best on larger widgets, fine
    on full panels, can dither on the smallest tiles.
 ---------------------------------------------------------------------------- */
 [data-style="elegant"],
@@ -249,7 +249,7 @@
 }
 
 /* ----------------------------------------------------------------------------
-   CONDENSED — Archivo Narrow, dense board, tall & loud.
+   CONDENSED, Archivo Narrow, dense board, tall & loud.
    Narrow letterforms let type run large; tight padding & gaps pack
    content; row rules give it the timetable-board feel.
 ---------------------------------------------------------------------------- */
@@ -275,13 +275,13 @@
 }
 
 /* ============================================================================
-   MOVEMENT STYLES — type/shape only. Each is meant to be paired with
+   MOVEMENT STYLES, type/shape only. Each is meant to be paired with
    its matching THEME (data-theme="bauhaus|destijl|brutalist") which
    supplies the palette. Style alone = the forms; theme supplies colour.
    Either half mixes with any other theme/style.
    ============================================================================ */
 
-/* ---- BAUHAUS — geometric, circle marker (pair with the bauhaus theme) ----
+/* ---- BAUHAUS, geometric, circle marker (pair with the bauhaus theme) ----
    Jost is the canonical font; Century Gothic and Inter remain in the
    chain as graceful fallbacks for older browsers or stripped builds. */
 [data-style="bauhaus"],
@@ -304,7 +304,7 @@
   --zebra-bg: var(--surface-sunken);
 }
 
-/* ---- DE STIJL — thick frame + grid rules (pair with the destijl theme) ---- */
+/* ---- DE STIJL, thick frame + grid rules (pair with the destijl theme) ---- */
 [data-style="destijl"],
 .w[data-style="destijl"]{
   --font-family: "Archivo", "Helvetica Neue", sans-serif;
@@ -326,7 +326,7 @@
   --pill-radius: 0px;
 }
 
-/* ---- BRUTALIST — monospace, exposed rules (pair with the brutalist theme) - */
+/* ---- BRUTALIST, monospace, exposed rules (pair with the brutalist theme) - */
 [data-style="brutalist"],
 .w[data-style="brutalist"]{
   --font-family: "Space Mono", "JetBrains Mono", ui-monospace, monospace;

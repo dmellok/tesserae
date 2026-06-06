@@ -3,7 +3,7 @@
 Devices created before the PanelPreset refactor have no native_w /
 native_h on disk. The dims-only fallback in ``device_panel`` is
 ambiguous for the 1200×1600 / 1600×1200 case (Inky 13.3" vs Waveshare
-13.3" Spectra 6) — the latter is portrait-native and the former is
+13.3" Spectra 6), the latter is portrait-native and the former is
 landscape-native. Wrong stride → distorted panel.
 """
 
@@ -48,7 +48,7 @@ def test_backfill_adds_native_dims_to_waveshare_13_3(tmp_path: Path) -> None:
 
 def test_backfill_handles_landscape_mounted_waveshare(tmp_path: Path) -> None:
     """Same panel, mounted sideways (1600×1200). The native stride is
-    still the portrait 1200×1600 — that's intrinsic to the hardware,
+    still the portrait 1200×1600, that's intrinsic to the hardware,
     not the mount."""
     path = tmp_path / "esp32_office.json"
     _write(
@@ -66,7 +66,7 @@ def test_backfill_handles_landscape_mounted_waveshare(tmp_path: Path) -> None:
 
 
 def test_backfill_handles_800x480_landscape_native(tmp_path: Path) -> None:
-    """PhotoPainter / Waveshare 7.5" / Inky 7.3" via ESP32 — all
+    """PhotoPainter / Waveshare 7.5" / Inky 7.3" via ESP32, all
     landscape-native 800×480. Either mount orientation backfills to
     the same native stride."""
     landscape = tmp_path / "esp32_a.json"
@@ -101,7 +101,7 @@ def test_backfill_handles_800x480_landscape_native(tmp_path: Path) -> None:
 
 
 def test_backfill_is_idempotent(tmp_path: Path) -> None:
-    """Already-migrated manifests are left alone — no re-write, not in
+    """Already-migrated manifests are left alone, no re-write, not in
     the patched list. Safe to run at every startup."""
     path = tmp_path / "esp32_done.json"
     _write(
@@ -125,7 +125,7 @@ def test_backfill_is_idempotent(tmp_path: Path) -> None:
 
 
 def test_backfill_skips_non_esp32_kinds(tmp_path: Path) -> None:
-    """pi_bin / pi_png / trmnl_png don't read native_w/native_h — the
+    """pi_bin / pi_png / trmnl_png don't read native_w/native_h, the
     migration leaves their manifests alone. Same dims, different kind,
     no patch."""
     path = tmp_path / "lounge.json"
@@ -165,7 +165,7 @@ def test_backfill_skips_unknown_dims(tmp_path: Path) -> None:
 
 
 def test_backfill_returns_empty_on_missing_dir(tmp_path: Path) -> None:
-    """A fresh install with no devices/ dir yet — no-op, no exception."""
+    """A fresh install with no devices/ dir yet, no-op, no exception."""
     assert backfill_native_panel_dims(tmp_path / "does-not-exist") == []
 
 
@@ -216,7 +216,7 @@ def test_manifest_native_dims_reach_device_panel(tmp_path: Path) -> None:
 def test_manifest_without_native_dims_falls_through(tmp_path: Path) -> None:
     """Counter-test: a manifest with no native_w/native_h goes through
     the preset-matching fallback. For an esp32 (1200, 1600) device that
-    fallback currently picks Inky 13.3" first — wrong, but the matter
+    fallback currently picks Inky 13.3" first, wrong, but the matter
     of the dims-only fallback's dict order, not the passthrough. The
     backfill migration is the supported fix for pre-v0.20 manifests."""
     devices_dir = tmp_path / "devices"
@@ -250,7 +250,7 @@ def test_manifest_without_native_dims_falls_through(tmp_path: Path) -> None:
 
 
 # Suppress unused-import warning when the device_service / renderer_loader
-# helpers aren't directly referenced — both are used implicitly through
+# helpers aren't directly referenced, both are used implicitly through
 # the discover machinery above.
 _ = device_service
 _ = renderer_loader

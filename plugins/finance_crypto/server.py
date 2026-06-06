@@ -1,4 +1,4 @@
-"""finance_crypto — current price + 24h sparkline via CoinGecko."""
+"""finance_crypto, current price + 24h sparkline via CoinGecko."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def fetch(
     if not pdata.get(vs):
         return {"error": f"Unknown coin '{coin}'.", "price": None}
 
-    # market_chart returns [[timestamp_ms, price], ...] — slim to numbers
+    # market_chart returns [[timestamp_ms, price], ...], slim to numbers
     # so client can sparkline without parsing.
     prices = chart.get("prices") or []
     series = [round(float(p[1]), 6) for p in prices]

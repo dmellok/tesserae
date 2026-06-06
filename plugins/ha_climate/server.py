@@ -1,4 +1,4 @@
-"""ha_climate — one or more HA thermostat tiles.
+"""ha_climate, one or more HA thermostat tiles.
 
 Thin widget over ha_core. A climate entity's state IS its HVAC mode
 (heat / cool / off / …); the live temps + what it's actually doing live

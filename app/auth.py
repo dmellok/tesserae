@@ -9,7 +9,7 @@ First run: the gate sees no password and redirects every request (except
 ``/setup`` so the user can pick one.
 
 Loopback bypass: ``/compose/<page_id>`` and ``/renders/<…>`` are reachable
-from ``127.0.0.1`` even without a session — the in-process Playwright
+from ``127.0.0.1`` even without a session, the in-process Playwright
 renderer needs both, and forcing a session cookie on it just to screenshot
 its own server is silly. Anything that isn't loopback still needs auth.
 """
@@ -52,7 +52,7 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     # (see app.webhook_routes._presented_token); the session gate would
     # otherwise bounce every external caller to /login.
     "/api/v1/",
-    # TRMNL BYOS protocol endpoints — each request carries an
+    # TRMNL BYOS protocol endpoints, each request carries an
     # ``access-token`` header that ``app.trmnl_api`` resolves to a
     # device. Jailbroken Kindles + native TRMNL hardware don't carry
     # sessions, so the gate has to let them through.
@@ -63,7 +63,7 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
 )
 _LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/")
-# Plugin assets — /plugins/<id>/<asset> only, NOT /plugins/ (the admin
+# Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin
 # index, which stays authed). The composer's dynamic import pulls
 # /plugins/<id>/client.js while rendering from loopback, so it has to
 # pass without a session. The index page is sensitive enough (lists
@@ -174,7 +174,7 @@ def password_required(settings: SettingsStore) -> bool:
 
 def set_password_disabled(settings: SettingsStore, disabled: bool) -> None:
     """Flip the disabled flag without touching the stored hash. Re-enabling
-    later restores the existing password — useful as a temporary "trust LAN"
+    later restores the existing password, useful as a temporary "trust LAN"
     toggle without losing the credential."""
     settings.patch_section("auth", {"disabled": bool(disabled)})
 
@@ -234,7 +234,7 @@ def _path_is_lan_reachable(path: str) -> bool:
 
 def install_gate(app: Flask, settings: SettingsStore) -> None:
     """Register the before_request handler that redirects unauthenticated
-    traffic. Idempotent — calling twice replaces the handler (Flask
+    traffic. Idempotent, calling twice replaces the handler (Flask
     deduplicates by function identity)."""
 
     @app.before_request
@@ -277,7 +277,7 @@ def install_gate(app: Flask, settings: SettingsStore) -> None:
             if is_authed():
                 return None
             return Response("forbidden", status=403)
-        # First-run: no password yet — redirect everything to setup.
+        # First-run: no password yet, redirect everything to setup.
         if not password_is_set(settings):
             return redirect(url_for("auth.setup"))
         # Authed sessions pass.

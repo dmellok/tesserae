@@ -14,7 +14,7 @@ Config payload (published from Tesserae, subscribed by the firmware):
     {"sleep_interval_s": int}
 
 ``validate_config`` rejects out-of-bounds sleep intervals before they go
-on the wire — the firmware uses the value verbatim so a typoed
+on the wire, the firmware uses the value verbatim so a typoed
 ``sleep_interval_s = 10`` would burn the battery flat in hours.
 """
 
@@ -25,7 +25,7 @@ from typing import Any
 
 # Bounds match config_schema in device.json. Duplicated here on purpose:
 # the manifest lives next to the form (UI affordance), the constants live
-# next to validate_config (server-side guard) — neither one trusts the other.
+# next to validate_config (server-side guard), neither one trusts the other.
 SLEEP_INTERVAL_MIN_S = 30
 SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 

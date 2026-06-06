@@ -46,7 +46,7 @@ def test_pi_bin_manifest_fields(pi_bin) -> None:
 def test_pi_bin_transform_produces_4bpp_buffer(pi_bin, panel_png) -> None:
     panel = Panel(w=100, h=80)
     artifact = pi_bin.transform(panel_png, panel=panel, settings=pi_bin.settings_defaults())
-    # Two pixels per byte, scanline order — width * height / 2 bytes total.
+    # Two pixels per byte, scanline order, width * height / 2 bytes total.
     assert len(artifact) == 100 * 80 // 2
 
 

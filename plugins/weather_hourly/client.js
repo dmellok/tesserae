@@ -1,4 +1,4 @@
-// weather_hourly — Spectra chart archetype. Temperature curve with a
+// weather_hourly, Spectra chart archetype. Temperature curve with a
 // vertical warm-to-cool gradient line + filled area, rain-probability
 // bars stacked behind on a right axis, and night-hour bands shaded in
 // the chart background so the eye reads "evening is coming" at a
@@ -45,7 +45,7 @@ function escapeHtml(s) {
 }
 
 function fmtTemp(v) {
-  if (v == null) return "—";
+  if (v == null) return "-";
   return Math.round(Number(v)) + "°";
 }
 
@@ -78,7 +78,7 @@ function isNightHour(hourStr) {
 
 // Pick how many of the available 24 hours actually paint, based on the
 // cell's measured width. xs / sm cells with the full 24-slot strip end
-// up with icons compressed into illegible 5px slivers — capping the
+// up with icons compressed into illegible 5px slivers, capping the
 // count keeps each tick + icon at a readable scale.
 function maxHoursForWidth(w) {
   if (w <= 280) return 6;
@@ -104,7 +104,7 @@ function nightBandsPlugin(nightFlags, color) {
       ctx.save();
       ctx.fillStyle = color;
       // Compute the half-step pixel spacing so each category fills the
-      // full slot, not just its centre tick — otherwise the band would
+      // full slot, not just its centre tick, otherwise the band would
       // leave a thin gap between hours.
       const stepHalf = (() => {
         if (nightFlags.length < 2) return (area.right - area.left) / 2;
@@ -178,7 +178,7 @@ export default function render(shadow, ctx) {
 
   // Cell width drives the hour cull. shadow.host is .cell-content
   // (transform-scaled), but clientWidth reads the layout dimension
-  // pre-scale so we get the virtual cell width — the same number the
+  // pre-scale so we get the virtual cell width, the same number the
   // container query breakpoints fire against.
   const cellWidth = shadow.host?.clientWidth || 600;
   const maxHrs = maxHoursForWidth(cellWidth);
@@ -191,7 +191,7 @@ export default function render(shadow, ctx) {
   const hasData = values.length >= 2;
   const hasRain = rainValues.some((v) => v > 0);
 
-  // Icon strip — drop on xs (too cramped), keep elsewhere. Now hour
+  // Icon strip, drop on xs (too cramped), keep elsewhere. Now hour
   // is the first slot; flag it with accent-1 so the eye lands on "now".
   const showIconStrip = cellWidth > 280 && icons.length > 0;
   const iconStrip = showIconStrip
@@ -264,7 +264,7 @@ export default function render(shadow, ctx) {
       font-size: 0.7em;
       color: var(--accent-1);
     }
-    /* hi / lo / now chips in the title bar — pulls the day's
+    /* hi / lo / now chips in the title bar, pulls the day's
        temperature range up to where the eye already lands when it
        reads the location. */
     .hr-range {
@@ -379,7 +379,7 @@ export default function render(shadow, ctx) {
     i === 0 ? t.accent1 : "transparent"
   );
 
-  // Axis tick size — clamp against cqmin so wide cells get legible 16-
+  // Axis tick size, clamp against cqmin so wide cells get legible 16-
   // 22px numbers, while cramped xs cells fall back to 10px without
   // overflowing the chart. The base spectra-chart helpers use a flat
   // size 10 which the user called out as unreadable.

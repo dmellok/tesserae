@@ -1,6 +1,6 @@
 // Shared helper for the f1_* widget family.
 //
-// One fetch per browser session — the JSON is small (~46KB) but every
+// One fetch per browser session, the JSON is small (~46KB) but every
 // widget on the panel would otherwise pull it independently. Module
 // scope cache + an in-flight promise so concurrent renders coalesce.
 
@@ -29,7 +29,7 @@ export async function loadCircuits() {
 
 // Returns { name, location, length_m, viewBox, d } or null when the
 // circuitId isn't in the bundle. Callers should fall back gracefully
-// — a new circuit can appear on the calendar before the bundle is
+//, a new circuit can appear on the calendar before the bundle is
 // rebuilt.
 export async function getCircuit(circuitId) {
   if (!circuitId) return null;
@@ -37,7 +37,7 @@ export async function getCircuit(circuitId) {
   return all[circuitId] || null;
 }
 
-// Render a circuit outline as an inline SVG. Bauhaus-bold stroke —
+// Render a circuit outline as an inline SVG. Bauhaus-bold stroke -
 // stroke-width 28 is roughly 2.8% of the viewBox width: confident
 // enough to read as a deliberate diagram inside the .f1-track card,
 // without crowding tight track sections (chicanes, hairpins) into
@@ -54,7 +54,7 @@ export async function getCircuit(circuitId) {
 export function trackSvg(circuit, opts = {}) {
   if (!circuit || !circuit.d) return "";
   const stroke = opts.stroke || "var(--text-primary)";
-  // No width/height on the SVG — the .f1-track CSS rule sizes it down
+  // No width/height on the SVG, the .f1-track CSS rule sizes it down
   // and centers it via flex so there's visible breathing room around
   // the path instead of edge-to-edge. The viewBox + preserveAspectRatio
   // keeps the path's own proportions while CSS controls the box.

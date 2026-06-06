@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Finance — Stock",
+  "name": "Finance, Stock",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Single stock ticker with current price + intraday sparkline + day change. Uses Yahoo Finance's public chart endpoint (query1.finance.yahoo.com) — undocumented but stable for years. Symbol format follows Yahoo's: e.g. 'AAPL', 'CBA.AX' (ASX), '^GSPC' (S&P 500 index).",
+  "description": "Single stock ticker with current price + intraday sparkline + day change. Uses Yahoo Finance's public chart endpoint (query1.finance.yahoo.com), undocumented but stable for years. Symbol format follows Yahoo's: e.g. 'AAPL', 'CBA.AX' (ASX), '^GSPC' (S&P 500 index).",
   "icon": "ph-chart-line",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "cell_options": [

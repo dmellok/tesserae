@@ -1,6 +1,6 @@
 {
   "tesserae_compat": "1.x",
-  "name": "Finance — Crypto",
+  "name": "Finance, Crypto",
   "version": "0.1.1",
   "kind": "widget",
   "description": "Single crypto with current price, 24h change, and a 24h sparkline. Data from CoinGecko (free, no API key). Coin ID is the lowercase slug from coingecko.com (e.g. bitcoin, ethereum, solana).",

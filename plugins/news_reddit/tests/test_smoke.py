@@ -1,4 +1,4 @@
-"""Smoke test — news_reddit parses Reddit's Atom feed, no network."""
+"""Smoke test, news_reddit parses Reddit's Atom feed, no network."""
 
 from __future__ import annotations
 

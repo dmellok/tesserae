@@ -7,12 +7,12 @@ keeps the ``tesserae`` console script entry point and re-exports the
 handful of symbols the rest of the codebase still imports by the old
 ``app.main`` path:
 
-* ``REPO_ROOT`` — repo root :class:`pathlib.Path`. Used by tests +
+* ``REPO_ROOT``, repo root :class:`pathlib.Path`. Used by tests +
   renderer smoke tests to locate plugins/ renderers/ devices/ on disk.
-* ``create_app`` — the Flask factory.
-* ``_resolve_client_id`` — MQTT client-id resolver. Imported by
+* ``create_app``, the Flask factory.
+* ``_resolve_client_id``, MQTT client-id resolver. Imported by
   ``tests/test_client_id.py``.
-* ``status_changed_meaningfully`` / ``merge_status_parsed`` — heartbeat
+* ``status_changed_meaningfully`` / ``merge_status_parsed``, heartbeat
   helpers. Imported by ``tests/test_event_log.py`` and
   ``tests/test_device_routes.py``.
 
@@ -78,7 +78,7 @@ def _serve(argv: list[str] | None = None) -> None:
         return
 
     logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s"
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s, %(message)s"
     )
     # Honour HA's log_level option before create_app so its own startup
     # log lines respect it. apply_log_level is a no-op when there's no
@@ -99,7 +99,7 @@ def _serve(argv: list[str] | None = None) -> None:
         app.run(host=args.host, port=args.port, debug=True)
         return
 
-    # Production: waitress. Single-process, multi-threaded — fine for
+    # Production: waitress. Single-process, multi-threaded, fine for
     # the single-user appliance. Avoids the "DO NOT USE IN PRODUCTION"
     # warning Flask's dev server prints on startup.
     from waitress import serve
@@ -129,7 +129,7 @@ def _reset_password() -> None:
     settings_path = data_root / "core" / "settings.json"
 
     if not settings_path.exists():
-        print(f"No settings.json at {settings_path} — nothing to reset.")
+        print(f"No settings.json at {settings_path}, nothing to reset.")
         return
 
     store = SettingsStore(settings_path)

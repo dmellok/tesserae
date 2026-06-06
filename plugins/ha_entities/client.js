@@ -1,4 +1,4 @@
-// ha_entities — Spectra list archetype. Generic entity list with a
+// ha_entities, Spectra list archetype. Generic entity list with a
 // Phosphor icon per row (server picks domain / device_class →
 // glyph), the current value/state on the right, and a "just changed"
 // chip on rows whose last_changed timestamp sits within the past
@@ -25,7 +25,7 @@ function statusAccent(status) {
   return "var(--text-secondary)";
 }
 
-// Compact "Nm ago" for the change badge — only used when the change
+// Compact "Nm ago" for the change badge, only used when the change
 // is within the 10-minute window, so it's always sub-hour.
 function changeAgo(iso) {
   if (!iso) return null;
@@ -84,7 +84,7 @@ export default function render(shadow, ctx) {
           <span class="list-title">${escapeHtml(it.name)}</span>
           ${changeBadge}
         </div>
-        <span class="list-meta" style="color:${accent}">${escapeHtml(it.label || "—")}</span>
+        <span class="list-meta" style="color:${accent}">${escapeHtml(it.label || "-")}</span>
       </div>`;
   }).join("");
 

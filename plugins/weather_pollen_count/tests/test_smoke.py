@@ -1,5 +1,5 @@
 """weather_pollen_count smoke: composer renders cells across every
-supported size with mocked Open-Meteo data — no network call. The
+supported size with mocked Open-Meteo data, no network call. The
 Melbourne fallback path is left to manual verification because it
 depends on the live MPC HTML structure."""
 

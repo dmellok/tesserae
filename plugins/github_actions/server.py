@@ -1,4 +1,4 @@
-"""github_actions — recent CI runs across watched repos."""
+"""github_actions, recent CI runs across watched repos."""
 
 from __future__ import annotations
 
@@ -103,7 +103,7 @@ def fetch(
                     "history": history,
                 }
             )
-        # max_per is now "max distinct workflows per repo" — keeps the
+        # max_per is now "max distinct workflows per repo", keeps the
         # list focused on N workflows-being-watched per repo rather
         # than N runs of the noisiest workflow.
         selected.sort(key=lambda r: r.get("updated_at") or "", reverse=True)

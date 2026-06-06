@@ -1,4 +1,4 @@
-// finance_currency — Spectra stat archetype. Hero is the exchange
+// finance_currency, Spectra stat archetype. Hero is the exchange
 // rate; the title carries a flag pair (🇦🇺/🇺🇸) for instant pair
 // recognition. Sparkline uses Chart.js (`sparkline()` helper) and
 // overlays a 7-day rolling average dashed line on top of the daily
@@ -21,7 +21,7 @@ const CURRENCY_TO_COUNTRY = {
 function flagFor(code) {
   const country = CURRENCY_TO_COUNTRY[code];
   if (!country) return "";
-  // EU = 🇪🇺 — same regional-indicator trick.
+  // EU = 🇪🇺, same regional-indicator trick.
   return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
 }
 
@@ -32,9 +32,9 @@ function escapeHtml(s) {
 }
 
 function fmtRate(n) {
-  if (n == null) return "—";
+  if (n == null) return "-";
   const v = Number(n);
-  if (Number.isNaN(v)) return "—";
+  if (Number.isNaN(v)) return "-";
   if (v >= 100) return v.toFixed(2);
   if (v >= 1) return v.toFixed(4);
   return v.toFixed(6);
@@ -76,8 +76,8 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const base = String(data.base || "—").toUpperCase();
-  const quote = String(data.quote || "—").toUpperCase();
+  const base = String(data.base || "-").toUpperCase();
+  const quote = String(data.quote || "-").toUpperCase();
   const rate = fmtRate(data.rate);
   const change = data.change_30d;
   const asOf = data.as_of || "";
@@ -86,7 +86,7 @@ export default function render(shadow, ctx) {
   const up = change != null && change >= 0;
   const deltaAccent = up ? "var(--accent-3)" : "var(--accent-1)";
   const deltaPh = up ? "ph-trend-up" : "ph-trend-down";
-  const deltaText = change == null ? "—" : `${Math.abs(change).toFixed(2)}%`;
+  const deltaText = change == null ? "-" : `${Math.abs(change).toFixed(2)}%`;
 
   const baseFlag = flagFor(base);
   const quoteFlag = flagFor(quote);

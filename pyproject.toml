@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.30.5"
+version = "0.31.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -24,7 +24,7 @@ dependencies = [
     # RFC 5545.
     "icalendar>=5.0,<7",
     "recurring-ical-events>=2.1,<4",
-    # Production WSGI server — Flask's built-in run() is dev-only and
+    # Production WSGI server, Flask's built-in run() is dev-only and
     # prints a "DO NOT USE IN PRODUCTION" banner on every startup.
     # Waitress is pure-Python, cross-platform, and tuned-by-default for
     # the single-user appliance Tesserae targets.

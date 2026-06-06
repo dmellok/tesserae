@@ -88,7 +88,7 @@
   gap: 6px;
 }
 .themes-strip-item {
-  /* Each item paints from its own theme's variables — the mini
+  /* Each item paints from its own theme's variables, the mini
      swatch row reads like a tiny postcard of the full theme. */
   background: var(--surface);
   color: var(--text-primary);
@@ -255,7 +255,7 @@
   flex-wrap: wrap;
 }
 
-/* Single-card palette layout — sub-group headings replace the per-card
+/* Single-card palette layout, sub-group headings replace the per-card
    chrome so the surface / text / accent groups still read as separated
    without 9 cards. */
 .theme-builder-group-head {
@@ -283,7 +283,7 @@
   margin-top: var(--t-space-2);
 }
 
-/* When auto-soft is on, the soft inputs are read-only — surface that
+/* When auto-soft is on, the soft inputs are read-only, surface that
    visually so the user understands the value is computed. The native
    readOnly attribute keeps the value in the form submission so the
    server still gets the derived value. */
@@ -339,7 +339,7 @@
   font-size: var(--t-size-xs);
 }
 
-/* Larger swatch grid in the preview pane than in the strip — same
+/* Larger swatch grid in the preview pane than in the strip, same
    markup, but the variables paint at a roomier scale here. */
 .theme-swatches {
   display: grid;

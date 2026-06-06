@@ -2,7 +2,7 @@
 // rendered row markup so new events look identical to existing ones.
 //
 // If EventSource isn't available (very old browser) the page degrades
-// gracefully to the static list — refresh to see new events.
+// gracefully to the static list, refresh to see new events.
 
 (function () {
   if (typeof EventSource === "undefined") return;
@@ -148,7 +148,7 @@
     li.innerHTML = rowHtml(ev);
     root.insertBefore(li, root.firstChild);
     // Keep the DOM bounded so a flood doesn't blow up the page. Even
-    // with the cap, decoded image bitmaps in the browser cache add up —
+    // with the cap, decoded image bitmaps in the browser cache add up -
     // the thumbnail variant of /renders/* (see rowHtml above) keeps
     // per-row decoded size at ~0.4 MB, but 100 rows is plenty for a
     // human scanning recent events. The full server-rendered list

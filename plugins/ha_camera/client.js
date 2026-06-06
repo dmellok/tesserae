@@ -1,4 +1,4 @@
-// ha_camera — Spectra image archetype with single-camera + grid
+// ha_camera, Spectra image archetype with single-camera + grid
 // rendering. Each tile carries a bottom overlay with name + state +
 // motion plus a corner timestamp chip ("just now", "2m ago") so the
 // frame's freshness is obvious without reading attributes. When the
@@ -136,7 +136,7 @@ export default function render(shadow, ctx) {
       text-transform: uppercase;
       letter-spacing: var(--ls-label);
     }
-    /* Timestamp chip — top-left corner, soft black backdrop so it
+    /* Timestamp chip, top-left corner, soft black backdrop so it
        stays legible against any frame. Uses a pure black tint rather
        than --surface so it works on both light + dark themes against
        a real-world camera image. */
@@ -177,7 +177,7 @@ export default function render(shadow, ctx) {
     }
   `;
 
-  // Full-bleed mode — only meaningful with a single camera. Falls
+  // Full-bleed mode, only meaningful with a single camera. Falls
   // back to the framed grid if multiple cameras are configured.
   if (fullBleed && !isGrid) {
     const cam = items[0] || data;
@@ -213,7 +213,7 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  // Multi-camera grid — render every item as a tile with corner
+  // Multi-camera grid, render every item as a tile with corner
   // timestamp + bottom overlay. The title bar carries an aggregated
   // motion count so the cell announces "2 cameras seeing motion"
   // without you having to scan every tile.

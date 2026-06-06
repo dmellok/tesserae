@@ -1,4 +1,4 @@
-// spotify_queue — Spectra list archetype. Currently-playing track is
+// spotify_queue, Spectra list archetype. Currently-playing track is
 // pinned at the top in accent-3 with a circular progress arc around
 // its album thumbnail (when Spotify reports progress_ms + duration_ms);
 // upcoming queue items follow as zebra rows. Each row carries a
@@ -56,7 +56,7 @@ function row(item, idx, opts) {
       <div class="list-lead sq-row-lead">
         ${lead}
         <div class="sq-text">
-          <span class="sq-title" style="${isCurrent ? `color:${accent}` : ""}">${escapeHtml(item.track || item.title || "—")}</span>
+          <span class="sq-title" style="${isCurrent ? `color:${accent}` : ""}">${escapeHtml(item.track || item.title || "-")}</span>
           <small class="sq-artist">${escapeHtml(item.artist || "")}</small>
         </div>
       </div>

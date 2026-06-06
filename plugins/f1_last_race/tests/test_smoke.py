@@ -1,5 +1,5 @@
 """f1_last_race smoke: composer renders cells across every supported
-size with mocked Jolpica data — no network call."""
+size with mocked Jolpica data, no network call."""
 
 from __future__ import annotations
 

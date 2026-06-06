@@ -1,4 +1,4 @@
-// f1_weekend — Spectra list archetype with day-grouped sessions.
+// f1_weekend, Spectra list archetype with day-grouped sessions.
 // Sessions cluster under FRIDAY / SATURDAY / SUNDAY headers so the
 // weekend's shape reads at a glance instead of being smuggled into
 // each row's subtitle. Race row gets an accent-1 tinted block + bold
@@ -94,7 +94,7 @@ function sessionIcon(label) {
   return "ph-clock";
 }
 
-// Long-form session labels — server emits short codes that read fine
+// Long-form session labels, server emits short codes that read fine
 // in the list (FP1 / QUAL / RACE) but the day-group headers can
 // breathe a bit so spell them out where the room allows.
 function expandLabel(label) {
@@ -254,7 +254,7 @@ export default async function render(shadow, ctx) {
       font-variant-numeric: tabular-nums;
       color: var(--text-primary);
     }
-    /* Race row pops — soft accent-1 tinted background with a left
+    /* Race row pops, soft accent-1 tinted background with a left
        border + bold label + accent-coloured time. So a quick scan
        always lands on "the race is at 13:00" first. */
     .weekend-row.is-race {
@@ -283,7 +283,7 @@ export default async function render(shadow, ctx) {
                    "Segoe UI Emoji", "Twemoji Mozilla", sans-serif;
     }
 
-    /* Circuit silhouette — hidden by default; LG only. */
+    /* Circuit silhouette, hidden by default; LG only. */
     .f1-track {
       display: none;
       color: var(--accent-1);

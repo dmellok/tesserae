@@ -1,10 +1,10 @@
-"""ha_core — shared Home Assistant connection + REST helpers.
+"""ha_core, shared Home Assistant connection + REST helpers.
 
 No widget cell of its own; sibling ha_* widgets reach in via the plugin
 registry and call ``get_state`` / ``get_states`` / ``history`` /
 ``entity_choices`` so all of them share one base URL, token, and TLS
 policy. Tesserae renders headlessly on push/schedule, so a plain REST
-poll at render time fits — no WebSocket needed.
+poll at render time fits, no WebSocket needed.
 
 Config lives in Settings → Plugins → Home Assistant Core: a base URL and
 a Long-Lived Access Token (HA → profile → Long-Lived Access Tokens).
@@ -94,7 +94,7 @@ def call_service_with_response(
 
     HA 2024.5+ exposes ``return_response`` so a service call can give the
     caller a payload back (rather than just emitting state changes). Used
-    here by ``ha_todo`` against ``todo.get_items`` — that's the only
+    here by ``ha_todo`` against ``todo.get_items``, that's the only
     sensible way to read todo items via REST without WebSocket
     subscriptions.
 
@@ -129,7 +129,7 @@ def history(entity_id: str, *, hours: int = 24, timeout: int = 12) -> list[dict[
     """Recent state changes for one entity over the last ``hours``.
 
     Uses ``/api/history/period`` with ``minimal_response`` so each sample
-    is just ``{state, last_changed}`` — enough for a sparkline without the
+    is just ``{state, last_changed}``, enough for a sparkline without the
     attribute payload. Returns the (possibly empty) sample list."""
     start = (datetime.now(UTC) - timedelta(hours=hours)).isoformat()
     path = (
@@ -161,7 +161,7 @@ def entity_choices(domains: tuple[str, ...] | None = None) -> list[dict[str, str
     try:
         states = get_states()
     except Exception:
-        return [{"value": "", "label": "Home Assistant unreachable — check URL + token"}]
+        return [{"value": "", "label": "Home Assistant unreachable, check URL + token"}]
     out: list[dict[str, str]] = []
     for st in states:
         eid = str(st.get("entity_id") or "")
@@ -181,9 +181,9 @@ def coerce_error(err: Exception) -> str:
     if isinstance(err, urllib.error.HTTPError):
         reason = err.reason
         if err.code == 401:
-            reason = "unauthorized — check the access token"
+            reason = "unauthorized, check the access token"
         elif err.code == 404:
-            reason = "not found — check the entity id"
+            reason = "not found, check the entity id"
         return f"Home Assistant HTTP {err.code}: {reason}"
     if isinstance(err, urllib.error.URLError):
         return f"Home Assistant unreachable: {err.reason}"

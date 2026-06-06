@@ -38,7 +38,7 @@
     if (!rect.width) return;
     const scale = rect.width / panelW;
     // Iframes are sized at the panel's native CSS pixels so the
-    // composer renders unscaled — they need a transform to fit. Raster
+    // composer renders unscaled, they need a transform to fit. Raster
     // images use object-fit (no transform) so they letterbox cleanly
     // regardless of the source's aspect ratio.
     frame.querySelectorAll("iframe").forEach((el) => {
@@ -137,7 +137,7 @@
 
   // Numeric field paired with a preset dropdown + "Custom…" option that
   // reveals the underlying number input. The number input always carries
-  // the field's name — submission picks up whichever value the user
+  // the field's name, submission picks up whichever value the user
   // last touched.
   function attachPresetNumbers(root) {
     root.querySelectorAll("[data-preset-field]:not([data-preset-bound])").forEach((field) => {
@@ -159,7 +159,7 @@
     });
   }
 
-  // Lightbox — delegated click handler that intercepts any
+  // Lightbox, delegated click handler that intercepts any
   // `<a data-lightbox href="...">` and shows the image in an in-page
   // overlay instead of a new tab. ESC or backdrop click closes.
   function attachLightbox() {
@@ -230,7 +230,7 @@
 
   // Observe future additions (the page editor swaps cell forms in/out on
   // plugin change). Skipping mutation observer for now since editor.js
-  // currently full-reloads on plugin change — re-init isn't needed mid-page.
+  // currently full-reloads on plugin change, re-init isn't needed mid-page.
   window.tesseraeComponents = {
     attachSliders,
     attachPreviewFit,

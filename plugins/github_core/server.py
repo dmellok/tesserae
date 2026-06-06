@@ -1,4 +1,4 @@
-"""github_core — shared GitHub credentials + HTTP helpers.
+"""github_core, shared GitHub credentials + HTTP helpers.
 
 No widget cell of its own; sibling github_* widgets reach in via the
 registry and call ``request_json`` / ``request_graphql`` so all of
@@ -50,7 +50,7 @@ def headers(*, accept: str = ACCEPT) -> dict[str, str]:
 
 
 class GithubAcceptedError(Exception):
-    """GitHub returned 202 Accepted — endpoint is async and the stats
+    """GitHub returned 202 Accepted, endpoint is async and the stats
     are still being computed (typical for ``/stats/commit_activity``,
     ``/stats/contributors``, etc.). Widgets should treat this as a
     "no data yet, try again" signal and avoid caching the empty
@@ -64,7 +64,7 @@ def request_json(url: str, *, timeout: int = 12) -> Any:
     Special case: GitHub's stats endpoints return 202 with an empty
     body the first time you hit them (the answer is being computed
     async). We raise ``GithubAcceptedError`` for those so the caller
-    can keep its widget state empty WITHOUT caching the empty result —
+    can keep its widget state empty WITHOUT caching the empty result -
     the next render will get the real data."""
     req = urllib.request.Request(url, headers=headers(), method="GET")
     with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -73,7 +73,7 @@ def request_json(url: str, *, timeout: int = 12) -> Any:
         body = resp.read().decode("utf-8")
         if not body.strip():
             # Some stats endpoints return 200 with an empty body when
-            # there's genuinely nothing to report — treat like a normal
+            # there's genuinely nothing to report, treat like a normal
             # empty list rather than blowing up on JSONDecodeError.
             return []
         return json.loads(body)
@@ -81,7 +81,7 @@ def request_json(url: str, *, timeout: int = 12) -> Any:
 
 def request_graphql(query: str, variables: dict[str, Any], *, timeout: int = 12) -> Any:
     """POST a GraphQL query to api.github.com/graphql. Always requires
-    the PAT — GitHub's GraphQL API doesn't accept unauthenticated
+    the PAT, GitHub's GraphQL API doesn't accept unauthenticated
     requests."""
     body = json.dumps({"query": query, "variables": variables}).encode("utf-8")
     h = headers()

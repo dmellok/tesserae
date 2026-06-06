@@ -1,5 +1,5 @@
 """Preprocess bacinger/f1-circuits GeoJSONs into a single circuits.json
-keyed by Jolpica circuitId — the runtime artifact every f1_* widget reads.
+keyed by Jolpica circuitId, the runtime artifact every f1_* widget reads.
 
 Run from anywhere:
 
@@ -65,7 +65,7 @@ def fetch(name: str) -> dict[str, Any]:
 
 
 def project(coords: list[list[float]]) -> tuple[str, str]:
-    """Equirectangular projection with a cos(lat) x-scale — accurate
+    """Equirectangular projection with a cos(lat) x-scale, accurate
     enough at the scale of a single track. Returns (viewBox, path)."""
     lons = [c[0] for c in coords]
     lats = [c[1] for c in coords]
@@ -93,7 +93,7 @@ def project(coords: list[list[float]]) -> tuple[str, str]:
     h = inner_h + 2 * PADDING
 
     out_pts = [(PADDING + px * scale, PADDING + inner_h + py * scale) for px, py in pts]
-    # Round to 1dp — invisible at any reasonable cell size, ~30% smaller JSON.
+    # Round to 1dp, invisible at any reasonable cell size, ~30% smaller JSON.
     d = "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in out_pts) + " Z"
     viewBox = f"0 0 {VIEWBOX_W} {h:.1f}"
     return viewBox, d

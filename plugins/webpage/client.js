@@ -1,4 +1,4 @@
-// webpage — Spectra full-bleed iframe. The cell hosts an external
+// webpage, Spectra full-bleed iframe. The cell hosts an external
 // URL inside a sandboxed iframe; ``scale`` shrinks the page's logical
 // pixels so a desktop layout fits in a small cell, and a fixed
 // ``viewport_w`` keeps responsive sites from collapsing to a mobile

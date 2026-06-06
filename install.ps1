@@ -1,4 +1,4 @@
-# Tesserae installer — Windows / PowerShell.
+# Tesserae installer, Windows / PowerShell.
 #
 # Usage (in PowerShell):
 #   iwr https://raw.githubusercontent.com/dmellok/tesserae/main/install.ps1 -UseBasicParsing | iex
@@ -64,7 +64,7 @@ Info "Port: $Port"
 # ---------- clone / update ----------
 Step "Source"
 if (Test-Path (Join-Path $InstallDir '.git')) {
-  Info "Existing checkout at $InstallDir — pulling $Branch"
+  Info "Existing checkout at $InstallDir, pulling $Branch"
   git -C $InstallDir fetch --quiet origin $Branch
   git -C $InstallDir checkout --quiet $Branch
   git -C $InstallDir pull --quiet --ff-only origin $Branch
@@ -97,7 +97,7 @@ Ok "Dependencies installed"
 # ---------- Chromium ----------
 Step "Chromium (webpage rendering)"
 if ($env:SKIP_PLAYWRIGHT -eq '1') {
-  Warn "SKIP_PLAYWRIGHT=1 set — skipping Chromium setup."
+  Warn "SKIP_PLAYWRIGHT=1 set, skipping Chromium setup."
   Warn "The Send -> Webpage tab and any webpage widgets won't render."
 } else {
   $VenvPlaywright = Join-Path $VenvDir 'Scripts\playwright.exe'
@@ -121,7 +121,7 @@ if ($env:SKIP_PLAYWRIGHT -eq '1') {
     } else {
       Warn "No Chromium / Chrome / Edge found. Install Google Chrome and re-run,"
       Warn "or set TESSERAE_CHROMIUM_PATH yourself. Until then, webpage"
-      Warn "rendering won't work — the rest does."
+      Warn "rendering won't work, the rest does."
     }
   }
 }

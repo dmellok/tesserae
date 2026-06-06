@@ -1,7 +1,7 @@
 # Architecture
 
 Tesserae is four layers and one direction of flow. Each layer only knows
-the boxes directly adjacent — so adding a new device, a new wire format,
+the boxes directly adjacent, so adding a new device, a new wire format,
 or a new widget is a contained change.
 
 ## The pipeline
@@ -40,13 +40,13 @@ panel size. Multi-head fan-out is just "more instances".
 
 One canonical internal orientation: **composition** (the panel's
 mounted orientation). Renderers transform out of it via their declared
-`orientation` field — no orientation muddle.
+`orientation` field, no orientation muddle.
 
 Two transports run side-by-side: **MQTT push** for Pi / ESP32 clients
 (the broker fans frames out to any number of subscribers) and
 **HTTP pull** for TRMNL hardware + KOReader-on-Kindle (the device
 polls `/api/display` on a schedule and pulls the latest 1-bit PNG).
-A Tesserae install can mix both — pick whichever fits each panel.
+A Tesserae install can mix both, pick whichever fits each panel.
 
 ## MQTT topic scheme
 
@@ -64,8 +64,8 @@ id (e.g. `pi_kitchen`, `esp32_hallway`).
 | `tesserae/esp32/frame/bin` | `{url}` | yes | publish |
 | `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip, kind, panel_w, panel_h, fw_version}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
-| `tesserae/<id>/frame/trmnl` | `{url}` — only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | yes | publish |
-| `tesserae/+/status` | (wildcard) — any unregistered id surfaces for one-click registration in Settings → Devices | — | subscribe |
+| `tesserae/<id>/frame/trmnl` | `{url}`, only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | yes | publish |
+| `tesserae/+/status` | (wildcard), any unregistered id surfaces for one-click registration in Settings → Devices |, | subscribe |
 
 The `kind` / `panel_w` / `panel_h` / `fw_version` keys in a heartbeat
 are the **discovery hint**: a client that includes them gets pre-filled
@@ -73,13 +73,13 @@ in the Discovered strip so registering it is one click.
 
 ## HTTP-pull API (TRMNL / KOReader)
 
-TRMNL-style devices don't subscribe to MQTT — they poll the Tesserae
+TRMNL-style devices don't subscribe to MQTT, they poll the Tesserae
 server on a schedule. A handful of HTTP endpoints (served by
 `app/trmnl_api.py`) cover the protocol:
 
 | Route | Purpose |
 |---|---|
-| `GET /api/setup` | Initial pairing — client sends MAC, server returns a 5-char access token + assigned device id. |
+| `GET /api/setup` | Initial pairing, client sends MAC, server returns a 5-char access token + assigned device id. |
 | `GET /api/display` | Latest frame URL + next-poll interval for the calling device. Authenticated via the device's access token. |
 | `POST /api/log` | Client log messages (battery state, RSSI, errors). Surfaces in the device card. |
 
@@ -130,14 +130,14 @@ Home Assistant.
 tesserae/
   app/             Flask app, transport, push pipeline, state, scheduler
   plugins/<id>/    widget / font / data / admin plugins
-                   (drop-a-folder) — 58 widgets ship bundled.
+                   (drop-a-folder), 58 widgets ship bundled.
                    Themes live in static/style/spectra-*.css + a
                    Python registry, not the plugin tree.
   renderers/<id>/  renderer plugins (drop-a-folder)
   devices/<id>/    device plugins (drop-a-folder)
   schema/          JSON Schemas for plugin/renderer/device manifests
   static/          Lit components, page entries, shared CSS, dist/, icons/
-                   (vendored Phosphor 2.1.1 — woff2 only, 1.5 MB)
+                   (vendored Phosphor 2.1.1, woff2 only, 1.5 MB)
   templates/       Jinja shells
   tests/           top-level tests
   data/            runtime state (gitignored)

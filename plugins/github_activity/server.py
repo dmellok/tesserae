@@ -1,4 +1,4 @@
-"""github_activity — recent public events for a user."""
+"""github_activity, recent public events for a user."""
 
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ def fetch(
     user = (options.get("user") or "").strip() or core.get_username()
     if not user:
         return {
-            "error": "Set a GitHub username — either here or as the default in Plugins → GitHub Core.",
+            "error": "Set a GitHub username, either here or as the default in Plugins → GitHub Core.",
             "events": [],
         }
 
@@ -143,7 +143,7 @@ def fetch(
             type_counts[kind] += 1
         else:
             type_counts["other"] += 1
-        # Daily bucket — UTC days back from today.
+        # Daily bucket, UTC days back from today.
         at = ev.get("at")
         if not at:
             continue
@@ -158,13 +158,13 @@ def fetch(
             bucket = TYPE_BUCKET.get(kind, "other")
             daily_typed[6 - delta_days][bucket] += 1
 
-    # Current streak — count consecutive days back from today (or
+    # Current streak, count consecutive days back from today (or
     # yesterday, if today is empty) where the user was active. Public
     # events go back at most 30 days, so 30 is the streak ceiling.
     streak = 0
     cursor = now.date()
     if cursor not in active_dates:
-        # Allow today to be empty — only break if yesterday is also empty.
+        # Allow today to be empty, only break if yesterday is also empty.
         from datetime import timedelta
 
         cursor = cursor - timedelta(days=1)

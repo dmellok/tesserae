@@ -1,4 +1,4 @@
-"""weather_wind — wind speed, gust, direction + Beaufort + 12h gust trace.
+"""weather_wind, wind speed, gust, direction + Beaufort + 12h gust trace.
 
 Open-Meteo, no API key. Caches per ``(lat, lon, units)`` for 10 minutes
 in the plugin's data_dir; refreshes when the cache is older.
@@ -161,7 +161,7 @@ def _beaufort(speed: Any, units: str) -> tuple[int, str]:
     return 12, "Hurricane"
 
 
-# 16-point compass — we report the closest 16th rather than degrees so
+# 16-point compass, we report the closest 16th rather than degrees so
 # the widget reads at a glance. The handoff uses 16-letter abbreviations
 # (NNE, ENE, …) which we collapse into the 8-point set for the rose.
 _COMPASS_16 = [

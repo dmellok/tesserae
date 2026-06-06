@@ -1,4 +1,4 @@
-"""sky_bom_warnings — current severe weather warnings from the BoM.
+"""sky_bom_warnings, current severe weather warnings from the BoM.
 
 Hits api.weather.bom.gov.au/v1/warnings (the same backend powering the
 BoM website itself; no key, treat as personal/non-redistribution per
@@ -15,7 +15,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-CACHE_TTL_S = 300  # 5 min — warnings update on the order of 10s of minutes
+CACHE_TTL_S = 300  # 5 min, warnings update on the order of 10s of minutes
 HTTP_TIMEOUT_S = 12
 USER_AGENT = "tesserae/0.1 (+sky_bom_warnings)"
 WARNINGS_URL = "https://api.weather.bom.gov.au/v1/warnings"
@@ -122,7 +122,7 @@ def _apply_view(
         "shown": min(len(out), max_results),
         "warnings": shown,
         "fetched_at": cache_record.get("fetched_at"),
-        # Design-handoff WARNINGS shape — variants read these.
+        # Design-handoff WARNINGS shape, variants read these.
         "region": region,
         "place": place,
         "time": time_label,

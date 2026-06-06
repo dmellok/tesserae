@@ -21,7 +21,7 @@ set -e
 if [ "$(id -u)" = "0" ]; then
     # Only the directory itself needs an unconditional chown so pwuser
     # can write inside it. Anything already owned correctly is skipped
-    # — keeps subsequent boots fast on a populated data tree.
+    #, keeps subsequent boots fast on a populated data tree.
     chown pwuser:pwuser /app/data
     # The -R catches existing entries that were created before this
     # entrypoint shipped (or files a previous root-running container
@@ -31,7 +31,7 @@ if [ "$(id -u)" = "0" ]; then
     # HA Add-on path: TESSERAE_DATA_ROOT redirects Tesserae's data
     # directory away from /app/data (typically to /data, HA Supervisor's
     # per-add-on persistent volume which is mounted root-owned). Same
-    # UID-mismatch fix applies — chown so pwuser can write inside it.
+    # UID-mismatch fix applies, chown so pwuser can write inside it.
     if [ -n "${TESSERAE_DATA_ROOT:-}" ] \
        && [ -d "${TESSERAE_DATA_ROOT}" ] \
        && [ "${TESSERAE_DATA_ROOT}" != "/app/data" ]; then

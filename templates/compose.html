@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ page.name|default("Compose") }}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
-  <!-- Phosphor icon webfont — widgets reference icons via <i class="ph ph-xxx">
+  <!-- Phosphor icon webfont, widgets reference icons via <i class="ph ph-xxx">
        (regular) or <i class="ph-bold ph-xxx"> (bold) or <i class="ph-fill ph-xxx">
        (fill, discouraged). The weight class + icon-name class form a compound
-       selector — both classes carry the bare icon name. Vendored locally so the
+       selector, both classes carry the bare icon name. Vendored locally so the
        renderer paints without network access. -->
   <script>
     // SCRIPT_NAME under HA Ingress (e.g. /api/hassio_ingress/<token>), empty
@@ -26,7 +26,7 @@
        in spectra-widgets.css and are relinked per shadow root by each
        client.js since class selectors don't pierce shadow boundaries.
        spectra-styles.css adds the orthogonal typographic style axis
-       (data-style) — its rules set custom properties on the body/cell,
+       (data-style), its rules set custom properties on the body/cell,
        which then cascade into the shadow root via inheritance. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
@@ -42,7 +42,7 @@
        script must be a regular non-module so composer.js's dynamic
        widget imports don't race the global. -->
   <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
-  <!-- chartjs-chart-sankey plugin — registers a `sankey` controller on
+  <!-- chartjs-chart-sankey plugin, registers a `sankey` controller on
        the global Chart so widgets can render proper Sankey diagrams
        (e.g. ha_energy's flow visualization) without hand-rolling the
        layout algorithm. ~10KB. -->
@@ -69,7 +69,7 @@
       overflow: hidden;
       border-radius: {{ page.corner_radius }}px;
     }
-    /* Per-cell zoom — the inner box paints into a 1/zoom virtual area
+    /* Per-cell zoom, the inner box paints into a 1/zoom virtual area
        then transform-scales back up to fill the cell, so widgets see a
        smaller container (both CSS via cqw/cqh AND JS via ctx.cell.w/h
        which composer.js divides by zoom). Container query unit lives
@@ -78,7 +78,7 @@
        present. */
     /* --c-zoom is set on the parent .cell (inline style at first paint,
        postMessage patches thereafter). Don't declare a separate value
-       on .cell-content — that would shadow the inherited one, since
+       on .cell-content, that would shadow the inherited one, since
        custom properties don't take "default" declarations; the var()
        fallback is the only way to express the 1.0 baseline. */
     .cell-content {
@@ -137,7 +137,7 @@
                    self-references (the right-hand side resolves against the
                    cell's just-being-set --font-family), which CSS treats as
                    invalid-at-computed-value-time and reverts to the
-                   guaranteed-invalid value — silently breaking the cascade for
+                   guaranteed-invalid value, silently breaking the cascade for
                    every chart inside the shadow root. When the cell has no
                    override, omit the declaration so the cell inherits the
                    page/style --font-family from body cleanly. #}

@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to file a bug. The more specific you can be — version, hardware, exact steps — the faster it can be fixed. If this is a "how do I…" question, please use [Discussions](https://github.com/dmellok/tesserae/discussions) instead.
+        Thanks for taking the time to file a bug. The more specific you can be, version, hardware, exact steps, the faster it can be fixed. If this is a "how do I…" question, please use [Discussions](https://github.com/dmellok/tesserae/discussions) instead.
 
   - type: input
     id: version
@@ -86,7 +86,7 @@ body:
     id: logs
     attributes:
       label: Server logs
-      description: Trim to ±30 lines around the error — full transcripts get truncated by GitHub.
+      description: Trim to ±30 lines around the error, full transcripts get truncated by GitHub.
       render: shell
 
   - type: checkboxes

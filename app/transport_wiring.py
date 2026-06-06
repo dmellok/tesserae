@@ -1,4 +1,4 @@
-"""MQTT transport wiring — rebuild, subscriptions, and status merging.
+"""MQTT transport wiring, rebuild, subscriptions, and status merging.
 
 Lifted out of :mod:`app.main` so the factory there is just app + route
 wiring. Everything here is concerned with the broker side: tearing
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 # Heartbeat fields that drift every beat (battery, signal, uptime). They
 # update the live status cache + HA sensors, but a change in one of these
-# alone shouldn't write an event-log row — otherwise every heartbeat logs.
+# alone shouldn't write an event-log row, otherwise every heartbeat logs.
 _VOLATILE_STATUS_KEYS: frozenset[str] = frozenset(
     {"battery_mv", "battery_pct", "rssi", "voltage", "uptime", "uptime_s", "last_paint"}
 )
@@ -78,7 +78,7 @@ def _is_reloader_watcher(dev: bool) -> bool:
     serve traffic; the parent just watches files and respawns the child
     on changes. We want heavyweight startup work (MQTT connect,
     scheduler tick loop, telemetry ``app.started`` send) to run ONLY in
-    the child — otherwise both processes init with the same MQTT client
+    the child, otherwise both processes init with the same MQTT client
     id and the broker bounces each off the other in an endless
     ping-pong, the scheduler fires every job twice, and every dev
     restart costs two ``app.started`` events instead of one.
@@ -94,7 +94,7 @@ def _persisted_random_suffix(data_root: Path) -> str:
 
     Two installs sharing a broker (typical: HA core-mosquitto reached
     by both a bare-metal Tesserae and the HA Add-on Tesserae) need
-    distinct client ids — the broker evicts duplicates the moment a
+    distinct client ids, the broker evicts duplicates the moment a
     second connects, causing the endless reconnect loop. Hostname
     alone isn't enough: HA Add-on containers and bare-metal hosts can
     have hostnames that match by accident. A persisted random suffix
@@ -154,7 +154,7 @@ def _resolve_client_id(configured: Any, *, dev: bool, data_root: Path | None = N
 
 
 def status_changed_meaningfully(prev: dict[str, Any], merged: dict[str, Any]) -> bool:
-    """True if the device status changed in a way worth an event-log row —
+    """True if the device status changed in a way worth an event-log row -
     ignoring volatile drift (battery / signal / uptime). First sighting
     (empty ``prev``) always counts."""
     if not prev:
@@ -169,7 +169,7 @@ def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, 
 
     Why merge instead of overwrite: an MQTT last-will message (or any
     partial heartbeat) typically carries only a subset of the well-known
-    fields — e.g. ``{"state": "offline"}`` published by the broker when
+    fields, e.g. ``{"state": "offline"}`` published by the broker when
     the firmware disconnects. ``parse_status`` fills the absent fields
     with ``None``. Overwriting would blank the last-known battery / rssi
     / ip from the previous good heartbeat. Merging keeps them visible.
@@ -234,7 +234,7 @@ def _subscribe_device_status(
                 logger.exception("HA discovery: heartbeat notify failed for %s", device.id)
 
     # Devices without a status topic (e.g. HTTP-polled TRMNL clients)
-    # don't get an MQTT subscription — their status arrives via the
+    # don't get an MQTT subscription, their status arrives via the
     # /api/display request headers handled in ``app.trmnl_api`` instead.
     if device.status_topic is None:
         return
@@ -253,7 +253,7 @@ def _subscribe_discovery(
 
     def on_wildcard(topic: str, payload: bytes) -> None:
         # Skip topics already owned by a registered INSTANCE. Built-in
-        # kinds aren't physical devices — heartbeats arriving on a
+        # kinds aren't physical devices, heartbeats arriving on a
         # kind's default topic (e.g. fresh pi_bin install publishing
         # to tesserae/pi_bin/status) belong in discovery so the user
         # can promote them to instances.
@@ -357,7 +357,7 @@ def _rebuild_transport(
     # 1883; bringing up our own broker on the same host causes pointless
     # confusion (which one are devices actually talking to?) and, when
     # the embedded broker binds 0.0.0.0, port clashes with anything else
-    # on the host. Disable it unconditionally — the broker section's UI
+    # on the host. Disable it unconditionally, the broker section's UI
     # also hides the option, this is the defensive runtime layer.
     if embedded_enabled and app.config.get("HA_INGRESS_MODE"):
         logger.info(
@@ -395,7 +395,7 @@ def _rebuild_transport(
             if not host:
                 # The broker runs on this machine, so the transport always
                 # connects over localhost. 0.0.0.0 means "bind all
-                # interfaces" (so LAN clients can reach it) — it isn't a
+                # interfaces" (so LAN clients can reach it), it isn't a
                 # connectable address, so map it to loopback here too.
                 host = (
                     embedded_bind
@@ -412,7 +412,7 @@ def _rebuild_transport(
 
     factory = _noop_client_factory if testing else None
     # When the transport is hitting our own embedded broker and the
-    # operator set creds for it, reuse those creds — no need to set
+    # operator set creds for it, reuse those creds, no need to set
     # them in two places.
     transport_user = broker_raw.get("username") or None
     transport_pass = broker_raw.get("password_secret") or None
@@ -446,7 +446,7 @@ def _rebuild_transport(
     # built-in kinds are templates with no physical device behind them.
     # A client publishing on a kind's default topic (e.g. fresh pi_bin
     # install on tesserae/pi_bin/status) is caught by the wildcard
-    # listener instead and surfaces in the Discovered strip — the user
+    # listener instead and surfaces in the Discovered strip, the user
     # registers it as an instance from there.
     for device in devices.all():
         if device.kind_of is None:
@@ -459,7 +459,7 @@ def _rebuild_transport(
 
     app_section = settings.get_section("app")
 
-    # Auto-detected from the host's primary outbound interface — panel
+    # Auto-detected from the host's primary outbound interface, panel
     # listeners need a LAN IP, not localhost. The port is captured
     # below from the first incoming HTTP request so we always emit the
     # actual bind port even when `flask run --port` is non-default.
@@ -531,7 +531,7 @@ def _rebuild_transport(
     if _truthy(app_section.get("mdns_enabled")) and not testing:
         # DETECTED_HTTP_PORT is captured on the first request; at boot fall
         # back to the env/default. Only the SRV record cares about the port
-        # — the tesserae.local A record resolves regardless.
+        # , the tesserae.local A record resolves regardless.
         env_port = os.environ.get("TESSERAE_HTTP_PORT", "").strip()
         default_port = int(env_port) if env_port.isdigit() else 8765
         port = int(app.config.get("DETECTED_HTTP_PORT") or default_port)

@@ -1,4 +1,4 @@
-"""ha_zones — who's home / who's away.
+"""ha_zones, who's home / who's away.
 
 Auto-discovers every ``person.*`` entity from Home Assistant and reports
 the current zone for each: the canonical ``home`` / ``not_home`` states,
@@ -25,7 +25,7 @@ Shape returned to the client:
 
 A single ``get_states`` call covers every person on the install; for
 the data variant we additionally pull ``history`` per person so the
-"history bar" can render. History fetches are best-effort — if HA's
+"history bar" can render. History fetches are best-effort, if HA's
 history endpoint is slow or the entity has no recorded changes, we just
 omit the strip and the variant falls back to the row-only layout.
 """
@@ -40,7 +40,7 @@ from flask import current_app
 
 
 def choices(name: str) -> list[dict[str, str]]:
-    """Entity picker for the editor — restricted to ``person.*``."""
+    """Entity picker for the editor, restricted to ``person.*``."""
     core = _core()
     if name == "entity" and core is not None:
         return core.entity_choices(domains=("person",))
@@ -55,7 +55,7 @@ def _core() -> Any:
 
 
 def _name(state: dict[str, Any]) -> str:
-    """Human label — friendly_name if HA has one, else the entity id."""
+    """Human label, friendly_name if HA has one, else the entity id."""
     attrs = state.get("attributes") or {}
     return str(attrs.get("friendly_name") or state.get("entity_id") or "")
 
@@ -88,8 +88,8 @@ def _zone_state(state: dict[str, Any]) -> str:
 
     HA's person domain emits ``home`` / ``not_home`` for the built-in
     zones and the zone's friendly name for any custom zone the person
-    is currently inside. We pass that through verbatim — the client
-    decides how to colour it — but trim and lowercase the canonical
+    is currently inside. We pass that through verbatim, the client
+    decides how to colour it, but trim and lowercase the canonical
     pair so variant code can switch on them reliably."""
     raw = str(state.get("state") or "").strip()
     if raw.lower() in ("home", "not_home"):
@@ -162,7 +162,7 @@ def fetch(
 
     items = all_items[:limit]
 
-    # Data variant gets a "history bar" — the last 24h of state changes
+    # Data variant gets a "history bar", the last 24h of state changes
     # for each shown person so the strip can render presence churn at a
     # glance. Best-effort: if HA's history endpoint errors we just skip
     # the strip for that person.

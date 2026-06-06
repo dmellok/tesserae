@@ -129,7 +129,7 @@ def system_backup_download(backup_id: str) -> Response:
     if backup is None:
         return Response("backup not found", status=404)
     # Serve from a BytesIO so the underlying file is fully read + closed
-    # before the response is built — avoids a lingering file handle that
+    # before the response is built, avoids a lingering file handle that
     # finalizers complain about under the test client.
     data = backup.path.read_bytes()
     return send_file(
@@ -147,7 +147,7 @@ def system_backup_restore(backup_id: str) -> Response:
         return refused
     push_mgr = push_manager()
     if not push_mgr._lock.acquire(blocking=True, timeout=10):
-        flash("Another push is in flight — try again in a moment.", "error")
+        flash("Another push is in flight, try again in a moment.", "error")
         return system_redirect()
     try:
         try:
@@ -180,7 +180,7 @@ def system_data_export() -> Response:
     the backup machinery (same exclusions: gallery photos + the render
     cache stay out) but deletes the staged file afterwards so this
     doesn't pollute the Backups list. For moving data between Tesserae
-    installs — restore-from-existing-backup is the in-place flow."""
+    installs, restore-from-existing-backup is the in-place flow."""
     try:
         backup = _backup_mod.create(data_root(), label=_backup_mod.LABEL_MANUAL, note="export")
     except OSError as err:
@@ -224,7 +224,7 @@ def system_data_import() -> Response:
         return system_redirect()
 
     # Validate it's a real Tesserae export before we let it touch
-    # data/. Also guard against zip-slip — backup.restore writes each
+    # data/. Also guard against zip-slip, backup.restore writes each
     # member to ``td_path / member`` without sanitisation, so a member
     # like ``../../etc/x`` would land outside the temp stage.
     import zipfile as _zipfile
@@ -249,11 +249,11 @@ def system_data_import() -> Response:
             return system_redirect()
 
     # Stage the upload into the backups dir under a synthetic id so the
-    # existing restore() pipeline can pick it up — keeps the restore
+    # existing restore() pipeline can pick it up, keeps the restore
     # path consistent with the in-place restore flow.
     push_mgr = push_manager()
     if not push_mgr._lock.acquire(blocking=True, timeout=10):
-        flash("Another push is in flight — try again in a moment.", "error")
+        flash("Another push is in flight, try again in a moment.", "error")
         return system_redirect()
     import time as _time
 
@@ -295,7 +295,7 @@ def system_webhook_regenerate() -> Response:
     """Mint a fresh random webhook token and persist it. Stashed in the
     session as ``_webhook_token_reveal`` so the Settings GET that follows
     the redirect can pop it into a one-shot modal with a copy button.
-    After that render it's gone — the disk value is masked like any
+    After that render it's gone, the disk value is masked like any
     other ``_secret`` field."""
     from app.webhook_routes import generate_token
 
@@ -331,7 +331,7 @@ def system_webhook_set() -> Response:
 @bp.post("/settings/system/telemetry/test")
 def system_telemetry_test() -> Response:
     """Fire a synchronous app.started and surface the outcome in a flash
-    + the Events tab. Dev-only — the card is hidden in production
+    + the Events tab. Dev-only, the card is hidden in production
     builds, so this route is gated to ``current_app.debug`` to avoid
     leaving an undocumented endpoint exposed."""
     if not current_app.debug:

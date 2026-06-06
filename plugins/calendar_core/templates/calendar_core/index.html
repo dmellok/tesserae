@@ -1,6 +1,6 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head, button, empty_state %}
-{% block title %}Calendar Feeds — Tesserae{% endblock %}
+{% block title %}Calendar Feeds, Tesserae{% endblock %}
 
 {% block main %}
 <div class="page-head">
@@ -57,7 +57,7 @@
   </ul>
   {% else %}
   {{ empty_state('calendar-blank', 'No feeds yet',
-                 blurb='Add one above. Then drop a Calendar — Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
+                 blurb='Add one above. Then drop a Calendar, Month / Week / Day widget into a dashboard and pick which feeds it should show.') }}
   {% endif %}
 </section>
 

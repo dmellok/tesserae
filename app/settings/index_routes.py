@@ -1,6 +1,6 @@
 """Settings index: ``GET /settings`` + ``GET /settings/<area>``.
 
-The big ``_build_sections`` walker lives here too — it composes one
+The big ``_build_sections`` walker lives here too, it composes one
 section dict per editable card across plugins, renderers, devices, and
 the hardcoded core (App / Panel / Broker). The template walks the same
 shape regardless of source. Helpers below (``_values_for_core``,
@@ -84,7 +84,7 @@ def settings_area(area: str) -> str | Response:
     system_telemetry_enabled = False
     system_telemetry_host = ""
     system_webhook_token_set = False
-    # One-shot reveal after /settings/system/webhook/regenerate — pop
+    # One-shot reveal after /settings/system/webhook/regenerate, pop
     # so a refresh doesn't re-show the token. Only honoured on the
     # System tab, which is the only place the modal renders.
     system_webhook_reveal_token = (
@@ -92,7 +92,7 @@ def settings_area(area: str) -> str | Response:
     )
     # Same one-shot pattern for TRMNL access tokens after devices_add
     # creates a trmnl_client instance. Only honoured on the Devices
-    # tab — that's where the modal lives and where the user is when
+    # tab, that's where the modal lives and where the user is when
     # the redirect lands.
     trmnl_token_reveal: dict[str, Any] | None = (
         session.pop("_trmnl_token_reveal", None) if area == "devices" else None
@@ -113,7 +113,7 @@ def settings_area(area: str) -> str | Response:
         system_git_available = upd.has_git_repo()
         if in_container or not system_git_available:
             # Skip the live API call under ``app.testing`` so tests
-            # don't depend on network reachability — the rest of the
+            # don't depend on network reachability, the rest of the
             # branch (the docker / bare-install hint) still renders.
             if not current_app.testing:
                 system_release_check = upd.latest_release_via_api(
@@ -132,8 +132,8 @@ def settings_area(area: str) -> str | Response:
             system_telemetry_enabled = telemetry.enabled
             # endpoint is empty when disabled; surface host as a hint either way.
             system_telemetry_host = telemetry._cfg.host
-        # Surface only whether a webhook token is set — never the value
-        # itself — so a screenshot of Settings → System doesn't leak it.
+        # Surface only whether a webhook token is set, never the value
+        # itself, so a screenshot of Settings → System doesn't leak it.
         # The disk key is ``webhook_token_secret`` (``_secret`` suffix
         # is the convention for masked fields); ``get_section`` returns
         # raw on-disk keys so we look up the suffixed form here.
@@ -143,7 +143,7 @@ def settings_area(area: str) -> str | Response:
         )
 
     # Auth state for the System → Authentication card. Cheap to compute,
-    # so we read it for any tab — the template only uses it on System.
+    # so we read it for any tab, the template only uses it on System.
     from app import auth as _auth
 
     system_password_set = _auth.password_is_set(settings_store())
@@ -211,7 +211,7 @@ def _build_sections() -> list[dict[str, Any]]:
         broker_blurb = (
             "Tesserae publishes frames here; devices subscribe. "
             "Host, port, and credentials are managed in the Tesserae "
-            "add-on's Configuration tab — changes there apply on the "
+            "add-on's Configuration tab, changes there apply on the "
             "next add-on restart."
         )
     sections.append(
@@ -230,7 +230,7 @@ def _build_sections() -> list[dict[str, Any]]:
     # Virtual panel: the fallback canvas size for pages with no target
     # device (the "(any)" option in the page editor). Registered devices
     # bring their own panel, so this only matters before you've added a
-    # device or for deliberately device-agnostic pages — hence it sits
+    # device or for deliberately device-agnostic pages, hence it sits
     # below the broker rather than up top.
     sections.append(
         {
@@ -248,7 +248,7 @@ def _build_sections() -> list[dict[str, Any]]:
     for renderer in renderers().all():
         # Per-instance clones inherit the base renderer's settings; the
         # cards add no UI value and just create N rows of the same
-        # form. Filter them out — clone ids always contain '__'
+        # form. Filter them out, clone ids always contain '__'
         # (see renderer_loader.clone_for_instances).
         if "__" in renderer.id:
             continue
@@ -290,7 +290,7 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     for device in devices().all():
-        # Built-in kinds are templates, not bindable devices — they
+        # Built-in kinds are templates, not bindable devices, they
         # never appear on the Devices tab. Every physical display is
         # represented by an instance (added manually or auto-registered
         # from the Discovered strip).
@@ -300,7 +300,7 @@ def _build_sections() -> list[dict[str, Any]]:
         fields = config_fields_from_schema(device.config_schema)
         is_instance = device.kind_of is not None
         # Picture-quality (dither / saturation / contrast) lives on the
-        # clone renderer keyed ``<base_id>__<device_id>`` — one clone
+        # clone renderer keyed ``<base_id>__<device_id>``, one clone
         # per renderer the device's kind consumes. Surface each clone's
         # device_setting-flagged fields as a "Picture quality" subsection;
         # the template renders them inside the combined form with the
@@ -334,7 +334,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 "fields": fields,
                 "state": (store.get_for_runtime("devices", device.id, fields) if fields else {}),
                 "endpoint": (url_for("auth.settings_update", section_kind=sid) if fields else None),
-                # Single Save for the whole device card — the template
+                # Single Save for the whole device card, the template
                 # wraps the renderer-config + panel + quiet-hours fields
                 # in one form posting here, and this handler fans out to
                 # the same service helpers the per-subsection endpoints
@@ -358,7 +358,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 "delete_endpoint": (
                     url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
                 ),
-                # Regenerate token — only present on devices that use
+                # Regenerate token, only present on devices that use
                 # access tokens (TRMNL). The template gates the button
                 # on this being non-None so a Pi/ESP32 card doesn't
                 # grow a meaningless control.
@@ -374,7 +374,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 # field via a Jinja ``is not none`` check.
                 "device_name": device.name if is_instance else None,
                 # Panel edit (orientation + dims) is only offered on
-                # instances — kinds aren't shown here at all.
+                # instances, kinds aren't shown here at all.
                 "panel": device.panel if is_instance else None,
                 "panel_endpoint": (
                     url_for("auth.devices_update_panel", instance_id=device.id)
@@ -405,7 +405,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 ),
                 # Per-device rotation view: every Schedule whose target
                 # page binds to this device, sorted by window start.
-                # Pure read view — each row deep-links to the Schedules
+                # Pure read view, each row deep-links to the Schedules
                 # editor where the user can actually change it.
                 "timetable_entries": (
                     device_timetable.timetable_for_device(
@@ -449,15 +449,15 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
     meta: dict[str, Any] = {"Renderers": ", ".join(device.renderer_ids)}
     access_token = device.manifest.get("access_token")
     if isinstance(access_token, str) and access_token:
-        # HTTP-polled device — surface the token + server URL so the
+        # HTTP-polled device, surface the token + server URL so the
         # user can configure their client without leaving the page.
         meta["Transport"] = "HTTP polling"
         meta["Access token"] = access_token
         meta["Server URL"] = f"http://{request.host}"
     else:
-        # MQTT device — keep the topic-pair display.
-        meta["Status topic"] = device.status_topic or "—"
-        meta["Config topic"] = device.config_topic or "—"
+        # MQTT device, keep the topic-pair display.
+        meta["Status topic"] = device.status_topic or "-"
+        meta["Config topic"] = device.config_topic or "-"
     if is_instance:
         meta["Instance of"] = str(device.kind_of)
     return meta
@@ -515,9 +515,9 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
     broker config. For the built-in broker a 0.0.0.0 bind resolves to the
     host's LAN IP (what other machines actually connect to) and a loopback
     bind stays 127.0.0.1; for an external broker it's the configured
-    host:port. Returns ``—`` when no external host is set.
+    host:port. Returns ``-`` when no external host is set.
 
-    Suffixes a hint when the resolved address is a Docker bridge — that
+    Suffixes a hint when the resolved address is a Docker bridge, that
     means we're running inside the official Docker image, the user hasn't
     set ``TESSERAE_HOST_IP``, and the URL would be useless to clients on
     the LAN. Surfaces the same warning the onboarding wizard shows."""
@@ -534,10 +534,10 @@ def _broker_mqtt_url(raw: dict[str, Any]) -> str:
         host = str(raw.get("host") or "").strip()
         port = raw.get("port") or 1883
         if not host:
-            return "—"
+            return "-"
     url = f"mqtt://{host}:{port}"
     if docker_bridge_ip_warning() and is_docker_bridge_ip(host):
-        url += " — set TESSERAE_HOST_IP"
+        url += ", set TESSERAE_HOST_IP"
     return url
 
 
@@ -551,7 +551,7 @@ _EMBEDDED_BROKER_FIELD_NAMES = frozenset(
     }
 )
 
-# Connection fields HA's Configuration tab owns — see ``app.ha_options``.
+# Connection fields HA's Configuration tab owns, see ``app.ha_options``.
 # Hidden from the Settings card so the user has one place to manage
 # them; the card's ``MQTT URL`` meta line still shows the effective
 # host:port so they can verify what's resolved.
@@ -565,8 +565,8 @@ def _broker_fields_with_client_id_hint() -> list[dict[str, Any]]:
 
     Under HA Ingress two groups of fields are stripped:
       * embedded broker fields (the bundled Mosquitto add-on already owns
-        1883 — see ``transport_wiring._rebuild_transport``).
-      * host / port / username / password — managed by HA's Configuration
+        1883, see ``transport_wiring._rebuild_transport``).
+      * host / port / username / password, managed by HA's Configuration
         tab and applied at every container start by ``app.ha_options``.
     """
     fields = BROKER_FIELDS

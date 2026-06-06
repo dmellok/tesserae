@@ -1,6 +1,6 @@
 """MQTT publish/subscribe primitive.
 
-One job — talk to the broker. Anything device-specific (parsing status
+One job, talk to the broker. Anything device-specific (parsing status
 heartbeats, validating config) belongs in the device plugin, not here.
 
 Subscribers register a per-topic callback with ``subscribe(topic, callback)``.
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # paho-mqtt rc=4 is MQTT_ERR_NO_CONN. With qos>=1 the message is queued
 # in paho's outbound store and replayed on reconnect, so it's not a real
-# delivery failure — only a "didn't go out on this call" signal.
+# delivery failure, only a "didn't go out on this call" signal.
 _MQTT_ERR_NO_CONN = 4
 
 
@@ -97,7 +97,7 @@ class MqttTransport:
 
     Wraps paho-mqtt by default; tests pass ``client_factory=`` to inject a
     fake implementing ``_MqttClientLike``. The broker connection is opt-in
-    via ``connect()`` — the transport is safe to construct without a live
+    via ``connect()``, the transport is safe to construct without a live
     broker, and ``publish()`` raises a clear error if called before connect.
     """
 
@@ -138,7 +138,7 @@ class MqttTransport:
 
     def connect(self) -> None:
         """Open the broker connection and start the network loop in a
-        background thread. Idempotent — calling twice is a no-op."""
+        background thread. Idempotent, calling twice is a no-op."""
         if self._connected:
             return
         self._client.connect(self._config.host, self._config.port, self._config.keepalive)
@@ -164,7 +164,7 @@ class MqttTransport:
             # message and will replay it on reconnect. With qos=0 the
             # publish would be lost, so we keep raising in that case.
             logger.warning(
-                "MQTT publish %s queued — broker not connected (qos=%d, %d bytes)",
+                "MQTT publish %s queued, broker not connected (qos=%d, %d bytes)",
                 topic,
                 qos,
                 len(payload),
@@ -182,7 +182,7 @@ class MqttTransport:
         sub = _Subscription(topic=topic, callback=callback, matcher=_topic_matcher(topic))
         with self._lock:
             self._subscriptions.append(sub)
-        # Subscribe on the broker too if connected — paho silently replays
+        # Subscribe on the broker too if connected, paho silently replays
         # subscriptions on reconnect, so we only need this one call.
         if self._connected:
             self._client.subscribe(topic, qos)
@@ -191,7 +191,7 @@ class MqttTransport:
         with self._lock:
             self._subscriptions = [s for s in self._subscriptions if s.callback is not callback]
 
-    # -- paho callbacks (kept tiny — real work happens in dispatch) --------
+    # -- paho callbacks (kept tiny, real work happens in dispatch) --------
 
     def _on_connect(
         self, client: Any, userdata: Any, flags: Any, rc: Any, properties: Any = None
@@ -206,7 +206,7 @@ class MqttTransport:
 
     def _on_disconnect(self, client: Any, userdata: Any, *args: Any, **kwargs: Any) -> None:
         # paho v2 passes (disconnect_flags, reason_code, properties). The
-        # reason code says WHY — notably "Session taken over", which means
+        # reason code says WHY, notably "Session taken over", which means
         # another client connected with this same client_id (give each
         # instance a unique 'MQTT client id' in Settings → Broker).
         reason = kwargs.get("reason_code")
@@ -229,7 +229,7 @@ class MqttTransport:
                 sub.callback(topic, payload)
             except Exception:
                 # A subscriber raising must not kill dispatch for other
-                # subscribers — log loudly and continue.
+                # subscribers, log loudly and continue.
                 logger.exception("MQTT subscriber for %r raised on topic %r", sub.topic, topic)
 
 

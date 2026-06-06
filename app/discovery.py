@@ -8,17 +8,17 @@ strip with one-click register buttons.
 Clients participating in discovery embed a few well-known keys in
 their heartbeat JSON (see `PROMPTS/updates/*_discovery.md`):
 
-* ``kind`` — the Tesserae device kind id (``pi_bin_client`` /
+* ``kind``, the Tesserae device kind id (``pi_bin_client`` /
   ``pi_png_client`` / ``esp32_client``). Tells the UI which kind to
   pre-select in the Add-device form.
-* ``panel_w`` / ``panel_h`` — pixel dims the client expects to paint.
-* ``fw_version``, ``ip`` (optional) — diagnostic context, surfaced in
+* ``panel_w`` / ``panel_h``, pixel dims the client expects to paint.
+* ``fw_version``, ``ip`` (optional), diagnostic context, surfaced in
   the discovered-device row.
 
-Unknown / missing keys are tolerated — the user can still register a
+Unknown / missing keys are tolerated, the user can still register a
 discovered device by hand, they just don't get the pre-fill convenience.
 
-mypy --strict applies to this module — see pyproject.toml.
+mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
@@ -77,12 +77,12 @@ def record_trmnl_discovery(
 ) -> DiscoveredDevice | None:
     """Cache an HTTP-polled TRMNL client that polled with an unknown
     token, so the Settings → Devices → Discovered strip surfaces it
-    for one-click adoption — same UX as MQTT-side discovery.
+    for one-click adoption, same UX as MQTT-side discovery.
 
     The cache id is synthetic (``trmnl_<token>``) since TRMNL devices
     don't have an MQTT topic. The cached payload includes the original
     ``access_token`` so the register flow can preserve it (the user
-    already has it pasted into their Kindle config — making them
+    already has it pasted into their Kindle config, making them
     re-paste a freshly-generated one would defeat the point of
     discovery)."""
     safe = re.sub(r"[^a-z0-9_-]", "", token.lower())[:20]
@@ -93,7 +93,7 @@ def record_trmnl_discovery(
     }
     # Map BYOS-style headers to the discovery schema the UI already
     # understands (kind / panel_w / panel_h / fw_version / ip). Lookup is
-    # case-insensitive — different BYOS clients spell the same field
+    # case-insensitive, different BYOS clients spell the same field
     # ``Png-Width`` (KOReader), ``png-width`` (recon scripts), or
     # ``Width`` (native TRMNL firmware) and we want the panel dims to
     # pre-fill the Register form regardless.
@@ -146,7 +146,7 @@ class DiscoveryCache:
         or None if ``device_id`` is malformed (we refuse to cache ids
         we'd reject during registration anyway) or the payload is empty.
 
-        An empty payload is a retained-message *tombstone* — what a broker
+        An empty payload is a retained-message *tombstone*, what a broker
         delivers after the retained heartbeat is cleared (e.g. on Dismiss).
         It's not a live device, so skip it; otherwise clearing a ghost
         would immediately re-add a kind-less one."""
