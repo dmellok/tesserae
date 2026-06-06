@@ -11,6 +11,12 @@
   </a>
 </p>
 
+> **Heads up:** the widget visual language has been rebuilt in v0.31.0 around
+> a more coherent theming system, so the hero image above is starting to age
+> (it'll be reshot soon). In the meantime, the
+> [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
+> shows the current look of every widget.
+
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices, Pi
 and ESP32 over MQTT, TRMNL / KOReader over HTTP-pull.
