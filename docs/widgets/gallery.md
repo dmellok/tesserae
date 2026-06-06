@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
+The **59 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy — convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -39,7 +39,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).
 
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 -   **Weather — Now** &middot; `weather_now`
 
@@ -221,7 +221,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_actions](../screenshots/widgets/github_actions.png)
 
-    Most recent CI runs across watched repos Pairs a success donut + pass/fail/live counts with a run list. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
+    Most recent CI runs across watched repos. Each workflow row pairs its conclusion icon + a workflow-type glyph (build / test / deploy / lint / docs / release / security / ci) with a mini timeline of the last 8 runs (bar height ∝ duration, colour ∝ conclusion) and the latest run's duration. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -231,7 +231,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_activity](../screenshots/widgets/github_activity.png)
 
-    Recent public activity for a GitHub user Each shows pushes / PRs / issues / repos stats, a 7-day mini histogram, and the event feed. Defaults to the username in Plugins → GitHub Core.
+    Recent public activity for a GitHub user. Pushes / PRs / issues / releases broken out as type-coloured tiles; a 7-day stacked-bar histogram segments each day's events by type and centres a Phosphor glyph on the dominant kind; an activity-streak pill counts consecutive days back from today. Defaults to the username in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -241,7 +241,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_contributions](../screenshots/widgets/github_contributions.png)
 
-    The familiar 53-week contributions heatmap for a user Each pairs the heatmap with year total + streak / busiest day stats. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
+    The familiar 53-week contributions heatmap for a user. Paired Current/Longest streak chips sit above the heatmap (ph-flame + ph-trophy on accent-tinted cards); a 12-month summary bar strip sits below, scaling each month's total against the year's max with the current month highlighted. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -251,7 +251,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_pr_queue](../screenshots/widgets/github_pr_queue.png)
 
-    Your open PRs + PRs awaiting your review Shows to-review / yours / stale / oldest stats with an honest all-clear state when the queue is empty. Requires a PAT in Plugins → GitHub Core.
+    Your open PRs + PRs awaiting your review. Each row leads with a draft / ready-for-review glyph, carries a PR-age chip (muted → ochre → terracotta → plum as the PR ages), and a comment-bubble chip showing discussion activity. Sections are sorted oldest-first so the staler PR floats to the top. Requires a PAT in Plugins → GitHub Core.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -261,7 +261,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_releases](../screenshots/widgets/github_releases.png)
 
-    Latest releases from a list of watched repos. Useful for tracking your dependencies' versions. Public repos work without a token.
+    Latest releases from a list of watched repos. Each row carries a SemVer bump chip (MAJOR / MINOR / PATCH, computed by comparing the tag to the previous release) and, for the most recent release per repo, a +N commits tail counting unreleased commits on the default branch. Useful for tracking your dependencies' versions.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -271,7 +271,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![github_repo](../screenshots/widgets/github_repo.png)
 
-    Single-repo card Each pairs the language split + stars / forks / issues / release stats with a 52-week commit activity chart. Public repos work without a token.
+    Single-repo card. Pairs the language split + stars / forks / issues / release stats with a 52-week commit activity sparkline and a top-contributors strip (up to 5, avatar + login + contribution count). Public repos work without a token.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -425,7 +425,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_camera](../screenshots/widgets/ha_camera.png)
 
-    Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display.
+    Snapshot from one or more Home Assistant camera.* entities. Pulls each entity's entity_picture via HA's REST API and renders it as a still frame — perfect for a door cam, garden cam, or 2×2 grid of indoor cameras on an e-ink display. Multi-camera grids auto-fit; every tile carries a corner timestamp chip and a motion pip when relevant.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -455,7 +455,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_entities](../screenshots/widgets/ha_entities.png)
 
-    A status grid of several Home Assistant entities Each row tints by its state (on / off / other) and shows its current value. Requires the Home Assistant Core plugin.
+    A status grid of several Home Assistant entities. Each row tints by its state (on / off / other), leads with a device-class-aware Phosphor glyph (temperature → thermometer, CO₂ → wind, motion → person walking, …), and shows its current value. Rows that changed within the last 10 minutes pick up an accent-4 wash + a 'just now' / 'Nm ago' badge.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -465,7 +465,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_history](../screenshots/widgets/ha_history.png)
 
-    A numeric Home Assistant sensor over time Each shows the current value, trend arrow, min/max for the window, and a sparkline of the series. Requires the Home Assistant Core plugin.
+    A numeric Home Assistant sensor over time. Pairs the current value + trend arrow + min/max with a Chart.js line chart, optional threshold horizontal line, min/max marker dots + labels on the curve, and an averaged hourly-profile ghost overlay for long windows. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -475,7 +475,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_lights](../screenshots/widgets/ha_lights.png)
 
-    An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, and what share of the house is currently lit. Reads from your existing Home Assistant install via the Core plugin.
+    An at-a-glance overview of a room (or whole-house) set of light.* entities: which are on, how bright, what colour, and what share of the house is currently lit. Each row carries a brightness mini-bar tinted by the light's actual colour-temperature (warm-white to cool-white) or RGB hue, plus a swatch dot for the colour itself. Reads from your existing Home Assistant install via the Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -485,7 +485,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_locks](../screenshots/widgets/ha_locks.png)
 
-    A security-focused at-a-glance overview of every lock.* entity in your Home Assistant install, plus the door / window / garage / opening binary_sensors guarding the rest of the house. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.
+    A security-focused overview of every lock.* entity plus door / window / garage / opening binary_sensors. Stateful kind glyphs (ph-lock ↔ ph-lock-open, ph-door ↔ ph-door-open, etc.) communicate state via icon rather than text colour alone; unsecured rows wear a terracotta wash + an 'unsecured for Xm' timer chip. Auto-discovers entities — nothing to configure beyond the label and which kinds of openings to include.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -495,7 +495,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_media](../screenshots/widgets/ha_media.png)
 
-    Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art and progress. Requires the Home Assistant Core plugin.
+    Now-playing tile for a Home Assistant media_player entity — title, artist, album, album art, progress bar with elapsed / remaining stamps, and a track-deterministic SVG waveform glyph. A blurred copy of the album art bleeds behind the body so the cell picks up the album's palette. Requires the Home Assistant Core plugin.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
 
@@ -505,7 +505,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_sensor](../screenshots/widgets/ha_sensor.png)
 
-    One or more Home Assistant entities as bold value blocks A single entity fills the cell as a hero number; several lay out as a 3×2 tile grid. Requires the Home Assistant Core plugin.
+    One or more Home Assistant entities as bold value blocks. A single entity fills the cell as a hero number with a trend arrow + 24h sparkline beneath; several lay out as a list with per-row trend + hairline sparkline. Lead glyph picks up the device-class (temperature → thermometer, CO₂ → wind, current → wave-sine, money → coin, etc.). Requires the Home Assistant Core plugin.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
@@ -525,7 +525,7 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![ha_zones](../screenshots/widgets/ha_zones.png)
 
-    Who's home, who's away — auto-discovers every person.* entity in Home Assistant and paints their current zone (home / away / a named zone) with avatars, names, and last-seen times. One get_states call covers the whole household.
+    Who's home, who's away — auto-discovers every person.* entity in Home Assistant. Each row leads with the person's avatar (HA profile picture, or a coloured-initials circle keyed to their name when there's no picture) and right-aligns a zone-glyph (briefcase for work, graduation-cap for school, barbell for gym, etc.) + the zone label. One get_states call covers the whole household.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -658,6 +658,22 @@ The **58 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
     Embed an external URL in a cell. The composer captures whatever the iframe renders — handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** —
+
+</div>
+
+## Glances
+
+<div class="grid cards" markdown>
+
+-   **Glances — Status** &middot; `glances_status`
+
+    ---
+
+    ![glances_status](../screenshots/widgets/glances_status.png)
+
+    Live system stats from a Glances instance: CPU / RAM / disk / load / uptime, with a tone-coded state pill that swings from ok → warn → danger as the headline metric crosses thresholds. Each cell targets its own Glances server so a dashboard can monitor several boxes side by side.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** —
 
 </div>
 
