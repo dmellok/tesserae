@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather — Now",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "kind": "widget",
   "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",
   "icon": "ph-cloud-sun",
@@ -47,6 +47,13 @@
           "label": "Imperial (°F, mph)"
         }
       ]
+    },
+    {
+      "name": "sky_backdrop",
+      "type": "boolean",
+      "label": "Sky backdrop",
+      "default": false,
+      "help": "Paint a flat sky illustration behind the hero (sun rays, cloud, rain hatches, snow dots, stars, etc.) tinted to the active theme. Off by default; turn on per cell."
     }
   ],
   "render": {
