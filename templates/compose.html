@@ -68,6 +68,12 @@
       box-sizing: border-box;
       overflow: hidden;
       border-radius: {{ page.corner_radius }}px;
+      /* Exposed to the widget shadow DOM as a custom property; .w
+         inside spectra-widgets.css picks it up so its own 1px border
+         curves to match the cell rather than getting clipped at the
+         corners by overflow:hidden + border-radius above. CSS
+         variables cross the shadow boundary via :host inheritance. */
+      --cell-corner-radius: {{ page.corner_radius }}px;
     }
     /* Per-cell zoom, the inner box paints into a 1/zoom virtual area
        then transform-scales back up to fill the cell, so widgets see a

@@ -6,6 +6,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.41.2], 2026-06-08
+
+### Fixed
+
+- **Widget inner border now follows the cell's corner radius.** When
+  a page had a non-zero `corner_radius`, the cell rounded its
+  corners + `overflow: hidden` clipped the inner widget's 1px border
+  rectangle at the curves, so the border looked truncated at each
+  corner. The cell now exposes its radius as a `--cell-corner-radius`
+  CSS variable that crosses the shadow DOM boundary, and `.w` in
+  `spectra-widgets.css` uses it as the default for its own
+  border-radius. The widget's outer edge now curves to match the
+  cell.
+
+### Changed
+
+- **Matting colour default → white.** Pages used to default to
+  `bleed_color = ""` which fell back to `var(--bg)` (theme-following)
+  and showed as black in the editor's colour picker (the macro's
+  fallback). New pages now default to `#ffffff` so the picker
+  starts on a sensible value. Existing pages with the empty default
+  read as white in the editor too; rendering is unchanged for any
+  page that already has an explicit colour set.
+
+- **`picture_gallery` renamed for the widget picker.** Was "Gallery
+  Core" landing under the "Other" group; now "Picture, Gallery" so
+  the picker's split-on-comma convention groups it under Picture
+  next to NASA APOD. Same widget, same id, no migration.
+
 ## [0.41.1], 2026-06-08
 
 ### Fixed

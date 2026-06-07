@@ -135,7 +135,13 @@ class Page(BaseModel):
     style: str = "standard"
     gap: int = 0
     corner_radius: int = 0
-    bleed_color: str = ""
+    # Default matting is white. Older pages stored before this default
+    # change have an empty string; the composer treats both as the
+    # bleed (empty falls back to var(--bg) for theme-following, the
+    # explicit default lays down white on new pages so the editor's
+    # colour picker shows a sensible starting value rather than the
+    # macro fallback of black).
+    bleed_color: str = "#ffffff"
     icon: str | None = None
 
     @model_validator(mode="before")

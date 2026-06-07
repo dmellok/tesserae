@@ -25,7 +25,11 @@
      ``display`` / ``mono`` / movement styles can thicken the frame
      without forking every widget rule. */
   border: var(--edge-weight, var(--stroke-1)) solid var(--edge);
-  border-radius: var(--radius-0);               /* sharp by default */
+  /* Follows the cell's corner radius when the composer sets it (so
+     the inner border curves with the rounded cell rather than getting
+     clipped); falls back to --radius-0 (sharp) outside the composer
+     context, preserving the Spectra default. */
+  border-radius: var(--cell-corner-radius, var(--radius-0));
 
   box-sizing: border-box;
   width: 100%;

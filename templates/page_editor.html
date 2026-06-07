@@ -305,7 +305,7 @@
           {{ select_field('page-theme', 'theme', 'Theme', value=page.theme or 'light', options=theme_options) }}
           {{ select_field('page-style', 'style', 'Style', value=page.style or 'standard', options=style_options) }}
           {{ select_field('page-font', 'font', 'Font', value=page.font or '', options=font_options, blank_label='(default)') }}
-          {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color) }}
+          {{ color_input('page-bleed', 'bleed_color', 'Matting colour', value=page.bleed_color or '#ffffff') }}
         </div>
         {{ slider('page-gap', 'gap', 'Gap', value=page.gap, min=0, max=200, unit='px',
                   help='Visible matting strip between cells + around panel edges.') }}
