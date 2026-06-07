@@ -305,6 +305,14 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
   header naming the widget (e.g. `tesserae/0.1 (+weather_now)`).
 * Don't raise, return `{"error": "..."}`. Uncaught exceptions get
   caught upstream but produce uglier diagnostics.
+* **Translate technical errors to friendly messages** before putting
+  them in the `error` field. The string lands directly in the cell.
+  `"HTTPError: 404 Not Found"` reads as "the widget broke";
+  `"Country code 'XX' is not supported."` reads as "I typed
+  something wrong, let me fix it." Catch the categories you can
+  meaningfully name (invalid input, upstream down, rate-limited),
+  pass everything else through with a tame fallback like
+  `"Couldn't load <thing> right now."`.
 
 ---
 
@@ -566,6 +574,69 @@ shadow.innerHTML = `<div class="root size-${ctx.cell.size}">...</div>`;
 .size-xs .stats, .size-xs .sun { display: none; }
 .size-xs .now-icon              { font-size: clamp(44px, 22cqw, 80px); }
 ```
+
+### Hero + list layouts: don't let `auto` rows starve the hero
+
+A common widget shape is **hero on top + bullet list below** (the
+weather forecast, the holiday countdown, the F1 standings). The trap
+is reaching for this grid:
+
+```css
+/* ⚠️ Looks right at lg, collapses the hero at md/sm */
+.body { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+```
+
+The `auto` row claims its **content height first**, leaving whatever's
+left for the `1fr` hero. At `lg` there's room for both; at `md` and
+especially `sm` the list eats the hero and clips the headline number.
+Two reliable patterns instead:
+
+**Pattern 1, hero takes its natural size + list fills the rest** —
+prefer this when the hero is a fixed-size stat / status block:
+
+```css
+.body { display: grid; grid-template-rows: auto minmax(0, 1fr); }
+.list { overflow: hidden; }  /* let the list clip, not the hero */
+```
+
+**Pattern 2, both rows constrained + per-size row hiding** — prefer
+this when the hero scales fluidly via `clamp()`:
+
+```css
+.body { display: grid; grid-template-rows: 1fr auto; gap: var(--space-3); }
+
+/* Cap how many list rows are even rendered at smaller sizes so the
+   `auto` row never claims more than it should. */
+.size-sm .list-row:nth-child(n+3) { display: none; }
+.size-md .list-row:nth-child(n+5) { display: none; }
+```
+
+Whichever pattern you pick, **walk every size in `/_test/render`
+before declaring the widget done**. The lg cell is forgiving; sm and
+xs aren't. The dev-server contact-sheet script renders all four
+side-by-side for fast inspection:
+
+```sh
+python scripts/widget_contact_sheet.py <id>
+```
+
+A few related sizing rules of thumb:
+
+- **At xs**, drop the entire list (`display: none`) and let the hero
+  fill the cell. `xs` is roughly a single information point.
+- **Title bars survive but compress.** The shared `.w-title` from
+  `spectra-widgets.css` shrinks gracefully; you don't need to
+  re-style it per size, but the title TEXT should be short enough to
+  not need truncating at sm (overflow ellipsis is acceptable on lists,
+  awkward on titles).
+- **`clamp(min, fluid, max)` is the right tool, not media queries.**
+  The cell can be any size between roughly 180×180 (xs) and 1200×800
+  (lg); use `clamp(N, M·cqmin, P)` for type / icon scaling rather than
+  branching on `.size-*`. Reserve the size classes for **structural**
+  changes (dropping sections, swapping grid shape).
+- **`minmax(0, 1fr)` keeps `<pre>` / `<code>` / long words from
+  blowing out a column.** The default `1fr` minimum is "auto", which
+  is content-derived; `minmax(0, 1fr)` lets the row actually shrink.
 
 ---
 

@@ -157,6 +157,9 @@ These are the things AI most often gets wrong on e-ink. Call them out explicitly
 - [ ] **Idempotent render.** Overwrite `shadow.innerHTML`; don't append (the renderer may call you twice).
 - [ ] **Don't load fonts.** `font-family: inherit` on `:host`; the page font arrives via `--font-family` and `ctx.font.family`.
 - [ ] **No `variant` cell option.** The Spectra rebuild replaced per-widget variants with the orthogonal `data-theme` × `data-style` axes, one widget should compose with every theme and every style instead of shipping N visual directions. If you find yourself reaching for variants, you probably want a new style or a new theme.
+- [ ] **Hero + list layouts don't use `grid-template-rows: 1fr auto`.** Models reach for this when stacking a hero stat on top of a bullet list, and it looks right at `lg`. At `md` / `sm` the `auto` list claims its full content height first and the `1fr` hero collapses to a sliver. Use `grid-template-rows: auto minmax(0, 1fr)` (hero takes its size, list fills) or cap visible list rows per size via `.size-sm .row:nth-child(n+3) { display: none; }`. See [the contract's "Hero + list layouts"](../widgets.md#hero-list-layouts-dont-let-auto-rows-starve-the-hero) section.
+- [ ] **Verify every size in `/_test/render`, not just `md`.** `lg` is forgiving and `md` usually looks fine; `sm` and `xs` are where layouts break. Insist the model produces screenshots at all four sizes before declaring the widget done.
+- [ ] **Translate technical errors to friendly messages.** The `error` string from `server.py:fetch()` lands directly in the cell; `"HTTPError: 404 Not Found"` reads as "broken widget" while `"Country code 'XX' is not supported."` reads as "I typed something wrong." Catch the categories you can name (invalid input, upstream down, rate-limited) and pass everything else through with a tame fallback.
 
 ## Structured design first (optional)
 
