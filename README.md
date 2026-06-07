@@ -28,7 +28,7 @@ contained change.
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** -
 install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
 (58 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
-and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-plugin/) (with AI).
+and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/) (with AI).
 
 > **Self-hosted hobby project.** Tesserae installs with `docker compose up`
 > or a `git clone`. The admin UI is polished, but the deployment story

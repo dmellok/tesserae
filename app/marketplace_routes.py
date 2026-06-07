@@ -1,4 +1,4 @@
-"""Routes for the community widget marketplace (Settings → Plugins → Browse).
+"""Routes for the community widget marketplace (Settings → Widgets → Browse).
 
 Three POST endpoints plus the Browse page render, all mounted under
 ``/plugins/`` to live alongside the existing plugin admin routes. The

@@ -84,9 +84,9 @@ nav:
   - Widgets:
       - Gallery: widgets/gallery.md
       - Stability tiers: widgets/tiers.md
-  - Plugin development:
+  - Widget development:
       - Architecture: dev/architecture.md
-      - Build a widget with AI: dev/writing-a-plugin.md
+      - Build a widget with AI: dev/writing-a-widget.md
       - Publish via the catalog: dev/publishing-a-widget.md
       - Widget contract: widgets.md
       - Cross-widget design system: widget-design-system.md

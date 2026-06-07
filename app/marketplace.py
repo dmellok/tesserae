@@ -2,7 +2,7 @@
 
 A static ``widgets.json`` index hosted in a separate catalog repo
 (default: ``dmellok/tesserae-widgets``) lists community widgets, each
-pinned to a tagged release tarball + sha256. The Settings → Plugins →
+pinned to a tagged release tarball + sha256. The Settings → Widgets →
 Browse page lets the user one-click install an entry; the install path
 downloads the tarball, verifies the sha256, validates the embedded
 ``plugin.json`` against ``schema/plugin.schema.json``, and drops the

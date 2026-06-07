@@ -153,9 +153,9 @@ def render() -> str:
     lines.append("")
     lines.append(
         f"The **{len(widgets)} widgets** that ship with Tesserae. Each is a "
-        "drop-a-folder plugin under `plugins/<id>/`; drop your own in and it "
+        "drop-a-folder widget under `plugins/<id>/`; drop your own in and it "
         "shows up in the editor's picker. Want to build one? See "
-        "[Build a widget with AI](../dev/writing-a-plugin.md)."
+        "[Build a widget with AI](../dev/writing-a-widget.md)."
     )
     lines.append("")
     lines.append(

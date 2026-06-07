@@ -16,7 +16,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
     - **I have a panel to drive** → [Install a client](install/clients.md) then [Set up a device](install/devices.md)
     - **What can it show?** → [Widget gallery](widgets/gallery.md) (58 widgets)
     - **What hardware works?** → [Screens & compatibility](compatibility.md)
-    - **I want to build a widget** → [Build a widget with AI](dev/writing-a-plugin.md)
+    - **I want to build a widget** → [Build a widget with AI](dev/writing-a-widget.md)
 
 ## How it works
 
@@ -27,7 +27,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 
 Every layer, the 58 widgets, the themes, the fonts, the renderers, the
 device kinds, is a drop-a-folder plugin or a dedicated app surface
-discovered at boot. See [Build a widget with AI](dev/writing-a-plugin.md)
+discovered at boot. See [Build a widget with AI](dev/writing-a-widget.md)
 for the authoring path and [the widget contract](widgets.md) for the
 full spec.
 

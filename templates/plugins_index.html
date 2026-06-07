@@ -1,15 +1,16 @@
 {% extends "_base.html" %}
 {% from "_components.html" import card_head %}
 {% set KIND_ICONS = {'widget':'puzzle-piece','renderer':'image-square','device':'device-mobile','theme':'palette','font':'text-aa'} %}
-{% block title %}Plugins, Tesserae{% endblock %}
+{% block title %}Widgets, Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
-  <h1><i class="ph ph-puzzle-piece"></i> Plugins</h1>
+  <h1><i class="ph ph-puzzle-piece"></i> Widgets</h1>
   <p class="lede">
-    Every loaded plugin, regardless of kind. Drop a new folder under
-    <code>plugins/&lt;id&gt;/</code> and restart to add one. Plugins with
-    a <code>blueprint()</code> in <code>server.py</code> get an
-    <em>Open admin</em> link, that's where their dedicated UI lives.
+    Every loaded widget, plus the supporting fonts + data plugins that
+    back them. Drop a new folder under <code>plugins/&lt;id&gt;/</code>
+    and restart to add one, or install community widgets via Browse below.
+    Widgets with a <code>blueprint()</code> in <code>server.py</code>
+    get an <em>Open admin</em> link, that's where their dedicated UI lives.
   </p>
   <p>
     <a class="primary" href="{{ url_for('marketplace.browse') }}">
@@ -21,7 +22,7 @@
 
 {% if errors %}
 <section class="card">
-  {{ card_head('Loader errors', icon_name='warning-octagon', blurb='These plugins failed to load and were skipped.') }}
+  {{ card_head('Loader errors', icon_name='warning-octagon', blurb='These widgets failed to load and were skipped.') }}
   <ul class="error-list">
     {% for err in errors %}
     <li><code>{{ err.plugin_id }}</code>, {{ err.message }} <span class="muted">({{ err.path }})</span></li>
@@ -66,6 +67,6 @@
 {% endfor %}
 
 {% if not plugins %}
-<p class="lede">No plugins loaded. Drop one under <code>plugins/&lt;id&gt;/</code> and restart.</p>
+<p class="lede">No widgets loaded. Drop one under <code>plugins/&lt;id&gt;/</code> and restart, or install community ones via Browse.</p>
 {% endif %}
 {% endblock %}

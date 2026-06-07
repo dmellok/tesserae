@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.34.1], 2026-06-07
+
+### Changed
+
+- **Rename Plugins → Widgets in the UI + docs.** Top-nav dropdown
+  label, the "All plugins" link, the `/plugins/` page title + h1,
+  the Settings tab + blurb, and every "Settings → Plugins"
+  breadcrumb in the docs all now say "Widgets". The
+  Plugin-development wiki section becomes Widget development;
+  `docs/dev/writing-a-plugin.md` is renamed to `writing-a-widget.md`.
+  Code paths (`plugin_loader`, `/plugins/` URLs, the `plugins/`
+  directory, `plugin.json`, `plugin.schema.json`) are unchanged —
+  those are the technical contract and renaming them would break
+  every installed widget.
+
 ## [0.34.0], 2026-06-07
 
 Marketplace bundle support for widget families.

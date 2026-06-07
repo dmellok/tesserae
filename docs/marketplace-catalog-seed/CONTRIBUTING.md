@@ -32,7 +32,7 @@ no widget sandbox yet.
    - **Settings access.** Does it read secrets it doesn't need?
    - **Reliability.** Does it handle upstream failures gracefully?
 7. Once merged, Tesserae users will see your widget in
-   Settings → Plugins → Browse on the next catalog refresh.
+   Settings → Widgets → Browse on the next catalog refresh.
 
 ## Widget metadata (per-entry shape)
 

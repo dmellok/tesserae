@@ -153,7 +153,7 @@ hooks; the loader catches mistakes at boot rather than mid-push.
 
 * **Widgets** export a default `render(shadow, ctx)` function (vanilla
   JS, mounted into a per-cell Shadow DOM) and (optionally) a server
-  module. See [Build a widget with AI](writing-a-plugin.md) for the
+  module. See [Build a widget with AI](writing-a-widget.md) for the
   full authoring walkthrough.
 * **Renderers** export `transform(png_bytes, *, panel, settings) ->
   bytes` and `payload(digest, base_url, *, settings) -> dict`. The

@@ -6,10 +6,10 @@ smoke test, you have two ways to ship it:
 | Path | When to use | Trust model |
 |---|---|---|
 | **Bundle in the Tesserae repo** | Foundational widgets ([Stable tier](../widgets/tiers.md)), built against a documented API, intended to ship to every installation. | Reviewed in the host PR; lives in `plugins/<id>/` alongside the existing bundled widgets. |
-| **Publish through the community catalog** | Your own widget, third-party APIs, niche use cases, anything you want users to opt into rather than installing for everyone. | Audit-only review on each catalog PR; lives in [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets) and installs into the user's `plugins/` via Settings → Plugins → Browse community widgets. |
+| **Publish through the community catalog** | Your own widget, third-party APIs, niche use cases, anything you want users to opt into rather than installing for everyone. | Audit-only review on each catalog PR; lives in [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets) and installs into the user's `plugins/` via Settings → Widgets → Browse community widgets. |
 
 This page covers the catalog path. For the bundled path see
-[Build a widget with AI → Submitting](writing-a-plugin.md#submitting).
+[Build a widget with AI → Submitting](writing-a-widget.md#submitting).
 
 ## How the catalog works
 

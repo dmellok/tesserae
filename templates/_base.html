@@ -111,12 +111,12 @@
       </a>
       <details class="nav-dropdown {% if request.blueprint == 'plugins' or request.path.startswith('/plugins/') %}is-active{% endif %}">
         <summary>
-          <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Plugins</span>
+          <i class="ph ph-puzzle-piece" aria-hidden="true"></i><span>Widgets</span>
           <i class="ph ph-caret-down caret-soft" aria-hidden="true"></i>
         </summary>
         <div class="nav-dropdown-panel">
           <a class="nav-dropdown-link" href="{{ url_for('plugins.plugins_index') }}">
-            <i class="ph ph-list-bullets" aria-hidden="true"></i>All plugins
+            <i class="ph ph-list-bullets" aria-hidden="true"></i>All widgets
           </a>
           <a class="nav-dropdown-link" href="{{ url_for('marketplace.browse') }}">
             <i class="ph ph-storefront" aria-hidden="true"></i>Browse community widgets
@@ -129,7 +129,7 @@
           </a>
           {% endfor %}
           {% else %}
-          <div class="nav-dropdown-hint">No plugins ship an admin page yet.</div>
+          <div class="nav-dropdown-hint">No widgets ship an admin page yet.</div>
           {% endif %}
         </div>
       </details>

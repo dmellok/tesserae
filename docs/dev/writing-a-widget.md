@@ -205,7 +205,7 @@ iterating on a polish pass.
 For your own widgets, third-party APIs, niche use cases — anything
 you want users to opt into per install rather than shipping to
 everyone. Your widget lives in its own GitHub repo and ships via a
-PR to the catalog index; users find it on Settings → Plugins →
+PR to the catalog index; users find it on Settings → Widgets →
 Browse community widgets.
 
 See **[Publish a widget through the catalog](publishing-a-widget.md)**

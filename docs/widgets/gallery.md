@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **59 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-plugin.md).
+The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -607,7 +607,7 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![picture_unsplash](../screenshots/widgets/picture_unsplash.png)
 
-    Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.
+    Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Widgets → Unsplash.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -623,7 +623,7 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder plugin under
 
     ![public_transport_times](../screenshots/widgets/public_transport_times.png)
 
-    Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.
+    Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Widgets → Public Transport. Pick stop_id + route_type per cell.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
