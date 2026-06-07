@@ -84,27 +84,29 @@ jobs:
               sed -i -E "s|(ghcr\.io/dmellok/tesserae:)[0-9A-Za-z._-]+|\1${VERSION}|g" tesserae/Dockerfile
           fi
 
+          # HA Supervisor surfaces this file under the add-on's
+          # "Changelog" tab. We rewrite it to just the current
+          # release every bump (rather than prepending history) so
+          # users see "what's in the version I just upgraded to",
+          # not a wall of every release this year. The host repo's
+          # GitHub releases page holds the full history.
           date_iso="$(date -u +'%Y-%m-%d')"
-          entry="## ${VERSION}, ${date_iso}
+          cat > tesserae/CHANGELOG.md <<EOF
+          # Changelog
 
-          - Tracks Tesserae [${TAG}](https://github.com/dmellok/tesserae/releases/tag/${TAG}).
+          ## ${VERSION}, ${date_iso}
 
-          "
-          entry="$(printf '%s' "${entry}" | sed -E 's/^ {10}//')"
+          Tracks Tesserae [${TAG}](https://github.com/dmellok/tesserae/releases/tag/${TAG}).
+          See the linked release notes for what changed.
 
-          python3 - <<PYEOF
-          from pathlib import Path
-          p = Path("tesserae/CHANGELOG.md")
-          src = p.read_text(encoding="utf-8") if p.exists() else ""
-          entry = """${entry}"""
-          marker = "# Changelog\n"
-          if marker in src:
-              head, _, rest = src.partition(marker)
-              rest = rest.lstrip("\n")
-              p.write_text(head + marker + "\n" + entry + rest, encoding="utf-8")
-          else:
-              p.write_text("# Changelog\n\n" + entry + src, encoding="utf-8")
-          PYEOF
+          ---
+
+          For the full release history, see
+          [the Tesserae releases page](https://github.com/dmellok/tesserae/releases).
+          EOF
+          # Strip the 10-space leading indent the heredoc inherits
+          # from the shell block.
+          sed -i -E 's/^ {10}//' tesserae/CHANGELOG.md
 
       - name: Commit + push
         working-directory: addon
@@ -190,29 +192,26 @@ jobs:
 
           sed -i -E "s/^(version:[[:space:]]*\")[^\"]+(\".*)$/\1${VERSION}\2/" tesserae-edge/config.yaml
 
+          # Edge ships many bumps per day, so we keep the changelog
+          # to JUST the current edge build + a pointer to the host's
+          # commit log for history. Same approach as the stable
+          # channel, see the explanation in bump-stable.
           date_iso="$(date -u +'%Y-%m-%d')"
-          # Single-line subject keeps the entry compact since edge ships
-          # many commits per day.
-          entry="## ${VERSION}, ${date_iso}
+          cat > tesserae-edge/CHANGELOG.md <<EOF
+          # Changelog
 
-          - [\`${SHA}\`](https://github.com/dmellok/tesserae/commit/${FULL_SHA}) ${SUBJECT}
+          ## ${VERSION}, ${date_iso}
 
-          "
-          entry="$(printf '%s' "${entry}" | sed -E 's/^ {10}//')"
+          [\`${SHA}\`](https://github.com/dmellok/tesserae/commit/${FULL_SHA}) ${SUBJECT}
 
-          python3 - <<PYEOF
-          from pathlib import Path
-          p = Path("tesserae-edge/CHANGELOG.md")
-          src = p.read_text(encoding="utf-8") if p.exists() else ""
-          entry = """${entry}"""
-          marker = "# Changelog\n"
-          if marker in src:
-              head, _, rest = src.partition(marker)
-              rest = rest.lstrip("\n")
-              p.write_text(head + marker + "\n" + entry + rest, encoding="utf-8")
-          else:
-              p.write_text("# Changelog\n\n" + entry + src, encoding="utf-8")
-          PYEOF
+          ---
+
+          Edge tracks the tip of \`main\` and updates on every commit; this
+          file always shows just the latest edge build. For the full edge
+          history, see
+          [the Tesserae commit log](https://github.com/dmellok/tesserae/commits/main).
+          EOF
+          sed -i -E 's/^ {10}//' tesserae-edge/CHANGELOG.md
 
       - name: Commit + push
         working-directory: addon
