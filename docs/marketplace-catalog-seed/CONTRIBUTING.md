@@ -70,6 +70,54 @@ Bumping a release follows the same flow: bump `version` in your
 PR here updating your `widgets.json` entry. The Browse page will show
 "Update available" to users running the older version.
 
+## Bundle entries (widget families)
+
+If your widget needs a shared admin / data-fetch sibling (e.g. a
+`_core` folder that holds an API key admin page consumed by several
+display widgets), you can ship the whole family as one catalog
+entry. Two changes to the layout:
+
+**Tarball layout.** Instead of one folder containing `plugin.json`,
+put your subplugins as direct children of the wrapping folder:
+
+```
+github-bundle-v1.0/        ← single wrapping folder (the GitHub
+  github_core/              archive envelope; can be any name)
+    plugin.json
+    server.py
+    client.js
+  github_releases/
+    plugin.json
+    client.js
+  github_repo/
+    plugin.json
+    client.js
+```
+
+**Catalog entry.** Add a `folders` field listing every subplugin:
+
+```json
+{
+  "id": "github",
+  "name": "GitHub family",
+  "folders": ["github_core", "github_releases", "github_repo"],
+  "release": { ... }
+}
+```
+
+The catalog `id` is a logical name for the family (it's NOT a real
+folder). The marketplace verifies the tarball's child folders match
+this list exactly, validates each `plugin.json`, and installs all of
+them as siblings under `plugins/`. Install + uninstall act on the
+whole bundle atomically; per-folder versions are independent (each
+subfolder ships its own `version`).
+
+The `folders` field is optional, the install path auto-detects the
+bundle layout from the tarball. Declaring it gives the reviewer a
+single line to verify and lets the Browse card list every folder
+under the description so users know what's about to land. CI on this
+repo enforces the match when the field is present.
+
 ## What the `official` flag means
 
 Reserved for entries whose source repo is owned by the catalog

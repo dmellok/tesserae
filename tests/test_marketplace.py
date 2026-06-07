@@ -56,6 +56,39 @@ def _make_tarball(
     return buf.getvalue()
 
 
+def _make_bundle_tarball(
+    *,
+    wrapper: str,
+    folders: dict[str, dict[str, Any]],
+    extra_files: dict[str, bytes] | None = None,
+) -> bytes:
+    """Build a bundle tarball: a single wrapping folder whose children
+    are themselves plugin folders. Mirrors the GitHub source-tarball
+    shape but with multiple subplugins inside, e.g.::
+
+        github-1.2/
+          github_core/plugin.json
+          github_core/client.js
+          github_releases/plugin.json
+          github_releases/client.js
+    """
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for sub, manifest in folders.items():
+            for name, payload in [
+                ("plugin.json", json.dumps(manifest).encode()),
+                ("client.js", b"export default function () {}\n"),
+            ]:
+                info = tarfile.TarInfo(f"{wrapper}/{sub}/{name}")
+                info.size = len(payload)
+                tar.addfile(info, io.BytesIO(payload))
+        for path, payload in (extra_files or {}).items():
+            info = tarfile.TarInfo(f"{wrapper}/{path}")
+            info.size = len(payload)
+            tar.addfile(info, io.BytesIO(payload))
+    return buf.getvalue()
+
+
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -76,6 +109,7 @@ def _make_catalog_entry(
     version: str = "0.0.1",
     sha256: str = "deadbeef" * 8,
     tarball_url: str = "https://example.invalid/sample-0.0.1.tar.gz",
+    folders: list[str] | None = None,
 ) -> CatalogEntry:
     return CatalogEntry(
         id=widget_id,
@@ -89,6 +123,7 @@ def _make_catalog_entry(
         tesserae_compat="1.x",
         official=False,
         screenshot_sizes=["lg"],
+        folders=folders,
         release_version=version,
         release_tarball_url=tarball_url,
         release_sha256=sha256,
@@ -485,3 +520,299 @@ def test_corrupt_state_file_treated_as_empty(
     marketplace._state_path.parent.mkdir(parents=True, exist_ok=True)
     marketplace._state_path.write_text("not-json")
     assert marketplace.installed() == {}
+
+
+def test_legacy_record_without_folders_loads_as_single_folder(
+    marketplace: Marketplace,
+) -> None:
+    """Pre-bundle records stored ``plugin_id`` instead of a folders
+    list. Make sure they read back as a single-folder install so an
+    upgrade doesn't break old marketplace.json files."""
+    marketplace._state_path.parent.mkdir(parents=True, exist_ok=True)
+    marketplace._state_path.write_text(
+        json.dumps(
+            {
+                "sample": {
+                    "catalog_id": "sample",
+                    "plugin_id": "sample",
+                    "version": "0.0.1",
+                    "sha256": "deadbeef",
+                    "source": None,
+                    "installed_at": "2026-06-01T00:00:00Z",
+                }
+            }
+        )
+    )
+    installed = marketplace.installed()
+    assert "sample" in installed
+    assert installed["sample"].folders == ["sample"]
+
+
+# -- bundles -----------------------------------------------------------
+
+
+def _github_manifest(name: str) -> dict[str, Any]:
+    """Variant of _minimal_manifest with a distinct name so each
+    subfolder's plugin.json reads as a different widget. Versions
+    deliberately differ between subfolders because real bundles
+    (calendar_core + calendar_day + calendar_week, etc.) version each
+    folder independently, the marketplace's per-folder version check
+    should be skipped for bundles."""
+    return {
+        "tesserae_compat": "1.x",
+        "name": name,
+        "version": "0.0.1",
+        "kind": "widget",
+        "supports": {"sizes": ["md"]},
+    }
+
+
+def test_bundle_install_happy_path(marketplace: Marketplace, url_fixture: dict[str, bytes]) -> None:
+    """End-to-end bundle install: tarball contains a wrapper folder
+    with two plugin subfolders, both land as siblings under plugins/,
+    and the install record lists both."""
+    tarball = _make_bundle_tarball(
+        wrapper="github-bundle-1.0",
+        folders={
+            "github_core": _github_manifest("GitHub Core"),
+            "github_releases": _github_manifest("GitHub Releases"),
+        },
+    )
+    url = "https://example.invalid/github-bundle.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="github",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["github_core", "github_releases"],
+    )
+    result = marketplace.install(entry)
+    assert result.plugin_id == "github"
+
+    plugins_dir = marketplace._plugins_dir
+    assert (plugins_dir / "github_core" / "plugin.json").exists()
+    assert (plugins_dir / "github_releases" / "plugin.json").exists()
+
+    installed = marketplace.installed()
+    assert "github" in installed
+    assert installed["github"].folders == ["github_core", "github_releases"]
+
+
+def test_bundle_install_auto_detects_layout_without_declared_folders(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """When the catalog entry omits `folders`, the install path
+    auto-detects the bundle layout by inspecting the tarball."""
+    tarball = _make_bundle_tarball(
+        wrapper="calendar-1.0",
+        folders={
+            "calendar_core": _github_manifest("Calendar Core"),
+            "calendar_day": _github_manifest("Calendar Day"),
+            "calendar_week": _github_manifest("Calendar Week"),
+        },
+    )
+    url = "https://example.invalid/calendar-bundle.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="calendar",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=None,  # auto-detect
+    )
+    marketplace.install(entry)
+
+    record = marketplace.installed()["calendar"]
+    assert sorted(record.folders) == ["calendar_core", "calendar_day", "calendar_week"]
+
+
+def test_bundle_install_rejects_declared_folders_mismatch(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """Catalog claims folders A+B but tarball has A+C — must reject
+    rather than silently installing whatever was inside."""
+    tarball = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={
+            "a_core": _github_manifest("A Core"),
+            "c_widget": _github_manifest("C Widget"),  # not declared
+        },
+    )
+    url = "https://example.invalid/mismatch.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="mismatch",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["a_core", "b_widget"],  # b_widget missing from tarball
+    )
+    with pytest.raises(InstallRefused, match="declares folders"):
+        marketplace.install(entry)
+
+
+def test_bundle_install_rejects_subfolder_without_manifest(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """Every direct child of the bundle root must have plugin.json;
+    a stray subfolder (LICENSE, docs/, etc.) trips this. Real bundles
+    put aux files inside the plugin subfolders, not at the bundle root."""
+    tarball = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={"core": _github_manifest("Core")},
+        extra_files={"docs/README.md": b"# docs"},
+    )
+    url = "https://example.invalid/stray-docs.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="bundle",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=None,
+    )
+    with pytest.raises(InstallRefused, match="docs"):
+        marketplace.install(entry)
+
+
+def test_bundle_install_collision_on_one_subfolder_aborts(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """One subfolder already exists (bundled or hand-installed) →
+    the whole bundle is refused, leaving the existing folder + the
+    other subfolders untouched."""
+    bundled = marketplace._plugins_dir / "foo_core"
+    bundled.mkdir()
+    (bundled / "plugin.json").write_text("{}")
+
+    tarball = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={
+            "foo_core": _github_manifest("Foo Core"),  # collides
+            "foo_widget": _github_manifest("Foo Widget"),
+        },
+    )
+    url = "https://example.invalid/foo-bundle.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="foo",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["foo_core", "foo_widget"],
+    )
+    with pytest.raises(InstallRefused, match="already exists"):
+        marketplace.install(entry)
+
+    # The collision sits at foo_core; foo_widget must NOT have been
+    # partial-installed. The early collision check fires before any
+    # download / extract, so the post-extract install never runs.
+    assert not (marketplace._plugins_dir / "foo_widget").exists()
+
+
+def test_bundle_uninstall_removes_every_folder(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """uninstall(catalog_id) drops the record + rms every folder
+    listed on the install record, not just the catalog id."""
+    tarball = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={
+            "github_core": _github_manifest("GitHub Core"),
+            "github_releases": _github_manifest("GitHub Releases"),
+            "github_repo": _github_manifest("GitHub Repo"),
+        },
+    )
+    url = "https://example.invalid/github.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="github",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["github_core", "github_releases", "github_repo"],
+    )
+    marketplace.install(entry)
+    assert (marketplace._plugins_dir / "github_core").exists()
+    assert (marketplace._plugins_dir / "github_releases").exists()
+    assert (marketplace._plugins_dir / "github_repo").exists()
+
+    assert marketplace.uninstall("github") is True
+    assert not (marketplace._plugins_dir / "github_core").exists()
+    assert not (marketplace._plugins_dir / "github_releases").exists()
+    assert not (marketplace._plugins_dir / "github_repo").exists()
+    assert "github" not in marketplace.installed()
+
+
+def test_bundle_uninstall_with_delete_data_clears_each_data_dir(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """delete_data=True should rm data/plugins/<folder>/ for every
+    folder in the bundle, not just the catalog id."""
+    tarball = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={
+            "foo_core": _github_manifest("Foo Core"),
+            "foo_widget": _github_manifest("Foo Widget"),
+        },
+    )
+    url = "https://example.invalid/foo.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="foo",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["foo_core", "foo_widget"],
+    )
+    marketplace.install(entry)
+
+    # data_root convention from Marketplace.uninstall:
+    # plugins_dir.parent / data / plugins / <folder>
+    data_root = marketplace._plugins_dir.parent / "data" / "plugins"
+    for f in ("foo_core", "foo_widget"):
+        (data_root / f).mkdir(parents=True, exist_ok=True)
+        (data_root / f / "state.json").write_text("{}")
+
+    marketplace.uninstall("foo", delete_data=True)
+    assert not (data_root / "foo_core").exists()
+    assert not (data_root / "foo_widget").exists()
+
+
+def test_bundle_reinstall_replaces_in_place(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """A second install over the same catalog_id (upgrade flow) should
+    replace folders the bundle owns; folders introduced by the new
+    version land fresh, and the record now lists the new set."""
+    t1 = _make_bundle_tarball(
+        wrapper="bundle-1.0",
+        folders={"core": _github_manifest("Core v0")},
+    )
+    url1 = "https://example.invalid/v1.tar.gz"
+    url_fixture[url1] = t1
+    entry1 = _make_catalog_entry(
+        widget_id="bundle",
+        sha256=_sha256(t1),
+        tarball_url=url1,
+        folders=["core"],
+    )
+    marketplace.install(entry1)
+
+    # Second release adds a second folder + bumps the first.
+    t2 = _make_bundle_tarball(
+        wrapper="bundle-1.1",
+        folders={
+            "core": _github_manifest("Core v1"),
+            "widget_a": _github_manifest("Widget A"),
+        },
+    )
+    url2 = "https://example.invalid/v2.tar.gz"
+    url_fixture[url2] = t2
+    entry2 = _make_catalog_entry(
+        widget_id="bundle",
+        version="0.0.2",
+        sha256=_sha256(t2),
+        tarball_url=url2,
+        folders=["core", "widget_a"],
+    )
+    marketplace.install(entry2)
+
+    record = marketplace.installed()["bundle"]
+    assert sorted(record.folders) == ["core", "widget_a"]
+    fresh_core = json.loads((marketplace._plugins_dir / "core" / "plugin.json").read_text())
+    assert fresh_core["name"] == "Core v1"

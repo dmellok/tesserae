@@ -92,7 +92,15 @@ class InstallRefused(MarketplaceError):
 class CatalogEntry:
     """One widget entry from the catalog index. Frozen so the route
     layer can pass it around without worrying about mutation, all the
-    interesting actions go through ``Marketplace`` methods."""
+    interesting actions go through ``Marketplace`` methods.
+
+    ``folders`` is the informational list of plugin folders this entry
+    installs. Single-widget entries can omit it; the install path
+    auto-detects ``[id]``. Bundle entries (a ``_core`` admin plugin
+    plus its display widgets, e.g. github_core + github_releases +
+    github_actions) should list every folder so the Browse card can
+    show what's about to land, and the install path verifies the
+    tarball matches exactly."""
 
     id: str
     name: str
@@ -105,6 +113,7 @@ class CatalogEntry:
     tesserae_compat: str
     official: bool
     screenshot_sizes: list[str]
+    folders: list[str] | None
     release_version: str
     release_tarball_url: str
     release_sha256: str
@@ -114,6 +123,7 @@ class CatalogEntry:
     def from_dict(cls, raw: dict[str, Any]) -> CatalogEntry:
         author = raw.get("author") or {}
         release = raw.get("release") or {}
+        folders_raw = raw.get("folders")
         return cls(
             id=str(raw["id"]),
             name=str(raw["name"]),
@@ -126,6 +136,7 @@ class CatalogEntry:
             tesserae_compat=str(raw["tesserae_compat"]),
             official=bool(raw.get("official", False)),
             screenshot_sizes=[str(s) for s in raw.get("screenshot_sizes", [])],
+            folders=([str(f) for f in folders_raw] if folders_raw else None),
             release_version=str(release["version"]),
             release_tarball_url=str(release["tarball_url"]),
             release_sha256=str(release["sha256"]).lower(),
@@ -135,13 +146,20 @@ class CatalogEntry:
 
 @dataclass(frozen=True)
 class InstalledRecord:
-    """One row of ``data/core/marketplace.json``: proof that a plugin
-    folder under ``plugins/`` came from the catalog. The Browse page
-    uses these to decide "Install" vs "Update" vs "Uninstall", and
-    uninstall refuses any id that isn't on this list."""
+    """One row of ``data/core/marketplace.json``: proof that a set of
+    plugin folders under ``plugins/`` came from the catalog. The
+    Browse page uses these to decide "Install" vs "Update" vs
+    "Uninstall", and uninstall refuses any catalog id that isn't on
+    this list.
+
+    ``folders`` is the authoritative list of plugin folders the install
+    created. For single-widget entries it's ``[catalog_id]``; for
+    bundles it's every subfolder name (e.g.
+    ``["github_core", "github_releases", "github_actions"]``).
+    Uninstall removes every folder listed here."""
 
     catalog_id: str
-    plugin_id: str
+    folders: list[str]
     version: str
     sha256: str
     source: str | None
@@ -152,9 +170,17 @@ class InstalledRecord:
 
     @classmethod
     def from_json(cls, raw: dict[str, Any]) -> InstalledRecord:
+        # Backward compat: pre-bundle records stored ``plugin_id``
+        # (single folder name, always equal to catalog_id) instead of
+        # a ``folders`` array. Treat the legacy shape as a one-element
+        # folder list keyed off whichever id field is present.
+        folders_raw = raw.get("folders")
+        if not folders_raw:
+            legacy = raw.get("plugin_id") or raw.get("catalog_id")
+            folders_raw = [legacy] if legacy else []
         return cls(
             catalog_id=str(raw["catalog_id"]),
-            plugin_id=str(raw["plugin_id"]),
+            folders=[str(f) for f in folders_raw],
             version=str(raw["version"]),
             sha256=str(raw["sha256"]),
             source=(str(raw["source"]) if raw.get("source") else None),
@@ -340,39 +366,67 @@ class Marketplace:
 
         Steps (in this order, so a failure leaves no partial state on
         disk):
-          1. Refuse if a bundled plugin already owns this id.
-          2. Refuse if compat doesn't match the host's major version.
-          3. Download the tarball with a size cap.
-          4. Verify sha256 matches the catalog entry.
-          5. Extract to a temp dir using ``tarfile``'s ``data`` filter
+          1. Refuse if compat doesn't match the host's major version.
+          2. Download the tarball with a size cap.
+          3. Verify sha256 matches the catalog entry.
+          4. Extract to a temp dir using ``tarfile``'s ``data`` filter
              (rejects absolute paths + ``..`` traversal + suid bits).
-          6. Locate the single top-level folder + validate its
-             ``plugin.json`` against ``schema/plugin.schema.json``.
-          7. Refuse if the embedded manifest's name/id don't match the
-             catalog claim.
-          8. Move the validated tree to ``plugins/<id>/``; on existing
-             marketplace install, replace it.
-          9. Persist a new ``InstalledRecord`` to ``marketplace.json``.
+          5. Detect layout: single-widget (one folder with
+             plugin.json) OR bundle (a containing folder whose
+             children are each plugin folders).
+          6. If the catalog entry declares ``folders``, the detected
+             set must match exactly, this is the catalog's claim
+             check.
+          7. Validate each folder's ``plugin.json`` against
+             ``schema/plugin.schema.json``. For single-widget entries
+             also verify embedded kind/version match the catalog
+             claim; bundles skip those checks because each subfolder
+             has its own kind/version.
+          8. Refuse if any of the destination folders already exist
+             on disk and aren't owned by this catalog entry.
+          9. Move each validated folder to ``plugins/<folder>/``; on
+             reinstall over the same catalog entry, replace.
+          10. Persist a new ``InstalledRecord`` to
+             ``marketplace.json`` listing every folder that landed.
 
         Raises ``InstallRefused`` or ``TarballRejected`` on any of the
         above. The route layer catches both and flashes the message.
         """
         from app.plugin_loader import HOST_MAJOR_VERSION, _compat_ok
 
-        installed = self.installed()
-        target_dir = self._plugins_dir / entry.id
-
-        if target_dir.exists() and entry.id not in installed:
-            raise InstallRefused(
-                f"A plugin folder named {entry.id!r} already exists on disk and "
-                "isn't tracked by the marketplace, refusing to overwrite a bundled "
-                "or hand-installed plugin."
-            )
-
         if not _compat_ok(entry.tesserae_compat, HOST_MAJOR_VERSION):
             raise InstallRefused(
                 f"Widget compat {entry.tesserae_compat!r} doesn't match host "
                 f"major version {HOST_MAJOR_VERSION}."
+            )
+
+        # Pre-flight collision check on whatever folders the catalog
+        # declared (single-widget: just entry.id). Saves the user from
+        # a download + extract round-trip when we already know the
+        # install will fail. The post-extract pass below catches the
+        # auto-detected bundle case + any folders the catalog didn't
+        # declare.
+        early_installed = self.installed()
+        early_record = early_installed.get(entry.id)
+        early_owned: set[str] = set(early_record.folders) if early_record is not None else set()
+        candidates = list(entry.folders) if entry.folders else [entry.id]
+        for folder_id in candidates:
+            target = self._plugins_dir / folder_id
+            if not target.exists() or folder_id in early_owned:
+                continue
+            other = next(
+                (rec.catalog_id for rec in early_installed.values() if folder_id in rec.folders),
+                None,
+            )
+            if other is not None:
+                raise InstallRefused(
+                    f"Plugin folder {folder_id!r} is already installed by "
+                    f"a different catalog entry ({other!r})."
+                )
+            raise InstallRefused(
+                f"A plugin folder named {folder_id!r} already exists on disk and "
+                "isn't tracked by the marketplace, refusing to overwrite a bundled "
+                "or hand-installed plugin."
             )
 
         with tempfile.TemporaryDirectory(prefix="tesserae-mkt-") as tmp:
@@ -402,30 +456,91 @@ class Marketplace:
             except (tarfile.TarError, OSError) as err:
                 raise TarballRejected(f"Could not extract release tarball: {err}") from err
 
-            plugin_root = self._locate_plugin_root(extract_dir, entry.id)
-            self._validate_embedded_manifest(plugin_root, entry)
+            layout = self._detect_layout(extract_dir, entry)
+            is_bundle = len(layout) > 1 or entry.id not in layout
 
-            # Atomic-ish swap: rename old into a backup, move new in,
-            # remove backup on success. If anything between the two
-            # moves fails, roll back to the backup.
-            backup_dir: Path | None = None
-            if target_dir.exists():
-                backup_dir = target_dir.with_name(target_dir.name + ".old")
-                if backup_dir.exists():
-                    shutil.rmtree(backup_dir)
-                target_dir.rename(backup_dir)
+            # Catalog-declared folders must match the tarball exactly.
+            # When folders is omitted we trust the auto-detected set.
+            if entry.folders is not None:
+                declared = set(entry.folders)
+                actual = set(layout.keys())
+                if declared != actual:
+                    raise InstallRefused(
+                        f"Catalog declares folders {sorted(declared)!r} but tarball "
+                        f"contains {sorted(actual)!r}."
+                    )
+
+            for folder_id, folder_path in layout.items():
+                self._validate_embedded_manifest(
+                    folder_path,
+                    entry,
+                    folder_id=folder_id,
+                    is_bundle=is_bundle,
+                )
+
+            installed = self.installed()
+            existing_record = installed.get(entry.id)
+            owned_folders: set[str] = (
+                set(existing_record.folders) if existing_record is not None else set()
+            )
+            # Collision guard: every destination folder must either be
+            # absent on disk or already owned by THIS catalog entry
+            # (the reinstall / upgrade path). A folder owned by a
+            # different catalog entry, or one that's bundled / hand-
+            # installed, blocks the install.
+            for folder_id in layout:
+                target = self._plugins_dir / folder_id
+                if not target.exists():
+                    continue
+                if folder_id in owned_folders:
+                    continue
+                conflicting_owner = next(
+                    (rec.catalog_id for rec in installed.values() if folder_id in rec.folders),
+                    None,
+                )
+                if conflicting_owner is not None:
+                    raise InstallRefused(
+                        f"Plugin folder {folder_id!r} is already installed by "
+                        f"a different catalog entry ({conflicting_owner!r})."
+                    )
+                raise InstallRefused(
+                    f"A plugin folder named {folder_id!r} already exists on disk "
+                    "and isn't tracked by the marketplace, refusing to overwrite "
+                    "a bundled or hand-installed plugin."
+                )
+
+            # Move each folder into place. Backups + rollback are
+            # per-folder so a partial failure (rare; only on disk
+            # errors mid-move) doesn't leave a half-installed bundle.
+            moved: list[tuple[Path, Path | None]] = []
             try:
-                shutil.move(str(plugin_root), str(target_dir))
+                for folder_id, src_path in layout.items():
+                    target = self._plugins_dir / folder_id
+                    backup: Path | None = None
+                    if target.exists():
+                        backup = target.with_name(target.name + ".old")
+                        if backup.exists():
+                            shutil.rmtree(backup)
+                        target.rename(backup)
+                    shutil.move(str(src_path), str(target))
+                    moved.append((target, backup))
             except OSError as err:
-                if backup_dir is not None and backup_dir.exists():
-                    backup_dir.rename(target_dir)
+                # Roll back: restore each backed-up dir, drop any
+                # newly-moved trees so the install is atomic-ish.
+                for target, backup in moved:
+                    if target.exists():
+                        shutil.rmtree(target, ignore_errors=True)
+                    if backup is not None and backup.exists():
+                        backup.rename(target)
                 raise InstallRefused(f"Could not move plugin into place: {err}") from err
-            if backup_dir is not None and backup_dir.exists():
-                shutil.rmtree(backup_dir, ignore_errors=True)
+            # Success: drop the backups.
+            for _target, backup in moved:
+                if backup is not None and backup.exists():
+                    shutil.rmtree(backup, ignore_errors=True)
 
         record = InstalledRecord(
             catalog_id=entry.id,
-            plugin_id=entry.id,
+            folders=sorted(layout.keys()),
             version=entry.release_version,
             sha256=entry.release_sha256,
             source=entry.source,
@@ -433,59 +548,70 @@ class Marketplace:
         )
         self._persist_record(record)
         logger.info(
-            "marketplace: installed %s v%s (sha256=%s…)",
+            "marketplace: installed %s v%s (folders=%s, sha256=%s…)",
             entry.id,
             entry.release_version,
+            record.folders,
             entry.release_sha256[:12],
         )
         return InstallResult(plugin_id=entry.id, version=entry.release_version)
 
     # -- uninstall -------------------------------------------------------
 
-    def uninstall(self, plugin_id: str, *, delete_data: bool = False) -> bool:
-        """Remove a marketplace-installed plugin from disk + state.
+    def uninstall(self, catalog_id: str, *, delete_data: bool = False) -> bool:
+        """Remove a marketplace-installed catalog entry from disk + state.
 
         Refuses any id not in ``marketplace.json``, this is the only
         thing standing between the Browse page and a bundled-plugin
-        rm. Returns True if a plugin was removed; False if the id
-        wasn't tracked (caller can flash "not installed by the
-        marketplace").
+        rm. Returns True if a record was removed; False if the id
+        wasn't tracked.
 
-        ``delete_data=False`` (default) leaves ``data/plugins/<id>/``
-        in place so a reinstall finds the user's settings + caches
-        intact. ``True`` also rms the data dir, the Browse uninstall
-        form has a tick for this.
+        For bundle entries this removes every folder listed on the
+        record (so a github bundle takes its `_core` + every display
+        widget along with it). ``delete_data=False`` (default) leaves
+        every folder's ``data/plugins/<folder>/`` in place so a
+        reinstall finds the user's settings + caches intact;
+        ``True`` also rms the data dirs.
         """
         installed = self.installed()
-        if plugin_id not in installed:
+        if catalog_id not in installed:
             return False
-        target_dir = self._plugins_dir / plugin_id
-        if target_dir.exists():
-            try:
-                shutil.rmtree(target_dir)
-            except OSError as err:
-                logger.warning(
-                    "marketplace: could not remove %s: %s, dropping record anyway",
-                    target_dir,
-                    err,
-                )
-        if delete_data:
-            # data_root for plugins is conventionally data/plugins/<id>.
-            # The path here mirrors what plugin_loader.discover passes;
-            # we reconstruct rather than thread it through the
-            # constructor to keep the wiring small.
-            data_root = self._plugins_dir.parent / "data" / "plugins" / plugin_id
-            if data_root.exists():
+        record = installed[catalog_id]
+        for folder_id in record.folders:
+            target_dir = self._plugins_dir / folder_id
+            if target_dir.exists():
                 try:
-                    shutil.rmtree(data_root)
+                    shutil.rmtree(target_dir)
                 except OSError as err:
-                    logger.warning("marketplace: could not remove data dir %s: %s", data_root, err)
+                    logger.warning(
+                        "marketplace: could not remove %s: %s, dropping record anyway",
+                        target_dir,
+                        err,
+                    )
+            if delete_data:
+                # data_root for plugins is conventionally data/plugins/<id>.
+                # The path here mirrors what plugin_loader.discover passes;
+                # we reconstruct rather than thread it through the
+                # constructor to keep the wiring small.
+                data_root = self._plugins_dir.parent / "data" / "plugins" / folder_id
+                if data_root.exists():
+                    try:
+                        shutil.rmtree(data_root)
+                    except OSError as err:
+                        logger.warning(
+                            "marketplace: could not remove data dir %s: %s", data_root, err
+                        )
         # Drop the record last so a partial failure above still leaves
         # the user with a "stuck" entry they can retry, instead of an
         # untracked plugin folder.
-        del installed[plugin_id]
+        del installed[catalog_id]
         self._write_state(installed)
-        logger.info("marketplace: uninstalled %s (delete_data=%s)", plugin_id, delete_data)
+        logger.info(
+            "marketplace: uninstalled %s (folders=%s, delete_data=%s)",
+            catalog_id,
+            record.folders,
+            delete_data,
+        )
         return True
 
     # -- internals -------------------------------------------------------
@@ -524,50 +650,93 @@ class Marketplace:
                 h.update(chunk)
         return h.hexdigest()
 
-    def _locate_plugin_root(self, extract_dir: Path, plugin_id: str) -> Path:
-        """Pick the directory inside the extracted tarball that should
-        become ``plugins/<id>/``.
+    def _detect_layout(self, extract_dir: Path, entry: CatalogEntry) -> dict[str, Path]:
+        """Return ``{folder_id: Path}`` for either a single-widget or
+        a bundle tarball.
 
-        Two layouts are tolerated:
-          * Single top-level folder containing ``plugin.json``,
-            common for GitHub source tarballs (``<repo>-<sha>/...``).
-            We don't care about the folder name on the way in, we
-            rename to ``plugin_id`` on the way out.
-          * ``plugin.json`` at the extract root, common for the
-            ``release.tar.gz`` artifact CI builds for the catalog.
+        Layouts auto-detected:
+          * **Single widget**: top-level folder contains ``plugin.json``
+            directly. Returns ``{entry.id: <that folder>}`` regardless
+            of the on-disk folder name (we rename on move).
+          * **Bundle**: top-level folder's *children* are themselves
+            plugin folders, each with ``plugin.json``. Returns
+            ``{child_name: <child path>, ...}``. Useful for widget
+            families that pair a ``_core`` admin plugin with display
+            widgets (github_core + github_releases + …) so a single
+            install ships the whole family.
 
-        Anything else raises ``InstallRefused``."""
-        if (extract_dir / "plugin.json").exists():
-            return extract_dir
-        candidates = [p for p in extract_dir.iterdir() if p.is_dir()]
-        if len(candidates) == 1 and (candidates[0] / "plugin.json").exists():
-            return candidates[0]
-        raise InstallRefused(
-            f"Could not find plugin.json in the {plugin_id!r} tarball (looked at "
-            "the extract root and a single top-level folder)."
-        )
+        First unwraps the GitHub-style ``<repo>-<sha>/`` envelope
+        (single top-level folder containing the real layout).
+        Anything that fits neither shape raises ``InstallRefused``."""
+        root = extract_dir
+        # Unwrap the GitHub source-tarball envelope when present:
+        # one top-level folder + nothing else at the root.
+        if not (root / "plugin.json").exists():
+            top_entries = list(root.iterdir())
+            top_dirs = [p for p in top_entries if p.is_dir()]
+            if len(top_entries) == 1 and len(top_dirs) == 1:
+                root = top_dirs[0]
 
-    def _validate_embedded_manifest(self, plugin_root: Path, entry: CatalogEntry) -> None:
-        """Validate the manifest inside the tarball against
-        ``schema/plugin.schema.json`` AND check it claims the same
-        identity as the catalog entry. Belt + braces — the catalog
-        PR review is the primary trust gate, this catches the case
-        where a tarball drifts after merge (republished tag, etc.)."""
+        if (root / "plugin.json").exists():
+            return {entry.id: root}
+
+        # Bundle: every subfolder must contain a plugin.json. Anything
+        # else (a stray file, a subfolder without plugin.json) is a
+        # malformed bundle; better to reject than partially install.
+        subfolders = sorted(p for p in root.iterdir() if p.is_dir())
+        if not subfolders:
+            raise InstallRefused(
+                f"Could not find plugin.json in the {entry.id!r} tarball (looked at "
+                "the extract root, a single wrapping folder, and any subfolders)."
+            )
+        layout: dict[str, Path] = {}
+        for sub in subfolders:
+            if not (sub / "plugin.json").exists():
+                raise InstallRefused(
+                    f"Bundle subfolder {sub.name!r} is missing plugin.json. "
+                    "Every direct child of the tarball must be a valid plugin folder."
+                )
+            layout[sub.name] = sub
+        return layout
+
+    def _validate_embedded_manifest(
+        self,
+        plugin_root: Path,
+        entry: CatalogEntry,
+        *,
+        folder_id: str,
+        is_bundle: bool,
+    ) -> None:
+        """Validate one folder's manifest against
+        ``schema/plugin.schema.json``.
+
+        For single-widget entries (``is_bundle=False``) additionally
+        verify embedded kind + version match the catalog claim — belt
+        + braces against the case where a tarball drifts after merge
+        (republished tag, etc.). For bundle entries each subfolder
+        has its own kind + version independently, so we drop those
+        cross-checks (the sha256 verify catches tarball drift
+        regardless)."""
         manifest_path = plugin_root / "plugin.json"
         try:
             raw = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as err:
-            raise InstallRefused(f"Embedded plugin.json invalid: {err}") from err
+            raise InstallRefused(
+                f"Embedded plugin.json in {folder_id!r} is invalid: {err}"
+            ) from err
         if not isinstance(raw, dict):
-            raise InstallRefused("Embedded plugin.json must be a JSON object")
+            raise InstallRefused(f"Embedded plugin.json in {folder_id!r} must be a JSON object")
         try:
             schema = self._load_json(self._schema_path)
             jsonschema.validate(raw, schema)
         except jsonschema.ValidationError as err:
             field_path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             raise InstallRefused(
-                f"Embedded manifest failed schema validation [{field_path}]: {err.message}"
+                f"Embedded manifest in {folder_id!r} failed schema validation "
+                f"[{field_path}]: {err.message}"
             ) from err
+        if is_bundle:
+            return
         embedded_kind = str(raw.get("kind", ""))
         if embedded_kind != entry.kind:
             raise InstallRefused(
@@ -582,7 +751,7 @@ class Marketplace:
 
     def _persist_record(self, record: InstalledRecord) -> None:
         existing = self.installed()
-        existing[record.plugin_id] = record
+        existing[record.catalog_id] = record
         self._write_state(existing)
 
     def _write_state(self, state: dict[str, InstalledRecord]) -> None:

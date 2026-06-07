@@ -81,7 +81,13 @@ def _entries_payload(
 ) -> list[dict[str, Any]]:
     """Shape catalog entries for the template: include install state,
     screenshot URL, and the "Update available" decision so the
-    template stays presentation-only."""
+    template stays presentation-only.
+
+    ``folders`` on the payload is the list the user should see
+    landing in ``plugins/``: catalog's declared folders when present,
+    falling back to the catalog id for single-widget entries. For
+    installed entries we prefer the marketplace record's actual
+    folders so reinstalling over an old set surfaces the truth."""
     out: list[dict[str, Any]] = []
     for entry in entries:
         record = installed.get(entry.id)
@@ -102,6 +108,13 @@ def _entries_payload(
             if (primary_size and screenshots_base)
             else None
         )
+        if record is not None:
+            folders = list(record.folders)
+        elif entry.folders:
+            folders = list(entry.folders)
+        else:
+            folders = [entry.id]
+        is_bundle = len(folders) > 1 or folders != [entry.id]
         out.append(
             {
                 "id": entry.id,
@@ -120,6 +133,8 @@ def _entries_payload(
                 "update_available": update_available,
                 "screenshot_url": primary_url,
                 "screenshot_sizes": entry.screenshot_sizes,
+                "folders": folders,
+                "is_bundle": is_bundle,
             }
         )
     return out
@@ -220,33 +235,35 @@ def install() -> Response:
 
 @bp.post("/browse/uninstall")
 def uninstall() -> Response:
-    """Uninstall a marketplace-installed plugin. Refuses bundled
-    plugins by checking the marketplace record first; the ``Marketplace``
-    layer also enforces this, so a hand-crafted POST with a bundled id
-    still hits the safety net."""
+    """Uninstall a marketplace-installed catalog entry. For bundle
+    entries this removes every folder listed on the install record
+    (so a github bundle takes its `_core` + every display widget
+    with it). Refuses bundled plugins by checking the marketplace
+    record first; the ``Marketplace`` layer also enforces this so a
+    hand-crafted POST with a bundled id still hits the safety net."""
     mkt = _marketplace()
-    plugin_id = (request.form.get("plugin_id") or "").strip()
-    if not plugin_id:
-        flash("Missing plugin id.", "error")
+    catalog_id = (request.form.get("catalog_id") or "").strip()
+    if not catalog_id:
+        flash("Missing catalog id.", "error")
         return redirect(url_for("marketplace.browse"))
     delete_data = request.form.get("delete_data") == "1"
     try:
-        removed = mkt.uninstall(plugin_id, delete_data=delete_data)
+        removed = mkt.uninstall(catalog_id, delete_data=delete_data)
     except Exception:
-        logger.exception("marketplace: unexpected uninstall failure for %s", plugin_id)
+        logger.exception("marketplace: unexpected uninstall failure for %s", catalog_id)
         flash("Uninstall failed with an unexpected error (see server log).", "error")
         return redirect(url_for("marketplace.browse"))
     if not removed:
         flash(
-            f"{plugin_id!r} isn't tracked by the marketplace, refusing to "
+            f"{catalog_id!r} isn't tracked by the marketplace, refusing to "
             "remove a bundled or hand-installed plugin.",
             "error",
         )
         return redirect(url_for("marketplace.browse"))
     _mark_restart_pending()
-    msg = f"Uninstalled {plugin_id}."
+    msg = f"Uninstalled {catalog_id}."
     if delete_data:
-        msg += " Plugin data dir also removed."
+        msg += " Plugin data dir(s) also removed."
     msg += " Restart Tesserae to drop it from the running registry."
     flash(msg, "ok")
     return redirect(url_for("marketplace.browse"))

@@ -144,6 +144,14 @@
 
       <p class="marketplace-desc">{{ e.description }}</p>
 
+      {% if e.is_bundle %}
+      <p class="marketplace-bundle">
+        <i class="ph ph-stack" aria-hidden="true"></i>
+        <span>Bundle, installs {{ e.folders|length }} plugin folder{{ '' if e.folders|length == 1 else 's' }}:</span>
+        {% for f in e.folders %}<code>{{ f }}</code>{% if not loop.last %} {% endif %}{% endfor %}
+      </p>
+      {% endif %}
+
       {% if e.tags %}
       <div class="marketplace-tags">
         {% for tag in e.tags %}
@@ -171,8 +179,8 @@
         {% endif %}
         <form method="post" action="{{ url_for('marketplace.uninstall') }}" class="inline"
               onsubmit="return confirm('Uninstall {{ e.name }}? (Data dir is kept; tick the box below first to delete that too.)');">
-          <input type="hidden" name="plugin_id" value="{{ e.id }}">
-          <label class="inline-check muted" title="Also delete plugin data dir">
+          <input type="hidden" name="catalog_id" value="{{ e.id }}">
+          <label class="inline-check muted" title="Also delete plugin data dir(s)">
             <input type="checkbox" name="delete_data" value="1">
             <span>+ data</span>
           </label>
@@ -282,6 +290,22 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;
+  }
+  .marketplace-bundle {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--t-fg-soft);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .marketplace-bundle code {
+    background: var(--t-surface-sunk);
+    border: 1px solid var(--t-border);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    font-size: 0.78rem;
   }
   .marketplace-actions {
     margin-top: auto;

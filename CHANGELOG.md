@@ -6,6 +6,62 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.34.0], 2026-06-07
+
+Marketplace bundle support for widget families.
+
+### Added
+
+- **Catalog bundles.** A catalog entry can now install a whole
+  widget family (e.g. github_core + github_releases +
+  github_actions) in one click. The tarball wraps every subplugin in
+  a single containing folder, and the marketplace install path
+  auto-detects the layout. Optional `folders: [...]` field on the
+  entry declares the expected subfolders; when present, the install
+  verifies the tarball matches exactly and the Browse card lists
+  every folder so users see what's about to land.
+- **Browse card bundle line.** Cards now show "Bundle, installs N
+  plugin folders: foo_core, foo_widget" when the entry installs
+  more than one folder, so the install action is unambiguous.
+
+### Changed
+
+- **`InstalledRecord` now carries a `folders` list** instead of a
+  single `plugin_id`. Existing single-widget records (pre-0.34) read
+  back as `folders=[catalog_id]` via a backward-compat shim in
+  `from_json`, so v0.33 installs survive the upgrade untouched.
+- **Marketplace uninstall is keyed by `catalog_id`** (the form field
+  on the Browse uninstall button renamed from `plugin_id` to
+  `catalog_id`). For bundle entries the uninstall removes every
+  folder the install record lists, plus optionally each folder's
+  data dir under `data/plugins/`.
+- **Catalog CI workflow** (in the seed at
+  `docs/marketplace-catalog-seed/`) now extracts each tarball and
+  cross-checks the declared `folders` against the actual subfolders.
+  Mismatched submissions die at the PR gate.
+
+### Internals
+
+- `app/marketplace.py` gains `_detect_layout`: unwraps the
+  GitHub-style single-folder envelope, then returns either
+  `{entry.id: <single folder>}` (single widget) or
+  `{child_id: <child path>, ...}` (bundle). Tarball extraction still
+  uses `tarfile.data_filter` (PEP 706) so path-traversal + suid
+  attacks die at the gate.
+- Per-folder install moves are now atomic-ish across the bundle: a
+  mid-move OS error rolls back every backup + drops any
+  partially-installed sibling, so a half-installed bundle can't
+  leak onto disk.
+- Embedded `kind` + `version` cross-checks are skipped for bundles
+  because each subfolder has its own kind + version independently;
+  the sha256 verify catches tarball drift regardless.
+- 9 new test cases for bundles: happy path, auto-detect without
+  declared folders, declared-vs-actual mismatch, subfolder without
+  plugin.json, collision on one subfolder aborts atomically,
+  uninstall removes every folder, uninstall with delete_data clears
+  each data dir, reinstall replaces in-place, and a legacy-record
+  backward-compat read.
+
 ## [0.33.0], 2026-06-07
 
 Community widget marketplace, phase 1 (audit-only catalog).

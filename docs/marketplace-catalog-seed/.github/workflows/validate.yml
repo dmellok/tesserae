@@ -32,7 +32,7 @@ jobs:
       - name: Validate catalog
         run: |
           python <<'PY'
-          import hashlib, json, sys
+          import hashlib, io, json, sys, tarfile
           from pathlib import Path
           import jsonschema, requests
 
@@ -40,6 +40,28 @@ jobs:
           index = json.loads((root / "widgets.json").read_text())
           schema = json.loads((root / "schema" / "marketplace.schema.json").read_text())
           jsonschema.validate(index, schema)
+
+          def detect_layout(buf: bytes, primary_id: str) -> list[str]:
+              """Mirror app/marketplace.py's _detect_layout: unwrap one
+              GitHub-style envelope, then either single-widget (top-level
+              has plugin.json) or bundle (subfolders each have one)."""
+              with tarfile.open(fileobj=io.BytesIO(buf), mode="r:*") as tar:
+                  names = [m.name for m in tar.getmembers() if not m.isdir()]
+              top_dirs = sorted({n.split("/", 1)[0] for n in names if "/" in n})
+              prefix = ""
+              # Single wrapping dir + nothing else at root
+              if len(top_dirs) == 1 and all("/" in n for n in names):
+                  prefix = top_dirs[0] + "/"
+              stripped = [n[len(prefix):] for n in names]
+              # Single widget: plugin.json directly under prefix
+              if "plugin.json" in stripped:
+                  return [primary_id]
+              # Bundle: subdirs each containing plugin.json
+              folders = set()
+              for n in stripped:
+                  if "/" in n and n.endswith("/plugin.json") and n.count("/") == 1:
+                      folders.add(n.split("/", 1)[0])
+              return sorted(folders)
 
           failures = []
           for w in index.get("widgets", []):
@@ -52,23 +74,34 @@ jobs:
                       continue
                   if p.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
                       failures.append(f"{wid}: {p} is not a PNG (bad magic)")
-              # tarball
+              # tarball: fetch + sha256 + layout vs declared folders
               rel = w["release"]
               try:
-                  resp = requests.get(rel["tarball_url"], stream=True, timeout=20)
+                  resp = requests.get(rel["tarball_url"], timeout=20)
                   resp.raise_for_status()
-                  h = hashlib.sha256()
-                  for chunk in resp.iter_content(64 * 1024):
-                      h.update(chunk)
-                  actual = h.hexdigest()
+                  body = resp.content
               except Exception as err:
                   failures.append(f"{wid}: tarball fetch failed: {err}")
                   continue
-              if actual != rel["sha256"]:
+              actual_sha = hashlib.sha256(body).hexdigest()
+              if actual_sha != rel["sha256"]:
                   failures.append(
                       f"{wid}: sha256 mismatch (declared {rel['sha256'][:12]}..., "
-                      f"got {actual[:12]}...)"
+                      f"got {actual_sha[:12]}...)"
                   )
+                  continue
+              # Bundle: catalog-declared folders must match tarball
+              if "folders" in w:
+                  declared = sorted(w["folders"])
+                  try:
+                      actual = detect_layout(body, wid)
+                  except Exception as err:
+                      failures.append(f"{wid}: could not detect tarball layout: {err}")
+                      continue
+                  if declared != actual:
+                      failures.append(
+                          f"{wid}: declared folders {declared} but tarball contains {actual}"
+                      )
 
           if failures:
               print("\n".join(failures))

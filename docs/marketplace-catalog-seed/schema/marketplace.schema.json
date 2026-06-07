@@ -105,6 +105,16 @@
           "uniqueItems": true,
           "description": "Sizes contributed under screenshots/<id>/<size>.png in the catalog repo. Must include 'lg'; CI rejects entries that don't ship the lg thumbnail."
         },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Informational: the plugin folders this entry will install. The marketplace auto-detects the layout from the tarball (single-widget or bundle-of-subfolders); when this field is present, the install path additionally verifies the tarball matches exactly. Used by widget families that pair a `_core` admin plugin with one or more display widgets, e.g. ['github_core', 'github_releases', 'github_actions']. Omit for single-widget entries (the folder is just `id`); the Browse card surfaces this list so users see what's about to land."
+        },
         "release": {
           "type": "object",
           "required": ["version", "tarball_url", "sha256"],
