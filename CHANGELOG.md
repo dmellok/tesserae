@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.38.0], 2026-06-08
+
+### Changed (breaking, but easy to fix)
+
+- **F1 widget family moved out of the bundle.** The five F1 widgets
+  (`f1_core`, `f1_last_race`, `f1_next`, `f1_standings_drivers`,
+  `f1_weekend`) are no longer bundled with Tesserae and instead live
+  in the community catalog. Existing dashboards that referenced these
+  widgets will show "widget not installed" cells on upgrade until
+  you reinstall them via Settings → Widgets → Browse community
+  widgets → Install Formula 1.
+
+  Why: kicking off the bundle slim-down. F1 is genuinely niche (most
+  users don't follow the sport) and shipping 5 widgets every install
+  inflated the picker for everyone. Marketplace is the right home,
+  opt in if you want them, ignore them if you don't.
+
+  Source repo for the moved bundle:
+  [dmellok/tesserae-f1](https://github.com/dmellok/tesserae-f1).
+  Catalog entry: id `f1`, official, bundle pattern (one install lays
+  down all 5 folders).
+
+  This is the first family to move. More niche / interest-specific
+  families will follow in upcoming releases (Spotify, GitHub,
+  Finance, etc.); each one will carry a CHANGELOG note in the same
+  shape so you always know where a removed widget went.
+
 ## [0.37.0], 2026-06-07
 
 ### Added
