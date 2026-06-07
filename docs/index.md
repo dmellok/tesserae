@@ -14,7 +14,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 !!! tip "New here? Start with the path that matches you"
     - **I want it running** → [Install Tesserae](install/server.md) (or via [Docker](install/docker.md) / as a [Home Assistant Add-on](install/home-assistant.md))
     - **I have a panel to drive** → [Install a client](install/clients.md) then [Set up a device](install/devices.md)
-    - **What can it show?** → [Widget gallery](widgets/gallery.md) (58 widgets)
+    - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (30 ship in the install) or the [community catalog](widgets/community.md) (more, one-click install)
     - **What hardware works?** → [Screens & compatibility](compatibility.md)
     - **I want to build a widget** → [Build a widget with AI](dev/writing-a-widget.md)
 
@@ -25,7 +25,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 3. **Quantise** the frame to the panel's colour palette and pack it for the wire.
 4. **Publish**, over MQTT (Pi, ESP32) or HTTP-pull (TRMNL, Kindle). A small client on the panel paints it and sleeps.
 
-Every layer, the 58 widgets, the themes, the fonts, the renderers, the
+Every layer, the bundled widgets + the community catalog, the themes, the fonts, the renderers, the
 device kinds, is a drop-a-folder plugin or a dedicated app surface
 discovered at boot. See [Build a widget with AI](dev/writing-a-widget.md)
 for the authoring path and [the widget contract](widgets.md) for the

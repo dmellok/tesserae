@@ -82,7 +82,8 @@ nav:
   - Set up a device: install/devices.md
   - Screens & compatibility: compatibility.md
   - Widgets:
-      - Gallery: widgets/gallery.md
+      - Gallery (bundled): widgets/gallery.md
+      - Gallery (community catalog): widgets/community.md
       - Stability tiers: widgets/tiers.md
   - Widget development:
       - Architecture: dev/architecture.md
