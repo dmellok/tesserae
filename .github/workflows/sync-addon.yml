@@ -33,8 +33,15 @@ on:
 permissions:
   contents: read
 
+# Single lock across all event flavors. Cutting a release fires BOTH a
+# release event (stable bump) and the matching push event (edge bump)
+# ~2s apart; if they ran in parallel they'd both check out the add-on
+# repo at the same SHA, race on push, and one would lose with
+# "remote rejected: cannot lock ref". Serialising them via a shared
+# group means stable bumps tesserae/, edge then rebases on top + bumps
+# tesserae-edge/, both lands cleanly.
 concurrency:
-  group: sync-addon-${{ github.event_name }}
+  group: sync-addon
   cancel-in-progress: false
 
 jobs:
@@ -127,7 +134,24 @@ jobs:
 
           Auto-synced by sync-addon.yml (stable channel).
           Release: https://github.com/dmellok/tesserae/releases/tag/${TAG}"
-          git push
+          # Pull-rebase before push: even with the workflow's
+          # concurrency lock, the add-on repo can advance from a manual
+          # edit or another workflow between checkout and push, retry
+          # is cheap and covers that race. Track success explicitly so
+          # a 3-fail run errors out rather than silently no-op-ing.
+          pushed=0
+          for attempt in 1 2 3; do
+              if git pull --rebase origin main && git push; then
+                  pushed=1
+                  break
+              fi
+              echo "Push attempt ${attempt} failed, retrying..."
+              sleep 2
+          done
+          if [ "${pushed}" -ne 1 ]; then
+              echo "::error::Failed to push after 3 attempts"
+              exit 1
+          fi
           echo "Bumped stable add-on to ${VERSION}."
 
   # Edge bump, push: branches: [main]. Tracks every main commit.
@@ -235,5 +259,19 @@ jobs:
 
           Auto-synced by sync-addon.yml (edge channel).
           Commit: https://github.com/dmellok/tesserae/commit/${SHA}"
-          git push
+          # See the stable channel comment, retry with pull-rebase to
+          # ride out any concurrent ref advance on the add-on repo.
+          pushed=0
+          for attempt in 1 2 3; do
+              if git pull --rebase origin main && git push; then
+                  pushed=1
+                  break
+              fi
+              echo "Push attempt ${attempt} failed, retrying..."
+              sleep 2
+          done
+          if [ "${pushed}" -ne 1 ]; then
+              echo "::error::Failed to push after 3 attempts"
+              exit 1
+          fi
           echo "Bumped edge add-on to ${VERSION}."
