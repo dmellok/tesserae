@@ -98,6 +98,20 @@ class Plugin:
         assert isinstance(sizes, list)
         return [str(s) for s in sizes]
 
+    @property
+    def palette(self) -> str:
+        """``"strict"`` (default) or ``"extended"``. Extended widgets
+        opt into arbitrary CSS colours and rely on the renderer's
+        dither pass to land them on the panel palette. See
+        ``schema/plugin.schema.json``'s ``design.palette`` for the
+        full contract."""
+        design = self.manifest.get("design")
+        if isinstance(design, dict):
+            value = design.get("palette")
+            if value in ("strict", "extended"):
+                return str(value)
+        return "strict"
+
     def cell_option_defaults(self) -> dict[str, Any]:
         defaults: dict[str, Any] = {}
         for opt in self.manifest.get("cell_options", []):

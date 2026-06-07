@@ -6,6 +6,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.37.0], 2026-06-07
+
+### Added
+
+- **`design.palette` manifest opt-in** for widgets that want to use
+  arbitrary CSS colours (gradients, layered shapes, soft shadows)
+  rather than the strict Spectra colour tokens. Default stays
+  `strict`; widgets declare `"design": {"palette": "extended"}` to
+  opt in. Renderer behaviour is unchanged: extended widgets rely on
+  the existing Floyd-Steinberg dither pass to approximate their
+  CSS colours on the panel palette. Typography + spacing tokens
+  remain mandatory regardless of the palette flag so multi-widget
+  dashboards stay visually coherent.
+- **`weather_now_scenic` widget**, the reference implementation of
+  the extended palette opt-in. Pill-shaped card with weather +
+  time-of-day theming across nine presets (sunny day, clear night,
+  partly day/night, cloudy day/night, rain, snow, storm). Same
+  Open-Meteo data path as `weather_now` (shares the WMO mapping)
+  but a slimmer payload tailored to the scenic layout. Ships as a
+  separate widget rather than a style switch on `weather_now` so
+  the two can coexist on a dashboard and the bundled widget keeps
+  its strict-palette guarantees for BW panels.
+
 ## [0.36.2], 2026-06-07
 
 ### Fixed

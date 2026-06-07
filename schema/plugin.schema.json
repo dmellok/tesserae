@@ -96,6 +96,17 @@
         "needs_network": { "type": "boolean" }
       }
     },
+    "design": {
+      "type": "object",
+      "description": "Design-system intent. Default for every field is the strict, palette-safe behaviour; opt-in values signal a widget is using a richer surface and accepts the downstream trade-offs.",
+      "properties": {
+        "palette": {
+          "enum": ["strict", "extended"],
+          "default": "strict",
+          "description": "`strict` (default): the widget only uses Spectra colour tokens (`--w-orange`, `--w-blue`, etc.), so the rendered output lands cleanly on every supported panel without dithering. `extended`: the widget uses arbitrary CSS colours and relies on the renderer's Floyd-Steinberg pass to approximate them on the panel palette. Good for scenic/decorative widgets (gradients, soft scenery); read worse on BW panels than strict widgets. Catalog reviewers should see this flag and treat extended widgets as taking on the dither-tradeoff responsibility."
+        }
+      }
+    },
     "requires": {
       "type": "array",
       "items": {

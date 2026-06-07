@@ -109,3 +109,72 @@ def test_cell_option_defaults_merged() -> None:
     )
     defaults = plugin.cell_option_defaults()
     assert defaults == {"a": "x", "b": True}
+
+
+def test_palette_defaults_to_strict() -> None:
+    """Widgets without a ``design`` block read as strict, the default
+    behaviour predating the opt-in. Matches the loader's contract that
+    absent fields don't change existing widgets."""
+    plugin = plugin_loader.Plugin(
+        id="toy",
+        path=Path("/tmp/toy"),
+        manifest={"kind": "widget", "name": "Toy", "supports": {"sizes": ["md"]}},
+        data_dir=Path("/tmp/toy_data"),
+    )
+    assert plugin.palette == "strict"
+
+
+def test_palette_extended_opt_in() -> None:
+    """``design.palette: "extended"`` flips the property, signalling
+    to reviewers + future device-side logic that this widget uses the
+    dither pass to approximate arbitrary CSS colours on the panel."""
+    plugin = plugin_loader.Plugin(
+        id="fancy",
+        path=Path("/tmp/fancy"),
+        manifest={
+            "kind": "widget",
+            "name": "Fancy",
+            "supports": {"sizes": ["md"]},
+            "design": {"palette": "extended"},
+        },
+        data_dir=Path("/tmp/fancy_data"),
+    )
+    assert plugin.palette == "extended"
+
+
+def test_palette_garbage_value_falls_back_to_strict() -> None:
+    """A malformed palette string (e.g. typo'd by a contributor)
+    falls back to strict so a bad manifest doesn't quietly grant the
+    extended opt-in. Schema validation upstream catches the literal
+    bad value; this guards the runtime accessor too."""
+    plugin = plugin_loader.Plugin(
+        id="typo",
+        path=Path("/tmp/typo"),
+        manifest={
+            "kind": "widget",
+            "name": "Typo",
+            "supports": {"sizes": ["md"]},
+            "design": {"palette": "fancy"},
+        },
+        data_dir=Path("/tmp/typo_data"),
+    )
+    assert plugin.palette == "strict"
+
+
+def test_extended_palette_manifest_passes_schema(tmp_path: Path, schema_path: Path) -> None:
+    """End-to-end: a manifest declaring the extended palette opt-in
+    discovers without schema errors. Locks in the schema's enum +
+    object shape so a future schema bump can't quietly break the
+    contract."""
+    plugins_dir = tmp_path / "plugins"
+    plugins_dir.mkdir()
+    _write_minimal_plugin(
+        plugins_dir,
+        "scenic_toy",
+        {"design": {"palette": "extended"}},
+    )
+    registry = plugin_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    assert "scenic_toy" in registry.plugins
+    assert registry.plugins["scenic_toy"].palette == "extended"

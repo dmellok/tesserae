@@ -1,0 +1,48 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Weather, Scenic",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Current weather as a pill card with weather-and-time-of-day theming. Uses the extended palette opt-in so soft gradients (sunset, night sky) render on 7-colour e-ink panels via the renderer's dither pass. Data from Open-Meteo (no API key).",
+  "icon": "ph-cloud-sun",
+  "supports": {
+    "sizes": ["sm", "md", "lg"]
+  },
+  "cell_options": [
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude",
+      "default": ""
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude",
+      "default": ""
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Place label",
+      "default": "Melbourne"
+    },
+    {
+      "name": "units",
+      "type": "select",
+      "label": "Units",
+      "default": "metric",
+      "choices": [
+        { "value": "metric", "label": "Metric (°C)" },
+        { "value": "imperial", "label": "Imperial (°F)" }
+      ]
+    }
+  ],
+  "render": {
+    "needs_network": true
+  },
+  "requires": ["network:api.open-meteo.com"],
+  "design": {
+    "palette": "extended"
+  }
+}

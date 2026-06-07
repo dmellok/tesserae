@@ -413,6 +413,60 @@ Worked examples in the bundled tree:
 
 ---
 
+## `design.palette`, opting out of strict colour tokens
+
+The Spectra colour tokens (`--w-orange`, `--w-blue`, etc.) constrain
+widgets to colours that land cleanly on every supported e-ink panel,
+no dithering surprises. That's the right default. Some widgets,
+typically decorative or scenic ones, want a richer surface: a sunset
+gradient on a weather card, layered cloud shapes, a deep night-sky
+background. Those land via the renderer's Floyd-Steinberg dither pass,
+which approximates arbitrary CSS colours as patterned dot-mixes of the
+panel's actual palette.
+
+To opt in, declare it in the manifest:
+
+```json
+{
+  "design": {
+    "palette": "extended"
+  }
+}
+```
+
+`strict` (the default) and `extended` are the only legal values.
+
+What this changes:
+
+- **For widget authors**: you can use any CSS colour, gradient, or
+  shadow you want. The browser preview shows the literal CSS; the
+  panel render shows the dithered approximation.
+- **For catalog reviewers**: the manifest flag is the signal that a
+  widget is taking on the dither-tradeoff responsibility. Soft scenery
+  reads well, fine details (small text on a gradient, sharp icon edges
+  over a transition) read worse than strict-palette equivalents.
+  Reviewers should ask "does the dithered output read clearly at the
+  target panel resolution?" rather than only checking the browser preview.
+- **For device-side logic** (future): the host can later prefer strict
+  widgets when assigning to a BW or 3-colour panel, since extended
+  widgets degrade harder there. The manifest declaration makes this
+  possible without re-parsing CSS at runtime.
+
+What this **does not** change:
+
+- Typography and spacing tokens (`--fs-display`, `--space-4`, etc.)
+  stay mandatory. Cross-widget consistency in type + layout is what
+  keeps a multi-widget dashboard from feeling chaotic.
+- The capability layer is unaffected. Extended widgets still need a
+  `requires:` block for any network egress, same as strict ones.
+
+The reference implementation is
+[`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic),
+a weather card with weather + time-of-day theming using gradients and
+layered shape decorations.
+
+---
+
 ## Tokens, the Spectra design system
 
 Spectra has three token layers. Widgets paint from the upper two; never
