@@ -244,6 +244,17 @@ layer.
 - **Failure modes.** Widgets that crash the cell on upstream errors
   should return `{"error": "..."}` from `fetch()` instead of raising
   so the client.js renders an error card.
+- **`design.palette` declared (if extended).** Strict palette widgets
+  (the default) read from Spectra colour tokens and dither cleanly on
+  every panel; no declaration needed. Widgets that use arbitrary CSS
+  colours (gradients, layered shapes, soft shadows) must declare
+  `"design": {"palette": "extended"}` in `plugin.json`. Reviewers
+  evaluating an extended-palette widget should check the *dithered*
+  output at the target panel resolution, not just the browser
+  preview; soft scenery dithers well, fine text-on-gradient does not.
+  The opt-in is a yellow flag (acceptable, but the design tradeoffs
+  are now yours, not the design system's). See
+  [the widget contract's `design.palette` section](../widgets.md#designpalette-opting-out-of-strict-colour-tokens).
 
 ## Repo hygiene
 

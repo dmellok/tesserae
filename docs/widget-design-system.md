@@ -184,6 +184,52 @@ the text inside a `<span class="pill">`).
 Bauhaus theme makes accent-1 red AND accent-6 red (both = primary red),
 but accent-3 is blue. Always reach by role.
 
+### Extended palette opt-in
+
+The accent-by-role discipline above is the default and the right answer
+for ~95% of widgets. Some widgets, scenic / decorative ones, weather
+cards with sunset gradients, anything visually atmospheric, want a
+richer surface than the six accent slots can express. For those, the
+manifest has an explicit opt-in:
+
+```json
+{
+  "design": {
+    "palette": "extended"
+  }
+}
+```
+
+With `"extended"` declared, the widget can use any CSS colour,
+gradient, or shadow. The renderer's Floyd-Steinberg dither pass
+approximates those colours on the panel's actual palette; the browser
+preview shows the literal CSS, the panel render shows the dithered
+approximation.
+
+What stays the same:
+
+- Typography + spacing tokens (`--fs-display`, `--space-4`, etc.) are
+  still mandatory. The opt-in covers colour only.
+- The capability layer is unaffected; `requires:` declarations still
+  apply.
+
+What changes:
+
+- The widget no longer reads as "this picks an accent role and the
+  theme decides the hue". Themes don't influence an extended palette,
+  the widget owns its colour story.
+- The dither tradeoff: soft gradients and atmospheric scenery dither
+  beautifully; sharp text-on-gradient or fine details read worse. The
+  reviewer's question becomes "does the dithered output read clearly
+  at the target panel resolution?" rather than "did they use the
+  right token?".
+- BW + 3-colour panels degrade harder than 7-colour Spectra. Extended
+  widgets are at their best on the colour panels; consider whether
+  yours has a meaningful fallback for low-colour hardware.
+
+Reference implementation:
+[`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
+
 ---
 
 ## 7. Charts

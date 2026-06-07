@@ -257,6 +257,31 @@ Example (weather_now):
 | range low arrow |,                      | `--accent-5`  | secondary |
 | rain pill       | rain ≥ 30%             | `--accent-4`  | primary water |
 
+### Extended palette: when strict tokens don't fit
+
+The accent table above is the right answer for almost every widget.
+For *scenic / decorative* widgets (a weather card whose whole point
+is a sunset gradient, an atmospheric clock background), the strict
+palette can't express what the design wants. Those widgets declare
+`"design": {"palette": "extended"}` in `plugin.json` and use
+arbitrary CSS colours; the renderer's Floyd-Steinberg dither
+approximates them on the panel palette.
+
+Trade-offs you take on:
+
+- Themes no longer change the widget's look, the widget owns its
+  colour story end to end.
+- The dithered output reads differently from the browser preview.
+  Soft scenery dithers well; fine details on gradients read worse.
+  Catalog reviewers will judge the *dithered* output, not the
+  browser preview.
+- BW + 3-colour panels degrade harder than 7-colour Spectra; an
+  extended-palette widget is at its best on the colour panels.
+
+Only opt in if the strict tokens genuinely can't carry the design.
+Reference:
+[`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
+
 ---
 
 ## 10. Size adaptations

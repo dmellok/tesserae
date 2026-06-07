@@ -105,6 +105,18 @@ The six accent slots have fixed **roles by position**:
 Reach by role, not by colour. "I want red" is the wrong instinct -
 pick the slot whose meaning is right; the theme gives you the hue.
 
+**Exception, the extended palette opt-in.** Scenic / decorative
+widgets (weather cards with sunset gradients, anything atmospheric)
+can declare `"design": {"palette": "extended"}` in `plugin.json` and
+use arbitrary CSS colours (gradients, layered shapes, soft shadows).
+The renderer's Floyd-Steinberg dither approximates them on the panel
+palette. Only opt in if your widget genuinely *needs* that surface;
+strict tokens are the right default and read cleaner on BW panels.
+Typography + spacing tokens stay mandatory either way.
+
+Reference:
+[`plugins/weather_now_scenic`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
+
 ### 3. Icons are bold Phosphor
 
 Use Phosphor at the **`bold`** weight for everything. Other weights
