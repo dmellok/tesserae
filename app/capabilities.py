@@ -117,6 +117,19 @@ _active: contextvars.ContextVar[Capabilities | None] = contextvars.ContextVar(
     default=None,
 )
 
+# When our ``create_connection`` hook has already approved a hostname
+# and called through to the stdlib implementation, the stdlib then does
+# ``getaddrinfo(host)`` and calls ``sock.connect((ip, port))`` on the
+# resolved IP. Without this flag, our ``socket.connect`` hook would
+# re-check the IP against the hostname allowlist and reject every real
+# request, the widget never declares the IP (it can't, DNS rotates).
+# This contextvar lets the connect hook skip exactly the calls that
+# come from an already-approved create_connection upstream.
+_in_approved_create_connection: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "tesserae_in_approved_create_connection",
+    default=False,
+)
+
 
 def parse(plugin_id: str, raw: object) -> Capabilities:
     """Build :class:`Capabilities` from a manifest's ``requires:``
@@ -229,7 +242,15 @@ def _hooked_create_connection(
                 f"widget {caps.plugin_id!r} tried to connect to {host!r} "
                 "but didn't declare it under requires: in plugin.json"
             )
-    return _original_create_connection(address, *args, **kwargs)
+    # Stdlib's create_connection will now resolve DNS and call
+    # sock.connect((ip, port)); flag the contextvar so our connect
+    # hook lets that post-DNS call through. The flag scopes per-task
+    # via contextvars, so concurrent renders don't race.
+    token = _in_approved_create_connection.set(True)
+    try:
+        return _original_create_connection(address, *args, **kwargs)
+    finally:
+        _in_approved_create_connection.reset(token)
 
 
 _original_socket_connect = socket.socket.connect
@@ -242,7 +263,15 @@ def _hooked_socket_connect(
     """Catch the lower-level ``socket.socket.connect`` path too. Some
     HTTPS stacks open a TCP socket and call ``connect`` directly
     rather than going through ``create_connection``; mirror the
-    same allow/deny logic so neither layer can be bypassed."""
+    same allow/deny logic so neither layer can be bypassed.
+
+    Skipped when called from inside our own ``create_connection``
+    hook (which has already approved the hostname), the stdlib's
+    create_connection internally calls ``sock.connect((ip, port))``
+    on the DNS-resolved IP and the IP is never going to be in any
+    widget's allowlist."""
+    if _in_approved_create_connection.get():
+        return _original_socket_connect(self, address)
     caps = _active.get()
     if caps is not None and isinstance(address, tuple) and len(address) >= 1:
         host = address[0]

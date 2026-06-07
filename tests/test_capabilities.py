@@ -244,6 +244,56 @@ def test_hook_install_is_idempotent() -> None:
     uninstall()
 
 
+def test_hook_allows_declared_host_through_real_create_connection(
+    hook_installed: _HookFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the post-DNS double-check bug. The stdlib's
+    ``create_connection`` does ``getaddrinfo(host)`` then
+    ``sock.connect((ip, port))``, so without the suppression
+    contextvar our ``socket.connect`` hook would re-check the IP
+    against the hostname allowlist and reject every real request
+    (every weather widget for example, since open-meteo's IPs
+    aren't in the manifest).
+
+    We mock DNS + the bare ``connect`` syscall so the test doesn't
+    need network, but go through the real
+    ``_original_create_connection`` so the second hook actually
+    fires the way it does in production."""
+    monkeypatch.setattr(
+        socket,
+        "getaddrinfo",
+        lambda host, port, *a, **kw: [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("188.40.99.226", port)),
+        ],
+    )
+    monkeypatch.setattr("app.capabilities._original_socket_connect", lambda self, address: None)
+
+    caps = parse("weather_now", ["network:api.open-meteo.com"])
+    with capability_scope(caps):
+        # Pre-fix this raised CapabilityDenied complaining about
+        # "188.40.99.226" not being in the manifest.
+        sock = socket.create_connection(("api.open-meteo.com", 443))
+    sock.close()
+
+
+def test_hook_blocks_undeclared_host_via_raw_socket_connect(
+    hook_installed: _HookFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Raw ``socket.socket().connect((host, port))`` (bypassing
+    ``create_connection`` entirely) still gets caught by the second
+    hook, since the suppression contextvar is only set inside our
+    ``create_connection`` hook."""
+    monkeypatch.setattr("app.capabilities._original_socket_connect", lambda self, address: None)
+    caps = parse("weather_now", ["network:api.open-meteo.com"])
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        with capability_scope(caps), pytest.raises(CapabilityDenied) as exc:
+            sock.connect(("exfil.example.invalid", 443))
+        assert "exfil.example.invalid" in str(exc.value)
+    finally:
+        sock.close()
+
+
 def test_undeclared_plugin_in_scope_still_allows_network(
     hook_installed: _HookFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:

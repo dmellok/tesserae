@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.36.2], 2026-06-07
+
+### Fixed
+
+- **Capability hook no longer rejects every real network call after
+  DNS.** The egress check installed two socket hooks (one on
+  `socket.create_connection`, one on `socket.socket.connect`) so
+  raw-socket use couldn't bypass the hostname allowlist. Problem:
+  stdlib's `create_connection` does `getaddrinfo()` and then calls
+  `sock.connect((ip, port))` internally, which our `socket.connect`
+  hook then re-checked against the hostname allowlist. The IP isn't
+  in the manifest, so every legitimately-declared widget (weather_now,
+  clock_sunrise_sunset, anything talking to a real upstream) failed
+  with `CapabilityDenied: tried to connect to '188.40.99.226' but
+  didn't declare it`. The connect hook now skips the post-DNS call
+  via a contextvar set inside the approved `create_connection` path;
+  raw `socket.socket().connect()` outside that path is still checked.
+
 ## [0.36.1], 2026-06-07
 
 ### Fixed
