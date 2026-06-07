@@ -6,6 +6,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.41.1], 2026-06-08
+
+### Fixed
+
+- **Browse page now lets you uninstall widgets that were originally
+  bundled.** After the 0.38-0.41 slim-down, widgets that moved to
+  the catalog still had their folders on disk for users who upgraded,
+  but Browse showed "Install" (which then refused on folder
+  collision) rather than "Uninstall". The marketplace now detects
+  this state: when the catalog's declared folders all exist on disk
+  but no marketplace record tracks them, the entry surfaces as
+  "from a previous install" with the Uninstall flow enabled. Clicking
+  Uninstall removes only the folders the catalog *currently* declares,
+  never touches arbitrary plugin folders.
+
+### Changed
+
+- **Catalog badge wording: "official" → "verified".** "Official" read
+  as an endorsement claim ("Spotify-official Tesserae integration")
+  when the badge actually meant "reviewed + maintained by the catalog
+  owner". Same shield icon + tooltip.
+
+  Catalog-side companion: the `Spotify` and `GitHub` entries renamed
+  to `Spotify Widgets` and `GitHub Widgets` to further disambiguate
+  ("widgets ABOUT the service" rather than "from the service"). Other
+  catalog entries with generic names (Finance, Sky, etc.) stay as-is.
+
+- **`monitoring` and `picture_extras` bundles split** into single-
+  purpose catalog entries: `glances` + `octoprint` (was `monitoring`),
+  `unsplash` + `apple_album` (was `picture_extras`). The combined
+  bundles lumped together widgets for very different audiences (a
+  homelab user vs a 3D-printer hobbyist; an Unsplash fan vs an Apple
+  Music user). Single-purpose entries respect those audiences. Pure
+  catalog-side change, no Tesserae code touched for the split.
+
 ## [0.41.0], 2026-06-08
 
 ### Changed (breaking, but easy to fix)

@@ -113,7 +113,7 @@
           <span>{{ e.name }}</span>
           {% if e.official %}
           <span class="pill is-accent" title="Reviewed + maintained by the catalog owner">
-            <i class="ph-fill ph-shield-check" aria-hidden="true"></i> official
+            <i class="ph-fill ph-shield-check" aria-hidden="true"></i> verified
           </span>
           {% endif %}
         </h3>
@@ -129,7 +129,12 @@
             {% endif %}
           </span>
           {% endif %}
-          {% if e.installed and not e.update_available %}
+          {% if e.installed_from_disk %}
+          <span class="muted">·</span>
+          <span class="pill is-warn" title="Plugin folders are present on disk but weren't installed via the marketplace, typically from a Tesserae upgrade where the widget moved from the bundle to the catalog.">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i> from a previous install
+          </span>
+          {% elif e.installed and not e.update_available %}
           <span class="muted">·</span>
           <span class="pill is-ok"><i class="ph ph-check-circle" aria-hidden="true"></i> installed</span>
           {% elif e.update_available %}

@@ -78,6 +78,7 @@ def _entries_payload(
     entries: list[CatalogEntry],
     installed: dict[str, Any],
     screenshots_base: str,
+    plugins_dir: Any,
 ) -> list[dict[str, Any]]:
     """Shape catalog entries for the template: include install state,
     screenshot URL, and the "Update available" decision so the
@@ -87,14 +88,20 @@ def _entries_payload(
     landing in ``plugins/``: catalog's declared folders when present,
     falling back to the catalog id for single-widget entries. For
     installed entries we prefer the marketplace record's actual
-    folders so reinstalling over an old set surfaces the truth."""
+    folders so reinstalling over an old set surfaces the truth.
+
+    Pre-bundled detection: when an entry's declared folders all exist
+    on disk but no marketplace record tracks them, the entry is
+    surfaced as ``installed`` with ``installed_from_disk: True``.
+    Covers the upgrade case where a widget shipped in the bundle on
+    an older Tesserae release moved to the catalog later, the user
+    still has the folder, the Browse page should let them Uninstall
+    it rather than show a confusing "Install" button that refuses on
+    folder collision."""
     out: list[dict[str, Any]] = []
     for entry in entries:
         record = installed.get(entry.id)
         installed_version = record.version if record is not None else None
-        update_available = bool(
-            installed_version is not None and installed_version != entry.release_version
-        )
         # lg is required by the schema, so it's always in screenshot_sizes
         # for a valid entry; default to it explicitly to keep the
         # template's image src derivation simple.
@@ -115,6 +122,21 @@ def _entries_payload(
         else:
             folders = [entry.id]
         is_bundle = len(folders) > 1 or folders != [entry.id]
+
+        # All declared folders present on disk + no marketplace record =
+        # pre-bundled (or hand-installed) instance. Some-but-not-all is
+        # ambiguous; leave it for the user to clean up by hand.
+        installed_from_disk = (
+            record is None
+            and bool(folders)
+            and plugins_dir is not None
+            and all((plugins_dir / f).exists() for f in folders)
+        )
+        is_installed = record is not None or installed_from_disk
+
+        update_available = bool(
+            installed_version is not None and installed_version != entry.release_version
+        )
         out.append(
             {
                 "id": entry.id,
@@ -128,7 +150,8 @@ def _entries_payload(
                 "official": entry.official,
                 "source": entry.source,
                 "version": entry.release_version,
-                "installed": record is not None,
+                "installed": is_installed,
+                "installed_from_disk": installed_from_disk,
                 "installed_version": installed_version,
                 "update_available": update_available,
                 "screenshot_url": primary_url,
@@ -185,7 +208,7 @@ def browse() -> str:
     installed = mkt.installed()
     return render_template(
         "plugins_browse.html",
-        entries=_entries_payload(entries, installed, mkt.screenshots_base()),
+        entries=_entries_payload(entries, installed, mkt.screenshots_base(), mkt.plugins_dir()),
         tags=_collect_tags(mkt.cached_index() or entries),
         active_tag=active_tag,
         installed_count=len(installed),

@@ -20,6 +20,7 @@ import pytest
 from app.main import REPO_ROOT
 from app.marketplace import (
     CatalogEntry,
+    IndexSnapshot,
     IndexUnavailable,
     IndexUrlProvider,
     InstalledRecord,
@@ -27,6 +28,14 @@ from app.marketplace import (
     Marketplace,
     TarballRejected,
 )
+
+
+def _seed_index(marketplace: Marketplace, entries: list[CatalogEntry]) -> None:
+    """Skip the fetch + parse round-trip when a test only cares about
+    a downstream code path (uninstall, browse payload, etc.) and not
+    the index-loading itself. Seeds the in-memory cache directly."""
+    marketplace._index_cache = IndexSnapshot(url=marketplace.index_url(), entries=entries)
+
 
 # -- helpers -----------------------------------------------------------
 
@@ -816,3 +825,83 @@ def test_bundle_reinstall_replaces_in_place(
     assert sorted(record.folders) == ["core", "widget_a"]
     fresh_core = json.loads((marketplace._plugins_dir / "core" / "plugin.json").read_text())
     assert fresh_core["name"] == "Core v1"
+
+
+def test_uninstall_adopts_prebundled_folders_without_record(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """Pre-bundled adoption: when a widget shipped in the Tesserae
+    bundle on an earlier release and moved to the catalog later, the
+    user has the folders on disk but no marketplace.json record.
+    Uninstalling via the catalog id should still remove those folders
+    (only the catalog's declared set, never anything else), so the
+    Browse page's Uninstall button actually works on legacy state.
+
+    Regression for the 0.41.0 slim-down upgrade path."""
+    # Pre-seed the plugins dir with a "pre-bundled" widget.
+    (marketplace._plugins_dir / "legacy_widget").mkdir()
+    (marketplace._plugins_dir / "legacy_widget" / "plugin.json").write_text("{}")
+    # A neighbouring folder that's not in the catalog entry, must NOT
+    # be touched.
+    (marketplace._plugins_dir / "unrelated").mkdir()
+    (marketplace._plugins_dir / "unrelated" / "plugin.json").write_text("{}")
+
+    # The catalog has an entry for it now.
+    _seed_index(marketplace, [_make_catalog_entry(widget_id="legacy_widget")])
+
+    assert marketplace.uninstall("legacy_widget") is True
+    assert not (marketplace._plugins_dir / "legacy_widget").exists()
+    # Unrelated folder untouched.
+    assert (marketplace._plugins_dir / "unrelated").exists()
+    # No record was ever written, no record to remove.
+    assert "legacy_widget" not in marketplace.installed()
+
+
+def test_uninstall_prebundled_bundle_with_all_folders_present(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """Same adoption path for bundles: every catalog-declared folder
+    must exist on disk before adoption fires (some-but-not-all is
+    ambiguous and stays as a no-op)."""
+    for f in ("github_core", "github_releases", "github_repo"):
+        (marketplace._plugins_dir / f).mkdir()
+        (marketplace._plugins_dir / f / "plugin.json").write_text("{}")
+
+    _seed_index(
+        marketplace,
+        [
+            _make_catalog_entry(
+                widget_id="github",
+                folders=["github_core", "github_releases", "github_repo"],
+            )
+        ],
+    )
+
+    assert marketplace.uninstall("github") is True
+    for f in ("github_core", "github_releases", "github_repo"):
+        assert not (marketplace._plugins_dir / f).exists()
+
+
+def test_uninstall_prebundled_no_op_when_some_folders_missing(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """If only some of the catalog's declared folders exist on disk,
+    don't adopt; the on-disk state isn't clearly the pre-bundled
+    install and the user should reconcile it manually."""
+    # Only one of three folders present.
+    (marketplace._plugins_dir / "github_core").mkdir()
+    (marketplace._plugins_dir / "github_core" / "plugin.json").write_text("{}")
+
+    _seed_index(
+        marketplace,
+        [
+            _make_catalog_entry(
+                widget_id="github",
+                folders=["github_core", "github_releases", "github_repo"],
+            )
+        ],
+    )
+
+    assert marketplace.uninstall("github") is False
+    # github_core stays put, nothing was removed.
+    assert (marketplace._plugins_dir / "github_core").exists()

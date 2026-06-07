@@ -270,6 +270,12 @@ class Marketplace:
     def screenshots_base(self) -> str:
         return _screenshots_base(self.index_url())
 
+    def plugins_dir(self) -> Path:
+        """The on-disk plugins directory. Exposed so the Browse route
+        can detect pre-bundled widgets (folders present but no
+        marketplace record) without reaching into ``_plugins_dir``."""
+        return self._plugins_dir
+
     def fetch_index(self, *, force: bool = False) -> list[CatalogEntry]:
         """Return the parsed catalog index. Cached in memory for
         ``_INDEX_CACHE_TTL_S``; ``force=True`` skips the cache.
@@ -331,6 +337,19 @@ class Marketplace:
         if cached is None or cached.url != url:
             return None
         return list(cached.entries)
+
+    def _find_catalog_entry(self, catalog_id: str) -> CatalogEntry | None:
+        """Look up a catalog entry by id, refreshing from upstream if
+        the in-memory cache hasn't been populated yet. Used by
+        ``uninstall`` to recover the declared-folders list for the
+        pre-bundled-adoption path."""
+        cached = self.cached_index()
+        if cached is None:
+            try:
+                cached = self.fetch_index()
+            except IndexUnavailable:
+                return None
+        return next((e for e in cached if e.id == catalog_id), None)
 
     # -- installed state -------------------------------------------------
 
@@ -561,23 +580,54 @@ class Marketplace:
     def uninstall(self, catalog_id: str, *, delete_data: bool = False) -> bool:
         """Remove a marketplace-installed catalog entry from disk + state.
 
-        Refuses any id not in ``marketplace.json``, this is the only
-        thing standing between the Browse page and a bundled-plugin
-        rm. Returns True if a record was removed; False if the id
-        wasn't tracked.
+        Returns True if folders were removed; False if the id wasn't
+        tracked and no matching folders exist on disk either.
 
-        For bundle entries this removes every folder listed on the
-        record (so a github bundle takes its `_core` + every display
+        Two paths:
+
+        * **Marketplace record present**: remove every folder the
+          install record lists. Standard uninstall.
+        * **No record but the catalog entry's declared folders all
+          exist on disk**: pre-bundled adoption path. A widget that
+          shipped in the Tesserae bundle on a previous release but
+          moved to the catalog later leaves its folders on disk after
+          upgrade; the Browse page surfaces it as installed and the
+          user can Uninstall it here. Only the folders the catalog
+          *currently* declares are touched, never arbitrary plugin
+          folders the catalog doesn't know about.
+
+        For bundle entries (either path) this removes every declared
+        folder (so a github bundle takes its `_core` + every display
         widget along with it). ``delete_data=False`` (default) leaves
         every folder's ``data/plugins/<folder>/`` in place so a
         reinstall finds the user's settings + caches intact;
         ``True`` also rms the data dirs.
         """
         installed = self.installed()
-        if catalog_id not in installed:
-            return False
-        record = installed[catalog_id]
-        for folder_id in record.folders:
+        record = installed.get(catalog_id)
+
+        if record is not None:
+            folders = list(record.folders)
+        else:
+            # No marketplace record. Fall back to the catalog entry's
+            # declared folders, only if ALL of them exist on disk
+            # (partial / unrelated states are too ambiguous to act on).
+            entry = self._find_catalog_entry(catalog_id)
+            if entry is None:
+                return False
+            candidate_folders = list(entry.folders) if entry.folders else [entry.id]
+            if not candidate_folders:
+                return False
+            if not all((self._plugins_dir / f).exists() for f in candidate_folders):
+                return False
+            folders = candidate_folders
+            logger.info(
+                "marketplace: adopting pre-bundled %s for uninstall (folders=%s)",
+                catalog_id,
+                folders,
+            )
+
+        for folder_id in folders:
             target_dir = self._plugins_dir / folder_id
             if target_dir.exists():
                 try:
@@ -603,13 +653,16 @@ class Marketplace:
                         )
         # Drop the record last so a partial failure above still leaves
         # the user with a "stuck" entry they can retry, instead of an
-        # untracked plugin folder.
-        del installed[catalog_id]
-        self._write_state(installed)
+        # untracked plugin folder. No-op when adopting a pre-bundled
+        # widget (the catalog id was never in marketplace.json to begin
+        # with).
+        if record is not None:
+            del installed[catalog_id]
+            self._write_state(installed)
         logger.info(
             "marketplace: uninstalled %s (folders=%s, delete_data=%s)",
             catalog_id,
-            record.folders,
+            folders,
             delete_data,
         )
         return True
