@@ -7,8 +7,11 @@ edit_uri: edit/main/docs/
 copyright: MIT-licensed. A self-hosted hobby project, built in the open.
 
 # docs/widget-build-prompt.md is an internal batch prompt, not a wiki page.
+# docs/marketplace-catalog-seed/ is a copy-into-new-repo scaffold for the
+# catalog repo, not user-facing wiki content.
 exclude_docs: |
   widget-build-prompt.md
+  marketplace-catalog-seed/
 
 theme:
   name: material
@@ -84,6 +87,7 @@ nav:
   - Plugin development:
       - Architecture: dev/architecture.md
       - Build a widget with AI: dev/writing-a-plugin.md
+      - Publish via the catalog: dev/publishing-a-widget.md
       - Widget contract: widgets.md
       - Cross-widget design system: widget-design-system.md
       - Design brief template: widget-design-brief.md

@@ -107,10 +107,10 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
   cells that exceed them.
 * **`cell_options`**, per-cell knobs. The editor renders one form
   field per option. Types: `string`, `textarea`, `number`, `select`
-  (needs `choices`), `multiselect` (needs `choices`), `boolean`,
-  `color`. The user's values land in `ctx.cell.options` at render
-  time. Don't ship a `variant` option for visual direction, that
-  model is gone; the `data-style` axis at page level provides
+  (needs `choices` OR `choices_from`), `multiselect` (same),
+  `boolean`, `color`. The user's values land in `ctx.cell.options` at
+  render time. Don't ship a `variant` option for visual direction,
+  that model is gone; the `data-style` axis at page level provides
   cross-widget shape selection. If a widget needs a genuine layout
   shape choice (e.g. `stack` vs `side`), name the option `layout` and
   use shape-describing values.
@@ -122,6 +122,99 @@ lowercase `[a-z0-9_]` is convention, not enforced. Name it `<family>_<role>`
 * **`render.needs_network`**, hint for the renderer (not enforced).
 
 Full schema: [`schema/plugin.schema.json`](https://github.com/dmellok/tesserae/blob/main/schema/plugin.schema.json).
+
+### Dynamic cell-option choices, `choices_from`
+
+A `select` / `multiselect` cell option can source its dropdown
+contents at edit time instead of declaring a static `choices` array.
+Set `choices_from: "<key>"` in the manifest, and the host calls
+**this plugin's** `server.py:choices(name)` with `name = "<key>"`:
+
+```jsonc
+// plugin.json
+{
+  "name": "board_id",
+  "type": "select",
+  "label": "Board",
+  "choices_from": "boards"
+}
+```
+
+```python
+# server.py
+def choices(name: str) -> list[dict[str, str]]:
+    if name != "boards":
+        return []
+    return [{"value": b["id"], "label": b["name"]} for b in _read_boards()]
+```
+
+The function returns a list of `{value, label}` dicts. Errors render
+as an empty dropdown (the host catches + logs), so prefer returning
+`[]` over raising.
+
+**Important:** the host calls `choices()` on the **same plugin** as
+the manifest, never on a sibling. If your widget reads data from a
+companion `_core` plugin, you still expose `choices()` on the widget
+and delegate to the core via the plugin registry:
+
+```python
+# plugins/widget_x/server.py
+from flask import current_app
+
+def choices(name: str) -> list[dict[str, str]]:
+    core = current_app.config["PLUGIN_REGISTRY"].get("widget_x_core")
+    if core is None or core.server_module is None:
+        return []
+    core_choices = getattr(core.server_module, "choices", None)
+    return list(core_choices(name)) if callable(core_choices) else []
+```
+
+This is the `glances_status` → `glances_core` pattern. The Dev
+Reference Bundle (`devref_card` → `devref_core`) is a worked
+example you can install from the catalog and read end-to-end.
+
+### Companion `_core` plugins
+
+A widget family that needs shared admin state (saved instances, API
+keys, user-edited lists) splits into two plugin folders:
+
+* `<family>_core` — `kind: "data"`, no widget. Exposes an admin page
+  via `server.py:blueprint()` and a `choices()` function the
+  display widgets delegate to.
+* `<family>_<view>` — `kind: "widget"`. Reads from the core via the
+  plugin registry, both at edit time (`choices_from`) and at render
+  time (`server.py:fetch`).
+
+Existing examples in the bundled tree: `glances_core` +
+`glances_status`, `github_core` + `github_*`, `calendar_core` +
+`calendar_*`. When shipping a family through the marketplace, declare
+all folders in the catalog entry's `folders` array so the install
+lands them as siblings under `plugins/`.
+
+### Admin pages, `blueprint()`
+
+Any plugin (widget OR `_core`) that exports `server.py:blueprint()`
+gets a `/plugins/<id>/` admin page. Return a Flask Blueprint with
+your routes; the host mounts it under the per-plugin URL prefix.
+
+```python
+# server.py
+from flask import Blueprint, render_template
+
+def blueprint() -> Blueprint:
+    bp = Blueprint("widget_x_admin", __name__, template_folder="templates")
+
+    @bp.get("/")
+    def index() -> str:
+        return render_template("widget_x/index.html", ...)
+
+    return bp
+```
+
+Templates live under `templates/<plugin_id>/` (the folder namespacing
+keeps Flask from colliding with the host's `templates/index.html`).
+Extend `_base.html` for visual consistency with the rest of the
+admin UI; the `card_head` macro + `card` class wrap content.
 
 ---
 

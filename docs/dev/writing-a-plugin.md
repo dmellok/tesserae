@@ -168,12 +168,23 @@ and makes the build pass cleaner.
 
 ## Submitting
 
-- Run the smoke test and `.venv/bin/ruff check plugins/<id>/`.
-- Open a PR. New widgets are welcome, especially ones backed by a documented, key-free public API (those land in the **Stable** tier; see [Screens & compatibility](../compatibility.md)).
-- If your widget hits an undocumented or scraped endpoint, say so in the PR, it'll be tiered **Best-effort** or **Fragile** so users know what to expect.
+You have two paths, pick the one that matches your widget's audience:
 
-Once it's merged and you've captured screenshots, it shows up automatically
-in the [widget gallery](../widgets/gallery.md):
+### Bundle into Tesserae itself
+
+For foundational widgets you want every install to ship with:
+
+- Run the smoke test and `.venv/bin/ruff check plugins/<id>/`.
+- Open a PR against [dmellok/tesserae](https://github.com/dmellok/tesserae).
+  New widgets are welcome, especially ones backed by a documented,
+  key-free public API (those land in the **Stable** tier; see
+  [Screens & compatibility](../compatibility.md)).
+- If your widget hits an undocumented or scraped endpoint, say so
+  in the PR; it'll be tiered **Best-effort** or **Fragile** so users
+  know what to expect.
+
+Once it's merged and you've captured screenshots, it shows up
+automatically in the [widget gallery](../widgets/gallery.md):
 
 ```sh
 python scripts/capture_widget_shots.py    # single hero shot per widget
@@ -184,6 +195,21 @@ default hero image). For visual-regression spot-checks across themes
 or styles, hit `/_test/matrix` in the dev server, it renders one
 widget across the full theme × style grid in a single page.
 
-For ongoing design work, `python scripts/widget_contact_sheet.py` builds a
-single PNG showing your widget at all four sizes side-by-side, the easiest
-"did anything regress?" loop while iterating on a polish pass.
+For ongoing design work, `python scripts/widget_contact_sheet.py`
+builds a single PNG showing your widget at all four sizes
+side-by-side, the easiest "did anything regress?" loop while
+iterating on a polish pass.
+
+### Publish through the community catalog
+
+For your own widgets, third-party APIs, niche use cases — anything
+you want users to opt into per install rather than shipping to
+everyone. Your widget lives in its own GitHub repo and ships via a
+PR to the catalog index; users find it on Settings → Plugins →
+Browse community widgets.
+
+See **[Publish a widget through the catalog](publishing-a-widget.md)**
+for the full flow: pinned-release tarballs, sha256 verification, the
+catalog PR template, bundle entries for widget families
+(`_core` + display widgets installed together), and what the
+review checklist looks at.
