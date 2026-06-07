@@ -274,7 +274,15 @@ def _fetch_plugin_data(
     panel_h: int,
     preview: bool,
 ) -> Any:
-    """Call the plugin's server.py fetch() if present. Returns None on miss."""
+    """Call the plugin's server.py fetch() if present. Returns None on miss.
+
+    The call runs inside :func:`app.capabilities.capability_scope` so
+    the socket egress hook can match against the widget's declared
+    ``requires:`` list. Undeclared widgets get an unrestricted scope
+    (legacy behaviour), declared ones get the snapshot the loader
+    parsed at discovery."""
+    from app.capabilities import CapabilityDenied, capability_scope
+
     plugin = _registry().get(plugin_id)
     if plugin is None or plugin.server_module is None:
         return None
@@ -288,16 +296,23 @@ def _fetch_plugin_data(
             "plugins", plugin_id, plugin.manifest.get("settings", [])
         )
     try:
-        return fetch_fn(
-            options,
-            settings,
-            ctx={
-                "panel_w": panel_w,
-                "panel_h": panel_h,
-                "preview": preview,
-                "data_dir": str(plugin.data_dir),
-            },
-        )
+        with capability_scope(plugin.capabilities):
+            return fetch_fn(
+                options,
+                settings,
+                ctx={
+                    "panel_w": panel_w,
+                    "panel_h": panel_h,
+                    "preview": preview,
+                    "data_dir": str(plugin.data_dir),
+                },
+            )
+    except CapabilityDenied as err:
+        # Capability violations get a tailored message so the cell
+        # surfaces "this widget tried something its manifest didn't
+        # claim" rather than the generic exception trace.
+        logger.warning("plugin %s capability denied: %s", plugin_id, err)
+        return {"error": f"Capability denied: {err}"}
     except Exception as err:
         # Surface the failure to the cell instead of failing the whole render.
         logger.warning("plugin %s fetch() raised: %s", plugin_id, err)

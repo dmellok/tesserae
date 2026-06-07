@@ -375,6 +375,13 @@ def create_app(
     discovery_cache = DiscoveryCache()
 
     app.config["PLUGIN_REGISTRY"] = plugins
+    # Install the capability hooks once the registry is built. Idempotent,
+    # so a hot-reload from the dev server re-entering create_app() doesn't
+    # stack hooks. The hooks are a no-op when no widget is on the call
+    # stack (see app/capabilities.py:_active for the contextvar gate).
+    from app.capabilities import install as _install_capability_hooks
+
+    _install_capability_hooks()
     app.config["RENDERER_REGISTRY"] = renderers
     app.config["DEVICE_REGISTRY"] = devices
     app.config["DEVICE_DATA_ROOT"] = device_data_root

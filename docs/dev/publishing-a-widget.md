@@ -212,16 +212,31 @@ restart, done.
 
 ## Review checklist (what reviewers look at)
 
-Pre-empt these in your PR's "Networking + settings" section:
+Pre-empt these in your PR's "Networking + settings" section. The
+catalog now expects a `requires:` array in `plugin.json` declaring
+each capability the widget uses (see [the widget contract's
+capability section](../widgets.md#capabilities-requires) for
+the vocabulary); the runtime enforces network egress at the socket
+layer.
 
+- **`requires:` declared.** Every hostname your widget connects to
+  shows up as `network:<host>`. Every settings section the widget
+  reads shows up as `settings:plugin` / `settings:plugin/<other>` /
+  `settings:app`. Filesystem writes outside `data_dir` show up as
+  `filesystem:write:<path>`. Reviewer: grep the source against the
+  declared set to confirm there's no drift.
 - **Network egress.** Every URL your widget hits (server-side or
   client-side), and which option / setting decides what gets called.
   Unexpected outbound calls are the most common review block.
+  `network:*` (unrestricted) is allowed but expensive to review;
+  widgets that genuinely need it (gallery image fetchers, etc.)
+  should say why in the PR.
 - **Settings access.** What `settings.json` keys does your widget
   read? Anything outside `cell_options[*]` and your declared
-  `settings`?
-- **Filesystem access.** Reads + writes outside your plugin's
-  `data_dir` are a red flag.
+  `settings`? Reads of other plugins' sections must be declared.
+- **Filesystem access.** Reads of your `data_dir` and the plugin
+  folder are free. Anything else, especially writes, are a red flag
+  and need an explicit `filesystem:write:<path>` declaration.
 - **Secrets handling.** If your widget needs an API key, declare it
   in `settings` with `secret: true` so it's stored as
   `<name>_secret` in `settings.json` and isn't echoed back to the

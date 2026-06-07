@@ -36,6 +36,9 @@ import jsonschema
 from flask import Blueprint, Flask, abort, render_template, send_from_directory
 from werkzeug.wrappers import Response
 
+from app.capabilities import Capabilities
+from app.capabilities import parse as _parse_capabilities
+
 logger = logging.getLogger(__name__)
 
 # Bumped on breaking changes to the plugin contract.
@@ -72,6 +75,10 @@ class Plugin:
     manifest: dict[str, Any]
     data_dir: Path
     server_module: ModuleType | None = None
+    # Parsed capability declarations from the manifest's ``requires:``
+    # block (or an undeclared snapshot when the field is absent).
+    # See app/capabilities.py for the enforcement layer.
+    capabilities: Capabilities | None = None
 
     @property
     def kind(self) -> str:
@@ -237,6 +244,7 @@ def discover(
             manifest=manifest,
             data_dir=data_dir,
             server_module=server_module,
+            capabilities=_parse_capabilities(plugin_id, manifest.get("requires")),
         )
         registry.plugins[plugin_id] = plugin
 

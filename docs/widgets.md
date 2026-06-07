@@ -316,6 +316,103 @@ def fetch(options: dict, settings: dict, *, ctx: dict) -> dict:
 
 ---
 
+## Capabilities, `requires:`
+
+A widget can declare which capabilities it needs in its manifest's
+`requires:` block. The host parses the declarations and enforces
+network egress at the socket layer — a widget trying to phone home
+to a host it didn't declare gets a `CapabilityDenied` instead of a
+network round-trip. Settings + filesystem entries are review-only
+in v1; the manifest forces the reviewer to notice the claim.
+
+```jsonc
+{
+  "name": "Weather, Now",
+  "kind": "widget",
+  ...
+  "requires": [
+    "network:api.open-meteo.com",
+    "settings:app"
+  ]
+}
+```
+
+### Vocabulary
+
+| Capability | What it means | Enforced? |
+|---|---|---|
+| `network:<hostname>` | Allows outbound TCP/HTTPS to that exact hostname (matched at `socket.create_connection` before DNS). | **Yes** |
+| `network:*` | Unrestricted egress. Catalog CI flags it; reviewers should push back unless the widget really needs arbitrary URLs (the gallery / picture widgets are the canonical case). | **Yes**, allows all |
+| `settings:plugin` | Read this plugin's own settings. The host already passes them in via `fetch(opts, settings, ctx)`, so this declaration just makes the access explicit for the reviewer. | Review-only |
+| `settings:plugin/<other_id>` | Read another plugin's settings section (e.g. a `_core` sibling's API token). Trips the reviewer to verify the claim. | Review-only |
+| `settings:app` | Read top-level app settings (lat/lon, timezone, etc.). | Review-only |
+| `filesystem:write:<path>` | Write outside the plugin's `data_dir`. Reads of `data_dir` and the plugin folder are implicit. | Review-only |
+
+### How the network enforcement works
+
+The host installs a hook over `socket.create_connection` (the bottom
+of every Python HTTP stack — `urllib`, `requests`, `httpx`, the
+sync path of `aiohttp`) and `socket.socket.connect`. When a widget's
+`fetch()` runs, the host enters a capability context for the
+duration of the call. Inside that context, every connect attempt
+checks the active widget's `network:` allowlist; outside the context
+(host code), the hook is a no-op.
+
+Sketch:
+
+```python
+# in app/composer.py
+with capability_scope(plugin.capabilities):
+    return plugin.server_module.fetch(opts, settings, ctx=...)
+```
+
+```python
+# in app/capabilities.py:_hooked_create_connection (simplified)
+caps = _active.get()
+if caps is not None and not caps.allows_host(address[0]):
+    raise CapabilityDenied(f"{caps.plugin_id} can't connect to {address[0]}")
+return _original_create_connection(address, ...)
+```
+
+The lookup is by hostname, not resolved IP, so a widget can't dodge
+the gate by hardcoding `1.2.3.4`. Lower-level direct
+`socket.socket().connect()` is covered too.
+
+### Backward compatibility
+
+Widgets without a `requires:` block load with **no enforcement** —
+the same behaviour they had before this layer existed. The catalog
+review checklist asks contributors to add `requires:` for any new
+submission, but existing bundled widgets and pre-#2 catalog entries
+keep working unchanged.
+
+### Threat model — what this catches and what it doesn't
+
+What it catches: a community widget that quietly tries to POST your
+MQTT password to some upstream gets a `CapabilityDenied` and the
+deny shows up in the server log. The "reviewer reads the manifest
+and the code" workflow is now load-bearing — the manifest is a
+machine-checked claim about the widget's surface.
+
+What it doesn't catch: a determined attacker. Python is sandbox-
+hostile. A widget can reach around the hook with `ctypes`, frame
+inspection, or by spawning a subprocess. The hook is best-effort
+defence-in-depth on top of the audit-only PR review, not a
+substitute for it. Real isolation lives in issue #3 (subprocess +
+seccomp, or WASM); until that ships, "audit-only catalog with
+declared capabilities" is the trust model.
+
+Worked examples in the bundled tree:
+
+- [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now) —
+  single-host network declaration: `network:api.open-meteo.com`.
+- [`plugins/clock_sunrise_sunset`](https://github.com/dmellok/tesserae/tree/main/plugins/clock_sunrise_sunset) —
+  same shape, second target on the same upstream.
+- [`plugins/clock_analog`](https://github.com/dmellok/tesserae/tree/main/plugins/clock_analog) —
+  `requires: []` — the widget explicitly claims no capabilities.
+
+---
+
 ## Tokens, the Spectra design system
 
 Spectra has three token layers. Widgets paint from the upper two; never

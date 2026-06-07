@@ -6,6 +6,81 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.35.0], 2026-06-07
+
+Marketplace phase 2: widget capability manifest + runtime
+enforcement. Closes [#2](https://github.com/dmellok/tesserae/issues/2).
+
+### Added
+
+- **`requires:` block in `plugin.json`.** Widgets declare which
+  capabilities they need (network egress targets, settings reads,
+  filesystem writes) as a list of `<category>:<value>` strings.
+  Vocabulary: `network:<hostname>` (or `network:*` for unrestricted
+  but flagged in review), `settings:plugin` / `settings:plugin/<id>`
+  / `settings:app`, `filesystem:write:<path>`.
+- **Runtime network enforcement.** The host installs a hook over
+  `socket.create_connection` + `socket.socket.connect` and gates
+  every connect against the active widget's allowlist. A widget
+  trying to phone home to an undeclared host raises
+  `CapabilityDenied`, which the composer surfaces as a cell-level
+  error rather than a render failure. Lower-level socket usage is
+  covered too — the hook fires before DNS so hard-coded IPs can't
+  dodge the gate either.
+- **Backward compatibility.** Widgets without a `requires:` block
+  load with no enforcement (legacy behaviour), so the existing
+  catalog + bundled widgets keep working unchanged. The catalog
+  review checklist now asks contributors to declare for new
+  submissions.
+
+### Changed
+
+- **Three bundled widgets ported as worked examples:** `weather_now`
+  and `clock_sunrise_sunset` declare `network:api.open-meteo.com`;
+  `clock_analog` declares `requires: []` (the explicit "no
+  capabilities" form, distinct from missing block which is legacy).
+- **Reviewer checklist** in [docs/dev/publishing-a-widget.md](https://dmellok.github.io/tesserae/dev/publishing-a-widget/)
+  expanded to require `requires:` declarations in catalog
+  submissions + grep the source against the declared set to confirm
+  there's no drift.
+- **Widget contract** at [docs/widgets.md](https://dmellok.github.io/tesserae/widgets/)
+  gains a "Capabilities, `requires:`" section: vocabulary table,
+  how enforcement works (contextvar scope + socket hook), backward
+  compat, and an honest threat-model section noting Python's
+  sandbox-hostility — this catches casual drift, not a determined
+  attacker. Real isolation lives in #3.
+
+### Trust model — what this catches
+
+What it catches: a community widget that quietly tries to POST your
+MQTT password to some upstream gets a `CapabilityDenied` and the
+deny lands in the server log. The "reviewer reads the manifest +
+greps the code" workflow becomes load-bearing — the manifest is a
+machine-checked claim.
+
+What it doesn't catch: a widget reaching around with `ctypes`,
+frame inspection, or a subprocess. The hook is defence-in-depth on
+top of the audit-only PR review, not a substitute for it.
+Capability declarations PLUS the PR review is the trust model;
+full isolation is [#3](https://github.com/dmellok/tesserae/issues/3).
+
+### Internals
+
+- `app/capabilities.py` (new): `Capabilities` dataclass + `parse()`
+  + `capability_scope()` contextmanager + idempotent
+  `install()` / `uninstall()` socket hooks. ContextVar-backed so
+  concurrent renders don't cross-contaminate.
+- `app/plugin_loader.py`: parses `requires:` during discovery and
+  stores the snapshot on `Plugin.capabilities`. Malformed entries
+  log + drop rather than failing the load.
+- `app/composer.py`: `_fetch_plugin_data` enters
+  `capability_scope(plugin.capabilities)` around the widget's
+  `fetch()` call.
+- `app/app_factory.py`: installs hooks once after the registry is
+  built. Idempotent so the dev reloader doesn't stack hooks.
+- 19 new tests covering parse / scope nesting / urllib enforcement /
+  legacy bypass / install idempotence. 853 tests pass total.
+
 ## [0.34.2], 2026-06-07
 
 ### Added

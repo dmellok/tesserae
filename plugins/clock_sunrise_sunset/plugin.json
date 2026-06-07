@@ -14,5 +14,8 @@
     { "name": "show_golden", "type": "boolean", "label": "Tint golden-hour bands", "default": true },
     { "name": "show_twilight", "type": "boolean", "label": "Tint twilight bands beyond the horizon (civil / nautical / astronomical)", "default": true }
   ],
-  "render": { "dither": "none", "needs_network": true }
+  "render": { "dither": "none", "needs_network": true },
+  "requires": [
+    "network:api.open-meteo.com"
+  ]
 }

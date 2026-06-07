@@ -35,5 +35,6 @@
     { "name": "show_date", "type": "boolean", "label": "Show date plate", "default": true },
     { "name": "show_am_pm", "type": "boolean", "label": "Show sun/moon AM-PM indicator", "default": true }
   ],
-  "render": { "dither": "none", "needs_network": false }
+  "render": { "dither": "none", "needs_network": false },
+  "requires": []
 }

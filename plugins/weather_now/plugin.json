@@ -52,5 +52,8 @@
   "render": {
     "dither": "none",
     "needs_network": true
-  }
+  },
+  "requires": [
+    "network:api.open-meteo.com"
+  ]
 }
