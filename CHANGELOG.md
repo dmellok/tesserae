@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.35.2], 2026-06-07
+
+### Changed
+
+- **Marketplace card thumbnails switch to `object-fit: fill`.**
+  After two iterations on aspect-ratio (5:3 → 3:2) and
+  object-position tuning still left letterboxing on some catalog
+  entries, dropped the aspect-ratio math and stretched the image
+  to fill the frame. Predictable, no empty space, accepting minor
+  distortion as the tradeoff. Cards are thumbnails; contributors'
+  source repo link is one click away if a user wants the true
+  ratio.
+
 ## [0.35.1], 2026-06-07
 
 ### Changed

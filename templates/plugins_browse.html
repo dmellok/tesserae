@@ -256,8 +256,14 @@
   .marketplace-thumb > img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: top center;
+    /* Stretch to fill the frame regardless of source aspect ratio.
+       Catalog screenshots come in at varying shapes (different
+       contributors, different Playwright configs); fill guarantees
+       the card surface is always covered, accepting minor
+       distortion as the cost. Cards are thumbnails; the
+       contributor's source URL link is one click away if a user
+       wants to see the widget at its true ratio. */
+    object-fit: fill;
   }
   .marketplace-thumb--placeholder > i {
     font-size: 3rem;
