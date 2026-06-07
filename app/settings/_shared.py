@@ -275,16 +275,21 @@ def refuse_in_dev() -> Response | None:
 
 
 def refuse_in_container() -> Response | None:
-    """Refuse in-app self-updates / restore-from-backup when running
-    inside the official Docker image. A ``git pull`` against a layered
-    filesystem would lose the next image rebuild, and restarts go
-    through the container manager rather than ``os.execv``. Users
-    upgrade via ``docker compose pull`` instead, the Settings →
-    System tab shows that hint when ``TESSERAE_IN_DOCKER=1`` is set.
-    Gated server-side too so a hand-crafted POST can't sneak through."""
+    """Refuse in-app self-updates when running inside the official Docker
+    image. A ``git pull`` against a layered filesystem would lose the next
+    image rebuild, so users upgrade via ``docker compose pull`` (or by
+    bumping the HA add-on) instead. The Settings → System tab shows that
+    hint when ``TESSERAE_IN_DOCKER=1`` is set. Gated server-side too so a
+    hand-crafted POST can't sneak through.
+
+    Note: backup restore and data import are *not* gated by this; they
+    only touch the persistent ``data/`` volume (which survives container
+    upgrades) and the post-restore ``os.execv`` cleanly replaces the
+    container's PID 1 in place. Only the code-tree-mutating routes
+    (``update/apply``, ``update/rollback``) need the docker refusal."""
     if os.environ.get("TESSERAE_IN_DOCKER"):
         flash(
-            "Updates and restores aren't supported in the Docker image, "
+            "Updates aren't supported in the Docker image, "
             "use `docker compose pull && docker compose up -d` to upgrade.",
             "error",
         )

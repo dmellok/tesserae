@@ -142,7 +142,7 @@ def system_backup_download(backup_id: str) -> Response:
 
 @bp.post("/settings/system/backup/<backup_id>/restore")
 def system_backup_restore(backup_id: str) -> Response:
-    refused = refuse_in_dev() or refuse_in_container()
+    refused = refuse_in_dev()
     if refused is not None:
         return refused
     push_mgr = push_manager()
@@ -209,10 +209,6 @@ def system_data_import() -> Response:
     the server afterwards on production; in --dev mode the os.execv
     restart fights the werkzeug reloader, so we extract the zip and
     leave it to the user to stop + start the dev server manually."""
-    refused = refuse_in_container()
-    if refused is not None:
-        return refused
-
     upload = request.files.get("archive")
     if upload is None or not upload.filename:
         flash("Pick a Tesserae export zip to import.", "error")

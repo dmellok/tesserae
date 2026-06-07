@@ -112,6 +112,88 @@ def test_update_apply_refused_under_docker(app: Flask, monkeypatch: pytest.Monke
     assert "docker compose pull" in body
 
 
+def test_data_import_runs_under_docker(
+    app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The data-import flow only writes to the persistent ``data/``
+    volume, so the docker refusal doesn't apply (unlike self-update,
+    which needs the git tree). Regression: pre-0.36 the HA add-on
+    (which inherits ``TESSERAE_IN_DOCKER=1`` from the base image) bailed
+    on import with a misleading "use docker compose pull" flash."""
+    import json
+    import time
+    from io import BytesIO
+
+    from app import backup as _backup_mod
+    from app.updater import Updater
+
+    monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    # Restart would otherwise os.execv the pytest process out from under us.
+    monkeypatch.setattr(Updater, "restart", lambda self, **kw: None)
+
+    client = app.test_client()
+    _sign_in(client)
+
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr(
+            _backup_mod.META_NAME,
+            json.dumps(
+                {
+                    "tool": "tesserae",
+                    "version": _backup_mod.META_VERSION,
+                    "created_at": time.time(),
+                    "label": "test",
+                    "excluded_subpaths": [],
+                }
+            ),
+        )
+    buf.seek(0)
+    resp = client.post(
+        "/settings/system/data/import",
+        data={"archive": (buf, "test-export.zip")},
+        content_type="multipart/form-data",
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The "Updates aren't supported..." string is unique to the refusal
+    # flash; the bare "docker compose pull" hint also appears in the
+    # Updates-card upgrade instructions on the system page.
+    assert "aren&#39;t supported in the Docker image" not in body
+    assert "Data imported" in body
+
+
+def test_backup_restore_runs_under_docker(
+    app: Flask, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same reasoning as the import test: restore only touches the
+    persistent volume, so it must work in the HA add-on / Docker image."""
+    from app.updater import Updater
+
+    # Create the backup before flipping the env so create() takes its
+    # normal path; restore is the one we care about gating.
+    (tmp_path / "core").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "core" / "sentinel.txt").write_text("hello-restore")
+
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/settings/system/backup/create", data={"note": "smoke"})
+    backup_id = next((tmp_path / "core" / "backups").glob("*.zip")).stem
+
+    monkeypatch.setenv("TESSERAE_IN_DOCKER", "1")
+    monkeypatch.setattr(Updater, "restart", lambda self, **kw: None)
+
+    resp = client.post(f"/settings/system/backup/{backup_id}/restore", follow_redirects=True)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The "Updates aren't supported..." string is unique to the refusal
+    # flash; the bare "docker compose pull" hint also appears in the
+    # Updates-card upgrade instructions on the system page.
+    assert "aren&#39;t supported in the Docker image" not in body
+    assert f"Restored from {backup_id}" in body
+
+
 def test_telemetry_test_button_is_dev_only(app: Flask) -> None:
     """The "Send test event" button is dev-only, the card is hidden in
     production builds and the route is gated to ``current_app.debug``.

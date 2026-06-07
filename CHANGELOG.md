@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.36.0], 2026-06-07
+
+### Fixed
+
+- **Data import + backup restore no longer refused in the HA add-on /
+  Docker image.** `refuse_in_container()` was over-broad: it gated
+  four routes (`update/apply`, `update/rollback`,
+  `backup/<id>/restore`, `data/import`), but only the first two
+  need it (those mutate the code tree via `git pull`). Restore +
+  import only write to the persistent `data/` volume, which
+  survives container upgrades; the post-restore `os.execv` cleanly
+  replaces the container's PID 1 (the entrypoint already `exec`s
+  through gosu). Previously, hitting Import in HA Settings →
+  System → Backups returned a misleading "use docker compose
+  pull" flash instead of importing. Both routes now work in HA,
+  Docker, and bare installs alike; self-update remains refused
+  under Docker.
+
 ## [0.35.2], 2026-06-07
 
 ### Changed
