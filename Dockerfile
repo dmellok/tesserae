@@ -14,9 +14,13 @@
 # hosted appliance that needs to render real web pages.
 
 # Pin the Playwright minor that matches our pyproject constraint
-# (playwright>=1.42,<2). Bumping the image tag and the constraint
-# together keeps Chromium and the Playwright Python client in lockstep.
-FROM mcr.microsoft.com/playwright/python:v1.49.0-noble
+# (playwright>=1.60,<1.61). Bumping the image tag and the constraint
+# together keeps Chromium and the Playwright Python client in lockstep,
+# the bundled chromium revision (e.g. ``chromium_headless_shell-1223``
+# for 1.60) is what the matching Python wheel goes looking for at
+# launch. A mismatch boots the container fine but errors at first
+# render with "Executable doesn't exist at /ms-playwright/...".
+FROM mcr.microsoft.com/playwright/python:v1.60.0-noble
 
 # Where Playwright looks for installed browsers. The base image puts
 # Chromium here; setting it explicitly so any later `playwright install`

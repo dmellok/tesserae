@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.36.0"
+version = "0.36.1"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -16,7 +16,13 @@ dependencies = [
     "pillow>=10.2,<12",
     "numpy>=1.26,<3",
     "paho-mqtt>=2.0,<3",
-    "playwright>=1.42,<2",
+    # Pinned to a minor: Playwright's Python client and the bundled
+    # Chromium revision are coupled (the client looks for a specific
+    # chromium_headless_shell-<rev>/ path at launch). The Docker base
+    # image is mcr.microsoft.com/playwright/python:v1.60.0-noble; the
+    # pip range here MUST match that minor or the container errors at
+    # first render. Bump both together when upgrading.
+    "playwright>=1.60,<1.61",
     "amqtt>=0.11,<1",
     # icalendar + recurring_ical_events power the calendar_* widgets.
     # Both pure-Python, depend transitively on python-dateutil, and

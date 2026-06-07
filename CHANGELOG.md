@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.36.1], 2026-06-07
+
+### Fixed
+
+- **Playwright base image + pip pin re-coupled.** The Dockerfile was
+  pinned at `mcr.microsoft.com/playwright/python:v1.49.0-noble` but
+  `pyproject.toml` allowed `playwright>=1.42,<2`, so a fresh image
+  build resolved Playwright 1.60.0 against a v1.49 Chromium and bombed
+  at first render with `Executable doesn't exist at
+  /ms-playwright/chromium_headless_shell-1223/...`. Bumped the base
+  image to `v1.60.0-noble` and tightened the pip pin to
+  `>=1.60,<1.61` so the Chromium revision the Python client expects
+  and the one bundled in the image are guaranteed to match. The
+  Dockerfile comment already promised this lockstep; now it actually
+  is.
+
 ## [0.36.0], 2026-06-07
 
 ### Fixed
