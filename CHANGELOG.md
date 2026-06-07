@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.39.0], 2026-06-08
+
+### Changed (breaking, but easy to fix)
+
+- **Spotify widget family moved out of the bundle.** The four Spotify
+  widgets (`spotify_core`, `spotify_now_playing`, `spotify_queue`,
+  `spotify_album_art`) are no longer bundled and live in the
+  community catalog. Dashboards that referenced them will show
+  "widget not installed" cells on upgrade until you reinstall via
+  Settings → Widgets → Browse community widgets → Install Spotify.
+
+  Why: continuation of the bundle slim-down started in 0.38.0
+  (F1). OAuth-required widgets aren't useful out of the box, every
+  user has to register a Spotify Developer app and complete a
+  connect flow before any cell renders. Marketplace is the right
+  home: install if you want it.
+
+  Source repo: [dmellok/tesserae-spotify](https://github.com/dmellok/tesserae-spotify).
+  Catalog entry: id `spotify`, official, bundle pattern (one
+  install lays down all 4 folders).
+
+  The shared `_SPOTIFY_ART_DATA_URL` sample placeholder + the three
+  `_spotify_*` sample functions in `app/widget_samples.py` were
+  removed alongside the folders.
+
 ## [0.38.0], 2026-06-08
 
 ### Changed (breaking, but easy to fix)

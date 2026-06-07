@@ -958,9 +958,9 @@ the conventions land in practice.
   [`plugins/calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)
 * `.wx-body`, [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
   [`plugins/weather_forecast`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_forecast)
-* `.img-body`, [`plugins/spotify_now_playing`](https://github.com/dmellok/tesserae/tree/main/plugins/spotify_now_playing),
-  [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera),
-  [`plugins/picture_apod`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_apod)
+* `.img-body`, [`plugins/picture_gallery`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_gallery),
+  [`plugins/picture_apod`](https://github.com/dmellok/tesserae/tree/main/plugins/picture_apod),
+  [`plugins/ha_camera`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_camera)
 
 Canonical patterns to lift:
 

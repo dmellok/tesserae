@@ -60,8 +60,8 @@ Three docs are the canonical contract. Read each before drafting:
      [`plugins/weather_now`](../plugins/weather_now)
    - **Calendar archetype**, [`plugins/calendar_day`](../plugins/calendar_day),
      [`plugins/calendar_week`](../plugins/calendar_week)
-   - **Image archetype**, [`plugins/spotify_now_playing`](../plugins/spotify_now_playing),
-     [`plugins/ha_camera`](../plugins/ha_camera)
+   - **Image archetype**, [`plugins/picture_gallery`](../plugins/picture_gallery),
+     [`plugins/picture_apod`](../plugins/picture_apod)
 
 ---
 

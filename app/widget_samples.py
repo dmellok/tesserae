@@ -24,22 +24,6 @@ from __future__ import annotations
 import copy
 from typing import Any
 
-# Inline SVG data URL used by the Spotify samples so the album-art and
-# now-playing widgets render their full layout instead of falling
-# through to "NOTHING PLAYING" / placeholder vinyl states when the
-# sample doesn't have a real cover URL. The art evokes "Sleep Well
-# Beast" without licensing real artwork.
-_SPOTIFY_ART_DATA_URL = (
-    "data:image/svg+xml;utf8,"
-    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'>"
-    "<rect width='200' height='200' fill='%231a1a2e'/>"
-    "<circle cx='100' cy='100' r='60' fill='none' stroke='%23e8c98a' stroke-width='2'/>"
-    "<circle cx='100' cy='100' r='30' fill='%23e8c98a'/>"
-    "<text x='100' y='180' text-anchor='middle' font-family='Georgia,serif' "
-    "font-size='12' fill='%23e8c98a' font-style='italic'>sample</text>"
-    "</svg>"
-)
-
 
 def _ha_energy() -> dict[str, Any]:
     return {
@@ -467,58 +451,6 @@ def _ha_todo() -> dict[str, Any]:
     }
 
 
-def _spotify_now_playing() -> dict[str, Any]:
-    return {
-        "track": "Light Years",
-        "artist": "The National",
-        "album": "Sleep Well Beast",
-        "album_art": _SPOTIFY_ART_DATA_URL,
-        "is_playing": True,
-        "progress_ms": 92_000,
-        "duration_ms": 248_000,
-        "device": "Living Room",
-    }
-
-
-def _spotify_album_art() -> dict[str, Any]:
-    return {
-        "album_art": _SPOTIFY_ART_DATA_URL,
-        "is_playing": True,
-        "track": "Light Years",
-        "artist": "The National",
-        "album": "Sleep Well Beast",
-    }
-
-
-def _spotify_queue() -> dict[str, Any]:
-    def _track(name: str, artist: str, album: str, duration_ms: int) -> dict[str, Any]:
-        return {
-            "track": name,
-            "artist": artist,
-            "album": album,
-            "album_art": _SPOTIFY_ART_DATA_URL,
-            "album_art_thumb": _SPOTIFY_ART_DATA_URL,
-            "duration_ms": duration_ms,
-        }
-
-    return {
-        "currently_playing": _track("Light Years", "The National", "Sleep Well Beast", 248_000),
-        "queue": [
-            _track("Day I Die", "The National", "Sleep Well Beast", 245_000),
-            _track("Walk It Back", "The National", "Sleep Well Beast", 220_000),
-            _track(
-                "The System Only Dreams in Total Darkness",
-                "The National",
-                "Sleep Well Beast",
-                264_000,
-            ),
-            _track("Born to Beg", "The National", "Trouble Will Find Me", 254_000),
-            _track("Pink Rabbits", "The National", "Trouble Will Find Me", 273_000),
-            _track("I Need My Girl", "The National", "Trouble Will Find Me", 246_000),
-        ],
-    }
-
-
 def _sky_moon() -> dict[str, Any]:
     return {
         "label": "Melbourne",
@@ -797,9 +729,6 @@ SAMPLES: dict[str, Any] = {
     "octoprint_status": _octoprint_status,
     "picture_gallery": _picture_gallery,
     "sky_moon": _sky_moon,
-    "spotify_now_playing": _spotify_now_playing,
-    "spotify_album_art": _spotify_album_art,
-    "spotify_queue": _spotify_queue,
     "todo": _todo,
     "weather_pollen_count": _weather_pollen_count,
 }

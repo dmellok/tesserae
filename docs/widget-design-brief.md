@@ -69,7 +69,7 @@ The form fields the editor will render. Types: `string` · `textarea` ·
     replaced that with the `data-style` axis at page level, widgets
     now render **one** shape. Don't add a `variant` option for
     direction; if your widget legitimately needs a layout shape choice
-    (e.g. spotify_now_playing's `stack` vs `side`), name it
+    (e.g. a now-playing-style card's `stack` vs `side`), name it
     `layout` and use shape-describing values, not design-language
     names.
 

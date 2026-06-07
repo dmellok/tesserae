@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **53 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -50,6 +50,16 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
+
+-   **Weather, Scenic** &middot; `weather_now_scenic`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Current weather as a pill card with weather-and-time-of-day theming. Uses the extended palette opt-in so soft gradients (sunset, night sky) render on 7-colour e-ink panels via the renderer's dither pass. Data from Open-Meteo (no API key).
+
+    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
 -   **Weather, Pollen Count** &middot; `weather_pollen_count`
 
@@ -160,52 +170,6 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
     Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Formula 1
-
-<div class="grid cards" markdown>
-
--   **F1, Last Race** &middot; `f1_last_race`
-
-    ---
-
-    ![f1_last_race](../screenshots/widgets/f1_last_race.png)
-
-    Podium from the most recently completed F1 race: P1/P2/P3 with driver, team, time/gap, fastest-lap badge, plus the circuit silhouette. Data from Jolpica-F1 (no API key).
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **F1, Next Race** &middot; `f1_next`
-
-    ---
-
-    ![f1_next](../screenshots/widgets/f1_next.png)
-
-    Countdown to the next F1 race with circuit silhouette, race name, round number, and local session time. Data from Jolpica-F1 (Ergast successor, no API key). Circuits from the bundled f1_core plugin.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **F1, Driver Standings** &middot; `f1_standings_drivers`
-
-    ---
-
-    ![f1_standings_drivers](../screenshots/widgets/f1_standings_drivers.png)
-
-    Current F1 driver championship: position, driver, team, points, wins. Constructor colour stripe on the left of each row. Top 3 shown on xs/sm, top 10 on md, top 20 on lg. Data from Jolpica-F1 (no API key).
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **F1, Race Weekend** &middot; `f1_weekend`
-
-    ---
-
-    ![f1_weekend](../screenshots/widgets/f1_weekend.png)
-
-    Session schedule for the upcoming F1 race weekend (FP1, FP2, FP3, Sprint where applicable, Qualifying, Race) with circuit silhouette. Times shown in the viewer's local timezone. Data from Jolpica-F1 (no API key).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -531,42 +495,6 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
 </div>
 
-## Spotify
-
-<div class="grid cards" markdown>
-
--   **Spotify, Album Art** &middot; `spotify_album_art`
-
-    ---
-
-    ![spotify_album_art](../screenshots/widgets/spotify_album_art.png)
-
-    Full-bleed album art of your currently-playing Spotify track. Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **Spotify, Now Playing** &middot; `spotify_now_playing`
-
-    ---
-
-    ![spotify_now_playing](../screenshots/widgets/spotify_now_playing.png)
-
-    Currently-playing Spotify track, album art, title, artist, album and progress, in five selectable layouts (split / cover / minimal / vinyl / stack). Requires the Spotify Core plugin (connect your account at Plugins → Spotify).
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **Spotify, Queue** &middot; `spotify_queue`
-
-    ---
-
-    ![spotify_queue](../screenshots/widgets/spotify_queue.png)
-
-    Currently-playing Spotify track + the next few items in your queue. Pulls from /v1/me/player/queue via the shared spotify_core OAuth. Requires Spotify Premium, the queue endpoint is gated to paid accounts.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
 ## Pictures
 
 <div class="grid cards" markdown>
@@ -607,7 +535,7 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![picture_unsplash](../screenshots/widgets/picture_unsplash.png)
 
-    Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Widgets → Unsplash.
+    Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -623,7 +551,7 @@ The **59 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![public_transport_times](../screenshots/widgets/public_transport_times.png)
 
-    Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Widgets → Public Transport. Pick stop_id + route_type per cell.
+    Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
