@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.35.1], 2026-06-07
+
+### Changed
+
+- **Marketplace card thumbnail aspect-ratio 5:3 → 3:2** to match
+  the lg widget cell dimensions (1200×800). Tight catalog
+  screenshots (taken via element-screenshot of `.cell` rather than
+  Playwright `full_page`) now fill the Browse card with no
+  letterboxing. Wider/taller sources still crop cleanly via
+  `object-fit: cover`; the `object-position` shifted from `center`
+  to `top center` so legacy full-page screenshots show the widget
+  area instead of dead space below it.
+- **All three live catalog entries got fresh tight screenshots**
+  (1200×800 each) so the new aspect-ratio doesn't show
+  letterboxing on entries that pre-date this change.
+
 ## [0.35.0], 2026-06-07
 
 Marketplace phase 2: widget capability manifest + runtime

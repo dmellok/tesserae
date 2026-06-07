@@ -239,7 +239,13 @@
     overflow: hidden;
   }
   .marketplace-thumb {
-    aspect-ratio: 5 / 3;
+    /* 3:2 matches the lg widget cell (1200×800), so a tightly-
+       cropped screenshot of an lg render fills the card without
+       letterboxing. Contributor convention is "screenshot the
+       widget at lg without surrounding chrome"; if a source PNG
+       comes in wider or taller than 3:2, object-fit: cover crops
+       symmetrically from the centre. */
+    aspect-ratio: 3 / 2;
     background: var(--t-surface-sunk);
     border-bottom: 1px solid var(--t-border);
     display: flex;
@@ -251,7 +257,7 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center;
+    object-position: top center;
   }
   .marketplace-thumb--placeholder > i {
     font-size: 3rem;
