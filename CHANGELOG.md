@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.40.0], 2026-06-08
+
+### Changed (breaking, but easy to fix)
+
+- **GitHub widget family moved out of the bundle.** The seven GitHub
+  widgets (`github_core`, `github_actions`, `github_activity`,
+  `github_contributions`, `github_pr_queue`, `github_releases`,
+  `github_repo`) are no longer bundled and live in the community
+  catalog. Reinstall via Settings → Widgets → Browse community
+  widgets → Install GitHub.
+
+  Why: continues the bundle slim-down (F1 in 0.38.0, Spotify in
+  0.39.0). All seven need a personal access token to do anything
+  useful; the typical user, especially a non-developer HA user,
+  never enables them. Marketplace is the right home.
+
+  Source repo: [dmellok/tesserae-github](https://github.com/dmellok/tesserae-github).
+  Catalog entry: id `github`, official, bundle pattern.
+
+  Also removed: three `_github_*` sample functions in
+  `app/widget_samples.py`. The `docs/widgets/tiers.md` table marks
+  the GitHub + F1 entries as `(marketplace)` so the stability tier
+  doc still describes the upstreams accurately.
+
 ## [0.39.0], 2026-06-08
 
 ### Changed (breaking, but easy to fix)

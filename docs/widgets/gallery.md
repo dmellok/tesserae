@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **53 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -172,72 +172,6 @@ The **53 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## GitHub
-
-<div class="grid cards" markdown>
-
--   **GitHub, Actions** &middot; `github_actions`
-
-    ---
-
-    ![github_actions](../screenshots/widgets/github_actions.png)
-
-    Most recent CI runs across watched repos. Each workflow row pairs its conclusion icon + a workflow-type glyph (build / test / deploy / lint / docs / release / security / ci) with a mini timeline of the last 8 runs (bar height ∝ duration, colour ∝ conclusion) and the latest run's duration. Public repos work without a token; private repos require the PAT in Plugins → GitHub Core.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **GitHub, Activity** &middot; `github_activity`
-
-    ---
-
-    ![github_activity](../screenshots/widgets/github_activity.png)
-
-    Recent public activity for a GitHub user. Pushes / PRs / issues / releases broken out as type-coloured tiles; a 7-day stacked-bar histogram segments each day's events by type and centres a Phosphor glyph on the dominant kind; an activity-streak pill counts consecutive days back from today. Defaults to the username in Plugins → GitHub Core.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **GitHub, Contributions** &middot; `github_contributions`
-
-    ---
-
-    ![github_contributions](../screenshots/widgets/github_contributions.png)
-
-    The familiar 53-week contributions heatmap for a user. Paired Current/Longest streak chips sit above the heatmap (ph-flame + ph-trophy on accent-tinted cards); a 12-month summary bar strip sits below, scaling each month's total against the year's max with the current month highlighted. Requires a PAT in Plugins → GitHub Core (GraphQL needs auth).
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **GitHub, PR Queue** &middot; `github_pr_queue`
-
-    ---
-
-    ![github_pr_queue](../screenshots/widgets/github_pr_queue.png)
-
-    Your open PRs + PRs awaiting your review. Each row leads with a draft / ready-for-review glyph, carries a PR-age chip (muted → ochre → terracotta → plum as the PR ages), and a comment-bubble chip showing discussion activity. Sections are sorted oldest-first so the staler PR floats to the top. Requires a PAT in Plugins → GitHub Core.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **GitHub, Releases** &middot; `github_releases`
-
-    ---
-
-    ![github_releases](../screenshots/widgets/github_releases.png)
-
-    Latest releases from a list of watched repos. Each row carries a SemVer bump chip (MAJOR / MINOR / PATCH, computed by comparing the tag to the previous release) and, for the most recent release per repo, a +N commits tail counting unreleased commits on the default branch. Useful for tracking your dependencies' versions.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **GitHub, Repo Card** &middot; `github_repo`
-
-    ---
-
-    ![github_repo](../screenshots/widgets/github_repo.png)
-
-    Single-repo card. Pairs the language split + stars / forks / issues / release stats with a 52-week commit activity sparkline and a top-contributors strip (up to 5, avatar + login + contribution count). Public repos work without a token.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 </div>
 

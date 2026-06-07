@@ -12,13 +12,13 @@ ships a deliberate breaking change (which usually comes with notice).
 | Widget | Upstream |
 |---|---|
 | `weather_now`, `weather_hourly`, `weather_forecast`, `weather_air_quality`, `weather_pollen_count` (Open-Meteo path) | open-meteo.com |
-| `f1_next`, `f1_last_race`, `f1_weekend`, `f1_standings_drivers` | jolpi.ca/ergast (maintained Ergast successor) |
+| `f1_next`, `f1_last_race`, `f1_weekend`, `f1_standings_drivers` *(marketplace)* | jolpi.ca/ergast (maintained Ergast successor) |
 | `news_rss` | any RSS 2.0 / Atom 1.0 feed |
 | `news_hacker_news` | hacker-news.firebaseio.com (Firebase-hosted, documented) |
 | `news_wikipedia_otd` | Wikimedia REST API |
 | `finance_crypto` | CoinGecko v3 (documented) |
 | `finance_currency` | frankfurter.app (ECB-sourced, documented) |
-| `github_repo`, `github_releases`, `github_activity`, `github_pr_queue`, `github_actions`, `github_contributions` | api.github.com (REST v3 + GraphQL v4) |
+| `github_repo`, `github_releases`, `github_activity`, `github_pr_queue`, `github_actions`, `github_contributions` *(marketplace)* | api.github.com (REST v3 + GraphQL v4) |
 | `calendar_month`, `calendar_week`, `calendar_day` | iCal feeds from Google / iCloud / Outlook |
 | `clock_sunrise_sunset` | open-meteo.com |
 | `sky_aurora` | services.swpc.noaa.gov (NOAA Space Weather, documented) |
