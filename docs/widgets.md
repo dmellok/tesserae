@@ -169,9 +169,11 @@ def choices(name: str) -> list[dict[str, str]]:
     return list(core_choices(name)) if callable(core_choices) else []
 ```
 
-This is the `glances_status` → `glances_core` pattern. The Dev
-Reference Bundle (`devref_card` → `devref_core`) is a worked
-example you can install from the catalog and read end-to-end.
+This is the `calendar_*` → `calendar_core` pattern (or, in the
+catalog, `glances_status` → `glances_core` if you install the
+monitoring bundle). The Dev Reference Bundle
+(`devref_card` → `devref_core`) is a worked example you can
+install from the catalog and read end-to-end.
 
 ### Companion `_core` plugins
 
@@ -185,11 +187,14 @@ keys, user-edited lists) splits into two plugin folders:
   plugin registry, both at edit time (`choices_from`) and at render
   time (`server.py:fetch`).
 
-Existing examples in the bundled tree: `glances_core` +
-`glances_status`, `github_core` + `github_*`, `calendar_core` +
-`calendar_*`. When shipping a family through the marketplace, declare
-all folders in the catalog entry's `folders` array so the install
-lands them as siblings under `plugins/`.
+Existing examples in the bundled tree: `calendar_core` +
+`calendar_*`, `weather_core` + `weather_*`, `ha_core` + `ha_*`.
+Marketplace bundles using the same pattern: `glances_core` +
+`glances_status`, `github_core` + `github_*`, `spotify_core` +
+`spotify_*`, `f1_core` + `f1_*`. When shipping a family through
+the marketplace, declare all folders in the catalog entry's
+`folders` array so the install lands them as siblings under
+`plugins/`.
 
 ### Admin pages, `blueprint()`
 
@@ -941,18 +946,16 @@ the conventions land in practice.
 
 **By archetype**, pick the closest information shape:
 
-* `.stat-body`, [`plugins/finance_stock`](https://github.com/dmellok/tesserae/tree/main/plugins/finance_stock),
-  [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now)
+* `.stat-body`, [`plugins/weather_now`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now),
+  [`plugins/ha_battery`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_battery)
 * `.list-body`, [`plugins/news_hacker_news`](https://github.com/dmellok/tesserae/tree/main/plugins/news_hacker_news),
   [`plugins/ha_entities`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_entities),
-  [`plugins/github_pr_queue`](https://github.com/dmellok/tesserae/tree/main/plugins/github_pr_queue),
-  [`plugins/f1_standings_drivers`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_standings_drivers)
+  [`plugins/todo`](https://github.com/dmellok/tesserae/tree/main/plugins/todo)
 * `.chart-body`, [`plugins/weather_hourly`](https://github.com/dmellok/tesserae/tree/main/plugins/weather_hourly),
   [`plugins/ha_history`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_history),
   [`plugins/ha_energy`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_energy)
-* `.status-body`, [`plugins/f1_next`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_next),
-  [`plugins/f1_last_race`](https://github.com/dmellok/tesserae/tree/main/plugins/f1_last_race),
-  [`plugins/sky_moon`](https://github.com/dmellok/tesserae/tree/main/plugins/sky_moon)
+* `.status-body`, [`plugins/ha_climate`](https://github.com/dmellok/tesserae/tree/main/plugins/ha_climate),
+  [`plugins/clock_sunrise_sunset`](https://github.com/dmellok/tesserae/tree/main/plugins/clock_sunrise_sunset)
 * `.cal-body`, [`plugins/calendar_day`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_day),
   [`plugins/calendar_week`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_week),
   [`plugins/calendar_month`](https://github.com/dmellok/tesserae/tree/main/plugins/calendar_month)

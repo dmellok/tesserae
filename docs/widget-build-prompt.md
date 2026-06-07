@@ -50,14 +50,14 @@ Three docs are the canonical contract. Read each before drafting:
 4. Pick two existing widgets that share your information shape and
    read their `client.js` as reference. Good examples by archetype:
 
-   - **Status archetype**, [`plugins/f1_next`](../plugins/f1_next),
-     [`plugins/sky_moon`](../plugins/sky_moon)
+   - **Status archetype**, [`plugins/ha_climate`](../plugins/ha_climate),
+     [`plugins/clock_sunrise_sunset`](../plugins/clock_sunrise_sunset)
    - **List archetype**, [`plugins/news_hacker_news`](../plugins/news_hacker_news),
      [`plugins/ha_entities`](../plugins/ha_entities)
    - **Chart archetype**, [`plugins/weather_hourly`](../plugins/weather_hourly),
      [`plugins/ha_history`](../plugins/ha_history)
-   - **Stat archetype**, [`plugins/finance_stock`](../plugins/finance_stock),
-     [`plugins/weather_now`](../plugins/weather_now)
+   - **Stat archetype**, [`plugins/weather_now`](../plugins/weather_now),
+     [`plugins/ha_battery`](../plugins/ha_battery)
    - **Calendar archetype**, [`plugins/calendar_day`](../plugins/calendar_day),
      [`plugins/calendar_week`](../plugins/calendar_week)
    - **Image archetype**, [`plugins/picture_gallery`](../plugins/picture_gallery),

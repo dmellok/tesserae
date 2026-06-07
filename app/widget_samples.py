@@ -378,25 +378,6 @@ def _ha_zones() -> dict[str, Any]:
     }
 
 
-def _octoprint_status() -> dict[str, Any]:
-    return {
-        "label": "OctoPrint",
-        "time": "14:32",
-        "state": {"text": "Printing", "tone": "printing"},
-        "job": {
-            "name": "benchy.gcode",
-            "completion": 47.3,
-            "elapsed": 3600,
-            "remaining": 5400,
-            "eta": "15:32",
-        },
-        "temps": {
-            "tool": {"actual": 208.4, "target": 210.0},
-            "bed": {"actual": 60.1, "target": 60.0},
-        },
-    }
-
-
 def _ha_todo() -> dict[str, Any]:
     # Mix of needs-action and completed items + a couple of due dates
     # so all four variants have something to render in the gallery.
@@ -451,54 +432,6 @@ def _ha_todo() -> dict[str, Any]:
     }
 
 
-def _sky_moon() -> dict[str, Any]:
-    return {
-        "label": "Melbourne",
-        "lat": -37.8,
-        "phase_name": "Waning Gibbous",
-        "age_days": 18.4,
-        "fraction": 0.62,
-        "illumination": 93.0,
-        "waxing": False,
-        "next_new": "2026-06-15T00:00:00+00:00",
-        "next_first_quarter": "2026-06-22T00:00:00+00:00",
-        "next_full": "2026-06-30T00:00:00+00:00",
-        "next_last_quarter": "2026-06-07T00:00:00+00:00",
-        "sunrise": "2026-06-03T07:27:00",
-        "sunset": "2026-06-03T17:09:00",
-        "moonrise": "2026-06-03T22:14:00",
-        "moonset": "2026-06-03T10:48:00",
-        "place": "Melbourne",
-        "time": "09:41",
-        "rise": "07:27",
-        "set": "17:09",
-        "riseMin": 7 * 60 + 27,
-        "setMin": 17 * 60 + 9,
-        "nowMin": 9 * 60 + 41,
-        "dayLength": "9h 42m",
-        "solarNoon": "12:18",
-        "sun": {
-            "rise": "07:27",
-            "set": "17:09",
-            "riseMin": 7 * 60 + 27,
-            "setMin": 17 * 60 + 9,
-            "nowMin": 9 * 60 + 41,
-            "dayLength": "9h 42m",
-            "solarNoon": "12:18",
-        },
-        "moon": {
-            "phase": "Waning Gibbous",
-            "illum": 93,
-            "age": 18.4,
-            "fraction": 0.62,
-            "waxing": False,
-            "rise": "22:14",
-            "set": "10:48",
-            "next": "Next last quarter · Sun 7 Jun",
-        },
-    }
-
-
 def _todo() -> dict[str, Any]:
     return {
         "list_name": "Today",
@@ -538,44 +471,7 @@ def _picture_gallery() -> dict[str, Any]:
     }
 
 
-def _weather_pollen_count() -> dict[str, Any]:
-    # Open-Meteo returns nulls outside Europe; the gallery is shot at
-    # Melbourne which falls outside CAMS coverage, so the upstream
-    # path lands with `breakdown[i].level == None` and the tiles
-    # render em-dashes. This fixture gives all three categories a
-    # plausible mid-spring reading so the visual treatment is
-    # actually exercised.
-    return {
-        "place": "Melbourne",
-        "label": "Melbourne",
-        "level": "Moderate",
-        "breakdown": [
-            {"label": "Tree", "icon": "tree", "level": "Low", "value": 1.2},
-            {"label": "Grass", "icon": "grass", "level": "High", "value": 28.4},
-            {"label": "Weed", "icon": "weed", "level": "Moderate", "value": 9.1},
-        ],
-    }
-
-
-def _glances_status() -> dict[str, Any]:
-    """Healthy server snapshot, CPU + RAM + disk in the safe zone so
-    the state pill paints `OK`. ``uptime`` is multi-day to exercise
-    the ``Nd`` formatting branch in the client."""
-    return {
-        "label": "nas",
-        "time": "14:32",
-        "hostname": "nas",
-        "cpu": 18.4,
-        "mem": 42.7,
-        "disk": {"percent": 63.2, "mnt_point": "/"},
-        "load": 0.51,
-        "uptime": 4 * 86400 + 3 * 3600 + 17 * 60,
-        "state": {"text": "OK", "tone": "ok"},
-    }
-
-
 SAMPLES: dict[str, Any] = {
-    "glances_status": _glances_status,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
     "ha_climate": _ha_climate,
@@ -588,11 +484,8 @@ SAMPLES: dict[str, Any] = {
     "ha_sensor": _ha_sensor,
     "ha_todo": _ha_todo,
     "ha_zones": _ha_zones,
-    "octoprint_status": _octoprint_status,
     "picture_gallery": _picture_gallery,
-    "sky_moon": _sky_moon,
     "todo": _todo,
-    "weather_pollen_count": _weather_pollen_count,
 }
 
 

@@ -6,6 +6,50 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.41.0], 2026-06-08
+
+### Changed (breaking, but easy to fix)
+
+- **Bundle slim-down completes: 18 more widgets moved to the
+  community catalog, 7 new bundles.** The default install now ships
+  ~30 universally-useful widgets instead of ~65. All moved widgets
+  are installable in one click from Settings → Widgets → Browse
+  community widgets.
+
+  | Bundle | Widgets | Source repo |
+  |---|---|---|
+  | Finance | finance_crypto, finance_currency, finance_stock | [dmellok/tesserae-finance](https://github.com/dmellok/tesserae-finance) |
+  | Sky | sky_air_traffic, sky_aurora, sky_bom_warnings, sky_moon | [dmellok/tesserae-sky](https://github.com/dmellok/tesserae-sky) |
+  | Weather Extras | weather_air_quality, weather_pollen_count, weather_wind | [dmellok/tesserae-weather-extras](https://github.com/dmellok/tesserae-weather-extras) |
+  | Picture Extras | picture_unsplash, picture_apple_album | [dmellok/tesserae-picture-extras](https://github.com/dmellok/tesserae-picture-extras) |
+  | Clock Extras | clock_qlock, clock_world | [dmellok/tesserae-clock-extras](https://github.com/dmellok/tesserae-clock-extras) |
+  | Monitoring | glances_core, glances_status, octoprint_status | [dmellok/tesserae-monitoring](https://github.com/dmellok/tesserae-monitoring) |
+  | Public Transport | public_transport_times | [dmellok/tesserae-transport](https://github.com/dmellok/tesserae-transport) |
+
+  Dashboards that referenced any of these will show "widget not
+  installed" cells on upgrade until you reinstall from Browse.
+
+  Why: completes the slim-down started in 0.38.0 (F1), 0.39.0
+  (Spotify), 0.40.0 (GitHub). The remaining ~30 bundled widgets are
+  what a new user can compose a useful dashboard from immediately
+  with zero accounts or niche knowledge: clocks, weather, calendar,
+  todo, RSS / Hacker News / Wikipedia news, picture_gallery,
+  webpage, and the Home Assistant family.
+
+  Also in this release:
+
+  - Browse Card screenshots now ship for every official bundle (the
+    catalog declared `screenshot_sizes: ["lg"]` for f1/spotify/github
+    in earlier releases but no PNG was uploaded, so the card showed a
+    broken-image placeholder).
+  - 4 dead `_sky_moon` / `_weather_pollen_count` / `_glances_status` /
+    `_octoprint_status` sample functions stripped from
+    `app/widget_samples.py`.
+  - `docs/widgets/tiers.md` marks moved entries as *(marketplace)*.
+  - `docs/widget-build-prompt.md` + `docs/widgets.md` archetype
+    examples swapped from moved widgets to still-bundled equivalents
+    so AI-built widgets read from valid file paths.
+
 ## [0.40.0], 2026-06-08
 
 ### Changed (breaking, but easy to fix)

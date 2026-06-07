@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -10,16 +10,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 ## Weather
 
 <div class="grid cards" markdown>
-
--   **Weather, Air Quality** &middot; `weather_air_quality`
-
-    ---
-
-    ![weather_air_quality](../screenshots/widgets/weather_air_quality.png)
-
-    Air Quality Index (European or US scale) plus PM2.5, PM10, O3, NO2 readings. Data from Open-Meteo CAMS (no API key). Colour-coded panel block reflects the AQI band.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 -   **Weather, Forecast** &middot; `weather_forecast`
 
@@ -61,26 +51,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
--   **Weather, Pollen Count** &middot; `weather_pollen_count`
-
-    ---
-
-    ![weather_pollen_count](../screenshots/widgets/weather_pollen_count.png)
-
-    Daily pollen counts (grass / tree / weed) with a colour-coded severity band. Primary source: Open-Meteo CAMS, Europe-only. Falls back to scraping the Melbourne Pollen Count daily forecast when coordinates are inside Australia.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **Weather, Wind** &middot; `weather_wind`
-
-    ---
-
-    ![weather_wind](../screenshots/widgets/weather_wind.png)
-
-    Current wind speed, gust, direction, and Beaufort scale plus a compass dial, 8-point wind rose, and 12-hour gust trace. Data from Open-Meteo (no API key required).
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
 </div>
 
 ## Clocks & time
@@ -94,16 +64,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     ![clock_analog](../screenshots/widgets/clock_analog.png)
 
     Analog clock face. Pure SVG, no network. Five face styles, pick the one that suits the rest of your dashboard.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
-
--   **Clock, Word grid** &middot; `clock_qlock`
-
-    ---
-
-    ![clock_qlock](../screenshots/widgets/clock_qlock.png)
-
-    QLOCKTWO-inspired letter-grid clock. An 11×10 matrix of letters where the words for the current time light up; everything else stays dim. Pure client-side, no fetch. Rounds to the nearest 5 minutes.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -126,16 +86,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Word clock, reads the time as English text, rounded to the nearest five minutes ('Twenty past three'). Pure client-side, ticks every 30 seconds.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
-
--   **Clock, World** &middot; `clock_world`
-
-    ---
-
-    ![clock_world](../screenshots/widgets/clock_world.png)
-
-    Multiple cities in one cell, each with its current time in the configured IANA timezone. Pure client-side, uses the browser's Intl.DateTimeFormat with the cell's timezone list.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
 </div>
 
@@ -218,88 +168,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Wikipedia 'On this day', featured historical events for today's date. Uses the free Wikimedia REST API (no key).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Finance
-
-<div class="grid cards" markdown>
-
--   **Finance, Crypto** &middot; `finance_crypto`
-
-    ---
-
-    ![finance_crypto](../screenshots/widgets/finance_crypto.png)
-
-    Single crypto with current price, 24h change, and a 24h sparkline. Data from CoinGecko (free, no API key). Coin ID is the lowercase slug from coingecko.com (e.g. bitcoin, ethereum, solana).
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **Finance, Currency (FX)** &middot; `finance_currency`
-
-    ---
-
-    ![finance_currency](../screenshots/widgets/finance_currency.png)
-
-    Single FX pair (e.g. AUD/USD) with current rate + 30-day sparkline. Data from frankfurter.app (free, no key, sourced from European Central Bank). ISO 4217 currency codes.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
--   **Finance, Stock** &middot; `finance_stock`
-
-    ---
-
-    ![finance_stock](../screenshots/widgets/finance_stock.png)
-
-    Single stock ticker with current price + intraday sparkline + day change. Uses Yahoo Finance's public chart endpoint (query1.finance.yahoo.com), undocumented but stable for years. Symbol format follows Yahoo's: e.g. 'AAPL', 'CBA.AX' (ASX), '^GSPC' (S&P 500 index).
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Sky & astronomy
-
-<div class="grid cards" markdown>
-
--   **Sky, Air Traffic** &middot; `sky_air_traffic`
-
-    ---
-
-    ![sky_air_traffic](../screenshots/widgets/sky_air_traffic.png)
-
-    Flights currently overhead at your location via OpenSky Network (free, no key). Shows count + the nearest N flights with callsign / origin country / altitude / speed.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **Sky, Aurora Forecast** &middot; `sky_aurora`
-
-    ---
-
-    ![sky_aurora](../screenshots/widgets/sky_aurora.png)
-
-    Current planetary Kp index + 3-day forecast from NOAA SWPC. Higher Kp = aurora visible further from the poles. Includes a viewer-latitude hint so the band reads as 'visible from your location' when conditions allow.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **Weather, BoM Warnings** &middot; `sky_bom_warnings`
-
-    ---
-
-    ![sky_bom_warnings](../screenshots/widgets/sky_bom_warnings.png)
-
-    Current severe weather warnings from the Bureau of Meteorology (Australia). Filter by state, flood, severe thunderstorm, severe weather, bushfire, etc. Uses api.weather.bom.gov.au (the same backend the BoM website itself uses; no key, treat as private/non-redistribution per BoM's terms).
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
--   **Sky, Sun & Moon** &middot; `sky_moon`
-
-    ---
-
-    ![sky_moon](../screenshots/widgets/sky_moon.png)
-
-    Sun arc + moon phase disc. Sunrise / sunset / day length / solar noon, plus moon phase, illumination, age, moonrise / moonset and upcoming new / first-quarter / full / last-quarter dates. Sun + moon times come from Open-Meteo when latitude / longitude are set; phase + age are computed locally from the synodic month.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 </div>
 
@@ -443,16 +311,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
--   **Picture, Apple Shared Album** &middot; `picture_apple_album`
-
-    ---
-
-    ![picture_apple_album](../screenshots/widgets/picture_apple_album.png)
-
-    Rotates through photos in a public iCloud Shared Album, full bleed. Enable Public Website on the album in Photos, then paste its share link (https://www.icloud.com/sharedalbum/#B0xxxxxx) or just the token. NOTE: uses Apple's reverse-engineered shared-album endpoints, undocumented but stable for ~10 years.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
 -   **Gallery Core** &middot; `picture_gallery`
 
     ---
@@ -462,32 +320,6 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Folder-based image rotation, full bleed. Manage folders + uploads at Plugins → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
-
--   **Picture, Unsplash** &middot; `picture_unsplash`
-
-    ---
-
-    ![picture_unsplash](../screenshots/widgets/picture_unsplash.png)
-
-    Random photo from Unsplash, full bleed. Filter by search query, collection IDs, or photographer username. Register a free Unsplash developer app at https://unsplash.com/oauth/applications and paste your Access Key in Settings → Plugins → Unsplash.
-
-    **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Transit
-
-<div class="grid cards" markdown>
-
--   **Public Transport (PTV)** &middot; `public_transport_times`
-
-    ---
-
-    ![public_transport_times](../screenshots/widgets/public_transport_times.png)
-
-    Next departures from a PTV stop (train / tram / bus / V-Line / night bus). Live data via the PTV Timetable API v3. Register at https://www.ptv.vic.gov.au/footer/data-and-reporting/datasets/ptv-timetable-api/ to receive a developer ID and signing key, then paste them into Settings → Plugins → Public Transport. Pick stop_id + route_type per cell.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 </div>
 
@@ -520,37 +352,5 @@ The **47 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Glances
-
-<div class="grid cards" markdown>
-
--   **Glances, Status** &middot; `glances_status`
-
-    ---
-
-    ![glances_status](../screenshots/widgets/glances_status.png)
-
-    Live system stats from a Glances instance: CPU / RAM / disk / load / uptime, with a tone-coded state pill that swings from ok → warn → danger as the headline metric crosses thresholds. Each cell targets its own Glances server so a dashboard can monitor several boxes side by side.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
-
-</div>
-
-## Octoprint
-
-<div class="grid cards" markdown>
-
--   **OctoPrint, Status** &middot; `octoprint_status`
-
-    ---
-
-    ![octoprint_status](../screenshots/widgets/octoprint_status.png)
-
-    Live 3D-print monitor for an OctoPrint instance: printer state, job progress with ETA, and hotend/bed temperatures.
-
-    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
 </div>
