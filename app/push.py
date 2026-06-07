@@ -866,10 +866,12 @@ class PushManager:
         y1 = y0 + chip_h
 
         draw = ImageDraw.Draw(img)
-        # White rectangle background + black border. Two-tone so the
-        # chip survives the 1-bit dither used by the e-ink renderers,
-        # and reads on any dashboard content underneath.
-        draw.rectangle((x0, y0, x1, y1), fill=(255, 255, 255), outline=(0, 0, 0), width=2)
+        # Plain white rectangle. We dropped the black outline because
+        # the white-on-dashboard contrast already reads cleanly on
+        # every theme we ship, and the 2px stroke picked up dither
+        # artifacts on some panel gamuts where the border quantised
+        # to a checker pattern.
+        draw.rectangle((x0, y0, x1, y1), fill=(255, 255, 255))
 
         # Phosphor battery-warning glyph, loaded lazily and cached on
         # the class so a busy fan-out doesn't re-open the TTF for every
@@ -878,12 +880,29 @@ class PushManager:
         icon_font = _phosphor_font(int(chip_h * 0.72))
         text_font = _ui_font(int(chip_h * 0.46))
         icon_x = x0 + max(4, chip_h // 6)
-        # Centre the glyph vertically within the chip via the font's
-        # actual bbox so different sizes line up cleanly.
+        # Anchor the icon's ink bottom to the percentage text's
+        # baseline so the two read as "on the same line". Centring
+        # each glyph in the chip independently left the Phosphor
+        # icon visibly floating above the digits because its em-box
+        # is taller than the text's; a shared baseline reads cleanly.
+        text = f"{pct}%"
+        if text_font is not None:
+            tbbox = text_font.getbbox(text)
+            # Centre the text's ink in the chip first, then read the
+            # baseline (= text_y + tbbox[3], the ink descender in em
+            # coords). Both glyphs hang from this Y.
+            th = tbbox[3] - tbbox[1]
+            text_y = y0 + (chip_h - th) // 2 - tbbox[1]
+            baseline_y = text_y + tbbox[3]
+        else:
+            baseline_y = y0 + chip_h - max(4, chip_h // 5)
+
         if icon_font is not None:
             ibbox = icon_font.getbbox(icon_glyph)
-            ih = ibbox[3] - ibbox[1]
-            icon_y = y0 + (chip_h - ih) // 2 - ibbox[1]
+            # Drop the icon so its ink bottom lands on the text
+            # baseline. PIL's draw.text uses (x, y) as the top of
+            # the em-box, so back out by ibbox[3].
+            icon_y = baseline_y - ibbox[3]
             draw.text((icon_x, icon_y), icon_glyph, fill=(208, 56, 28), font=icon_font)
             icon_advance = ibbox[2] - ibbox[0]
         else:
@@ -891,21 +910,17 @@ class PushManager:
             # chip still communicates SOMETHING. Should never trigger
             # in normal installs since the TTF is vendored.
             block = chip_h // 2
-            icon_y = y0 + (chip_h - block) // 2
+            icon_y = baseline_y - block
             draw.rectangle(
                 (icon_x, icon_y, icon_x + block, icon_y + block),
                 fill=(208, 56, 28),
             )
             icon_advance = block
 
-        # Percentage text to the right of the icon. Sized at ~46% of
-        # chip height so it sits visually balanced with the glyph.
-        text = f"{pct}%"
+        # Percentage text follows the icon, drawn at the baseline-
+        # derived top so both share their visual bottom edge.
         text_x = icon_x + icon_advance + 6
         if text_font is not None:
-            tbbox = text_font.getbbox(text)
-            th = tbbox[3] - tbbox[1]
-            text_y = y0 + (chip_h - th) // 2 - tbbox[1]
             draw.text((text_x, text_y), text, fill=(0, 0, 0), font=text_font)
         else:
             draw.text((text_x, y0 + chip_h // 3), text, fill=(0, 0, 0))

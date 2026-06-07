@@ -6,6 +6,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.34.2], 2026-06-07
+
+### Added
+
+- **Topbar battery indicator.** When any registered device instance
+  is reporting a `battery_pct` heartbeat, a small Phosphor battery
+  glyph appears next to the theme toggle. Single-device installs
+  show the percentage inline; multi-device installs show a count
+  badge with a hover/click popover listing every battery + level.
+  The trigger paints in the tone of the worst battery
+  (critical ≤10% / low ≤30% / ok) so a single critical device
+  catches the eye when others are fine. Mains-powered devices
+  (Pi paths) don't surface here, so a panel-only deployment stays
+  uncluttered.
+
+### Changed
+
+- **Low-battery push overlay.** Dropped the black border (was picking
+  up dither artifacts on some panel gamuts) and re-anchored the
+  Phosphor glyph to share a baseline with the percentage text so
+  they read as "on the same line" instead of the icon visibly
+  floating above the digits.
+
 ## [0.34.1], 2026-06-07
 
 ### Changed

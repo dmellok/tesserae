@@ -216,6 +216,119 @@
 :root[data-theme="dark"] .is-light-only { display: none; }
 :root:not([data-theme="dark"]) .is-dark-only { display: none; }
 
+/* Topbar battery indicator. Rendered only when at least one
+   registered device reports a battery_pct (nav_batteries non-empty);
+   the trigger paints in the tone of the WORST battery so a single
+   critical device catches the eye even when others are fine. Native
+   <details> handles hover-on-desktop + click-on-mobile without JS. */
+.topbar-batteries { position: relative; }
+.topbar-batteries--topbar { margin-left: auto; }
+/* Push the theme-toggle's auto-margin off when the indicator is
+   present, so they sit as a tight pair at the far right. */
+.topbar-batteries--topbar + .theme-toggle--topbar { margin-left: 4px; }
+.topbar-batteries--topbar > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  color: var(--t-fg-soft);
+  list-style: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+/* Hide the disclosure triangle the browser puts on <summary>. */
+.topbar-batteries--topbar > summary::-webkit-details-marker { display: none; }
+.topbar-batteries--topbar > summary::marker { content: ""; }
+.topbar-batteries--topbar > summary:hover { background: var(--t-surface-sunk); }
+.topbar-batteries--topbar > summary > .ph { font-size: 18px; }
+.topbar-batteries--topbar.is-tone-critical > summary { color: var(--t-danger); }
+.topbar-batteries--topbar.is-tone-low      > summary { color: var(--t-warn); }
+.topbar-batteries--topbar.is-tone-ok       > summary { color: var(--t-fg-soft); }
+.topbar-batteries-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  padding: 0 4px;
+  height: 18px;
+  background: var(--t-surface-sunk);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.topbar-batteries--topbar.is-tone-critical .topbar-batteries-count {
+  background: color-mix(in oklab, var(--t-danger) 18%, transparent);
+  color: var(--t-danger);
+}
+.topbar-batteries--topbar.is-tone-low .topbar-batteries-count {
+  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
+  color: var(--t-warn);
+}
+.topbar-batteries-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 600;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 8px 0;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-md);
+}
+.topbar-batteries-head {
+  padding: 4px 14px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--t-muted);
+}
+.topbar-batteries-popover ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+.topbar-batteries-popover li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  font-size: 0.88rem;
+}
+.topbar-batteries-popover .topbar-batteries-pct {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.topbar-batteries-popover li.is-tone-critical .topbar-batteries-pct { color: var(--t-danger); }
+.topbar-batteries-popover li.is-tone-low      .topbar-batteries-pct { color: var(--t-warn); }
+.topbar-batteries-popover li.is-tone-ok       .topbar-batteries-pct { color: var(--t-fg-soft); }
+/* Single-device case: the trigger already shows pct, so no popover. */
+.topbar-batteries--topbar.is-single .topbar-batteries-popover { display: none; }
+.topbar-batteries--topbar.is-single > summary { cursor: default; }
+/* Hover open + focus open on desktop so it behaves like a tooltip;
+   click-to-toggle still works on touch via the native <details>. */
+@media (hover: hover) {
+  .topbar-batteries--topbar:not(.is-single):hover[open],
+  .topbar-batteries--topbar:not(.is-single):hover {
+    /* no-op; intent is documented in the next rule */
+  }
+  .topbar-batteries--topbar:not(.is-single):hover > .topbar-batteries-popover,
+  .topbar-batteries--topbar:not(.is-single):focus-within > .topbar-batteries-popover {
+    display: block;
+  }
+}
+/* The drawer variant collapses into a labelled list, no popover
+   nesting inside the mobile sidebar. */
+.topbar-batteries--drawer { display: none; }
+
 /* Hamburger + sidebar (mobile/tablet) ------------------------------ */
 
 .nav-toggle {
@@ -281,6 +394,47 @@
   }
   /* Drawer-only theme toggle takes over inside the drawer. */
   .theme-toggle--topbar { display: none; }
+  /* Topbar battery indicator is hidden in mobile; the drawer variant
+     below renders the same data inline. */
+  .topbar-batteries--topbar { display: none; }
+  .topbar-batteries--drawer {
+    display: block;
+    padding: var(--t-space-3) var(--t-space-3);
+    color: var(--t-fg-soft);
+    font-size: 0.85rem;
+  }
+  .topbar-batteries--drawer .topbar-batteries-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--t-space-2);
+    font-weight: 600;
+  }
+  .topbar-batteries--drawer .ph { font-size: 18px; }
+  .topbar-batteries--drawer.is-tone-critical { color: var(--t-danger); }
+  .topbar-batteries--drawer.is-tone-low      { color: var(--t-warn); }
+  .topbar-batteries-drawer-list {
+    list-style: none;
+    padding: var(--t-space-2) 0 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--t-space-1);
+  }
+  .topbar-batteries-drawer-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--t-space-3);
+    padding: 4px var(--t-space-3);
+    border-left: 2px solid var(--t-border);
+    color: var(--t-fg-soft);
+  }
+  .topbar-batteries-drawer-list li.is-tone-critical { border-color: var(--t-danger); color: var(--t-danger); }
+  .topbar-batteries-drawer-list li.is-tone-low      { border-color: var(--t-warn); color: var(--t-warn); }
+  .topbar-batteries-drawer-list .topbar-batteries-pct {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
   .theme-toggle--drawer {
     display: inline-flex;
     width: 100%;

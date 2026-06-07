@@ -64,6 +64,54 @@ REPO_ROOT: Path = Path(__file__).resolve().parent.parent
 _MAX_THUMB_HEIGHT_MULTIPLIER: int = 8
 
 
+def _collect_battery_status(app: Flask) -> list[dict[str, Any]]:
+    """Snapshot of every registered device instance that reported a
+    battery_pct in its last heartbeat. Returns a list of ``{id, name,
+    pct, tone}`` dicts sorted worst-charge-first so the topbar
+    indicator + popover always lead with the device that needs
+    attention. ``tone`` is one of ``"critical"`` / ``"low"`` / ``"ok"``
+    so the template can colour-code without re-doing the math.
+
+    Mains-powered devices (no battery, the Pi paths) are omitted, the
+    indicator doesn't render at all when the list is empty so a
+    panel-only deployment stays uncluttered."""
+    registry = app.config.get("DEVICE_REGISTRY")
+    status_cache: dict[str, dict[str, Any]] = app.config.get("DEVICE_STATUS") or {}
+    if registry is None:
+        return []
+    out: list[dict[str, Any]] = []
+    for device in registry.devices.values():
+        # Built-in kinds aren't real targets; only user-registered
+        # instances heartbeat to the status cache.
+        if device.kind_of is None:
+            continue
+        status = status_cache.get(device.id) or {}
+        parsed = status.get("parsed") or {}
+        raw = parsed.get("battery_pct")
+        if raw is None:
+            continue
+        try:
+            pct = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if pct <= 10:
+            tone = "critical"
+        elif pct <= 30:
+            tone = "low"
+        else:
+            tone = "ok"
+        out.append(
+            {
+                "id": device.id,
+                "name": device.display_name,
+                "pct": pct,
+                "tone": tone,
+            }
+        )
+    out.sort(key=lambda entry: entry["pct"])
+    return out
+
+
 def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Response | None:
     """Return a downscaled cached variant of ``filename`` at the requested
     width, or ``None`` if anything goes wrong (caller falls through to the
@@ -654,7 +702,12 @@ def create_app(
         template, the top-nav Plugins dropdown enumerates them. Also
         forwards the ``app`` settings section so per-toggle UI knobs
         (e.g. mobile-zoom lock) can render conditional snippets in the
-        base template without each route having to pass them in."""
+        base template without each route having to pass them in.
+
+        ``nav_batteries`` is the registered device instances that
+        reported a battery_pct in their last heartbeat, sorted by
+        worst-charge-first. Powers the topbar battery indicator + its
+        per-device popover."""
         registry = app.config["PLUGIN_REGISTRY"]
         store = app.config.get("SETTINGS_STORE")
         app_settings: dict[str, Any] = {}
@@ -668,6 +721,7 @@ def create_app(
                 (p for p in registry.plugins.values() if p.has_admin),
                 key=lambda p: p.name.lower(),
             ),
+            "nav_batteries": _collect_battery_status(app),
             "app_settings": app_settings,
         }
 
