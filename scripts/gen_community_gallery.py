@@ -25,9 +25,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT = REPO_ROOT / "docs" / "widgets" / "community.md"
 
-DEFAULT_CATALOG_URL = (
-    "https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json"
-)
+DEFAULT_CATALOG_URL = "https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json"
 SCREENSHOTS_BASE = "https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/screenshots"
 
 # Friendly section names per tag. Tags come from the catalog schema's
@@ -163,18 +161,13 @@ def _card(entry: dict[str, Any]) -> str:
     )
 
     if len(folders) > 1:
-        folders_note = (
-            f"**Bundle:** installs {len(folders)} folders &middot; "
-            + " ".join(f"`{f}`" for f in folders)
+        folders_note = f"**Bundle:** installs {len(folders)} folders &middot; " + " ".join(
+            f"`{f}`" for f in folders
         )
     else:
         folders_note = f"**Folder:** `{folders[0]}`"
 
-    img = (
-        f"    ![{eid}]({screenshot_url})"
-        if screenshot_url
-        else "    *(no screenshot yet)*"
-    )
+    img = f"    ![{eid}]({screenshot_url})" if screenshot_url else "    *(no screenshot yet)*"
 
     lines = [
         f"-   **{name}**{badge} &middot; `{eid}`",
