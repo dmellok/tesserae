@@ -3,21 +3,45 @@
   "name": "Picture, Gallery",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Plugins → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",
+  "description": "Folder-based image rotation, full bleed. Manage folders + uploads at Widgets \u2192 Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.",
   "icon": "ph-images",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "folder", "type": "select", "label": "Folder", "default": "", "choices_from": "folders" },
+    {
+      "name": "folder",
+      "type": "select",
+      "label": "Folder",
+      "default": "",
+      "choices_from": "folders"
+    },
     {
       "name": "orientation",
       "type": "select",
       "label": "Orientation filter",
       "default": "any",
       "choices": [
-        { "value": "any",       "label": "Any" },
-        { "value": "portrait",  "label": "Portrait" },
-        { "value": "landscape", "label": "Landscape" },
-        { "value": "square",    "label": "Square" }
+        {
+          "value": "any",
+          "label": "Any"
+        },
+        {
+          "value": "portrait",
+          "label": "Portrait"
+        },
+        {
+          "value": "landscape",
+          "label": "Landscape"
+        },
+        {
+          "value": "square",
+          "label": "Square"
+        }
       ]
     },
     {
@@ -26,8 +50,14 @@
       "label": "Selection",
       "default": "random",
       "choices": [
-        { "value": "random",     "label": "Random each render" },
-        { "value": "sequential", "label": "Sequential (rotates one per render)" }
+        {
+          "value": "random",
+          "label": "Random each render"
+        },
+        {
+          "value": "sequential",
+          "label": "Sequential (rotates one per render)"
+        }
       ]
     },
     {
@@ -36,16 +66,49 @@
       "label": "Scale",
       "default": "fit",
       "choices": [
-        { "value": "fit",     "label": "Fit (letterbox)" },
-        { "value": "fill",    "label": "Fill (crop to cover)" },
-        { "value": "stretch", "label": "Stretch (distort to fill)" },
-        { "value": "center",  "label": "Center (no scaling)" },
-        { "value": "blurred", "label": "Fit with blurred background" }
+        {
+          "value": "fit",
+          "label": "Fit (letterbox)"
+        },
+        {
+          "value": "fill",
+          "label": "Fill (crop to cover)"
+        },
+        {
+          "value": "stretch",
+          "label": "Stretch (distort to fill)"
+        },
+        {
+          "value": "center",
+          "label": "Center (no scaling)"
+        },
+        {
+          "value": "blurred",
+          "label": "Fit with blurred background"
+        }
       ]
     },
-    { "name": "show_filename", "type": "boolean", "label": "Show filename overlay", "default": false },
-    { "name": "show_folder_chip", "type": "boolean", "label": "Show folder-name chip in the corner", "default": true },
-    { "name": "show_count", "type": "boolean", "label": "Show photo count indicator", "default": true }
+    {
+      "name": "show_filename",
+      "type": "boolean",
+      "label": "Show filename overlay",
+      "default": false
+    },
+    {
+      "name": "show_folder_chip",
+      "type": "boolean",
+      "label": "Show folder-name chip in the corner",
+      "default": true
+    },
+    {
+      "name": "show_count",
+      "type": "boolean",
+      "label": "Show photo count indicator",
+      "default": true
+    }
   ],
-  "render": { "dither": "floyd-steinberg", "full_bleed": true }
+  "render": {
+    "dither": "floyd-steinberg",
+    "full_bleed": true
+  }
 }

@@ -196,7 +196,7 @@ recommend.
 
 If the data source needs an API key or upstream service, name it
 explicitly (e.g. "Open-Meteo, no key required" / "GitHub PAT in
-Plugins → GitHub Core" / "Home Assistant Core plugin"). The user
+Widgets → GitHub Core" / "Home Assistant Core plugin"). The user
 configures those out-of-band.
 
 ---

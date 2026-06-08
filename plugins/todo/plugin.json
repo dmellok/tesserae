@@ -3,9 +3,16 @@
   "name": "Todo",
   "version": "0.1.1",
   "kind": "widget",
-  "description": "Persistent todo lists. Create lists and add items on the admin page (Plugins → Todo); the widget cell renders the chosen list as a read-only checklist. Completed items auto-prune after 24 hours so the list doesn't grow indefinitely.",
+  "description": "Persistent todo lists. Create lists and add items on the admin page (Widgets \u2192 Todo); the widget cell renders the chosen list as a read-only checklist. Completed items auto-prune after 24 hours so the list doesn't grow indefinitely.",
   "icon": "ph-list-checks",
-  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
     {
       "name": "list_id",
@@ -26,5 +33,8 @@
       "default": 0
     }
   ],
-  "render": { "dither": "none", "needs_network": false }
+  "render": {
+    "dither": "none",
+    "needs_network": false
+  }
 }

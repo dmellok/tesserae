@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.42.3], 2026-06-08
+
+### Changed
+
+- **README + bundled plugin descriptions refreshed for the 0.38–0.42
+  state.** The README's bundled widget count went from 58 (pre
+  slim-down) to 30 plus the community catalog, the top-nav rename
+  ("Plugins" → "Widgets") propagated to user-facing copy, and new
+  surfaces (smart sync, `design.palette`, `requires:` capabilities,
+  marketplace install persistence) got mentions in the feature list.
+  Five bundled plugin manifests (`calendar_day`, `calendar_week`,
+  `calendar_month`, `picture_gallery`, `todo`) had a "manage at
+  Plugins → …" hint in their description that's now "manage at
+  Widgets → …". Auto-generated widget gallery regenerated to pick up
+  the new text.
+
 ## [0.42.2], 2026-06-08
 
 ### Fixed

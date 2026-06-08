@@ -99,7 +99,7 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_day](../screenshots/widgets/calendar_day.png)
 
-    Today's agenda Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
+    Today's agenda Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the stripe / marker / fill colour.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** -
 
@@ -109,7 +109,7 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_month](../screenshots/widgets/calendar_month.png)
 
-    Month-grid view Reads from feeds configured in Plugins → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
+    Month-grid view Reads from feeds configured in Widgets → Calendar Feeds; each feed's colour drives the bar / dot / stripe colour.
 
     **Sizes:** `md` `lg` &middot; **Tier:** -
 
@@ -119,7 +119,7 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![calendar_week](../screenshots/widgets/calendar_week.png)
 
-    Seven-day strip Each event's colour comes from its feed (Plugins → Calendar Feeds).
+    Seven-day strip Each event's colour comes from its feed (Widgets → Calendar Feeds).
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
@@ -311,13 +311,13 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
 
--   **Gallery Core** &middot; `picture_gallery`
+-   **Picture, Gallery** &middot; `picture_gallery`
 
     ---
 
     ![picture_gallery](../screenshots/widgets/picture_gallery.png)
 
-    Folder-based image rotation, full bleed. Manage folders + uploads at Plugins → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.
+    Folder-based image rotation, full bleed. Manage folders + uploads at Widgets → Gallery. Supports internal folders (uploaded to the appliance) and external pointers to any directory on the host. Optional orientation filter + random or sequential rotation.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** Local
 
@@ -333,7 +333,7 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
 
     ![todo](../screenshots/widgets/todo.png)
 
-    Persistent todo lists. Create lists and add items on the admin page (Plugins → Todo); the widget cell renders the chosen list as a read-only checklist. Completed items auto-prune after 24 hours so the list doesn't grow indefinitely.
+    Persistent todo lists. Create lists and add items on the admin page (Widgets → Todo); the widget cell renders the chosen list as a read-only checklist. Completed items auto-prune after 24 hours so the list doesn't grow indefinitely.
 
     **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
 

@@ -11,11 +11,16 @@
   </a>
 </p>
 
-> **Heads up:** the widget visual language has been rebuilt in v0.31.0 around
-> a more coherent theming system, so the hero image above is starting to age
-> (it'll be reshot soon). In the meantime, the
-> [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-> shows the current look of every widget.
+> **Heads up:** the widget visual language was rebuilt around the
+> Spectra design system and has had a slim-down pass in 0.38–0.42
+> moving niche families (F1, Spotify, GitHub, finance, sky, etc.) to
+> a [community catalog](https://github.com/dmellok/tesserae-widgets)
+> so the default install ships a focused widget shelf. The hero image
+> above is starting to age (it'll be reshot soon). In the meantime,
+> the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
+> shows the current bundled look and the
+> [community gallery](https://dmellok.github.io/tesserae/widgets/community/)
+> covers the catalog.
 
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices, Pi
@@ -26,8 +31,9 @@ a drop-a-folder plugin. Adding new hardware (or a new widget) is a
 contained change.
 
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** -
-install guides, the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-(58 widgets), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
+install guides, the [bundled gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
+(30 widgets) and [community catalog](https://dmellok.github.io/tesserae/widgets/community/)
+(15 + bundles), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/) (with AI).
 
 > **Self-hosted hobby project.** Tesserae installs with `docker compose up`
@@ -38,15 +44,22 @@ and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-wid
 ## Status
 
 A working hobbyist build. Composer → renderers → transport → devices
-pipeline, scheduler, Home Assistant MQTT auto-discovery, webhook push,
-data export / import, theme builder (with image-to-palette extraction),
-form-driven page editor, and the modern admin UI are all in. Multi-head
-is built in throughout, register multiple panels, bind a dashboard to
-a specific display, auto-discover clients that announce themselves on
-the broker.
+pipeline, scheduler (with opt-in smart sync for JIT rendering against
+device sleep telemetry), Home Assistant MQTT auto-discovery, webhook
+push, data export / import, theme builder (with image-to-palette
+extraction), form-driven page editor, the community widget catalog,
+and the modern admin UI are all in. Multi-head is built in throughout,
+register multiple panels, bind a dashboard to a specific display,
+auto-discover clients that announce themselves on the broker.
 
-58 widgets bundled across weather, F1, calendar, news, finance, GitHub,
-clocks, sky, pictures, todo, and Melbourne public transport. See
+30 widgets bundled across the universally-useful set, weather, clocks,
+calendar, news (HN / RSS / Wikipedia OTD), HA, picture gallery, todo,
+webpage, plus the `weather_now_scenic` reference for the
+`design.palette: extended` opt-in. Another 15 entries cover niche /
+credential-gated families (F1, Spotify, GitHub, Finance, Sky, Glances,
+OctoPrint, Unsplash, iCloud Shared Albums, and more) via the
+[community catalog](https://dmellok.github.io/tesserae/widgets/community/),
+one-click install from Settings → Widgets → Browse. See
 [widget stability tiers](https://dmellok.github.io/tesserae/widgets/tiers/)
 for an upfront read on which depend on undocumented upstreams.
 
@@ -64,8 +77,10 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - **10 layout presets** (1-cell, 2/3 column, 2/3 row, 2×2 grid, hero top/bottom/left/right, hero sandwich), fraction-based so the same layout works at any panel size; "Custom layout" snaps to a grid you set.
 - **Per-cell overrides**: theme, style (typography), font, content zoom. Cells inherit the page's pick by default; the override flag lets a single tile break from the rest.
 - **Reactive layout for mobile editing**, preview stacks above the cell forms on small viewports, with a floating back-to-top button (drag along the bottom to flip side for left-handed grips).
-- **58 widgets bundled** across 11 categories, weather, F1, calendar, news, finance, GitHub, clocks, sky, pictures, todo, public transport.
+- **30 widgets bundled** across the universal set (weather, clocks, calendar, news, HA, picture gallery, todo, webpage). The slim-down landed in 0.38–0.42; niche / credential-gated families moved to the [community catalog](https://github.com/dmellok/tesserae-widgets) as installable bundles (F1, Spotify, GitHub, Finance, Sky, Glances, OctoPrint, Unsplash, iCloud Shared Albums, more).
 - **Drop-a-folder widget plugins**, `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The orthogonal `data-theme` × `data-style` Spectra axes let one widget compose with every theme + typography pairing instead of shipping N variants per widget.
+- **`design.palette: extended` opt-in** for decorative widgets that want gradients / layered shapes / soft shadows (the renderer's Floyd-Steinberg dither approximates them on the panel palette); strict tokens stay the default. [Reference impl: weather_now_scenic](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
+- **Capability declarations** (`requires: [network:..., settings:..., filesystem:write:...]` in `plugin.json`) gated at the socket layer for network egress so a widget can't quietly call home outside its declared upstreams; reviewer-visible for the rest. Bundled + catalog widgets ship declarations.
 
 ### Rendering
 
@@ -93,6 +108,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
   - **interval**, fires every N minutes inside a day-of-week mask + time-of-day window.
   - **daily**, once per day at a wall-clock time inside a day-of-week mask.
 - **Schedule priority** ordering, **quiet hours** suppression, **stale-schedule detection** (deleted-page schedules don't fire silently).
+- **Smart sync (JIT rendering)**, opt-in per interval schedule. The scheduler tracks each bound device's sleep telemetry (configured `sleep_interval_s` fallback or firmware-published `sleep_until` / `next_sleep_s` on the heartbeat) and fires within a configurable lead window of the next predicted wake. The rendered frame is waiting for the panel when it wakes instead of being rendered after the paint. Falls back to fixed-cadence firing when no bound device is trusted yet. Schedule list shows a green / yellow / red indicator dot per row; the device admin card carries a plain-English diagnostic for the confidence state. Added in v0.42.0; see [#10](https://github.com/dmellok/tesserae/issues/10).
 - **Send page** for one-shot manual pushes.
 - **Retained MQTT frames**, panels that boot mid-cycle get the latest frame on subscribe.
 
@@ -102,7 +118,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - Per-device **display name** that re-publishes discovery on save.
 - **Generic-camera** preview via the per-device alias.
 - **HA sensors** for battery, signal, IP, last-render time per device.
-- **HA widget set**, `ha_climate`, `ha_entities`, `ha_history`, `ha_sensor`, each with 6 selectable visual directions.
+- **HA widget set**, `ha_battery`, `ha_climate`, `ha_entities`, `ha_lights`, `ha_media`, `ha_sensor` bundled; `ha_camera` / `ha_energy` / `ha_history` / `ha_locks` / `ha_todo` / `ha_zones` opt-in via the catalog.
 - **Stale-discovery sweep on start** so deleted Tesserae devices stop ghosting HA tiles.
 
 ### Themes & typography (Spectra design system)
@@ -119,8 +135,9 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 ### Administration & ops
 
 - **First-run onboarding wizard**, welcome → broker → device → dashboard. Every step skippable.
-- **Top-nav structure**: Send / Dashboards / Schedules / Themes / Plugins (dropdown) / Settings, plus a Dev dropdown under `--dev` grouping Widget gallery + Theme × style matrix.
-- **Settings UI** tabs: Server, Renderers, Devices, Plugins, System, Events.
+- **Top-nav structure**: Send / Dashboards / Schedules / Themes / Widgets (dropdown) / Settings, plus a Dev dropdown under `--dev` grouping Widget gallery + Theme × style matrix.
+- **Settings UI** tabs: Server, Renderers, Devices, Widgets, System, Events.
+- **Community widget catalog**, audit-only marketplace at [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets); Settings → Widgets → Browse community widgets lists every entry, one-click install / update / uninstall with a sha256 + schema check on the tarball before it lands. Installed widgets persist under `<data_root>/marketplace/` so Docker / HA image upgrades don't wipe them.
 - **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts), gated to git-clone installs; Docker shows an upgrade hint instead.
 - **Data export / import**, pack the entire install (pages, themes, devices, plugin settings, secrets) into a single ZIP; restore on a fresh install. Validated against JSON Schemas before writing.
 - **Webhook push**, `POST /api/v1/push` with a bearer token. Re-renders a named page and fans the frame out to every device bound to it. Generate / rotate the token from Settings → System → Webhook. Useful from HA automations, cron, GitHub Actions.
@@ -148,7 +165,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Quality
 
-- **779 tests** (pytest) green; CI runs every push.
+- **~790 tests** (pytest) green; CI runs every push.
 - **`ruff check` + `ruff format --check`** in CI.
 - **`mypy --strict`** on contract modules (state, push, plugin / renderer / device loaders, renderer, themes routes).
 - **Spectra CSS ↔ theme-registry guard test**, every `[data-theme="..."]` block in the stylesheet has a registry entry and vice versa, so the picker and the cascade can never drift.
