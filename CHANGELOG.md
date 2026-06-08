@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.2], 2026-06-09
+
+### Removed
+
+- **`firmware-prompts/sleep-until-clock-skew-fix.md`.** The firmware
+  fix shipped on the user's ESP32 build; the handover prompt was a
+  point-in-time artefact and is no longer needed in-repo. The
+  defensive server-side fallback from 0.43.1 stays in place to
+  protect anyone else who hits the same firmware-side bug pattern;
+  the prompt itself is preserved in git history at the v0.43.1 tag
+  if anyone needs the full diagnostic context later.
+
 ## [0.43.1], 2026-06-09
 
 ### Fixed
