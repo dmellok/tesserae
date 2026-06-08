@@ -45,7 +45,31 @@ def test_parse_status_normalises_known_fields(esp) -> None:
 
 def test_parse_status_empty_payload_returns_none_fields(esp) -> None:
     parsed = esp.parse_status(b"")
-    assert parsed == {"battery_mv": None, "battery_pct": None, "rssi": None, "ip": None}
+    assert parsed == {
+        "battery_mv": None,
+        "battery_pct": None,
+        "rssi": None,
+        "ip": None,
+        # Smart-sync optional fields (issue #10).
+        "sleep_until": None,
+        "next_sleep_s": None,
+    }
+
+
+def test_parse_status_reads_smart_sync_fields(esp) -> None:
+    """Issue #10: firmware can publish sleep_until or next_sleep_s on
+    the heartbeat. The parser pulls them with light coercion so the
+    telemetry store has accurate wake-time predictions to work from."""
+    payload = json.dumps(
+        {
+            "battery_pct": 80,
+            "sleep_until": 1_700_000_300.5,
+            "next_sleep_s": 600,
+        }
+    ).encode()
+    parsed = esp.parse_status(payload)
+    assert parsed["sleep_until"] == 1_700_000_300.5
+    assert parsed["next_sleep_s"] == 600
 
 
 def test_parse_status_passes_through_unknown_fields(esp) -> None:

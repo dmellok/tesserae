@@ -306,3 +306,23 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   }
 }
 
+
+/* Smart-sync indicator dot on the schedule list (issue #10).
+   Three states, surfaced as colour via the `--{state}` modifier:
+     warming, schedule has smart_sync on but no bound device is
+              trusted yet, scheduler falls back to interval cadence
+     active,  at least one bound device is trusted; JIT firing is live
+     blocked, smart_sync is on but the schedule has no device bindings,
+              or none of the bindings will ever publish telemetry */
+.smart-sync-dot {
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  margin-right: 0.45em;
+  vertical-align: middle;
+  background: var(--t-muted);
+}
+.smart-sync-dot--active  { background: var(--t-ok, #4eb87d); }
+.smart-sync-dot--warming { background: var(--t-warn, #d49a3a); }
+.smart-sync-dot--blocked { background: var(--t-danger, #c34d3a); }

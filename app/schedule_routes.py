@@ -110,6 +110,11 @@ def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Sche
             form.getlist("days_of_week") if hasattr(form, "getlist") else []
         ),
         "priority": int(form.get("priority") or 0),
+        # Smart sync (issue #10). Only the interval form shows these,
+        # but accept them on daily submissions too without crashing,
+        # the model ignores them for daily-type schedules.
+        "smart_sync": form.get("smart_sync") in ("on", "true", "1"),
+        "smart_sync_lead_s": int(form.get("smart_sync_lead_s") or 10),
     }
     if schedule_type == "interval":
         try:
@@ -268,7 +273,68 @@ def index() -> str:
         last_fired={sid: _last_fired_view(st.get("last_fired")) for sid, st in status.items()},
         timeline=_build_timeline(schedules),
         edit_id=request.args.get("edit"),
+        smart_sync_states=_smart_sync_states(schedules, pages),
     )
+
+
+def _smart_sync_states(schedules: list[Schedule], pages: list[Any]) -> dict[str, dict[str, str]]:
+    """Per-schedule smart-sync indicator state for the list view dot.
+
+    States:
+      - ``off``    : ``smart_sync`` disabled. No dot.
+      - ``warming``: enabled, page has bound devices, but none are
+                    trusted yet (warming-up window). Yellow.
+      - ``active`` : enabled, at least one bound device is trusted;
+                    JIT firing is live. Green.
+      - ``blocked``: enabled but the page has no bound devices, so
+                    smart-sync will never fire and the schedule
+                    permanently falls back to interval cadence. Red.
+
+    Falls back to ``off`` cleanly when the telemetry store isn't
+    wired (test path / bare run)."""
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    out: dict[str, dict[str, str]] = {}
+    page_by_id = {p.id: p for p in pages}
+    for s in schedules:
+        if not s.smart_sync:
+            out[s.id] = {"state": "off", "tooltip": "Smart sync off"}
+            continue
+        page = page_by_id.get(s.page_id)
+        if page is None or not page.device_ids:
+            out[s.id] = {
+                "state": "blocked",
+                "tooltip": (
+                    "Smart sync on but the page has no bound devices, "
+                    "the schedule falls back to its interval cadence"
+                ),
+            }
+            continue
+        if telemetry is None:
+            out[s.id] = {"state": "warming", "tooltip": "Smart sync enabled"}
+            continue
+        trusted = 0
+        for device_id in page.device_ids:
+            entry = telemetry.get(device_id)
+            if entry is not None and entry.is_trusted:
+                trusted += 1
+        if trusted == 0:
+            out[s.id] = {
+                "state": "warming",
+                "tooltip": (
+                    f"Smart sync warming up, {len(page.device_ids)} device"
+                    f"{'' if len(page.device_ids) == 1 else 's'} bound but "
+                    "none trusted yet (need 3 consecutive on-time wakes)"
+                ),
+            }
+        else:
+            out[s.id] = {
+                "state": "active",
+                "tooltip": (
+                    f"Smart sync active, {trusted} of {len(page.device_ids)} "
+                    "bound device(s) trusted"
+                ),
+            }
+    return out
 
 
 @bp.post("/new")

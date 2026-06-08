@@ -39,6 +39,13 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         "battery_pct": None,
         "rssi": None,
         "ip": None,
+        # Optional smart-sync fields (issue #10). Firmware that publishes
+        # either of these gives the server a more accurate wake-time
+        # prediction than the configured ``sleep_interval_s`` fallback.
+        # ``sleep_until`` (unix seconds) is preferred over ``next_sleep_s``
+        # (relative seconds) because it bypasses clock-skew math.
+        "sleep_until": None,
+        "next_sleep_s": None,
     }
     if not payload:
         return out
@@ -57,6 +64,8 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         ("battery_pct", int),
         ("rssi", int),
         ("ip", str),
+        ("sleep_until", float),
+        ("next_sleep_s", int),
     ):
         if key in decoded:
             try:

@@ -21,14 +21,17 @@
   color: var(--text-primary);
 
   background: var(--surface);
-  /* ONLY the outer edge is allowed; weight is a style-tunable token so
-     ``display`` / ``mono`` / movement styles can thicken the frame
-     without forking every widget rule. */
-  border: var(--edge-weight, var(--stroke-1)) solid var(--edge);
-  /* Follows the cell's corner radius when the composer sets it (so
-     the inner border curves with the rounded cell rather than getting
-     clipped); falls back to --radius-0 (sharp) outside the composer
-     context, preserving the Spectra default. */
+  /* Card borders removed: the matting gap (page.gap with white
+     bleed_color) provides cell separation without the visual noise
+     of a 1px line that doesn't dither cleanly on e-ink, especially
+     with rounded corners. The --edge-weight + --edge tokens stay
+     defined for anyone wanting to re-enable a frame via a custom
+     style; .w-title and .w-body rules still use --edge for their
+     internal accents. */
+  border: 0;
+  /* Background still respects the cell's corner radius so the
+     coloured surface curves at the rounded edge instead of painting
+     a sharp rectangle behind a rounded mask. */
   border-radius: var(--cell-corner-radius, var(--radius-0));
 
   box-sizing: border-box;

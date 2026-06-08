@@ -391,6 +391,13 @@ def create_app(
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["EVENT_LOG"] = event_log
+    # Smart-sync per-device telemetry (issue #10). Persisted under
+    # data/core/device_telemetry.json. Step 1 only tracks heartbeats +
+    # computes predictions; the scheduler hook that acts on them is
+    # step 2 of the same feature.
+    from app.state.device_telemetry import TelemetryStore
+
+    app.config["DEVICE_TELEMETRY"] = TelemetryStore(data_root / "core" / "device_telemetry.json")
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
@@ -549,12 +556,18 @@ def create_app(
             logger.warning("settings.app.timezone=%r is not a known IANA zone", raw)
             return None
 
+    def _device_ids_for_page(page_id: str) -> list[str]:
+        page = page_store.get(page_id)
+        return list(page.device_ids) if page else []
+
     scheduler = Scheduler(
         store=schedule_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,
         page_exists=lambda page_id: page_store.get(page_id) is not None,
+        device_ids_for_page=_device_ids_for_page,
+        device_telemetry=app.config["DEVICE_TELEMETRY"],
     )
     app.config["SCHEDULER"] = scheduler
     if not testing and not is_watcher:

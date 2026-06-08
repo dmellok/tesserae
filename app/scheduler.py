@@ -27,6 +27,7 @@ import logging
 import threading
 from collections.abc import Callable
 from datetime import UTC, datetime, time, tzinfo
+from typing import Any
 
 from app.push import PushManager, PushResult
 from app.state.event_log import EventLog
@@ -79,6 +80,10 @@ class Scheduler:
         event_log: EventLog | None = None,
         timezone_provider: TimezoneProvider | None = None,
         page_exists: Callable[[str], bool] | None = None,
+        # Smart sync (issue #10) dependencies. Optional so existing
+        # tests + bare construction keep working; production wires both.
+        device_ids_for_page: Callable[[str], list[str]] | None = None,
+        device_telemetry: Any = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
@@ -104,6 +109,8 @@ class Scheduler:
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
         self._page_exists = page_exists
+        self._device_ids_for_page = device_ids_for_page
+        self._device_telemetry = device_telemetry
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -179,8 +186,24 @@ class Scheduler:
                     continue
                 with self._lock:
                     last = self._last_fired.get(s.id)
-                if last is None or (now.timestamp() - last) >= s.interval_minutes * 60:
-                    candidates.append(s)
+                # Interval acts as a floor regardless of smart-sync; it's
+                # the user-set "don't push the panel more often than this"
+                # ceiling on the render rate.
+                interval_passed = (
+                    last is None or (now.timestamp() - last) >= s.interval_minutes * 60
+                )
+                if not interval_passed:
+                    continue
+                # Default path: fire on the interval cadence.
+                # Smart-sync (issue #10): if the schedule opts in AND at
+                # least one bound device is trusted, only fire when that
+                # device is within ``smart_sync_lead_s`` of its predicted
+                # wake. When no bound device is trusted (warm-up window)
+                # or the schedule has no device bindings, fall back to
+                # interval firing so the page still pushes on time.
+                if s.smart_sync and self._smart_sync_should_wait(s, now):
+                    continue
+                candidates.append(s)
             elif s.type == "daily":
                 if s.fires_at is None:
                     continue
@@ -218,6 +241,52 @@ class Scheduler:
         self._observe(now)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
+
+    def _smart_sync_should_wait(self, schedule: Schedule, now: datetime) -> bool:
+        """Return True when smart-sync wants to *hold* this schedule
+        (don't fire yet), False when it should fire now.
+
+        Hold conditions:
+          - Schedule has device bindings AND at least one is trusted
+            AND none of the trusted devices are within the lead window
+            of their next predicted wake. The page has a fresh frame
+            ready but the panel isn't about to wake; waiting saves a
+            stale frame from sitting in the broker until the next
+            actual wake.
+
+        Fire conditions (return False, let the interval cadence win):
+          - No telemetry dependencies wired (test path / bare run).
+          - The schedule's page has no bound devices.
+          - No bound device is trusted yet (warm-up).
+          - At least one trusted device is inside the lead window.
+        """
+        if self._device_telemetry is None or self._device_ids_for_page is None:
+            return False
+        device_ids = self._device_ids_for_page(schedule.page_id)
+        if not device_ids:
+            return False
+        trusted_predictions: list[float] = []
+        for device_id in device_ids:
+            entry = self._device_telemetry.get(device_id)
+            if entry is None or not entry.is_trusted:
+                continue
+            if entry.predicted_next_wake_at is None:
+                continue
+            trusted_predictions.append(entry.predicted_next_wake_at)
+        if not trusted_predictions:
+            # No trusted bindings: smart-sync hasn't warmed up. Fall
+            # through to interval firing so the page still pushes on
+            # the user's configured cadence.
+            return False
+        # Fire when the soonest predicted wake is within the lead
+        # window of right now (we want the frame waiting before the
+        # panel asks for it). Devices that have already woken (offset
+        # past prediction) won't satisfy this and the schedule waits
+        # for the next prediction.
+        now_ts = now.timestamp()
+        soonest = min(trusted_predictions)
+        lead_window_starts_at = soonest - schedule.smart_sync_lead_s
+        return now_ts < lead_window_starts_at
 
     def _observe(self, now: datetime) -> None:
         """Maintain ``_first_seen``. Drop entries for ids no longer enabled

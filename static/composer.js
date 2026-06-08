@@ -157,6 +157,18 @@ function applyPagePatch(page) {
       panelEl.style.height = page.panel.h + "px";
     }
   }
+  // Live corner-radius update. The compose template bakes
+  // page.corner_radius into both `.cell { border-radius }` and the
+  // `--cell-corner-radius` CSS variable; replicate both on every
+  // mounted cell when the editor's slider moves so the preview
+  // tracks the value without a full reload.
+  if (page.corner_radius != null) {
+    const radius = `${Number(page.corner_radius) || 0}px`;
+    document.querySelectorAll(".cell").forEach((cellEl) => {
+      cellEl.style.borderRadius = radius;
+      cellEl.style.setProperty("--cell-corner-radius", radius);
+    });
+  }
 }
 
 function ctxFingerprint(cell) {

@@ -6,6 +6,84 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.42.0], 2026-06-08
+
+### Added
+
+- **Smart sync (JIT rendering)** — opt-in per schedule. When enabled
+  on an interval schedule, the scheduler consults each bound device's
+  telemetry-derived `predicted_next_wake_at` and fires within
+  `smart_sync_lead_s` seconds of a trusted device's wake instead of
+  on a fixed cadence. The rendered frame is waiting for the panel
+  when it wakes, rather than being rendered after the panel paint.
+  Falls back to plain interval firing when no bound device is
+  trusted yet (warm-up window) or when the schedule has no device
+  bindings. `interval_minutes` stays in force as a floor so smart
+  sync can't push faster than the configured cadence. Tracked in
+  [#10](https://github.com/dmellok/tesserae/issues/10).
+
+  Device telemetry plumbing:
+  - New `app/state/device_telemetry.py` persists per-device
+    derived state (`predicted_next_wake_at`, confidence counter,
+    last-wake offset). One JSON file under
+    `data/core/device_telemetry.json`.
+  - `devices/esp32_client/device.py` parses optional
+    `sleep_until` / `next_sleep_s` heartbeat fields. Firmwares can
+    publish either for accurate predictions; absent both, the server
+    falls back to the device's configured `sleep_interval_s`.
+  - Heartbeats arriving within 10s of the previous one are
+    debounced (some firmwares send a connect-beat + a sleep-beat
+    per wake; without this, the second beat sets offset ≈
+    -sleep_cycle and confidence never accumulates).
+  - Confidence ramps on each on-time wake (±60s tolerance), resets
+    on a miss. Three consecutive on-time wakes = trusted.
+
+  Admin surface:
+  - **Schedule list dot** (issue #10 follow-up request): green
+    (active) / yellow (warming) / red (blocked) indicator per
+    schedule row showing smart-sync readiness at a glance. Tooltip
+    explains the current state.
+  - **Schedule form**: smart sync toggle + render-lead input.
+  - **Device admin card**: always-on Smart sync section with a
+    plain-English reason line ("Last wake missed the prediction by
+    Xs", "1/3 consecutive on-time wakes", etc.) so you can diagnose
+    why a device isn't trusted yet.
+
+### Changed
+
+- **Widget card borders removed.** The 1px outer frame on `.w` is now
+  off by default. The matting gap (page-level `gap` + the white
+  `bleed_color` default that landed in 0.41.2) provides cleaner
+  cell separation than a thin line that doesn't dither well on
+  e-ink, especially around rounded corners. The `--edge-weight` +
+  `--edge` Spectra tokens stay defined for anyone who wants to
+  re-enable the frame in a custom style; `.w-title` and `.w-body`
+  internal accents continue to use `--edge` for dividers. If your
+  dashboard uses `gap: 0`, set a few pixels of gap or the cells
+  will appear seamless.
+- **`weather_now_scenic` light presets switched to dark text.** The
+  three light-background presets (snow, partly_day, cloudy_day) now
+  paint deep-navy / slate text on their gradients rather than white,
+  so the temperature reads at a glance on every preset without a
+  shadow workaround. The snow preset's gradient also brightens a
+  touch and its snowflake glyphs flip to translucent dark blue so
+  they show on the lighter bg.
+
+### Fixed
+
+- **Corner radius slider now live-updates the preview.** The editor
+  was sending `corner_radius` in its postMessage patch but
+  `applyPagePatch` in the composer never applied it; you had to
+  reload to see the new shape. The handler now writes both
+  `border-radius` and the `--cell-corner-radius` CSS variable to
+  every mounted `.cell` so the preview tracks the slider live.
+  Note: `gap` still requires a reload (matting padding gets baked
+  into cell `x/y/w/h` server-side).
+- **Battery indicator popover now dismisses cleanly.** Auto-closes
+  5 seconds after opening (matches the flash-notification timing)
+  and closes immediately on any click outside the indicator or its
+  panel.
+
 ## [0.41.2], 2026-06-08
 
 ### Fixed

@@ -81,6 +81,19 @@
     {{ day_picker('days_of_week', s.days_of_week) }}
   </div>
 
+  {# Smart sync (issue #10), only meaningful for interval schedules.
+     Hidden via the data-interval-only switch the existing form already
+     uses for the interval-only blocks above. #}
+  <div class="field-grid sf-meta" data-interval-only>
+    {{ switch('sf-' ~ (s.id or 'new') ~ '-smart-sync', 'smart_sync', 'Smart sync (JIT)', checked=s.smart_sync,
+              help='When the bound devices report sleep timing (battery e-ink panels), render just before each predicted wake instead of on a fixed cadence. Falls back to the interval cadence when devices have no telemetry. Interval still acts as a ceiling.') }}
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-lead">Render lead (s)</label>
+      <input type="number" id="sf-{{ s.id or 'new' }}-lead" name="smart_sync_lead_s"
+             value="{{ s.smart_sync_lead_s or 10 }}" min="0" max="600" step="1">
+    </div>
+  </div>
+
   <div class="actions">
     {{ button('Save changes' if edit_mode else 'Create schedule', icon='floppy-disk' if edit_mode else 'plus') }}
     {% if edit_mode %}<a class="ghost-link" href="{{ url_for('schedules.index') }}">Cancel</a>{% endif %}
@@ -153,7 +166,7 @@
       <p class="lede">No schedule with that id.</p>
     {% endif %}
   {% else %}
-    {% set blank = {'id': '', 'name': '', 'page_id': '', 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6]} %}
+    {% set blank = {'id': '', 'name': '', 'page_id': '', 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
     {{ schedule_form(blank, false, pages) }}
   {% endif %}
 </section>
@@ -178,8 +191,14 @@
     <tbody>
       {% for s in schedules %}
       {% set stale = not page_names.get(s.page_id) %}
+      {% set sync = smart_sync_states.get(s.id) if smart_sync_states else none %}
       <tr class="{% if not s.enabled %}is-disabled {% endif %}{% if stale %}is-stale{% endif %}">
-        <td><strong>{{ s.name }}</strong></td>
+        <td>
+          {% if sync and sync.state != 'off' %}
+          <span class="smart-sync-dot smart-sync-dot--{{ sync.state }}" title="{{ sync.tooltip }}" aria-label="Smart sync: {{ sync.state }}"></span>
+          {% endif %}
+          <strong>{{ s.name }}</strong>
+        </td>
         <td class="col-page">
           {% if not stale %}
             {{ page_names[s.page_id] }}

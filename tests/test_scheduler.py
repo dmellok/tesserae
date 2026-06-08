@@ -184,3 +184,190 @@ def test_status_snapshot_contains_first_seen(scheduler: Scheduler, store: Schedu
     snapshot = scheduler.status()
     assert "a" in snapshot
     assert snapshot["a"]["first_seen"] is not None
+
+
+# ----- Smart sync (issue #10) ---------------------------------------------
+
+
+class _FakeTelemetry:
+    """Tiny stand-in for app.state.device_telemetry.TelemetryStore in
+    scheduler tests. Lets the test set per-device predictions + trust
+    without standing up the real persisted store."""
+
+    def __init__(self, entries: dict[str, dict] | None = None) -> None:
+        self._entries = entries or {}
+
+    def get(self, device_id: str):
+        raw = self._entries.get(device_id)
+        if raw is None:
+            return None
+
+        class _E:
+            predicted_next_wake_at = raw.get("predicted_next_wake_at")
+            is_trusted = bool(raw.get("is_trusted", False))
+
+        return _E()
+
+
+def _make_smart_scheduler(store, push_manager, *, device_ids, telemetry) -> Scheduler:
+    return Scheduler(
+        store=store,
+        push_manager=lambda: push_manager,
+        device_ids_for_page=lambda page_id: device_ids.get(page_id, []),
+        device_telemetry=telemetry,
+    )
+
+
+def test_smart_sync_off_uses_interval_unchanged(store: ScheduleStore, push_manager) -> None:
+    """``smart_sync=False`` (the default) ignores telemetry entirely;
+    behaviour matches the pre-#10 interval schedule."""
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry({"esp": {"is_trusted": True, "predicted_next_wake_at": 9e9}}),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=False,
+        )
+    )
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    assert [s.id for s in sched.find_due(now)] == ["a"]
+
+
+def test_smart_sync_on_with_no_bound_devices_falls_back_to_interval(
+    store: ScheduleStore, push_manager
+) -> None:
+    """A page with no device_ids: smart_sync can't act, schedule still
+    fires on its interval cadence."""
+    sched = _make_smart_scheduler(
+        store, push_manager, device_ids={"home": []}, telemetry=_FakeTelemetry()
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+        )
+    )
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    assert [s.id for s in sched.find_due(now)] == ["a"]
+
+
+def test_smart_sync_on_warming_up_falls_back_to_interval(
+    store: ScheduleStore, push_manager
+) -> None:
+    """Devices bound but none trusted yet, scheduler keeps firing on
+    the existing cadence so the panel still gets fresh frames."""
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry({"esp": {"is_trusted": False, "predicted_next_wake_at": 9e9}}),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+        )
+    )
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    assert [s.id for s in sched.find_due(now)] == ["a"]
+
+
+def test_smart_sync_holds_when_trusted_device_not_in_lead_window(
+    store: ScheduleStore, push_manager
+) -> None:
+    """Device is trusted but its predicted wake is 10 min away with a
+    10s lead, smart_sync says wait (return no candidates)."""
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    far_future = now.timestamp() + 600  # 10 min from now
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": far_future}}
+        ),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+            smart_sync_lead_s=10,
+        )
+    )
+    assert sched.find_due(now) == []
+
+
+def test_smart_sync_fires_inside_lead_window(store: ScheduleStore, push_manager) -> None:
+    """Trusted device's prediction is 5 seconds away; lead window is
+    10s so we should fire RIGHT NOW so the frame is waiting for the
+    panel."""
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    near_wake = now.timestamp() + 5
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": near_wake}}
+        ),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+            smart_sync_lead_s=10,
+        )
+    )
+    assert [s.id for s in sched.find_due(now)] == ["a"]
+
+
+def test_smart_sync_respects_interval_floor(store: ScheduleStore, push_manager) -> None:
+    """Even with a trusted prediction RIGHT NOW, the interval cadence
+    is a floor, never push more often than the user configured. Fired
+    a minute ago + 15-min floor means we hold."""
+    now = datetime(2026, 6, 1, 10, tzinfo=UTC)
+    sched = _make_smart_scheduler(
+        store,
+        push_manager,
+        device_ids={"home": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": now.timestamp()}}
+        ),
+    )
+    store.upsert(
+        Schedule(
+            id="a",
+            name="A",
+            page_id="home",
+            type="interval",
+            interval_minutes=15,
+            smart_sync=True,
+        )
+    )
+    sched.run_due_once(now)  # initial fire
+    one_minute_later = now + timedelta(minutes=1)
+    assert sched.find_due(one_minute_later) == []

@@ -537,6 +537,12 @@ def devices_delete(instance_id: str) -> Response:
     if not result.ok or result.device is None:
         flash(result.error or "Delete failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    # Drop the device's smart-sync telemetry too (issue #10) so a
+    # future device that happens to reuse the id starts with a clean
+    # confidence counter instead of inheriting stale state.
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    if telemetry is not None:
+        telemetry.forget(instance_id)
     rebuild_transport_fn()()
     flash(f"Deleted device {result.device.name!r}.", "ok")
     return redirect(url_for("auth.settings_area", area="devices"))

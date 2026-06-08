@@ -171,6 +171,61 @@
         </dl>
       </div>
       {% endif %}
+
+      {# Smart-sync telemetry + diagnostic (issue #10). Always rendered
+         when telemetry is wired so the user can see WHY the schedule's
+         indicator dot is not green; the "reason" line explains the
+         current state in plain English. #}
+      {% if section.status and section.status.smart_sync %}
+      {% set ss = section.status.smart_sync %}
+      <div class="device-status device-status--body">
+        <p class="device-subhead">
+          Smart sync
+          {% if ss.state in ('active', 'warming') %}
+          <span class="smart-sync-dot smart-sync-dot--{{ ss.state }}"></span>
+          <span class="muted">{{ ss.state }}</span>
+          {% elif ss.state == 'waiting' %}
+          <span class="smart-sync-dot smart-sync-dot--warming"></span>
+          <span class="muted">waiting for heartbeat</span>
+          {% else %}
+          <span class="muted">unavailable</span>
+          {% endif %}
+        </p>
+        <p class="field-help smart-sync-reason">{{ ss.reason }}</p>
+        {% if ss.last_heartbeat_rel or ss.predicted_rel or ss.interval_s or ss.offset_text %}
+        <dl class="status-fields">
+          {% if ss.last_heartbeat_rel %}
+          <div>
+            <dt>last heartbeat</dt>
+            <dd>{{ ss.last_heartbeat_rel }}</dd>
+          </div>
+          {% endif %}
+          {% if ss.predicted_rel %}
+          <div>
+            <dt>next wake</dt>
+            <dd>{{ ss.predicted_rel }}</dd>
+          </div>
+          {% endif %}
+          {% if ss.interval_s %}
+          <div>
+            <dt>sleep cycle</dt>
+            <dd>{{ ss.interval_s }}s</dd>
+          </div>
+          {% endif %}
+          <div>
+            <dt>confidence</dt>
+            <dd>{{ ss.confidence|default(0) }}/10</dd>
+          </div>
+          {% if ss.offset_text %}
+          <div>
+            <dt>last offset</dt>
+            <dd>{{ ss.offset_text }}</dd>
+          </div>
+          {% endif %}
+        </dl>
+        {% endif %}
+      </div>
+      {% endif %}
   {% else %}
   <header class="card-head">
     <h2>

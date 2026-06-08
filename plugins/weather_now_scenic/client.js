@@ -52,6 +52,7 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.78)",
     accent: "#ffd166",
+    stroke: "#8c2c1b",
     scene: sceneSun,
   },
   clear_night: {
@@ -60,14 +61,16 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.72)",
     accent: "#ffd166",
+    stroke: "#04081a",
     scene: sceneNight,
   },
   partly_day: {
     icon: "ph-cloud-sun",
     bg: "linear-gradient(135deg, #4a8fbf 0%, #6daed3 55%, #aacde0 100%)",
-    text: "#fff",
-    textSoft: "rgba(255, 255, 255, 0.78)",
+    text: "#0d2a4a",
+    textSoft: "rgba(13, 42, 74, 0.7)",
     accent: "#ffd166",
+    stroke: "#1f3f5f",
     scene: sceneSun,
   },
   partly_night: {
@@ -76,14 +79,16 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.72)",
     accent: "#ffd166",
+    stroke: "#04081a",
     scene: sceneNight,
   },
   cloudy_day: {
     icon: "ph-cloud",
     bg: "linear-gradient(135deg, #6c9bb8 0%, #8eb4cb 55%, #c3d6e0 100%)",
-    text: "#fff",
-    textSoft: "rgba(255, 255, 255, 0.78)",
-    accent: "#ffffff",
+    text: "#1e334a",
+    textSoft: "rgba(30, 51, 74, 0.7)",
+    accent: "#1e334a",
+    stroke: "#2e4a64",
     scene: sceneClouds,
   },
   cloudy_night: {
@@ -92,6 +97,7 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.74)",
     accent: "#ffd166",
+    stroke: "#08111f",
     scene: sceneClouds,
   },
   rain: {
@@ -100,17 +106,18 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.74)",
     accent: "#bcd8ee",
+    stroke: "#101a2e",
     scene: sceneRain,
   },
   snow: {
     icon: "ph-snowflake",
-    /* Darker base than the original sketch so white text reads,
-       light blue at the bottom keeps the snowy-vibe without going
-       full pastel. */
-    bg: "linear-gradient(150deg, #4a78a0 0%, #87a8c4 60%, #b6cee0 100%)",
-    text: "#fff",
-    textSoft: "rgba(255, 255, 255, 0.85)",
-    accent: "#ffffff",
+    /* Light gradient runs from a mid blue to a near-white at the
+       bottom; dark navy text reads cleanly across the whole sweep. */
+    bg: "linear-gradient(150deg, #87a8c4 0%, #b6cee0 55%, #dceaf2 100%)",
+    text: "#0a1f3a",
+    textSoft: "rgba(10, 31, 58, 0.7)",
+    accent: "#0a1f3a",
+    stroke: "#1d3e5c",
     scene: sceneSnow,
   },
   storm: {
@@ -119,6 +126,7 @@ const PRESETS = {
     text: "#fff",
     textSoft: "rgba(255, 255, 255, 0.72)",
     accent: "#ffd166",
+    stroke: "#04060e",
     scene: sceneStorm,
   },
 };
@@ -204,7 +212,7 @@ function sceneRain() {
   ]
     .map(
       ([x, y]) => `
-    <path d="M ${x} ${y} q -1.8 4 -3.6 8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>`
+    <path d="M ${x} ${y} q -1.8 4 -3.6 8" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.7"/>`
     )
     .join("");
   return `
@@ -228,10 +236,10 @@ function sceneSnow() {
     .map(
       ([x, y]) => `
     <g transform="translate(${x},${y})" opacity="0.5">
-      <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#fff" stroke-width="0.9" stroke-linecap="round"/>
-      <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#fff" stroke-width="0.9" stroke-linecap="round"/>
-      <line x1="-2.5" y1="-2.5" x2="2.5" y2="2.5" stroke="#fff" stroke-width="0.9" stroke-linecap="round"/>
-      <line x1="-2.5" y1="2.5" x2="2.5" y2="-2.5" stroke="#fff" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="rgba(20, 40, 68, 0.55)" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="rgba(20, 40, 68, 0.55)" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="-2.5" y1="-2.5" x2="2.5" y2="2.5" stroke="rgba(20, 40, 68, 0.55)" stroke-width="0.9" stroke-linecap="round"/>
+      <line x1="-2.5" y1="2.5" x2="2.5" y2="-2.5" stroke="rgba(20, 40, 68, 0.55)" stroke-width="0.9" stroke-linecap="round"/>
     </g>`
     )
     .join("");
@@ -241,10 +249,10 @@ function sceneSnow() {
     .map(
       ([x, y]) => `
     <g transform="translate(${x},${y})" opacity="0.7">
-      <line x1="-7" y1="0" x2="7" y2="0" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
-      <line x1="0" y1="-7" x2="0" y2="7" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
-      <line x1="-5" y1="-5" x2="5" y2="5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
-      <line x1="-5" y1="5" x2="5" y2="-5" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/>
+      <line x1="-7" y1="0" x2="7" y2="0" stroke="rgba(20, 40, 68, 0.55)" stroke-width="1.4" stroke-linecap="round"/>
+      <line x1="0" y1="-7" x2="0" y2="7" stroke="rgba(20, 40, 68, 0.55)" stroke-width="1.4" stroke-linecap="round"/>
+      <line x1="-5" y1="-5" x2="5" y2="5" stroke="rgba(20, 40, 68, 0.55)" stroke-width="1.4" stroke-linecap="round"/>
+      <line x1="-5" y1="5" x2="5" y2="-5" stroke="rgba(20, 40, 68, 0.55)" stroke-width="1.4" stroke-linecap="round"/>
     </g>`
     )
     .join("");

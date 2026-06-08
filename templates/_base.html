@@ -309,6 +309,33 @@
         setTimeout(() => dismiss(card), 5000 + i * 400);
       });
     })();
+    // Battery indicator popover: auto-close 5s after opening, and close
+    // immediately on any click outside the trigger / popover. Mirrors the
+    // flash-notification auto-dismiss timing so the topbar doesn't sit
+    // there with a panel hanging open after a casual glance.
+    (function () {
+      document.querySelectorAll('[data-batteries]').forEach((el) => {
+        let timer = null;
+        function close() {
+          if (timer) { clearTimeout(timer); timer = null; }
+          el.open = false;
+          document.removeEventListener('mousedown', onOutside, true);
+        }
+        function onOutside(ev) {
+          if (!el.contains(ev.target)) close();
+        }
+        el.addEventListener('toggle', () => {
+          if (el.open) {
+            timer = setTimeout(close, 5000);
+            document.addEventListener('mousedown', onOutside, true);
+          } else if (timer) {
+            clearTimeout(timer);
+            timer = null;
+            document.removeEventListener('mousedown', onOutside, true);
+          }
+        });
+      });
+    })();
     (function () {
       document.querySelectorAll('[data-theme-toggle]').forEach((tbtn) => {
         tbtn.addEventListener('click', () => {

@@ -52,6 +52,19 @@ class Schedule(BaseModel):
 
     priority: int = 0
 
+    # Smart sync (issue #10): when enabled on an interval schedule,
+    # the scheduler consults each bound device's telemetry-derived
+    # ``predicted_next_wake_at`` and fires within ``smart_sync_lead_s``
+    # seconds of a trusted device's wake (so the rendered frame is
+    # waiting for the panel rather than being rendered after the
+    # panel paint). Falls back to plain interval firing when no
+    # bound device is trusted yet (warm-up window) or when the
+    # schedule has no device bindings at all. ``interval_minutes``
+    # stays in force as a floor so smart sync can't fire faster than
+    # the configured cadence.
+    smart_sync: bool = False
+    smart_sync_lead_s: int = Field(default=10, ge=0, le=600)
+
     @field_validator("days_of_week")
     @classmethod
     def _validate_dow(cls, v: list[int]) -> list[int]:

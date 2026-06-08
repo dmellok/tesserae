@@ -466,10 +466,16 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
 def _status_view(device: Device) -> dict[str, Any]:
     """Build the status-block dict the template renders above the config
     form: freshness class (ok / warn / stale / unknown), relative time,
-    and the parsed key/value pairs."""
+    the parsed key/value pairs, and the smart-sync telemetry summary."""
     cache = device_status().get(device.id)
+    base: dict[str, Any] = {
+        "health": "unknown",
+        "relative": "no heartbeat received yet",
+        "parsed": {},
+        "smart_sync": _smart_sync_view(device.id),
+    }
     if cache is None:
-        return {"health": "unknown", "relative": "no heartbeat received yet", "parsed": {}}
+        return base
     age = max(0.0, time.time() - float(cache.get("received_at", 0)))
     if age <= STATUS_FRESH_S:
         health = "ok"
@@ -477,10 +483,129 @@ def _status_view(device: Device) -> dict[str, Any]:
         health = "warn"
     else:
         health = "stale"
+    base.update(
+        {
+            "health": health,
+            "relative": format_relative(age),
+            "parsed": cache.get("parsed", {}),
+        }
+    )
+    return base
+
+
+def _format_duration(seconds: float) -> str:
+    """Tense-neutral duration formatter for smart-sync display, so the
+    caller can prefix with 'in' / 'ago' without doubling-up the
+    helper's existing 'ago' suffix."""
+    if seconds < 5:
+        return "a moment"
+    if seconds < 60:
+        return f"{int(seconds)} s"
+    if seconds < 3600:
+        return f"{int(seconds / 60)} min"
+    if seconds < 86400:
+        return f"{int(seconds / 3600)} h"
+    return f"{int(seconds / 86400)} d"
+
+
+def _smart_sync_view(device_id: str) -> dict[str, Any]:
+    """Build the smart-sync sub-block for a device card. Always
+    returns a dict; the ``reason`` field explains in plain English
+    why the device is in its current state so the user can diagnose
+    why their schedule's smart-sync dot isn't green yet.
+
+    Pulls from the TelemetryStore (issue #10). The smart-sync
+    section is always rendered on the device card so the user can
+    see the diagnostic state even before any heartbeat has been
+    recorded."""
+    telemetry = current_app.config.get("DEVICE_TELEMETRY")
+    if telemetry is None:
+        return {
+            "state": "off",
+            "reason": "Smart-sync telemetry store isn't wired (this should not happen in production).",
+        }
+    entry = telemetry.get(device_id)
+    if entry is None or entry.last_heartbeat_at is None:
+        return {
+            "state": "waiting",
+            "reason": (
+                "No heartbeat with telemetry recorded yet. Once the device wakes and "
+                "publishes its heartbeat, you'll see the prediction and confidence here."
+            ),
+        }
+
+    now_ts = time.time()
+    predicted_rel: str | None = None
+    if entry.predicted_next_wake_at is not None:
+        delta = entry.predicted_next_wake_at - now_ts
+        if delta > 0:
+            # format_relative is past-only ("32 s ago"); build the
+            # future-tense ourselves so we don't end up with the
+            # broken "in 30 s ago" sandwich.
+            predicted_rel = f"in {_format_duration(delta)}"
+        else:
+            predicted_rel = f"{_format_duration(-delta)} ago (overdue)"
+    offset_text: str | None = None
+    if entry.last_wake_offset_s is not None:
+        signed = entry.last_wake_offset_s
+        offset_text = f"{'+' if signed >= 0 else ''}{signed}s"
+
+    # Reason text by current state. Goal: tell the user exactly what
+    # to do next when they see the dot stuck on warming. The most
+    # common failure mode is that the firmware doesn't publish
+    # sleep_until / next_sleep_s AND the configured sleep_interval_s
+    # doesn't match the firmware's actual cycle, so every wake
+    # arrives way off the prediction and confidence never accrues.
+    if entry.predicted_next_wake_at is None:
+        reason = (
+            "No prediction possible. The firmware isn't publishing "
+            "'sleep_until' or 'next_sleep_s' AND no sleep cycle is configured "
+            "for this device. Either update the firmware (handover prompt in "
+            "the smart-sync issue), or set a sleep cycle in this device's "
+            "settings to match the firmware's actual deep-sleep duration."
+        )
+    elif entry.is_trusted:
+        reason = (
+            f"Trusted. The scheduler will JIT-render for this device when a "
+            f"bound schedule has smart sync on. Last {entry.consecutive_on_time_wakes} "
+            f"consecutive wake(s) landed within ±60s of prediction."
+        )
+    elif entry.consecutive_on_time_wakes > 0:
+        reason = (
+            f"Warming up: {entry.consecutive_on_time_wakes}/3 consecutive on-time "
+            "wakes. One more on-time wake will flip this device to trusted."
+        )
+    elif entry.last_wake_offset_s is not None:
+        # We made predictions, but none landed within ±60s of the
+        # actual wake. Almost always: configured sleep interval !=
+        # actual firmware cycle.
+        reason = (
+            f"Last wake missed the prediction by {entry.last_wake_offset_s}s "
+            "(tolerance is ±60s). The configured sleep cycle probably doesn't "
+            "match the firmware's actual deep-sleep duration. Adjust the "
+            "device's 'sleep interval' setting to match, or have the firmware "
+            "publish 'sleep_until' / 'next_sleep_s' for a perfect match."
+        )
+    else:
+        # Edge case: prediction exists but no previous prediction to
+        # compare against (this is the very first heartbeat after the
+        # store learned of the device). Next wake will start the
+        # confidence ramp.
+        reason = (
+            "Prediction recorded. The next wake will start the confidence "
+            "counter; 3 consecutive on-time wakes flip this device to trusted."
+        )
+
     return {
-        "health": health,
-        "relative": format_relative(age),
-        "parsed": cache.get("parsed", {}),
+        "state": "active" if entry.is_trusted else "warming",
+        "is_trusted": entry.is_trusted,
+        "confidence": entry.consecutive_on_time_wakes,
+        "last_heartbeat_rel": format_relative(max(0.0, now_ts - entry.last_heartbeat_at)),
+        "predicted_rel": predicted_rel,
+        "predicted_at": entry.predicted_next_wake_at,
+        "interval_s": entry.last_sleep_interval_s,
+        "offset_text": offset_text,
+        "reason": reason,
     }
 
 

@@ -208,12 +208,34 @@ def _subscribe_device_status(
     def on_status(topic: str, payload: bytes) -> None:
         del topic
         parsed = device.parse_status(payload)
+        received_at = time.time()
         prev = status_cache.get(device.id, {}).get("parsed", {})
         merged = merge_status_parsed(prev, parsed)
         status_cache[device.id] = {
-            "received_at": time.time(),
+            "received_at": received_at,
             "parsed": merged,
         }
+        # Smart sync (issue #10): record telemetry for the scheduler's
+        # JIT prediction. Pulls the configured sleep_interval_s from
+        # the per-device settings section as a fallback when the
+        # firmware doesn't publish ``sleep_until`` / ``next_sleep_s``
+        # itself. Step 1 only tracks; the scheduler hook is step 2.
+        telemetry = app.config.get("DEVICE_TELEMETRY")
+        if telemetry is not None and "error" not in parsed:
+            settings: SettingsStore = app.config["SETTINGS_STORE"]
+            device_settings = (settings.get_section("devices") or {}).get(device.id) or {}
+            configured_sleep_s = device_settings.get("sleep_interval_s")
+            try:
+                telemetry.record_heartbeat(
+                    device.id,
+                    received_at=received_at,
+                    parsed=parsed,
+                    configured_sleep_s=(
+                        int(configured_sleep_s) if configured_sleep_s is not None else None
+                    ),
+                )
+            except Exception:
+                logger.exception("telemetry: record_heartbeat failed for %s", device.id)
         # Only log when the status actually changed (or carries an error).
         # The live cache + HA sensors still see every heartbeat; this just
         # keeps steady heartbeats from churning the capped event log.
