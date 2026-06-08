@@ -12,15 +12,47 @@
 </p>
 
 > **Heads up:** the widget visual language was rebuilt around the
-> Spectra design system and has had a slim-down pass in 0.38–0.42
+> Spectra design system and has had a slim-down pass in 0.38–0.43
 > moving niche families (F1, Spotify, GitHub, finance, sky, etc.) to
 > a [community catalog](https://github.com/dmellok/tesserae-widgets)
 > so the default install ships a focused widget shelf. The hero image
-> above is starting to age (it'll be reshot soon). In the meantime,
-> the [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-> shows the current bundled look and the
-> [community gallery](https://dmellok.github.io/tesserae/widgets/community/)
-> covers the catalog.
+> above is from the early build and is being reshot. For the current
+> look, see the screenshots below and the
+> [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/).
+
+## Screenshots
+
+<p align="center">
+  <a href="docs/screenshots/ui/ha-hub.png">
+    <img src="docs/screenshots/ui/ha-hub.png" alt="Home Assistant dashboard with the Tesserae Hub tile + four panel device cards (live image, battery, signal, IP)" width="820">
+  </a>
+  <br>
+  <em>Tesserae lives inside HA. The Hub tile + one device card per panel, each pulling its live image entity, battery, signal, and IP.</em>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/ui/ha-composition.png">
+    <img src="docs/screenshots/ui/ha-composition.png" alt="Composing a Home Assistant dashboard in Tesserae, cell grid on the left, rendered preview on the right with ha_climate + ha_history + calendar + Spotify + todo tiles" width="820">
+  </a>
+  <br>
+  <em>Composing a dashboard. Cell grid on the left, live preview of HA widgets (climate gauges, history, calendar, Spotify, todo) on the right.</em>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/ui/paper-calendar.png">
+    <img src="docs/screenshots/ui/paper-calendar.png" alt="Paper Calendar dashboard composition, Unsplash photo on the left + calendar_month on the right at 1200x1600" width="820">
+  </a>
+  <br>
+  <em>"Paper Calendar" dashboard, full-bleed Unsplash photo + month grid, rendered at 1200×1600 for an Inky 13.3".</em>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/ui/bedside.png">
+    <img src="docs/screenshots/ui/bedside.png" alt="Bedside dashboard composition with vivid gradient weather + clock tiles in the preview, Sending toast in the corner" width="820">
+  </a>
+  <br>
+  <em>Bedside dashboard with two of the new gradient themes, mid-send.</em>
+</p>
 
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices, Pi
