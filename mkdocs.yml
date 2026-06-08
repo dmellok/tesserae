@@ -15,6 +15,11 @@ exclude_docs: |
 
 theme:
   name: material
+  # overrides/main.html injects the Umami analytics snippet into the
+  # head of every page. Material doesn't ship a first-party Umami
+  # provider; the override block is the documented hook for custom
+  # script tags that need preserved attributes (data-website-id).
+  custom_dir: overrides
   icon:
     repo: fontawesome/brands/github
   features:
