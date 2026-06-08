@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.3], 2026-06-09
+
+### Fixed
+
+- **`clock_word` capitalisation no longer mixes cases.** Phrasing
+  tokens were stored ALL CAPS in `MIN_WORDS`; hours were Title Case
+  in `HOUR_WORD`; the renderer `.toLowerCase()`'d the prefix and
+  suffix but left the hour Title-cased, producing "twenty past
+  Three" and "three o'clock"-without-apostrophe (the source said
+  `OCLOCK`). Now every token is lowercase, the renderer
+  capitalises the first letter of the joined sentence, and the
+  word "o'clock" gets its apostrophe back. Output reads
+  consistently as "Twenty past three" / "Quarter to eleven" /
+  "Three o'clock".
+
 ## [0.43.2], 2026-06-09
 
 ### Removed

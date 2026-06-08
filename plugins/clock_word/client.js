@@ -6,24 +6,29 @@
 // afternoon / evening / night". Pulse-dot for seconds is just a
 // static --accent-4 indicator since the spec forbids animation.
 
+// Phrasing tokens kept lowercase here, the renderer capitalises the
+// first letter of the assembled sentence (see spelledTime) so the
+// output reads "Twenty past three" rather than the mixed
+// "twenty past Three" the old MIN_WORDS-uppercase + HOUR_WORD-titlecase
+// combination produced.
 const MIN_WORDS = {
-  0: ["", "OCLOCK"],
-  5: ["FIVE PAST", ""],
-  10: ["TEN PAST", ""],
-  15: ["QUARTER PAST", ""],
-  20: ["TWENTY PAST", ""],
-  25: ["TWENTY-FIVE PAST", ""],
-  30: ["HALF PAST", ""],
-  35: ["TWENTY-FIVE TO", ""],
-  40: ["TWENTY TO", ""],
-  45: ["QUARTER TO", ""],
-  50: ["TEN TO", ""],
-  55: ["FIVE TO", ""],
+  0: ["", "o'clock"],
+  5: ["five past", ""],
+  10: ["ten past", ""],
+  15: ["quarter past", ""],
+  20: ["twenty past", ""],
+  25: ["twenty-five past", ""],
+  30: ["half past", ""],
+  35: ["twenty-five to", ""],
+  40: ["twenty to", ""],
+  45: ["quarter to", ""],
+  50: ["ten to", ""],
+  55: ["five to", ""],
 };
 
 const HOUR_WORD = [
-  "Twelve", "One", "Two", "Three", "Four", "Five",
-  "Six", "Seven", "Eight", "Nine", "Ten", "Eleven",
+  "twelve", "one", "two", "three", "four", "five",
+  "six", "seven", "eight", "nine", "ten", "eleven",
 ];
 
 // Phase-of-day table. Each phase has a label, an icon, and an accent
@@ -55,8 +60,11 @@ function spelledTime(date) {
   const hourIdx = isTo ? (h + 1) % 12 : h;
   const [prefix, suffix] = MIN_WORDS[step] || ["", ""];
   const hour = HOUR_WORD[hourIdx];
-  const parts = [prefix.toLowerCase(), hour, suffix.toLowerCase()].filter(Boolean);
-  return parts.join(" ").trim();
+  // All tokens are lowercase, capitalise the very first letter of the
+  // joined sentence so the output reads "Twenty past three" rather
+  // than the inconsistent "twenty past Three".
+  const sentence = [prefix, hour, suffix].filter(Boolean).join(" ").trim();
+  return sentence ? sentence.charAt(0).toUpperCase() + sentence.slice(1) : "";
 }
 
 export default function render(shadow, ctx) {
