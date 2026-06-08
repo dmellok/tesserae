@@ -46,6 +46,20 @@ CONFIDENCE_TRUSTED_AT: int = 3
 # couple of missed predictions.
 CONFIDENCE_MAX: int = 10
 
+# Defensive sanity check when the firmware publishes both
+# ``sleep_until`` (absolute wake timestamp) and ``next_sleep_s``
+# (relative seconds until sleep). They should always agree, since
+# they come from the same firmware. When they DON'T agree, the
+# usual cause is a stale clock at the moment ``sleep_until`` was
+# computed (e.g. NTP hadn't synced when the firmware grabbed
+# ``time(nullptr)``) or ``sleep_until`` being a leftover value from
+# the previous wake cycle. In that case ``next_sleep_s`` is the
+# more trustworthy field, it's a duration so it can't carry clock
+# skew. The threshold is generous enough to accept normal jitter
+# (wifi connect time, MQTT publish latency) but small enough that a
+# really bad ``sleep_until`` value is caught and ignored.
+SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S: float = 30.0
+
 # Some firmwares send two heartbeats per wake cycle, e.g. one on connect
 # (battery + rssi for the dashboard) and one just before deep-sleep
 # (with the sleep_until timing). Without debouncing, the second
@@ -185,6 +199,32 @@ class TelemetryStore:
             # Resolve the sleep interval that will be used for the next
             # prediction. Firmware-published value wins; configured
             # interval is the fallback when the firmware is silent.
+            #
+            # Defensive: when both ``sleep_until`` AND ``next_sleep_s``
+            # are present, they're meant to encode the same wake event
+            # in two forms. If they disagree by more than
+            # ``SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S``, the absolute
+            # timestamp is almost certainly carrying clock skew (NTP
+            # not synced when computed, or a stale value from a
+            # previous wake) and the relative seconds is the
+            # trustworthy field. Drop ``sleep_until`` in that case and
+            # fall through to the ``next_sleep_s`` branch.
+            if (
+                sleep_until is not None
+                and next_sleep_s is not None
+                and abs((sleep_until - received_at) - next_sleep_s)
+                > SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S
+            ):
+                logger.warning(
+                    "telemetry: %s sleep_until disagrees with next_sleep_s "
+                    "(sleep_until=>%ds vs next_sleep_s=%ds); using next_sleep_s. "
+                    "Likely an unsynced clock at sleep_until computation in firmware.",
+                    device_id,
+                    round(sleep_until - received_at),
+                    next_sleep_s,
+                )
+                sleep_until = None
+
             effective_interval: int | None
             predicted_wake: float | None
             if sleep_until is not None:

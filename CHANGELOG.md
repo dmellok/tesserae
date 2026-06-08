@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.1], 2026-06-09
+
+### Fixed
+
+- **Smart sync: defensive fallback when `sleep_until` disagrees with
+  `next_sleep_s`.** Real-world firmware (ESP32) was publishing both
+  fields on every heartbeat, but the absolute `sleep_until`
+  timestamp didn't match the relative `next_sleep_s` duration. The
+  server-side priority chain trusted `sleep_until` first, so it
+  predicted wakes 5+ minutes out for devices actually sleeping 60s,
+  producing a constant `-307s` offset that never let confidence
+  ramp.
+
+  Server now checks `abs((sleep_until - received_at) - next_sleep_s)`
+  on every heartbeat that carries both fields. If the disagreement
+  exceeds 30 seconds, `sleep_until` is rejected as untrustworthy
+  (almost certainly clock skew at compute time) and `next_sleep_s`
+  is used for the prediction. A `WARNING` log line records the
+  disagreement so the firmware bug stays discoverable.
+
+  Firmware-side handover prompt for the underlying bug is at
+  [`firmware-prompts/sleep-until-clock-skew-fix.md`](firmware-prompts/sleep-until-clock-skew-fix.md)
+  in the repo.
+
 ## [0.43.0], 2026-06-08
 
 ### Added

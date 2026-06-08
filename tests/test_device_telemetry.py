@@ -40,19 +40,20 @@ def test_record_with_configured_sleep_only_uses_fallback(tmp_path: Path) -> None
 
 def test_record_prefers_sleep_until_over_next_sleep_s(tmp_path: Path) -> None:
     """``sleep_until`` (absolute wake time) is more accurate than
-    ``next_sleep_s``; the parser should always pick it when both come
-    in. The configured fallback is ignored too."""
+    ``next_sleep_s``; the parser should always pick it when the two
+    agree (within the mismatch tolerance). The configured fallback
+    is ignored too."""
     store = _make_store(tmp_path)
+    # Both fields agree: 1_000_500 - 1_000_000 = 500s, matches
+    # next_sleep_s=500. sleep_until wins as the more precise source.
     entry = store.record_heartbeat(
         "esp32_office",
         received_at=1_000_000.0,
-        parsed={"sleep_until": 1_001_234.0, "next_sleep_s": 500},
+        parsed={"sleep_until": 1_000_500.0, "next_sleep_s": 500},
         configured_sleep_s=600,
     )
-    assert entry.predicted_next_wake_at == 1_001_234.0
-    # Derived interval should reflect the wake-time math, not the
-    # less-accurate published next_sleep_s or the fallback.
-    assert entry.last_sleep_interval_s == 1234
+    assert entry.predicted_next_wake_at == 1_000_500.0
+    assert entry.last_sleep_interval_s == 500
 
 
 def test_record_uses_next_sleep_s_when_no_sleep_until(tmp_path: Path) -> None:
@@ -264,3 +265,51 @@ def test_double_heartbeat_within_debounce_does_not_reset_confidence(tmp_path: Pa
     )
     assert after_debounce.is_trusted
     assert after_debounce.consecutive_on_time_wakes == CONFIDENCE_TRUSTED_AT
+
+
+def test_sleep_until_falls_back_to_next_sleep_s_when_they_disagree(tmp_path: Path) -> None:
+    """Defensive sanity check: when firmware publishes both
+    ``sleep_until`` and ``next_sleep_s`` and they disagree by more
+    than 30 seconds, the absolute timestamp is almost certainly
+    carrying clock skew (NTP not synced when computed, or a stale
+    value). The relative duration is a duration and can't be wrong
+    about length, so prefer it.
+
+    Real-world repro: ESP32 firmware publishing
+    ``sleep_until=<received+371>`` while ``next_sleep_s=60``, the
+    server would happily trust the bad ``sleep_until`` and predict a
+    wake 6 minutes out for a device actually waking in 1 minute,
+    producing -307s offsets every cycle."""
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    entry = store.record_heartbeat(
+        "esp32_bedside",
+        received_at=t0,
+        # firmware claims wake at t0+371, but also next_sleep_s=60.
+        # The 371 is wrong (clock skew); the 60 is correct.
+        parsed={"sleep_until": t0 + 371, "next_sleep_s": 60},
+        configured_sleep_s=None,
+    )
+    # The bad sleep_until was rejected; we used next_sleep_s instead.
+    assert entry.last_sleep_interval_s == 60
+    assert entry.predicted_next_wake_at == t0 + 60
+
+
+def test_sleep_until_still_trusted_when_close_to_next_sleep_s(tmp_path: Path) -> None:
+    """Small disagreement (e.g. a couple of seconds between when
+    ``sleep_until`` was computed and the heartbeat was actually
+    published) is normal and within ``SLEEP_UNTIL_VS_NEXT_SLEEP_MISMATCH_S``.
+    In that case we keep using the more-accurate absolute
+    ``sleep_until`` value as documented."""
+    store = _make_store(tmp_path)
+    t0 = 1_000_000.0
+    entry = store.record_heartbeat(
+        "esp32_office",
+        received_at=t0,
+        # Off by 5s, well within the 30s tolerance, so trust the
+        # absolute value (rounded interval should still be ~605).
+        parsed={"sleep_until": t0 + 605, "next_sleep_s": 600},
+        configured_sleep_s=None,
+    )
+    assert entry.predicted_next_wake_at == t0 + 605
+    assert entry.last_sleep_interval_s == 605
