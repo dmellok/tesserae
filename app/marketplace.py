@@ -253,8 +253,29 @@ class Marketplace:
         schema_path: Path,
         index_schema_path: Path,
         index_url_provider: IndexUrlProvider,
+        bundled_plugins_dir: Path | None = None,
+        plugin_data_root: Path | None = None,
     ) -> None:
+        """``plugins_dir`` is where this Marketplace **writes** when a
+        user installs from the catalog, and where it **rms from** when
+        a user uninstalls. In 0.42.2+ this is the persistent user
+        marketplace dir (``<data_root>/marketplace/`` in Docker / HA
+        Add-on installs) so installs survive image upgrades.
+
+        ``bundled_plugins_dir`` is the read-only directory shipped with
+        the image (``/app/plugins/`` in Docker), only used for the
+        install collision check, refusing to install a catalog id
+        whose folder name clashes with a bundled widget. Defaults to
+        ``plugins_dir`` for legacy single-dir setups + tests.
+
+        ``plugin_data_root`` is where each plugin's data dir lives
+        (e.g. ``<data_root>/plugins/picture_gallery/`` for uploaded
+        photos), used by ``uninstall(delete_data=True)``. Defaults to
+        the legacy ``plugins_dir.parent / "data" / "plugins"`` for
+        backwards compat with single-dir test setups."""
         self._plugins_dir = plugins_dir
+        self._bundled_plugins_dir = bundled_plugins_dir or plugins_dir
+        self._plugin_data_root = plugin_data_root or plugins_dir.parent / "data" / "plugins"
         self._state_path = state_path
         self._schema_path = schema_path
         self._index_schema_path = index_schema_path
@@ -430,6 +451,19 @@ class Marketplace:
         early_owned: set[str] = set(early_record.folders) if early_record is not None else set()
         candidates = list(entry.folders) if entry.folders else [entry.id]
         for folder_id in candidates:
+            # Refuse if the folder name clashes with a bundled widget
+            # in the image (read-only, can't be touched). This catches
+            # the case where the catalog re-publishes a widget that
+            # later became bundled.
+            if (
+                self._bundled_plugins_dir != self._plugins_dir
+                and (self._bundled_plugins_dir / folder_id).exists()
+            ):
+                raise InstallRefused(
+                    f"Plugin folder {folder_id!r} is already shipped with "
+                    "Tesserae as a bundled widget; the marketplace entry "
+                    "for it is now obsolete. Skip this entry."
+                )
             target = self._plugins_dir / folder_id
             if not target.exists() or folder_id in early_owned:
                 continue
@@ -639,11 +673,12 @@ class Marketplace:
                         err,
                     )
             if delete_data:
-                # data_root for plugins is conventionally data/plugins/<id>.
-                # The path here mirrors what plugin_loader.discover passes;
-                # we reconstruct rather than thread it through the
-                # constructor to keep the wiring small.
-                data_root = self._plugins_dir.parent / "data" / "plugins" / folder_id
+                # Per-plugin data dir; wired in from app_factory in
+                # 0.42.2+ to decouple from the plugins-dir location
+                # (the marketplace now writes code to
+                # ``<data_root>/marketplace/`` while data still lives
+                # at ``<data_root>/plugins/<id>/``).
+                data_root = self._plugin_data_root / folder_id
                 if data_root.exists():
                     try:
                         shutil.rmtree(data_root)

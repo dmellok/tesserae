@@ -180,14 +180,49 @@ def discover(
     *,
     schema_path: Path,
     data_root: Path,
+    additional_plugins_dirs: list[Path] | None = None,
 ) -> PluginRegistry:
-    """Walk ``plugins_dir`` and return a registry of validated plugins."""
-    registry = PluginRegistry()
-    if not plugins_dir.exists():
-        return registry
+    """Walk ``plugins_dir`` and ``additional_plugins_dirs`` (if any) and
+    return a registry of validated plugins.
 
+    ``additional_plugins_dirs`` were added in 0.42.2 so the marketplace
+    can install widgets to a persistent location outside the Docker
+    image layer; in HA Add-on / Docker installs the bundled plugins
+    sit at ``/app/plugins/`` (immutable, shipped with each image), and
+    user-installed marketplace widgets sit at ``<data_root>/plugins/``
+    (persistent volume). Both dirs are walked and merged. Bundled wins
+    on duplicate ids, the user's marketplace install is rejected with
+    an error so the user can resolve it (the bundled adoption of a
+    previously-marketplace widget is the only way this happens in
+    practice).
+    """
+    registry = PluginRegistry()
     schema = _load_schema(schema_path)
 
+    # Bundled dir first so its ids are claimed; marketplace dir is
+    # walked second and any duplicate ids get an error.
+    dirs = [plugins_dir]
+    if additional_plugins_dirs:
+        dirs.extend(additional_plugins_dirs)
+
+    for source_dir in dirs:
+        if not source_dir.exists():
+            continue
+        _scan_plugin_dir(source_dir, registry, schema=schema, data_root=data_root)
+    return registry
+
+
+def _scan_plugin_dir(
+    plugins_dir: Path,
+    registry: PluginRegistry,
+    *,
+    schema: dict[str, Any],
+    data_root: Path,
+) -> None:
+    """Walk one plugin source directory and append everything it
+    contains to ``registry``. Split out of ``discover`` so the loader
+    can walk multiple sources (bundled + user marketplace) without
+    duplicating the per-folder validation loop."""
     for child in sorted(plugins_dir.iterdir()):
         if not child.is_dir() or child.name.startswith((".", "_")):
             continue
@@ -284,8 +319,6 @@ def discover(
                 registry.fonts[font.id] = font
 
         logger.info("Loaded plugin %s (kind=%s)", plugin_id, manifest["kind"])
-
-    return registry
 
 
 def register_routes(app: Flask, registry: PluginRegistry) -> None:

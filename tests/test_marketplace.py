@@ -905,3 +905,92 @@ def test_uninstall_prebundled_no_op_when_some_folders_missing(
     assert marketplace.uninstall("github") is False
     # github_core stays put, nothing was removed.
     assert (marketplace._plugins_dir / "github_core").exists()
+
+
+# ----- Persistent user-dir install (0.42.2, issue: HA upgrades wipe plugins) ---
+
+
+def test_install_writes_to_user_dir_not_bundled(tmp_path: Path) -> None:
+    """0.42.2: marketplace installs go to a separate user dir
+    (``data/marketplace/`` in Docker / HA setups) so they survive
+    image upgrades that wipe ``/app/plugins/``. The bundled dir is
+    only consulted for the collision check."""
+    user_dir = tmp_path / "marketplace"
+    user_dir.mkdir()
+    bundled_dir = tmp_path / "bundled"
+    bundled_dir.mkdir()
+    plugin_data_root = tmp_path / "plugin-data"
+    state_path = tmp_path / "core" / "marketplace.json"
+
+    url = "https://example.invalid/widget.tar.gz"
+    tarball = _make_tarball(
+        folder="indie",
+        manifest=_minimal_manifest(),
+    )
+    url_table: dict[str, bytes] = {url: tarball}
+
+    def fake_urlopen(req, timeout=10):
+        return _FakeResponse(url_table[req.full_url if hasattr(req, "full_url") else str(req)])
+
+    import urllib.request
+
+    orig = urllib.request.urlopen
+    urllib.request.urlopen = fake_urlopen
+    try:
+
+        class _Provider(IndexUrlProvider):
+            def __call__(self) -> str:
+                return "https://example.invalid/widgets.json"
+
+        mkt = Marketplace(
+            plugins_dir=user_dir,
+            bundled_plugins_dir=bundled_dir,
+            plugin_data_root=plugin_data_root,
+            state_path=state_path,
+            schema_path=REPO_ROOT / "schema" / "plugin.schema.json",
+            index_schema_path=REPO_ROOT / "schema" / "marketplace.schema.json",
+            index_url_provider=_Provider(),
+        )
+
+        entry = _make_catalog_entry(
+            widget_id="indie",
+            sha256=_sha256(tarball),
+            tarball_url=url,
+        )
+        mkt.install(entry)
+        # Lands in the user dir...
+        assert (user_dir / "indie").exists()
+        # ...not the bundled dir (which the image owns).
+        assert not (bundled_dir / "indie").exists()
+    finally:
+        urllib.request.urlopen = orig
+
+
+def test_install_refused_when_folder_clashes_with_bundled(tmp_path: Path) -> None:
+    """A catalog entry whose folder name matches a bundled widget
+    name (rare; happens if the marketplace re-publishes something
+    later adopted into the bundle) is rejected with a clear message,
+    no download / extract is even attempted."""
+    user_dir = tmp_path / "marketplace"
+    user_dir.mkdir()
+    bundled_dir = tmp_path / "bundled"
+    bundled_dir.mkdir()
+    # Pre-seed a bundled "indie" folder.
+    (bundled_dir / "indie").mkdir()
+    (bundled_dir / "indie" / "plugin.json").write_text("{}")
+
+    class _Provider(IndexUrlProvider):
+        def __call__(self) -> str:
+            return "https://example.invalid/widgets.json"
+
+    mkt = Marketplace(
+        plugins_dir=user_dir,
+        bundled_plugins_dir=bundled_dir,
+        state_path=tmp_path / "state.json",
+        schema_path=REPO_ROOT / "schema" / "plugin.schema.json",
+        index_schema_path=REPO_ROOT / "schema" / "marketplace.schema.json",
+        index_url_provider=_Provider(),
+    )
+    entry = _make_catalog_entry(widget_id="indie")
+    with pytest.raises(InstallRefused, match="bundled widget"):
+        mkt.install(entry)

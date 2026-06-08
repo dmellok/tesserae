@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.42.2], 2026-06-08
+
+### Fixed
+
+- **Marketplace widgets no longer wiped by Docker / HA Add-on image
+  upgrades.** Prior to this release, `Marketplace.install` wrote new
+  widget folders to the same path the bundled widgets live at
+  (`/app/plugins/`), which is inside the Docker image layer. Every
+  image upgrade (HA Supervisor pull, `docker compose pull`) replaced
+  that layer, wiping anything the user installed via Browse community
+  widgets while leaving the rest of `/data/` (pages, schedules,
+  settings) intact.
+
+  Now:
+  - Marketplace installs write to `<data_root>/marketplace/<id>/`,
+    which is on the persistent volume (`/data/marketplace/` in HA,
+    `/app/data/marketplace/` in standalone Docker, `data/marketplace/`
+    in bare-metal installs).
+  - The plugin loader walks both the bundled dir (`/app/plugins/`,
+    immutable, shipped with each image) and the user marketplace dir,
+    merging the results. Bundled wins on duplicate ids with a logged
+    warning so the admin notices and resolves manually.
+  - Marketplace's install collision check also looks at the bundled
+    dir, refusing to install a catalog entry whose folder name
+    clashes with a shipped widget.
+
+  **Migration for existing HA / Docker users**: marketplace widgets
+  installed before 0.42.2 are gone from the filesystem (the image
+  upgrade did that), but their `marketplace.json` records still
+  exist. On the first 0.42.2 Browse visit, those entries show as
+  installed but the actual code is missing; click Uninstall to drop
+  the stale record, then Install to land the widget at the new
+  persistent path. Future upgrades preserve installs.
+
+  Bare-metal / git-clone installs aren't affected by the original
+  bug (no image layer to wipe) but pick up the new path on upgrade
+  too. Existing marketplace widgets at `plugins/` keep working until
+  the user moves them to `data/marketplace/` (or just reinstalls).
+
 ## [0.42.1], 2026-06-08
 
 ### Fixed

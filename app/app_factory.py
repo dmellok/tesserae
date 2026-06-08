@@ -286,6 +286,12 @@ def create_app(
     device_data_root.mkdir(parents=True, exist_ok=True)
     renders_dir = data_root / "core" / "renders"
     renders_dir.mkdir(parents=True, exist_ok=True)
+    # Marketplace-installed widgets land under the persistent data
+    # volume so they survive Docker / HA Add-on image upgrades (which
+    # replace the bundled plugins_dir at /app/plugins/). Added in
+    # 0.42.2; see https://github.com/dmellok/tesserae/issues/11 (if any).
+    user_plugins_dir = data_root / "marketplace"
+    user_plugins_dir.mkdir(parents=True, exist_ok=True)
 
     settings = SettingsStore(data_root / "core" / "settings.json")
     app.config["SETTINGS_STORE"] = settings
@@ -304,6 +310,10 @@ def create_app(
         plugins_dir,
         schema_path=plugin_schema,
         data_root=plugin_data_root,
+        # Marketplace-installed widgets live under the persistent
+        # data volume; the loader walks both dirs and merges. See
+        # the user_plugins_dir comment above.
+        additional_plugins_dirs=[user_plugins_dir],
     )
     for perr in plugins.errors:
         logger.warning("plugin loader: %s, %s", perr.plugin_id, perr.message)
@@ -428,7 +438,15 @@ def create_app(
             return str(url) if isinstance(url, str) else ""
 
     app.config["MARKETPLACE"] = _Marketplace(
-        plugins_dir=plugins_dir,
+        # Install / uninstall writes go to the persistent dir so they
+        # survive Docker / HA image upgrades.
+        plugins_dir=user_plugins_dir,
+        # Read-only image layer; checked on install so a marketplace
+        # entry can't clash with a bundled widget folder name.
+        bundled_plugins_dir=plugins_dir,
+        # Plugin data dirs stay under data/plugins/<id>/ where they
+        # already are; only the widget CODE moved to data/marketplace/.
+        plugin_data_root=plugin_data_root,
         state_path=data_root / "core" / "marketplace.json",
         schema_path=plugin_schema,
         index_schema_path=REPO_ROOT / "schema" / "marketplace.schema.json",

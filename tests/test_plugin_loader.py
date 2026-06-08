@@ -178,3 +178,48 @@ def test_extended_palette_manifest_passes_schema(tmp_path: Path, schema_path: Pa
     )
     assert "scenic_toy" in registry.plugins
     assert registry.plugins["scenic_toy"].palette == "extended"
+
+
+def test_discover_merges_additional_plugins_dirs(tmp_path: Path, schema_path: Path) -> None:
+    """0.42.2: marketplace-installed widgets live under a separate
+    user dir (data/marketplace/) so they survive Docker image
+    upgrades. The loader walks both the bundled dir and the
+    additional dirs, merging the resulting registries."""
+    bundled = tmp_path / "plugins"
+    bundled.mkdir()
+    user = tmp_path / "marketplace"
+    user.mkdir()
+    _write_minimal_plugin(bundled, "bundled_widget", {"name": "Bundled"})
+    _write_minimal_plugin(user, "user_widget", {"name": "User"})
+
+    registry = plugin_loader.discover(
+        bundled,
+        schema_path=schema_path,
+        data_root=tmp_path / "data",
+        additional_plugins_dirs=[user],
+    )
+    assert "bundled_widget" in registry.plugins
+    assert "user_widget" in registry.plugins
+
+
+def test_discover_bundled_wins_on_duplicate_id(tmp_path: Path, schema_path: Path) -> None:
+    """If a user has a marketplace widget that shares an id with a
+    bundled widget (rare; happens if a marketplace widget gets
+    adopted into the bundle later), the bundled copy wins and the
+    user copy is rejected with a 'duplicate plugin id' error so the
+    admin notices and resolves manually."""
+    bundled = tmp_path / "plugins"
+    bundled.mkdir()
+    user = tmp_path / "marketplace"
+    user.mkdir()
+    _write_minimal_plugin(bundled, "shared", {"name": "Bundled copy"})
+    _write_minimal_plugin(user, "shared", {"name": "User copy"})
+
+    registry = plugin_loader.discover(
+        bundled,
+        schema_path=schema_path,
+        data_root=tmp_path / "data",
+        additional_plugins_dirs=[user],
+    )
+    assert registry.plugins["shared"].name == "Bundled copy"
+    assert any(err.plugin_id == "shared" and "duplicate" in err.message for err in registry.errors)
