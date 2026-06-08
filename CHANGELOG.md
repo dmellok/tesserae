@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.42.1], 2026-06-08
+
+### Fixed
+
+- **mypy strict on `app.state.device_telemetry`.** The 0.42.0 ship
+  failed CI on a missed type annotation: `effective_interval` was
+  inferred as `int` from the firmware-published branches but the
+  no-signal else branch assigns `prev.last_sleep_interval_s` which
+  is `int | None`. Added the explicit union annotation. No behaviour
+  change.
+
 ## [0.42.0], 2026-06-08
 
 ### Added

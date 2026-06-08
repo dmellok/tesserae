@@ -185,6 +185,8 @@ class TelemetryStore:
             # Resolve the sleep interval that will be used for the next
             # prediction. Firmware-published value wins; configured
             # interval is the fallback when the firmware is silent.
+            effective_interval: int | None
+            predicted_wake: float | None
             if sleep_until is not None:
                 # Wake time is published directly; derive an effective
                 # interval for storage so the admin UI can show it.
