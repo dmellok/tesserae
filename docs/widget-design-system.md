@@ -49,7 +49,7 @@ cell:
 
 | Axis | Attribute | Controls | Shipped |
 |---|---|---|---|
-| **Theme** | `data-theme` | colour only (surfaces, text, accents) | 6 Spectra + 3 movement + 10 base16 = 19 |
+| **Theme** | `data-theme` | colour only (surfaces, text, accents) | 9 Spectra + 3 movement + 15 vivid + 14 gradient |
 | **Style** | `data-style` | typography / scale / density / shape (never colour) | 6 neutral + 3 movement = 9 |
 
 Any theme composes with any style. The user picks a `(theme, style)`

@@ -28,7 +28,7 @@ from app.state.theme_registry import (
 # top of spectra-tokens.css.
 _CSS_THEME_RE = re.compile(r'\[data-theme="([^"]+)"\]\s*(?:,\s*\[data-theme="[^"]+"\]\s*)*\{')
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
-_SPECTRA_FILES = ("spectra-tokens.css", "spectra-base16.css")
+_SPECTRA_FILES = ("spectra-tokens.css",)
 
 
 def _css_theme_ids() -> set[str]:
@@ -78,7 +78,7 @@ def test_picker_label_includes_tagline_when_set() -> None:
 
 
 def test_picker_label_falls_back_to_name_when_no_tagline() -> None:
-    t = Theme(id="t", name="Dracula", family="base16")
+    t = Theme(id="t", name="Dracula", family="vivid")
     assert t.picker_label() == "Dracula"
 
 

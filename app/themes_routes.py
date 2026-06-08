@@ -317,7 +317,21 @@ def _theme_from_form(form: Any, *, fallback_id: str) -> UserTheme:
         # box is checked. Persist the preference so toggling survives
         # reloads.
         "auto_soft_tints": form.get("auto_soft_tints") == "on",
+        # Optional vivid-card gradient. Same checkbox-presence rule;
+        # angle parsed defensively (falls back to 135 on garbage).
+        "gradient_enabled": form.get("gradient_enabled") == "on",
     }
+    grad_a = (form.get("gradient_a") or "").strip()
+    grad_b = (form.get("gradient_b") or "").strip()
+    if grad_a:
+        kwargs["gradient_a"] = grad_a
+    if grad_b:
+        kwargs["gradient_b"] = grad_b
+    try:
+        angle = int((form.get("gradient_angle") or "").strip() or 135)
+    except ValueError:
+        angle = 135
+    kwargs["gradient_angle"] = max(0, min(360, angle))
     for key in UserTheme.TOKEN_FIELDS:
         raw = (form.get(key) or "").strip()
         if raw:

@@ -34,9 +34,9 @@ from typing import Any, ClassVar
 from app.state.theme_registry import Theme
 
 # Slug prefix for every user theme id. Picked so user themes can never
-# shadow a bundled id (``light`` / ``dark`` / ``base16-*``) by accident
-# , the form-side slug sanitizer adds this prefix after stripping it
-# if the user re-entered it.
+# shadow a bundled id (``light`` / ``dark`` / ``coral`` / etc.) by
+# accident, the form-side slug sanitizer adds this prefix after
+# stripping it if the user re-entered it.
 USER_THEME_PREFIX = "user-"
 
 # Slug rule: lowercase alphanumeric + hyphen, 2–48 chars after the
@@ -110,6 +110,16 @@ class UserTheme:
     # changes how the builder treats them.
     auto_soft_tints: bool = False
 
+    # Optional vivid-card-background gradient. When enabled, emits
+    # ``--surface-gradient`` so ``.w`` paints a gradient instead of
+    # the flat ``--surface``. Three components keep the UI simple:
+    # an enable flag, two stop colours, and an angle (deg). Disabled
+    # by default; existing themes paint a flat surface as before.
+    gradient_enabled: bool = False
+    gradient_a: str = "#FF6B35"
+    gradient_b: str = "#F2B5C3"
+    gradient_angle: int = 135
+
     # The colour-token field names in the order they appear on disk and
     # in the CSS output. Excludes the metadata trio (id / name / mode /
     # font_family). Kept as a ClassVar so dataclass treats it as
@@ -163,6 +173,14 @@ class UserTheme:
         # Icon always derives from text-primary in the Spectra cascade,
         # so we don't ask the user to set it; emit the derivation.
         lines.append("  --icon: var(--text-primary);")
+        # Optional vivid-card gradient. ``.w``'s background rule is
+        # ``var(--surface-gradient, var(--surface))`` so unset = flat.
+        if self.gradient_enabled:
+            angle = max(0, min(360, int(self.gradient_angle)))
+            lines.append(
+                f"  --surface-gradient: linear-gradient({angle}deg, "
+                f"{self.gradient_a} 0%, {self.gradient_b} 100%);"
+            )
         lines.append("}")
         return "\n".join(lines)
 

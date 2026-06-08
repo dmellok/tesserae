@@ -29,7 +29,6 @@
        (data-style), its rules set custom properties on the body/cell,
        which then cascade into the shadow root via inheritance. -->
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
   {# User themes load right after the bundled blocks so cells bound to
      a "user-*" data-theme paint from the matching server-generated
      rule. The endpoint is concatenated CSS; on a fresh install with

@@ -831,9 +831,8 @@ root via the cascade:
 
 | File | What it sets |
 |---|---|
-| [`spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css) | primitives + 19 themes (`[data-theme="..."]`) |
+| [`spectra-tokens.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-tokens.css) | primitives + every bundled theme (`[data-theme="..."]`) |
 | [`spectra-styles.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-styles.css) | 9 styles (`[data-style="..."]`) + @font-face for the vendored families |
-| [`spectra-base16.css`](https://github.com/dmellok/tesserae/blob/main/static/style/spectra-base16.css) | 10 base16 colour palettes |
 
 Widgets don't link these, the document does it once. Custom
 properties cascade through the shadow boundary, so widgets just read

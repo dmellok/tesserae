@@ -19,9 +19,9 @@ folder.
 Tesserae uses **Spectra**, a token-themed design system with two
 orthogonal axes:
 
-- **`data-theme`**, colour only. 19 themes shipped (light, dark,
-  high-contrast, sepia, nord, cool-gray, three movement themes, and
-  ten base16 palettes). Set on `<body>`, cascades into every widget.
+- **`data-theme`**, colour only. ~40 themes shipped across the Light /
+  Dark / Movement / Vivid / Gradient families. Set on `<body>`,
+  cascades into every widget.
 - **`data-style`**, typography, scale, density, shape (never colour).
   9 styles shipped (standard, display, editorial, mono, elegant,
   condensed, plus three movement styles).

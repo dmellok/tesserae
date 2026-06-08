@@ -395,3 +395,691 @@
   --accent-6:#7A3A2A; --accent-6-soft:#DBC7BD;
   --on-accent:#D9D7CE;
 }
+
+/* ============================================================================
+   VIVID FAMILY — saturated flat-colour canvases
+   --------------------------------------------------------------------------
+   Bold flat surfaces (no gradient). Each theme's accents are tuned to
+   harmonise with its specific canvas hue rather than reusing a shared
+   palette. Mix of light, medium, and dark canvases; text-* tokens
+   pick the right luminance for the canvas.
+   ============================================================================ */
+
+/* ---- TANGERINE, bright orange canvas, deep brown text ------------------- */
+[data-theme="tangerine"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #C0945A;
+  --surface:        #F7843B;
+  --surface-sunken: #D86420;
+  --text-primary:   #2B1808;
+  --text-secondary: #4F2D14;
+  --text-muted:     #784A24;
+  --icon:           var(--text-primary);
+  --edge:           #B0521C;
+
+  --accent-1:#2A356B; --accent-1-soft:#BDC0D2;  /* navy alert (contrast) */
+  --accent-2:#7A4810; --accent-2-soft:#D8CAA8;  /* gold warning      */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss positive     */
+  --accent-4:#A82C18; --accent-4-soft:#E5C5BA;  /* terracotta primary*/
+  --accent-5:#3F3068; --accent-5-soft:#C5BFD2;  /* indigo secondary  */
+  --accent-6:#6A2858; --accent-6-soft:#D2B6C8;  /* plum third        */
+  --on-accent:#FFE5CC;
+}
+
+/* ---- LIME, electric lime green canvas, forest text ---------------------- */
+[data-theme="lime"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #94A858;
+  --surface:        #B4E834;
+  --surface-sunken: #94CB28;
+  --text-primary:   #1A2F08;
+  --text-secondary: #2D4818;
+  --text-muted:     #4E6928;
+  --icon:           var(--text-primary);
+  --edge:           #6E9028;
+
+  --accent-1:#A82018; --accent-1-soft:#E5C2BD;  /* vivid red alert   */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* burnt amber       */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* deep forest       */
+  --accent-4:#1E4878; --accent-4-soft:#B5BFD0;  /* royal blue        */
+  --accent-5:#3F3068; --accent-5-soft:#C5BFD2;  /* indigo            */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#F5FFDC;
+}
+
+/* ---- COBALT, bright cobalt blue canvas, cream text ---------------------- */
+[data-theme="cobalt"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #3A5BA5;
+  --surface:        #4A7DEC;
+  --surface-sunken: #2F5FC8;
+  --text-primary:   #F0F4FF;
+  --text-secondary: #D8E0F5;
+  --text-muted:     #B0BCE0;
+  --icon:           var(--text-primary);
+  --edge:           #A8BCE8;
+
+  --accent-1:#FF5A5A; --accent-1-soft:#3D1A1A;  /* red alert         */
+  --accent-2:#FFC847; --accent-2-soft:#3D3115;  /* gold              */
+  --accent-3:#5CE0A0; --accent-3-soft:#143D2A;  /* mint              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#C7A8FF; --accent-5-soft:#28204A;  /* lavender          */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* pink              */
+  --on-accent:#1F3F88;
+}
+
+/* ---- MAGENTA, bright fuchsia canvas, cream text ------------------------- */
+[data-theme="magenta"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #983068;
+  --surface:        #F0386E;
+  --surface-sunken: #CC2858;
+  --text-primary:   #FFF0F5;
+  --text-secondary: #F8DCE5;
+  --text-muted:     #D5A0B5;
+  --icon:           var(--text-primary);
+  --edge:           #F8A8C0;
+
+  --accent-1:#FFE94A; --accent-1-soft:#3D3815;  /* lemon alert       */
+  --accent-2:#FFB347; --accent-2-soft:#3D2515;  /* amber             */
+  --accent-3:#B4E834; --accent-3-soft:#283A12;  /* lime              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#A87CFF; --accent-5-soft:#251E3D;  /* indigo            */
+  --accent-6:#5C1840; --accent-6-soft:#D8B5C8;  /* plum              */
+  --on-accent:#5C0830;
+}
+
+/* ---- EMERALD, bright emerald green canvas, cream text ------------------ */
+[data-theme="emerald"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #1F6A38;
+  --surface:        #2EC368;
+  --surface-sunken: #1FA050;
+  --text-primary:   #F0FFF5;
+  --text-secondary: #DCFCE8;
+  --text-muted:     #A8D8BC;
+  --icon:           var(--text-primary);
+  --edge:           #A8E8C0;
+
+  --accent-1:#FF5A5A; --accent-1-soft:#3D1A1A;  /* red alert         */
+  --accent-2:#FFC847; --accent-2-soft:#3D3115;  /* gold              */
+  --accent-3:#B4E834; --accent-3-soft:#283A12;  /* lime              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#A87CFF; --accent-5-soft:#251E3D;  /* indigo            */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* pink              */
+  --on-accent:#0F4022;
+}
+
+/* ---- CRIMSON, bright crimson red canvas, cream text -------------------- */
+[data-theme="crimson"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #8A1828;
+  --surface:        #E5394F;
+  --surface-sunken: #C0283D;
+  --text-primary:   #FFF0F0;
+  --text-secondary: #FCDCDC;
+  --text-muted:     #D8A0A4;
+  --icon:           var(--text-primary);
+  --edge:           #F8A8B0;
+
+  --accent-1:#FFE94A; --accent-1-soft:#3D3815;  /* lemon alert       */
+  --accent-2:#FFB347; --accent-2-soft:#3D2515;  /* amber             */
+  --accent-3:#5CE0A0; --accent-3-soft:#143D2A;  /* mint              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#A87CFF; --accent-5-soft:#251E3D;  /* indigo            */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* pink              */
+  --on-accent:#5C0810;
+}
+
+/* ---- CYAN, electric cyan canvas, deep navy text ------------------------- */
+[data-theme="cyan"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #6FA8B0;
+  --surface:        #1ED8E4;
+  --surface-sunken: #14B0BC;
+  --text-primary:   #0A2528;
+  --text-secondary: #144548;
+  --text-muted:     #386A6E;
+  --icon:           var(--text-primary);
+  --edge:           #2A858C;
+
+  --accent-1:#A82828; --accent-1-soft:#E5C0BD;  /* deep red alert    */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* burnt amber       */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss              */
+  --accent-4:#1E3C88; --accent-4-soft:#B5BCD2;  /* navy              */
+  --accent-5:#4E2880; --accent-5-soft:#C2B5D2;  /* deep indigo       */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#E5FAFC;
+}
+
+/* ---- AUBERGINE, bright purple canvas, cream text ----------------------- */
+[data-theme="aubergine"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #4A2068;
+  --surface:        #9040D0;
+  --surface-sunken: #7028B0;
+  --text-primary:   #F8F0FF;
+  --text-secondary: #E8D8F5;
+  --text-muted:     #C0A0DD;
+  --icon:           var(--text-primary);
+  --edge:           #D8B0F0;
+
+  --accent-1:#FF6B9D; --accent-1-soft:#3D1F2D;  /* pink alert        */
+  --accent-2:#FFD166; --accent-2-soft:#3A3018;  /* gold              */
+  --accent-3:#B4E834; --accent-3-soft:#283A12;  /* lime              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#7CA8FF; --accent-5-soft:#1E2845;  /* sky               */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* magenta           */
+  --on-accent:#28084A;
+}
+
+/* ---- MUSTARD, bright mustard yellow canvas, deep brown text ------------- */
+[data-theme="mustard"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #B8A038;
+  --surface:        #F0CC0F;
+  --surface-sunken: #C8A808;
+  --text-primary:   #2B1A05;
+  --text-secondary: #4F2F0F;
+  --text-muted:     #784E1F;
+  --icon:           var(--text-primary);
+  --edge:           #A07020;
+
+  --accent-1:#A82018; --accent-1-soft:#E5C0BD;  /* vivid red         */
+  --accent-2:#7A4810; --accent-2-soft:#D8CAA8;  /* burnt amber       */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss              */
+  --accent-4:#1E5560; --accent-4-soft:#B5C7CC;  /* teal              */
+  --accent-5:#2F3068; --accent-5-soft:#BCBFD2;  /* indigo            */
+  --accent-6:#6A2858; --accent-6-soft:#D2B6C8;  /* plum              */
+  --on-accent:#FFF8D8;
+}
+
+/* ---- TEAL POP, bright teal canvas, deep teal text ---------------------- */
+[data-theme="teal-pop"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #208A92;
+  --surface:        #2CD0D8;
+  --surface-sunken: #1FA8B0;
+  --text-primary:   #082025;
+  --text-secondary: #1A4045;
+  --text-muted:     #406870;
+  --icon:           var(--text-primary);
+  --edge:           #208A92;
+
+  --accent-1:#A82828; --accent-1-soft:#E5C0BD;  /* red               */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* burnt amber       */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss              */
+  --accent-4:#1E3C88; --accent-4-soft:#B5BCD2;  /* navy              */
+  --accent-5:#4E2880; --accent-5-soft:#C2B5D2;  /* indigo            */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#E8FCFD;
+}
+
+/* ---- HOT PINK, vivid pink canvas, deep wine text ------------------------ */
+[data-theme="hot-pink"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #A85068;
+  --surface:        #FF4080;
+  --surface-sunken: #D62870;
+  --text-primary:   #28050F;
+  --text-secondary: #4F0F1F;
+  --text-muted:     #781F38;
+  --icon:           var(--text-primary);
+  --edge:           #A0203A;
+
+  --accent-1:#1E3C88; --accent-1-soft:#B5BCD2;  /* cobalt alert      */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* amber             */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss              */
+  --accent-4:#0E6868; --accent-4-soft:#A8C5C5;  /* teal              */
+  --accent-5:#4E2880; --accent-5-soft:#C2B5D2;  /* indigo            */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#FFEEF2;
+}
+
+/* ---- LAVENDER POP, bright lavender canvas, deep purple text ------------- */
+[data-theme="lavender-pop"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #7A5AB0;
+  --surface:        #B58CFF;
+  --surface-sunken: #946ADF;
+  --text-primary:   #1A0828;
+  --text-secondary: #320F4F;
+  --text-muted:     #582078;
+  --icon:           var(--text-primary);
+  --edge:           #6A2090;
+
+  --accent-1:#A82048; --accent-1-soft:#E5BFC8;  /* wine alert        */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* amber             */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* moss              */
+  --accent-4:#1E5560; --accent-4-soft:#B5C7CC;  /* teal              */
+  --accent-5:#3F3068; --accent-5-soft:#C5BFD2;  /* indigo            */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#F5F0FF;
+}
+
+/* ---- OLIVE POP, bright olive canvas, deep olive text -------------------- */
+[data-theme="olive-pop"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #7A8528;
+  --surface:        #B4C238;
+  --surface-sunken: #909C25;
+  --text-primary:   #1F2808;
+  --text-secondary: #384418;
+  --text-muted:     #586828;
+  --icon:           var(--text-primary);
+  --edge:           #6E7820;
+
+  --accent-1:#A82018; --accent-1-soft:#E5C2BD;  /* red               */
+  --accent-2:#7C4A0A; --accent-2-soft:#D5C2A2;  /* burnt amber       */
+  --accent-3:#1F5828; --accent-3-soft:#BCCEB8;  /* deep moss         */
+  --accent-4:#1E5560; --accent-4-soft:#B5C7CC;  /* teal              */
+  --accent-5:#3F3068; --accent-5-soft:#C5BFD2;  /* indigo            */
+  --accent-6:#7A1860; --accent-6-soft:#D5B5CC;  /* magenta           */
+  --on-accent:#F8FFE0;
+}
+
+/* ---- BURGUNDY, lifted wine canvas, cream text -------------------------- */
+[data-theme="burgundy"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #6A1828;
+  --surface:        #C03050;
+  --surface-sunken: #9A1F38;
+  --text-primary:   #FFF0F0;
+  --text-secondary: #FCDCE0;
+  --text-muted:     #D8A0A8;
+  --icon:           var(--text-primary);
+  --edge:           #F0A0B0;
+
+  --accent-1:#FFC847; --accent-1-soft:#3D3115;  /* gold alert        */
+  --accent-2:#FFB347; --accent-2-soft:#3D2515;  /* amber             */
+  --accent-3:#5CE0A0; --accent-3-soft:#143D2A;  /* mint              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#A87CFF; --accent-5-soft:#251E3D;  /* indigo            */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* pink              */
+  --on-accent:#480814;
+}
+
+/* ---- FOREST, lifted forest green canvas, cream text -------------------- */
+[data-theme="forest"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #1F5828;
+  --surface:        #2E8838;
+  --surface-sunken: #1F6020;
+  --text-primary:   #F0FFF0;
+  --text-secondary: #DCF8DC;
+  --text-muted:     #A8D8A8;
+  --icon:           var(--text-primary);
+  --edge:           #A8E0A8;
+
+  --accent-1:#FF5A5A; --accent-1-soft:#3D1A1A;  /* red               */
+  --accent-2:#FFC847; --accent-2-soft:#3D3115;  /* gold              */
+  --accent-3:#B4E834; --accent-3-soft:#283A12;  /* lime              */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* cyan              */
+  --accent-5:#A87CFF; --accent-5-soft:#251E3D;  /* indigo            */
+  --accent-6:#FF8CC8; --accent-6-soft:#3D1E2D;  /* pink              */
+  --on-accent:#0F3818;
+}
+
+/* ============================================================================
+   GRADIENT FAMILY, --surface-gradient opt-in for vivid card backdrops
+   --------------------------------------------------------------------------
+   Each theme sets ``--surface-gradient`` to a CSS gradient; .w's
+   background rule (``var(--surface-gradient, var(--surface))``) picks
+   it up automatically. Themes that don't set the variable behave
+   exactly as before, surface is a flat colour.
+
+   Renderer pairing: the renderer's Floyd-Steinberg dither approximates
+   the gradient on the panel's actual palette. Reads especially well on
+   7-colour Spectra. On 2-/3-colour BW panels the gradient collapses to
+   coarse hatching, those panels should use the flat themes.
+
+   Each theme keeps its own --bg (the matting strip around the cells)
+   complementary so the cards visually float in coherent context, not
+   on stark white. text-* tokens pick the right luminance for the
+   gradient's mid-tone.
+   ============================================================================ */
+
+/* ---- SUNSET, orange → amber gradient, deep brown text -------------------- */
+[data-theme="sunset"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #2E1B0E;
+  --surface:        #F7931E;                   /* gradient mid-stop */
+  --surface-gradient: linear-gradient(135deg, #FF6B35 0%, #F7931E 55%, #FFB347 100%);
+  --surface-sunken: #C46A11;
+  --text-primary:   #2D1B0F;
+  --text-secondary: #4A2C18;
+  --text-muted:     #6B4528;
+  --icon:           var(--text-primary);
+  --edge:           #6B4528;
+
+  --accent-1:#9C2A19; --accent-1-soft:#F3D2C8;  /* deep terracotta */
+  --accent-2:#7A4A0E; --accent-2-soft:#F0DDB8;  /* burnt amber     */
+  --accent-3:#1E5A33; --accent-3-soft:#C8DDCD;  /* forest green    */
+  --accent-4:#1E4E5E; --accent-4-soft:#C5D6DA;  /* deep teal       */
+  --accent-5:#3B2D5C; --accent-5-soft:#CFC9D8;  /* deep indigo     */
+  --accent-6:#7E2545; --accent-6-soft:#E5C8D2;  /* berry           */
+  --on-accent:#FFF5E8;
+}
+
+/* ---- AURORA, teal → blue → magenta on deep night sky --------------------- */
+[data-theme="aurora"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #0A0E27;
+  --surface:        #4D5FAC;                   /* gradient mid-stop */
+  --surface-gradient: linear-gradient(135deg, #00C9A7 0%, #4D8FAC 45%, #845EC2 100%);
+  --surface-sunken: #1E2A52;
+  --text-primary:   #F5F5F5;
+  --text-secondary: #D5D5E5;
+  --text-muted:     #A5A5B5;
+  --icon:           var(--text-primary);
+  --edge:           #B5B5C5;
+
+  --accent-1:#FFB347; --accent-1-soft:#3E2E22;  /* amber warning   */
+  --accent-2:#FFD166; --accent-2-soft:#3A3318;  /* gold capacity   */
+  --accent-3:#AEEFA6; --accent-3-soft:#1E3320;  /* mint positive   */
+  --accent-4:#7AFFE8; --accent-4-soft:#1A332F;  /* cyan primary    */
+  --accent-5:#A8C5FF; --accent-5-soft:#1E2640;  /* sky secondary   */
+  --accent-6:#E2A0FF; --accent-6-soft:#332840;  /* lavender third  */
+  --on-accent:#0A0E27;
+}
+
+/* ---- TWILIGHT, deep violet → magenta gradient, very dark canvas --------- */
+[data-theme="twilight"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #0F0820;
+  --surface:        #5E3C8C;                   /* gradient mid-stop */
+  --surface-gradient: linear-gradient(150deg, #2E1F47 0%, #5E3C8C 50%, #9D4EDD 100%);
+  --surface-sunken: #251735;
+  --text-primary:   #F5F0FF;
+  --text-secondary: #D8CCEE;
+  --text-muted:     #9A8AB4;
+  --icon:           var(--text-primary);
+  --edge:           #C8B8DD;
+
+  --accent-1:#FF6B9D; --accent-1-soft:#3D1F2D;  /* hot pink alert  */
+  --accent-2:#FFD166; --accent-2-soft:#3A3018;  /* gold capacity   */
+  --accent-3:#AEEFA6; --accent-3-soft:#1F3022;  /* mint positive   */
+  --accent-4:#7AC8FF; --accent-4-soft:#1A2C3D;  /* sky primary     */
+  --accent-5:#C7A8FF; --accent-5-soft:#28204A;  /* lilac secondary */
+  --accent-6:#FFB5A0; --accent-6-soft:#3D2A28;  /* coral third     */
+  --on-accent:#0F0820;
+}
+
+/* ---- SPECTRUM, full rainbow pop, near-black canvas ---------------------- */
+[data-theme="spectrum"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #0E0E12;
+  --surface:        #FB5607;                   /* gradient mid-stop */
+  --surface-gradient: linear-gradient(120deg, #FF006E 0%, #FB5607 35%, #FFBE0B 70%, #8338EC 100%);
+  --surface-sunken: #2A2225;
+  --text-primary:   #FFFFFF;
+  --text-secondary: #F0F0F5;
+  --text-muted:     #BABACA;
+  --icon:           var(--text-primary);
+  --edge:           #FFFFFF;
+
+  --accent-1:#FFFFFF; --accent-1-soft:#1A1A20;  /* pure-white alert */
+  --accent-2:#FFFA94; --accent-2-soft:#3D3815;  /* lemon capacity   */
+  --accent-3:#5CFFD2; --accent-3-soft:#143D2F;  /* mint positive    */
+  --accent-4:#52E5FF; --accent-4-soft:#143844;  /* electric blue    */
+  --accent-5:#D599FF; --accent-5-soft:#322244;  /* violet secondary */
+  --accent-6:#FFA1C2; --accent-6-soft:#3F1D2C;  /* pink third       */
+  --on-accent:#0E0E12;
+}
+
+/* ============================================================================
+   SUBTLE GRADIENT FAMILY — tonal shifts rather than colour shifts
+   --------------------------------------------------------------------------
+   Same --surface-gradient opt-in as the vivid set; the gradient stops
+   sit in a narrow hue band so the result reads as a soft luminance
+   ramp on each card. All light-leaning, dark text throughout.
+   ============================================================================ */
+
+/* ---- CORAL, peach → coral → magenta blush ------------------------------ */
+[data-theme="coral"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #2F1F25;
+  --surface:        #F08070;
+  --surface-gradient: linear-gradient(135deg, #FFB58A 0%, #F08070 50%, #E889A8 100%);
+  --surface-sunken: #D26468;
+  --text-primary:   #3D1A2A;
+  --text-secondary: #5E2D44;
+  --text-muted:     #855065;
+  --icon:           var(--text-primary);
+  --edge:           #B0707D;
+
+  --accent-1:#B82A4A; --accent-1-soft:#E8C0CC;  /* vivid wine        */
+  --accent-2:#BC7515; --accent-2-soft:#EBD2A8;  /* burnt orange      */
+  --accent-3:#2D6B40; --accent-3-soft:#BFCFBE;  /* moss (contrast)   */
+  --accent-4:#C44760; --accent-4-soft:#ECC4CB;  /* saturated coral   */
+  --accent-5:#6D4458; --accent-5-soft:#CCBCC4;  /* mauve             */
+  --accent-6:#823850; --accent-6-soft:#D5BAC4;  /* deep berry        */
+  --on-accent:#FFEEEA;
+}
+
+/* ---- MIST, steel-blue → soft lavender → muted violet ------------------- */
+[data-theme="mist"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #B3BBD0;
+  --surface:        #BFB8DD;
+  --surface-gradient: linear-gradient(135deg, #C5D2E5 0%, #BFB8DD 55%, #B89BCC 100%);
+  --surface-sunken: #9AA2CC;
+  --text-primary:   #1F2240;
+  --text-secondary: #3A406A;
+  --text-muted:     #5F6586;
+  --icon:           var(--text-primary);
+  --edge:           #828AA8;
+
+  --accent-1:#8D2030; --accent-1-soft:#D2BCC0;  /* cool red          */
+  --accent-2:#B07020; --accent-2-soft:#E0CEAE;  /* warm amber pop    */
+  --accent-3:#3D6D55; --accent-3-soft:#C4D1C9;  /* sea green         */
+  --accent-4:#3858A0; --accent-4-soft:#C2C9DC;  /* royal blue        */
+  --accent-5:#5A3D8A; --accent-5-soft:#CFC2D5;  /* purple            */
+  --accent-6:#743873; --accent-6-soft:#D2BCC5;  /* violet            */
+  --on-accent:#F2EEF8;
+}
+
+/* ---- SAND, warm cream → sand → tan -------------------------------------- */
+[data-theme="sand"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #C4B690;
+  --surface:        #D4BC85;
+  --surface-gradient: linear-gradient(135deg, #F0DEB0 0%, #D4BC85 55%, #B89968 100%);
+  --surface-sunken: #AC9560;
+  --text-primary:   #38280C;
+  --text-secondary: #5A4220;
+  --text-muted:     #7F643F;
+  --icon:           var(--text-primary);
+  --edge:           #927544;
+
+  --accent-1:#A82C18; --accent-1-soft:#E4C5BA;  /* rich terracotta   */
+  --accent-2:#8D5A0F; --accent-2-soft:#DFCAA8;  /* mustard           */
+  --accent-3:#4D6A22; --accent-3-soft:#CFD5B5;  /* olive             */
+  --accent-4:#20675A; --accent-4-soft:#BCD2CD;  /* peacock           */
+  --accent-5:#3F4A78; --accent-5-soft:#C5C8D8;  /* navy              */
+  --accent-6:#6D3A48; --accent-6-soft:#D5BFC5;  /* wine              */
+  --on-accent:#F8ECCC;
+}
+
+/* ---- SAGE, moss → muted teal → seafoam ---------------------------------- */
+[data-theme="sage"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #97B095;
+  --surface:        #A0CBB8;
+  --surface-gradient: linear-gradient(135deg, #BFDABA 0%, #A0CBB8 50%, #82B5B0 100%);
+  --surface-sunken: #7BA694;
+  --text-primary:   #182E1F;
+  --text-secondary: #2E4936;
+  --text-muted:     #506A53;
+  --icon:           var(--text-primary);
+  --edge:           #5E7C66;
+
+  --accent-1:#8C2828; --accent-1-soft:#D0BABA;  /* brick             */
+  --accent-2:#7D5A0F; --accent-2-soft:#D3C5AA;  /* mustard           */
+  --accent-3:#1F6A28; --accent-3-soft:#BBD0BD;  /* pure green        */
+  --accent-4:#1A5A52; --accent-4-soft:#B5CDC8;  /* emerald           */
+  --accent-5:#2D3D6A; --accent-5-soft:#BBC1D2;  /* navy              */
+  --accent-6:#5C2D58; --accent-6-soft:#CCB7C7;  /* plum              */
+  --on-accent:#EBF3EB;
+}
+
+/* ---- LINEN, cream → soft gold → ochre ----------------------------------- */
+[data-theme="linen"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #CDB57E;
+  --surface:        #DEC275;
+  --surface-gradient: linear-gradient(135deg, #F0DCA0 0%, #DEC275 55%, #C5A050 100%);
+  --surface-sunken: #B89A55;
+  --text-primary:   #38280B;
+  --text-secondary: #5A421A;
+  --text-muted:     #7E6438;
+  --icon:           var(--text-primary);
+  --edge:           #957638;
+
+  --accent-1:#A52818; --accent-1-soft:#E3C5BC;  /* vivid brick       */
+  --accent-2:#845010; --accent-2-soft:#DAC7A4;  /* burnt gold        */
+  --accent-3:#3E6822; --accent-3-soft:#C9D2B6;  /* olive-green       */
+  --accent-4:#1D6048; --accent-4-soft:#B7CCC3;  /* peacock           */
+  --accent-5:#2F4070; --accent-5-soft:#BCC2D2;  /* navy              */
+  --accent-6:#682E40; --accent-6-soft:#D3BCC4;  /* wine              */
+  --on-accent:#FCEFB8;
+}
+
+/* ---- MAUVE, dusty rose → muted lavender → violet ------------------------ */
+[data-theme="mauve"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #B49AB0;
+  --surface:        #B888B0;
+  --surface-gradient: linear-gradient(135deg, #D8A8B5 0%, #B888B0 55%, #9870AE 100%);
+  --surface-sunken: #9568A0;
+  --text-primary:   #2A1738;
+  --text-secondary: #432955;
+  --text-muted:     #6A4F7C;
+  --icon:           var(--text-primary);
+  --edge:           #7A608A;
+
+  --accent-1:#8E2050; --accent-1-soft:#D5BDC8;  /* vivid wine        */
+  --accent-2:#8D5510; --accent-2-soft:#D7C9AB;  /* amber             */
+  --accent-3:#2D5F2D; --accent-3-soft:#BBCCBB;  /* moss              */
+  --accent-4:#1D4F70; --accent-4-soft:#B5C5D2;  /* teal-blue         */
+  --accent-5:#4E3878; --accent-5-soft:#C8BFD2;  /* deep purple       */
+  --accent-6:#6D2855; --accent-6-soft:#D2BAC6;  /* plum              */
+  --on-accent:#F2E2EE;
+}
+
+/* ---- MARBLE, ivory → cream → soft stone --------------------------------- */
+[data-theme="marble"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #CFCCC3;
+  --surface:        #EAE2D0;
+  --surface-gradient: linear-gradient(135deg, #F5EFE2 0%, #EAE2D0 55%, #D6CDB8 100%);
+  --surface-sunken: #C0B8A8;
+  --text-primary:   #2A2625;
+  --text-secondary: #4D4843;
+  --text-muted:     #807870;
+  --icon:           var(--text-primary);
+  --edge:           #A89E8C;
+
+  --accent-1:#A52818; --accent-1-soft:#E3C5BC;  /* terracotta        */
+  --accent-2:#8C6018; --accent-2-soft:#DBCAA8;  /* ochre             */
+  --accent-3:#3E632A; --accent-3-soft:#C9D2B8;  /* moss              */
+  --accent-4:#1F5E5C; --accent-4-soft:#B7CDCB;  /* teal              */
+  --accent-5:#34406A; --accent-5-soft:#BFC4D2;  /* slate             */
+  --accent-6:#6E3050; --accent-6-soft:#D3BBC5;  /* plum              */
+  --on-accent:#FBF5E8;
+}
+
+/* ---- GLACIER, pale teal → mint → seafoam -------------------------------- */
+[data-theme="glacier"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #97BFBC;
+  --surface:        #82CCC4;
+  --surface-gradient: linear-gradient(135deg, #A8DBD5 0%, #82CCC4 50%, #6BB8B0 100%);
+  --surface-sunken: #5DA298;
+  --text-primary:   #142D28;
+  --text-secondary: #284A42;
+  --text-muted:     #4D6A60;
+  --icon:           var(--text-primary);
+  --edge:           #5D8077;
+
+  --accent-1:#B82820; --accent-1-soft:#E5BCB8;  /* vivid red         */
+  --accent-2:#B07015; --accent-2-soft:#E0CEA8;  /* amber             */
+  --accent-3:#2D6B33; --accent-3-soft:#BFCFC0;  /* fresh green       */
+  --accent-4:#1A685D; --accent-4-soft:#B5CDC8;  /* deep teal         */
+  --accent-5:#2F4280; --accent-5-soft:#BFC4D8;  /* navy              */
+  --accent-6:#5C3868; --accent-6-soft:#CDBCD2;  /* violet            */
+  --on-accent:#E5F3F0;
+}
+
+/* ---- HONEY, butter → soft amber → deep gold ----------------------------- */
+[data-theme="honey"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #C5A052;
+  --surface:        #EAC468;
+  --surface-gradient: linear-gradient(135deg, #F8DA88 0%, #EAC468 55%, #D4A338 100%);
+  --surface-sunken: #BC8E28;
+  --text-primary:   #38240A;
+  --text-secondary: #5A3A18;
+  --text-muted:     #806038;
+  --icon:           var(--text-primary);
+  --edge:           #9A7228;
+
+  --accent-1:#A52818; --accent-1-soft:#E3C5BC;  /* vivid brick       */
+  --accent-2:#7D4A0A; --accent-2-soft:#D6C2A4;  /* burnt amber       */
+  --accent-3:#3D6822; --accent-3-soft:#C9D2B8;  /* olive             */
+  --accent-4:#1D5550; --accent-4-soft:#B5C7C5;  /* peacock           */
+  --accent-5:#2F4070; --accent-5-soft:#BFC4D2;  /* navy              */
+  --accent-6:#6E3848; --accent-6-soft:#D3BFC5;  /* wine              */
+  --on-accent:#FCEAB5;
+}
+
+/* ---- PEARL, blush → cream → ivory --------------------------------------- */
+[data-theme="pearl"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #D2BBB8;
+  --surface:        #F0E0D5;
+  --surface-gradient: linear-gradient(135deg, #F8C0C5 0%, #F0E0D5 55%, #ECE4D8 100%);
+  --surface-sunken: #D5BCB0;
+  --text-primary:   #38222A;
+  --text-secondary: #5A3A40;
+  --text-muted:     #806068;
+  --icon:           var(--text-primary);
+  --edge:           #AE8A88;
+
+  --accent-1:#A22850; --accent-1-soft:#E3BCC8;  /* vivid wine-pink   */
+  --accent-2:#8D5510; --accent-2-soft:#D6C8A6;  /* ochre             */
+  --accent-3:#355F2A; --accent-3-soft:#C2D0B6;  /* moss              */
+  --accent-4:#1F5560; --accent-4-soft:#B5C7CC;  /* deep teal         */
+  --accent-5:#2F3D70; --accent-5-soft:#BFC2D2;  /* navy              */
+  --accent-6:#5E2858; --accent-6-soft:#CFB5CC;  /* plum              */
+  --on-accent:#FAEAE8;
+}

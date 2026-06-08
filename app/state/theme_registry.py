@@ -2,11 +2,11 @@
 
 Single source of truth for which themes Tesserae knows about. Each
 entry mirrors a ``[data-theme="..."]`` block in
-``static/style/spectra-tokens.css`` / ``spectra-base16.css`` / (later)
-the user-themes CSS endpoint, so we don't end up with stale dropdowns
-referencing themes that have been removed from the stylesheet or vice
-versa. A guard test in ``tests/test_theme_registry.py`` enforces both
-directions of the invariant.
+``static/style/spectra-tokens.css`` / the user-themes CSS endpoint, so
+we don't end up with stale dropdowns referencing themes that have been
+removed from the stylesheet or vice versa. A guard test in
+``tests/test_theme_registry.py`` enforces both directions of the
+invariant.
 
 User themes don't live in this module; they come from
 ``app.state.user_themes`` via :func:`build_registry` at app-factory
@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-ThemeFamily = Literal["light", "dark", "movement", "base16", "user"]
+ThemeFamily = Literal["light", "dark", "movement", "vivid", "gradient", "user"]
 
 
 @dataclass(frozen=True)
@@ -86,17 +86,47 @@ BUNDLED_THEMES: tuple[Theme, ...] = (
     Theme(id="bauhaus", name="Bauhaus", family="movement", tagline="palette only"),
     Theme(id="destijl", name="De Stijl", family="movement", tagline="palette only"),
     Theme(id="brutalist", name="Brutalist", family="movement", tagline="palette only"),
-    # base16 themes, popular code-editor palettes adapted for dashboards.
-    Theme(id="base16-gruvbox-dark", name="Gruvbox", family="base16", tagline="dark"),
-    Theme(id="base16-gruvbox-light", name="Gruvbox", family="base16", tagline="light"),
-    Theme(id="base16-solarized-dark", name="Solarized", family="base16", tagline="dark"),
-    Theme(id="base16-solarized-light", name="Solarized", family="base16", tagline="light"),
-    Theme(id="base16-dracula", name="Dracula", family="base16"),
-    Theme(id="base16-catppuccin-mocha", name="Catppuccin Mocha", family="base16"),
-    Theme(id="base16-monokai", name="Monokai", family="base16"),
-    Theme(id="base16-tomorrow-night", name="Tomorrow Night", family="base16"),
-    Theme(id="base16-tomorrow", name="Tomorrow", family="base16"),
-    Theme(id="base16-one-dark", name="One Dark", family="base16"),
+    # Vivid family, saturated flat-colour surfaces. Distinct from the
+    # gradient family (no gradient on .w, just bold canvas + accents).
+    # Each theme's accents are picked to harmonise with its canvas
+    # hue rather than reusing a shared palette.
+    Theme(id="tangerine", name="Tangerine", family="vivid", tagline="bright orange"),
+    Theme(id="lime", name="Lime", family="vivid", tagline="electric green"),
+    Theme(id="cobalt", name="Cobalt", family="vivid", tagline="deep blue"),
+    Theme(id="magenta", name="Magenta", family="vivid", tagline="vivid fuchsia"),
+    Theme(id="emerald", name="Emerald", family="vivid", tagline="rich green"),
+    Theme(id="crimson", name="Crimson", family="vivid", tagline="deep red"),
+    Theme(id="cyan", name="Cyan", family="vivid", tagline="electric cyan"),
+    Theme(id="aubergine", name="Aubergine", family="vivid", tagline="deep purple"),
+    Theme(id="mustard", name="Mustard", family="vivid", tagline="bright yellow"),
+    Theme(id="teal-pop", name="Teal Pop", family="vivid", tagline="saturated teal"),
+    Theme(id="hot-pink", name="Hot Pink", family="vivid", tagline="bright pink"),
+    Theme(id="lavender-pop", name="Lavender Pop", family="vivid", tagline="bright lavender"),
+    Theme(id="olive-pop", name="Olive Pop", family="vivid", tagline="rich olive"),
+    Theme(id="burgundy", name="Burgundy", family="vivid", tagline="deep wine"),
+    Theme(id="forest", name="Forest", family="vivid", tagline="deep green"),
+    # Gradient family, vivid linear-gradient card surfaces via the
+    # --surface-gradient opt-in token (the rest of the Spectra system
+    # behaves the same; only .w's background changes). The renderer's
+    # Floyd-Steinberg dither approximates the gradient on the panel
+    # palette; pairs especially well with 7-colour Spectra panels.
+    Theme(id="sunset", name="Sunset", family="gradient", tagline="orange → amber"),
+    Theme(id="aurora", name="Aurora", family="gradient", tagline="teal → magenta"),
+    Theme(id="twilight", name="Twilight", family="gradient", tagline="violet night"),
+    Theme(id="spectrum", name="Spectrum", family="gradient", tagline="full pop"),
+    # Subtle gradient set, narrow hue range + lower saturation so the
+    # gradient reads as a tonal shift rather than a colour shift. All
+    # light-leaning; dark text throughout.
+    Theme(id="coral", name="Coral", family="gradient", tagline="peach → blush"),
+    Theme(id="mist", name="Mist", family="gradient", tagline="blue-gray → lavender"),
+    Theme(id="sand", name="Sand", family="gradient", tagline="cream → taupe"),
+    Theme(id="sage", name="Sage", family="gradient", tagline="moss → teal"),
+    Theme(id="linen", name="Linen", family="gradient", tagline="cream → gold"),
+    Theme(id="mauve", name="Mauve", family="gradient", tagline="rose → lavender"),
+    Theme(id="marble", name="Marble", family="gradient", tagline="ivory → pale stone"),
+    Theme(id="glacier", name="Glacier", family="gradient", tagline="teal → mint"),
+    Theme(id="honey", name="Honey", family="gradient", tagline="butter → amber"),
+    Theme(id="pearl", name="Pearl", family="gradient", tagline="blush → cream"),
 )
 
 
@@ -104,7 +134,8 @@ FAMILY_LABELS: dict[ThemeFamily, str] = {
     "light": "Light",
     "dark": "Dark",
     "movement": "Movement",
-    "base16": "base16",
+    "vivid": "Vivid",
+    "gradient": "Gradient",
     "user": "Your themes",
 }
 
@@ -112,7 +143,14 @@ FAMILY_LABELS: dict[ThemeFamily, str] = {
 # Family display order on the browse page; mirrors how a hobbyist tends
 # to scan a theme catalogue (familiar defaults first, then experimental,
 # then user-curated).
-FAMILY_ORDER: tuple[ThemeFamily, ...] = ("light", "dark", "movement", "base16", "user")
+FAMILY_ORDER: tuple[ThemeFamily, ...] = (
+    "light",
+    "dark",
+    "movement",
+    "vivid",
+    "gradient",
+    "user",
+)
 
 
 def build_registry(user_themes: list[Theme] | None = None) -> list[Theme]:
@@ -144,7 +182,8 @@ _PICKER_GROUP_LABELS: dict[ThemeFamily, str] = {
     "light": "Light themes",
     "dark": "Dark themes",
     "movement": "Movement themes",
-    "base16": "base16",
+    "vivid": "Vivid themes",
+    "gradient": "Gradient themes",
     "user": "Your themes",
 }
 
@@ -222,7 +261,7 @@ def _load_bundled_theme_colours() -> dict[str, dict[str, str]]:
     """
     here = Path(__file__).resolve()
     css_dir = here.parent.parent.parent / "static" / "style"
-    files = ("spectra-tokens.css", "spectra-base16.css")
+    files = ("spectra-tokens.css",)
     raw: dict[str, dict[str, str]] = {}
     for fname in files:
         path = css_dir / fname

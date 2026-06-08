@@ -186,7 +186,7 @@
     /* Hover halo, call out a single cell when you're studying it. */
     .matrix .frame:hover { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 4; }
 
-    /* Group divider rows between Spectra / Movement / base16. */
+    /* Group divider rows between Spectra / Movement bands. */
     .matrix .group-divider {
       grid-column: 1 / -1;
       padding: 14px 12px 6px;
@@ -245,7 +245,7 @@
     {% endfor %}
 
     {# Theme rows, grouped by category. Each group boundary emits a
-       divider row first to visually separate Spectra / Movement / base16.
+       divider row first to visually separate Spectra / Movement bands.
        The render URL is built via url_for so query params (including the
        optional sample flag) compose correctly, manually appending
        ?sample=1 here would collide with the existing query string url_for

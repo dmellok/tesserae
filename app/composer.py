@@ -566,16 +566,6 @@ _MATRIX_THEMES: Final[list[dict[str, str]]] = [
     {"id": "bauhaus", "label": "Bauhaus", "group": "Movement"},
     {"id": "destijl", "label": "De Stijl", "group": "Movement"},
     {"id": "brutalist", "label": "Brutalist", "group": "Movement"},
-    {"id": "base16-gruvbox-dark", "label": "Gruvbox dark", "group": "base16"},
-    {"id": "base16-gruvbox-light", "label": "Gruvbox light", "group": "base16"},
-    {"id": "base16-solarized-dark", "label": "Solarized dark", "group": "base16"},
-    {"id": "base16-solarized-light", "label": "Solarized light", "group": "base16"},
-    {"id": "base16-dracula", "label": "Dracula", "group": "base16"},
-    {"id": "base16-catppuccin-mocha", "label": "Catppuccin Mocha", "group": "base16"},
-    {"id": "base16-monokai", "label": "Monokai", "group": "base16"},
-    {"id": "base16-tomorrow-night", "label": "Tomorrow Night", "group": "base16"},
-    {"id": "base16-tomorrow", "label": "Tomorrow", "group": "base16"},
-    {"id": "base16-one-dark", "label": "One Dark", "group": "base16"},
 ]
 _MATRIX_STYLES: Final[list[dict[str, str]]] = [
     {"id": "standard", "label": "Standard"},

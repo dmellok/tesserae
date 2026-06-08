@@ -342,7 +342,16 @@ def _editor_context(page: Page) -> dict[str, Any]:
     # for the per-cell override, which drifted on every theme add.
     from app.state.theme_registry import build_registry, picker_options
 
-    theme_options = picker_options(build_registry(user_themes=None))
+    # Pull user-saved themes (data/themes/user.json) into the registry
+    # so the editor's picker lists them alongside the bundled themes.
+    # Without this the picker silently drops every custom theme.
+    user_themes_store = current_app.config.get("USER_THEMES_STORE")
+    user_themes = (
+        [t.to_registry_theme() for t in user_themes_store.list_all()]
+        if user_themes_store is not None
+        else None
+    )
+    theme_options = picker_options(build_registry(user_themes=user_themes))
 
     return {
         "page": page,

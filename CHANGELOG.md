@@ -6,6 +6,66 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.0], 2026-06-08
+
+### Added
+
+- **29 new bundled themes + a Gradient family + a Vivid family.**
+  - 4 vivid linear-gradient surfaces (Sunset, Aurora, Twilight, Spectrum).
+  - 10 subtle gradients (Coral, Mist, Sand, Sage, Linen, Mauve, Marble,
+    Glacier, Honey, Pearl) — each with bespoke accents derived from
+    its own gradient hue, not a shared Light-theme palette.
+  - 15 vivid flat surfaces (Tangerine, Lime, Cobalt, Magenta, Emerald,
+    Crimson, Cyan, Aubergine, Mustard, Teal Pop, Hot Pink, Lavender
+    Pop, Olive Pop, Burgundy, Forest) — brightened canvases with
+    accents that harmonise with each canvas hue.
+  - New `--surface-gradient` opt-in CSS token (falls back to flat
+    `--surface`), so existing themes are unaffected and any future
+    theme can paint a vivid gradient backdrop on `.w` cards.
+- **Theme builder gradient support.** UserTheme grew
+  `gradient_enabled` / `gradient_a` / `gradient_b` / `gradient_angle`;
+  the Colour palette card has a "Card-surface gradient" switch + two
+  stop colour pickers + a Tesserae-styled angle slider that live-
+  updates the preview. The gradient subsection disables itself when
+  the switch is off.
+- **Mobile tab shell on the Themes page.** Below 900px the 3-column
+  layout collapses to a tabbed view (Themes / Edit / Preview) so
+  each task gets full viewport focus. Desktop layout is unchanged.
+- **Tesserae-themed scrollbar globally.** 12px-wide, soft track
+  (`color-mix` 14% of the foreground), rounded pill thumb in
+  `--t-fg-soft` with a min-height grab target. Firefox + Webkit
+  covered.
+
+### Changed
+
+- **Themes page UI polish.**
+  - Colour palette card now lays each field as `label | swatch`
+    (label left, 72×36px chrome-wrapped swatch right) instead of
+    label-above-tiny-swatch. ~10 fields fit where 4 used to.
+  - Gradient subsection's angle slider sits on its own full-width
+    row below the two stop swatches, with a "Angle 135°" header
+    line and a Tesserae-styled `.ts-range` thumb / track.
+  - Theme strip is now `position: sticky` with a viewport-bound
+    `max-height` and an always-visible scrollbar — no JS, no
+    race conditions on read-only views, no "list runs past the
+    palette card" overflow.
+- **User themes appear in the page editor's theme picker.** The
+  editor route was passing `user_themes=None` to `build_registry`,
+  silently dropping every custom theme from the dropdown. Now
+  pulls from `USER_THEMES_STORE` like the Themes admin route
+  already did.
+
+### Removed
+
+- **base16 family + all 10 base16 themes.** Gruvbox / Solarized /
+  Dracula / Catppuccin Mocha / Monokai / Tomorrow / One Dark are
+  no longer bundled. Dashboards using a base16 theme will fall
+  back to Light on next load; the equivalent code-editor palette
+  can be rebuilt in the theme builder or pinned by saving the old
+  values as a user theme before upgrading.
+  `static/style/spectra-base16.css` is deleted along with the
+  registry entries and template `<link>` references.
+
 ## [0.42.3], 2026-06-08
 
 ### Changed

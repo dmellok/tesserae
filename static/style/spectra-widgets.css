@@ -20,7 +20,11 @@
   line-height: var(--lh-body);
   color: var(--text-primary);
 
-  background: var(--surface);
+  /* Card background. Themes that want a gradient (sunset, aurora,
+     etc.) opt in by setting --surface-gradient to a linear-gradient
+     /radial-gradient on their [data-theme=...] block; the fallback
+     keeps every existing theme on its flat --surface colour. */
+  background: var(--surface-gradient, var(--surface));
   /* Card borders removed: the matting gap (page.gap with white
      bleed_color) provides cell separation without the visual noise
      of a 1px line that doesn't dither cleanly on e-ink, especially

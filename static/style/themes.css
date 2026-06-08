@@ -33,9 +33,80 @@
   margin-top: var(--t-space-4);
   grid-template-columns: 1fr;
   grid-template-areas:
+    "tabs"
     "strip"
     "builder"
     "preview";
+}
+
+/* ---- Mobile tab bar ------------------------------------------------ */
+/* Hidden by default; only surfaced below the 900px desktop breakpoint
+   where the 3-column layout has been collapsed to one. */
+.themes-mobile-tabs {
+  grid-area: tabs;
+  display: none;
+}
+@media (max-width: 899px) {
+  .themes-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--t-space-2);
+    padding: var(--t-space-1);
+    background: color-mix(in srgb, var(--t-fg-soft, #9aa0aa) 10%, transparent);
+    border-radius: 12px;
+    position: sticky;
+    top: var(--t-space-3);
+    z-index: 5;
+  }
+  .themes-mobile-tabs button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--t-space-2);
+    padding: var(--t-space-3) var(--t-space-3);
+    font-size: var(--t-size-sm);
+    font-weight: 600;
+    color: var(--t-fg-soft);
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .themes-mobile-tabs button .ph { font-size: 1.1em; }
+  .themes-mobile-tabs button:hover {
+    color: var(--t-fg);
+  }
+  .themes-mobile-tabs button[aria-selected="true"] {
+    background: var(--t-bg, #fff);
+    color: var(--t-fg);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Each tab gates its sibling grid-area to display: none. The active
+     tab's content takes the full viewport row. */
+  .themes-layout[data-mobile-tab="themes"]  .themes-builder,
+  .themes-layout[data-mobile-tab="themes"]  .themes-preview { display: none; }
+  .themes-layout[data-mobile-tab="edit"]    .themes-strip,
+  .themes-layout[data-mobile-tab="edit"]    .themes-preview { display: none; }
+  .themes-layout[data-mobile-tab="preview"] .themes-strip,
+  .themes-layout[data-mobile-tab="preview"] .themes-builder { display: none; }
+
+  /* Themes tab: drop the strip's padding-right and let it own the full
+     viewport width with bigger touch targets. */
+  .themes-layout[data-mobile-tab="themes"] .themes-strip {
+    padding-right: 0;
+  }
+  .themes-layout[data-mobile-tab="themes"] .themes-strip-item {
+    padding: var(--t-space-3) var(--t-space-3);
+    font-size: var(--t-size-md);
+  }
+
+  /* Preview tab: pin the preview pane to viewport so users see a
+     reasonable size while comparing to the live edits. */
+  .themes-layout[data-mobile-tab="preview"] .themes-preview {
+    position: static;
+  }
 }
 @media (min-width: 900px) {
   .themes-layout {
@@ -60,12 +131,49 @@
   display: flex;
   flex-direction: column;
   gap: var(--t-space-4);
-  align-self: start;
-  /* Independent scroll on tall viewports so the user can jump between
-     themes without scrolling the builder. */
-  max-height: calc(100vh - 160px);
-  overflow-y: auto;
   padding-right: var(--t-space-2);
+}
+@media (min-width: 900px) {
+  .themes-strip {
+    /* Sticky + viewport-bound max-height: the strip rides the viewport
+       as the user scrolls the page, and always shows its own
+       overflow-y scrollbar for the full theme catalogue inside its
+       window. Bottom edge naturally ends where the viewport ends,
+       which is what we want, the colour palette card scrolls
+       independently. Top offset matches the topbar + small breathing
+       room. */
+    position: sticky;
+    top: var(--t-space-4);
+    align-self: start;
+    max-height: calc(100vh - var(--t-space-6));
+    overflow-y: auto;
+  }
+}
+
+/* Force an always-visible scrollbar on the strip even when the global
+   rule's --t-fg-soft fallback colour-mixes with the page tint and goes
+   transparent. Stronger contrast + a track that's never fully see-
+   through. */
+.themes-strip {
+  scrollbar-color: var(--t-fg-soft, #8a8f99) color-mix(in srgb, var(--t-fg-soft, #8a8f99) 18%, transparent);
+}
+.themes-strip::-webkit-scrollbar {
+  width: 12px;
+}
+.themes-strip::-webkit-scrollbar-track {
+  background: color-mix(in srgb, var(--t-fg-soft, #8a8f99) 18%, transparent);
+  border-radius: 999px;
+}
+.themes-strip::-webkit-scrollbar-thumb {
+  background: var(--t-fg-soft, #8a8f99);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+  min-height: 48px;
+}
+.themes-strip::-webkit-scrollbar-thumb:hover {
+  background: var(--t-fg, #444);
+  background-clip: padding-box;
 }
 .themes-strip-family {
   display: flex;
@@ -89,8 +197,10 @@
 }
 .themes-strip-item {
   /* Each item paints from its own theme's variables, the mini
-     swatch row reads like a tiny postcard of the full theme. */
-  background: var(--surface);
+     swatch row reads like a tiny postcard of the full theme. Mirrors
+     .w's gradient-then-flat fallback so gradient themes show their
+     real backdrop in the strip preview. */
+  background: var(--surface-gradient, var(--surface));
   color: var(--text-primary);
   border: 1px solid var(--edge);
   border-radius: 8px;
@@ -240,12 +350,52 @@
 
 .theme-builder-fields {
   display: grid;
-  gap: var(--t-space-3);
+  gap: var(--t-space-2);
 }
 @media (min-width: 600px) {
   .theme-builder-fields {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* Inside the colour-palette card, each colour field reads as label on
+   the left + bold swatch on the right instead of a label-above-tiny-
+   swatch stack. Way more visual weight on the actual colour, way less
+   wasted vertical space, the palette card fits ~10 fields in the same
+   height that previously held 4. */
+.theme-builder-palette .theme-builder-fields .field {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--t-space-3);
+  margin: 0;
+}
+.theme-builder-palette .theme-builder-fields .field > label {
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  margin: 0;
+  padding: 0;
+  color: var(--t-fg);
+}
+.theme-builder-palette input[type="color"] {
+  width: 72px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--t-edge, #d0d4dc);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+.theme-builder-palette input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.theme-builder-palette input[type="color"]::-webkit-color-swatch {
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+.theme-builder-palette input[type="color"]::-moz-color-swatch {
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .theme-builder-actions {
@@ -283,6 +433,108 @@
   margin-top: var(--t-space-2);
 }
 
+/* Gradient subsection: switch above the three stop controls (two
+   colour pickers + an angle slider). When the switch is off the
+   subsection grays out and disables its inputs (the JS adds /
+   removes data-builder-readonly), matching the existing read-only
+   visual language used for the auto-soft computed soft tints. */
+.theme-builder-gradient-row {
+  margin: var(--t-space-2) 0 var(--t-space-2);
+}
+.theme-builder-gradient-row .field--switch {
+  margin: 0;
+}
+/* Gradient stops live in a two-row block: the two stop swatches on
+   row 1 (same layout pattern as a normal field-grid pair) + the angle
+   slider on its own row below, full width so the slider has runway. */
+.theme-builder-gradient-stops {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-3);
+}
+
+.theme-builder-angle-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  margin: 0;
+}
+.theme-builder-angle-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  color: var(--t-fg);
+}
+.theme-builder-angle-readout {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--t-fg-soft);
+}
+
+/* Tesserae-styled range input. Native ranges are platform-dependent
+   and ugly; ts-range matches the chip / button rounded-pill language
+   and uses the admin shell tokens so it adapts to light + dark
+   themes for free. Webkit + Firefox covered. */
+input.ts-range {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 10px;
+  margin: var(--t-space-2) 0;
+  padding: 0;
+  background: var(--t-surface-sunk, color-mix(in srgb, var(--t-fg-soft, #9aa0aa) 18%, transparent));
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+input.ts-range::-webkit-slider-runnable-track {
+  height: 10px;
+  background: transparent;
+  border-radius: 999px;
+}
+input.ts-range::-moz-range-track {
+  height: 10px;
+  background: transparent;
+  border-radius: 999px;
+}
+input.ts-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--t-accent, #2f7a73);
+  border: 2px solid var(--t-bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  transition: transform 80ms ease;
+}
+input.ts-range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--t-accent, #2f7a73);
+  border: 2px solid var(--t-bg, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  transition: transform 80ms ease;
+}
+input.ts-range:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--t-accent, #2f7a73);
+  outline-offset: 2px;
+}
+input.ts-range:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--t-accent, #2f7a73);
+  outline-offset: 2px;
+}
+input.ts-range:active::-webkit-slider-thumb { transform: scale(1.06); cursor: grabbing; }
+input.ts-range:active::-moz-range-thumb { transform: scale(1.06); cursor: grabbing; }
+input.ts-range:disabled { opacity: 0.5; cursor: not-allowed; }
+input.ts-range:disabled::-webkit-slider-thumb { background: var(--t-fg-soft, #9aa0aa); cursor: not-allowed; }
+input.ts-range:disabled::-moz-range-thumb     { background: var(--t-fg-soft, #9aa0aa); cursor: not-allowed; }
+
 /* When auto-soft is on, the soft inputs are read-only, surface that
    visually so the user understands the value is computed. The native
    readOnly attribute keeps the value in the form submission so the
@@ -306,7 +558,9 @@
   }
 }
 .theme-preview-pane {
-  background: var(--surface);
+  /* Mirrors .w's background rule so the preview reflects whatever the
+     active theme paints on a real widget card, gradient or flat. */
+  background: var(--surface-gradient, var(--surface));
   color: var(--text-primary);
   border: 1px solid var(--edge);
   border-radius: 10px;

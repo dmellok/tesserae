@@ -10,7 +10,6 @@
    user.css drops in any saved user themes so their data-theme blocks
    paint here too. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
-<link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-base16.css') }}">
 <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
 {% endblock %}
@@ -32,7 +31,28 @@
   </div>
 </header>
 
-<div class="themes-layout">
+<div class="themes-layout" data-mobile-tab="edit">
+
+  {# ----- Mobile-only tab bar ---------------------------------------- #}
+  {# Below 900px the 3-column layout doesn't work, the strip, builder,
+     and preview each want a full viewport's worth of room. The tab bar
+     surfaces the three views one at a time; default is 'edit' because
+     it's the highest-friction surface to reach by scroll. Hidden
+     completely at desktop widths by CSS. #}
+  <nav class="themes-mobile-tabs" role="tablist" aria-label="Theme builder views">
+    <button type="button" data-mobile-tab-btn="themes" role="tab"
+            aria-selected="false">
+      <i class="ph ph-swatches" aria-hidden="true"></i><span>Themes</span>
+    </button>
+    <button type="button" data-mobile-tab-btn="edit" role="tab"
+            aria-selected="true">
+      <i class="ph ph-paint-brush" aria-hidden="true"></i><span>Edit</span>
+    </button>
+    <button type="button" data-mobile-tab-btn="preview" role="tab"
+            aria-selected="false">
+      <i class="ph ph-eye" aria-hidden="true"></i><span>Preview</span>
+    </button>
+  </nav>
 
   {# ----- Left strip: every theme, grouped by family ----------------- #}
   <aside class="themes-strip" aria-label="Theme catalogue">
@@ -154,6 +174,37 @@
           {{ color_input('tok-edge', 'edge', 'Edge / divider', value=theme.edge) }}
         </div>
 
+        {# Card-surface gradient: optional vivid backdrop on .w. Renders
+           a linear-gradient(angle, stop_a, stop_b) over the flat surface
+           when enabled. Disabled by default so existing themes are
+           unaffected. #}
+        <div class="theme-builder-gradient-row">
+          {{ switch('gradient-enabled', 'gradient_enabled',
+                    'Card-surface gradient',
+                    checked=theme.gradient_enabled,
+                    help='Paints a linear gradient on each widget card instead of the flat Card-surface colour. Renderer dithering approximates the gradient on the panel palette.') }}
+        </div>
+        <div class="theme-builder-gradient-stops"
+             data-gradient-controls
+             {% if not theme.gradient_enabled %}data-builder-readonly{% endif %}>
+          <div class="theme-builder-fields">
+            {{ color_input('tok-gradient-a', 'gradient_a', 'Stop A',
+                           value=theme.gradient_a) }}
+            {{ color_input('tok-gradient-b', 'gradient_b', 'Stop B',
+                           value=theme.gradient_b) }}
+          </div>
+          <label class="field theme-builder-angle-field" for="tok-gradient-angle">
+            <span class="theme-builder-angle-head">
+              <span>Angle</span>
+              <span class="theme-builder-angle-readout" data-gradient-angle-readout>{{ theme.gradient_angle }}°</span>
+            </span>
+            <input type="range" id="tok-gradient-angle" name="gradient_angle"
+                   min="0" max="360" step="1" value="{{ theme.gradient_angle }}"
+                   class="ts-range"
+                   data-gradient-angle>
+          </label>
+        </div>
+
         <p class="theme-builder-group-head">Text</p>
         <div class="theme-builder-fields">
           {{ color_input('tok-text-primary', 'text_primary', 'Primary', value=theme.text_primary) }}
@@ -228,6 +279,28 @@
 </div>
 
 <script>
+// ---- Mobile tab switcher --------------------------------------------
+// Runs independently from the builder wiring below so it works on
+// bundled (read-only) views too. Below 900px the 3-column layout
+// collapses, the tab bar gates which section is visible.
+(function () {
+  const layout = document.querySelector(".themes-layout");
+  if (!layout) return;
+  const tabButtons = layout.querySelectorAll("[data-mobile-tab-btn]");
+  tabButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.dataset.mobileTabBtn;
+      if (!target) return;
+      layout.dataset.mobileTab = target;
+      tabButtons.forEach((b) => {
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      // Scroll to top of the layout so the new view starts from its top.
+      layout.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+})();
+
 // Builder wiring, three jobs, all client-side so users keep their
 // scroll position and half-typed values across changes:
 //
@@ -337,6 +410,61 @@
     applyAutoSoftState();
   }
 
+  // ---- Card-surface gradient ----------------------------------------
+  // Builds the linear-gradient(angle, A 0%, B 100%) string live from
+  // the two stop colour pickers + the angle slider, and paints it on
+  // the preview pane's --surface-gradient. When the enable switch is
+  // off the var is cleared so the pane falls back to flat --surface,
+  // exactly matching the cascade.
+  const gradientCheckbox = form.querySelector("input[name='gradient_enabled']");
+  const gradientBlock = form.querySelector("[data-gradient-controls]");
+  const angleReadout = form.querySelector("[data-gradient-angle-readout]");
+  function gradientString() {
+    const a = form.querySelector("input[name='gradient_a']");
+    const b = form.querySelector("input[name='gradient_b']");
+    const ang = form.querySelector("[data-gradient-angle]");
+    if (!a || !b || !ang) return null;
+    const angle = Math.max(0, Math.min(360, parseInt(ang.value, 10) || 135));
+    return `linear-gradient(${angle}deg, ${a.value} 0%, ${b.value} 100%)`;
+  }
+  function applyGradientState() {
+    if (!gradientCheckbox) return;
+    const on = gradientCheckbox.checked;
+    if (gradientBlock) {
+      gradientBlock.toggleAttribute("data-builder-readonly", !on);
+      gradientBlock.querySelectorAll("input").forEach((el) => {
+        el.disabled = !on;
+      });
+    }
+    if (on) {
+      const grad = gradientString();
+      if (grad) pane.style.setProperty("--surface-gradient", grad);
+    } else {
+      pane.style.removeProperty("--surface-gradient");
+    }
+  }
+  function onGradientStopChange() {
+    if (gradientCheckbox && gradientCheckbox.checked) {
+      const grad = gradientString();
+      if (grad) pane.style.setProperty("--surface-gradient", grad);
+    }
+  }
+  if (gradientCheckbox) {
+    gradientCheckbox.addEventListener("change", applyGradientState);
+    applyGradientState();
+  }
+  ["gradient_a", "gradient_b"].forEach((n) => {
+    const el = form.querySelector(`input[name='${n}']`);
+    if (el) el.addEventListener("input", onGradientStopChange);
+  });
+  const angleEl = form.querySelector("[data-gradient-angle]");
+  if (angleEl) {
+    angleEl.addEventListener("input", () => {
+      if (angleReadout) angleReadout.textContent = `${angleEl.value}°`;
+      onGradientStopChange();
+    });
+  }
+
   if (!readOnly) {
     // Seed the inline overrides from the form's initial state so the
     // preview matches what the user is editing. Skipped for bundled
@@ -421,6 +549,7 @@
       goBtn.disabled = false;
     }
   });
+
 })();
 </script>
 {% endblock %}
