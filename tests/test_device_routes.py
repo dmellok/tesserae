@@ -208,18 +208,14 @@ def test_instance_status_subscriptions_replayed_on_broker_rebuild(app: Flask) ->
     assert "tesserae/esp32/status" not in new_transport.topic_subscriptions
 
 
-def test_trmnl_api_setup_mints_real_token_for_new_device(app: Flask) -> None:
-    """Real-world repro from a XIAO ESP32-C3 TRMNL DIY-kit polling
-    Tesserae. The firmware contract is: device sends its MAC in the
-    ``Id`` header to GET /api/setup, server hands back an ``api_key``
-    the device stores locally. Tesserae used to literally return the
-    string ``paste-a-server-issued-token-into-your-client`` as the
-    api_key, which the device would dutifully use as its access token
-    on every subsequent /api/display poll — leaving the device's
-    secret as a publicly-known string forever. Fix: mint a real
-    short-form Tesserae token, record a Discovered entry with the
-    new token + MAC + Model + panel dims pre-filled, and hand the
-    real token back to the device."""
+def test_trmnl_api_setup_auto_provisions_native_device_by_mac(app: Flask) -> None:
+    """0.44.1: full Terminus BYOS contract. When a native TRMNL
+    device (any client that sends its MAC in the ``Id`` header) hits
+    /api/setup with no recognised auth, Tesserae auto-creates a
+    device instance keyed by MAC, mints a high-entropy 20-char
+    api_key, and returns it. The device immediately starts polling
+    /api/display with a real, recognised token; no admin click, no
+    Discovered → Register two-step, no TRMNL mobile app."""
     client = app.test_client()
     resp = client.get(
         "/api/setup",
@@ -235,27 +231,55 @@ def test_trmnl_api_setup_mints_real_token_for_new_device(app: Flask) -> None:
     body = resp.get_json()
     assert isinstance(body, dict)
     api_key = body["api_key"]
-    # The literal placeholder must NEVER come back; that was the bug.
-    assert api_key != "paste-a-server-issued-token-into-your-client"
-    # Real Tesserae tokens are short typeable strings (5 chars from a
-    # 30-char alphabet); accept lengths in that range as a sanity check.
-    assert 4 <= len(api_key) <= 8
-    # friendly_id should also not be the bare placeholder.
-    assert body["friendly_id"] not in ("paste-a-server-issued-token-into-your-client",)
+    # Native api_keys are 20-char alphanumeric (Terminus parity), not
+    # the typeable 5-char form (that stays for KOReader path only).
+    assert len(api_key) == 20
+    assert api_key.isalnum()
+    # friendly_id is six characters from the unambiguous alphabet.
+    friendly = body["friendly_id"]
+    assert len(friendly) == 6
 
-    # Discovery cache should have an entry keyed off the MAC with the
-    # new token preserved so admin's one-click Register adopts it.
-    cache = app.config["DISCOVERY_CACHE"]
-    entries = cache.all()
-    matches = [e for e in entries if e.id.startswith("trmnl_e072a1d8289c")]
+    # The device was AUTO-CREATED, not parked in the Discovered cache.
+    # Find it via the registry by MAC.
+    devs = app.config["DEVICE_REGISTRY"]
+    matches = [d for d in devs.all() if d.manifest.get("mac") == "E0:72:A1:D8:28:9C"]
     assert len(matches) == 1
-    entry = matches[0]
-    assert entry.parsed.get("access_token") == api_key
-    assert entry.parsed.get("mac") == "E0:72:A1:D8:28:9C"
-    assert entry.parsed.get("model") == "xiao_epaper_display"
-    # Discovered entry should NOT carry the needs_pairing flag, the
-    # token IS real now.
-    assert entry.parsed.get("needs_pairing") is not True
+    device = matches[0]
+    assert device.manifest["access_token"] == api_key
+    assert device.manifest["friendly_id"] == friendly
+    # Panel dims should have been picked up from the Width/Height
+    # headers, not the default.
+    assert device.manifest["panel"]["w"] == 800
+    assert device.manifest["panel"]["h"] == 480
+
+
+def test_trmnl_api_setup_returns_same_credentials_for_known_mac(app: Flask) -> None:
+    """Second /api/setup call from the same MAC must hand back the
+    same api_key + friendly_id, not auto-create another instance."""
+    client = app.test_client()
+    headers = {"Id": "F0:AB:CD:11:22:33", "Width": "800", "Height": "480"}
+    first = client.get("/api/setup", headers=headers).get_json()
+    second = client.get("/api/setup", headers=headers).get_json()
+    assert first["api_key"] == second["api_key"]
+    assert first["friendly_id"] == second["friendly_id"]
+    # Only one instance in the registry.
+    devs = app.config["DEVICE_REGISTRY"]
+    macs = [d.manifest.get("mac") for d in devs.all() if d.manifest.get("mac")]
+    assert macs.count("F0:AB:CD:11:22:33") == 1
+
+
+def test_trmnl_api_setup_koreader_path_falls_back_to_discovery(app: Flask) -> None:
+    """Clients without a MAC (KOReader on Kindle) still hit the
+    discovery-cache fallback: token minted, Discovered entry created,
+    admin clicks Register. The pre-0.44.1 flow continues to work."""
+    client = app.test_client()
+    resp = client.get("/api/setup", headers={"User-Agent": "KOReader/2024"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["api_key"]) == 5  # typeable token for hand-entry
+    # Discovery cache has an entry.
+    cache = app.config["DISCOVERY_CACHE"]
+    assert any(e.id.startswith("trmnl_") for e in cache.all())
 
 
 def test_trmnl_api_log_level_acks_for_native_firmware(app: Flask) -> None:
@@ -293,10 +317,12 @@ def test_trmnl_api_setup_returns_manifest_friendly_id_for_known_device(app: Flas
     assert body.get("friendly_id") == friendly
 
 
-def test_trmnl_api_display_envelope_contains_byos_optional_fields(app: Flask) -> None:
-    """0.44.0: BYOS optional response fields some native firmwares
-    parse — ``friendly_id``, ``image_url_timeout``,
-    ``pending_status_change``, ``network_diagnostics_url``."""
+def test_trmnl_api_display_envelope_matches_terminus_shape(app: Flask) -> None:
+    """0.44.1: /api/display response shape matches the official
+    Terminus BYOS contract. Every field a native TRMNL firmware
+    expects is present; the invented fields from 0.44.0
+    (``pending_status_change``, ``network_diagnostics_url``) are
+    gone."""
     client = app.test_client()
     _sign_in(client)
     _add_instance(client, id="trmnl_envelope_test", kind="trmnl_client")
@@ -306,8 +332,40 @@ def test_trmnl_api_display_envelope_contains_byos_optional_fields(app: Flask) ->
     resp = client.get("/api/display", headers={"Access-Token": token})
     assert resp.status_code == 200
     body = resp.get_json()
-    assert "friendly_id" in body
-    assert body["image_url_timeout"] == 0
-    assert body["pending_status_change"] is False
-    assert isinstance(body["network_diagnostics_url"], str)
-    assert body["network_diagnostics_url"].endswith("/api/log")
+    # Terminus envelope fields.
+    expected = {
+        "status",
+        "filename",
+        "image_url",
+        "image_url_timeout",
+        "refresh_rate",
+        "special_function",
+        "firmware_url",
+        "firmware_version",
+        "update_firmware",
+        "reset_firmware",
+        "friendly_id",
+    }
+    assert expected <= set(body.keys())
+    # Invented-by-Tesserae fields removed in 0.44.1.
+    assert "pending_status_change" not in body
+    assert "network_diagnostics_url" not in body
+
+
+def test_trmnl_api_display_auths_by_mac_when_id_header_present(app: Flask) -> None:
+    """0.44.1: MAC-first auth precedence. A device with a manifest
+    ``mac`` resolves through the ``Id`` header even if the
+    Access-Token header is missing entirely."""
+    client = app.test_client()
+    # Auto-provision via /api/setup to get a device with a stored MAC.
+    setup = client.get(
+        "/api/setup",
+        headers={"Id": "AB:CD:EF:01:23:45", "Width": "800", "Height": "480"},
+    ).get_json()
+    assert setup["api_key"]
+    # /api/display with ONLY the Id header (no Access-Token) should
+    # still resolve the device.
+    resp = client.get("/api/display", headers={"Id": "AB:CD:EF:01:23:45"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["friendly_id"] == setup["friendly_id"]

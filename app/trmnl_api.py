@@ -93,6 +93,45 @@ def _device_by_token(token: str) -> Device | None:
     return matched
 
 
+def _device_by_mac(mac: str) -> Device | None:
+    """Find a TRMNL device instance by its stored ``mac``.
+
+    Matches Terminus's primary identity model: native TRMNL firmware
+    always sends its MAC in the ``Id`` header, the access token is
+    informational. We look up by MAC first (case-insensitive, the
+    XIAO firmware sends uppercase + colons, KOReader users don't
+    set this at all)."""
+    if not mac:
+        return None
+    target = mac.upper()
+    for dev in _devices().all():
+        if dev.kind_of != TRMNL_KIND_ID:
+            continue
+        stored = dev.manifest.get("mac")
+        if not isinstance(stored, str) or not stored:
+            continue
+        if stored.upper() == target:
+            return dev
+    return None
+
+
+def _device_by_request() -> Device | None:
+    """Resolve the requesting device using BYOS auth precedence.
+
+    MAC first (``Id`` header) since that's what native TRMNL firmware
+    uses as its primary identity, then access token as the fallback
+    for KOReader and any client without a MAC."""
+    mac = request.headers.get("Id") or request.headers.get("id") or ""
+    if mac:
+        device = _device_by_mac(mac)
+        if device is not None:
+            return device
+    token = _request_token()
+    if token:
+        return _device_by_token(token)
+    return None
+
+
 # -- request shape ------------------------------------------------------
 
 
@@ -173,9 +212,15 @@ def _update_status_from_headers(device: Device) -> dict[str, Any]:
 def display() -> Response | tuple[Response, int]:
     """Steady-state polling endpoint. The client polls; we hand back a
     JSON envelope pointing at the latest render artifact for the
-    device the token identifies."""
-    token = _request_token()
-    device = _device_by_token(token)
+    device the request identifies.
+
+    Auth precedence matches Terminus's official BYOS contract: MAC
+    address (``Id`` header) first, access token as a fallback. Native
+    TRMNL firmware always sends the MAC; the token is informational
+    on that path. KOReader doesn't send a MAC, so it stays
+    token-authenticated."""
+    device = _device_by_request()
+    token = _request_token()  # Still used for the discovery-cache fallback below.
     if device is None:
         logger.info(
             "trmnl: rejected /api/display from %s (token=%r, ua=%r)",
@@ -234,36 +279,32 @@ def display() -> Response | tuple[Response, int]:
         )
         filename = f"placeholder-{device.id}-{w}x{h}.png"
 
-    # BYOS optional fields some native TRMNL firmwares parse:
+    # Envelope shape matches Terminus's official /api/display response
+    # so any TRMNL-compatible firmware reads the same fields it would
+    # against the upstream BYOS server. Fields populated:
     #
-    #   * ``friendly_id``: stable six-char human-readable id (sticker
-    #     style). Populated from the device manifest's ``friendly_id``
-    #     for any device created in 0.44.0+; falls back to instance
-    #     id for older manifests.
-    #   * ``image_url_timeout``: HTTP timeout the client should apply
-    #     when fetching ``image_url``. 0 means "use firmware default".
-    #   * ``pending_status_change``: True when an admin action is
-    #     pending that the client should notice (e.g. queued restart).
-    #     We don't have a UI for this yet, always False.
-    #   * ``network_diagnostics_url``: where to POST connectivity
-    #     diagnostics. Reusing /api/log for that path.
+    #   filename, image_url           render artefact
+    #   image_url_timeout             HTTP timeout (0 = firmware default)
+    #   refresh_rate                  next poll cadence in seconds
+    #   special_function              "none" (no admin action queued)
+    #   firmware_url, firmware_version, update_firmware, reset_firmware
+    #                                 OTA hooks; Tier 2 (#11) wires them
+    #   friendly_id                   stable human-readable id
     manifest_friendly = device.manifest.get("friendly_id")
     friendly = manifest_friendly if isinstance(manifest_friendly, str) else device.id
-    diag_url = f"{request.url_root.rstrip('/')}/api/log"
     return jsonify(
         {
             "status": 0,
-            "image_url": image_url,
             "filename": filename,
-            "refresh_rate": refresh_rate,
-            "reset_firmware": False,
-            "update_firmware": False,
-            "firmware_url": "",
-            "special_function": "none",
-            "friendly_id": friendly,
+            "image_url": image_url,
             "image_url_timeout": 0,
-            "pending_status_change": False,
-            "network_diagnostics_url": diag_url,
+            "refresh_rate": refresh_rate,
+            "special_function": "none",
+            "firmware_url": "",
+            "firmware_version": "",
+            "update_firmware": False,
+            "reset_firmware": False,
+            "friendly_id": friendly,
         }
     )
 
@@ -273,82 +314,143 @@ def display() -> Response | tuple[Response, int]:
 def setup() -> Response:
     """First-boot / pairing endpoint.
 
-    Native TRMNL firmware (and the official XIAO DIY-kit build) calls
-    this on first wake. The firmware contract: send your MAC in the
-    ``Id`` header, get back an ``api_key`` that the device stores
-    locally and uses for every subsequent ``/api/display`` poll. The
-    device never expects a captive-portal "paste a token" step, the
-    server mints it.
+    Implements the official Terminus BYOS contract:
 
-    Pairing flow:
+    * Device sends its MAC in the ``Id`` header.
+    * Server looks up an existing device by MAC. If found, returns its
+      api_key + friendly_id.
+    * If not found, auto-creates a fresh TRMNL instance keyed by MAC,
+      mints a high-entropy api_key + friendly_id, persists, and
+      returns them.
 
-    * Known device (incoming token resolves to a registered instance):
-      return its existing token unchanged.
-    * Unknown device: mint a fresh short-form Tesserae token, record a
-      pending entry in the Discovered strip pre-populated with the
-      MAC + Model + panel dims + the new token, and hand the new
-      token to the device. The device stores it and immediately starts
-      polling ``/api/display`` with a real value; the admin sees the
-      device in Settings → Devices → Discovered and one-clicks Register
-      to formalise it. ``create_instance`` preserves the token, so the
-      device transitions from "polling unrecognised → polling
-      recognised" with zero firmware-side work.
+    Result: a box-fresh TRMNL device that's been pointed at a Tesserae
+    URL (via the firmware's captive portal) self-provisions on first
+    boot. No admin click, no token typed into a config screen, no
+    TRMNL mobile app, the user just sees the new device appear in
+    Settings → Devices a few seconds after it joins WiFi.
 
-    KOReader callers also work through this path: KOReader doesn't
-    usually hit ``/api/setup``, but if it does the same flow runs and
-    the token returned can be pasted into KOReader's settings.
+    KOReader / Kindle callers that don't send a MAC fall back to the
+    pre-0.44.1 path: token preserved if provided, discovery cache
+    entry written, admin clicks Register. This stays the simplest
+    flow for the type-the-token-on-the-Kindle case.
     """
-    token = _request_token()
-    device = _device_by_token(token)
-    if device is not None:
-        api_key = token
-        # Prefer the manifest's friendly_id (set at device creation
-        # in device_service.create_instance for TRMNL kinds). Fall
-        # back to the instance id if a manually-created device
-        # pre-dates the friendly_id field.
-        manifest_friendly = device.manifest.get("friendly_id")
-        friendly = manifest_friendly if isinstance(manifest_friendly, str) else device.id
-    else:
-        # Mint a real token + record discovery with it. Future polls
-        # of /api/display will get the same token from the device and
-        # land back in discovery (record merges by synthetic id), or
-        # resolve to the formal device once admin clicks Register.
-        from app.device_service import generate_access_token
+    mac = (request.headers.get("Id") or request.headers.get("id") or "").strip()
+    # Known device by MAC? Hand back its existing credentials.
+    if mac:
+        existing = _device_by_mac(mac)
+        if existing is not None:
+            api_key = str(existing.manifest.get("access_token") or "")
+            manifest_friendly = existing.manifest.get("friendly_id")
+            friendly = manifest_friendly if isinstance(manifest_friendly, str) else existing.id
+            return _setup_response(api_key, friendly, existing.id)
 
-        registry = current_app.config.get("DEVICE_REGISTRY")
-        if registry is None:
-            # Sanity guard, registry wires in via app_factory; should
-            # always be present in production.
-            api_key = "registry-unavailable"
-            friendly = "unpaired"
-        else:
-            api_key = generate_access_token(registry)
-            cache = current_app.config.get("DISCOVERY_CACHE")
-            if cache is not None:
-                record_trmnl_discovery(
-                    cache,
-                    token=api_key,
-                    headers=_headers_as_dict(),
-                    remote_addr=request.remote_addr,
-                )
-            friendly = "pending"
+    # Known device by token? (Rare on /api/setup; mostly KOReader.)
+    token = _request_token()
+    if token:
+        existing = _device_by_token(token)
+        if existing is not None:
+            api_key = token
+            manifest_friendly = existing.manifest.get("friendly_id")
+            friendly = manifest_friendly if isinstance(manifest_friendly, str) else existing.id
+            return _setup_response(api_key, friendly, existing.id)
+
+    # Unknown device. If we have a MAC, auto-create a TRMNL instance.
+    # This is the Terminus BYOS flow: the device is implicitly trusted
+    # (it's on the LAN) and the admin gets to see + manage it after
+    # the fact rather than having to approve it up front.
+    if mac:
+        from app import device_service
+
+        registry = current_app.config["DEVICE_REGISTRY"]
+        data_root = current_app.config["DEVICE_DATA_ROOT"]
+        renderers = current_app.config["RENDERER_REGISTRY"]
+
+        # Synth an instance id from the MAC (six hex chars suffix), so
+        # the file on disk is predictable and a re-register after
+        # delete picks up the same id.
+        mac_clean = "".join(c for c in mac.lower() if c.isalnum())
+        instance_id = f"trmnl_{mac_clean[-6:]}" if mac_clean else "trmnl_new"
+        # Panel dims from the headers, with the BYOS-standard fallback
+        # for native TRMNL panels (800×480).
+        try:
+            panel_w = int(request.headers.get("Width") or request.headers.get("png-width") or 800)
+            panel_h = int(request.headers.get("Height") or request.headers.get("png-height") or 480)
+        except ValueError:
+            panel_w, panel_h = 800, 480
+        # Model gives us a human-readable label fallback if the user
+        # never edits the device name.
+        model = request.headers.get("Model") or "TRMNL"
+        result = device_service.create_instance(
+            devices=registry,
+            renderers=renderers,
+            data_root=data_root,
+            instance_id=instance_id,
+            kind_id=TRMNL_KIND_ID,
+            name=model,
+            panel_overrides={"w": panel_w, "h": panel_h},
+            mac=mac,
+            api_key_strength="native",
+        )
+        if result.ok and result.device is not None:
+            new_device = result.device
+            api_key = str(new_device.manifest.get("access_token") or "")
+            manifest_friendly = new_device.manifest.get("friendly_id")
+            friendly = manifest_friendly if isinstance(manifest_friendly, str) else new_device.id
             logger.info(
-                "trmnl: /api/setup minted token for %s (mac=%r, model=%r)",
-                request.remote_addr,
-                request.headers.get("Id"),
+                "trmnl: /api/setup auto-provisioned device %r (mac=%s, model=%r)",
+                new_device.id,
+                mac,
                 request.headers.get("Model"),
             )
+            return _setup_response(api_key, friendly, new_device.id)
+        # Auto-create failed (id collision, schema error, etc.); fall
+        # through to the discovery-cache path so the admin can at
+        # least see the device exists.
+        logger.warning(
+            "trmnl: /api/setup auto-provision failed for mac=%s: %s",
+            mac,
+            result.error,
+        )
+
+    # No MAC, or auto-create failed. Fall back to the discovery flow:
+    # mint a token, record, hand it to the device, let admin
+    # one-click Register from the Discovered strip.
+    from app.device_service import generate_access_token
+
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    if registry is None:
+        api_key = "registry-unavailable"
+        friendly = "unpaired"
+    else:
+        api_key = generate_access_token(registry)
+        cache = current_app.config.get("DISCOVERY_CACHE")
+        if cache is not None:
+            record_trmnl_discovery(
+                cache,
+                token=api_key,
+                headers=_headers_as_dict(),
+                remote_addr=request.remote_addr,
+            )
+        friendly = "pending"
+    return _setup_response(api_key, friendly, friendly)
+
+
+def _setup_response(api_key: str, friendly: str, image_slug: str) -> Response:
+    """Build the BYOS /api/setup JSON response. ``image_slug`` keeps
+    the placeholder PNG URL stable per device, falling back to the
+    friendly_id for unpaired callers."""
     # Reflect the client's requested panel dims back in the hello image
     # so the setup-time fetch confirms end-to-end at the right size.
-    w_key, h_key = "png-width", "png-height"
+    # Native TRMNL firmware sends Width/Height, KOReader sends
+    # png-width/png-height.
     try:
-        w = int(request.headers.get(w_key) or 800)
-        h = int(request.headers.get(h_key) or 480)
+        w = int(request.headers.get("Width") or request.headers.get("png-width") or 800)
+        h = int(request.headers.get("Height") or request.headers.get("png-height") or 480)
     except ValueError:
         w, h = 800, 480
     image_url = url_for(
         "trmnl_api.placeholder_png",
-        device_id=friendly,
+        device_id=image_slug,
         width=w,
         height=h,
         _external=True,
@@ -359,7 +461,10 @@ def setup() -> Response:
             "api_key": api_key,
             "friendly_id": friendly,
             "image_url": image_url,
-            "filename": f"setup-{friendly}-{w}x{h}.png",
+            "filename": f"setup-{image_slug}-{w}x{h}.png",
+            # Terminus includes a friendly welcome string. Mirror that
+            # so a TRMNL firmware that parses it gets the same shape.
+            "message": "Welcome to Tesserae.",
         }
     )
 

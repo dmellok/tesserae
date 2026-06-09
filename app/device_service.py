@@ -65,6 +65,15 @@ def _kind_uses_access_token(kind: Device) -> bool:
 _TOKEN_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
 _TOKEN_LENGTH = 5
 
+# Native TRMNL firmware stores its api_key in flash and never asks the
+# user to retype it, so we don't need a typeable token length there.
+# A 20-char alphanumeric matches Terminus's defaulter (full entropy,
+# ~120 bits) and is what the official BYOS contract uses for
+# server-minted tokens. The 5-char human-typeable form stays for the
+# KOReader path (user types it on the Kindle on-screen keyboard).
+_NATIVE_TOKEN_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+_NATIVE_TOKEN_LENGTH = 20
+
 # TRMNL convention: a six-character uppercase identifier the device
 # can show on its setup screen / about page, picked from a typeable
 # alphabet that omits ambiguous glyphs (0/O, 1/I/L). Stable across
@@ -73,6 +82,29 @@ _TOKEN_LENGTH = 5
 # so any TRMNL-compatible firmware reads the same field.
 _FRIENDLY_ID_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 _FRIENDLY_ID_LENGTH = 6
+
+
+def generate_native_access_token(devices: DeviceRegistry) -> str:
+    """Generate a high-entropy 20-char alphanumeric access token for a
+    native TRMNL device (no user-typed-on-Kindle constraint).
+
+    Matches Terminus's defaulter (SecureRandom.alphanumeric(20)). The
+    typeable 5-char form (``generate_access_token``) stays for the
+    KOReader path where the user keys the token in by hand."""
+    import secrets
+
+    existing = {
+        d.manifest.get("access_token")
+        for d in devices.all()
+        if isinstance(d.manifest.get("access_token"), str)
+    }
+    for _ in range(64):
+        token = "".join(secrets.choice(_NATIVE_TOKEN_ALPHABET) for _ in range(_NATIVE_TOKEN_LENGTH))
+        if token not in existing:
+            return token
+    raise RuntimeError(
+        f"could not generate a unique {_NATIVE_TOKEN_LENGTH}-char native token after 64 attempts"
+    )
 
 
 def generate_friendly_id(devices: DeviceRegistry) -> str:
@@ -89,7 +121,9 @@ def generate_friendly_id(devices: DeviceRegistry) -> str:
         if isinstance(d.manifest.get("friendly_id"), str)
     }
     for _ in range(64):
-        candidate = "".join(secrets.choice(_FRIENDLY_ID_ALPHABET) for _ in range(_FRIENDLY_ID_LENGTH))
+        candidate = "".join(
+            secrets.choice(_FRIENDLY_ID_ALPHABET) for _ in range(_FRIENDLY_ID_LENGTH)
+        )
         if candidate not in existing:
             return candidate
     raise RuntimeError(
@@ -165,6 +199,8 @@ def create_instance(
     panel_overrides: dict[str, Any] | None = None,
     orientation: str | None = None,
     access_token: str | None = None,
+    mac: str | None = None,
+    api_key_strength: str = "typeable",
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
@@ -218,11 +254,27 @@ def create_instance(
     #    already polling with, preserve it so the user doesn't have
     #    to update the client config after registering.
     if _kind_uses_access_token(kind):
-        manifest["access_token"] = access_token or generate_access_token(devices)
+        # api_key_strength="native" mints the high-entropy 20-char
+        # alphanumeric used by the official Terminus BYOS contract,
+        # safe to use when the device stores its key in flash. The
+        # default "typeable" keeps the 5-char form for the KOReader
+        # path where the user types the token on the Kindle's
+        # on-screen keyboard.
+        if access_token:
+            manifest["access_token"] = access_token
+        elif api_key_strength == "native":
+            manifest["access_token"] = generate_native_access_token(devices)
+        else:
+            manifest["access_token"] = generate_access_token(devices)
         # TRMNL clients expect a six-character ``friendly_id`` they can
         # show on the setup screen as a stable, human-readable id.
         # Generated once at creation, never rotates.
         manifest["friendly_id"] = generate_friendly_id(devices)
+        # MAC address (when auto-provisioning from /api/setup) becomes
+        # the device's primary identity for /api/display auth, matching
+        # the Terminus BYOS model.
+        if mac:
+            manifest["mac"] = mac.strip()
 
     data_root.mkdir(parents=True, exist_ok=True)
     inst_file = data_root / f"{instance_id}.json"

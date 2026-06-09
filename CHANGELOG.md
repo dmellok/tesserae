@@ -6,6 +6,66 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.1], 2026-06-09
+
+### Changed
+
+- **Full Terminus BYOS parity: TRMNL devices auto-provision by MAC.**
+  After reading the official Terminus reference implementation
+  ([usetrmnl/terminus](https://github.com/usetrmnl/terminus)),
+  Tesserae's flow was off in two ways:
+
+  1. **Auth model.** Terminus authenticates `/api/display` by the
+     `Id` (MAC) header; the access token is optional. Tesserae was
+     auth'ing by access token only.
+  2. **Pairing.** Terminus auto-creates the device record on the
+     first `/api/setup` call. Tesserae was parking it in the
+     Discovered strip and making the admin click Register.
+
+  The result was that a box-fresh TRMNL device pointed at Tesserae
+  needed an admin two-step before it'd actually paint frames — not
+  the "BYOS = device just works" experience users expect.
+
+  Now:
+
+  - `/api/setup` looks up the device by MAC. If novel, auto-creates a
+    full TRMNL instance with the MAC stored on the manifest, mints a
+    20-char alphanumeric `api_key` (matches Terminus's
+    `SecureRandom.alphanumeric(20)`), and returns the credentials.
+    The device immediately starts polling `/api/display` with a real,
+    recognised token; no admin click.
+  - `/api/display` resolves the device by MAC first, falls back to
+    access-token lookup for KOReader (which doesn't send a MAC).
+    Existing TRMNL-on-Tesserae installs keep working unchanged.
+  - The 5-char typeable token form stays for the KOReader path
+    (where the user types the token on the Kindle's on-screen
+    keyboard); the new 20-char form is only used for native
+    auto-provisioning where the device stores the key in flash.
+  - `/api/display` response envelope now exactly matches Terminus's
+    shape: dropped the invented `pending_status_change` and
+    `network_diagnostics_url` fields (introduced in 0.44.0 from
+    second-hand BYOS docs), added the official `firmware_version`
+    field, kept everything else. `friendly_id` still surfaces in
+    both `/api/setup` and `/api/display`.
+  - `/api/setup` response now includes a `message: "Welcome to
+    Tesserae."` field to mirror Terminus's shape.
+
+  Backwards compatibility:
+
+  - Existing TRMNL devices using token-based auth continue to work
+    (token lookup is the MAC-miss fallback).
+  - KOReader Kindle path is unaffected; it never sent a MAC.
+  - Admin still sees all auto-created devices in the Devices list,
+    can rename / delete / regenerate tokens as before.
+
+  Tests:
+
+  - `test_trmnl_api_setup_auto_provisions_native_device_by_mac`
+  - `test_trmnl_api_setup_returns_same_credentials_for_known_mac`
+  - `test_trmnl_api_setup_koreader_path_falls_back_to_discovery`
+  - `test_trmnl_api_display_envelope_matches_terminus_shape`
+  - `test_trmnl_api_display_auths_by_mac_when_id_header_present`
+
 ## [0.44.0], 2026-06-09
 
 ### Added

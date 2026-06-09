@@ -445,6 +445,14 @@ def load_instance_file(
     # have one yet.
     if isinstance(raw_inst.get("friendly_id"), str) and raw_inst["friendly_id"].strip():
         inst_manifest["friendly_id"] = raw_inst["friendly_id"].strip()
+    # TRMNL ``mac``: when present, app.trmnl_api authenticates
+    # /api/display calls by the ``Id`` header (MAC) rather than the
+    # access token, matching the official Terminus BYOS behaviour
+    # where the access token is optional and the MAC is the primary
+    # identity. Auto-populated when a native TRMNL device first hits
+    # /api/setup; KOReader (no MAC) keeps using token-based auth.
+    if isinstance(raw_inst.get("mac"), str) and raw_inst["mac"].strip():
+        inst_manifest["mac"] = raw_inst["mac"].strip()
     # Point the instance at its cloned renderers so the settings UI
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.
