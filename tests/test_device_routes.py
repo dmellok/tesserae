@@ -206,3 +206,53 @@ def test_instance_status_subscriptions_replayed_on_broker_rebuild(app: Flask) ->
     assert "tesserae/+/status" in new_transport.topic_subscriptions  # discovery wildcard
     # Kind default topics are NOT directly subscribed any more.
     assert "tesserae/esp32/status" not in new_transport.topic_subscriptions
+
+
+def test_trmnl_api_setup_mints_real_token_for_new_device(app: Flask) -> None:
+    """Real-world repro from a XIAO ESP32-C3 TRMNL DIY-kit polling
+    Tesserae. The firmware contract is: device sends its MAC in the
+    ``Id`` header to GET /api/setup, server hands back an ``api_key``
+    the device stores locally. Tesserae used to literally return the
+    string ``paste-a-server-issued-token-into-your-client`` as the
+    api_key, which the device would dutifully use as its access token
+    on every subsequent /api/display poll — leaving the device's
+    secret as a publicly-known string forever. Fix: mint a real
+    short-form Tesserae token, record a Discovered entry with the
+    new token + MAC + Model + panel dims pre-filled, and hand the
+    real token back to the device."""
+    client = app.test_client()
+    resp = client.get(
+        "/api/setup",
+        headers={
+            "Id": "E0:72:A1:D8:28:9C",
+            "Model": "xiao_epaper_display",
+            "Width": "800",
+            "Height": "480",
+            "Fw-Version": "1.5.12",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert isinstance(body, dict)
+    api_key = body["api_key"]
+    # The literal placeholder must NEVER come back; that was the bug.
+    assert api_key != "paste-a-server-issued-token-into-your-client"
+    # Real Tesserae tokens are short typeable strings (5 chars from a
+    # 30-char alphabet); accept lengths in that range as a sanity check.
+    assert 4 <= len(api_key) <= 8
+    # friendly_id should also not be the bare placeholder.
+    assert body["friendly_id"] not in ("paste-a-server-issued-token-into-your-client",)
+
+    # Discovery cache should have an entry keyed off the MAC with the
+    # new token preserved so admin's one-click Register adopts it.
+    cache = app.config["DISCOVERY_CACHE"]
+    entries = cache.all()
+    matches = [e for e in entries if e.id.startswith("trmnl_e072a1d8289c")]
+    assert len(matches) == 1
+    entry = matches[0]
+    assert entry.parsed.get("access_token") == api_key
+    assert entry.parsed.get("mac") == "E0:72:A1:D8:28:9C"
+    assert entry.parsed.get("model") == "xiao_epaper_display"
+    # Discovered entry should NOT carry the needs_pairing flag, the
+    # token IS real now.
+    assert entry.parsed.get("needs_pairing") is not True

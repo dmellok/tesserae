@@ -253,20 +253,66 @@ def display() -> Response | tuple[Response, int]:
 def setup() -> Response:
     """First-boot / pairing endpoint.
 
-    Native TRMNL firmware calls this on first wake to exchange its MAC
-    for a server-issued ``api_key``. The KOReader plugin doesn't -
-    its user pastes the token in directly. We respond with whatever
-    token the client brought (or a placeholder) so any client looking
-    for a setup ACK gets one.
+    Native TRMNL firmware (and the official XIAO DIY-kit build) calls
+    this on first wake. The firmware contract: send your MAC in the
+    ``Id`` header, get back an ``api_key`` that the device stores
+    locally and uses for every subsequent ``/api/display`` poll. The
+    device never expects a captive-portal "paste a token" step, the
+    server mints it.
 
-    Real pairing, recognising a new MAC, creating a pending device,
-    surfacing it in Settings → Devices for one-click register, is a
-    follow-up. For now the user pre-creates the device + token in
-    Tesserae and pastes the token into the client."""
+    Pairing flow:
+
+    * Known device (incoming token resolves to a registered instance):
+      return its existing token unchanged.
+    * Unknown device: mint a fresh short-form Tesserae token, record a
+      pending entry in the Discovered strip pre-populated with the
+      MAC + Model + panel dims + the new token, and hand the new
+      token to the device. The device stores it and immediately starts
+      polling ``/api/display`` with a real value; the admin sees the
+      device in Settings → Devices → Discovered and one-clicks Register
+      to formalise it. ``create_instance`` preserves the token, so the
+      device transitions from "polling unrecognised → polling
+      recognised" with zero firmware-side work.
+
+    KOReader callers also work through this path: KOReader doesn't
+    usually hit ``/api/setup``, but if it does the same flow runs and
+    the token returned can be pasted into KOReader's settings.
+    """
     token = _request_token()
     device = _device_by_token(token)
-    friendly = device.id if device else "unpaired"
-    api_key = token if device else "paste-a-server-issued-token-into-your-client"
+    if device is not None:
+        api_key = token
+        friendly = device.id
+    else:
+        # Mint a real token + record discovery with it. Future polls
+        # of /api/display will get the same token from the device and
+        # land back in discovery (record merges by synthetic id), or
+        # resolve to the formal device once admin clicks Register.
+        from app.device_service import generate_access_token
+
+        registry = current_app.config.get("DEVICE_REGISTRY")
+        if registry is None:
+            # Sanity guard, registry wires in via app_factory; should
+            # always be present in production.
+            api_key = "registry-unavailable"
+            friendly = "unpaired"
+        else:
+            api_key = generate_access_token(registry)
+            cache = current_app.config.get("DISCOVERY_CACHE")
+            if cache is not None:
+                record_trmnl_discovery(
+                    cache,
+                    token=api_key,
+                    headers=_headers_as_dict(),
+                    remote_addr=request.remote_addr,
+                )
+            friendly = "pending"
+            logger.info(
+                "trmnl: /api/setup minted token for %s (mac=%r, model=%r)",
+                request.remote_addr,
+                request.headers.get("Id"),
+                request.headers.get("Model"),
+            )
     # Reflect the client's requested panel dims back in the hello image
     # so the setup-time fetch confirms end-to-end at the right size.
     w_key, h_key = "png-width", "png-height"

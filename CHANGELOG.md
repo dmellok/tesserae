@@ -6,6 +6,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.6], 2026-06-09
+
+### Fixed
+
+- **`/api/setup` now mints real tokens for unrecognised TRMNL
+  clients.** The official TRMNL firmware contract is: device sends
+  its MAC in the `Id` header to `GET /api/setup`, server hands back
+  an `api_key` the device stores locally and uses for every
+  subsequent `/api/display` poll. Tesserae was literally returning
+  the string `paste-a-server-issued-token-into-your-client` as the
+  api_key when the device's incoming token didn't resolve, which the
+  firmware then dutifully cached as its access token forever. Now
+  `/api/setup` mints a fresh short-form token, records a Discovered
+  entry pre-populated with the new token + MAC + Model + panel dims,
+  and hands the real token back to the device. The device transitions
+  from "polling with a real token" to "polling with a recognised
+  token" the moment the admin clicks Register in the Discovered
+  strip — no firmware-side reconfig, no captive-portal revisit, no
+  token re-entry. Matches the BYOS contract every official TRMNL
+  variant follows (XIAO DIY kit, native hardware, KOReader Kindle).
+
+  The placeholder-detection added in 0.43.5 stays in place as
+  defence-in-depth (e.g. a non-official firmware that doesn't honour
+  the `/api/setup` response), but the bug it was working around is
+  now gone at the source.
+
 ## [0.43.5], 2026-06-09
 
 ### Added
