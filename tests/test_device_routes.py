@@ -256,3 +256,58 @@ def test_trmnl_api_setup_mints_real_token_for_new_device(app: Flask) -> None:
     # Discovered entry should NOT carry the needs_pairing flag, the
     # token IS real now.
     assert entry.parsed.get("needs_pairing") is not True
+
+
+def test_trmnl_api_log_level_acks_for_native_firmware(app: Flask) -> None:
+    """Native TRMNL firmware queries /api/log/level on boot for the
+    server's preferred log verbosity. Tesserae doesn't actually drive
+    remote log levels, but the firmware refuses to continue polling
+    if the endpoint 404s — we just acknowledge with 200."""
+    client = app.test_client()
+    resp = client.post("/api/log/level", data=b"")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert isinstance(body, dict)
+    assert body.get("status") == 200
+
+
+def test_trmnl_api_setup_returns_manifest_friendly_id_for_known_device(app: Flask) -> None:
+    """Devices created in 0.44.0+ get a six-character friendly_id
+    auto-populated on the manifest by device_service.create_instance.
+    The /api/setup response returns that value as ``friendly_id`` so
+    TRMNL firmwares can show it on their setup / about screens."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="kindle_test", kind="trmnl_client")
+    devs = app.config["DEVICE_REGISTRY"]
+    instance = devs.get("kindle_test")
+    assert instance is not None
+    token = instance.manifest["access_token"]
+    friendly = instance.manifest["friendly_id"]
+    assert len(friendly) == 6
+    assert all(c.isupper() or c.isdigit() for c in friendly)
+
+    resp = client.get("/api/setup", headers={"Access-Token": token})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body.get("friendly_id") == friendly
+
+
+def test_trmnl_api_display_envelope_contains_byos_optional_fields(app: Flask) -> None:
+    """0.44.0: BYOS optional response fields some native firmwares
+    parse — ``friendly_id``, ``image_url_timeout``,
+    ``pending_status_change``, ``network_diagnostics_url``."""
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="trmnl_envelope_test", kind="trmnl_client")
+    devs = app.config["DEVICE_REGISTRY"]
+    token = devs.get("trmnl_envelope_test").manifest["access_token"]
+
+    resp = client.get("/api/display", headers={"Access-Token": token})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "friendly_id" in body
+    assert body["image_url_timeout"] == 0
+    assert body["pending_status_change"] is False
+    assert isinstance(body["network_diagnostics_url"], str)
+    assert body["network_diagnostics_url"].endswith("/api/log")

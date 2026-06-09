@@ -65,6 +65,37 @@ def _kind_uses_access_token(kind: Device) -> bool:
 _TOKEN_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
 _TOKEN_LENGTH = 5
 
+# TRMNL convention: a six-character uppercase identifier the device
+# can show on its setup screen / about page, picked from a typeable
+# alphabet that omits ambiguous glyphs (0/O, 1/I/L). Stable across
+# token rotations; lives on the device manifest alongside
+# ``access_token`` and gets returned in /api/setup + /api/display
+# so any TRMNL-compatible firmware reads the same field.
+_FRIENDLY_ID_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
+_FRIENDLY_ID_LENGTH = 6
+
+
+def generate_friendly_id(devices: DeviceRegistry) -> str:
+    """Generate a TRMNL-style human-readable device id (e.g. ``7B3X9K``).
+
+    Uniqueness check matches ``generate_access_token`` so two devices
+    can't share the same id, the friendly_id surfaces to the user as
+    the 'sticker' identifier on TRMNL's setup screens."""
+    import secrets
+
+    existing = {
+        d.manifest.get("friendly_id")
+        for d in devices.all()
+        if isinstance(d.manifest.get("friendly_id"), str)
+    }
+    for _ in range(64):
+        candidate = "".join(secrets.choice(_FRIENDLY_ID_ALPHABET) for _ in range(_FRIENDLY_ID_LENGTH))
+        if candidate not in existing:
+            return candidate
+    raise RuntimeError(
+        f"could not generate a unique {_FRIENDLY_ID_LENGTH}-char friendly id after 64 attempts"
+    )
+
 
 def generate_access_token(devices: DeviceRegistry) -> str:
     """Generate a short access token that isn't already in use.
@@ -188,6 +219,10 @@ def create_instance(
     #    to update the client config after registering.
     if _kind_uses_access_token(kind):
         manifest["access_token"] = access_token or generate_access_token(devices)
+        # TRMNL clients expect a six-character ``friendly_id`` they can
+        # show on the setup screen as a stable, human-readable id.
+        # Generated once at creation, never rotates.
+        manifest["friendly_id"] = generate_friendly_id(devices)
 
     data_root.mkdir(parents=True, exist_ok=True)
     inst_file = data_root / f"{instance_id}.json"

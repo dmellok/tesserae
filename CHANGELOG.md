@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.0], 2026-06-09
+
+### Added
+
+- **BYOS protocol Tier 1: full compliance with the official TRMNL
+  contract.** Any TRMNL-compatible client (XIAO ESP32-C3 DIY kit,
+  native commercial hardware, KOReader Kindle) now talks to Tesserae
+  exactly the same way it talks to the upstream TRMNL service.
+
+  Concretely:
+
+  - **`POST /api/log/level`**: BYOS log-level config endpoint
+    acknowledged with `200 OK` + a `log_level: "info"` default. Some
+    native firmwares refuse to continue polling if this 404s.
+  - **`friendly_id`**: every TRMNL device now gets a six-character
+    uppercase id (e.g. `7B3X9K`) auto-populated at instance creation,
+    picked from an alphabet that omits ambiguous glyphs (0/O, 1/I/L).
+    Surfaced in both `/api/setup` and `/api/display` responses so
+    firmwares can show it on their setup / about screens. Older
+    devices (pre-0.44.0) fall back to the instance id cleanly.
+  - **Optional `/api/display` envelope fields**: `image_url_timeout`,
+    `pending_status_change`, `network_diagnostics_url` are now in
+    every response. Some native firmwares parse them; harmless to
+    unaware clients (they ignore unknown fields).
+
+  Tier 2 (firmware OTA) and Tier 3 (TRMNL recipe / plugin ecosystem)
+  filed as [#11](https://github.com/dmellok/tesserae/issues/11) and
+  [#12](https://github.com/dmellok/tesserae/issues/12); BMP format
+  negotiation as [#13](https://github.com/dmellok/tesserae/issues/13).
+  None of those are needed for the XIAO DIY kit, native TRMNL, or
+  KOReader, which all accept PNG.
+
+### Fixed
+
+- **`device_loader` now carries `friendly_id` through** alongside
+  `access_token`. Without this, the field that `device_service`
+  writes to the instance JSON would be stripped when the loader
+  merges instance overrides on top of the kind manifest.
+
 ## [0.43.7], 2026-06-09
 
 ### Fixed

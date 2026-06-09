@@ -234,6 +234,22 @@ def display() -> Response | tuple[Response, int]:
         )
         filename = f"placeholder-{device.id}-{w}x{h}.png"
 
+    # BYOS optional fields some native TRMNL firmwares parse:
+    #
+    #   * ``friendly_id``: stable six-char human-readable id (sticker
+    #     style). Populated from the device manifest's ``friendly_id``
+    #     for any device created in 0.44.0+; falls back to instance
+    #     id for older manifests.
+    #   * ``image_url_timeout``: HTTP timeout the client should apply
+    #     when fetching ``image_url``. 0 means "use firmware default".
+    #   * ``pending_status_change``: True when an admin action is
+    #     pending that the client should notice (e.g. queued restart).
+    #     We don't have a UI for this yet, always False.
+    #   * ``network_diagnostics_url``: where to POST connectivity
+    #     diagnostics. Reusing /api/log for that path.
+    manifest_friendly = device.manifest.get("friendly_id")
+    friendly = manifest_friendly if isinstance(manifest_friendly, str) else device.id
+    diag_url = f"{request.url_root.rstrip('/')}/api/log"
     return jsonify(
         {
             "status": 0,
@@ -244,6 +260,10 @@ def display() -> Response | tuple[Response, int]:
             "update_firmware": False,
             "firmware_url": "",
             "special_function": "none",
+            "friendly_id": friendly,
+            "image_url_timeout": 0,
+            "pending_status_change": False,
+            "network_diagnostics_url": diag_url,
         }
     )
 
@@ -282,7 +302,12 @@ def setup() -> Response:
     device = _device_by_token(token)
     if device is not None:
         api_key = token
-        friendly = device.id
+        # Prefer the manifest's friendly_id (set at device creation
+        # in device_service.create_instance for TRMNL kinds). Fall
+        # back to the instance id if a manually-created device
+        # pre-dates the friendly_id field.
+        manifest_friendly = device.manifest.get("friendly_id")
+        friendly = manifest_friendly if isinstance(manifest_friendly, str) else device.id
     else:
         # Mint a real token + record discovery with it. Future polls
         # of /api/display will get the same token from the device and
@@ -356,6 +381,33 @@ def device_log() -> Response:
         decoded = repr(body[:1024])
     logger.info("trmnl: /api/log/ from %s (%d bytes): %s", target, len(body), decoded)
     return jsonify({"status": 200})
+
+
+@bp.post("/api/log/level/")
+@bp.post("/api/log/level")
+def device_log_level() -> Response:
+    """BYOS log-level config endpoint.
+
+    Some TRMNL native firmwares query this on boot to learn what log
+    verbosity the server wants. Tesserae doesn't drive remote log
+    levels (we just record whatever the device sends), but the
+    firmware refuses to continue polling if this 404s, so we
+    acknowledge with a sensible default and log the body."""
+    body = request.get_data(cache=False) or b""
+    token = _request_token()
+    device = _device_by_token(token)
+    target = device.id if device else "unknown"
+    try:
+        decoded = body.decode("utf-8", errors="replace")[:512]
+    except Exception:
+        decoded = repr(body[:512])
+    logger.info(
+        "trmnl: /api/log/level from %s (%d bytes): %s",
+        target,
+        len(body),
+        decoded,
+    )
+    return jsonify({"status": 200, "log_level": "info"})
 
 
 # -- placeholder image (until the renderer lands) -----------------------

@@ -437,6 +437,14 @@ def load_instance_file(
     # device on incoming /api/display requests.
     if isinstance(raw_inst.get("access_token"), str) and raw_inst["access_token"].strip():
         inst_manifest["access_token"] = raw_inst["access_token"].strip()
+    # TRMNL ``friendly_id`` (six-character human-readable id, e.g.
+    # ``7B3X9K``). Surfaced in /api/setup + /api/display so the BYOS
+    # firmware can show it on the setup screen / about screen the way
+    # the official TRMNL hardware does. Auto-populated at instance
+    # creation in device_service; older instances (pre-0.44.0) won't
+    # have one yet.
+    if isinstance(raw_inst.get("friendly_id"), str) and raw_inst["friendly_id"].strip():
+        inst_manifest["friendly_id"] = raw_inst["friendly_id"].strip()
     # Point the instance at its cloned renderers so the settings UI
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.
