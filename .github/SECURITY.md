@@ -11,10 +11,15 @@ Only the latest minor release is supported. Pre-1.0, that means the
 most recent `0.x` tag receives security fixes; older minors do not.
 When 1.0 ships, this policy moves to "current + previous minor".
 
-| Version | Supported |
-|---|---|
-| 0.14.x (current) | ✅ |
-| < 0.14 | ❌ |
+| Version | Latest patch | Supported |
+|---|---|---|
+| 0.43.x (current) | v0.43.3 | ✅ |
+| 0.42.x | v0.42.3 | ❌ |
+| 0.41.x | v0.41.2 | ❌ |
+| 0.40.x | v0.40.0 | ❌ |
+| 0.39.x | v0.39.0 | ❌ |
+| 0.38.x | v0.38.0 | ❌ |
+| < 0.38 | varies | ❌ |
 
 ## Reporting a vulnerability
 
@@ -52,7 +57,7 @@ Please include:
   [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client),
   [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client),
   [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client).
-- The HA Add-on companion repo:
+- The HA App companion repo:
   [homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
 
 ### Out of scope

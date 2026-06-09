@@ -6,22 +6,22 @@ run HA.
 
 | Path | What it gives you |
 |---|---|
-| **HA Add-on** | Tesserae installs inside HA Supervisor and shows up as a sidebar Ingress tab. Same admin UI you'd run standalone, but you don't manage the Python install. |
-| **MQTT auto-discovery** | Tesserae publishes HA discovery messages so every device + dashboard surfaces as HA entities (button, select, image, diagnostics). Works whether Tesserae is installed standalone, in Docker, or as the Add-on. |
+| **HA App** | Tesserae installs inside HA Supervisor and shows up as a sidebar Ingress tab. Same admin UI you'd run standalone, but you don't manage the Python install. |
+| **MQTT auto-discovery** | Tesserae publishes HA discovery messages so every device + dashboard surfaces as HA entities (button, select, image, diagnostics). Works whether Tesserae is installed standalone, in Docker, or as the App. |
 
 ---
 
-## HA Add-on (Ingress)
+## HA App (Ingress)
 
 The companion repo
 [:material-github: dmellok/homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon)
-publishes the Tesserae Add-on to Home Assistant Supervisor.
+publishes the Tesserae App to Home Assistant Supervisor.
 
 ### Install
 
-1. **Settings → Add-ons → Add-on Store → ⋮ → Repositories**, paste
+1. **Settings → Apps → app store → ⋮ → Repositories**, paste
    `https://github.com/dmellok/homeassistant-tesserae-addon`, click **Add**.
-2. The **Tesserae** add-on appears under the new repository. Open it and
+2. The **Tesserae** app appears under the new repository. Open it and
    click **Install**. (For the in-development build, use the
    **Tesserae (edge)** entry, it tracks `main` and is rebuilt on every
    release.)
@@ -30,22 +30,22 @@ publishes the Tesserae Add-on to Home Assistant Supervisor.
 
 ### Configuration
 
-The Add-on's **Configuration** tab exposes the small set of options
+The App's **Configuration** tab exposes the small set of options
 that need to be set at boot (port, broker host, app password). Anything
 else is configured from inside Tesserae's own Settings UI, which
-persists into the Add-on's mounted `/data` volume, your state survives
-Add-on restarts and version upgrades.
+persists into the App's mounted `/data` volume, your state survives
+App restarts and version upgrades.
 
-### What the Add-on does for you
+### What the App does for you
 
 - Mounts `/data` so pages / themes / settings persist across upgrades.
 - Sets `TESSERAE_HA_INGRESS=1` so the admin UI trusts HA's Ingress
   session and skips the standalone login form (HA's own auth gates
   access, you don't sign in twice).
 - Wires `SUPERVISOR_TOKEN` through so Tesserae can call Supervisor
-  for "rebuild the add-on" and "read installed version" niceties.
+  for "rebuild the app" and "read installed version" niceties.
 - Provides an MQTT default that points at HA's built-in broker (if
-  you're running it as an Add-on too).
+  you're running it as an App too).
 
 ---
 
@@ -59,8 +59,8 @@ in HA, the entities just appear.
 ### Enable
 
 1. **Settings → Server → MQTT broker**, confirm Tesserae is pointed
-   at the same broker HA uses. (If you run HA's Mosquitto Add-on, that's
-   `core-mosquitto` from inside the Add-on or `homeassistant.local`
+   at the same broker HA uses. (If you run HA's Mosquitto App, that's
+   `core-mosquitto` from inside the App or `homeassistant.local`
    from a standalone Tesserae host.)
 2. **Settings → App → Home Assistant discovery**, flip the toggle on
    and save.
@@ -158,9 +158,9 @@ The token comes from **Settings → System → Webhook** in Tesserae, see
   and HA are pointed at the same broker (same host:port and same
   credentials). HA's MQTT integration must be installed and connected
  , check **Settings → Devices & Services → MQTT**.
-- **The Add-on starts but Ingress shows a blank page.** Open the
-  Add-on's **Log** tab, Tesserae logs why it bailed (most often a
-  missing broker host or a wrong port). The Add-on's **Configuration**
+- **The App starts but Ingress shows a blank page.** Open the
+  App's **Log** tab, Tesserae logs why it bailed (most often a
+  missing broker host or a wrong port). The App's **Configuration**
   tab is the right place to fix it; the in-app Settings pages won't
   let you change Ingress wiring.
 - **Buttons fire but nothing pushes.** Check the *Last error* sensor

@@ -211,8 +211,8 @@ def _build_sections() -> list[dict[str, Any]]:
         broker_blurb = (
             "Tesserae publishes frames here; devices subscribe. "
             "Host, port, and credentials are managed in the Tesserae "
-            "add-on's Configuration tab, changes there apply on the "
-            "next add-on restart."
+            "App's Configuration tab, changes there apply on the "
+            "next App restart."
         )
     sections.append(
         {

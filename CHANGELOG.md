@@ -6,6 +6,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.4], 2026-06-09
+
+### Changed
+
+- **Renamed "Add-on" → "App" in user-facing docs and prose.** Home
+  Assistant rebranded "Add-ons" to "Apps" in its 2026 UI refresh
+  (Settings → **Add-ons** → Settings → **Apps**; Add-on Store →
+  **app store**). Updated the README, the install guides
+  (`docs/install/home-assistant.md`, `docs/install/spotify-home-assistant.md`,
+  `docs/install/server.md`, `docs/install/devices.md`),
+  `docs/index.md`, `.github/SECURITY.md`, the SECURITY versions
+  table to include 0.38–0.43, and two user-visible strings in
+  `templates/onboarding.html` and `app/settings/index_routes.py`
+  (the broker blurb).
+
+  Companion `homeassistant-tesserae-addon` repo's README updated
+  in lockstep.
+
+  Internal references (Python code comments, log lines,
+  `HA_INGRESS_MODE` config keys, the `homeassistant-tesserae-addon`
+  repo slug, the `sync-addon` workflow name, the Supervisor
+  `config.yaml` schema) stay as-is, those are platform-contract
+  names and historical code paths, not user-visible labels.
+  CHANGELOG history is preserved unchanged (the language was
+  accurate at shipping time).
+
 ## [0.43.3], 2026-06-09
 
 ### Fixed

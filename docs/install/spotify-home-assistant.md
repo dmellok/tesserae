@@ -4,9 +4,9 @@ The [Spotify widget bundle](https://github.com/dmellok/tesserae-spotify)
 (`spotify_core` + `spotify_now_playing` + `spotify_queue` +
 `spotify_album_art`) needs a one-time OAuth handshake before it can show
 your now-playing track. This guide walks through that handshake when
-you're running Tesserae as a Home Assistant Add-on, which has one
+you're running Tesserae as a Home Assistant App, which has one
 particular wrinkle: **Spotify will only redirect OAuth callbacks to an
-HTTPS URL** (or `http://localhost`), and the Add-on's normal access
+HTTPS URL** (or `http://localhost`), and the App's normal access
 paths don't give you a stable HTTPS URL out of the box.
 
 If you're running Tesserae as a bare-metal install on your LAN, the
@@ -39,19 +39,19 @@ and Tesserae-side configuration for each.
 
 ## Option A: NGINX Proxy Manager + DuckDNS
 
-The most common HA pattern; if you already have these two add-ons
+The most common HA pattern; if you already have these two apps
 installed (for remote access generally), you're already done with the
 hard part. Skip to **Add the Tesserae host** below.
 
 If not, install both first:
 
-- **DuckDNS** add-on (free dynamic DNS + Let's Encrypt certs):
-  Settings → Add-ons → Add-on Store → Search DuckDNS → Install. Get a
+- **DuckDNS** app (free dynamic DNS + Let's Encrypt certs):
+  Settings → Apps → app store → Search DuckDNS → Install. Get a
   token from [duckdns.org](https://www.duckdns.org/) and pick a
   subdomain (e.g. `myhome.duckdns.org`).
-- **Nginx Proxy Manager** add-on: Settings → Add-ons → Add-on Store →
+- **Nginx Proxy Manager** app: Settings → Apps → app store →
   Search Nginx Proxy Manager → Install. Default config is fine; open
-  the web UI from its add-on page.
+  the web UI from its app page.
 
 ### Add the Tesserae host
 
@@ -80,7 +80,7 @@ Free, no port forwarding required, works behind CGNAT. Needs:
 
 - A domain on Cloudflare (free tier is fine; transfer a `$5/yr` domain
   or use a `*.cloudflare.tld` workers domain).
-- The **Cloudflared** HA add-on:
+- The **Cloudflared** HA app:
   [github.com/brenner-tobias/ha-addons](https://github.com/brenner-tobias/ha-addons)
   has a maintained one.
 
@@ -89,7 +89,7 @@ Free, no port forwarding required, works behind CGNAT. Needs:
 1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → **Create
    a tunnel**.
 2. Name it (e.g., `home`) and copy the tunnel token.
-3. In HA, install the Cloudflared add-on, paste the token into its
+3. In HA, install the Cloudflared app, paste the token into its
    options, start it.
 4. Back in the Cloudflare dashboard, on the tunnel's **Public
    Hostname** tab: **Add a public hostname**:
@@ -108,9 +108,9 @@ Simplest if you already use Tailscale; gives you an HTTPS URL on a
 `*.ts.net` subdomain with no extra config. Needs Tailscale running on
 HA.
 
-1. Install the **Tailscale** HA add-on.
-2. Sign in to your Tailnet on the add-on's page.
-3. On the HA host's shell (Terminal & SSH add-on), expose Tesserae:
+1. Install the **Tailscale** HA app.
+2. Sign in to your Tailnet on the app's page.
+3. On the HA host's shell (Terminal & SSH app), expose Tesserae:
 
    ```bash
    tailscale funnel --bg --https=443 http://localhost:8765
@@ -231,7 +231,7 @@ Connect dance is complete**:
   need to re-authorise.
 - **Cloudflare Tunnel**: delete the `tesserae.yourdomain.tld`
   public hostname from the tunnel config, or stop the Cloudflared
-  add-on entirely.
+  app entirely.
 - **Tailscale Funnel**: `tailscale funnel off` on the HA host shell.
 
 The widgets keep working on every other access path (HA sidebar

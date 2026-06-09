@@ -12,7 +12,7 @@ name comes from [*tessera*](https://en.wikipedia.org/wiki/Tessera), the
 individual tile of a mosaic; the editor composes a dashboard out of cells.
 
 !!! tip "New here? Start with the path that matches you"
-    - **I want it running** → [Install Tesserae](install/server.md) (or via [Docker](install/docker.md) / as a [Home Assistant Add-on](install/home-assistant.md))
+    - **I want it running** → [Install Tesserae](install/server.md) (or via [Docker](install/docker.md) / as a [Home Assistant App](install/home-assistant.md))
     - **I have a panel to drive** → [Install a client](install/clients.md) then [Set up a device](install/devices.md)
     - **What can it show?** → [Bundled widget gallery](widgets/gallery.md) (30 ship in the install) or the [community catalog](widgets/community.md) (more, one-click install)
     - **What hardware works?** → [Screens & compatibility](compatibility.md)

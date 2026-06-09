@@ -11,7 +11,7 @@ KOReader devices poll the server over HTTP instead, no broker required.
     If you'd rather not touch Python, the [Docker install path](docker.md)
     has you running with one `docker compose up -d`. Running Home Assistant?
     See the [Home Assistant integration](home-assistant.md) page, Tesserae
-    can install as an HA Add-on (Ingress-tabbed inside HA's sidebar) and
+    can install as an HA App (Ingress-tabbed inside HA's sidebar) and
     publish MQTT discovery so every device shows up as an HA entity.
 
 ## Quick install
@@ -135,7 +135,7 @@ suitable for moving to another install or restoring after a wipe.
   embedded, treat the file like a credential).
 - **Import:** upload a ZIP from another install. The server validates
   every file against the matching JSON Schema before writing, then
-  replaces state atomically. On Docker / HA Add-on installs the
+  replaces state atomically. On Docker / HA App installs the
   in-place restart happens automatically; on a venv install the page
   flashes a "stop and restart" hint so nothing is left mid-flight.
 
@@ -170,5 +170,5 @@ with no broker or Chromium dependency.
 
 - [Install a client](clients.md) for your panel hardware
 - [Set up a device](devices.md), register it, calibrate orientation, bind a dashboard
-- [Home Assistant integration](home-assistant.md), HA Add-on install + MQTT auto-discovery
+- [Home Assistant integration](home-assistant.md), HA App install + MQTT auto-discovery
 - [Browse the widgets](../widgets/gallery.md) you can place on a dashboard
