@@ -45,6 +45,14 @@ _RSSI_HEADERS = ("rssi",)
 _FW_HEADERS = ("fw-version", "user-agent")  # User-Agent is the KOReader fallback
 _WIDTH_HEADERS = ("png-width", "width")
 _HEIGHT_HEADERS = ("png-height", "height")
+# Official TRMNL DIY-kit firmware (XIAO-based ESP32-C3) puts the
+# device's MAC in ``Id`` and a board identifier (e.g.
+# ``xiao_epaper_display``) in ``Model``. Surface both so the device
+# card distinguishes "the XIAO kit" from "a Kindle running KOReader"
+# at a glance, instead of relying on the synthetic ``trmnl_<token>``
+# id.
+_MAC_HEADERS = ("id",)
+_MODEL_HEADERS = ("model",)
 
 
 def parse_status(payload: bytes) -> dict[str, Any]:
@@ -66,6 +74,8 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         "fw_version": None,
         "panel_w": None,
         "panel_h": None,
+        "mac": None,
+        "model": None,
     }
     if not payload:
         return out
@@ -87,6 +97,8 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     out["fw_version"] = _first_str(folded, _FW_HEADERS)
     out["panel_w"] = _first_int(folded, _WIDTH_HEADERS)
     out["panel_h"] = _first_int(folded, _HEIGHT_HEADERS)
+    out["mac"] = _first_str(folded, _MAC_HEADERS)
+    out["model"] = _first_str(folded, _MODEL_HEADERS)
     # Drop the originals into a debug bucket so the Settings card can
     # surface unexpected headers without us having to anticipate every
     # client implementation up front.

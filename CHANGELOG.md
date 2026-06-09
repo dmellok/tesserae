@@ -6,6 +6,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.5], 2026-06-09
+
+### Added
+
+- **Official TRMNL DIY-kit (XIAO-based ESP32-C3) headers parsed.** The
+  TRMNL header parser now picks up `Id` (MAC) and `Model` (board
+  identifier, e.g. `xiao_epaper_display`) and surfaces both in the
+  device card's Diagnostics block alongside battery, RSSI, and
+  firmware. Lets a glance distinguish the official DIY kit from a
+  Kindle running KOReader.
+
+### Fixed
+
+- **TRMNL placeholder-token pairing UX.** A client polling with the
+  firmware's literal placeholder token (e.g.
+  `paste-a-server-issued-token-into-your-client`) used to be
+  registered as-is, which left the new device's access secret a
+  publicly-known string. Now the discovery layer detects placeholder
+  patterns, flags `needs_pairing: true`, and the register flow mints
+  a fresh token instead of preserving the placeholder. After
+  registration the existing one-shot reveal modal pops with the new
+  token AND the device's polling IP, so the user knows exactly where
+  to paste it ("the device polled in from `192.168.50.125`, open its
+  config UI there"). The Discovered card also gains a "Unpaired,
+  click Register to mint a token" pill, plus `Model` and `MAC` rows
+  for at-a-glance hardware identification.
+
+- **Discovery synthetic IDs prefer MAC over token.** Previously the
+  Discovered card's id was `trmnl_<first-20-chars-of-token>`, which
+  drifted between reboots if the token changed (and looked weird if
+  the token was a placeholder). Now keyed off MAC when the client
+  provides one, so the same physical device always resolves to the
+  same Discovered row.
+
 ## [0.43.4], 2026-06-09
 
 ### Changed

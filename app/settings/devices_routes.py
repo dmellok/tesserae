@@ -193,15 +193,27 @@ def devices_register_discovered(discovered_id: str) -> Response:
     # entry's parsed payload so create_instance can preserve it, the
     # user already has it pasted into their client config, and the
     # whole point of one-click pairing is not making them re-paste a
-    # freshly-generated one.
+    # freshly-generated one. EXCEPT when the discovery flagged
+    # ``needs_pairing``, in that case the client was polling with the
+    # firmware's literal placeholder token (e.g.
+    # ``paste-a-server-issued-token-into-your-client``), and preserving
+    # it would lock the new instance to a publicly-known string.
+    # Force a fresh mint there, and the reveal modal will surface it
+    # for the user to paste back into the client.
+    discovered_needs_pairing = bool(entry.parsed.get("needs_pairing")) if kind_id == "trmnl_client" else False
     discovered_token = entry.parsed.get("access_token") if kind_id == "trmnl_client" else None
-    # The synthetic discovery id for TRMNL entries (``trmnl_<token>``)
-    # leaks the token into the device id if used as-is; default the
-    # instance id to a friendlier one and let the user override if
-    # they want.
+    if discovered_needs_pairing:
+        discovered_token = None
+    # The synthetic discovery id for TRMNL entries (``trmnl_<token>``
+    # or ``trmnl_<mac>``) leaks identifiers into the device id if used
+    # as-is; default the instance id to a friendlier one and let the
+    # user override if they want.
     default_id = discovered_id
     if kind_id == "trmnl_client" and default_id.startswith("trmnl_"):
-        default_id = "trmnl_" + (discovered_token[:5] if isinstance(discovered_token, str) else "")
+        if isinstance(discovered_token, str):
+            default_id = "trmnl_" + discovered_token[:5]
+        else:
+            default_id = "trmnl_new"
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers(),
@@ -219,6 +231,19 @@ def devices_register_discovered(discovered_id: str) -> Response:
     # Same picture-quality seeding as the manual add-device path.
     renderer_loader.seed_device_settings_from_base(renderers(), settings_store())
     rebuild_transport_fn()()
+    # If the discovery was unpaired (placeholder token) AND
+    # create_instance therefore minted a fresh token, surface it via
+    # the existing one-shot reveal modal. Stash the device's polling
+    # IP too so the modal can say "paste this token into the client at
+    # <IP>'s config" rather than just "into your client".
+    new_token = result.device.manifest.get("access_token")
+    if discovered_needs_pairing and isinstance(new_token, str) and new_token:
+        session["_trmnl_token_reveal"] = {
+            "device_id": result.device.id,
+            "device_name": result.device.name,
+            "token": new_token,
+            "client_ip": entry.parsed.get("ip"),
+        }
     flash(f"Registered discovered device {result.device.name!r}.", "ok")
     return redirect(
         url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")

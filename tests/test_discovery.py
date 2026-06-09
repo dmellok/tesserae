@@ -264,3 +264,50 @@ def test_dismiss_drops_from_cache(app: Flask) -> None:
     resp = client.post("/settings/devices/discovery/noise/dismiss", follow_redirects=False)
     assert resp.status_code == 302
     assert cache.get("noise") is None
+
+
+def test_trmnl_discovery_flags_placeholder_token_as_unpaired() -> None:
+    """The official TRMNL DIY-kit firmware ships with a literal
+    placeholder token (``paste-a-server-issued-token-into-your-client``)
+    that the user is expected to replace via the pairing flow. If we
+    let create_instance preserve it the new device's secret would be
+    a publicly-known string. record_trmnl_discovery flags this with
+    needs_pairing and drops the access_token from the cache so the
+    register flow mints a fresh one."""
+    cache = DiscoveryCache()
+    entry = record_trmnl_discovery(
+        cache,
+        token="paste-a-server-issued-token-into-your-client",
+        headers={
+            "Id": "E0:72:A1:D8:28:9C",
+            "Model": "xiao_epaper_display",
+            "Width": "800",
+            "Height": "480",
+            "Fw-Version": "1.5.12",
+        },
+        remote_addr="192.168.50.125",
+    )
+    assert entry is not None
+    assert entry.parsed.get("needs_pairing") is True
+    assert "access_token" not in entry.parsed
+    # MAC + model wired through to the discovered card via parsed.
+    assert entry.parsed.get("mac") == "E0:72:A1:D8:28:9C"
+    assert entry.parsed.get("model") == "xiao_epaper_display"
+    # MAC-keyed synthetic id is stable across reboots (token would
+    # change after first pairing).
+    assert entry.id.startswith("trmnl_e072a1d8289c") or entry.id == "trmnl_e072a1d8289c"
+
+
+def test_trmnl_discovery_preserves_real_token() -> None:
+    """KOReader users already paste a real token before discovery
+    fires; preserve it so register doesn't make them re-paste."""
+    cache = DiscoveryCache()
+    entry = record_trmnl_discovery(
+        cache,
+        token="kfrxz",
+        headers={"User-Agent": "KOReader/2024"},
+        remote_addr="192.168.1.42",
+    )
+    assert entry is not None
+    assert entry.parsed.get("access_token") == "kfrxz"
+    assert entry.parsed.get("needs_pairing") is not True

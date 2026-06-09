@@ -68,6 +68,28 @@ class DiscoveredDevice:
         return str(value) if isinstance(value, str) else None
 
 
+# Default-config tokens shipped by various BYOS client firmwares. A
+# device polling with one of these is the official "I haven't been
+# paired yet" signal, the user opened the box, plugged it in, but
+# never pasted a server-minted token into the client config. Treat as
+# unpaired regardless of whether the literal token would happen to
+# pass the access-token validator. Case-insensitive.
+_PLACEHOLDER_TOKEN_PATTERNS: tuple[str, ...] = (
+    "paste-a-server-issued-token-into-your-client",
+    "your-access-token",
+    "placeholder",
+)
+
+
+def _is_placeholder_token(token: str) -> bool:
+    """True when the polling token is the firmware's default
+    'paste-a-real-one-here' literal rather than a server-issued one."""
+    if not token:
+        return True
+    lower = token.lower()
+    return any(p in lower for p in _PLACEHOLDER_TOKEN_PATTERNS)
+
+
 def record_trmnl_discovery(
     cache: DiscoveryCache,
     *,
@@ -79,29 +101,48 @@ def record_trmnl_discovery(
     token, so the Settings → Devices → Discovered strip surfaces it
     for one-click adoption, same UX as MQTT-side discovery.
 
-    The cache id is synthetic (``trmnl_<token>``) since TRMNL devices
-    don't have an MQTT topic. The cached payload includes the original
-    ``access_token`` so the register flow can preserve it (the user
-    already has it pasted into their Kindle config, making them
-    re-paste a freshly-generated one would defeat the point of
-    discovery)."""
-    safe = re.sub(r"[^a-z0-9_-]", "", token.lower())[:20]
-    synthetic_id = f"trmnl_{safe}" if safe else "trmnl_unknown"
+    The cache id is synthetic, since TRMNL devices don't have an MQTT
+    topic. When the client sends its MAC (the official DIY-kit firmware
+    puts it in the ``Id`` header) we key off that, so a device that
+    polls with a placeholder token AND with its real MAC always
+    resolves to a stable id across reboots. The cached payload
+    includes the original ``access_token`` so the register flow can
+    preserve it for clients that already polled with a real token
+    (the user already has it pasted into their Kindle config; making
+    them re-paste defeats discovery). When the token is the firmware's
+    placeholder, we flag ``needs_pairing`` instead and the register
+    flow mints a fresh token so the placeholder doesn't end up as the
+    instance's access secret."""
+    folded = {k.casefold(): v for k, v in headers.items() if isinstance(k, str)}
+    placeholder = _is_placeholder_token(token)
+    mac = folded.get("id") if isinstance(folded.get("id"), str) else None
+    if mac:
+        mac_safe = re.sub(r"[^a-z0-9_-]", "", mac.lower())[:20]
+        synthetic_id = f"trmnl_{mac_safe}" if mac_safe else "trmnl_unknown"
+    else:
+        safe = re.sub(r"[^a-z0-9_-]", "", token.lower())[:20]
+        synthetic_id = f"trmnl_{safe}" if safe else "trmnl_unknown"
     parsed: dict[str, Any] = {
         "kind": "trmnl_client",
-        "access_token": token,
     }
+    if placeholder:
+        # Flag for the register flow + the Discovered card UX.
+        parsed["needs_pairing"] = True
+    else:
+        parsed["access_token"] = token
+    if mac:
+        parsed["mac"] = mac
     # Map BYOS-style headers to the discovery schema the UI already
-    # understands (kind / panel_w / panel_h / fw_version / ip). Lookup is
-    # case-insensitive, different BYOS clients spell the same field
-    # ``Png-Width`` (KOReader), ``png-width`` (recon scripts), or
+    # understands (kind / panel_w / panel_h / fw_version / ip / model).
+    # Lookup is case-insensitive, different BYOS clients spell the same
+    # field ``Png-Width`` (KOReader), ``png-width`` (recon scripts), or
     # ``Width`` (native TRMNL firmware) and we want the panel dims to
     # pre-fill the Register form regardless.
-    folded = {k.casefold(): v for k, v in headers.items() if isinstance(k, str)}
     for src_keys, dest in (
         (("png-width", "width"), "panel_w"),
         (("png-height", "height"), "panel_h"),
         (("user-agent",), "fw_version"),
+        (("model",), "model"),
     ):
         for k in src_keys:
             value = folded.get(k)

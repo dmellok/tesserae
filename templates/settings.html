@@ -50,7 +50,10 @@
         <div class="discovery-id"><code>{{ d.id }}</code></div>
         <dl class="discovery-meta">
           <div><dt>Kind</dt><dd>{{ d.kind or '-' }}</dd></div>
+          {% if d.parsed.needs_pairing %}<div><dt>Status</dt><dd><span class="pill is-warn">Unpaired, click Register to mint a token</span></dd></div>{% endif %}
           {% if d.parsed.access_token %}<div><dt>Access token</dt><dd><code>{{ d.parsed.access_token }}</code></dd></div>{% endif %}
+          {% if d.parsed.model %}<div><dt>Model</dt><dd><code>{{ d.parsed.model }}</code></dd></div>{% endif %}
+          {% if d.parsed.mac %}<div><dt>MAC</dt><dd><code>{{ d.parsed.mac }}</code></dd></div>{% endif %}
           {% if d.panel_w and d.panel_h %}<div><dt>Panel</dt><dd>{{ d.panel_w }}×{{ d.panel_h }}</dd></div>{% endif %}
           {% if d.fw_version %}<div><dt>FW</dt><dd>{{ d.fw_version }}</dd></div>{% endif %}
           {% if d.ip %}<div><dt>IP</dt><dd><code>{{ d.ip }}</code></dd></div>{% endif %}
@@ -1013,6 +1016,9 @@ docker compose up -d</code></pre>
     </header>
     <div class="modal-body">
       <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings, or native TRMNL app config). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Copy it now, refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
+      {% if trmnl_token_reveal.client_ip %}
+      <p class="lede"><i class="ph ph-broadcast" aria-hidden="true"></i> The device polled in from <code>{{ trmnl_token_reveal.client_ip }}</code>. Open its config UI there (usually the same address in a browser) and replace the placeholder access token with the value below.</p>
+      {% endif %}
       <div class="token-row">
         <input type="text" class="token-input" value="{{ trmnl_token_reveal.token }}" readonly data-modal-token aria-label="TRMNL access token">
         <button type="button" class="button" data-modal-copy>
