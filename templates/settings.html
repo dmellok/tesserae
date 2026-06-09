@@ -84,6 +84,10 @@
    collects the instance-specific id, name, and panel dims. #}
 <section class="card" id="add-device">
   {{ card_head('Add device', icon_name='plus-circle', blurb='Register another physical display. Picks a kind for its protocol + renderers; the id becomes its MQTT topic prefix.') }}
+  <p class="field-help" style="margin: 0 0 var(--t-space-3) 0;">
+    <i class="ph ph-info" aria-hidden="true"></i>
+    <strong>Native TRMNL hardware</strong> (XIAO DIY kit, commercial TRMNL devices) doesn't need this form, point the device at this Tesserae's URL via its captive portal and it'll register itself the moment it polls. Only add a TRMNL device manually for the <strong>KOReader on Kindle</strong> path, where the user types the access token on the Kindle's on-screen keyboard.
+  </p>
   <form method="post" action="{{ url_for('auth.devices_add') }}" class="form add-device-form">
     {{ text_input('add-device-id', 'id', 'Device id', value='', placeholder='esp32_kitchen', required=True,
                   help='Lowercase letters, digits, underscore, hyphen (2–32 chars). Used as the MQTT topic prefix: tesserae/<id>/...') }}
@@ -1015,7 +1019,7 @@ docker compose up -d</code></pre>
       </button>
     </header>
     <div class="modal-body">
-      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings, or native TRMNL app config). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Copy it now, refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
+      <p class="lede">Type this into <code>{{ trmnl_token_reveal.device_name }}</code>'s client config (KOReader plugin → TRMNL settings). It's short on purpose so you can enter it on an on-screen keyboard without losing your mind. Native TRMNL hardware (XIAO DIY kit, commercial TRMNL devices) doesn't need this, those clients auto-provision by MAC the first time they poll Tesserae and don't expose a "paste a token" UI. Copy it now, refreshing this page won't bring the modal back, though the device card always shows the current token.</p>
       {% if trmnl_token_reveal.client_ip %}
       <p class="lede"><i class="ph ph-broadcast" aria-hidden="true"></i> The device polled in from <code>{{ trmnl_token_reveal.client_ip }}</code>. Open its config UI there (usually the same address in a browser) and replace the placeholder access token with the value below.</p>
       {% endif %}

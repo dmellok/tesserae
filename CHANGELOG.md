@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.3], 2026-06-09
+
+### Changed
+
+- **TRMNL Add-device + token-reveal copy aligned with the 0.44.1+
+  auto-provision model.**
+  - The Add-device card now opens with an info paragraph telling
+    users that **native TRMNL hardware** (XIAO DIY kit, commercial
+    TRMNL devices) doesn't need the manual form, those clients
+    auto-register the moment they poll. Only the **KOReader on
+    Kindle** path needs a manual add (where the user types the
+    access token on the Kindle's on-screen keyboard).
+  - The one-shot token-reveal modal dropped its "or native TRMNL
+    app config" line (no such app exists for BYOS) and now
+    explicitly notes that native TRMNL hardware ignores this token
+    entirely, the modal is purely for KOReader users.
+
+  Copy-only fix; no contract change.
+
 ## [0.44.2], 2026-06-09
 
 ### Fixed
