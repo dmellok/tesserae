@@ -6,53 +6,17 @@
 [![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae)](https://github.com/dmellok/tesserae/discussions)
 
 <p align="center">
-  <a href="docs/screenshots/hero-dashboards.jpg">
-    <img src="docs/screenshots/hero-dashboards.jpg" alt="Five e-ink panels running Tesserae dashboards" width="820">
-  </a>
-</p>
-
-> **Heads up:** the widget visual language was rebuilt around the
-> Spectra design system and has had a slim-down pass in 0.38–0.43
-> moving niche families (F1, Spotify, GitHub, finance, sky, etc.) to
-> a [community catalog](https://github.com/dmellok/tesserae-widgets)
-> so the default install ships a focused widget shelf. The hero image
-> above is from the early build and is being reshot. For the current
-> look, see the screenshots below and the
-> [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/).
-
-## Screenshots
-
-<p align="center">
-  <a href="docs/screenshots/ui/ha-hub.png">
-    <img src="docs/screenshots/ui/ha-hub.png" alt="Home Assistant dashboard with the Tesserae Hub tile + four panel device cards (live image, battery, signal, IP)" width="820">
+  <a href="docs/screenshots/hero-rack.jpg">
+    <img src="docs/screenshots/hero-rack.jpg" alt="A wooden tabletop with six different e-ink panels, each painting a different Tesserae dashboard: a framed weather/clock/Spotify panel, a Waveshare Spectra 6 bare board showing F1 schedule, the centre 13.3 inch Spectra 6 panel running a GitHub stats dashboard, a Kindle Paperwhite running an OctoPrint dashboard, a Waveshare 7.3 inch PhotoPainter running a weather/pollen view, and a framed Inky 13.3 inch showing the month calendar plus Hacker News" width="900">
   </a>
   <br>
-  <em>Tesserae lives inside HA. The Hub tile + one device card per panel, each pulling its live image entity, battery, signal, and IP.</em>
+  <em>Six panels, one Tesserae server. Framed Inkys, bare Waveshare boards driven by ESP32, and a jailbroken Kindle, all painting different dashboards from the same composer.</em>
 </p>
 
-<p align="center">
-  <a href="docs/screenshots/ui/ha-composition.png">
-    <img src="docs/screenshots/ui/ha-composition.png" alt="Composing a Home Assistant dashboard in Tesserae, cell grid on the left, rendered preview on the right with ha_climate + ha_history + calendar + Spotify + todo tiles" width="820">
-  </a>
-  <br>
-  <em>Composing a dashboard. Cell grid on the left, live preview of HA widgets (climate gauges, history, calendar, Spotify, todo) on the right.</em>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/ui/paper-calendar.png">
-    <img src="docs/screenshots/ui/paper-calendar.png" alt="Paper Calendar dashboard composition, Unsplash photo on the left + calendar_month on the right at 1200x1600" width="820">
-  </a>
-  <br>
-  <em>"Paper Calendar" dashboard, full-bleed Unsplash photo + month grid, rendered at 1200×1600 for an Inky 13.3".</em>
-</p>
-
-<p align="center">
-  <a href="docs/screenshots/ui/bedside.png">
-    <img src="docs/screenshots/ui/bedside.png" alt="Bedside dashboard composition with vivid gradient weather + clock tiles in the preview, Sending toast in the corner" width="820">
-  </a>
-  <br>
-  <em>Bedside dashboard with two of the new gradient themes, mid-send.</em>
-</p>
+For more, see the
+[admin UI gallery](https://dmellok.github.io/tesserae/gallery/)
+and the
+[bundled widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/).
 
 E-ink dashboard companion. Compose tile-based dashboards in the browser,
 render headless, push the resulting frame to one or more devices, Pi

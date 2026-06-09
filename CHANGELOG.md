@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.4], 2026-06-09
+
+### Changed
+
+- **README slimmed down.** Replaced the aged 0.20-era hero image
+  with a new top-down shot of six different e-ink panels (framed
+  Inkys, bare Waveshare boards driven by ESP32, a jailbroken
+  Kindle), all painting different dashboards from the same Tesserae
+  server. Moved the five admin / UI screenshots that lived inline
+  in the README (HA hub, composition, paper calendar, bedside,
+  widget sizing) to a new `docs/gallery.md` wiki page; the README
+  now points at the gallery instead of carrying all five inline.
+- **Wiki nav restructured for clarity.** New top-level "Gallery"
+  page collects the admin UI shots. The two existing widget pages
+  (previously "Gallery (bundled)" and "Gallery (community
+  catalog)") are renamed to "Bundled widgets" and "Community
+  catalog" so the word "Gallery" only means one thing now.
+
 ## [0.44.3], 2026-06-09
 
 ### Changed
