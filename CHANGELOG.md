@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.43.7], 2026-06-09
+
+### Fixed
+
+- **`ruff format` CI failure.** A late-breaking comment edit in
+  `app/settings/devices_routes.py` had drifted from the formatter's
+  preferred wrap. No behaviour change.
+
 ## [0.43.6], 2026-06-09
 
 ### Fixed

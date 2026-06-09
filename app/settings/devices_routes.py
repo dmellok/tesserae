@@ -200,7 +200,9 @@ def devices_register_discovered(discovered_id: str) -> Response:
     # it would lock the new instance to a publicly-known string.
     # Force a fresh mint there, and the reveal modal will surface it
     # for the user to paste back into the client.
-    discovered_needs_pairing = bool(entry.parsed.get("needs_pairing")) if kind_id == "trmnl_client" else False
+    discovered_needs_pairing = (
+        bool(entry.parsed.get("needs_pairing")) if kind_id == "trmnl_client" else False
+    )
     discovered_token = entry.parsed.get("access_token") if kind_id == "trmnl_client" else None
     if discovered_needs_pairing:
         discovered_token = None
