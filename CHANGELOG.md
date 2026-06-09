@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.5], 2026-06-10
+
+### Changed
+
+- **README images re-encoded with EXIF metadata removed.** Smaller
+  files (`hero-rack.jpg` 600 KB → 387 KB, `widget-sizing.jpg` 325 KB
+  → 193 KB), no other visual difference.
+
 ## [0.44.4], 2026-06-09
 
 ### Changed
