@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.2], 2026-06-09
+
+### Fixed
+
+- **`/api/display` now auto-provisions when it sees a novel MAC.**
+  0.44.1 made the box-fresh device flow work via `/api/setup`, but
+  the official TRMNL firmware caches its `api_key` in flash and only
+  hits `/api/setup` on first boot. A device that had already cached
+  a bad / placeholder token (from a pre-0.44.1 Tesserae) would keep
+  polling `/api/display` with that token, get rejected, and land in
+  the Discovered strip — defeating the auto-provision flow.
+
+  Now `/api/display` runs the same auto-provision logic when it sees
+  a MAC (``Id`` header) that doesn't match any existing device.
+  Result: any TRMNL client polling Tesserae with its MAC ends up
+  registered after exactly one poll, regardless of which endpoint
+  it called.
+
+  The auto-provision helper is factored out so both `/api/setup` and
+  `/api/display` use the same code path; no behaviour drift between
+  the two endpoints.
+
 ## [0.44.1], 2026-06-09
 
 ### Changed

@@ -369,3 +369,32 @@ def test_trmnl_api_display_auths_by_mac_when_id_header_present(app: Flask) -> No
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["friendly_id"] == setup["friendly_id"]
+
+
+def test_trmnl_api_display_auto_provisions_when_only_a_mac_arrives(app: Flask) -> None:
+    """Real-world: the XIAO firmware caches whatever api_key it got at
+    setup (potentially a placeholder from a pre-0.44.0 Tesserae) and
+    keeps polling /api/display with it. The token won't be
+    recognised, but the MAC will be present. /api/display should
+    auto-create the device on first sight rather than dropping it
+    into the Discovered strip and making the admin click Register.
+    Matches Terminus's behaviour, where /api/display is implicitly
+    a registration trigger if the device isn't known."""
+    client = app.test_client()
+    resp = client.get(
+        "/api/display",
+        headers={
+            "Id": "BB:CC:DD:EE:FF:00",
+            "Access-Token": "paste-a-server-issued-token-into-your-client",
+            "Width": "800",
+            "Height": "480",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    # Sanity-check: real frame envelope, not a 404 problem-details.
+    assert "image_url" in body
+    # Device is registered and resolvable by MAC.
+    devs = app.config["DEVICE_REGISTRY"]
+    matches = [d for d in devs.all() if d.manifest.get("mac") == "BB:CC:DD:EE:FF:00"]
+    assert len(matches) == 1

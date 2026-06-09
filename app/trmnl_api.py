@@ -132,6 +132,54 @@ def _device_by_request() -> Device | None:
     return None
 
 
+def _auto_provision_by_mac(mac: str) -> Device | None:
+    """Auto-create a TRMNL instance for a fresh device polling with a
+    novel MAC. Matches Terminus's first-touch behaviour, the device
+    polls, the server creates a record, the device gets a frame on
+    its very next iteration. Returns the new ``Device`` on success,
+    ``None`` on auto-create failure (logged; caller falls back to
+    the discovery-cache path)."""
+    from app import device_service
+
+    registry = current_app.config["DEVICE_REGISTRY"]
+    data_root = current_app.config["DEVICE_DATA_ROOT"]
+    renderers = current_app.config["RENDERER_REGISTRY"]
+
+    mac_clean = "".join(c for c in mac.lower() if c.isalnum())
+    instance_id = f"trmnl_{mac_clean[-6:]}" if mac_clean else "trmnl_new"
+    try:
+        panel_w = int(request.headers.get("Width") or request.headers.get("png-width") or 800)
+        panel_h = int(request.headers.get("Height") or request.headers.get("png-height") or 480)
+    except ValueError:
+        panel_w, panel_h = 800, 480
+    model = request.headers.get("Model") or "TRMNL"
+    result = device_service.create_instance(
+        devices=registry,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id=instance_id,
+        kind_id=TRMNL_KIND_ID,
+        name=model,
+        panel_overrides={"w": panel_w, "h": panel_h},
+        mac=mac,
+        api_key_strength="native",
+    )
+    if not result.ok or result.device is None:
+        logger.warning(
+            "trmnl: auto-provision failed for mac=%s: %s",
+            mac,
+            result.error,
+        )
+        return None
+    logger.info(
+        "trmnl: auto-provisioned device %r (mac=%s, model=%r)",
+        result.device.id,
+        mac,
+        request.headers.get("Model"),
+    )
+    return result.device
+
+
 # -- request shape ------------------------------------------------------
 
 
@@ -220,6 +268,16 @@ def display() -> Response | tuple[Response, int]:
     on that path. KOReader doesn't send a MAC, so it stays
     token-authenticated."""
     device = _device_by_request()
+    # If the polling device sent its MAC but we don't have a record
+    # for it (common when the firmware cached a stale api_key in flash
+    # and never re-calls /api/setup), auto-provision right here.
+    # Terminus does the same: any MAC-bearing client polling /api/
+    # display can self-register. The device's own stored token
+    # doesn't matter on subsequent polls because MAC auth is primary.
+    if device is None:
+        mac = (request.headers.get("Id") or request.headers.get("id") or "").strip()
+        if mac:
+            device = _auto_provision_by_mac(mac)
     token = _request_token()  # Still used for the discovery-cache fallback below.
     if device is None:
         logger.info(
@@ -355,62 +413,16 @@ def setup() -> Response:
             return _setup_response(api_key, friendly, existing.id)
 
     # Unknown device. If we have a MAC, auto-create a TRMNL instance.
-    # This is the Terminus BYOS flow: the device is implicitly trusted
-    # (it's on the LAN) and the admin gets to see + manage it after
-    # the fact rather than having to approve it up front.
+    # The device is implicitly trusted (it's on the LAN) and the
+    # admin gets to see + manage it after the fact rather than having
+    # to approve it up front.
     if mac:
-        from app import device_service
-
-        registry = current_app.config["DEVICE_REGISTRY"]
-        data_root = current_app.config["DEVICE_DATA_ROOT"]
-        renderers = current_app.config["RENDERER_REGISTRY"]
-
-        # Synth an instance id from the MAC (six hex chars suffix), so
-        # the file on disk is predictable and a re-register after
-        # delete picks up the same id.
-        mac_clean = "".join(c for c in mac.lower() if c.isalnum())
-        instance_id = f"trmnl_{mac_clean[-6:]}" if mac_clean else "trmnl_new"
-        # Panel dims from the headers, with the BYOS-standard fallback
-        # for native TRMNL panels (800×480).
-        try:
-            panel_w = int(request.headers.get("Width") or request.headers.get("png-width") or 800)
-            panel_h = int(request.headers.get("Height") or request.headers.get("png-height") or 480)
-        except ValueError:
-            panel_w, panel_h = 800, 480
-        # Model gives us a human-readable label fallback if the user
-        # never edits the device name.
-        model = request.headers.get("Model") or "TRMNL"
-        result = device_service.create_instance(
-            devices=registry,
-            renderers=renderers,
-            data_root=data_root,
-            instance_id=instance_id,
-            kind_id=TRMNL_KIND_ID,
-            name=model,
-            panel_overrides={"w": panel_w, "h": panel_h},
-            mac=mac,
-            api_key_strength="native",
-        )
-        if result.ok and result.device is not None:
-            new_device = result.device
+        new_device = _auto_provision_by_mac(mac)
+        if new_device is not None:
             api_key = str(new_device.manifest.get("access_token") or "")
             manifest_friendly = new_device.manifest.get("friendly_id")
             friendly = manifest_friendly if isinstance(manifest_friendly, str) else new_device.id
-            logger.info(
-                "trmnl: /api/setup auto-provisioned device %r (mac=%s, model=%r)",
-                new_device.id,
-                mac,
-                request.headers.get("Model"),
-            )
             return _setup_response(api_key, friendly, new_device.id)
-        # Auto-create failed (id collision, schema error, etc.); fall
-        # through to the discovery-cache path so the admin can at
-        # least see the device exists.
-        logger.warning(
-            "trmnl: /api/setup auto-provision failed for mac=%s: %s",
-            mac,
-            result.error,
-        )
 
     # No MAC, or auto-create failed. Fall back to the discovery flow:
     # mint a token, record, hand it to the device, let admin
