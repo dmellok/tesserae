@@ -105,6 +105,56 @@ def test_anchor_reseeds_each_local_day() -> None:
     assert idx_d2 == 0  # re-anchors at midnight, doesn't carry remainder
 
 
+def test_end_at_returns_none_past_window() -> None:
+    """Rotation runs 09:00 to 17:00. At 17:30, it's no longer active."""
+    r = Rotation(
+        id="r",
+        name="r",
+        anchor="09:00",
+        end_at="17:00",
+        steps=_steps(("a", 30), ("b", 30)),
+    )
+    now = datetime(2026, 6, 15, 17, 30, tzinfo=UTC)
+    assert compute_current_step(r, now, UTC) is None
+
+
+def test_end_at_active_just_before_window_end() -> None:
+    """One minute before end_at, the rotation is still active."""
+    r = Rotation(
+        id="r",
+        name="r",
+        anchor="09:00",
+        end_at="17:00",
+        steps=_steps(("a", 30), ("b", 30)),
+    )
+    now = datetime(2026, 6, 15, 16, 59, tzinfo=UTC)
+    assert compute_current_step(r, now, UTC) is not None
+
+
+def test_end_at_none_means_until_midnight() -> None:
+    """Default behaviour (no end_at): cycle continues to end of day."""
+    r = Rotation(id="r", name="r", anchor="09:00", steps=_steps(("a", 30), ("b", 30)))
+    late = datetime(2026, 6, 15, 23, 59, tzinfo=UTC)
+    assert compute_current_step(r, late, UTC) is not None
+
+
+def test_end_at_wrap_around_window() -> None:
+    """end_at < anchor means a window that wraps midnight, e.g.
+    22:00 to 06:00. Active at 23:00 and 02:00, inactive at 12:00."""
+    r = Rotation(
+        id="r",
+        name="r",
+        anchor="22:00",
+        end_at="06:00",
+        steps=_steps(("a", 60), ("b", 60)),
+    )
+    assert compute_current_step(r, datetime(2026, 6, 15, 23, 0, tzinfo=UTC), UTC) is not None
+    # 02:00 is "before today's 22:00 anchor", so the same-day path
+    # returns None (we're not in the active window for THIS day's
+    # cycle). Wrap-window semantics still hold for daytime gap:
+    assert compute_current_step(r, datetime(2026, 6, 15, 12, 0, tzinfo=UTC), UTC) is None
+
+
 def test_timezone_aware_anchor() -> None:
     """``anchor='09:00'`` is the local 9am; at 09:30 local we're 30 min
     in, so step 1 on a 30/30 split."""

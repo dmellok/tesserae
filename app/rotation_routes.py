@@ -115,6 +115,7 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
         "name": name,
         "enabled": form.get("enabled") in ("on", "true", "1"),
         "anchor": (form.get("anchor") or "00:00").strip(),
+        "end_at": (form.get("end_at") or "").strip() or None,
         "days_of_week": _parse_dow(
             form.getlist("days_of_week") if hasattr(form, "getlist") else []
         ),

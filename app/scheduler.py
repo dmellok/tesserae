@@ -78,12 +78,15 @@ def compute_current_step(
 ) -> tuple[int, RotationStep] | None:
     """Return the ``(step_index, step)`` whose dwell window contains
     ``now`` (in the rotation's anchor timezone), or ``None`` if the
-    rotation isn't active right now (day-of-week mask excludes today,
-    or wall-clock is before today's anchor).
+    rotation isn't active right now.
+
+    Not active when:
+      * day-of-week mask excludes today
+      * wall-clock is before today's anchor
+      * wall-clock is past ``end_at`` (when set)
 
     The cycle re-anchors at the configured ``anchor`` HH:MM each local
-    day, so DST flips don't desync long rotations: at 00:00 (or
-    whatever the anchor is), step 0 starts fresh.
+    day, so DST flips don't desync long rotations.
 
     Math: minutes since today's anchor, modulo total cycle length, then
     walk the steps in order summing dwells until we find the bucket
@@ -98,6 +101,19 @@ def compute_current_step(
     )
     if local_now < anchor_today:
         return None
+    if rotation.end_at is not None:
+        end_t = _parse_hhmm(rotation.end_at)
+        end_today = local_now.replace(hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0)
+        if end_today > anchor_today:
+            # Normal same-day window: stop cycling once we pass end.
+            if local_now >= end_today:
+                return None
+        else:
+            # Wrap-around window (e.g. 22:00 -> 06:00). We're outside
+            # the active window when local_now is in the gap between
+            # ``end`` and ``anchor`` (exclusive of both ends).
+            if end_today <= local_now < anchor_today:
+                return None
     minutes_since_anchor = (local_now - anchor_today).total_seconds() / 60.0
     cycle = rotation.cycle_minutes
     if cycle <= 0:

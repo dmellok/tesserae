@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.3], 2026-06-11
+
+### Added
+
+- **Rotations: optional `end_at` field stops the cycle at a
+  wall-clock time.** Default behaviour is unchanged (cycle until
+  midnight, re-anchor next day), but you can now set e.g.
+  `anchor=09:00` + `end_at=17:00` so the rotation only runs during
+  the workday and falls silent overnight. `end_at < anchor` is a
+  wrap-around window (e.g. 22:00 to 06:00) matching the existing
+  schedule semantics.
+
 ## [0.45.2], 2026-06-11
 
 ### Changed

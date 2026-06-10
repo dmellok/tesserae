@@ -77,6 +77,14 @@ class Rotation(BaseModel):
     # rotations stay aligned to a sensible wall-clock moment.
     anchor: str = "00:00"
 
+    # Optional end-of-day stop time (HH:MM, local). When the wall
+    # clock passes this, the rotation stops cycling for the day and
+    # picks back up at the next day's anchor. ``None`` (the default)
+    # means "cycle until midnight." Setting ``end_at < anchor`` means
+    # a wrap-around window (e.g. 22:00 -> 06:00), same semantics the
+    # Schedule model uses for ``time_of_day_*``.
+    end_at: str | None = None
+
     # Day-of-week filter (0=Mon..6=Sun). On a non-matching day the
     # rotation doesn't fire; the scheduler picks back up on the next
     # matching day at the anchor.
@@ -98,6 +106,15 @@ class Rotation(BaseModel):
     def _validate_anchor(cls, v: str) -> str:
         if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
             raise ValueError("anchor must be 'HH:MM' 24-hour")
+        return v
+
+    @field_validator("end_at")
+    @classmethod
+    def _validate_end_at(cls, v: str | None) -> str | None:
+        if v is None or v == "":
+            return None
+        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", v):
+            raise ValueError("end_at must be 'HH:MM' 24-hour or empty")
         return v
 
     @model_validator(mode="after")

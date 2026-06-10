@@ -48,6 +48,13 @@
       <input type="time" id="rf-{{ r.id or 'new' }}-anchor" name="anchor" value="{{ r.anchor }}" required>
     </div>
     <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-end-at">
+        Cycle ends at <span class="field-opt">optional</span>
+      </label>
+      <input type="time" id="rf-{{ r.id or 'new' }}-end-at" name="end_at" value="{{ r.end_at or '' }}">
+      <p class="field-help">Leave blank to cycle until midnight.</p>
+    </div>
+    <div class="field">
       <label for="rf-{{ r.id or 'new' }}-priority">Priority</label>
       <input type="number" id="rf-{{ r.id or 'new' }}-priority" name="priority"
              value="{{ r.priority }}" min="-100" max="100">
@@ -127,7 +134,10 @@
       </div>
 
       <div class="rotation-meta">
-        <span><i class="ph ph-clock" aria-hidden="true"></i> Cycle starts at {{ r.anchor }}</span>
+        <span>
+          <i class="ph ph-clock" aria-hidden="true"></i>
+          {{ r.anchor }}{% if r.end_at %} to {{ r.end_at }}{% endif %}
+        </span>
         <span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> {{ r.cycle_minutes }} min cycle</span>
         <span><i class="ph ph-list-numbers" aria-hidden="true"></i> {{ r.steps|length }} step{{ '' if r.steps|length == 1 else 's' }}</span>
       </div>
@@ -209,7 +219,7 @@
   <section class="card" id="rotation-form-card">
     {{ card_head('New rotation', icon_name='plus-circle', blurb='Pick the dashboards to cycle through and how long to dwell on each.') }}
     {% set blank = {
-      'id': '', 'name': '', 'anchor': '00:00', 'priority': 0,
+      'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
       'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
       'device_ids': [], 'steps': []
     } %}
