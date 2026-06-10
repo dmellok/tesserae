@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.9], 2026-06-10
+
+### Fixed
+
+- **TRMNL `Battery-Voltage` accepts decimal volts.** Some native TRMNL
+  firmware sends voltage as a decimal string (e.g. `"3.86"`) instead
+  of the integer millivolt form `"3860"`. Tesserae's parser previously
+  only accepted the integer form, so `battery_mv` came out as `None`
+  for those devices, which then meant no entry in the topbar battery
+  indicator and no `battery` sensor in HA discovery. The parser now
+  accepts both: any positive value below 100 is treated as volts and
+  multiplied by 1000; everything else stays interpreted as mV.
+  Threshold is unambiguous, a LiPo never reads in the 100-1000 mV
+  range. Values of 0 or negative are rejected as sensor noise.
+
+## [0.44.8], 2026-06-10
+
 ### Changed
 
 - **`/api/display` envelope alignment with Terminus.** Three small

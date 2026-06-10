@@ -40,7 +40,10 @@ REFRESH_RATE_MAX_S = 24 * 60 * 60
 # ``Battery-Voltage`` and ``Width``/``Height``. Lookup is case-insensitive
 # (see parse_status), so these are stored already case-folded.
 _BATTERY_PCT_HEADERS = ("percent-charged", "battery-percent")
-_BATTERY_MV_HEADERS = ("battery-voltage",)  # native TRMNL sends mV
+# Native TRMNL firmware historically sent millivolts as an integer
+# (e.g. ``"3860"``), but some builds send volts as a decimal string
+# (e.g. ``"3.86"``). Both are accepted, see ``_parse_battery_voltage``.
+_BATTERY_MV_HEADERS = ("battery-voltage",)
 _RSSI_HEADERS = ("rssi",)
 _FW_HEADERS = ("fw-version", "user-agent")  # User-Agent is the KOReader fallback
 _WIDTH_HEADERS = ("png-width", "width")
@@ -92,7 +95,7 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     # ``percent-charged`` or ``PERCENT-CHARGED`` all resolve the same way.
     folded = {k.casefold(): v for k, v in decoded.items() if isinstance(k, str)}
     out["battery_pct"] = _first_int(folded, _BATTERY_PCT_HEADERS)
-    out["battery_mv"] = _first_int(folded, _BATTERY_MV_HEADERS)
+    out["battery_mv"] = _parse_battery_voltage(folded)
     out["rssi"] = _first_int(folded, _RSSI_HEADERS)
     out["fw_version"] = _first_str(folded, _FW_HEADERS)
     out["panel_w"] = _first_int(folded, _WIDTH_HEADERS)
@@ -123,6 +126,39 @@ def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
 
 
 # -- internals ----------------------------------------------------------
+
+
+def _parse_battery_voltage(headers: dict[str, Any]) -> int | None:
+    """Normalise the TRMNL ``Battery-Voltage`` header to millivolts.
+
+    Two formats observed in the wild:
+
+    * Integer millivolts: ``"3860"`` (older / DIY-kit firmware).
+    * Decimal volts: ``"3.86"`` (newer native firmware, also some
+      community builds).
+
+    Heuristic: parse as float, then if the result is below 100,
+    interpret as volts and multiply by 1000. A real LiPo never reads
+    below 100 mV (it'd be far past brownout), and a real volts reading
+    never exceeds ~5 V, so the threshold is unambiguous.
+    """
+    for k in _BATTERY_MV_HEADERS:
+        if k not in headers:
+            continue
+        raw = headers[k]
+        if raw is None:
+            continue
+        try:
+            value = float(str(raw).strip())
+        except (TypeError, ValueError):
+            continue
+        if value <= 0:
+            continue
+        if value < 100:
+            # Decimal volts -> millivolts.
+            return round(value * 1000)
+        return round(value)
+    return None
 
 
 def _first_int(headers: dict[str, Any], keys: tuple[str, ...]) -> int | None:
