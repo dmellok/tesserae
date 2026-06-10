@@ -13,13 +13,13 @@ When 1.0 ships, this policy moves to "current + previous minor".
 
 | Version | Latest patch | Supported |
 |---|---|---|
-| 0.43.x (current) | v0.43.3 | ✅ |
+| 0.44.x (current) | v0.44.5 | ✅ |
+| 0.43.x | v0.43.7 | ❌ |
 | 0.42.x | v0.42.3 | ❌ |
 | 0.41.x | v0.41.2 | ❌ |
 | 0.40.x | v0.40.0 | ❌ |
 | 0.39.x | v0.39.0 | ❌ |
-| 0.38.x | v0.38.0 | ❌ |
-| < 0.38 | varies | ❌ |
+| < 0.39 | varies | ❌ |
 
 ## Reporting a vulnerability
 

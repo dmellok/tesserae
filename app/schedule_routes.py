@@ -274,6 +274,11 @@ def index() -> str:
         timeline=_build_timeline(schedules),
         edit_id=request.args.get("edit"),
         smart_sync_states=_smart_sync_states(schedules, pages),
+        # ``prefill_page`` lets the page editor's inline schedule card
+        # link straight here with the dashboard already selected in
+        # the New-schedule form. Just affects the blank-form default;
+        # editing existing schedules is unaffected.
+        prefill_page=request.args.get("prefill_page", ""),
     )
 
 

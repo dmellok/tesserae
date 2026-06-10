@@ -385,6 +385,54 @@
     {% for cell in page.cells %}
       {{ cell_form(cell, loop.index) }}
     {% endfor %}
+
+    {# Schedules pinned to this dashboard. Last card in the editor
+       column so the user composes the dashboard top-to-bottom, then
+       sees "what fires this and when" as the natural next step. On
+       desktop the preview stays sticky in the right column; on
+       mobile this card stacks below the cell editors with the
+       preview pinned to the top. #}
+    <section class="card schedules-card">
+      {{ card_head('Schedules', icon_name='alarm',
+         blurb='Pushes that fire this dashboard. The Schedules page is the canonical edit surface.') }}
+      {% if schedules_for_page %}
+      <ul class="schedules-card-list">
+        {% for s in schedules_for_page %}
+        <li class="schedules-card-row {% if not s.enabled %}is-disabled{% endif %}">
+          <div class="schedules-card-row-main">
+            <div class="schedules-card-row-name">
+              {% if not s.enabled %}<i class="ph ph-pause-circle" aria-hidden="true" title="Disabled"></i>{% endif %}
+              <strong>{{ s.name }}</strong>
+            </div>
+            <div class="schedules-card-row-meta muted">
+              {% if s.type == 'interval' %}
+                every {{ s.interval_minutes }} min
+                {% if s.time_of_day_start or s.time_of_day_end %}
+                  · {{ s.time_of_day_start or '00:00' }}–{{ s.time_of_day_end or '23:59' }}
+                {% endif %}
+              {% else %}
+                daily {{ s.fires_at.strftime('%H:%M') if s.fires_at else '??:??' }}
+              {% endif %}
+              {% if s.smart_sync %}<span class="pill is-info" title="Smart sync on">JIT</span>{% endif %}
+            </div>
+          </div>
+          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">Edit</a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted schedules-card-empty">
+        No schedules fire this dashboard yet. Add one to push it on a cadence.
+      </p>
+      {% endif %}
+      <div class="schedules-card-actions">
+        <a class="button" href="{{ url_for('schedules.index', prefill_page=page.id) }}#schedule-form-card">
+          <i class="ph ph-plus" aria-hidden="true"></i>
+          Add schedule
+        </a>
+        <a class="ghost-link" href="{{ url_for('schedules.index') }}">All schedules</a>
+      </div>
+    </section>
   </div>
 </div>
 

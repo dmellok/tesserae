@@ -353,6 +353,17 @@ def _editor_context(page: Page) -> dict[str, Any]:
     )
     theme_options = picker_options(build_registry(user_themes=user_themes))
 
+    # Schedules pinned to this page. The editor renders them in a card
+    # under the live preview so you can see (and create) what fires
+    # this dashboard without leaving the composer. The full schedules
+    # page stays the canonical edit / day-mask / smart-sync surface.
+    schedule_store = current_app.config.get("SCHEDULE_STORE")
+    schedules_for_page = (
+        [s for s in schedule_store.all() if s.page_id == page.id]
+        if schedule_store is not None
+        else []
+    )
+
     return {
         "page": page,
         "panel": panel,
@@ -366,6 +377,7 @@ def _editor_context(page: Page) -> dict[str, Any]:
         "layout_editor_cells": layout_editor_cells,
         "device_options": device_options,
         "theme_options": theme_options,
+        "schedules_for_page": schedules_for_page,
     }
 
 

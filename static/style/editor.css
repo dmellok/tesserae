@@ -465,28 +465,59 @@
 
 @media (max-width: 1099px) {
   .editor-grid { gap: var(--t-space-4); }
+  /* Mobile: editor header is NOT sticky, scrolls away naturally so
+     the save/send/delete row only exists at the top of the page.
+     Preview pins just below the global topbar (which IS sticky at
+     z=500), z=5 keeps it under the topbar but above everything else. */
+  :root {
+    --mobile-preview-h: 36vh;
+    --mobile-topbar-h: 56px;
+  }
+  /* Override the base rule (lines ~334) that makes the editor header
+     sticky at top:64px on desktop. Mobile: header is in normal flow
+     so it scrolls away with the rest of the page. Background + blur
+     stay so the visual style is preserved. */
+  .editor-header {
+    position: static;
+    top: auto;
+    z-index: auto;
+  }
+  .preview-card {
+    text-align: center;
+    position: sticky;
+    top: var(--mobile-topbar-h);
+    z-index: 5;
+    margin: 0;
+    background: var(--t-surface);
+    /* Soft separator from the editor content scrolling beneath. */
+    box-shadow: 0 8px 12px -10px rgba(0, 0, 0, 0.22);
+    /* Tighter padding since the title bar + dims line are hidden;
+       the preview gets nearly the full card. */
+    padding: var(--t-space-3);
+  }
+  /* Hide the "Live preview" title bar and the "1200 × 1600 · …" dims
+     line on mobile to maximise the preview area in the sticky card.
+     Both labels are obvious in context (the preview IS the preview;
+     the panel dims are in the topbar's deeper UI). */
+  .preview-card > .card-head { display: none; }
+  .preview-card .preview-dims { display: none; }
   /* Centred, aspect-preserved preview frame. --panel-ar is set
      inline (w/h) so width = min(100%, max-height × --panel-ar);
-     height comes from the existing aspect-ratio rule. Result: a
-     portrait panel takes 460px of vertical room and 460*0.75 =
-     345px of horizontal room, leaving the rest of the card empty
-     instead of being wastefully wide. */
-  .preview-card { text-align: center; }
+     height comes from the existing aspect-ratio rule. */
   .preview-frame {
     display: inline-block;
-    width: min(100%, calc(460px * var(--panel-ar, 1)));
-    max-height: 460px;
-    /* aspect-ratio inline keeps height in lockstep with width. */
+    width: min(100%, calc(var(--mobile-preview-h) * var(--panel-ar, 1)));
+    max-height: var(--mobile-preview-h);
   }
 }
 
 /* Phone-portrait: tighten everything. Header collapses to two rows;
    action buttons go icon-only to fit. */
 @media (max-width: 600px) {
-  .preview-frame {
-    max-height: 320px;
-    width: min(100%, calc(320px * var(--panel-ar, 1)));
-  }
+  /* Shorter cap on phone-portrait so the cell editors get most of the
+     viewport. The sticky preview at the top is meant for live-eyeing
+     edits, not dominating the screen. */
+  :root { --mobile-preview-h: 30vh; }
   .editor-grid { gap: var(--t-space-3); }
   .preview-dims { font-size: var(--t-size-xs); margin-top: var(--t-space-2); text-align: center; }
 
@@ -978,3 +1009,57 @@
   border-style: dashed;
 }
 
+
+/* ----- Schedules card on the page editor --------------------------- */
+/* Compact list of schedules pinned to this dashboard, surfaced under
+   the live preview so the composer can see "what fires this" at a
+   glance and one-click into the schedules page to add or edit. */
+.schedules-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.schedules-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--t-space-3);
+  padding: var(--t-space-2) var(--t-space-3);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--t-fg-soft, #9aa0aa) 6%, transparent);
+}
+.schedules-card-row.is-disabled .schedules-card-row-name { color: var(--t-fg-soft); }
+.schedules-card-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.schedules-card-row-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  font-size: var(--t-size-md);
+  color: var(--t-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.schedules-card-row-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-sm);
+}
+.schedules-card-empty {
+  margin: 0 0 var(--t-space-3);
+}
+.schedules-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-3);
+  margin-top: var(--t-space-3);
+}

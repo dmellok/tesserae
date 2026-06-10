@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.6], 2026-06-10
+
+### Added
+
+- **Inline schedules card on the page editor.** A new "Schedules"
+  card now sits at the bottom of the editor column (last after the
+  Dashboard, Layout, and Cell editor cards) showing the schedules
+  pinned to this dashboard with their cadence, smart-sync state, and
+  an Edit link per row. "Add schedule" links straight to the full
+  schedules form with the dashboard already selected (new
+  `?prefill_page=<id>` query param on `/schedules` opens the
+  New-schedule form automatically). Empty state nudges you to add
+  one when none exist.
+
+### Changed
+
+- **Mobile page-editor layout reshaped.** Below 1100px the live
+  preview is now `position: sticky` pinned just under the global
+  topbar so you can keep editing cells without losing sight of the
+  rendered output. The "Live preview" title bar and the
+  `1200 × 1600 · Lounge, Office` dims line are hidden at narrow
+  widths to maximise the preview area in the sticky card. The
+  page-editor header (Save / Send / Delete) goes back to being
+  non-sticky on mobile so it scrolls away naturally; the desktop
+  sticky-glass-blur behaviour is preserved.
+- **README + docs drift cleanup.**
+  - README's theme block called out "19 themes across four families
+    including base16"; base16 was retired in 0.43.0 and the actual
+    count is 41 themes across 5 families (Light / Dark / Movement /
+    Vivid / Gradient). Fixed.
+  - README's community-catalog mentions updated from 15 to 16
+    entries (the new `paperlesspaper_art` widget published today).
+  - README's "~790 tests" bumped to "~800 tests" (currently 802 in
+    CI).
+  - `.github/SECURITY.md` supported-versions table refreshed: 0.44.x
+    is current at v0.44.5; 0.43.x rolled off to ❌.
+  - `docs/widget-design-system.md` theme breakdown corrected
+    (`7 Light + 2 Dark + 3 Movement + 15 Vivid + 14 Gradient = 41`).
+
 ## [0.44.5], 2026-06-10
 
 ### Changed

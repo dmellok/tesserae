@@ -155,7 +155,7 @@
   {% endif %}
 </section>
 
-<section class="card" id="schedule-form-card" {% if not edit_id %}hidden{% endif %} data-new-schedule-form>
+<section class="card" id="schedule-form-card" {% if not edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
   {{ card_head('Edit schedule' if edit_id else 'New schedule',
                icon_name='pencil-simple' if edit_id else 'plus-circle') }}
   {% if edit_id %}
@@ -166,7 +166,7 @@
       <p class="lede">No schedule with that id.</p>
     {% endif %}
   {% else %}
-    {% set blank = {'id': '', 'name': '', 'page_id': '', 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
+    {% set blank = {'id': '', 'name': '', 'page_id': (prefill_page or ''), 'enabled': true, 'type': 'interval', 'interval_minutes': 30, 'fires_at': none, 'time_of_day_start': '', 'time_of_day_end': '', 'priority': 0, 'days_of_week': [0,1,2,3,4,5,6], 'smart_sync': false, 'smart_sync_lead_s': 10} %}
     {{ schedule_form(blank, false, pages) }}
   {% endif %}
 </section>

@@ -29,7 +29,7 @@ contained change.
 **📖 [Full documentation](https://dmellok.github.io/tesserae/)** -
 install guides, the [bundled gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
 (30 widgets) and [community catalog](https://dmellok.github.io/tesserae/widgets/community/)
-(15 + bundles), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
+(16 + bundles), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/) (with AI).
 
 > **Self-hosted hobby project.** Tesserae installs with `docker compose up`
@@ -51,7 +51,7 @@ auto-discover clients that announce themselves on the broker.
 30 widgets bundled across the universally-useful set, weather, clocks,
 calendar, news (HN / RSS / Wikipedia OTD), HA, picture gallery, todo,
 webpage, plus the `weather_now_scenic` reference for the
-`design.palette: extended` opt-in. Another 15 entries cover niche /
+`design.palette: extended` opt-in. Another 16 entries cover niche /
 credential-gated families (F1, Spotify, GitHub, Finance, Sky, Glances,
 OctoPrint, Unsplash, iCloud Shared Albums, and more) via the
 [community catalog](https://dmellok.github.io/tesserae/widgets/community/),
@@ -119,7 +119,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Themes & typography (Spectra design system)
 
-- **19 bundled themes** across four families: Light (light / sepia / cool-gray / high-contrast), Dark (dark / nord), Movement (bauhaus / destijl / brutalist palettes), and base16 (10 popular code-editor palettes adapted for dashboards: Gruvbox, Solarized, Dracula, Catppuccin Mocha, Monokai, Tomorrow, One Dark).
+- **41 bundled themes** across five families: Light (4 + 3 punchier vivid-light / citrus / arctic), Dark (2), Movement (3 palettes for the matching movement styles), Vivid (15 saturated flat-colour surfaces, Tangerine through Forest), and Gradient (14 themes that paint a linear gradient on every widget card via the `--surface-gradient` opt-in). base16 was retired in 0.43.0; the curated dashboards-friendly Spectra families took its place.
 - **Themes page** (top-nav → Themes) with a vertical strip of every theme on the left, a builder pane in the middle, and a sticky preview on the right. Click any theme to load it; bundled themes show a "Duplicate to edit" CTA, user themes are editable + deletable.
 - **Theme builder**: 20 colour tokens (3 surfaces + 4 text + 1 edge + 6 accents × 2 (base + soft) + 1 on-accent) plus mode (light/dark) and optional font-family. Live preview tracks every input. Optional auto-derive switch computes each `accent_*_soft` as `mix(accent, bg, 0.78)` for one less thing to tune.
 - **Image-to-theme**, upload a photo or poster; k-means picks dominant colours and the assignment heuristic spreads them across the Spectra tokens (light/dark mode auto-detected from the modal cluster's luminance). One click fills the form.
@@ -161,7 +161,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Quality
 
-- **~790 tests** (pytest) green; CI runs every push.
+- **~800 tests** (pytest) green; CI runs every push.
 - **`ruff check` + `ruff format --check`** in CI.
 - **`mypy --strict`** on contract modules (state, push, plugin / renderer / device loaders, renderer, themes routes).
 - **Spectra CSS ↔ theme-registry guard test**, every `[data-theme="..."]` block in the stylesheet has a registry entry and vice versa, so the picker and the cascade can never drift.
