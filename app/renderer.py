@@ -116,6 +116,12 @@ class RenderRequest:
     # under no obvious cause, most commonly a brief loopback contention
     # or a background-thread GC pause that ate the navigation window.
     max_attempts: int = 3
+    # IANA zone name (e.g. ``"Europe/London"``) forwarded to Chromium so
+    # widgets' client-side ``new Date()`` matches the app's configured
+    # timezone, NOT the Docker container's ``TZ`` env var (which defaults
+    # to UTC). ``None`` leaves Chromium on its default behaviour, which
+    # is what unit tests + the local dev server want.
+    timezone_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -255,11 +261,14 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
     ``attempt`` is the 1-indexed retry counter, surfaced in the phase log
     so a "render took 30s" investigation can spot when a goto failure
     burned the first attempt + 15s before the second one succeeded."""
-    context = browser.new_context(
-        viewport={"width": request.viewport_w, "height": request.viewport_h},
-        device_scale_factor=1,
-        color_scheme="light",
-    )
+    context_kwargs: dict[str, Any] = {
+        "viewport": {"width": request.viewport_w, "height": request.viewport_h},
+        "device_scale_factor": 1,
+        "color_scheme": "light",
+    }
+    if request.timezone_id:
+        context_kwargs["timezone_id"] = request.timezone_id
+    context = browser.new_context(**context_kwargs)
     try:
         page = context.new_page()
         page.set_default_timeout(request.timeout_ms)

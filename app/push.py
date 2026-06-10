@@ -40,6 +40,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
 from app.panel import (
@@ -54,6 +55,40 @@ from app.state.event_log import EventLog
 from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
 from app.transport import MqttTransport
+
+
+def resolve_render_timezone_id(settings: SettingsStore) -> str | None:
+    """Return the IANA zone name (e.g. ``"Europe/London"``) the
+    renderer's Chromium should use for ``new Date()``, or ``None`` to
+    leave Chromium on its default behaviour.
+
+    Reads ``settings.app.timezone`` on every call so a settings change
+    picks up without restarting Playwright. ``"system"`` and
+    unparseable values return ``None``, which means the container's
+    ``TZ`` env var still applies (pre-fix behaviour).
+
+    Without this, a Docker / HA add-on deployment runs Chromium in a
+    UTC container while the user's Tesserae settings say
+    ``Europe/London``. The clock widget's ``new Date()`` honours UTC,
+    so the rendered frame is an hour behind during BST. Forwarding
+    the resolved name via ``new_context(timezone_id=...)`` aligns the
+    rendered frame with what the in-browser preview shows."""
+    try:
+        raw = str(settings.get_section("app").get("timezone") or "system").strip()
+    except Exception:
+        return None
+    if not raw or raw.lower() == "system":
+        return None
+    try:
+        ZoneInfo(raw)
+    except ZoneInfoNotFoundError:
+        logger.warning(
+            "render timezone: settings.app.timezone=%r is not a known IANA zone, "
+            "falling back to container TZ",
+            raw,
+        )
+        return None
+    return raw
 
 
 def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
@@ -456,7 +491,12 @@ class PushManager:
                 started = time.monotonic()
                 try:
                     composition = render_to_png(
-                        RenderRequest(url=url, viewport_w=viewport_w, viewport_h=viewport_h),
+                        RenderRequest(
+                            url=url,
+                            viewport_w=viewport_w,
+                            viewport_h=viewport_h,
+                            timezone_id=self._render_timezone_id(),
+                        ),
                         pool=self._browser_pool_fn(),
                     )
                 except Exception as err:
@@ -606,7 +646,12 @@ class PushManager:
             )
             try:
                 composition_png = render_to_png(
-                    RenderRequest(url=compose_url, viewport_w=panel.w, viewport_h=panel.h),
+                    RenderRequest(
+                        url=compose_url,
+                        viewport_w=panel.w,
+                        viewport_h=panel.h,
+                        timezone_id=self._render_timezone_id(),
+                    ),
                     pool=self._browser_pool_fn(),
                 )
             except Exception as err:
@@ -1030,6 +1075,10 @@ class PushManager:
         if len(data) > _MAX_REMOTE_IMAGE_BYTES:
             raise RuntimeError(f"image exceeds {_MAX_REMOTE_IMAGE_BYTES // (1024 * 1024)} MiB cap")
         return bytes(data)
+
+    def _render_timezone_id(self) -> str | None:
+        """See :func:`resolve_render_timezone_id`."""
+        return resolve_render_timezone_id(self._settings)
 
     # -- event-log shortcuts --------------------------------------------
 

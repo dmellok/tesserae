@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.10], 2026-06-11
+
+### Fixed
+
+- **Rendered frames now honour the app-level timezone setting.**
+  Tesserae's preview iframe paints in the user's browser, so it picks
+  up the laptop's local timezone. The actual frame pushed to the
+  device is painted by a headless Chromium *inside the Tesserae
+  container*, which previously read its timezone from the container's
+  `TZ` env var (defaulting to UTC under Docker / the HA add-on). For
+  users on Europe/London during BST, that meant clock + calendar
+  widgets rendered an hour behind, even with
+  `settings.app.timezone = "Europe/London"` configured.
+  `RenderRequest` now carries a `timezone_id` field; `PushManager`
+  reads the app setting on every push and forwards it to
+  `browser.new_context(timezone_id=...)`. `"system"`, empty, or
+  unparseable values still fall through to the container TZ (pre-fix
+  behaviour). DST transitions are handled by the underlying
+  `tzdata` package, so a BST→GMT change at the end of October will
+  follow automatically without restarting Tesserae.
+
 ## [0.44.9], 2026-06-10
 
 ### Fixed
