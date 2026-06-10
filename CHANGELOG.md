@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.4], 2026-06-11
+
+### Fixed
+
+- **Rotations editor form: 4-column grid + equal field heights.**
+  The `end_at` field's "leave blank to cycle until midnight" help
+  text was a `<p class="field-help">` underneath the input, which
+  pushed that column taller than the others and bumped Priority
+  onto a second row. Help text now lives in the input's `title`
+  tooltip; the grid is `1.5fr 1fr 1fr 1fr` so Name | Starts | Ends
+  | Priority share one row at desktop, collapse to 2-up under
+  960px and 1-up under 540px.
+
 ## [0.45.3], 2026-06-11
 
 ### Added

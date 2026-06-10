@@ -51,8 +51,9 @@
       <label for="rf-{{ r.id or 'new' }}-end-at">
         Cycle ends at <span class="field-opt">optional</span>
       </label>
-      <input type="time" id="rf-{{ r.id or 'new' }}-end-at" name="end_at" value="{{ r.end_at or '' }}">
-      <p class="field-help">Leave blank to cycle until midnight.</p>
+      <input type="time" id="rf-{{ r.id or 'new' }}-end-at" name="end_at"
+             value="{{ r.end_at or '' }}"
+             title="Leave blank to cycle until midnight">
     </div>
     <div class="field">
       <label for="rf-{{ r.id or 'new' }}-priority">Priority</label>

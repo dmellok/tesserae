@@ -427,9 +427,20 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 
 /* New / edit form */
 
-.rotation-form .field-grid { grid-template-columns: repeat(3, 1fr); }
+/* Four fields on one row at desktop width (Name + Starts + Ends +
+   Priority). Name gets a bit more space because it's free-text; the
+   three numeric / time inputs sit at 1fr each. align-items: end keeps
+   inputs on a shared baseline even if a label wraps over two lines. */
+.rotation-form .field-grid {
+  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  align-items: end;
+}
 
-@media (max-width: 720px) {
+@media (max-width: 960px) {
+  .rotation-form .field-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 540px) {
   .rotation-form .field-grid { grid-template-columns: 1fr; }
 }
 
