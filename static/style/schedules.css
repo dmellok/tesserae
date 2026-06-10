@@ -462,3 +462,56 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 @media (max-width: 540px) {
   .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto; }
 }
+
+/* Step preview cards: page name on one line, bound devices listed below. */
+.rotation-steps-preview li {
+  grid-template-columns: 2em 1fr;
+  align-items: start;
+  padding: var(--t-space-2);
+}
+
+.rot-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-1);
+  min-width: 0;
+}
+
+.rot-step-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--t-space-3);
+}
+
+.rot-step-devices {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  font-size: var(--t-size-sm);
+}
+
+.rot-step-devices li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 2px 8px;
+  background: var(--t-surface-sunken, color-mix(in srgb, var(--t-text) 6%, transparent));
+  border-radius: var(--t-radius-pill, 999px);
+  color: var(--t-muted);
+}
+
+.rot-step-devices li i {
+  font-size: 1.1em;
+}
+
+.rot-step-devices--empty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  margin: 0;
+  font-size: var(--t-size-sm);
+}

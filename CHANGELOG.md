@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.2], 2026-06-11
+
+### Changed
+
+- **Rotations: drop the device picker; show each step's page-bound
+  devices in the preview instead.** Each dashboard already binds to
+  devices, so making the rotation re-bind was duplicate work and a
+  source of confusion. The form's Devices section is gone; the
+  read-only step preview on each rotation card now shows little
+  device chips under the page name, so at a glance you see "step 1:
+  Morning Briefing → Lounge + Kitchen panels." Empty bindings show
+  a warning chip so you don't accidentally save a rotation whose
+  step has no destination.
+
 ## [0.45.1], 2026-06-11
 
 ### Fixed

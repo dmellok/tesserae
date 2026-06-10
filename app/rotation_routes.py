@@ -118,9 +118,9 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
         "days_of_week": _parse_dow(
             form.getlist("days_of_week") if hasattr(form, "getlist") else []
         ),
-        "device_ids": [
-            d for d in (form.getlist("device_ids") if hasattr(form, "getlist") else []) if d
-        ],
+        # Rotation does NOT carry device bindings; each step's page
+        # already knows which devices it pushes to.
+        "device_ids": [],
         "priority": int(form.get("priority") or 0),
         "steps": [s.model_dump() for s in _parse_steps(form)],
     }
@@ -208,27 +208,28 @@ def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any
     return out
 
 
-def _device_options(selected: set[str]) -> list[dict[str, Any]]:
-    """Build the list-of-dicts shape the ``device-checklist`` macro
-    expects, same as the page editor uses. Built-in kinds and devices
-    without a panel block are skipped (not bindable targets)."""
+def _devices_for_page(pages: list[Any]) -> dict[str, list[dict[str, str]]]:
+    """Map ``page_id -> [{id, name, icon}]`` so each step row in the
+    read-only preview can show which physical devices a step's page
+    will push to. Built-in-kind devices and panel-less entries are
+    skipped (they aren't real targets)."""
     registry = current_app.config.get("DEVICE_REGISTRY")
-    out: list[dict[str, Any]] = []
+    out: dict[str, list[dict[str, str]]] = {}
     if registry is None:
+        for p in pages:
+            out[p.id] = []
         return out
-    for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
+    by_id: dict[str, Any] = {}
+    for dev in registry.devices.values():
         if dev.kind_of is None or dev.panel is None:
             continue
-        out.append(
-            {
-                "id": dev.id,
-                "name": dev.name,
-                "icon": dev.icon,
-                "label": dev.display_name,
-                "dims": f"{dev.panel['w']}×{dev.panel['h']}",
-                "checked": dev.id in selected,
-            }
-        )
+        by_id[dev.id] = dev
+    for p in pages:
+        out[p.id] = [
+            {"id": d.id, "name": d.display_name, "icon": d.icon}
+            for d in (by_id.get(did) for did in p.device_ids)
+            if d is not None
+        ]
     return out
 
 
@@ -236,29 +237,14 @@ def _device_options(selected: set[str]) -> list[dict[str, Any]]:
 def index() -> str:
     rotations = _store().all()
     pages = _pages().list()
-    edit_id = request.args.get("edit")
-    # When editing, the form's device-checklist needs to reflect the
-    # rotation's existing bindings; otherwise the empty form gets
-    # everything unchecked.
-    selected_for_form: set[str] = set()
-    if edit_id is not None:
-        existing = next((r for r in rotations if r.id == edit_id), None)
-        if existing is not None:
-            selected_for_form = set(existing.device_ids)
     return render_template(
         "rotations.html",
         rotations=rotations,
         pages=pages,
         page_names={p.id: p.name for p in pages},
-        device_options=_device_options(selected_for_form),
-        # Per-card device_options snapshots, keyed by rotation id, so
-        # an inline-edit form for a specific rotation gets the right
-        # ticks pre-set without us swapping global state per row.
-        device_options_by_rotation={
-            r.id: _device_options(set(r.device_ids)) for r in rotations
-        },
+        page_devices=_devices_for_page(pages),
         current_step=_current_step_for_each(rotations),
-        edit_id=edit_id,
+        edit_id=request.args.get("edit"),
         projections={r.id: _build_projection(r) for r in rotations},
     )
 
