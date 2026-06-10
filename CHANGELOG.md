@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.11], 2026-06-11
+
+### Added
+
+- **Dev gallery sample for `calendar_schedule`.** The new community
+  widget (Google-Calendar-style agenda view, lives in
+  `tesserae-calendar-schedule`) would render blank in the dev gallery
+  without an ICS feed configured. Bundling a synthetic
+  school-week sample under `widget_samples` so users browsing
+  `/_test/widgets` (and the catalog preview pipeline) see a
+  representative frame without having to wire up calendar_core.
+
 ## [0.44.10], 2026-06-11
 
 ### Fixed

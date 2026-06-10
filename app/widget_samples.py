@@ -471,7 +471,172 @@ def _picture_gallery() -> dict[str, Any]:
     }
 
 
+def _calendar_schedule() -> dict[str, Any]:
+    """Synthetic agenda fixture that mimics a busy school-and-work
+    week. Used to paint the dev gallery + catalog preview for the
+    ``calendar_schedule`` community widget without needing a live ICS
+    feed configured."""
+    # Use placeholder date metadata; the widget reads these fields
+    # straight from the dict, so we don't need to derive them from a
+    # real date (the live path does that itself).
+    return {
+        "now": "2026-10-01T08:00:00+00:00",
+        "tz": "UTC",
+        "time_format": "12h",
+        "show_location": True,
+        "show_dot_color": True,
+        "count": 13,
+        "days": [
+            {
+                "date_iso": "2026-10-01",
+                "day_of_month": 1,
+                "day_of_week_short": "FRI",
+                "month_short": "OCT",
+                "is_today": True,
+                "is_tomorrow": False,
+                "events": [
+                    {
+                        "summary": "PTO Book Fair",
+                        "all_day": True,
+                        "colour": "#3366CC",
+                        "feed_name": "School",
+                    },
+                    {
+                        "summary": "Day A (Week 4)",
+                        "all_day": True,
+                        "colour": "#C2185B",
+                        "feed_name": "Calendar",
+                    },
+                    {
+                        "summary": "PTO Fall Family Night",
+                        "all_day": False,
+                        "colour": "#3366CC",
+                        "feed_name": "School",
+                        "start_local": "2026-10-01T18:00:00-04:00",
+                        "end_local": "2026-10-01T19:00:00-04:00",
+                    },
+                ],
+            },
+            {
+                "date_iso": "2026-10-02",
+                "day_of_month": 2,
+                "day_of_week_short": "SAT",
+                "month_short": "OCT",
+                "is_today": False,
+                "is_tomorrow": True,
+                "events": [
+                    {
+                        "summary": "PTO Book Fair",
+                        "all_day": True,
+                        "colour": "#3366CC",
+                        "feed_name": "School",
+                    },
+                ],
+            },
+            {
+                "date_iso": "2026-10-03",
+                "day_of_month": 3,
+                "day_of_week_short": "SUN",
+                "month_short": "OCT",
+                "is_today": False,
+                "is_tomorrow": False,
+                "events": [
+                    {
+                        "summary": "PTO Book Fair",
+                        "all_day": True,
+                        "colour": "#3366CC",
+                        "feed_name": "School",
+                    },
+                ],
+            },
+            {
+                "date_iso": "2026-10-04",
+                "day_of_month": 4,
+                "day_of_week_short": "MON",
+                "month_short": "OCT",
+                "is_today": False,
+                "is_tomorrow": False,
+                "events": [
+                    {
+                        "summary": "PTO Book Fair",
+                        "all_day": True,
+                        "colour": "#3366CC",
+                        "feed_name": "School",
+                    },
+                    {
+                        "summary": "Week of Respect (WHS theme days)",
+                        "all_day": True,
+                        "colour": "#C2185B",
+                        "feed_name": "Calendar",
+                    },
+                    {
+                        "summary": "Day B",
+                        "all_day": True,
+                        "colour": "#C2185B",
+                        "feed_name": "Calendar",
+                    },
+                    {
+                        "summary": "Voluntary PD: Carolina Science Online Review (Option 1)",
+                        "all_day": False,
+                        "colour": "#8E8E8E",
+                        "feed_name": "Staff",
+                        "start_local": "2026-10-04T15:45:00-04:00",
+                        "end_local": "2026-10-04T16:45:00-04:00",
+                    },
+                ],
+            },
+            {
+                "date_iso": "2026-10-05",
+                "day_of_month": 5,
+                "day_of_week_short": "TUE",
+                "month_short": "OCT",
+                "is_today": False,
+                "is_tomorrow": False,
+                "events": [
+                    {
+                        "summary": "Week of Respect (WHS theme days)",
+                        "all_day": True,
+                        "colour": "#C2185B",
+                        "feed_name": "Calendar",
+                    },
+                    {
+                        "summary": "Day C",
+                        "all_day": True,
+                        "colour": "#C2185B",
+                        "feed_name": "Calendar",
+                    },
+                    {
+                        "summary": "ARC Core Training at Clifford",
+                        "all_day": True,
+                        "colour": "#8E8E8E",
+                        "feed_name": "Staff",
+                        "location": "Margaret C Clifford School",
+                    },
+                    {
+                        "summary": "Scholastic Fall Bookfair Teacher Preview",
+                        "all_day": False,
+                        "colour": "#7CB342",
+                        "feed_name": "Events",
+                        "location": "Hill Media Center",
+                        "start_local": "2026-10-05T11:00:00-04:00",
+                        "end_local": "2026-10-05T13:00:00-04:00",
+                    },
+                    {
+                        "summary": "Voluntary PD: Carolina Science Online Review (Option 2)",
+                        "all_day": False,
+                        "colour": "#8E8E8E",
+                        "feed_name": "Staff",
+                        "start_local": "2026-10-05T15:45:00-04:00",
+                        "end_local": "2026-10-05T16:45:00-04:00",
+                    },
+                ],
+            },
+        ],
+    }
+
+
 SAMPLES: dict[str, Any] = {
+    "calendar_schedule": _calendar_schedule,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
     "ha_climate": _ha_climate,
