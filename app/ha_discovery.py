@@ -73,6 +73,15 @@ CMD_TOPIC_ACTIVE_PAGE = "tesserae/ha/cmd/active_page"
 # which don't report battery/RSSI, stay uncluttered).
 _DYN_SENSORS: dict[str, dict[str, Any]] = {
     "battery_pct": {"object": "battery", "name": "Battery", "device_class": "battery", "unit": "%"},
+    "battery_mv": {
+        # Native TRMNL firmware sends raw millivolts; expose them as a
+        # separate diagnostic so power-curious users can wire automations
+        # against the underlying voltage rather than the (derived) pct.
+        "object": "battery_voltage",
+        "name": "Battery voltage",
+        "device_class": "voltage",
+        "unit": "mV",
+    },
     "rssi": {
         "object": "signal",
         "name": "Signal",

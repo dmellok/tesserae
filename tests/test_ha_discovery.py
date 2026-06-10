@@ -424,6 +424,23 @@ def test_heartbeat_publishes_last_seen_and_dynamic_sensors(tmp_path: Path) -> No
     assert any("sensor/tesserae/dev_lounge_battery/config" in t for t in _published_topics(client))
 
 
+def test_heartbeat_publishes_battery_voltage_sensor(tmp_path: Path) -> None:
+    """TRMNL devices report raw mV in the heartbeat. HA discovery should
+    publish a separate voltage sensor alongside the (derived) battery
+    pct so power-curious users can wire automations off the raw value."""
+    ha, client, _pm, _store = _wire(tmp_path, devices=_reg_with_lounge())
+    ha.start()
+    client.published.clear()
+    ha.note_device_heartbeat("lounge", {"battery_mv": 3850, "battery_pct": 61})
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/battery_voltage") == b"3850"
+    assert _payload_for(client, "tesserae/ha/dev/lounge/state/battery") == b"61"
+    # The voltage sensor config was published lazily the first time the
+    # key appeared, alongside the battery sensor.
+    topics = _published_topics(client)
+    assert any("sensor/tesserae/dev_lounge_battery_voltage/config" in t for t in topics)
+    assert any("sensor/tesserae/dev_lounge_battery/config" in t for t in topics)
+
+
 def test_stop_blanks_per_device_configs(tmp_path: Path) -> None:
     ha, client, _pm, store = _wire(tmp_path, devices=_reg_with_lounge())
     store.save(Page(id="m", name="Morning", panel=Panel(w=100, h=100), device_ids=["lounge"]))

@@ -164,6 +164,35 @@ def status_changed_meaningfully(prev: dict[str, Any], merged: dict[str, Any]) ->
     return before != after
 
 
+# LiPo discharge curve, used to derive ``battery_pct`` from raw
+# millivolts when a device's firmware reports only voltage (native
+# TRMNL kit firmware does this). The curve is the simple linear
+# approximation that smart-home dashboards typically run, full at
+# 4200 mV and empty at the panel-safe 3300 mV cutoff. Real cells
+# discharge non-linearly (a long plateau near 3.7 V), so this is
+# pessimistic in the middle of the range, which is the right bias
+# for "should the user worry about replacing this battery."
+_BATTERY_FULL_MV: int = 4200
+_BATTERY_EMPTY_MV: int = 3300
+
+
+def _derive_battery_pct(merged: dict[str, Any]) -> None:
+    """Overwrite ``merged['battery_pct']`` from ``merged['battery_mv']``.
+    No-op when no mV is known. Called by ``merge_status_parsed`` only
+    when the caller knows the explicit pct is missing AND a fresh mV
+    arrived (see the gating logic there)."""
+    mv_raw = merged.get("battery_mv")
+    if mv_raw is None:
+        return
+    try:
+        mv = int(mv_raw)
+    except (TypeError, ValueError):
+        return
+    span = _BATTERY_FULL_MV - _BATTERY_EMPTY_MV
+    pct = round((mv - _BATTERY_EMPTY_MV) / span * 100)
+    merged["battery_pct"] = max(0, min(100, pct))
+
+
 def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     """Merge a freshly-parsed heartbeat into the prior cached dict.
 
@@ -176,12 +205,25 @@ def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, 
 
     Rules: a ``None`` in ``new`` doesn't overwrite a non-None in
     ``prev``. Everything else takes the new value, so a real heartbeat
-    that brings a fresh number always wins."""
+    that brings a fresh number always wins.
+
+    After merging, derive ``battery_pct`` from ``battery_mv`` when the
+    firmware only reported voltage (TRMNL kit firmware does this).
+    Done here so every heartbeat path, MQTT and HTTP, gets the
+    derivation uniformly without each device's ``parse_status`` having
+    to know LiPo math."""
     merged: dict[str, Any] = dict(prev)
     for key, value in new.items():
         if value is None and merged.get(key) is not None:
             continue
         merged[key] = value
+    # Derive battery_pct from voltage only when the fresh heartbeat
+    # carried a new mV AND no explicit pct. This handles three cases:
+    #   * ESP32 sends both: explicit pct wins, derivation skipped.
+    #   * TRMNL sends only mV: derivation runs, populates pct.
+    #   * LWT (all None): no mV in new, no derive, prev pct preserved.
+    if new.get("battery_pct") is None and new.get("battery_mv") is not None:
+        _derive_battery_pct(merged)
     return merged
 
 

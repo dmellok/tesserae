@@ -344,9 +344,13 @@ def display() -> Response | tuple[Response, int]:
     #   filename, image_url           render artefact
     #   image_url_timeout             HTTP timeout (0 = firmware default)
     #   refresh_rate                  next poll cadence in seconds
-    #   special_function              "none" (no admin action queued)
+    #   special_function              "sleep" (deep-sleep until next poll;
+    #                                 matches Terminus's default)
     #   firmware_url, firmware_version, update_firmware, reset_firmware
     #                                 OTA hooks; Tier 2 (#11) wires them
+    #   maximum_compatibility         false = let firmware use modern
+    #                                 features (partial refresh, etc.).
+    #                                 Matches Terminus's per-device flag.
     #   friendly_id                   stable human-readable id
     manifest_friendly = device.manifest.get("friendly_id")
     friendly = manifest_friendly if isinstance(manifest_friendly, str) else device.id
@@ -357,11 +361,12 @@ def display() -> Response | tuple[Response, int]:
             "image_url": image_url,
             "image_url_timeout": 0,
             "refresh_rate": refresh_rate,
-            "special_function": "none",
+            "special_function": "sleep",
             "firmware_url": "",
             "firmware_version": "",
             "update_firmware": False,
             "reset_firmware": False,
+            "maximum_compatibility": False,
             "friendly_id": friendly,
         }
     )
@@ -484,20 +489,91 @@ def _setup_response(api_key: str, friendly: str, image_slug: str) -> Response:
 @bp.post("/api/log/")
 @bp.post("/api/log")
 def device_log() -> Response:
-    """Optional client-side diagnostics POST. We accept anything,
-    log the body for the admin, and return 200. Some BYOS clients
-    refuse to continue polling if /api/log/ 404s, so the endpoint
-    exists even though Tesserae doesn't use the bodies (yet)."""
+    """Client-side diagnostics POST.
+
+    Terminus's official log payload is either::
+
+        {"logs": [{"creation_timestamp": "...", "message": "...", ...}, ...]}
+
+    or the nested form::
+
+        {"log": {"logs_array": [...]}}
+
+    Both carry one entry per device-side log line. We extract whichever
+    shape the firmware sent, log each entry individually so they stay
+    readable in journald / docker logs, and return 200. Bodies we
+    can't parse as either shape still log as raw text rather than
+    erroring, native TRMNL firmware refuses to continue polling if
+    /api/log/ 404s (or 500s), so we always succeed.
+
+    Per-device log persistence is a follow-up; for now the server log
+    is the only surface."""
     body = request.get_data(cache=False) or b""
     token = _request_token()
     device = _device_by_token(token)
     target = device.id if device else "unknown"
-    try:
-        decoded = body.decode("utf-8", errors="replace")[:1024]
-    except Exception:
-        decoded = repr(body[:1024])
-    logger.info("trmnl: /api/log/ from %s (%d bytes): %s", target, len(body), decoded)
+
+    entries = _extract_log_entries(body)
+    if entries:
+        for idx, entry in enumerate(entries):
+            ts = entry.get("creation_timestamp") if isinstance(entry, dict) else None
+            ts_label = f"[{ts}] " if isinstance(ts, str | int) and ts else ""
+            logger.info(
+                "trmnl: /api/log/ from %s entry %d/%d %s%s",
+                target,
+                idx + 1,
+                len(entries),
+                ts_label,
+                _safe_log_repr(entry),
+            )
+    else:
+        try:
+            decoded = body.decode("utf-8", errors="replace")[:1024]
+        except Exception:
+            decoded = repr(body[:1024])
+        logger.info("trmnl: /api/log/ from %s (%d bytes): %s", target, len(body), decoded)
     return jsonify({"status": 200})
+
+
+def _extract_log_entries(body: bytes) -> list[Any]:
+    """Return the Terminus-shaped log entry list, or ``[]`` when the
+    body isn't JSON or doesn't match either documented shape.
+
+    Documented shapes (see Terminus's ``StoreDeviceLogRequest``):
+
+    * ``{"logs": [...]}`` (flat list of entries)
+    * ``{"log": {"logs_array": [...]}}`` (nested under ``log`` key)
+    """
+    if not body:
+        return []
+    try:
+        decoded = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return []
+    if not isinstance(decoded, dict):
+        return []
+    flat = decoded.get("logs")
+    if isinstance(flat, list):
+        return flat
+    nested = decoded.get("log")
+    if isinstance(nested, dict):
+        arr = nested.get("logs_array")
+        if isinstance(arr, list):
+            return arr
+    return []
+
+
+def _safe_log_repr(entry: Any) -> str:
+    """Render a single log entry as a single-line string for journald /
+    docker, capping length so a misbehaving client can't flood disk."""
+    if isinstance(entry, dict):
+        try:
+            text = json.dumps(entry, separators=(",", ":"))
+        except (TypeError, ValueError):
+            text = repr(entry)
+    else:
+        text = repr(entry)
+    return text[:1024]
 
 
 @bp.post("/api/log/level/")

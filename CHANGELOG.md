@@ -6,6 +6,46 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **`/api/display` envelope alignment with Terminus.** Three small
+  corrections so any TRMNL-compatible firmware reads identical fields
+  off Tesserae as it does off the upstream BYOS reference server:
+  - `special_function` now defaults to `"sleep"` (was `"none"`).
+    Native firmware branches on this; `"sleep"` is the documented
+    "deep-sleep until next poll" signal, which is what the firmware
+    expects when there's no admin action queued. The prior `"none"`
+    value caused some firmware builds to stay in standby between
+    polls, draining the LiPo.
+  - New `maximum_compatibility: false` field. Per-device flag in
+    Terminus; we ship `false` so firmware uses its modern features
+    (partial refresh, etc.) by default.
+  - `/api/log/` now parses Terminus's documented payload shapes
+    (`{"logs": [...]}` and the nested `{"log": {"logs_array": [...]}}`)
+    and surfaces each entry as its own log line rather than logging
+    the raw request body as one blob. Unknown shapes still get
+    accepted + raw-logged + a 200 response (firmware refuses to poll
+    if `/api/log/` 4xxs).
+
+### Added
+
+- **Derive `battery_pct` from `battery_mv` on every heartbeat.** Native
+  TRMNL kit firmware sends raw millivolts (`Battery-Voltage` header)
+  but no percentage; that meant TRMNL devices were absent from the
+  topbar battery indicator AND from the HA MQTT auto-discovery
+  battery sensor. The merge step now runs a LiPo curve (4200 mV =
+  100 %, 3300 mV = 0 %, clamped both ends, linear in between) when
+  the firmware reports mV without an explicit pct. ESP32 + TRMNL
+  panels that send both keep their explicit reading; TRMNL panels
+  that send only mV gain a derived pct that flows through the topbar
+  indicator and the HA `battery` sensor uniformly.
+- **HA auto-discovery now publishes a `battery_voltage` sensor** for
+  any device that reports `battery_mv` (voltage device-class, unit
+  mV). Lets HA automations run off the raw value rather than the
+  derived percentage. Lazy-published the first time a heartbeat
+  carries the key, same pattern as the existing `battery` / `signal`
+  / `ip` sensors.
+
 ## [0.44.7], 2026-06-10
 
 ### Added

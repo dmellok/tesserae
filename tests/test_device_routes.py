@@ -123,6 +123,53 @@ def test_merge_takes_new_values_when_present() -> None:
     assert merged["state"] == "offline"
 
 
+def test_merge_derives_battery_pct_from_mv_for_trmnl() -> None:
+    """TRMNL kit firmware reports raw mV only. The merge step must
+    derive battery_pct so the topbar indicator and HA discovery both
+    pick up the device. Curve: 4200 mV = 100%, 3300 mV = 0%."""
+    # Fresh heartbeat with only voltage, no prior cache.
+    merged = merge_status_parsed({}, {"battery_mv": 4200, "battery_pct": None})
+    assert merged["battery_pct"] == 100
+    # Mid-range: linear from the curve. 3750 = 50% (midpoint 3300-4200).
+    merged = merge_status_parsed({}, {"battery_mv": 3750, "battery_pct": None})
+    assert merged["battery_pct"] == 50
+    # At/below cutoff clamps to 0.
+    merged = merge_status_parsed({}, {"battery_mv": 3300, "battery_pct": None})
+    assert merged["battery_pct"] == 0
+    merged = merge_status_parsed({}, {"battery_mv": 3100, "battery_pct": None})
+    assert merged["battery_pct"] == 0
+    # Above full clamps to 100 (USB-attached charging spike).
+    merged = merge_status_parsed({}, {"battery_mv": 4400, "battery_pct": None})
+    assert merged["battery_pct"] == 100
+
+
+def test_merge_keeps_explicit_pct_over_derived() -> None:
+    """ESP32 firmware sends both mV and explicit pct; the explicit value
+    must win because the curve is a rough linear approximation."""
+    merged = merge_status_parsed({}, {"battery_mv": 3700, "battery_pct": 88})
+    # 3700 mV would have derived to ~44%; explicit 88 must survive.
+    assert merged["battery_pct"] == 88
+
+
+def test_merge_no_battery_data_leaves_pct_none() -> None:
+    """Pi clients (mains-powered) don't report either field; merge
+    should leave battery_pct as None so the topbar indicator skips them."""
+    merged = merge_status_parsed({}, {"battery_pct": None, "battery_mv": None})
+    assert merged.get("battery_pct") is None
+
+
+def test_merge_derives_pct_when_new_only_brings_mv() -> None:
+    """A heartbeat that drops the pct but still carries mV (e.g. firmware
+    upgrade to a build that stops sending the percent header) should
+    still produce a usable battery_pct downstream."""
+    prev = {"battery_mv": 3800, "battery_pct": 56}
+    new = {"battery_mv": 4000, "battery_pct": None}
+    merged = merge_status_parsed(prev, new)
+    assert merged["battery_mv"] == 4000
+    # 4000 mV on the curve: (4000-3300) / 900 * 100 = 77.77 -> 78.
+    assert merged["battery_pct"] == 78
+
+
 def test_stale_heartbeat_renders_warn(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
@@ -282,6 +329,65 @@ def test_trmnl_api_setup_koreader_path_falls_back_to_discovery(app: Flask) -> No
     assert any(e.id.startswith("trmnl_") for e in cache.all())
 
 
+def test_trmnl_api_log_accepts_flat_logs_array(app: Flask, caplog) -> None:
+    """0.44.8: /api/log/ parses the Terminus payload shape.
+
+    Flat shape: ``{"logs": [{...}, {...}]}``. Each entry must surface
+    as its own log line so it stays readable in journald / docker
+    logs rather than collapsing into one blob."""
+    import logging
+
+    client = app.test_client()
+    body = {
+        "logs": [
+            {"creation_timestamp": "2026-06-10T09:00:00Z", "message": "boot ok"},
+            {"creation_timestamp": "2026-06-10T09:00:05Z", "message": "wifi up"},
+        ]
+    }
+    with caplog.at_level(logging.INFO, logger="app.trmnl_api"):
+        resp = client.post("/api/log", json=body)
+    assert resp.status_code == 200
+    # Two entries -> two info log lines.
+    matching = [r for r in caplog.records if "trmnl: /api/log/ from" in r.getMessage()]
+    assert len(matching) == 2
+    assert any("boot ok" in r.getMessage() for r in matching)
+    assert any("wifi up" in r.getMessage() for r in matching)
+
+
+def test_trmnl_api_log_accepts_nested_logs_array(app: Flask, caplog) -> None:
+    """0.44.8: nested shape ``{"log": {"logs_array": [...]}}`` also
+    parses; older TRMNL firmwares ship this envelope."""
+    import logging
+
+    client = app.test_client()
+    body = {
+        "log": {
+            "logs_array": [{"creation_timestamp": 1234567890, "message": "hello"}],
+        }
+    }
+    with caplog.at_level(logging.INFO, logger="app.trmnl_api"):
+        resp = client.post("/api/log", json=body)
+    assert resp.status_code == 200
+    matching = [r for r in caplog.records if "trmnl: /api/log/ from" in r.getMessage()]
+    assert len(matching) == 1
+    assert "hello" in matching[0].getMessage()
+
+
+def test_trmnl_api_log_falls_back_to_raw_body_when_not_terminus_shape(app: Flask, caplog) -> None:
+    """Unknown payloads still return 200 (firmware won't tolerate 4xx
+    on /api/log/) but get logged as raw text rather than crashing."""
+    import logging
+
+    client = app.test_client()
+    with caplog.at_level(logging.INFO, logger="app.trmnl_api"):
+        resp = client.post("/api/log", data=b"not json at all")
+    assert resp.status_code == 200
+    matching = [r for r in caplog.records if "trmnl: /api/log/ from" in r.getMessage()]
+    assert matching
+    # The raw-body branch labels by byte count; the structured path doesn't.
+    assert any("bytes" in r.getMessage() for r in matching)
+
+
 def test_trmnl_api_log_level_acks_for_native_firmware(app: Flask) -> None:
     """Native TRMNL firmware queries /api/log/level on boot for the
     server's preferred log verbosity. Tesserae doesn't actually drive
@@ -344,9 +450,14 @@ def test_trmnl_api_display_envelope_matches_terminus_shape(app: Flask) -> None:
         "firmware_version",
         "update_firmware",
         "reset_firmware",
+        "maximum_compatibility",
         "friendly_id",
     }
     assert expected <= set(body.keys())
+    # special_function default aligned with Terminus in 0.44.8; "none"
+    # caused some firmware to skip deep-sleep, which drains a LiPo.
+    assert body["special_function"] == "sleep"
+    assert body["maximum_compatibility"] is False
     # Invented-by-Tesserae fields removed in 0.44.1.
     assert "pending_status_change" not in body
     assert "network_diagnostics_url" not in body
