@@ -52,6 +52,7 @@ from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
 from app.state.page_store import PageStore
+from app.state.rotation_store import RotationStore
 from app.state.schedule_store import ScheduleStore
 from app.state.settings_store import SettingsStore
 from app.transport_wiring import _is_reloader_watcher, _rebuild_transport
@@ -363,6 +364,7 @@ def create_app(
 
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
+    rotation_store = RotationStore(data_root / "core" / "rotations.json")
     # User themes live alongside core stores at ``data/themes/user.json``.
     # The store creates the directory on first save so a fresh install
     # without any custom themes leaves no empty directory behind.
@@ -399,6 +401,7 @@ def create_app(
     app.config["DISCOVERY_CACHE"] = discovery_cache
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
+    app.config["ROTATION_STORE"] = rotation_store
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["EVENT_LOG"] = event_log
     # Smart-sync per-device telemetry (issue #10). Persisted under
@@ -580,6 +583,7 @@ def create_app(
 
     scheduler = Scheduler(
         store=schedule_store,
+        rotation_store=rotation_store,
         push_manager=lambda: app.config["PUSH_MANAGER"],
         event_log=event_log,
         timezone_provider=_resolve_timezone,
@@ -603,6 +607,9 @@ def create_app(
     app.register_blueprint(composer.bp)
     settings_routes.register(app)
     schedule_routes.register(app)
+    from app import rotation_routes
+
+    rotation_routes.register(app)
     send_routes.register(app)
     history_routes.register(app)
     events_routes.register(app)

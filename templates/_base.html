@@ -101,6 +101,10 @@
          class="{% if request.blueprint == 'schedules' %}is-active{% endif %}">
          <i class="ph ph-calendar-dots" aria-hidden="true"></i><span>Schedules</span>
       </a>
+      <a href="{{ url_for('rotations.index') }}"
+         class="{% if request.blueprint == 'rotations' %}is-active{% endif %}">
+         <i class="ph ph-shuffle" aria-hidden="true"></i><span>Rotations</span>
+      </a>
       <a href="{{ url_for('history.index') }}"
          class="{% if request.blueprint == 'history' %}is-active{% endif %}">
          <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>History</span>

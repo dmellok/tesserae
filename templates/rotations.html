@@ -1,0 +1,249 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head, button, empty_state, switch %}
+{% block title %}Rotations, Tesserae{% endblock %}
+
+{% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+
+{% macro day_picker(name, selected) %}
+<div class="dow-picker">
+  {% for i in range(7) %}
+  <label class="dow-chip">
+    <input type="checkbox" name="{{ name }}" value="{{ i }}" {% if i in selected %}checked{% endif %}>
+    <span>{{ DAY_NAMES[i] }}</span>
+  </label>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro step_row(idx, step, pages) %}
+<div class="rot-step" data-rot-step>
+  <span class="rot-step-num">{{ idx + 1 }}</span>
+  <select name="step_page_ids[]" required>
+    {% if not pages %}<option value="">(no dashboards yet)</option>{% endif %}
+    {% for p in pages %}
+    <option value="{{ p.id }}" {% if p.id == step.page_id %}selected{% endif %}>{{ p.name }}</option>
+    {% endfor %}
+  </select>
+  <input type="number" name="step_dwell_minutes[]" min="1" max="10080"
+         value="{{ step.dwell_minutes }}" required aria-label="Dwell minutes">
+  <span class="rot-step-unit">min</span>
+  <button type="button" class="btn btn--ghost btn--icon" data-rot-step-remove
+          aria-label="Remove step">
+    <i class="ph ph-x" aria-hidden="true"></i>
+  </button>
+</div>
+{% endmacro %}
+
+{% macro rotation_form(r, edit_mode, pages, devices) %}
+<form method="post" class="form rotation-form"
+      action="{{ url_for('rotations.update', rotation_id=r.id) if edit_mode else url_for('rotations.create') }}">
+  <div class="field-grid">
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-name">Name</label>
+      <input type="text" id="rf-{{ r.id or 'new' }}-name" name="name" value="{{ r.name }}"
+             placeholder="Kitchen alternation" required>
+    </div>
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-anchor">Cycle starts at</label>
+      <input type="time" id="rf-{{ r.id or 'new' }}-anchor" name="anchor" value="{{ r.anchor }}" required>
+    </div>
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-priority">Priority</label>
+      <input type="number" id="rf-{{ r.id or 'new' }}-priority" name="priority"
+             value="{{ r.priority }}" min="-100" max="100">
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Steps (rotate through these in order)</label>
+    <div class="rot-steps" data-rot-steps>
+      {% for step in r.steps %}
+        {{ step_row(loop.index0, step, pages) }}
+      {% endfor %}
+      {% if not r.steps %}
+        {{ step_row(0, {'page_id': '', 'dwell_minutes': 30}, pages) }}
+      {% endif %}
+    </div>
+    <button type="button" class="btn btn--ghost btn--sm" data-rot-step-add>
+      <i class="ph ph-plus" aria-hidden="true"></i> Add step
+    </button>
+  </div>
+
+  <div class="field">
+    <label>Days of week</label>
+    {{ day_picker('days_of_week', r.days_of_week) }}
+  </div>
+
+  <div class="field">
+    <label>Devices (optional, leave empty to use each step's page bindings)</label>
+    <div class="device-picker">
+      {% for d in devices %}
+      <label class="device-chip">
+        <input type="checkbox" name="device_ids" value="{{ d.id }}"
+               {% if d.id in r.device_ids %}checked{% endif %}>
+        <span>{{ d.display_name }}</span>
+      </label>
+      {% endfor %}
+      {% if not devices %}<p class="muted">No device instances registered.</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="field field--inline">
+    {{ switch('rf-' ~ (r.id or 'new') ~ '-enabled', 'enabled', 'Enabled', r.enabled) }}
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn--primary">
+      <i class="ph ph-floppy-disk" aria-hidden="true"></i> {{ 'Update' if edit_mode else 'Create' }}
+    </button>
+    {% if edit_mode %}
+    <a class="btn btn--ghost" href="{{ url_for('rotations.index') }}">Cancel</a>
+    {% endif %}
+  </div>
+</form>
+
+<template data-rot-step-template>
+  {{ step_row(0, {'page_id': '', 'dwell_minutes': 30}, pages) }}
+</template>
+{% endmacro %}
+
+{% block main %}
+<section class="page">
+  <header class="page-head">
+    <h1>Rotations</h1>
+    <p class="muted">Cycle through dashboards on a wall-clock anchor. Each step dwells for a fixed number of minutes; the cycle repeats from the anchor every day.</p>
+  </header>
+
+  {# Existing rotations #}
+  {% if rotations %}
+  <div class="rotations-list">
+    {% for r in rotations %}
+    {% set cur = current_step.get(r.id) %}
+    <section class="card rotation-card" id="rotation-{{ r.id }}">
+      <div class="rotation-head">
+        <div class="rotation-title">
+          <h2>{{ r.name }}</h2>
+          <span class="muted">{{ r.id }}</span>
+        </div>
+        <div class="rotation-status">
+          {% if not r.enabled %}
+            <span class="pill pill--off">Disabled</span>
+          {% elif cur and cur.active %}
+            <span class="pill pill--ok">Now: step {{ cur.step_index + 1 }}, {{ cur.page_name }}</span>
+          {% else %}
+            <span class="pill pill--warn">Not active right now</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="rotation-meta">
+        <span><i class="ph ph-clock" aria-hidden="true"></i> Cycle starts at {{ r.anchor }}</span>
+        <span><i class="ph ph-arrows-clockwise" aria-hidden="true"></i> {{ r.cycle_minutes }} min cycle</span>
+        <span><i class="ph ph-list-numbers" aria-hidden="true"></i> {{ r.steps|length }} step{{ '' if r.steps|length == 1 else 's' }}</span>
+      </div>
+
+      <ol class="rotation-steps-preview">
+        {% for step in r.steps %}
+        <li {% if cur and cur.active and cur.step_index == loop.index0 %}class="is-current"{% endif %}>
+          <span class="rot-step-num">{{ loop.index }}</span>
+          <span class="rot-step-page">{{ page_names.get(step.page_id, step.page_id) }}</span>
+          <span class="rot-step-dwell muted">{{ step.dwell_minutes }} min</span>
+        </li>
+        {% endfor %}
+      </ol>
+
+      {% set proj = projections.get(r.id) %}
+      {% if proj and proj.bands %}
+      <div class="rotation-timeline" aria-label="Next 24 hours">
+        {% for band in proj.bands %}
+        <span class="rotation-band rotation-band--step-{{ band.index % 5 }}"
+              style="left:{{ band.pct }}%; width:{{ band.width_pct }}%;"
+              title="{{ band.page_name }} ({{ band.dwell_minutes }} min)"></span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="rotation-actions">
+        <form method="post" action="{{ url_for('rotations.toggle', rotation_id=r.id) }}">
+          <button type="submit" class="btn btn--ghost btn--sm">
+            <i class="ph ph-power" aria-hidden="true"></i>
+            {{ 'Disable' if r.enabled else 'Enable' }}
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('rotations.fire', rotation_id=r.id) }}">
+          <button type="submit" class="btn btn--ghost btn--sm">
+            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Fire now
+          </button>
+        </form>
+        <a class="btn btn--ghost btn--sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-form-card">
+          <i class="ph ph-pencil" aria-hidden="true"></i> Edit
+        </a>
+        <form method="post" action="{{ url_for('rotations.delete', rotation_id=r.id) }}"
+              onsubmit="return confirm('Delete rotation {{ r.name }}?');">
+          <button type="submit" class="btn btn--ghost btn--sm btn--danger">
+            <i class="ph ph-trash" aria-hidden="true"></i> Delete
+          </button>
+        </form>
+      </div>
+
+      {% if edit_id == r.id %}
+      <hr>
+      {{ rotation_form(r, edit_mode=True, pages=pages, devices=devices) }}
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# New rotation form #}
+  <section class="card" id="rotation-form-card">
+    {{ card_head('New rotation', icon_name='plus-circle', blurb='Pick the dashboards to cycle through and how long to dwell on each.') }}
+    {% set blank = {
+      'id': '', 'name': '', 'anchor': '00:00', 'priority': 0,
+      'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
+      'device_ids': [], 'steps': []
+    } %}
+    {{ rotation_form(blank, edit_mode=False, pages=pages, devices=devices) }}
+  </section>
+
+  {% if not rotations %}
+    {{ empty_state(
+      'shuffle',
+      'No rotations yet',
+      blurb='Add one above and Tesserae will cycle through the dashboards you pick on the cadence you set.',
+    ) }}
+  {% endif %}
+</section>
+
+<script>
+(function () {
+  // Step add / remove. Re-numbers visible steps so the "1, 2, 3"
+  // counter stays continuous after a remove.
+  function renumber(container) {
+    var nodes = container.querySelectorAll('[data-rot-step] .rot-step-num');
+    nodes.forEach(function (n, idx) { n.textContent = String(idx + 1); });
+  }
+  document.querySelectorAll('[data-rot-steps]').forEach(function (container) {
+    var form = container.closest('form');
+    var addBtn = form && form.querySelector('[data-rot-step-add]');
+    var tpl = form && form.querySelector('[data-rot-step-template]');
+    if (addBtn && tpl) {
+      addBtn.addEventListener('click', function () {
+        var node = tpl.content.cloneNode(true);
+        container.appendChild(node);
+        renumber(container);
+      });
+    }
+    container.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('[data-rot-step-remove]');
+      if (!btn) return;
+      var rows = container.querySelectorAll('[data-rot-step]');
+      if (rows.length <= 1) return;  // keep at least one row
+      var row = btn.closest('[data-rot-step]');
+      if (row) row.remove();
+      renumber(container);
+    });
+  });
+})();
+</script>
+{% endblock %}

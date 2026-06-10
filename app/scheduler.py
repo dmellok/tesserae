@@ -31,6 +31,8 @@ from typing import Any
 
 from app.push import PushManager, PushResult
 from app.state.event_log import EventLog
+from app.state.rotation_model import Rotation, RotationStep
+from app.state.rotation_store import RotationStore
 from app.state.schedule_model import Schedule
 from app.state.schedule_store import ScheduleStore
 
@@ -71,6 +73,46 @@ def _parse_hhmm(value: str) -> time:
     return time(int(h), int(m))
 
 
+def compute_current_step(
+    rotation: Rotation, now: datetime, tz: tzinfo | None
+) -> tuple[int, RotationStep] | None:
+    """Return the ``(step_index, step)`` whose dwell window contains
+    ``now`` (in the rotation's anchor timezone), or ``None`` if the
+    rotation isn't active right now (day-of-week mask excludes today,
+    or wall-clock is before today's anchor).
+
+    The cycle re-anchors at the configured ``anchor`` HH:MM each local
+    day, so DST flips don't desync long rotations: at 00:00 (or
+    whatever the anchor is), step 0 starts fresh.
+
+    Math: minutes since today's anchor, modulo total cycle length, then
+    walk the steps in order summing dwells until we find the bucket
+    that contains the modulo result.
+    """
+    local_now = _local(now, tz)
+    if local_now.weekday() not in rotation.days_of_week:
+        return None
+    anchor_t = _parse_hhmm(rotation.anchor)
+    anchor_today = local_now.replace(
+        hour=anchor_t.hour, minute=anchor_t.minute, second=0, microsecond=0
+    )
+    if local_now < anchor_today:
+        return None
+    minutes_since_anchor = (local_now - anchor_today).total_seconds() / 60.0
+    cycle = rotation.cycle_minutes
+    if cycle <= 0:
+        return None
+    position = minutes_since_anchor % cycle
+    cumulative = 0.0
+    for idx, step in enumerate(rotation.steps):
+        cumulative += step.dwell_minutes
+        if position < cumulative:
+            return idx, step
+    # Defensive fallback: float arithmetic edge case can leave position
+    # equal to cycle; treat that as the last step (we just rolled over).
+    return len(rotation.steps) - 1, rotation.steps[-1]
+
+
 class Scheduler:
     def __init__(
         self,
@@ -84,6 +126,9 @@ class Scheduler:
         # tests + bare construction keep working; production wires both.
         device_ids_for_page: Callable[[str], list[str]] | None = None,
         device_telemetry: Any = None,
+        # Rotations (issue: dashboard rotation). Optional; None means
+        # no rotation evaluation runs each tick. Production wires it.
+        rotation_store: RotationStore | None = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
@@ -105,6 +150,7 @@ class Scheduler:
         is dispatched and PushManager logs the miss itself), that matches
         existing tests, which don't care about staleness."""
         self._store = store
+        self._rotation_store = rotation_store
         self._push_factory = push_manager
         self._event_log = event_log
         self._tz_provider = timezone_provider or (lambda: None)
@@ -125,6 +171,14 @@ class Scheduler:
         # implicitly: re-enabling or re-binding the schedule re-warns
         # because the new page check will pass (so we never re-add).
         self._warned_missing_page: set[str] = set()
+        # rotation_id -> last fired step index. We push only when the
+        # current step's index differs from this one (avoids re-pushing
+        # the same page every tick). Cleared on disable so re-enable
+        # fires the current step fresh.
+        self._rotation_last_step: dict[str, int] = {}
+        # rotation_id we've warned about for a missing step page; same
+        # one-shot semantics as ``_warned_missing_page``.
+        self._warned_missing_rotation_page: set[str] = set()
         self._lock = threading.Lock()
 
     def start(self) -> None:
@@ -239,8 +293,102 @@ class Scheduler:
 
     def _tick_once(self, now: datetime) -> None:
         self._observe(now)
+        # Rotations fire FIRST so any same-tick schedule pushes land
+        # last. Reason: eink panels show the most recent frame. If a
+        # user has set up a daily schedule to override the rotation at
+        # 09:00 (priority knob), the schedule's frame ends up on the
+        # panel because rotation already fired before it.
+        for rotation, step_index in self.find_due_rotations(now):
+            self._fire_rotation(rotation, step_index, now, respect_quiet_hours=True)
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
+
+    def find_due_rotations(self, now: datetime | None = None) -> list[tuple[Rotation, int]]:
+        """Return ``(rotation, step_index)`` pairs whose current step
+        DIFFERS from the last fired step (or has never fired). Each
+        such pair is a step-transition that should push the new page.
+
+        Sorted by ``priority`` descending then id, mirroring
+        ``find_due``. Stale rotations (target page deleted) are skipped
+        with a one-shot warning so the log doesn't fill up."""
+        if self._rotation_store is None:
+            return []
+        now = now or datetime.now(UTC)
+        tz = self._tz_provider()
+        out: list[tuple[Rotation, int]] = []
+        for rotation in self._rotation_store.all():
+            if not rotation.enabled:
+                # Clear last-step so re-enable fires the current step
+                # rather than waiting for the next transition.
+                with self._lock:
+                    self._rotation_last_step.pop(rotation.id, None)
+                continue
+            picked = compute_current_step(rotation, now, tz)
+            if picked is None:
+                continue
+            step_index, step = picked
+            if self._page_exists is not None and not self._page_exists(step.page_id):
+                with self._lock:
+                    if rotation.id not in self._warned_missing_rotation_page:
+                        self._warned_missing_rotation_page.add(rotation.id)
+                        logger.warning(
+                            "rotation %r (%s) step %d targets missing page %r, skipping",
+                            rotation.name,
+                            rotation.id,
+                            step_index,
+                            step.page_id,
+                        )
+                continue
+            with self._lock:
+                last_step = self._rotation_last_step.get(rotation.id)
+            if last_step == step_index:
+                continue
+            out.append((rotation, step_index))
+        out.sort(key=lambda pair: (-pair[0].priority, pair[0].id))
+        return out
+
+    def _fire_rotation(
+        self,
+        rotation: Rotation,
+        step_index: int,
+        now: datetime,
+        *,
+        respect_quiet_hours: bool = False,
+    ) -> PushResult:
+        step = rotation.steps[step_index]
+        logger.info(
+            "Firing rotation %s step %d -> page %s",
+            rotation.id,
+            step_index,
+            step.page_id,
+        )
+        result = self._push_factory().push(
+            step.page_id,
+            respect_quiet_hours=respect_quiet_hours,
+            source="rotation",
+        )
+        # Same status semantics as _fire: a quiet result still counts
+        # as "we tried" so the next tick doesn't re-attempt within the
+        # quiet window. Failures don't bump so the next tick retries.
+        if result.status in ("sent", "quiet"):
+            with self._lock:
+                self._rotation_last_step[rotation.id] = step_index
+        if self._event_log is not None:
+            self._event_log.record(
+                type="rotation",
+                source="rotation",
+                target=rotation.id,
+                status=result.status,
+                error=result.error,
+                duration_s=result.duration_s,
+                extra={
+                    "rotation_name": rotation.name,
+                    "step_index": step_index,
+                    "page_id": step.page_id,
+                    "push_event_id": result.event_id,
+                },
+            )
+        return result
 
     def _smart_sync_should_wait(self, schedule: Schedule, now: datetime) -> bool:
         """Return True when smart-sync wants to *hold* this schedule

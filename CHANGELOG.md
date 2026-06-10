@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.0], 2026-06-11
+
+### Added
+
+- **Rotations: cycle dashboards on a wall-clock anchor.** New top-nav
+  entry next to Schedules. A rotation is an ordered list of
+  `(page, dwell_minutes)` steps that loop on a daily anchor.
+  Common ask was "show dashboard A for 30 min, then B for 30 min,
+  repeat" or "morning dashboard 06:00, midday dashboard 12:00,
+  evening dashboard 18:00." That now configures with a couple of
+  clicks instead of needing six daily schedules.
+  - Anchor reseeds at the configured `HH:MM` each local day, so long
+    cycles don't drift across DST flips.
+  - Day-of-week filter mirrors Schedules.
+  - Priority field lets existing schedules preempt the rotation
+    (e.g. a daily 09:00 schedule with `priority=10` overrides the
+    rotation at 09:00 the same way it would override another
+    schedule, eink shows the most recently pushed frame).
+  - First tick after enable fires the current step immediately;
+    subsequent ticks within the same step are no-ops.
+  - "Fire now" button manually pushes whichever step the rotation is
+    currently on, useful for previewing edits without waiting for
+    the next transition.
+  - New `rotation_routes` blueprint at `/rotations`, new
+    `RotationStore` persisting to `data/core/rotations.json`,
+    new `Rotation` pydantic model under `app.state.rotation_model`.
+
 ## [0.44.11], 2026-06-11
 
 ### Added
