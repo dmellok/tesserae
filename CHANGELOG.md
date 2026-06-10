@@ -6,6 +6,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.44.7], 2026-06-10
+
+### Added
+
+- **Plugin `ctx` now carries `cell_w` / `cell_h`.** The composer
+  hydrates every widget's `fetch()` with the cell's actual pixel
+  dimensions alongside the existing `panel_w` / `panel_h`. Widgets
+  that pull images from upstream APIs (e.g. the new `fal_image`
+  community widget) can now request an image at the exact size
+  they'll be painted at, instead of falling back to an aspect-ratio
+  guess derived from the whole panel. Defaults to 0 / 0 in sample-
+  mode and single-cell preview paths, so existing widgets keep
+  working unchanged.
+
+### Changed
+
+- **Page editor: text inputs now defer preview refresh to blur, not
+  keystroke.** The live preview in the dashboard editor still updates on
+  every slider tick / checkbox flip / dropdown change, but text and
+  number fields wait for the `change` event (fires on blur or Enter)
+  before re-rendering the preview iframe. This matters for widgets
+  whose `fetch()` calls a paid API (e.g. the new `fal_image` community
+  widget on Fal.ai): typing a prompt no longer fires a generation per
+  character. The dirty indicator + save-button enable still happen on
+  every keystroke, so save flow is unchanged.
+
 ## [0.44.6], 2026-06-10
 
 ### Added

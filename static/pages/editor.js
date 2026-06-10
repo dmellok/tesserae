@@ -46,6 +46,22 @@
     if (saveBtn) saveBtn.disabled = !dirty;
   }
 
+  // Text-like inputs (<input type="text|search|email|url|password|tel">
+  // and <textarea>) defer preview to the 'change' event (fires on blur
+  // or Enter). Everything else keeps live preview on 'input'.
+  // Number inputs are special-cased because they're often used for
+  // step-wise widget options where each keystroke isn't a meaningful
+  // value; the 'change' (blur) commit is the natural preview point.
+  const _DEFER_INPUT_TYPES = new Set([
+    "text", "search", "email", "url", "password", "tel", "number",
+  ]);
+  function _deferToBlur(el) {
+    if (!el) return false;
+    if (el.tagName === "TEXTAREA") return true;
+    if (el.tagName !== "INPUT") return false;
+    return _DEFER_INPUT_TYPES.has((el.type || "text").toLowerCase());
+  }
+
   // Cache of the last hydrated state we know each iframe is rendering,
   // keyed by the iframe element. Used to compute postMessage patches so
   // a theme nudge / gap tweak / single-cell option change doesn't tear
@@ -356,8 +372,16 @@
     forms().forEach((form) => {
       if (form.dataset.dirtyBound) return;
       form.dataset.dirtyBound = "1";
-      form.addEventListener("input", () => {
+      form.addEventListener("input", (ev) => {
         setDirty(true);
+        // Text-like inputs defer preview to the 'change' event (which
+        // fires on blur / Enter) so the preview doesn't re-render on
+        // every keystroke. Matters for expensive widgets like
+        // fal_image whose render calls a paid image API. Sliders /
+        // colour pickers / number steppers / checkboxes / selects all
+        // keep live preview because their 'input' event is the natural
+        // commit point.
+        if (_deferToBlur(ev.target)) return;
         schedulePreview();
       });
       form.addEventListener("change", (ev) => {

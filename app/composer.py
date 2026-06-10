@@ -163,7 +163,7 @@ def _parallel_fetch_plugin_data(
     """
     import concurrent.futures
 
-    indexed: list[tuple[int, str, dict[str, Any]]] = []
+    indexed: list[tuple[int, str, dict[str, Any], int, int]] = []
     sample_results: dict[int, Any] = {}
     for idx, meta in enumerate(cells_meta):
         plugin_id = meta["plugin_id"]
@@ -185,7 +185,10 @@ def _parallel_fetch_plugin_data(
             continue
         if getattr(plugin.server_module, "fetch", None) is None:
             continue
-        indexed.append((idx, plugin_id, meta["resolved_options"]))
+        cell = meta.get("cell") or {}
+        cell_w = int(cell.get("w") or 0)
+        cell_h = int(cell.get("h") or 0)
+        indexed.append((idx, plugin_id, meta["resolved_options"], cell_w, cell_h))
 
     if not indexed:
         return sample_results
@@ -195,9 +198,11 @@ def _parallel_fetch_plugin_data(
     # local proxy and won't follow us off the request thread.
     app = current_app._get_current_object()  # type: ignore[attr-defined]
 
-    def _worker(plugin_id: str, options: dict[str, Any]) -> Any:
+    def _worker(plugin_id: str, options: dict[str, Any], cell_w: int, cell_h: int) -> Any:
         with app.app_context():
-            return _fetch_plugin_data(plugin_id, options, panel_w, panel_h, preview)
+            return _fetch_plugin_data(
+                plugin_id, options, panel_w, panel_h, preview, cell_w=cell_w, cell_h=cell_h
+            )
 
     results: dict[int, Any] = {}
     # Cells whose result was synthesised by US (executor caught an
@@ -212,7 +217,8 @@ def _parallel_fetch_plugin_data(
     max_workers = min(_HYDRATE_MAX_WORKERS, len(indexed))
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {
-            pool.submit(_worker, plugin_id, options): idx for idx, plugin_id, options in indexed
+            pool.submit(_worker, plugin_id, options, cw, ch): idx
+            for idx, plugin_id, options, cw, ch in indexed
         }
         try:
             for fut in concurrent.futures.as_completed(futures, timeout=_HYDRATE_OVERALL_TIMEOUT_S):
@@ -251,7 +257,7 @@ def _parallel_fetch_plugin_data(
     # returned error states), stash it under its (plugin, options,
     # panel) key. If we synthesised the error (executor exception or
     # overall timeout), try to serve the previous successful result.
-    for idx, plugin_id, options in indexed:
+    for idx, plugin_id, options, _cw, _ch in indexed:
         result = results.get(idx)
         if result is None:
             continue
@@ -273,6 +279,9 @@ def _fetch_plugin_data(
     panel_w: int,
     panel_h: int,
     preview: bool,
+    *,
+    cell_w: int = 0,
+    cell_h: int = 0,
 ) -> Any:
     """Call the plugin's server.py fetch() if present. Returns None on miss.
 
@@ -280,7 +289,14 @@ def _fetch_plugin_data(
     the socket egress hook can match against the widget's declared
     ``requires:`` list. Undeclared widgets get an unrestricted scope
     (legacy behaviour), declared ones get the snapshot the loader
-    parsed at discovery."""
+    parsed at discovery.
+
+    ``cell_w`` / ``cell_h`` carry the cell's actual pixel dims, useful
+    for widgets that want to request an upstream image at the exact
+    size they'll be painted at (e.g. fal_image). Defaults of 0 keep
+    existing callers (single-cell preview, sample mode) backwards
+    compatible: a plugin treats 0 as "unknown" and falls back to
+    ``panel_w``/``panel_h``."""
     from app.capabilities import CapabilityDenied, capability_scope
 
     plugin = _registry().get(plugin_id)
@@ -303,6 +319,8 @@ def _fetch_plugin_data(
                 ctx={
                     "panel_w": panel_w,
                     "panel_h": panel_h,
+                    "cell_w": cell_w,
+                    "cell_h": cell_h,
                     "preview": preview,
                     "data_dir": str(plugin.data_dir),
                 },
