@@ -28,6 +28,7 @@ bp = Blueprint("history", __name__, url_prefix="/history")
 FILTERABLE_SOURCES = (
     "page",
     "scheduler",
+    "rotation",
     "webhook",
     "home_assistant",
     "file",

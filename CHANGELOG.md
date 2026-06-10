@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.5], 2026-06-11
+
+### Fixed
+
+- **History page: rotation source-chip now shows the shuffle icon.**
+  Rotation pushes were already being recorded with
+  `source='rotation'`, but `history.html`'s `SOURCE_META` had no
+  entry, so the chip fell through to the neutral question-mark
+  fallback. Added `rotation → ('Rotation', 'shuffle',
+  'accent-ochre')` to the metadata map and included `rotation` in
+  `history_routes.FILTERABLE_SOURCES` so the filter strip at the
+  top of `/history` exposes a Rotation tab too.
+
 ## [0.45.4], 2026-06-11
 
 ### Fixed
