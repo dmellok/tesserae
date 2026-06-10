@@ -208,19 +208,57 @@ def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any
     return out
 
 
+def _device_options(selected: set[str]) -> list[dict[str, Any]]:
+    """Build the list-of-dicts shape the ``device-checklist`` macro
+    expects, same as the page editor uses. Built-in kinds and devices
+    without a panel block are skipped (not bindable targets)."""
+    registry = current_app.config.get("DEVICE_REGISTRY")
+    out: list[dict[str, Any]] = []
+    if registry is None:
+        return out
+    for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
+        if dev.kind_of is None or dev.panel is None:
+            continue
+        out.append(
+            {
+                "id": dev.id,
+                "name": dev.name,
+                "icon": dev.icon,
+                "label": dev.display_name,
+                "dims": f"{dev.panel['w']}×{dev.panel['h']}",
+                "checked": dev.id in selected,
+            }
+        )
+    return out
+
+
 @bp.get("")
 def index() -> str:
     rotations = _store().all()
     pages = _pages().list()
-    devices = current_app.config["DEVICE_REGISTRY"]
+    edit_id = request.args.get("edit")
+    # When editing, the form's device-checklist needs to reflect the
+    # rotation's existing bindings; otherwise the empty form gets
+    # everything unchecked.
+    selected_for_form: set[str] = set()
+    if edit_id is not None:
+        existing = next((r for r in rotations if r.id == edit_id), None)
+        if existing is not None:
+            selected_for_form = set(existing.device_ids)
     return render_template(
         "rotations.html",
         rotations=rotations,
         pages=pages,
         page_names={p.id: p.name for p in pages},
-        devices=[d for d in devices.devices.values() if d.kind_of is not None],
+        device_options=_device_options(selected_for_form),
+        # Per-card device_options snapshots, keyed by rotation id, so
+        # an inline-edit form for a specific rotation gets the right
+        # ticks pre-set without us swapping global state per row.
+        device_options_by_rotation={
+            r.id: _device_options(set(r.device_ids)) for r in rotations
+        },
         current_step=_current_step_for_each(rotations),
-        edit_id=request.args.get("edit"),
+        edit_id=edit_id,
         projections={r.id: _build_projection(r) for r in rotations},
     )
 

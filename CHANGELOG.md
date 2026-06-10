@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.1], 2026-06-11
+
+### Fixed
+
+- **Rotations editor: Add Step button now works.** The `<template>`
+  element with the row markup sat outside the `<form>` (Jinja macro
+  put it as a sibling), so the form-scoped `form.querySelector`
+  couldn't find it and the click handler bailed silently. Moved the
+  template inside the form so each rotation form binds to its own
+  template.
+- **Rotations editor: device picker now uses the same wide-card
+  `device-checklist` style as the dashboard editor and Send page**
+  (icon + name + dimensions per row) instead of the inline-chip
+  fallback.
+
 ## [0.45.0], 2026-06-11
 
 ### Added
