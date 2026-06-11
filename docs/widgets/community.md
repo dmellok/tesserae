@@ -104,6 +104,18 @@ The catalog is the right home for widgets that:
 
 <div class="grid cards" markdown>
 
+-   **Calendar, Schedule** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `calendar_schedule`
+
+    ---
+
+    ![calendar_schedule](https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/screenshots/calendar_schedule/lg.png)
+
+    Google-Calendar-style agenda view. Lists upcoming events grouped by day, with date headers, all-day events at the top of each day, and per-feed colour dots. Pulls from the same calendar_core feeds as the other calendar_* widgets.
+
+    **Folder:** `calendar_schedule` &middot; **Version:** `v0.1.2`
+
+    [Source repository](https://github.com/dmellok/tesserae-calendar-schedule)
+
 -   **Public Holiday Countdown** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `public_holiday_countdown`
 
     ---
@@ -161,6 +173,18 @@ The catalog is the right home for widgets that:
 
 <div class="grid cards" markdown>
 
+-   **Fal Image** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `fal_image`
+
+    ---
+
+    ![fal_image](https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/screenshots/fal_image/lg.png)
+
+    Full-bleed AI-generated image widget. 9 Fal.ai models from $0.003 (Flux Schnell, Hyper SDXL) to $0.15 (Nano Banana Pro). Style presets, contextual placeholders ({time_of_day}, {season}, {moon_phase}), multi-prompt rotation. BYO key.
+
+    **Folder:** `fal_image` &middot; **Version:** `v0.4.0`
+
+    [Source repository](https://github.com/dmellok/tesserae-fal-image)
+
 -   **iCloud Shared Albums** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `apple_album`
 
     ---
@@ -172,6 +196,18 @@ The catalog is the right home for widgets that:
     **Folder:** `picture_apple_album` &middot; **Version:** `v0.1.0`
 
     [Source repository](https://github.com/dmellok/tesserae-apple-album)
+
+-   **Paperlesspaper Art** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `paperlesspaper_art`
+
+    ---
+
+    ![paperlesspaper_art](https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/screenshots/paperlesspaper_art/lg.png)
+
+    Full-bleed widget that paints a curated public-domain or Creative Commons artwork on every render, pulled from the paperlesspaper-art catalog (Met Museum, Art Institute of Chicago, Wikimedia Commons, SVG Repo). Optional artist + title caption overlay.
+
+    **Folder:** `paperlesspaper_art` &middot; **Version:** `v0.1.0`
+
+    [Source repository](https://github.com/dmellok/tesserae-paperlesspaper-art)
 
 -   **Spotify Widgets** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `spotify`
 
@@ -250,7 +286,7 @@ The catalog is the right home for widgets that:
 
     A minimal hello-world widget. Renders a configurable greeting + the current local time. Use it to confirm the marketplace install pipeline works end-to-end on a non-bundled widget.
 
-    **Folder:** `community_demo` &middot; **Version:** `v0.1.1`
+    **Folder:** `community_demo` &middot; **Version:** `v0.1.2`
 
     [Source repository](https://github.com/dmellok/tesserae-community-demo)
 

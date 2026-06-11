@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.7], 2026-06-11
+
+### Added
+
+- **Community widget gallery auto-refresh.** The community gallery
+  (`docs/widgets/community.md`) is generated from the catalog repo's
+  `widgets.json` on every docs build, but the docs workflow only
+  fires on pushes to *this* repo. Catalog changes silently drifted
+  behind the wiki. Two new triggers in `.github/workflows/docs.yml`:
+  a daily cron at 06:00 UTC (zero-config, catches drift within 24 h)
+  and a `repository_dispatch` listener (`catalog_updated` event) so
+  the catalog repo can ping this one on PR merge for an immediate
+  refresh.
+
+### Changed
+
+- **Community gallery refreshed.** Adds `calendar_schedule`,
+  `fal_image`, `paperlesspaper_art`, and pins the latest versions
+  of the other community entries (18 entries total, was 15 at the
+  last deploy).
+
 ## [0.45.6], 2026-06-11
 
 ### Fixed

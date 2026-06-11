@@ -22,7 +22,22 @@ on:
       - "devices/**/device.json"
       - "app/panel.py"
       - ".github/workflows/docs.yml"
+  # Manual rebuild button on the Actions tab.
   workflow_dispatch:
+  # Daily rebuild so changes to the community widget catalog (which
+  # lives in a separate repo) pick up here within 24 h. The push
+  # trigger only fires when this repo changes; without a schedule,
+  # the community gallery would silently drift behind the catalog.
+  schedule:
+    - cron: "0 6 * * *"
+  # Cross-repo trigger from the tesserae-widgets catalog. When a PR
+  # merges there, its workflow can ``gh api repos/dmellok/tesserae/
+  # dispatches`` with ``event_type: catalog_updated`` to refresh the
+  # community gallery immediately rather than waiting for the daily
+  # rebuild. The PAT for the catalog side lives there as a secret;
+  # this side just listens.
+  repository_dispatch:
+    types: [catalog_updated]
 
 # Allow the workflow to publish to Pages via the deployment API.
 permissions:
