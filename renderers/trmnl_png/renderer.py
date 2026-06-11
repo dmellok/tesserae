@@ -1,8 +1,8 @@
 """trmnl_png renderer.
 
 Composition PNG → 1-bit dithered PNG at the device's panel native
-dims. Output is what the KOReader trmnl-display plugin (and native
-TRMNL hardware) paints directly, MuPDF on the Kindle side decodes a
+dims. Output is what the KOReader trmnl-display plugin (and TRMNL
+devices) paint directly, MuPDF on the Kindle side decodes a
 1-bit greyscale PNG cleanly when it's well-formed; we use Pillow's
 ``Image.save(format="PNG", optimize=True)`` so the encoded bytes meet
 the spec without any of the stride-padding traps a stdlib hand-rolled

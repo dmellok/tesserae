@@ -2,7 +2,7 @@
   "tesserae_compat": "1.x",
   "name": "TRMNL client (1-bit PNG)",
   "version": "0.1.0",
-  "description": "Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. Output is a 1-bit greyscale PNG that the KOReader trmnl-display plugin (and native TRMNL hardware) paints directly. Per-device picture quality (dither / contrast) lives on the device card and tunes the output for the specific panel, Kindle Paperwhite, native TRMNL panel, ESP32 SPI-attached, etc.",
+  "description": "Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. Output is a 1-bit greyscale PNG that the KOReader trmnl-display plugin (and TRMNL devices) paint directly. Per-device picture quality (dither / contrast) lives on the device card and tunes the output for the specific panel, Kindle Paperwhite, the TRMNL device's panel, ESP32 SPI-attached, etc.",
   "orientation": "composition",
   "mime": "image/png",
   "extension": "png",

@@ -22,7 +22,7 @@ broker (**Settings → Server → MQTT broker**), and you've
 
 Two paths, depending on the client:
 
-**Native TRMNL hardware (auto-provision):** Just point the device at Tesserae's URL via its captive-portal Wi-Fi setup. On first boot the firmware calls `/api/setup` with its MAC in the `Id` header; Tesserae auto-creates a device record, mints an access token, and the device starts polling `/api/display` immediately. The new device appears in **Settings → Devices** within seconds, no admin click required. Auto-provision was wired up in 0.44.1; the device card lets you rename it after the fact.
+**TRMNL device (auto-provision):** Just point the device at Tesserae's URL via its captive-portal Wi-Fi setup. The TRMNL firmware (running on Seeed-built hardware) calls `/api/setup` with its MAC in the `Id` header on first boot; Tesserae auto-creates a device record, mints an access token, and the device starts polling `/api/display` immediately. The new device appears in **Settings → Devices** within seconds, no admin click required. Auto-provision was wired up in 0.44.1; the device card lets you rename it after the fact.
 
 **KOReader on a Kindle (token-typed):** KOReader's `trmnl-display` plugin doesn't send a MAC, so you provision via a short token instead.
 

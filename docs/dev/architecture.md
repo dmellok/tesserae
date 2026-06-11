@@ -44,7 +44,7 @@ mounted orientation). Renderers transform out of it via their declared
 
 Two transports run side-by-side: **MQTT push** for Pi / ESP32 clients
 (the broker fans frames out to any number of subscribers) and
-**HTTP pull** for TRMNL hardware + KOReader-on-Kindle (the device
+**HTTP pull** for TRMNL devices + KOReader-on-Kindle (the device
 polls `/api/display` on a schedule and pulls the latest 1-bit PNG).
 A Tesserae install can mix both, pick whichever fits each panel.
 

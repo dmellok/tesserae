@@ -2,7 +2,7 @@
 
 **Self-hosted e-ink dashboard companion.** Compose tile-based dashboards in
 the browser, render them headless, and push the resulting frame to one or more
-panels, Raspberry Pi and ESP32 over MQTT, TRMNL hardware and Kindle (via
+panels, Raspberry Pi and ESP32 over MQTT, TRMNL devices and Kindle (via
 KOReader) over HTTP-pull.
 
 Sibling rebuild of [inky-dash](https://github.com/dmellok/inky-dash), same job,

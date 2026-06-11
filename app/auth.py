@@ -54,7 +54,7 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     "/api/v1/",
     # TRMNL BYOS protocol endpoints, each request carries an
     # ``access-token`` header that ``app.trmnl_api`` resolves to a
-    # device. Jailbroken Kindles + native TRMNL hardware don't carry
+    # device. Jailbroken Kindles + TRMNL devices don't carry
     # sessions, so the gate has to let them through.
     "/api/display",
     "/api/setup",

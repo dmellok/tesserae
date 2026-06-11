@@ -179,7 +179,7 @@ supports two transport shapes:
 * **HTTP pull**, TRMNL [BYOS](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
   protocol. The panel polls `GET /api/display` on a server-set cadence
   and paints whatever PNG comes back. Best for battery-constrained
-  pollers (jailbroken Kindles, native TRMNL hardware), they
+  pollers (jailbroken Kindles, TRMNL devices), they
   deep-sleep between polls.
 
 | Client | Pairs with | Transport | What it's for |
@@ -245,7 +245,7 @@ token you paste into the client config.
 | Panel | Resolution | Colours | Client | Tested |
 |---|---|---|---|---|
 | Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | greyscale | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
-| [Native TRMNL device](https://usetrmnl.com/) | 800×480 | 1-bit | TRMNL firmware |, |
+| [TRMNL device](https://usetrmnl.com/) (Seeed hardware, TRMNL firmware) | 800×480 | 1-bit | TRMNL firmware |, |
 
 The token is short on purpose (5 chars from a typeable alphabet)
 because the typical client has an on-screen keyboard. It's

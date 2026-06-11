@@ -440,7 +440,7 @@ def load_instance_file(
     # TRMNL ``friendly_id`` (six-character human-readable id, e.g.
     # ``7B3X9K``). Surfaced in /api/setup + /api/display so the BYOS
     # firmware can show it on the setup screen / about screen the way
-    # the official TRMNL hardware does. Auto-populated at instance
+    # the official TRMNL devices do. Auto-populated at instance
     # creation in device_service; older instances (pre-0.44.0) won't
     # have one yet.
     if isinstance(raw_inst.get("friendly_id"), str) and raw_inst["friendly_id"].strip():

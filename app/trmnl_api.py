@@ -1,7 +1,7 @@
 """HTTP API for TRMNL-compatible clients.
 
 TRMNL clients (jailbroken Kindles running the KOReader trmnl-display
-plugin, native TRMNL hardware, any BYOS-compatible client) poll
+plugin, TRMNL devices, any BYOS-compatible client) poll
 ``GET /api/display`` on a fixed cadence and paint whatever PNG the
 server hands back. Authentication is a per-device ``access-token``
 header, the user generates it in Tesserae's Settings → Devices and

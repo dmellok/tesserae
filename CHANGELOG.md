@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.1], 2026-06-12
+
+### Changed
+
+- **Stop calling Seeed-built hardware "native TRMNL hardware".** TRMNL
+  is the firmware / software; the physical devices are built by Seeed
+  Studio running the TRMNL firmware. The phrasing made some folks
+  read Tesserae as conflating the two. Swept all user-facing docs,
+  manifests (`devices/trmnl_client/device.json`,
+  `renderers/trmnl_png/renderer.json`), and load-bearing code
+  comments (`app/auth.py`, `app/trmnl_api.py`, `app/device_loader.py`,
+  `renderers/trmnl_png/renderer.py`) and reworded as "TRMNL devices"
+  or "TRMNL device (Seeed hardware, TRMNL firmware)" depending on
+  context. CHANGELOG entries left alone; convention is don't rewrite
+  history.
+
 ## [0.46.0], 2026-06-12
 
 ### Added
