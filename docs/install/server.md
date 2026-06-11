@@ -68,9 +68,10 @@ when you're hacking on the admin.
 ## First run
 
 1. Open `http://127.0.0.1:8765/`, on first boot you're sent to `/setup` to pick an admin password.
-2. Sign in at `/login`. The onboarding wizard walks you through pointing Tesserae at your **MQTT broker** (if any), registering your first **device**, and composing your first **dashboard**, the same screens you'd reach via Settings if you skipped it.
-3. **Settings → Server** holds the post-onboarding knobs: broker host / credentials, **base URL** the panel uses to fetch frames, optional **mDNS** broadcast of `tesserae.local`, and Chromium fallback for webpage rendering.
-4. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
+2. Sign in at `/login`. The onboarding wizard runs through five steps: **welcome → broker → device → dashboard → telemetry consent**. Same screens you'd reach via Settings if you skipped it.
+3. **Settings → Server** holds the broker host / credentials, **base URL** the panel uses to fetch frames, optional **mDNS** broadcast of `tesserae.local`, and Chromium fallback for webpage rendering.
+4. **Settings → App** holds the timezone, location, telemetry toggle, and Home Assistant discovery toggle. The timezone setting forwards to the rendering Chromium (since 0.44.10), so clock + calendar widgets paint in your local zone whether the container's `TZ` env var matches or not.
+5. Renderers and plugins that declare settings show up as their own sections, generated from their manifests.
 
 To preview a single widget without composing a dashboard, run `--dev`, sign
 in, then open
@@ -125,22 +126,16 @@ dusk lighting widgets repaint promptly. The token lives at
 
 ## Backup, export, import
 
-Settings → System → **Data** exports your full Tesserae state
-(pages, themes, devices, plugin settings, secrets) as a single ZIP
-suitable for moving to another install or restoring after a wipe.
+Two related features under **Settings → System**, both admin-only:
 
-- **Export:** clicks straight to a `tesserae-export-<timestamp>.zip`
-  download. The ZIP includes every page JSON, theme definition, font
-  pick, device registration, and per-plugin settings (with secrets
-  embedded, treat the file like a credential).
-- **Import:** upload a ZIP from another install. The server validates
-  every file against the matching JSON Schema before writing, then
-  replaces state atomically. On Docker / HA App installs the
-  in-place restart happens automatically; on a venv install the page
-  flashes a "stop and restart" hint so nothing is left mid-flight.
+**Backups** (`Settings → System → Backups`) snapshot your full Tesserae state into a ZIP on disk under `data/core/backups/`. Use it for periodic local safety copies and rollback after a bad change. Endpoints: `/settings/system/backup/{create,restore,delete,download}`.
 
-The two endpoints land under `/settings/system/data/export` and
-`/settings/system/data/import`; they're admin-only.
+**Data export / import** (`Settings → System → Data`) is the one-shot migration ZIP. Use it when moving to another install, not for routine snapshots. The ZIP includes every page JSON, theme definition, font pick, device registration, and per-plugin settings (with secrets embedded, treat the file like a credential).
+
+- **Export:** clicks straight to a `tesserae-export-<timestamp>.zip` download.
+- **Import:** upload a ZIP from another install. The server validates every file against the matching JSON Schema before writing, then replaces state atomically. On Docker / HA App installs the in-place restart happens automatically; on a venv install the page flashes a "stop and restart" hint so nothing is left mid-flight.
+
+Endpoints: `/settings/system/data/export` and `/settings/system/data/import`.
 
 ## mDNS, `tesserae.local`
 

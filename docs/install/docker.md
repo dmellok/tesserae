@@ -165,12 +165,14 @@ on the next image rebuild, so upgrades go through `docker compose
 pull` instead. The Settings page surfaces a `docker compose` hint
 instead of the update form.
 
-## Backups
+## Backups + data export
 
-The **Settings → System → Backups** card still works, backups land
-in `./data/core/backups/` on your host. Snapshotting `./data` with
-your normal backup tool (restic, borg, rsnapshot, or a plain cron'd
-tarball) covers everything Tesserae has, including those backups.
+Two related features under **Settings → System**:
+
+- **Backups** (`Settings → System → Backups`) snapshots the full Tesserae state into a ZIP under `./data/core/backups/` on your host. Use it for periodic safety copies and rollback.
+- **Data export / import** (`Settings → System → Data`) is the one-shot migration ZIP for moving to another install, not for routine snapshots.
+
+Both still work under Docker. Snapshotting `./data` with your normal backup tool (restic, borg, rsnapshot, or a plain cron'd tarball) covers everything Tesserae has, including the in-app backups.
 
 ## Limits
 

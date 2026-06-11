@@ -69,12 +69,12 @@ For TRMNL hardware and Kindle e-readers running KOReader's
 URL and the next-poll interval). No broker required, handy when you
 want a panel that "just talks to the internet".
 
-Pairing flow: the device reads its MAC, hits `/api/setup`, and the
-server prints a short 5-character access token on the admin's
-**Settings → Devices → Add device → TRMNL** card. Type the token into
-the device once and it's paired; from there it polls `/api/display`
-authenticated via the token. Errors / battery / RSSI heartbeat back
-via `POST /api/log` and surface on the device card.
+Pairing has two paths:
+
+- **Native TRMNL hardware (auto-provision, no admin action).** The device sends its MAC in the `Id` header on its first `/api/setup` call; Tesserae creates a device record and mints an access token automatically. The new card appears in **Settings → Devices** within seconds. Auto-provision was wired up in 0.44.1.
+- **KOReader on a Kindle (token-typed).** KOReader's `trmnl-display` plugin doesn't send a MAC, so you generate a short 5-character token via **Settings → Devices → Add device → TRMNL**, paste it into the plugin config, and the next `/api/setup` exchanges it for a permanent device-id + access token.
+
+From there the device polls `/api/display` authenticated via the token. Errors / battery / RSSI heartbeat back via `POST /api/log` and surface on the device card.
 
 The `trmnl_png` renderer fits your composition PNG to the device's
 panel size and quantises to **1-bit black/white** with the dither of

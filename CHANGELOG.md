@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.45.6], 2026-06-11
+
+### Fixed
+
+- **Install guides: audited against current code, five real
+  discrepancies fixed.** Onboarding wizard described as 3 steps in
+  `server.md` (it's 5); timezone + HA discovery wrongly listed under
+  Settings → Server (they're App-level fields); Backups vs Data
+  export collapsed into one feature in `server.md` + `docker.md`
+  (they're two separate `/settings/system/{backup,data}` endpoints);
+  TRMNL MAC-based auto-provision (primary path since 0.44.1) missing
+  from `clients.md` + `devices.md`; "Settings → Pages" and
+  "Settings → Widgets" referenced in `devices.md` +
+  `spotify-home-assistant.md` (they're top-nav entries Dashboards
+  and Widgets, not Settings areas). Rotations mention added to
+  `devices.md`.
+
 ## [0.45.5], 2026-06-11
 
 ### Fixed

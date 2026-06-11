@@ -20,8 +20,14 @@ broker (**Settings → Server → MQTT broker**), and you've
 
 ## Register a TRMNL / KOReader client (HTTP-pull)
 
-1. **Settings → Devices → Add device → TRMNL.** Tesserae generates a short 5-character access token and prints it on the card.
-2. **Type the token into your TRMNL device or Kindle's KOReader `trmnl-display` plugin.** It calls `/api/setup`, exchanges the token for a permanent device-id + access token, and starts polling `/api/display` on the cadence you configure.
+Two paths, depending on the client:
+
+**Native TRMNL hardware (auto-provision):** Just point the device at Tesserae's URL via its captive-portal Wi-Fi setup. On first boot the firmware calls `/api/setup` with its MAC in the `Id` header; Tesserae auto-creates a device record, mints an access token, and the device starts polling `/api/display` immediately. The new device appears in **Settings → Devices** within seconds, no admin click required. Auto-provision was wired up in 0.44.1; the device card lets you rename it after the fact.
+
+**KOReader on a Kindle (token-typed):** KOReader's `trmnl-display` plugin doesn't send a MAC, so you provision via a short token instead.
+
+1. **Settings → Devices → Add device → TRMNL.** Tesserae generates a five-character access token and prints it on the card.
+2. **Type the token into the KOReader plugin config.** It calls `/api/setup`, exchanges the token for a permanent device-id + access token, and starts polling `/api/display` on the cadence you configure.
 3. **Calibrate + bind a dashboard** exactly as above, the device appears in the Devices list the moment it completes setup.
 
 ## Per-device settings
@@ -39,7 +45,7 @@ Atkinson, Jarvis-Judice-Ninke, Stucki, Bayer 8×8, halftone, crosshatch, or none
 The page editor models a dashboard as **one page → one layout preset → one
 widget per cell**.
 
-1. **Settings → Pages → New page** (or pick an existing one). Set its panel
+1. **Top nav → Dashboards → New dashboard** (or pick an existing one). Set its panel
    block to the size the dashboard targets, usually the size of the device
    you're binding to.
 2. **Pick a layout preset.** Ten built-in presets are exposed as cards: one
@@ -59,7 +65,9 @@ widget per cell**.
    one or many. A page bound to several differently-sized panels
    renders once per distinct panel size and fans each frame out.
 6. **Send.** Hit Send to push immediately, or let the scheduler do it
-   on the cadence set by Settings → Pages → Schedule.
+   on the cadence set in the top nav's **Schedules** entry. For
+   cycling between several dashboards on one device, use
+   **Rotations** instead (also in the top nav), shipped in 0.45.0.
 
 ## Multiple panels
 

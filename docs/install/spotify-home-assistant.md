@@ -157,10 +157,12 @@ Same for all three options above.
    (NOT through the HA sidebar ingress tab). You'll log in to the
    admin UI as you would normally.
 2. Install the Spotify widget bundle if you haven't:
-   **Settings → Widgets → Browse community widgets → Install Spotify
-   Widgets**. Restart when prompted.
-3. After the restart, go to **Settings → Widgets → Spotify Core**
-   (the admin page the bundle drops in).
+   **top nav → Widgets → Browse community widgets → Install Spotify
+   Widgets**. Restart when prompted. (The Widgets entry is in the
+   top nav, not under Settings.)
+3. After the restart, go to **top nav → Widgets → Spotify Core**
+   (the admin page the bundle drops in, listed under "Admin pages"
+   in the dropdown).
 4. Paste your **Client ID** and **Client Secret** into the form, hit
    Save.
 5. Click **Connect**. Your browser bounces to Spotify, you authorise
