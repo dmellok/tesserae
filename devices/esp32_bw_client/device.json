@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "ESP32 BW client",
+  "icon": "device-tablet",
+  "version": "0.1.0",
+  "description": "Battery-powered ESP32 firmware for mono B/W e-paper panels (e.g. Waveshare 4.2\" 400x300). Subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, then deep-sleeps. Publishes battery / RSSI / IP heartbeats on wake; reads its sleep-interval config from the broker.",
+  "renderers": ["esp32_bw_bin"],
+  "status_topic": "tesserae/esp32/status",
+  "config_topic": "tesserae/esp32/config",
+  "panel": { "w": 400, "h": 300, "orientation": "landscape", "name": "Waveshare 4.2\" BW" },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 900,
+      "min": 30,
+      "max": 604800,
+      "presets": [
+        {"value": 60,    "label": "1 minute"},
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "Custom value is in seconds."
+    }
+  }
+}

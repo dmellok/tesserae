@@ -6,6 +6,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.0], 2026-06-12
+
+### Added
+
+- **New device kind `esp32_bw_client` + new renderer `esp32_bw_bin`
+  for 1-bpp B/W e-paper panels.** Closes the loop on the
+  `tesserae-esp32-bw-client` firmware (generic ESP32 + mono e-paper,
+  canonical target Waveshare 4.2" 400x300, but the renderer + packer
+  are resolution-agnostic). Before this, a device heartbeating with
+  `kind:"esp32_bw_client"` showed up in the Discovered strip but
+  one-click Register failed with "Unknown device kind", and no
+  renderer emitted the strict 1-bpp wire format the firmware decoder
+  demands (exactly `width * height / 8` bytes, 8 pixels per byte,
+  MSB = leftmost, bit-set = white).
+  - `app/quantizer.py`: new `pack_to_panel_bin_1bpp()` mirrors
+    `pack_to_panel_bin` but for the 1-bpp wire. Same full dither
+    suite works (Floyd-Steinberg, Atkinson, Jarvis, Stucki,
+    Bayer 8x8, halftone, crosshatch, none).
+  - `app/panel.py`: new `waveshare_42_bw` preset (400x300,
+    landscape-native).
+  - The device's `parse_status` extracts `panel_w` / `panel_h` from
+    the heartbeat (with `width` / `height` as aliases) so any
+    width-multiple-of-8 BW panel (296x128, 480x280, 800x480, etc.)
+    registers in one click with the correct dims via the existing
+    Discovered card pre-fill path.
+  - Wire-contract tests lock the firmware byte format: all-white
+    400x300 packs to 15000 bytes of `0xFF`; all-black packs to
+    `0x00`; a single white column at x=0 makes every byte `0x80`.
+
 ## [0.45.7], 2026-06-11
 
 ### Added

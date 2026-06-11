@@ -630,3 +630,100 @@ def pack_to_panel_bin(
     expected = width * height // 2
     assert len(packed) == expected, f"packed buffer is {len(packed)}, expected {expected}"
     return packed
+
+
+# 2-colour mono palette used by the 1-bpp packer below. Index 0 = black,
+# index 1 = white, which matches the firmware wire convention
+# (bit-set = white, bit-clear = black). Defined at module scope so callers
+# (and tests) can reference it without re-typing the tuple.
+_MONO_PALETTE_2: tuple[tuple[int, int, int], tuple[int, int, int]] = (
+    (0, 0, 0),
+    (255, 255, 255),
+)
+
+
+def pack_to_panel_bin_1bpp(
+    img: Image.Image,
+    *,
+    width: int,
+    height: int,
+    dither: DitherMode = "floyd-steinberg",
+    contrast: float = 1.0,
+) -> bytes:
+    """Quantise to mono B/W and pack to the firmware's 1-bpp wire format.
+
+    Mirror of :func:`pack_to_panel_bin` for 1-bpp panels (Waveshare 4.2"
+    B/W + the `esp32_bw_bin` renderer). Same dither pipeline (every mode
+    `pack_to_panel_bin` supports works here too), 2-colour palette, and
+    a different pack stride.
+
+    Wire layout:
+
+    * Exactly ``width * height / 8`` bytes (15000 for 400x300). No
+      header, no padding, no checksum.
+    * Scanline order, 8 pixels per byte, **MSB = leftmost pixel**
+      (``np.packbits`` default).
+    * **bit-set (1) = white, bit-clear (0) = black** (palette index 1
+      maps to white). A fully white scanline is 0xFF bytes; a fully
+      black scanline is 0x00.
+
+    ``width`` must be a multiple of 8 (no row padding, so partial
+    bytes at the right edge would silently corrupt the packing). The
+    image must already be at ``(width, height)``; callers
+    ``fit_to_panel`` first.
+
+    The dither pre-pass takes the same ``contrast`` knob as the colour
+    packer because that's the single most useful tuning lever on a
+    photo / text mixed dashboard: bump > 1 to deepen black-or-white
+    decisions on photos, drop < 1 to soften text-heavy frames.
+    """
+    if width % 8:
+        raise ValueError(f"panel width must be a multiple of 8 (8 pixels per byte), got {width}")
+    if img.size != (width, height):
+        raise ValueError(f"image must be {width}x{height}, got {img.size}")
+
+    palette = _MONO_PALETTE_2
+    pal_arr = np.array(palette, dtype=np.float32)
+
+    rgb = img.convert("RGB")
+    if contrast != 1.0:
+        rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
+
+    # Same dither branch as pack_to_panel_bin, just against the 2-colour
+    # mono palette. Every mode produces palette indices (0=black, 1=white)
+    # at the end of this block.
+    if dither in _PIL_DITHER_MAP:
+        pal_img = _palette_image(palette)
+        indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
+        raw = indexed.tobytes()
+    elif dither == "atkinson":
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+    elif dither == "jarvis":
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+    elif dither == "stucki":
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+    elif dither == "bayer-8x8":
+        raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
+    elif dither == "halftone":
+        raw = _dither_ordered(rgb, pal_arr, _HALFTONE_16, strength=128.0)
+    elif dither == "crosshatch":
+        raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
+    else:
+        raise ValueError(f"unknown dither mode: {dither!r}")
+
+    # Palette indices: 0 = black, 1 = white. Bit-set must be white,
+    # so the mask straight from the indices already matches the wire
+    # convention. np.packbits defaults to bitorder='big', i.e. MSB
+    # is the first (leftmost) pixel, which is also what the firmware
+    # expects (matches tools/gen_splash.py's pack_1bpp in the firmware
+    # repo: np.packbits(white_mask, axis=1)).
+    indices = np.frombuffer(raw, dtype=np.uint8).reshape(height, width)
+    # Tolerate strays past index 1 (a buggy dither implementation):
+    # clamp anything above 0 down to 1 so we still get a 1-bit mask.
+    white_mask = (indices >= 1).astype(np.uint8)
+    packed_arr = np.packbits(white_mask, axis=1)
+    packed = packed_arr.tobytes()
+
+    expected = width * height // 8
+    assert len(packed) == expected, f"packed buffer is {len(packed)}, expected {expected}"
+    return packed
