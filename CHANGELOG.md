@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.2], 2026-06-12
+
+### Changed
+
+- **Credit TRMNL + Terminus in the README and credits page.** Added
+  explicit acknowledgment that TRMNL's open BYOS protocol is what
+  makes Tesserae's HTTP-pull path possible, that Terminus is the
+  reference server I aligned envelopes against, and that the
+  rotations feature is a Tesserae take on TRMNL's playlists concept
+  rather than an original design.
+
 ## [0.46.1], 2026-06-12
 
 ### Changed

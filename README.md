@@ -375,6 +375,7 @@ Tesserae stands on generously-licensed open source:
 - **[Phosphor Icons](https://phosphoricons.com/)**, every icon in the admin UI + widgets (6 weights, MIT).
 - **[Chart.js](https://chartjs.org/)** v4.4.0, the line / bar / radar / pie / horizon plots across finance, weather, and stats widgets (MIT).
 - **17 typefaces** under SIL OFL or Apache 2.0, Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
+- **[TRMNL](https://usetrmnl.com/)** + **[Terminus](https://github.com/usetrmnl/byos_laravel)**, the team behind the TRMNL devices, the BYOS protocol Tesserae implements, and the Terminus reference server I aligned the `/api/display`, `/api/setup`, and `/api/log` envelopes against. Tesserae's HTTP-pull path exists because TRMNL's open protocol made it easy to drop in a self-hosted server. The "rotations" feature is also a Tesserae take on TRMNL's playlists.
 - **[KOReader](https://github.com/koreader/koreader)** trmnl-display plugin, the upstream Lua client that turns a jailbroken Kindle into a TRMNL-compatible panel.
 - **[paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)**, calibrated Spectra 6 + ACeP palette measurements (Apache 2.0) that power Tesserae's opt-in calibrated dither path. Measurements made by the team at [paperlesspaper](https://paperlesspaper.de/en) on their eInk picture frames; we ported the numbers into [`app/quantizer.py`](app/quantizer.py) and paired them with our own linear tone-mapping pre-pass. Full attribution in [NOTICES.md](NOTICES.md).
 

@@ -36,13 +36,24 @@ live in `plugins/fonts_core/static/`.
 
 ## Upstream protocols and reference clients
 
+- **[TRMNL](https://usetrmnl.com/)** - the team behind the TRMNL
+  devices and the open BYOS protocol Tesserae's HTTP-pull path
+  implements. Tesserae's `trmnl_png` renderer, `/api/display`,
+  `/api/setup`, and `/api/log` endpoints exist because TRMNL
+  published a documented protocol you can host yourself. The
+  rotations feature is Tesserae's take on TRMNL's playlists concept.
+- **[Terminus](https://github.com/usetrmnl/byos_laravel)** - TRMNL's
+  Laravel reference BYOS server. I aligned Tesserae's HTTP envelopes
+  + access-token flow against Terminus to make sure existing TRMNL
+  clients (firmware, KOReader plugin) drop in without firmware
+  changes.
+- **[TRMNL BYOS specification](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)** -
+  usetrmnl.com's documented protocol that the `trmnl_png` renderer +
+  `/api/display` blueprint implement.
 - **[KOReader trmnl-display plugin](https://github.com/koreader/koreader)** -
   Lua plugin running on jailbroken Kindles that paints frames over the
   TRMNL BYOS protocol. The Kindle Paperwhite 2 testing on Tesserae's
   TRMNL HTTP path leans entirely on this work.
-- **[TRMNL BYOS specification](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)** -
-  usetrmnl.com's documented protocol that the `trmnl_png` renderer +
-  `/api/display` blueprint implement.
 
 ## Python dependencies
 
