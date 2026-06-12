@@ -129,6 +129,12 @@
             {% endif %}
           </span>
           {% endif %}
+          {% if e.stars %}
+          <span class="muted">·</span>
+          <span class="muted marketplace-stars" title="GitHub stars on the widget's source repo; refreshed hourly by the catalog.">
+            <i class="ph ph-star" aria-hidden="true"></i> {{ e.stars }}
+          </span>
+          {% endif %}
           {% if e.installed_from_disk %}
           <span class="muted">·</span>
           <span class="pill is-warn" title="Plugin folders are present on disk but weren't installed via the marketplace, typically from a Tesserae upgrade where the widget moved from the bundle to the catalog.">

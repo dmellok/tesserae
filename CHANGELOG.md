@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.6], 2026-06-13
+
+### Added
+
+- **Star counts on community widget catalog cards.** Each entry on
+  Settings → Widgets → Browse now shows a `★ N` chip next to the
+  author byline when the widget's source repo has at least one
+  GitHub star. The count comes from a `stars.json` sidecar published
+  next to `widgets.json` by a GitHub Action in the `tesserae-widgets`
+  catalog repo (hourly cron, `GITHUB_TOKEN`-authenticated GitHub API
+  calls, only commits when counts actually change). Tesserae itself
+  makes no extra GitHub API calls — every install reads `stars.json`
+  with the same TTL as `widgets.json`. Cleanly fits the no-extra-
+  telemetry stance. Sidecar 404 / parse failure is non-fatal: the
+  catalog renders without the chip. New `CatalogEntry.stars` field
+  defaults to `None`; the template hides the chip on `None` or `0`
+  so widgets with no star data don't display "★ 0" as discouraging
+  noise. See [`app/marketplace.py`](app/marketplace.py) for the
+  sidecar fetch + merge, [`templates/plugins_browse.html`](templates/plugins_browse.html)
+  for the chip, and two new tests in [`tests/test_marketplace.py`](tests/test_marketplace.py)
+  covering the happy path and the sidecar-missing fallback.
+
 ## [0.46.5], 2026-06-13
 
 ### Fixed

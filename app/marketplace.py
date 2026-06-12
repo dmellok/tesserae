@@ -30,6 +30,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import logging
@@ -118,6 +119,12 @@ class CatalogEntry:
     release_tarball_url: str
     release_sha256: str
     source: str | None
+    # Populated from a sibling ``stars.json`` published alongside the
+    # catalog index (refreshed hourly by a GitHub Action in the catalog
+    # repo). ``None`` means the sidecar wasn't reachable; ``0`` means
+    # the widget repo has zero stars; positive int means real signal.
+    # The Browse template hides the chip when this is None or 0.
+    stars: int | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> CatalogEntry:
@@ -345,9 +352,39 @@ class Marketplace:
             except (KeyError, TypeError, ValueError) as err:
                 logger.warning("marketplace: dropping malformed entry: %s", err)
                 continue
+        stars = self._fetch_stars_sidecar(url)
+        if stars:
+            entries = [
+                dataclasses.replace(e, stars=stars.get(e.id)) if e.id in stars else e
+                for e in entries
+            ]
         with self._lock:
             self._index_cache = IndexSnapshot(url=url, entries=list(entries))
         return entries
+
+    def _fetch_stars_sidecar(self, index_url: str) -> dict[str, int]:
+        """Best-effort fetch of ``stars.json`` next to the catalog
+        index. Returns ``{widget_id: count}`` or empty dict on any
+        failure. The sidecar is published hourly by a GitHub Action
+        in the catalog repo; a 404 / network blip / parse error is
+        not fatal — the catalog renders without star counts and the
+        Browse template hides the chip. Never raises."""
+        stars_url = _screenshots_base(index_url) + "/stars.json"
+        try:
+            raw = fetch_json(stars_url, timeout=_HTTP_TIMEOUT_S, retries=0)
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+            return {}
+        if not isinstance(raw, dict):
+            logger.debug("marketplace: stars.json was not a JSON object")
+            return {}
+        stars_block = raw.get("stars")
+        if not isinstance(stars_block, dict):
+            return {}
+        out: dict[str, int] = {}
+        for k, v in stars_block.items():
+            if isinstance(k, str) and isinstance(v, int) and v >= 0:
+                out[k] = v
+        return out
 
     def cached_index(self) -> list[CatalogEntry] | None:
         """Best-effort fallback for the Browse page when ``fetch_index``

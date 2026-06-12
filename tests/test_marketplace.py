@@ -279,6 +279,87 @@ def test_valid_index_returns_entries(
     assert entries[0].tags == ["utility"]
 
 
+def test_stars_sidecar_merges_into_entries(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """When ``stars.json`` is published next to ``widgets.json``,
+    ``fetch_index`` merges the counts into ``CatalogEntry.stars`` for
+    every entry whose id matches. Missing ids stay ``None``."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [
+            {
+                "id": "sample",
+                "name": "Sample",
+                "description": "A sample widget for tests.",
+                "author": {"name": "Test Author", "github": "testauthor"},
+                "tags": ["utility"],
+                "kind": "widget",
+                "tesserae_compat": "1.x",
+                "screenshot_sizes": ["lg"],
+                "release": {
+                    "version": "0.0.1",
+                    "tarball_url": "https://example.invalid/sample.tar.gz",
+                    "sha256": "a" * 64,
+                },
+            },
+            {
+                "id": "uncounted",
+                "name": "Uncounted",
+                "description": "No star data published yet.",
+                "author": {"name": "Test Author", "github": "testauthor"},
+                "tags": ["utility"],
+                "kind": "widget",
+                "tesserae_compat": "1.x",
+                "screenshot_sizes": ["lg"],
+                "release": {
+                    "version": "0.0.1",
+                    "tarball_url": "https://example.invalid/uncounted.tar.gz",
+                    "sha256": "a" * 64,
+                },
+            },
+        ]
+    )
+    url_fixture["https://example.invalid/stars.json"] = json.dumps(
+        {
+            "fetched_at": "2026-06-13T11:00:00Z",
+            "stars": {"sample": 42, "stale_entry_no_longer_in_catalog": 7},
+        }
+    ).encode("utf-8")
+    entries = {e.id: e for e in marketplace.fetch_index()}
+    assert entries["sample"].stars == 42
+    assert entries["uncounted"].stars is None
+
+
+def test_stars_sidecar_missing_does_not_break_catalog(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """A 404 / network blip on ``stars.json`` must not poison the
+    catalog. Entries should still come through with ``stars=None``."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [
+            {
+                "id": "sample",
+                "name": "Sample",
+                "description": "A sample widget for tests.",
+                "author": {"name": "Test Author", "github": "testauthor"},
+                "tags": ["utility"],
+                "kind": "widget",
+                "tesserae_compat": "1.x",
+                "screenshot_sizes": ["lg"],
+                "release": {
+                    "version": "0.0.1",
+                    "tarball_url": "https://example.invalid/sample.tar.gz",
+                    "sha256": "a" * 64,
+                },
+            }
+        ]
+    )
+    # stars.json deliberately not added to url_fixture → OSError on fetch.
+    entries = marketplace.fetch_index()
+    assert len(entries) == 1
+    assert entries[0].stars is None
+
+
 def test_index_cache_reused_within_ttl(
     marketplace: Marketplace, url_fixture: dict[str, bytes]
 ) -> None:

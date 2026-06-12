@@ -149,6 +149,7 @@ def _entries_payload(
                 "kind": entry.kind,
                 "official": entry.official,
                 "source": entry.source,
+                "stars": entry.stars,
                 "version": entry.release_version,
                 "installed": is_installed,
                 "installed_from_disk": installed_from_disk,
