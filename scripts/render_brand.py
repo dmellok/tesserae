@@ -120,8 +120,14 @@ def main() -> None:
     )
     # 180×180, the canonical Apple "Add to Home Screen" icon (iOS,
     # iPadOS, macOS Safari → Add to Dock). iOS upscales smaller PNGs
-    # and the result looks blurry on Retina.
-    render(BASE_SIZE).resize((180, 180), Image.LANCZOS).save(
+    # and the result looks blurry on Retina. Rendered with
+    # ``maskable=True`` so the gradient fills every pixel to the edge:
+    # iOS applies its own squircle mask, and a pre-rounded source
+    # leaves a thin band of background colour at the corner edges
+    # wherever iOS's mask radius doesn't quite match ours. Apple's HIG
+    # explicitly says "don't add a layer mask of an icon's shape to
+    # your image; iOS automatically applies an icon mask."
+    render(BASE_SIZE, maskable=True).resize((180, 180), Image.LANCZOS).save(
         OUT_DIR / "apple-touch-icon.png", optimize=True
     )
     # 192×192, Android Chrome's preferred home-screen icon size + the

@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.5], 2026-06-13
+
+### Fixed
+
+- **Thin white border at the corner edges of the iOS home-screen
+  icon.** The 180×180 `apple-touch-icon.png` was rendered with the
+  brand's own rounded-square mask baked in, so the corners of the
+  PNG were transparent. iOS then applies its own squircle mask on
+  top, and the slight radius mismatch exposed a band of
+  home-screen background colour wherever iOS's mask sat outside
+  ours. Per Apple's HIG ("don't add a layer mask of an icon's
+  shape to your image; iOS automatically applies an icon mask"),
+  the apple-touch-icon now renders with `maskable=True` so the
+  gradient fills every pixel edge-to-edge. iOS does the rounding;
+  the corners come out clean. Other icons (favicon, HA add-on
+  sidebar icon, social-card 512) keep the rounded mask since they
+  display as-is. [`scripts/render_brand.py`](scripts/render_brand.py).
+
 ## [0.46.4], 2026-06-12
 
 ### Changed
