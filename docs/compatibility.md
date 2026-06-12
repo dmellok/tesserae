@@ -27,6 +27,7 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 | Renderer | Output | Target client(s) | What it's for |
 |---|---|---|---|
 | `esp32_bin` | `.bin` | [tesserae-esp32-bin-client (13.3" Waveshare)](https://github.com/dmellok/tesserae-esp32-bin-client)<br>[tesserae-photopainter-7.3-bin-client (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
+| `esp32_bw_bin` | `.bin` | [tesserae-esp32-bw-client (4.2" Waveshare B/W)](https://github.com/dmellok/tesserae-esp32-bw-client) | Composition PNG quantised to 1-bpp + dithered, packed 8 pixels per byte (MSB = leftmost, bit-set = white) so a width × height / 8 byte buffer paints the panel directly. Width must be a multiple of 8. |
 | `pi_bin` | `.bin` | [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
 | `pi_png` | `.png` | [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
@@ -38,6 +39,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | Device kind | Default panel | Renderers | What it is |
 |---|---|---|---|
 | `esp32_client` | 800×480 | `esp32_bin` | Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. |
+| `esp32_bw_client` | 400×300 | `esp32_bw_bin` | ESP32 firmware for Waveshare 4.2" B/W (and any other 1-bpp panel with width a multiple of 8). Same MQTT topic shape as `esp32_client`, but consumes the 1-bpp `esp32_bw_bin` buffer. Heartbeat publishes `panel_w` / `panel_h` so other B/W resolutions auto-fill the Discovered card without firmware changes. |
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `trmnl_client` | 800×480 | `trmnl_png` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
@@ -49,6 +51,7 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-esp32-bin-client; the 7.3" PhotoPainter client at tesserae-photopainter-7.3-bin-client. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
+| `esp32_bw_bin` | Waveshare 4.2" B/W (400×300, 1-bpp, ESP32) | :material-help-circle: Untested | Wire contract verified by unit tests (all-white → 0xFF × 15000, all-black → 0x00 × 15000, left-column → 0x80 first byte each row) but no in-the-wild paint confirmation yet. Waiting on user feedback. [Open an issue](https://github.com/dmellok/tesserae/issues) if you've flashed it. |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. TRMNL devices (Seeed hardware running the TRMNL firmware) are supported but not yet confirmed here. |

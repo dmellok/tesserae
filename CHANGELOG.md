@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.4], 2026-06-12
+
+### Changed
+
+- **Document the missing panels and firmware clients.** The 0.46.0
+  `esp32_bw_client` + `esp32_bw_bin` work shipped but the README and
+  docs hadn't been updated to mention them; the
+  `tesserae-photopainter-7.3-bin-client` was in the README but absent
+  from the install-a-client doc. README now lists 5 renderer plugins
+  and 5 device plugins (was 4/4), includes the
+  `tesserae-esp32-bw-client` firmware row, and the Waveshare panels
+  table calls out the 4.2" B/W panel (Tested column intentionally
+  blank — wire contract verified, awaiting in-the-wild feedback).
+  `docs/compatibility.md` gains `waveshare_42_bw` preset, `esp32_bw_bin`
+  renderer, `esp32_bw_client` device-kind, and a per-renderer test-
+  status row marked `Untested`. `docs/install/clients.md` gains
+  sections for both `tesserae-photopainter-7.3-bin-client` (confirmed
+  on hardware) and `tesserae-esp32-bw-client` (with an explicit
+  "untested in the wild" admonition), and the stale "all three
+  clients" claim is replaced with a pointer to the compatibility
+  table that gets actively maintained.
+
 ## [0.46.3], 2026-06-12
 
 ### Added

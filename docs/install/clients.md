@@ -1,14 +1,16 @@
 # Install a client
 
 The Tesserae server publishes frames; a **client** on the other end paints your
-panel. Four reference clients live in their own repos, pick whichever matches
-your hardware. Three of them subscribe to MQTT (Pi + ESP32); the fourth (TRMNL
-/ KOReader-on-Kindle) polls the server over HTTP. All four use the same
+panel. Six reference clients live in their own repos, pick whichever matches
+your hardware. Five of them subscribe to MQTT (Pi + ESP32); the sixth (TRMNL
+/ KOReader-on-Kindle) polls the server over HTTP. All six use the same
 device-registration flow described in [Set up a device](devices.md).
 
 | Client | Transport | Default id | Best for |
 |---|---|---|---|
 | `tesserae-esp32-bin-client` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
+| `tesserae-photopainter-7.3-bin-client` | MQTT | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
+| `tesserae-esp32-bw-client` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
 | `tesserae-pi-bin-client` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
 | `tesserae-pi-png-client` | MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
 | `tesserae-trmnl-client` | HTTP-pull | `trmnl` | TRMNL devices + KOReader-on-Kindle |
@@ -30,8 +32,41 @@ and Wi-Fi are configured through a captive portal (reachable afterward on the
 LAN at `tesserae-<id>.local`).
 
 !!! success "This is the maintainer's daily driver"
-    The ESP32 + Waveshare 13.3" path runs in production daily. All three
-    clients are [confirmed on real hardware](../compatibility.md#whats-been-tested-on-real-hardware).
+    The ESP32 + Waveshare 13.3" path runs in production daily. See
+    [Screens & compatibility](../compatibility.md#whats-been-tested-on-real-hardware)
+    for the full per-client real-hardware status table.
+
+## tesserae-photopainter-7.3-bin-client
+
+[:material-github: dmellok/tesserae-photopainter-7.3-bin-client](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client)
+· pairs with the `esp32_bin` renderer · default id `esp32`
+
+Battery-powered **ESP32-S3** firmware for the **Waveshare 7.3" PhotoPainter**
+(landscape-native 800×480 Spectra 6). Same MQTT wire contract and deep-sleep
+pattern as the 13.3" client; the difference is the panel size and the SPI init
+sequence baked for the PhotoPainter board. Pick `waveshare_photopainter_7_3` as
+the panel preset when registering the device so the server-side renderer uses
+the right row stride. Confirmed on real hardware.
+
+## tesserae-esp32-bw-client
+
+[:material-github: dmellok/tesserae-esp32-bw-client](https://github.com/dmellok/tesserae-esp32-bw-client)
+· pairs with the `esp32_bw_bin` renderer · default id `esp32_bw`
+
+ESP32 firmware for the **Waveshare 4.2" B/W** e-paper panel (400×300, 1-bpp).
+Same MQTT topic shape as the 13.3" client (subscribes to
+`tesserae/<device_id>/frame/bin`), but consumes the 1-bpp packed buffer the
+`esp32_bw_bin` renderer produces: exactly `width × height / 8` bytes, 8 pixels
+per byte, MSB = leftmost, bit-set = white. Heartbeat publishes `panel_w` /
+`panel_h` so other B/W resolutions (with width a multiple of 8) auto-fill the
+Discovered card — point the firmware at a different size and Tesserae picks it
+up without changes.
+
+!!! warning "Untested in the wild as of v0.46.x"
+    Wire contract verified by unit tests; no real-hardware paint confirmation
+    yet. If you flash it, [open an issue](https://github.com/dmellok/tesserae/issues)
+    with the result either way and the table on [Screens & compatibility](../compatibility.md)
+    gets updated.
 
 ## tesserae-pi-bin-client
 
