@@ -20,6 +20,7 @@ clients can hit /settings without juggling sessions.
 from __future__ import annotations
 
 import logging
+import mimetypes
 import os
 import time
 from datetime import tzinfo
@@ -162,6 +163,11 @@ def create_app(
     devices_dir: Path | None = None,
 ) -> Flask:
     """Construct the Flask app with everything wired."""
+    # Modern Python registers ``.webmanifest`` → ``application/manifest+json``
+    # in the standard mimetypes module, but Alpine-based containers and
+    # Windows installs sometimes ship without that entry, which makes
+    # browsers ignore the manifest. Register defensively at startup.
+    mimetypes.add_type("application/manifest+json", ".webmanifest")
     app = Flask(
         __name__,
         template_folder=str(REPO_ROOT / "templates"),

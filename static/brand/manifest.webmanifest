@@ -1,0 +1,31 @@
+{
+  "name": "Tesserae",
+  "short_name": "Tesserae",
+  "description": "Self-hosted dashboard companion for e-ink panels.",
+  "start_url": "../../",
+  "scope": "../../",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#0d8c7e",
+  "background_color": "#f1f0ec",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

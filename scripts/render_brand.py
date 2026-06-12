@@ -48,19 +48,26 @@ def _diagonal_gradient(size: int) -> np.ndarray:
     return np.stack([r, g, b, a], axis=-1)
 
 
-def render(size: int = BASE_SIZE) -> Image.Image:
+def render(size: int = BASE_SIZE, *, maskable: bool = False) -> Image.Image:
     """Draw the brand mark at ``size``×``size``. Use BASE_SIZE for max
-    fidelity then resample down if you need a smaller deliverable."""
+    fidelity then resample down if you need a smaller deliverable.
+
+    ``maskable=True`` skips the outer rounded-rectangle so the gradient
+    fills the full square. Android adaptive icons mask the canvas to
+    whatever shape the launcher uses (circle, squircle, rounded square);
+    a pre-rounded source would have its corners double-clipped.
+    """
     bg = _diagonal_gradient(size)
 
-    # Outer rounded-square mask carves the gradient into the brand shape.
-    outer_mask = Image.new("L", (size, size), 0)
-    ImageDraw.Draw(outer_mask).rounded_rectangle(
-        (0, 0, size - 1, size - 1),
-        radius=int(OUTER_RADIUS * size / BASE_SIZE),
-        fill=255,
-    )
-    bg[..., 3] = np.array(outer_mask)
+    if not maskable:
+        # Outer rounded-square mask carves the gradient into the brand shape.
+        outer_mask = Image.new("L", (size, size), 0)
+        ImageDraw.Draw(outer_mask).rounded_rectangle(
+            (0, 0, size - 1, size - 1),
+            radius=int(OUTER_RADIUS * size / BASE_SIZE),
+            fill=255,
+        )
+        bg[..., 3] = np.array(outer_mask)
     canvas = Image.fromarray(bg)
 
     # Inner quadrant overlay, two filled white squares clipped to the
@@ -110,6 +117,25 @@ def main() -> None:
     # 32×32, PNG favicon fallback for Safari + older browsers.
     render(BASE_SIZE).resize((32, 32), Image.LANCZOS).save(
         OUT_DIR / "favicon-32.png", optimize=True
+    )
+    # 180×180, the canonical Apple "Add to Home Screen" icon (iOS,
+    # iPadOS, macOS Safari → Add to Dock). iOS upscales smaller PNGs
+    # and the result looks blurry on Retina.
+    render(BASE_SIZE).resize((180, 180), Image.LANCZOS).save(
+        OUT_DIR / "apple-touch-icon.png", optimize=True
+    )
+    # 192×192, Android Chrome's preferred home-screen icon size + the
+    # smaller of the two web-manifest entries.
+    render(BASE_SIZE).resize((192, 192), Image.LANCZOS).save(
+        OUT_DIR / "icon-192.png", optimize=True
+    )
+    # 512×512 maskable variant for Android adaptive icons. Renders the
+    # mark on a square canvas (no outer rounding) so the launcher can
+    # mask it into whatever shape it wants without double-clipping the
+    # corners. The white quadrants are inset ~21%, well inside the
+    # ~10% safe zone Android requires.
+    render(BASE_SIZE, maskable=True).resize((512, 512), Image.LANCZOS).save(
+        OUT_DIR / "icon-maskable-512.png", optimize=True
     )
     print(f"Wrote PNGs into {OUT_DIR.relative_to(REPO_ROOT)}")
 

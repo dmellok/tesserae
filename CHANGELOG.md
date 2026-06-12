@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.3], 2026-06-12
+
+### Added
+
+- **Proper home-screen icons across iOS, iPadOS, macOS, Android, and
+  Windows.** Tesserae now ships a 180×180 `apple-touch-icon.png`
+  (the canonical Apple Add-to-Home-Screen / Add-to-Dock size), a
+  192×192 PNG for Android Chrome, a 512×512 maskable variant for
+  Android adaptive-icon launchers (rendered without the outer
+  rounded-square so the launcher can mask to circle / squircle /
+  rounded square without double-clipping the corners), and a
+  `manifest.webmanifest` declaring all of the above plus brand
+  colour and standalone display. The manifest uses relative
+  `start_url` / `scope` (`../../`) so the same file works for direct
+  hosting and HA Ingress. Added `theme-color` (light + dark),
+  `apple-mobile-web-app-capable`, `apple-mobile-web-app-title`, and
+  `apple-mobile-web-app-status-bar-style` metas to
+  [`templates/_base.html`](templates/_base.html). Registered
+  `application/manifest+json` for `.webmanifest` in
+  [`app/app_factory.py`](app/app_factory.py) so Alpine containers
+  and Windows installs (where the system mime.types file may not
+  include the entry) serve the manifest with the right Content-Type.
+  [`scripts/render_brand.py`](scripts/render_brand.py) bakes all
+  the new sizes from the same SVG source.
+
 ## [0.46.2], 2026-06-12
 
 ### Changed

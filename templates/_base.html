@@ -17,7 +17,30 @@
   <title>{% block title %}Tesserae{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
   <link rel="alternate icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='brand/favicon-32.png') }}">
-  <link rel="apple-touch-icon" href="{{ url_for('static', filename='brand/icon.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='brand/icon-192.png') }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='brand/apple-touch-icon.png') }}">
+  {# Web App Manifest — drives Android Chrome / Edge / Chrome desktop
+     "Install app" + home-screen icon. start_url and scope inside the
+     manifest are relative ("../../") so the same file serves both
+     direct hosting (/static/brand/manifest.webmanifest → start at /)
+     and HA Ingress (/api/hassio_ingress/<token>/static/brand/… →
+     start at /api/hassio_ingress/<token>/) without templating. #}
+  <link rel="manifest" href="{{ url_for('static', filename='brand/manifest.webmanifest') }}">
+  {# Theme color matches the brand accent in light mode and the dark
+     canvas in dark mode. iOS Safari paints this around the notch /
+     status bar when the page is added to the home screen; Android
+     Chrome uses it for the toolbar tint. #}
+  <meta name="theme-color" content="#0d8c7e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1015" media="(prefers-color-scheme: dark)">
+  {# iOS / iPadOS / macOS Safari Add-to-Home-Screen behaviour. -capable
+     drops the URL bar in standalone mode; -title is the label that
+     appears under the icon (short enough to fit one line);
+     -status-bar-style=default keeps the status bar legible against
+     the page background instead of overlaying it. #}
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tesserae">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   {# Inline theme background so the *canvas* (the area the browser paints
      before external CSS arrives) matches the page bg. Without this, every
      navigation showed a brief white frame in dark mode while base.css was
