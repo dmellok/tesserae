@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.10], 2026-06-13
+
+### Fixed
+
+- **Cleanup: removed the `_ai_brief` sample data from
+  [`app/widget_samples.py`](app/widget_samples.py).** It was a
+  screenshot-capture helper that slipped into 0.46.8 alongside the
+  bundled-plugin noise; should never have been part of the released
+  tarball. Removing now closes the 0.46.8 carry-over cleanly. ai_brief
+  is a community widget published via the marketplace
+  ([`dmellok/tesserae-ai-brief`](https://github.com/dmellok/tesserae-ai-brief))
+  and the catalog-install path doesn't touch widget_samples.py.
+
 ## [0.46.9], 2026-06-13
 
 ### Fixed
