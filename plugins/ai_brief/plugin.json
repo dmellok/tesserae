@@ -1,0 +1,118 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "AI Brief",
+  "version": "0.1.2",
+  "kind": "widget",
+  "description": "An LLM-written 1-3 sentence brief that reads live weather, calendar, Home Assistant entities, and time, then renders as a typeset card. Bring your own Anthropic API key (configured once on the AI Core plugin). Defaults to Claude Haiku 4.5 (~$0.18/month at hourly refresh).",
+  "icon": "ph-sparkle",
+  "supports": { "sizes": ["sm", "md", "lg"] },
+  "design": { "palette": "extended" },
+  "render": { "needs_network": true },
+  "cell_options": [
+    {
+      "name": "prompt_template",
+      "type": "variables_textarea",
+      "label": "Prompt template",
+      "rows": 14,
+      "default": "Write a friendly, concise 2-sentence morning brief for someone whose e-ink dashboard shows:\n- Weather: {weather.now.condition}, {weather.now.temp_c}°C, feels {weather.now.feels_like_c}°C\n- Today: high {weather.today.high_c}°C, low {weather.today.low_c}°C, rain chance {weather.today.precip_pct}%\n- Calendar: {calendar.events_today} events today, next is \"{calendar.next.title}\" in {calendar.next.in_minutes} min\n- Time: {time.day_of_week}, {time.hour}:00 ({time.am_pm})\n\nStyle: warm but not saccharine, plain prose, no emoji, no \"Good morning!\" greeting, no preamble.",
+      "help": "Click a chip below to insert a placeholder at the cursor. Missing data renders as \"unknown\" so the brief never breaks.",
+      "variables": [
+        { "value": "{weather.now.condition}",       "label": "Weather: current condition",      "category": "Weather" },
+        { "value": "{weather.now.temp_c}",          "label": "Weather: current temp (°C)",      "category": "Weather" },
+        { "value": "{weather.now.feels_like_c}",    "label": "Weather: feels-like (°C)",        "category": "Weather" },
+        { "value": "{weather.now.humidity_pct}",    "label": "Weather: humidity (%)",           "category": "Weather" },
+        { "value": "{weather.today.high_c}",        "label": "Weather: today's high (°C)",      "category": "Weather" },
+        { "value": "{weather.today.low_c}",         "label": "Weather: today's low (°C)",       "category": "Weather" },
+        { "value": "{weather.today.precip_pct}",    "label": "Weather: rain chance (%)",        "category": "Weather" },
+        { "value": "{calendar.events_today}",       "label": "Calendar: events today",          "category": "Calendar" },
+        { "value": "{calendar.next.title}",         "label": "Calendar: next event title",      "category": "Calendar" },
+        { "value": "{calendar.next.in_minutes}",    "label": "Calendar: next in N minutes",     "category": "Calendar" },
+        { "value": "{ha.entity.<entity_id>.state}", "label": "HA: entity state (allow-listed)", "category": "Home Assistant" },
+        { "value": "{ha.entity.<entity_id>.attr_<attr>}", "label": "HA: entity attribute",      "category": "Home Assistant" },
+        { "value": "{time.day_of_week}",            "label": "Time: day of week",               "category": "Time" },
+        { "value": "{time.hour}",                   "label": "Time: hour (00-23)",              "category": "Time" },
+        { "value": "{time.am_pm}",                  "label": "Time: AM / PM",                   "category": "Time" },
+        { "value": "{time.is_morning}",             "label": "Time: is morning",                "category": "Time" },
+        { "value": "{time.is_afternoon}",           "label": "Time: is afternoon",              "category": "Time" },
+        { "value": "{time.is_evening}",             "label": "Time: is evening",                "category": "Time" },
+        { "value": "{time.is_night}",               "label": "Time: is night",                  "category": "Time" }
+      ]
+    },
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude (for weather)",
+      "default": "",
+      "step": "any",
+      "help": "Leave empty to use the server-level home location (Settings → Server → Location)."
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude (for weather)",
+      "default": "",
+      "step": "any",
+      "help": "Leave empty to use the server-level home location."
+    },
+    {
+      "name": "units",
+      "type": "select",
+      "label": "Weather units",
+      "default": "metric",
+      "choices": [
+        { "value": "metric", "label": "Metric (°C, km/h)" },
+        { "value": "imperial", "label": "Imperial (°F, mph)" }
+      ]
+    },
+    {
+      "name": "include_calendar",
+      "type": "boolean",
+      "label": "Resolve {calendar.*} from configured iCal feeds",
+      "default": true
+    },
+    {
+      "name": "ha_entities",
+      "type": "string",
+      "label": "Home Assistant entities whitelist",
+      "default": "",
+      "placeholder": "sensor.living_room_temp, light.kitchen",
+      "help": "Comma-separated entity IDs that {ha.entity.<entity_id>.state} is allowed to read. Empty = no HA placeholders resolve."
+    },
+    {
+      "name": "refresh_minutes",
+      "type": "number",
+      "label": "Refresh interval (minutes)",
+      "default": 60,
+      "min": 5,
+      "max": 1440,
+      "help": "Hourly refresh on Claude Haiku 4.5 costs roughly $0.18/month."
+    },
+    {
+      "name": "max_tokens",
+      "type": "number",
+      "label": "Max response tokens",
+      "default": 200,
+      "min": 50,
+      "max": 1000
+    },
+    {
+      "name": "model_override",
+      "type": "select",
+      "label": "Model override",
+      "default": "",
+      "choices": [
+        { "value": "", "label": "Use AI Core default" },
+        { "value": "claude-haiku-4-5", "label": "Claude Haiku 4.5" },
+        { "value": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6" },
+        { "value": "claude-opus-4-8", "label": "Claude Opus 4.8" }
+      ]
+    },
+    {
+      "name": "header_label",
+      "type": "string",
+      "label": "Card header label",
+      "default": "BRIEF",
+      "placeholder": "BRIEF, MORNING, NOW..."
+    }
+  ]
+}

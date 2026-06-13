@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "AI Core",
+  "version": "0.1.2",
+  "kind": "data",
+  "description": "Shared Anthropic Claude connection + context resolver for the ai_* widget family. Set your Anthropic API key once here and every ai widget uses it. Resolves placeholders like {weather.now.temp_c}, {todo.count}, {calendar.next.title}, {ha.entity.<entity_id>.state}, {time.day_of_week} against the live state of other widget cores. No cell of its own.",
+  "icon": "ph-sparkle",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "settings": [
+    {
+      "name": "api_key",
+      "type": "string",
+      "label": "Anthropic API key",
+      "secret": true,
+      "default": "",
+      "help": "Get one at https://console.anthropic.com/. Stored locally; only sent to api.anthropic.com when an ai_* widget renders. Claude Haiku 4.5 is the default model (~$0.00025 per brief, ~$0.18/month at hourly refresh)."
+    },
+    {
+      "name": "model",
+      "type": "select",
+      "label": "Default model",
+      "default": "claude-haiku-4-5",
+      "choices": [
+        { "value": "claude-haiku-4-5", "label": "Claude Haiku 4.5 (cheap, fast, recommended)" },
+        { "value": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6 (smarter, ~5x cost)" },
+        { "value": "claude-opus-4-8", "label": "Claude Opus 4.8 (smartest, ~20x cost)" }
+      ]
+    }
+  ],
+  "render": { "needs_network": true }
+}

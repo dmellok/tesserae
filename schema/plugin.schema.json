@@ -53,7 +53,7 @@
         "required": ["name", "type", "label"],
         "properties": {
           "name": { "type": "string" },
-          "type": { "enum": ["string", "textarea", "entity_overrides", "number", "select", "multiselect", "boolean", "color"] },
+          "type": { "enum": ["string", "textarea", "variables_textarea", "entity_overrides", "number", "select", "multiselect", "boolean", "color"] },
           "label": { "type": "string" },
           "default": {},
           "choices": {

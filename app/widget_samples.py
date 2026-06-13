@@ -635,7 +635,34 @@ def _calendar_schedule() -> dict[str, Any]:
     }
 
 
+def _ai_brief() -> dict[str, Any]:
+    return {
+        "brief": (
+            "Cloudy and 14°C this morning, climbing to 19 by midday with showers "
+            "possible after lunch. Three calendar events today including the standup "
+            "at 9; the living room's already warming up at 21°."
+        ),
+        "model": "claude-haiku-4-5-20251001",
+        "header_label": "MORNING BRIEF",
+        "generated_at": "2026-06-13T06:42:00Z",
+        "resolved_prompt": "(sample data — not from the live LLM)",
+        "debug_values": {
+            "weather.now.condition": "cloudy",
+            "weather.now.temp_c": "14",
+            "weather.today.high_c": "19",
+            "calendar.events_today": "3",
+            "calendar.next.title": "Standup",
+            "calendar.next.in_minutes": "138",
+            "ha.entity.sensor.living_room_temp.state": "21",
+            "time.day_of_week": "Saturday",
+            "time.am_pm": "AM",
+        },
+        "from_cache": False,
+    }
+
+
 SAMPLES: dict[str, Any] = {
+    "ai_brief": _ai_brief,
     "calendar_schedule": _calendar_schedule,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,

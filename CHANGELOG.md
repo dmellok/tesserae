@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.8], 2026-06-13
+
+### Fixed
+
+- **Plugin schema rejected `variables_textarea` field type.** The
+  0.46.7 release added the `variables_textarea` macro + JS + CSS but
+  forgot to add the new value to the `cell_options[*].type` enum in
+  [`schema/plugin.schema.json`](schema/plugin.schema.json). Plugins
+  declaring it would load-fail with "'variables_textarea' is not one
+  of [...]" and the cell would render a "couldn't fetch dynamically
+  imported module" error. Fixed.
+
 ## [0.46.7], 2026-06-13
 
 ### Added
