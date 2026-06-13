@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.4], 2026-06-14
+
+### Added
+
+- **Carousel preview for marketplace screenshots.** The community
+  widget Browse page now renders multi-screenshot widgets as an
+  inline carousel inside the existing 3:2 thumbnail, with prev/next
+  arrows (revealed on hover/focus), clickable dot indicators, and
+  native touch-swipe + keyboard arrow navigation via CSS scroll-
+  snap. Single-screenshot widgets (every existing catalog entry)
+  render byte-identically to before, no JS path, no new DOM nodes.
+  Schema gains an optional `extra_screenshot_count: int` (0-9);
+  when > 0 the catalog also ships
+  `screenshots/<id>/extra-<n>.png` for n=1..count. The catalog-side
+  CI (in the `tesserae-widgets` repo) verifies every declared
+  extra exists with valid PNG magic bytes. Contributors who want
+  to show off multiple widget states (playing vs paused, day vs
+  night, sun vs rain) can now do so without leaving the grid.
+  [`schema/marketplace.schema.json`](schema/marketplace.schema.json),
+  [`app/marketplace.py`](app/marketplace.py),
+  [`app/marketplace_routes.py`](app/marketplace_routes.py),
+  [`templates/plugins_browse.html`](templates/plugins_browse.html),
+  [`static/plugins_browse_carousel.js`](static/plugins_browse_carousel.js).
+
 ## [0.47.3], 2026-06-13
 
 ### Added

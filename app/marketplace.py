@@ -114,6 +114,12 @@ class CatalogEntry:
     tesserae_compat: str
     official: bool
     screenshot_sizes: list[str]
+    # Optional carousel extras. When > 0, the catalog repo also ships
+    # ``screenshots/<id>/extra-<n>.png`` for n in 1..count alongside
+    # the primary ``lg.png``; the Browse card renders all N+1 shots as
+    # an inline carousel. Defaults to 0 = single-screenshot card,
+    # which is byte-identical to the pre-feature render.
+    extra_screenshot_count: int
     folders: list[str] | None
     release_version: str
     release_tarball_url: str
@@ -143,6 +149,7 @@ class CatalogEntry:
             tesserae_compat=str(raw["tesserae_compat"]),
             official=bool(raw.get("official", False)),
             screenshot_sizes=[str(s) for s in raw.get("screenshot_sizes", [])],
+            extra_screenshot_count=int(raw.get("extra_screenshot_count", 0) or 0),
             folders=([str(f) for f in folders_raw] if folders_raw else None),
             release_version=str(release["version"]),
             release_tarball_url=str(release["tarball_url"]),

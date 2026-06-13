@@ -119,6 +119,7 @@ def _make_catalog_entry(
     sha256: str = "deadbeef" * 8,
     tarball_url: str = "https://example.invalid/sample-0.0.1.tar.gz",
     folders: list[str] | None = None,
+    extra_screenshot_count: int = 0,
 ) -> CatalogEntry:
     return CatalogEntry(
         id=widget_id,
@@ -132,6 +133,7 @@ def _make_catalog_entry(
         tesserae_compat="1.x",
         official=False,
         screenshot_sizes=["lg"],
+        extra_screenshot_count=extra_screenshot_count,
         folders=folders,
         release_version=version,
         release_tarball_url=tarball_url,
@@ -277,6 +279,96 @@ def test_valid_index_returns_entries(
     assert len(entries) == 1
     assert entries[0].id == "sample"
     assert entries[0].tags == ["utility"]
+    # Default when the field is omitted: zero extras, single-image card.
+    assert entries[0].extra_screenshot_count == 0
+
+
+def test_extra_screenshot_count_parses_through(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """A widget that declares ``extra_screenshot_count: 2`` exposes
+    the value on CatalogEntry so the route layer can build the
+    carousel URL list."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [
+            {
+                "id": "sample",
+                "name": "Sample",
+                "description": "A sample widget for tests.",
+                "author": {"name": "Test Author"},
+                "tags": ["utility"],
+                "kind": "widget",
+                "tesserae_compat": "1.x",
+                "screenshot_sizes": ["lg"],
+                "extra_screenshot_count": 2,
+                "release": {
+                    "version": "0.0.1",
+                    "tarball_url": "https://example.invalid/sample.tar.gz",
+                    "sha256": "a" * 64,
+                },
+            }
+        ]
+    )
+    entries = marketplace.fetch_index()
+    assert len(entries) == 1
+    assert entries[0].extra_screenshot_count == 2
+
+
+def test_extra_screenshot_count_rejects_above_schema_cap(
+    marketplace: Marketplace, url_fixture: dict[str, bytes]
+) -> None:
+    """The schema caps extras at 9 to keep the dot-indicator row
+    from overflowing the 320px-min card width. A widget that
+    declares 10 must be rejected at the schema layer, not silently
+    truncated at render time."""
+    url_fixture["https://example.invalid/widgets.json"] = _make_index(
+        [
+            {
+                "id": "toomany",
+                "name": "Too many",
+                "description": "Tries to ship more carousel shots than the schema allows.",
+                "author": {"name": "Test Author"},
+                "tags": ["utility"],
+                "kind": "widget",
+                "tesserae_compat": "1.x",
+                "screenshot_sizes": ["lg"],
+                "extra_screenshot_count": 10,
+                "release": {
+                    "version": "0.0.1",
+                    "tarball_url": "https://example.invalid/sample.tar.gz",
+                    "sha256": "a" * 64,
+                },
+            }
+        ]
+    )
+    with pytest.raises(IndexUnavailable):
+        marketplace.fetch_index()
+
+
+def test_entries_payload_builds_screenshot_urls_list() -> None:
+    """``_entries_payload`` materialises ``screenshot_urls`` as a list
+    so the Browse template can branch on ``len(urls) > 1`` to render
+    the carousel. Single-screenshot entries get a one-element list
+    (back-compat with the single-image render); entries that declare
+    ``extra_screenshot_count: N`` get N+1 URLs in catalog order."""
+    from app.marketplace_routes import _entries_payload
+
+    single = _make_catalog_entry(widget_id="single")
+    multi = _make_catalog_entry(widget_id="multi", extra_screenshot_count=2)
+    payload = _entries_payload(
+        [single, multi],
+        installed={},
+        screenshots_base="https://cdn.example.invalid",
+        plugins_dir=None,
+    )
+    assert payload[0]["screenshot_urls"] == [
+        "https://cdn.example.invalid/screenshots/single/lg.png",
+    ]
+    assert payload[1]["screenshot_urls"] == [
+        "https://cdn.example.invalid/screenshots/multi/lg.png",
+        "https://cdn.example.invalid/screenshots/multi/extra-1.png",
+        "https://cdn.example.invalid/screenshots/multi/extra-2.png",
+    ]
 
 
 def test_stars_sidecar_merges_into_entries(

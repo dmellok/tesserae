@@ -105,6 +105,12 @@
           "uniqueItems": true,
           "description": "Sizes contributed under screenshots/<id>/<size>.png in the catalog repo. Must include 'lg'; CI rejects entries that don't ship the lg thumbnail."
         },
+        "extra_screenshot_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9,
+          "description": "Optional. When > 0, the catalog also ships screenshots/<id>/extra-<n>.png for n=1..count (same 3:2 lg-size shape as the primary screenshot). The Browse card renders all N+1 shots as a carousel; entries omitting this field render exactly as before."
+        },
         "folders": {
           "type": "array",
           "items": {

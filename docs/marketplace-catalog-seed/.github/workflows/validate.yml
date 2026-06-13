@@ -74,6 +74,19 @@ jobs:
                       continue
                   if p.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
                       failures.append(f"{wid}: {p} is not a PNG (bad magic)")
+              # carousel extras: when extra_screenshot_count > 0, the
+              # contributor must ship screenshots/<id>/extra-<n>.png
+              # for n = 1..count (same 3:2 lg-size shape as the primary
+              # screenshot). Missing or non-PNG files fail CI so the
+              # Browse carousel never 404s.
+              extra_count = int(w.get("extra_screenshot_count", 0) or 0)
+              for n in range(1, extra_count + 1):
+                  p = root / "screenshots" / wid / f"extra-{n}.png"
+                  if not p.exists():
+                      failures.append(f"{wid}: missing carousel extra {p}")
+                      continue
+                  if p.read_bytes()[:8] != b"\x89PNG\r\n\x1a\n":
+                      failures.append(f"{wid}: {p} is not a PNG (bad magic)")
               # tarball: fetch + sha256 + layout vs declared folders
               rel = w["release"]
               try:

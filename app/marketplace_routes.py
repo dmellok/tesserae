@@ -115,6 +115,19 @@ def _entries_payload(
             if (primary_size and screenshots_base)
             else None
         )
+        # Carousel extras (optional). When the entry declares
+        # ``extra_screenshot_count``, the catalog also ships
+        # ``screenshots/<id>/extra-<n>.png`` for n in 1..count, same
+        # 3:2 lg-size shape. The template uses len(screenshot_urls) > 1
+        # to switch from <img> to the carousel widget; a one-element
+        # list (the default) renders byte-identically to the pre-feature
+        # behaviour.
+        screenshot_urls: list[str] = [primary_url] if primary_url else []
+        if primary_url and screenshots_base and entry.extra_screenshot_count > 0:
+            screenshot_urls.extend(
+                f"{screenshots_base}/screenshots/{entry.id}/extra-{n}.png"
+                for n in range(1, entry.extra_screenshot_count + 1)
+            )
         if record is not None:
             folders = list(record.folders)
         elif entry.folders:
@@ -156,6 +169,7 @@ def _entries_payload(
                 "installed_version": installed_version,
                 "update_available": update_available,
                 "screenshot_url": primary_url,
+                "screenshot_urls": screenshot_urls,
                 "screenshot_sizes": entry.screenshot_sizes,
                 "folders": folders,
                 "is_bundle": is_bundle,

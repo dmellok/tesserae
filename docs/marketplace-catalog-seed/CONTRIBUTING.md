@@ -18,7 +18,13 @@ no widget sandbox yet.
    curl -sL https://github.com/<you>/<repo>/archive/refs/tags/v0.1.0.tar.gz | sha256sum
    ```
 4. Prepare at least one screenshot at the largest cell size (`lg`).
-   Optionally include `xs`, `sm`, `md`. PNG only.
+   Optionally include `xs`, `sm`, `md`. PNG only. If your widget has
+   meaningfully different states worth previewing (playing vs paused,
+   day vs night, sun vs rain), you can also ship up to 9 extra `lg`-
+   sized shots at `screenshots/<id>/extra-1.png`, `extra-2.png`, ... and
+   declare them in `widgets.json` with `"extra_screenshot_count": N`.
+   The Browse card renders all N+1 shots as an inline carousel; entries
+   without the field stay single-image.
 5. Open a PR to **this** repo (`tesserae-widgets`):
    - Add a `screenshots/<id>/lg.png` (plus any other sizes you shot).
    - Add a new entry to `widgets.json` with your widget metadata
