@@ -178,6 +178,63 @@
   --on-accent:#FFFFFF;
 }
 
+/* ---- PAPER, strict 1-bit ink on white, B&W e-ink ready -----------------
+   White bg, black ink, no greys anywhere. The most disciplined option
+   for 2-colour panels (Inky pHAT bw, Waveshare 2.13 bw, etc.) where any
+   mid-tone dithers to a noisy checker pattern. All accent slots
+   collapse to pure black; every `-soft` slot collapses to bg-white so
+   tinted-fill regions disappear cleanly. Visual hierarchy comes from
+   rules, type weight, and size, exactly as it would on letterpress. */
+[data-theme="paper"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFFFF;
+  --surface:        #FFFFFF;
+  --surface-sunken: #FFFFFF;
+  --text-primary:   #000000;
+  --text-secondary: #000000;
+  --text-muted:     #000000;
+  --icon:           var(--text-primary);
+  --edge:           #000000;
+
+  --accent-1:#000000; --accent-1-soft:#FFFFFF;
+  --accent-2:#000000; --accent-2-soft:#FFFFFF;
+  --accent-3:#000000; --accent-3-soft:#FFFFFF;
+  --accent-4:#000000; --accent-4-soft:#FFFFFF;
+  --accent-5:#000000; --accent-5-soft:#FFFFFF;
+  --accent-6:#000000; --accent-6-soft:#FFFFFF;
+  --on-accent:#FFFFFF;
+}
+
+/* ---- NEWSPRINT, B&W on white with greyscale hierarchy ------------------
+   Same white canvas + black ink as Paper, but uses a small set of
+   greys for muted text, secondary copy, edges, and a hairline
+   surface-sunken so the design has tonal depth without colour. On true
+   B&W panels the greys dither to fine stipple patterns (intentional
+   newsprint texture, not noise); on greyscale-capable e-ink (Spectra,
+   Kaleido) they read as clean tonal steps. Pure black for headings,
+   primary ink, and all accents keeps emphasis crisp. */
+[data-theme="newsprint"]{
+  --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+  --bg:             #FFFFFF;
+  --surface:        #FFFFFF;
+  --surface-sunken: #ECECEC;
+  --text-primary:   #000000;
+  --text-secondary: #3A3A3A;
+  --text-muted:     #707070;
+  --icon:           var(--text-primary);
+  --edge:           #8C8C8C;
+
+  --accent-1:#000000; --accent-1-soft:#E8E8E8;
+  --accent-2:#000000; --accent-2-soft:#E8E8E8;
+  --accent-3:#000000; --accent-3-soft:#E8E8E8;
+  --accent-4:#000000; --accent-4-soft:#E8E8E8;
+  --accent-5:#000000; --accent-5-soft:#E8E8E8;
+  --accent-6:#000000; --accent-6-soft:#E8E8E8;
+  --on-accent:#FFFFFF;
+}
+
 /* ---- SEPIA, warm book paper --------------------------------------------- */
 [data-theme="sepia"]{
   --font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;

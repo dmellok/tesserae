@@ -73,6 +73,13 @@ BUNDLED_THEMES: tuple[Theme, ...] = (
     Theme(id="sepia", name="Sepia", family="light", tagline="book paper"),
     Theme(id="cool-gray", name="Cool gray", family="light", tagline="neutral slate"),
     Theme(id="high-contrast", name="High contrast", family="light"),
+    # B&W e-ink-ready themes: pure white canvas, no colour. Paper is
+    # strict 1-bit (no greys); Newsprint admits a small greyscale
+    # hierarchy for muted text + hairline edges so panels with grey
+    # support get tonal depth and pure-B&W panels render the greys as
+    # stipple texture.
+    Theme(id="paper", name="Paper", family="light", tagline="1-bit ink"),
+    Theme(id="newsprint", name="Newsprint", family="light", tagline="grey hierarchy"),
     # Vivid light variants, chunky bg → surface contrast + saturated accents.
     Theme(id="vivid-light", name="Vivid", family="light", tagline="bold paper"),
     Theme(id="citrus-light", name="Citrus", family="light", tagline="cream pop"),

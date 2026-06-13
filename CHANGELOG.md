@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.2], 2026-06-13
+
+### Added
+
+- **Two new B&W e-ink-ready themes in the Light family.** *Paper*
+  is strict 1-bit (pure `#FFFFFF` canvas, pure `#000000` ink, no
+  greys), best for 2-colour panels where any mid-tone dithers to
+  noisy checker. *Newsprint* uses the same white canvas but admits
+  a small greyscale hierarchy (muted/secondary text, hairline
+  edges, light-grey sunken surface + accent-soft fills) so panels
+  with grey support get tonal depth and pure-B&W panels render the
+  greys as deliberate stipple texture. Both use the standard
+  Helvetica Neue stack so typography stays a Style concern.
+  [`static/style/spectra-tokens.css`](static/style/spectra-tokens.css),
+  [`app/state/theme_registry.py`](app/state/theme_registry.py).
+
 ## [0.47.1], 2026-06-13
 
 ### Fixed
