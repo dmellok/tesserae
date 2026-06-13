@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.1], 2026-06-13
+
+### Fixed
+
+- **Editor: cell config/theme reverting after save.** When the
+  editor needed to reload (binding/unbinding a device, plugin
+  swap, layout-form submit, batch cell ops), unsaved cell-form
+  draft inputs were dropped, so the last-typed prompt or theme
+  override silently reverted to whatever the server had on disk.
+  Every reload path now flushes all dirty cell forms first via a
+  shared `window.tesseraeSaveAllForms` helper, and the editor now
+  warns on raw browser reload while the Save button is hot.
+  [`static/pages/editor.js`](static/pages/editor.js),
+  [`static/pages/layout_editor.js`](static/pages/layout_editor.js).
+- **Custom layout garbled when binding a second device with a
+  different aspect ratio.** `_ensure_cells_fit_panel` was running
+  a non-uniform rescale every time the primary panel resolved to
+  different dimensions, so binding (or unbinding) a
+  different-aspect device silently rewrote every cell's
+  geometry, and repeated rebinds accumulated rounding errors
+  until the layout looked random. The function is now a no-op
+  unless the panel actually flipped orientation or the existing
+  cells overflow the new panel. Paired with that,
+  `resolve_panel_for_page` now picks the *largest* bound panel by
+  area deterministically, so bind order can no longer swap the
+  design canvas under an existing layout. A new "Refit to current
+  panel" button in the layout editor's custom-layout details is
+  the explicit escape hatch when you actually do want every cell
+  proportionally rescaled to a freshly-bound display.
+  [`app/page_routes.py`](app/page_routes.py),
+  [`app/panel.py`](app/panel.py),
+  [`templates/page_editor.html`](templates/page_editor.html).
+
 ## [0.47.0], 2026-06-13
 
 ### Added

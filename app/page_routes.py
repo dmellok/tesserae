@@ -263,12 +263,39 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
 
 
 def _ensure_cells_fit_panel(page: Page, panel: Any) -> Page:
-    """If the saved cell coords don't fit the current panel (e.g. user
-    flipped to portrait after designing in landscape), auto-rotate and
-    rescale them to the new panel, persist, and return the updated page."""
+    """If the saved cell coords genuinely don't fit the current panel,
+    auto-rotate and rescale them to the new panel, persist, and return
+    the updated page.
+
+    "Don't fit" means:
+
+    * Orientation flip — the design was laid out in landscape but the
+      current panel is portrait (or vice-versa). A 90° rotation is
+      required for the coords to make geometric sense.
+    * Any cell overflows the panel — ``x + w > panel.w`` or
+      ``y + h > panel.h``. Without a rescale those cells would render
+      with clipped edges.
+
+    Just changing panel dimensions (e.g. binding a second device with
+    a different aspect ratio in the same orientation) used to
+    non-uniformly rescale every cell here, and the round-trip through
+    that scaling destroys edge alignment — adjacent cells gain gaps
+    or overlap, the layout editor's edge-detection loses the handles,
+    and the layout has to be rebuilt by hand. With this branch the
+    canonical saved coords stay intact; render-time scaling via
+    ``fit_cells_to_panel`` still runs on push, and the user can
+    manually call POST /<page>/refit if they actually want the saved
+    coords rescaled to a new panel.
+    """
     if not page.cells:
         return page
     coords = [(c.x, c.y, c.w, c.h) for c in page.cells]
+    design_w = max(x + w for x, y, w, h in coords)
+    design_h = max(y + h for x, y, w, h in coords)
+    in_bounds = all(x + w <= panel.w and y + h <= panel.h for x, y, w, h in coords)
+    orientation_changed = (design_w >= design_h) != (panel.w >= panel.h)
+    if in_bounds and not orientation_changed:
+        return page
     fitted = fit_cells_to_panel(coords, panel.w, panel.h)
     if fitted == coords:
         return page
@@ -811,6 +838,36 @@ def batch_cells(page_id: str) -> Response:
             ],
         }
     )
+
+
+@bp.post("/<page_id>/refit")
+def refit_cells(page_id: str) -> Response:
+    """Explicitly rescale every cell so its proportions match the
+    current primary panel. Power-user escape hatch for the case where
+    you've intentionally swapped to a new panel size and want the
+    saved coords scaled (with the implicit acceptance that
+    non-uniform scaling will mangle pixel-perfect alignments).
+
+    The edit page handler refuses to do this automatically — see
+    ``_ensure_cells_fit_panel`` for the reasoning — so the editor
+    surfaces a "Refit to current panel" button that posts here."""
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    if not page.cells:
+        return _flash_save(True, "Nothing to refit.")
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
+    coords = [(c.x, c.y, c.w, c.h) for c in page.cells]
+    fitted = fit_cells_to_panel(coords, panel.w, panel.h)
+    if fitted == coords:
+        return _flash_save(True, "Cells already fit the current panel.")
+    new_cells = [
+        cell.model_copy(update={"x": nx, "y": ny, "w": nw, "h": nh})
+        for cell, (nx, ny, nw, nh) in zip(page.cells, fitted, strict=True)
+    ]
+    _store().save(page.model_copy(update={"cells": new_cells}))
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+    return _flash_save(True, f"Refitted {len(new_cells)} cell(s) to {panel.w}×{panel.h}.")
 
 
 def register(app: Flask) -> None:

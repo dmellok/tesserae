@@ -273,6 +273,20 @@
     }
     if (opts.reload) {
       // Structural change, full reload so the per-cell forms refresh.
+      // Persist every cell form FIRST so any typed-but-unsaved edits
+      // on existing cells (theme override, widget options) survive the
+      // reload. editor.js exposes tesseraeSaveAllForms for exactly
+      // this case.
+      try {
+        if (typeof window.tesseraeSaveAllForms === "function") {
+          await window.tesseraeSaveAllForms();
+        }
+      } catch (err) {
+        // Don't block the structural change on a per-cell save error;
+        // log and let the user notice via the editor's save-status
+        // indicator going red.
+        console.warn("[layout-editor] save-before-reload failed:", err);
+      }
       window.location.reload();
     } else {
       render();

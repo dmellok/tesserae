@@ -425,6 +425,11 @@
         ev.preventDefault();
         setStatus("saving");
         try {
+          // Persist every cell form first — picking a layout preset
+          // reloads the page, and without this any typed-but-unsaved
+          // cell options / theme overrides on OTHER cells get wiped
+          // when the editor renders fresh from disk.
+          for (const f of forms()) await submit(f);
           await submit(form);
           location.reload();
         } catch (err) {
@@ -434,6 +439,56 @@
       });
     });
   }
+
+  // The "Refit to current panel" button inside the layout editor.
+  // Native form submit would lose any in-flight cell edits the user
+  // hadn't pressed Save on yet (and the page reload that follows is
+  // the same eat-everything reload the layout-form picker had).
+  // Intercept, persist every cell form, then POST the refit and
+  // navigate to the redirect target on success.
+  document.querySelectorAll(".layout-editor-refit").forEach((form) => {
+    if (form.dataset.refitBound) return;
+    form.dataset.refitBound = "1";
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      setStatus("saving");
+      try {
+        for (const f of forms()) await submit(f);
+        const resp = await fetch(form.action, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "X-Requested-With": "fetch" },
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        location.reload();
+      } catch (err) {
+        setStatus("error");
+        console.error("[editor] refit failed:", err);
+      }
+    });
+  });
+
+  // Helper consumed by layout_editor.js's structural-change reload
+  // path (insert/delete cell). The layout editor lives in its own IIFE
+  // and doesn't have a handle to forms() / submit() directly, so we
+  // expose this thin wrapper that does the same "save every cell form,
+  // then reload" the reload-on-change handlers do. Returns a Promise so
+  // callers can await it before they trigger their own reload.
+  window.tesseraeSaveAllForms = async function () {
+    const all = forms();
+    for (const f of all) await submit(f);
+    setDirty(false);
+  };
+
+  // Warn before navigating away with unsaved cell edits. Doesn't fire
+  // on programmatic reloads (those go through tesseraeSaveAllForms
+  // first) but does catch accidental Cmd+R / browser back / tab close.
+  window.addEventListener("beforeunload", (ev) => {
+    if (saveBtn && !saveBtn.disabled) {
+      ev.preventDefault();
+      ev.returnValue = "";
+    }
+  });
 
   // Icon picker lives in static/icon-picker.js as a reusable shared
   // module, it auto-binds every [data-icon-picker] on page load. The

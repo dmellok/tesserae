@@ -605,3 +605,83 @@ def test_multiselect_cell_option_coercion() -> None:
     assert _coerce_cell_option(field, "light.a", {"opt_entities": "light.a"}) == ["light.a"]
     assert _coerce_cell_option(field, None, {}) == []
     assert _coerce_cell_option(field, "", {"opt_entities": ""}) == []
+
+
+# -- _ensure_cells_fit_panel ------------------------------------------------
+
+
+def _stub_panel(w: int, h: int):
+    """Minimal duck-typed Panel for _ensure_cells_fit_panel."""
+
+    class _P:
+        pass
+
+    p = _P()
+    p.w = w
+    p.h = h
+    return p
+
+
+def _make_page(cells: list[tuple[int, int, int, int]]):
+    """Stand-alone Page object with stub plugin-less cells."""
+    from app.state.page_store import Cell, Page
+
+    return Page(
+        id="p",
+        name="P",
+        cells=[
+            Cell(id=f"c{i}", plugin=None, x=x, y=y, w=w, h=h)
+            for i, (x, y, w, h) in enumerate(cells)
+        ],
+    )
+
+
+def test_ensure_fit_leaves_cells_alone_when_in_bounds_same_orientation(app: Flask) -> None:
+    """The most common multi-device case: bind a new device with a
+    different aspect ratio but the same orientation, the existing cells
+    fit within the new panel's bounds. Saved coords must NOT change —
+    non-uniform rescaling here is what destroys edge alignment and
+    "garbles" the layout."""
+    from app.page_routes import _ensure_cells_fit_panel
+
+    page = _make_page([(0, 0, 400, 240), (400, 0, 400, 240), (0, 240, 800, 240)])
+    larger_landscape = _stub_panel(1024, 768)  # same landscape, different aspect
+    with app.app_context():
+        out = _ensure_cells_fit_panel(page, larger_landscape)
+    assert [(c.x, c.y, c.w, c.h) for c in out.cells] == [
+        (0, 0, 400, 240),
+        (400, 0, 400, 240),
+        (0, 240, 800, 240),
+    ]
+
+
+def test_ensure_fit_rescales_when_cells_overflow(app: Flask) -> None:
+    """If any cell's right or bottom edge is past the new panel, the
+    layout genuinely doesn't fit — rescale is required."""
+    from app.page_routes import _ensure_cells_fit_panel
+
+    page = _make_page([(0, 0, 800, 480), (200, 100, 700, 400)])
+    smaller = _stub_panel(400, 300)
+    with app.app_context():
+        out = _ensure_cells_fit_panel(page, smaller)
+    # All cells now within smaller panel bounds.
+    for c in out.cells:
+        assert c.x + c.w <= 400
+        assert c.y + c.h <= 300
+
+
+def test_ensure_fit_rescales_on_orientation_flip(app: Flask) -> None:
+    """Landscape design → portrait panel needs a 90° rotation; saved
+    coords are otherwise nonsensical."""
+    from app.page_routes import _ensure_cells_fit_panel
+
+    page = _make_page([(0, 0, 400, 240), (400, 0, 400, 240)])  # landscape
+    portrait = _stub_panel(480, 800)
+    with app.app_context():
+        out = _ensure_cells_fit_panel(page, portrait)
+    # Shouldn't be identical (rotation happened), all in bounds.
+    coords_after = [(c.x, c.y, c.w, c.h) for c in out.cells]
+    assert coords_after != [(0, 0, 400, 240), (400, 0, 400, 240)]
+    for c in out.cells:
+        assert c.x + c.w <= 480
+        assert c.y + c.h <= 800

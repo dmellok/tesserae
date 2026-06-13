@@ -253,11 +253,32 @@ def resolve_panel_for_page(
     settings: SettingsStore,
 ) -> Panel:
     """The page's primary panel, for single-panel contexts (the editor's
-    layout grid, the default compose render). Uses the first targeted
-    device's panel, else ``page.panel``, else the global settings panel."""
+    layout grid, the default compose render).
+
+    Selection rule:
+
+    * If devices are bound, return the **largest** of their panels by
+      area. Largest is deterministic regardless of the user's bind
+      order, so binding a second device with a different aspect ratio
+      doesn't silently swap the design canvas under the existing
+      layout. It also gives the editor the most pixels to work with.
+      Ties (two panels with identical area) break by panel id /
+      ``(w, h)`` tuple for stability.
+    * Otherwise fall back to ``page.panel``, else the global settings
+      panel.
+
+    Previously this returned ``panels[0]`` (first targeted device),
+    which meant a layout designed against device A would get
+    silently re-anchored to device B as soon as B was added — and
+    the load handler's ``_ensure_cells_fit_panel`` would then
+    non-uniformly rescale every cell, with the round-trip eating
+    edge alignments and "garbling" the layout. See
+    ``_ensure_cells_fit_panel`` in app/page_routes.py for the
+    matching change.
+    """
     panels = _selected_device_panels(page, devices)
     if panels:
-        return panels[0][1]
+        return max(panels, key=lambda dp: (dp[1].w * dp[1].h, dp[1].w, dp[1].h, dp[0].id))[1]
     return resolve_page_panel(page.panel, settings)
 
 

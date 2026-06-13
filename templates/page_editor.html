@@ -352,6 +352,20 @@
             <i class="ph ph-info" aria-hidden="true"></i>
             Drag any edge between cells to resize. Hover a cell's outer edge to insert a new cell in that direction.
           </p>
+          {# Manual refit. The page editor no longer auto-rescales cells
+             when a new device with a different aspect is bound (the
+             round-trip mangles edge alignment). This button is the
+             explicit escape hatch when the user has intentionally
+             changed the design panel and wants the saved coords
+             stretched to it. #}
+          <form method="post" action="{{ url_for('pages.refit_cells', page_id=page.id) }}"
+                class="layout-editor-refit"
+                onsubmit="return confirm('Rescale every cell to fit the {{ panel.w }}×{{ panel.h }} panel? Non-uniform scaling can soften pixel-perfect edge alignments — undo by editing manually if needed.');">
+            <button type="submit" class="btn btn--ghost btn--sm" data-layout-refit>
+              <i class="ph ph-frame-corners" aria-hidden="true"></i>
+              Refit to current panel ({{ panel.w }}×{{ panel.h }})
+            </button>
+          </form>
           {# Optional snap-to-grid editing aid. The dashed N×M overlay
              on the board makes it easy to size cells consistently -
              every drag rounds to the nearest gridline. Persisted to

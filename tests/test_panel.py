@@ -49,13 +49,14 @@ def env(tmp_path: Path):
         orientation: str | None = None,
         gamut: str | None = None,
         underscan: int | None = None,
+        kind_id: str = "esp32_client",
     ) -> None:
         device_service.create_instance(
             devices=devices,
             renderers=renderers,
             data_root=data_root,
             instance_id=instance_id,
-            kind_id="esp32_client",
+            kind_id=kind_id,
             orientation=orientation,
         )
         if gamut is not None or underscan is not None:
@@ -138,14 +139,35 @@ def test_preview_groups_by_aspect_merges_flip_and_resolution(env) -> None:
     assert (by_label["Landscape 5:3"]["w"], by_label["Landscape 5:3"]["h"]) == (800, 480)
 
 
-def test_first_bound_device_drives_single_panel_contexts(env) -> None:
+def test_single_bound_device_drives_single_panel_contexts(env) -> None:
     """``resolve_panel_for_page`` (editor layout grid, default compose)
-    uses the first targeted device's panel, ignoring the virtual one."""
+    returns the bound device's panel when there's only one bound,
+    ignoring the virtual one."""
     devices, settings, make = env
     make("esp32_tall", orientation="portrait")  # 480x800
     page = Page(id="p", name="P", device_ids=["esp32_tall"], cells=[])
     panel = resolve_panel_for_page(page, devices, settings)
     assert (panel.w, panel.h) == (480, 800)
+
+
+def test_largest_bound_panel_wins_when_multiple_devices(env) -> None:
+    """When multiple devices are bound, ``resolve_panel_for_page``
+    returns the LARGEST panel by area — deterministic regardless of
+    bind order, so a layout doesn't silently re-anchor to a new
+    panel just because the user added a second device. Also gives
+    the layout editor the most pixels to work with."""
+    devices, settings, make = env
+    make("small", kind_id="esp32_client")  # 800×480 = 384k
+    make("big", kind_id="pi_bin_client")  # 1424×1200 = 1.7M
+    # Bind small first so previous "first targeted" semantics would
+    # have returned 800×480; new "largest" semantics must return the
+    # 1424×1200 regardless of order.
+    page = Page(id="p", name="P", device_ids=["small", "big"], cells=[])
+    panel = resolve_panel_for_page(page, devices, settings)
+    assert (panel.w, panel.h) == (1424, 1200)
+    # Reorder bind list, same answer.
+    page_reordered = Page(id="p", name="P", device_ids=["big", "small"], cells=[])
+    assert resolve_panel_for_page(page_reordered, devices, settings) == panel
 
 
 def test_push_groups_split_by_gamut(env) -> None:
