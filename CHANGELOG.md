@@ -6,6 +6,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.3], 2026-06-13
+
+### Added
+
+- **Smart sync (JIT) for rotations.** The wake-aware fire gate that
+  schedules picked up in issue #10 now applies to rotations too:
+  when smart sync is on, a step transition is held until at least
+  one bound device is within `smart_sync_lead_s` seconds of its
+  predicted next wake. The step that ends up firing is whichever
+  step is current at fire-time, so long wake intervals naturally
+  skip intermediate steps the panel slept through (matching what
+  the panel would render on wake anyway). Falls back to natural
+  step-boundary firing when no bound device reports telemetry, when
+  every device is still in the warm-up window, or when smart sync
+  is left off. New form fields on the rotation editor mirror the
+  schedule UI: a "Smart sync (JIT)" toggle plus a "Render lead (s)"
+  input (default 10s, 0-600 range).
+  [`app/state/rotation_model.py`](app/state/rotation_model.py),
+  [`app/scheduler.py`](app/scheduler.py),
+  [`app/rotation_routes.py`](app/rotation_routes.py),
+  [`templates/rotations.html`](templates/rotations.html).
+
+### Changed
+
+- `Scheduler._smart_sync_should_wait` now takes
+  `(page_id, lead_s, now)` so the rotation and schedule code paths
+  can share one gate. Behaviour for the existing schedule call site
+  is unchanged.
+
 ## [0.47.2], 2026-06-13
 
 ### Added

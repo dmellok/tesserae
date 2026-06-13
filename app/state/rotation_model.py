@@ -94,6 +94,18 @@ class Rotation(BaseModel):
     # rotation and a schedule are due on the same tick. Higher wins.
     priority: int = 0
 
+    # Smart sync (issue #10), same semantics as Schedule.smart_sync:
+    # when enabled, a step transition is held until at least one
+    # bound device is within ``smart_sync_lead_s`` of its predicted
+    # next wake. Falls back to the natural step-boundary fire when
+    # no bound device is trusted yet or when none expose telemetry.
+    # The rotation re-evaluates the current step at fire time, so
+    # holding a transition can naturally "skip ahead" to whichever
+    # step is current at wake-time (matching what the panel will
+    # display anyway).
+    smart_sync: bool = False
+    smart_sync_lead_s: int = Field(default=10, ge=0, le=600)
+
     @field_validator("days_of_week")
     @classmethod
     def _validate_dow(cls, v: list[int]) -> list[int]:

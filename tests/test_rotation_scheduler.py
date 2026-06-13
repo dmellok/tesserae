@@ -377,3 +377,168 @@ def test_override_garbage_collected_when_next_anchor_catches_up(wiring) -> None:
     assert on_tuesday.step_index == 2
     # And the override map is empty (GC'd).
     assert r.id not in scheduler._rotation_force_state
+
+
+# -- Smart sync (issue #10) on rotations -------------------------------
+
+
+class _FakeTelemetry:
+    """Same shape as the test_scheduler.py stand-in: per-device
+    ``predicted_next_wake_at`` + ``is_trusted`` flags without spinning
+    up the real persisted telemetry store."""
+
+    def __init__(self, entries: dict[str, dict] | None = None) -> None:
+        self._entries = entries or {}
+
+    def get(self, device_id: str):
+        raw = self._entries.get(device_id)
+        if raw is None:
+            return None
+
+        class _E:
+            predicted_next_wake_at = raw.get("predicted_next_wake_at")
+            is_trusted = bool(raw.get("is_trusted", False))
+
+        return _E()
+
+
+def _smart_wiring(tmp_path: Path, *, device_ids, telemetry):
+    schedule_store = ScheduleStore(tmp_path / "schedules.json")
+    rotation_store = RotationStore(tmp_path / "rotations.json")
+    push_manager = MagicMock()
+    push_manager.push.return_value = MagicMock(
+        status="sent", error=None, duration_s=0.01, event_id="evt"
+    )
+    scheduler = Scheduler(
+        store=schedule_store,
+        rotation_store=rotation_store,
+        push_manager=lambda: push_manager,
+        page_exists=lambda _pid: True,
+        device_ids_for_page=lambda page_id: device_ids.get(page_id, []),
+        device_telemetry=telemetry,
+    )
+    return scheduler, push_manager, rotation_store
+
+
+def test_rotation_smart_sync_off_fires_on_transition(tmp_path: Path) -> None:
+    """``smart_sync=False`` (default): step transitions fire immediately
+    regardless of telemetry, matching pre-issue-#10 behaviour."""
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry({"esp": {"is_trusted": True, "predicted_next_wake_at": 9e9}}),
+    )
+    store.upsert(_rot(steps=_steps(("a", 30), ("b", 30))))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    assert push.push.call_count == 2
+
+
+def test_rotation_smart_sync_no_devices_falls_back(tmp_path: Path) -> None:
+    """Smart-sync ON but page has no bound devices: rotation still
+    transitions naturally (otherwise an orphan rotation would never
+    fire)."""
+    scheduler, push, store = _smart_wiring(
+        tmp_path, device_ids={"a": [], "b": []}, telemetry=_FakeTelemetry()
+    )
+    r = _rot(steps=_steps(("a", 30), ("b", 30))).model_copy(update={"smart_sync": True})
+    store.upsert(r)
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    assert push.push.call_count == 2
+
+
+def test_rotation_smart_sync_warming_up_falls_back(tmp_path: Path) -> None:
+    """Devices bound but none trusted yet: keep firing on natural
+    transitions so the panel still updates during warm-up."""
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry({"esp": {"is_trusted": False, "predicted_next_wake_at": 9e9}}),
+    )
+    r = _rot(steps=_steps(("a", 30), ("b", 30))).model_copy(update={"smart_sync": True})
+    store.upsert(r)
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    assert push.push.call_count == 2
+
+
+def test_rotation_smart_sync_holds_outside_lead_window(tmp_path: Path) -> None:
+    """Wake is 10 min away with a 10s lead: smart-sync holds the
+    rotation entirely. Mirrors the schedule gate, no special-case
+    'always fire first observation' carve-out, the panel keeps showing
+    whatever it last got until the lead window opens."""
+    now = datetime(2026, 6, 15, 0, 0, tzinfo=UTC)
+    # Wake well past both tick moments below so the gate stays closed
+    # on each one (if the prediction were earlier than a later tick,
+    # the gate falls through to fire as a "stale prediction, ship the
+    # freshest frame anyway" safety net).
+    far_future = now.timestamp() + 3600
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": far_future}}
+        ),
+    )
+    r = _rot(steps=_steps(("a", 30), ("b", 30))).model_copy(
+        update={"smart_sync": True, "smart_sync_lead_s": 10}
+    )
+    store.upsert(r)
+    scheduler._tick_once(now)
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    assert push.push.call_count == 0
+
+
+def test_rotation_smart_sync_fires_inside_lead_window(tmp_path: Path) -> None:
+    """Wake is 5s away, lead is 10s: fire now with whichever step is
+    current at this moment so the fresh frame is sitting in the broker
+    when the panel wakes."""
+    now = datetime(2026, 6, 15, 0, 0, tzinfo=UTC)
+    near_wake = now.timestamp() + 5
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"]},
+        telemetry=_FakeTelemetry(
+            {"esp": {"is_trusted": True, "predicted_next_wake_at": near_wake}}
+        ),
+    )
+    r = _rot(steps=_steps(("a", 30), ("b", 30))).model_copy(
+        update={"smart_sync": True, "smart_sync_lead_s": 10}
+    )
+    store.upsert(r)
+    scheduler._tick_once(now)
+    assert push.push.call_count == 1
+    assert push.push.call_args.args[0] == "a"
+
+
+def test_rotation_smart_sync_skips_intermediate_steps(tmp_path: Path) -> None:
+    """Long wake interval crosses multiple step boundaries: the only
+    fire that happens is the one inside the lead window, with whatever
+    step is current at fire-time. Intermediate steps the panel slept
+    through are silently skipped, matching what it would have rendered
+    on wake anyway."""
+    # 4 steps of 15 min each, 1h cycle. Device wake is at 00:50, lead
+    # 10s. Tick at 00:00 (step 0), 00:15 (step 1), 00:30 (step 2),
+    # 00:45 (step 3) all held; tick at 00:49:55 inside lead window
+    # fires step 3 ("d"). Steps a/b/c never render.
+    r = _rot(
+        anchor="00:00",
+        steps=_steps(("a", 15), ("b", 15), ("c", 15), ("d", 15)),
+    ).model_copy(update={"smart_sync": True, "smart_sync_lead_s": 10})
+
+    wake_at = datetime(2026, 6, 15, 0, 50, tzinfo=UTC).timestamp()
+    scheduler, push, store = _smart_wiring(
+        tmp_path,
+        device_ids={"a": ["esp"], "b": ["esp"], "c": ["esp"], "d": ["esp"]},
+        telemetry=_FakeTelemetry({"esp": {"is_trusted": True, "predicted_next_wake_at": wake_at}}),
+    )
+    store.upsert(r)
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 15, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 45, tzinfo=UTC))
+    assert push.push.call_count == 0
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 49, 55, tzinfo=UTC))
+    assert push.push.call_count == 1
+    assert push.push.call_args.args[0] == "d"

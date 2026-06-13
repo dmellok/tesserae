@@ -83,6 +83,16 @@
   </div>
 
 
+  <div class="field-grid">
+    {{ switch('rf-' ~ (r.id or 'new') ~ '-smart-sync', 'smart_sync', 'Smart sync (JIT)', checked=r.smart_sync,
+              help='When the bound devices report sleep timing (battery e-ink panels), hold each step transition until just before a predicted wake. The step current at fire-time is what gets pushed, so intermediate steps may be skipped when wake intervals exceed dwell. Falls back to natural transitions when no device reports telemetry.') }}
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-lead">Render lead (s)</label>
+      <input type="number" id="rf-{{ r.id or 'new' }}-lead" name="smart_sync_lead_s"
+             value="{{ r.smart_sync_lead_s or 10 }}" min="0" max="600" step="1">
+    </div>
+  </div>
+
   <div class="field field--inline">
     {{ switch('rf-' ~ (r.id or 'new') ~ '-enabled', 'enabled', 'Enabled', r.enabled) }}
   </div>
@@ -253,7 +263,7 @@
     {% set blank = {
       'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
       'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
-      'device_ids': [], 'steps': []
+      'device_ids': [], 'steps': [], 'smart_sync': False, 'smart_sync_lead_s': 10,
     } %}
     {{ rotation_form(blank, edit_mode=False, pages=pages) }}
   </section>

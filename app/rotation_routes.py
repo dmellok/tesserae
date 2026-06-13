@@ -123,6 +123,8 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
         # already knows which devices it pushes to.
         "device_ids": [],
         "priority": int(form.get("priority") or 0),
+        "smart_sync": form.get("smart_sync") in ("on", "true", "1"),
+        "smart_sync_lead_s": int(form.get("smart_sync_lead_s") or 10),
         "steps": [s.model_dump() for s in _parse_steps(form)],
     }
     return Rotation.model_validate(payload)

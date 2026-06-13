@@ -350,7 +350,9 @@ class Scheduler:
                 # wake. When no bound device is trusted (warm-up window)
                 # or the schedule has no device bindings, fall back to
                 # interval firing so the page still pushes on time.
-                if s.smart_sync and self._smart_sync_should_wait(s, now):
+                if s.smart_sync and self._smart_sync_should_wait(
+                    s.page_id, s.smart_sync_lead_s, now
+                ):
                     continue
                 candidates.append(s)
             elif s.type == "daily":
@@ -496,6 +498,19 @@ class Scheduler:
                 last_step = self._rotation_last_step.get(rotation.id)
             if last_step == step_index:
                 continue
+            # Smart-sync: same wake-aware gate that schedules use.
+            # Hold the transition until a bound device is close to
+            # waking, so the frame the panel grabs is fresh rather
+            # than minutes-stale. ``compute_step_state`` already runs
+            # at every tick, so when the gate later opens we'll pick
+            # up whichever step is current at fire-time, which is
+            # what the panel would see anyway. Skipped intermediate
+            # steps are silent on purpose (the user opted in to "only
+            # render around wake").
+            if rotation.smart_sync and self._smart_sync_should_wait(
+                step.page_id, rotation.smart_sync_lead_s, now
+            ):
+                continue
             out.append((rotation, step_index))
         out.sort(key=lambda pair: (-pair[0].priority, pair[0].id))
         return out
@@ -543,27 +558,28 @@ class Scheduler:
             )
         return result
 
-    def _smart_sync_should_wait(self, schedule: Schedule, now: datetime) -> bool:
-        """Return True when smart-sync wants to *hold* this schedule
-        (don't fire yet), False when it should fire now.
+    def _smart_sync_should_wait(self, page_id: str, lead_s: int, now: datetime) -> bool:
+        """Return True when smart-sync wants to *hold* the fire (don't
+        push yet), False when it should fire now. Shared between
+        schedules and rotations: both consult the same predicted-wake
+        telemetry, just with their own per-record lead windows.
 
         Hold conditions:
-          - Schedule has device bindings AND at least one is trusted
-            AND none of the trusted devices are within the lead window
-            of their next predicted wake. The page has a fresh frame
-            ready but the panel isn't about to wake; waiting saves a
-            stale frame from sitting in the broker until the next
-            actual wake.
+          - At least one bound device is trusted AND none of the
+            trusted devices are within the lead window of their next
+            predicted wake. The page has a fresh frame ready but no
+            panel is about to wake; waiting saves a stale frame from
+            sitting in the broker until the next actual wake.
 
-        Fire conditions (return False, let the interval cadence win):
+        Fire conditions (return False, let the natural cadence win):
           - No telemetry dependencies wired (test path / bare run).
-          - The schedule's page has no bound devices.
+          - The page has no bound devices.
           - No bound device is trusted yet (warm-up).
           - At least one trusted device is inside the lead window.
         """
         if self._device_telemetry is None or self._device_ids_for_page is None:
             return False
-        device_ids = self._device_ids_for_page(schedule.page_id)
+        device_ids = self._device_ids_for_page(page_id)
         if not device_ids:
             return False
         trusted_predictions: list[float] = []
@@ -576,17 +592,17 @@ class Scheduler:
             trusted_predictions.append(entry.predicted_next_wake_at)
         if not trusted_predictions:
             # No trusted bindings: smart-sync hasn't warmed up. Fall
-            # through to interval firing so the page still pushes on
-            # the user's configured cadence.
+            # through to the natural cadence so the page still pushes
+            # on the user's configured timing.
             return False
         # Fire when the soonest predicted wake is within the lead
         # window of right now (we want the frame waiting before the
         # panel asks for it). Devices that have already woken (offset
-        # past prediction) won't satisfy this and the schedule waits
-        # for the next prediction.
+        # past prediction) won't satisfy this and the fire waits for
+        # the next prediction.
         now_ts = now.timestamp()
         soonest = min(trusted_predictions)
-        lead_window_starts_at = soonest - schedule.smart_sync_lead_s
+        lead_window_starts_at = soonest - lead_s
         return now_ts < lead_window_starts_at
 
     def _observe(self, now: datetime) -> None:
