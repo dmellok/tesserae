@@ -186,25 +186,38 @@ def _relative(epoch: float | None) -> str:
 
 
 def _current_step_for_each(rotations: list[Rotation]) -> dict[str, dict[str, Any]]:
-    """Snapshot of which step each rotation is currently on, so the
-    list view can show 'now: page X' next to each row. Uses the same
-    ``compute_current_step`` the scheduler uses, no inconsistency."""
-    tz_provider_attr = getattr(_scheduler(), "_tz_provider", None)
-    tz = tz_provider_attr() if callable(tz_provider_attr) else None
+    """Snapshot of which step each rotation is on PLUS the dwell-window
+    edges (epoch seconds) so the index template can render a live
+    countdown bar. Uses the scheduler's override-aware
+    ``compute_step_state`` so a manual "play step N" poke reflects
+    in the UI immediately."""
+    sched = _scheduler()
     now = datetime.now(UTC)
     pages_by_id = {p.id: p.name for p in _pages().list()}
     out: dict[str, dict[str, Any]] = {}
     for r in rotations:
-        picked = compute_current_step(r, now, tz)
-        if picked is None:
-            out[r.id] = {"active": False, "step_index": None, "page_id": None}
+        state = sched.compute_step_state(r, now)
+        if state is None:
+            out[r.id] = {
+                "active": False,
+                "step_index": None,
+                "page_id": None,
+                "step_started_epoch": None,
+                "next_transition_epoch": None,
+                "dwell_seconds": None,
+                "override_in_effect": False,
+            }
             continue
-        idx, step = picked
+        step = r.steps[state.step_index]
         out[r.id] = {
             "active": True,
-            "step_index": idx,
+            "step_index": state.step_index,
             "page_id": step.page_id,
             "page_name": pages_by_id.get(step.page_id, step.page_id),
+            "step_started_epoch": state.step_started_at.timestamp(),
+            "next_transition_epoch": state.next_transition_at.timestamp(),
+            "dwell_seconds": step.dwell_minutes * 60,
+            "override_in_effect": state.forced_at is not None,
         }
     return out
 
@@ -290,6 +303,11 @@ def toggle(rotation_id: str) -> Response:
         return redirect(url_for("rotations.index"))
     updated = existing.model_copy(update={"enabled": not existing.enabled})
     _store().upsert(updated)
+    # Disabling clears any manual override so the rotation comes back
+    # clean when re-enabled. (Enabling-after-disable falls through to
+    # the no-op branch since there's nothing to clear.)
+    if not updated.enabled:
+        _scheduler().clear_anchor_override(rotation_id)
     return redirect(url_for("rotations.index"))
 
 
@@ -299,6 +317,7 @@ def delete(rotation_id: str) -> Response:
     if not deleted:
         flash(f"No rotation with id {rotation_id!r}.", "error")
     else:
+        _scheduler().clear_anchor_override(rotation_id)
         flash("Rotation deleted.", "ok")
     return redirect(url_for("rotations.index"))
 
@@ -313,22 +332,68 @@ def fire(rotation_id: str) -> Response:
         flash(f"No rotation with id {rotation_id!r}.", "error")
         return redirect(url_for("rotations.index"))
     sched = _scheduler()
-    tz = sched._tz_provider() if hasattr(sched, "_tz_provider") else None
-    picked = compute_current_step(rotation, datetime.now(UTC), tz)
-    if picked is None:
+    state = sched.compute_step_state(rotation, datetime.now(UTC))
+    if state is None:
         flash(
             f"Rotation {rotation.name!r} isn't active right now "
             "(day-of-week filter or before anchor).",
             "warn",
         )
         return redirect(url_for("rotations.index"))
-    step_index, _step = picked
-    result = sched._fire_rotation(rotation, step_index, datetime.now(UTC))
+    result = sched._fire_rotation(rotation, state.step_index, datetime.now(UTC))
     if result.status == "sent":
-        flash(f"Fired rotation {rotation_id!r} (step {step_index}).", "ok")
+        flash(f"Fired rotation {rotation_id!r} (step {state.step_index}).", "ok")
     else:
         flash(
             f"Fired rotation {rotation_id!r}: {result.status}, {result.error or ''}",
+            "error",
+        )
+    return redirect(url_for("rotations.index"))
+
+
+@bp.post("/<rotation_id>/play/<int:step_index>")
+def play(rotation_id: str, step_index: int) -> Response:
+    """Play a specific step right now and re-anchor the cycle from
+    there. Lasts until tomorrow's anchor catches up (or the user
+    clicks another step). Override is in-memory only — a server
+    restart returns the rotation to its anchor-deterministic
+    schedule."""
+    rotation = _store().get(rotation_id)
+    if rotation is None:
+        flash(f"No rotation with id {rotation_id!r}.", "error")
+        return redirect(url_for("rotations.index"))
+    if not 0 <= step_index < len(rotation.steps):
+        flash(f"Step {step_index + 1} doesn't exist on this rotation.", "error")
+        return redirect(url_for("rotations.index"))
+    sched = _scheduler()
+    now = datetime.now(UTC)
+    try:
+        state = sched.force_step(rotation, step_index, now)
+    except IndexError:
+        flash(f"Step {step_index + 1} doesn't exist on this rotation.", "error")
+        return redirect(url_for("rotations.index"))
+    if state is None:
+        flash(
+            f"Rotation {rotation.name!r} isn't active right now "
+            "(day-of-week filter or outside its window). Can't play a step.",
+            "warn",
+        )
+        return redirect(url_for("rotations.index"))
+    result = sched._fire_rotation(rotation, state.step_index, now)
+    page_label = next(
+        (p.name for p in _pages().list() if p.id == rotation.steps[state.step_index].page_id),
+        rotation.steps[state.step_index].page_id,
+    )
+    if result.status == "sent":
+        flash(
+            f"Playing step {state.step_index + 1} ({page_label}) on rotation "
+            f"{rotation.name!r}; cycle continues from here.",
+            "ok",
+        )
+    else:
+        flash(
+            f"Couldn't play step {state.step_index + 1} on {rotation.name!r}: "
+            f"{result.status}, {result.error or ''}",
             "error",
         )
     return redirect(url_for("rotations.index"))

@@ -526,3 +526,74 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   margin: 0;
   font-size: var(--t-size-sm);
 }
+
+/* ----- Rotation countdown bar (rotations.js) -----------------------
+   Live progress bar above each active rotation's step list, ticking
+   every second toward the next step transition. The fill is driven
+   from JS by the wall-clock delta between data-step-started and
+   data-next-transition. */
+.rotation-countdown {
+  margin: var(--t-space-3) 0 var(--t-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rotation-countdown-track {
+  height: 8px;
+  background: var(--t-bg-soft, rgba(0, 0, 0, 0.06));
+  border-radius: var(--t-radius-pill, 999px);
+  overflow: hidden;
+  position: relative;
+}
+.rotation-countdown-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(
+    to right,
+    var(--t-accent, #0d8c7e),
+    var(--t-accent-hover, #0d8c7e)
+  );
+  border-radius: inherit;
+  transition: width 0.95s linear;
+}
+.rotation-countdown-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg);
+}
+.rotation-countdown-meta strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.rotation-countdown-meta .pill {
+  font-size: 0.75em;
+  padding: 1px 8px;
+}
+
+/* ----- Per-step "play" button --------------------------------------
+   Sits to the right of the dwell label on each step row. Compact icon
+   button; "manual" flash gets surfaced via the countdown's chip. */
+.rot-step-play {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+.rot-step-play .btn--icon {
+  padding: 2px 6px;
+  color: var(--t-fg-soft, var(--text-muted));
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.rotation-steps-preview li:hover .rot-step-play .btn--icon,
+.rot-step-play .btn--icon:focus-visible {
+  opacity: 1;
+  color: var(--t-accent, #0d8c7e);
+}
+.rotation-steps-preview li.is-current .rot-step-play .btn--icon {
+  opacity: 0.8;
+  color: var(--t-accent, #0d8c7e);
+}

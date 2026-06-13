@@ -143,6 +143,28 @@
         <span><i class="ph ph-list-numbers" aria-hidden="true"></i> {{ r.steps|length }} step{{ '' if r.steps|length == 1 else 's' }}</span>
       </div>
 
+      {% if cur and cur.active and cur.next_transition_epoch %}
+      <div class="rotation-countdown"
+           data-rot-countdown
+           data-step-started="{{ cur.step_started_epoch }}"
+           data-next-transition="{{ cur.next_transition_epoch }}"
+           data-dwell-seconds="{{ cur.dwell_seconds }}"
+           aria-live="polite">
+        <div class="rotation-countdown-track">
+          <span class="rotation-countdown-fill" data-rot-countdown-fill></span>
+        </div>
+        <p class="rotation-countdown-meta">
+          <span class="muted">Next in </span>
+          <strong data-rot-countdown-remaining>—</strong>
+          {% if cur.override_in_effect %}
+          <span class="pill pill--warn" title="Manual play: the cycle was re-anchored, this lasts until tomorrow's anchor catches up.">
+            <i class="ph ph-fast-forward" aria-hidden="true"></i> manual
+          </span>
+          {% endif %}
+        </p>
+      </div>
+      {% endif %}
+
       <ol class="rotation-steps-preview">
         {% for step in r.steps %}
         {% set step_devices = page_devices.get(step.page_id, []) %}
@@ -152,6 +174,15 @@
             <div class="rot-step-line">
               <span class="rot-step-page">{{ page_names.get(step.page_id, step.page_id) }}</span>
               <span class="rot-step-dwell muted">{{ step.dwell_minutes }} min</span>
+              {% if cur and cur.active %}
+              <form method="post" action="{{ url_for('rotations.play', rotation_id=r.id, step_index=loop.index0) }}" class="rot-step-play">
+                <button type="submit" class="btn btn--ghost btn--icon"
+                        title="Play this step now and continue the cycle from here">
+                  <i class="ph ph-play" aria-hidden="true"></i>
+                  <span class="sr-only">Play step {{ loop.index }} now</span>
+                </button>
+              </form>
+              {% endif %}
             </div>
             {% if step_devices %}
             <ul class="rot-step-devices">
@@ -267,4 +298,5 @@
   });
 })();
 </script>
+<script src="{{ url_for('static', filename='rotations.js') }}"></script>
 {% endblock %}

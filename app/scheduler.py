@@ -26,7 +26,8 @@ from __future__ import annotations
 import logging
 import threading
 from collections.abc import Callable
-from datetime import UTC, datetime, time, tzinfo
+from dataclasses import dataclass
+from datetime import UTC, datetime, time, timedelta, tzinfo
 from typing import Any
 
 from app.push import PushManager, PushResult
@@ -77,20 +78,52 @@ def compute_current_step(
     rotation: Rotation, now: datetime, tz: tzinfo | None
 ) -> tuple[int, RotationStep] | None:
     """Return the ``(step_index, step)`` whose dwell window contains
-    ``now`` (in the rotation's anchor timezone), or ``None`` if the
-    rotation isn't active right now.
+    ``now``. Thin wrapper kept for backwards compatibility; new code
+    should use ``Scheduler.compute_current_step`` so that in-memory
+    "play step N now" overrides are honoured. The override map lives
+    on the Scheduler instance, so this free function only sees the
+    deterministic anchor-based schedule."""
+    state = _compute_step_state(rotation, now, tz, forced=None)
+    if state is None:
+        return None
+    return state.step_index, rotation.steps[state.step_index]
 
-    Not active when:
-      * day-of-week mask excludes today
-      * wall-clock is before today's anchor
-      * wall-clock is past ``end_at`` (when set)
 
-    The cycle re-anchors at the configured ``anchor`` HH:MM each local
-    day, so DST flips don't desync long rotations.
+@dataclass(frozen=True)
+class StepState:
+    """Resolved current-step state used by the scheduler tick and the
+    rotations UI. ``forced_at`` is the wall-clock moment the user
+    manually played a step; ``None`` means the regular daily anchor
+    is in force."""
 
-    Math: minutes since today's anchor, modulo total cycle length, then
-    walk the steps in order summing dwells until we find the bucket
-    that contains the modulo result.
+    step_index: int
+    step_started_at: datetime
+    next_transition_at: datetime
+    cycle_position_minutes: float
+    forced_at: datetime | None
+
+
+def _compute_step_state(
+    rotation: Rotation,
+    now: datetime,
+    tz: tzinfo | None,
+    *,
+    forced: tuple[datetime, int] | None,
+) -> StepState | None:
+    """Locate the active step + dwell-window edges, with optional
+    manual override.
+
+    Without override, this matches the original behaviour:
+      * Wall-clock must satisfy day-of-week + anchor + end_at gates.
+      * Position = (now - today_anchor) % cycle.
+
+    With override (``forced = (clicked_at, step_index)``), we still
+    apply the day-of-week + end_at gates, but the cycle anchor used
+    for position math becomes ``clicked_at - prefix(step_index)`` so
+    that the requested step starts at the moment of the click. The
+    override stays in effect as long as the click landed inside
+    today's anchor window; the next day's anchor moment silently GCs
+    it back to deterministic.
     """
     local_now = _local(now, tz)
     if local_now.weekday() not in rotation.days_of_week:
@@ -105,28 +138,65 @@ def compute_current_step(
         end_t = _parse_hhmm(rotation.end_at)
         end_today = local_now.replace(hour=end_t.hour, minute=end_t.minute, second=0, microsecond=0)
         if end_today > anchor_today:
-            # Normal same-day window: stop cycling once we pass end.
             if local_now >= end_today:
                 return None
         else:
-            # Wrap-around window (e.g. 22:00 -> 06:00). We're outside
-            # the active window when local_now is in the gap between
-            # ``end`` and ``anchor`` (exclusive of both ends).
             if end_today <= local_now < anchor_today:
                 return None
-    minutes_since_anchor = (local_now - anchor_today).total_seconds() / 60.0
     cycle = rotation.cycle_minutes
     if cycle <= 0:
         return None
+
+    forced_at_local: datetime | None = None
+    if forced is not None:
+        forced_at, forced_idx = forced
+        if 0 <= forced_idx < len(rotation.steps):
+            forced_local = forced_at.astimezone(tz) if tz else forced_at.astimezone()
+            # Override is valid while the click landed in today's window
+            # (>= today's anchor) and isn't in the future.
+            if anchor_today <= forced_local <= local_now:
+                prefix = sum(s.dwell_minutes for s in rotation.steps[:forced_idx])
+                effective_anchor = forced_local - timedelta(minutes=prefix)
+                forced_at_local = forced_local
+            else:
+                effective_anchor = anchor_today
+        else:
+            effective_anchor = anchor_today
+    else:
+        effective_anchor = anchor_today
+
+    minutes_since_anchor = (local_now - effective_anchor).total_seconds() / 60.0
     position = minutes_since_anchor % cycle
     cumulative = 0.0
     for idx, step in enumerate(rotation.steps):
+        prev_cumulative = cumulative
         cumulative += step.dwell_minutes
         if position < cumulative:
-            return idx, step
-    # Defensive fallback: float arithmetic edge case can leave position
-    # equal to cycle; treat that as the last step (we just rolled over).
-    return len(rotation.steps) - 1, rotation.steps[-1]
+            cycles_done = int(minutes_since_anchor // cycle)
+            step_started_minutes = cycles_done * cycle + prev_cumulative
+            step_started_at = effective_anchor + timedelta(minutes=step_started_minutes)
+            next_transition_at = step_started_at + timedelta(minutes=step.dwell_minutes)
+            return StepState(
+                step_index=idx,
+                step_started_at=step_started_at,
+                next_transition_at=next_transition_at,
+                cycle_position_minutes=position,
+                forced_at=forced_at_local,
+            )
+    # Edge case: float math left position exactly at cycle. Roll
+    # forward to the last step of the previous cycle.
+    last_idx = len(rotation.steps) - 1
+    last_step = rotation.steps[last_idx]
+    cycles_done = int(minutes_since_anchor // cycle)
+    step_started_minutes = cycles_done * cycle + (cycle - last_step.dwell_minutes)
+    step_started_at = effective_anchor + timedelta(minutes=step_started_minutes)
+    return StepState(
+        step_index=last_idx,
+        step_started_at=step_started_at,
+        next_transition_at=step_started_at + timedelta(minutes=last_step.dwell_minutes),
+        cycle_position_minutes=position,
+        forced_at=forced_at_local,
+    )
 
 
 class Scheduler:
@@ -195,6 +265,15 @@ class Scheduler:
         # rotation_id we've warned about for a missing step page; same
         # one-shot semantics as ``_warned_missing_page``.
         self._warned_missing_rotation_page: set[str] = set()
+        # Manual "play step N now and continue from there" overrides.
+        # Map rotation_id -> (clicked_at_utc, step_index). The cycle
+        # math treats clicked_at as the start of step_index's dwell
+        # window, replacing the deterministic anchor-based position
+        # until the next daily anchor crosses (or the user pokes
+        # again). In-memory only, by design: a restart wipes overrides
+        # and the rotation goes back to its anchor-deterministic
+        # schedule.
+        self._rotation_force_state: dict[str, tuple[datetime, int]] = {}
         self._lock = threading.Lock()
 
     def start(self) -> None:
@@ -319,6 +398,64 @@ class Scheduler:
         for schedule in self.find_due(now):
             self._fire(schedule, now, respect_quiet_hours=True)
 
+    def compute_step_state(
+        self, rotation: Rotation, now: datetime | None = None
+    ) -> StepState | None:
+        """Resolve the current step + dwell-window edges, with any
+        in-memory force-step override in effect. The deterministic
+        free ``compute_current_step`` is the no-override version;
+        callers that want override-aware state (the scheduler tick,
+        the rotations UI) should use this method."""
+        now = now or datetime.now(UTC)
+        tz = self._tz_provider()
+        with self._lock:
+            forced = self._rotation_force_state.get(rotation.id)
+        state = _compute_step_state(rotation, now, tz, forced=forced)
+        # If the override is no longer in effect (the deterministic
+        # anchor caught up or rolled past it) we GC it so memory
+        # doesn't accumulate stale overrides across days.
+        if forced is not None and (state is None or state.forced_at is None):
+            with self._lock:
+                if self._rotation_force_state.get(rotation.id) == forced:
+                    self._rotation_force_state.pop(rotation.id, None)
+        return state
+
+    def force_step(
+        self,
+        rotation: Rotation,
+        step_index: int,
+        now: datetime | None = None,
+    ) -> StepState | None:
+        """Record a manual "play step ``step_index`` now" override and
+        return the resulting StepState (or ``None`` if the rotation
+        isn't active right now). The override re-bases the cycle so
+        ``step_index`` starts at ``now``; subsequent steps follow at
+        their normal dwell intervals until the next daily anchor.
+
+        Caller is responsible for actually pushing the step (the
+        scheduler doesn't auto-fire from this method) and for clearing
+        ``_rotation_last_step`` so the next tick treats the new step
+        as a transition. ``rotation_routes.play`` wires both."""
+        if not 0 <= step_index < len(rotation.steps):
+            raise IndexError(f"step_index {step_index} out of range")
+        now = now or datetime.now(UTC)
+        with self._lock:
+            self._rotation_force_state[rotation.id] = (now, step_index)
+            # Clear last_step so the next tick treats this as a fresh
+            # transition. Without this, the new step's index might
+            # equal the previously-fired step's index (e.g. you click
+            # the same step you're already on) and the scheduler would
+            # skip the push.
+            self._rotation_last_step.pop(rotation.id, None)
+        return self.compute_step_state(rotation, now)
+
+    def clear_anchor_override(self, rotation_id: str) -> None:
+        """Drop any manual override for ``rotation_id``. Used by tests
+        and by the rotation routes when the user disables a rotation
+        or deletes it."""
+        with self._lock:
+            self._rotation_force_state.pop(rotation_id, None)
+
     def find_due_rotations(self, now: datetime | None = None) -> list[tuple[Rotation, int]]:
         """Return ``(rotation, step_index)`` pairs whose current step
         DIFFERS from the last fired step (or has never fired). Each
@@ -330,7 +467,6 @@ class Scheduler:
         if self._rotation_store is None:
             return []
         now = now or datetime.now(UTC)
-        tz = self._tz_provider()
         out: list[tuple[Rotation, int]] = []
         for rotation in self._rotation_store.all():
             if not rotation.enabled:
@@ -339,10 +475,11 @@ class Scheduler:
                 with self._lock:
                     self._rotation_last_step.pop(rotation.id, None)
                 continue
-            picked = compute_current_step(rotation, now, tz)
-            if picked is None:
+            state = self.compute_step_state(rotation, now)
+            if state is None:
                 continue
-            step_index, step = picked
+            step_index = state.step_index
+            step = rotation.steps[step_index]
             if self._page_exists is not None and not self._page_exists(step.page_id):
                 with self._lock:
                     if rotation.id not in self._warned_missing_rotation_page:

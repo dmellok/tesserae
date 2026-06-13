@@ -254,3 +254,126 @@ def test_quiet_result_still_bumps_last_step(wiring) -> None:
     scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
     scheduler._tick_once(datetime(2026, 6, 15, 0, 5, tzinfo=UTC))
     assert push.push.call_count == 1
+
+
+# -- Manual play step / anchor override --------------------------------
+
+
+def test_force_step_jumps_to_requested_step(wiring) -> None:
+    """force_step(rotation, idx=2) re-anchors the cycle so step 2 is
+    "now" — compute_step_state on the same instant reports idx 2 with
+    a fresh dwell window."""
+    scheduler, _push, store = wiring
+    r = _rot(steps=_steps(("a", 30), ("b", 30), ("c", 30), ("d", 30)))
+    store.upsert(r)
+    # Without override at 00:00 we're on step 0.
+    now = datetime(2026, 6, 15, 0, 0, tzinfo=UTC)
+    state0 = scheduler.compute_step_state(r, now)
+    assert state0 is not None and state0.step_index == 0
+    # Force step 2 at 00:00.
+    forced = scheduler.force_step(r, 2, now)
+    assert forced is not None
+    assert forced.step_index == 2
+    assert forced.forced_at is not None
+    # Step 2's window starts at now and runs 30 minutes.
+    assert forced.step_started_at == now
+    assert (forced.next_transition_at - forced.step_started_at).total_seconds() == 30 * 60
+
+
+def test_force_step_clears_last_step_so_tick_fires(wiring) -> None:
+    """After force_step, the very next scheduler tick must fire the
+    requested step even if that step's index matches the previously
+    fired one (e.g. user clicks the same step they're already on as
+    a 're-push' shortcut)."""
+    scheduler, push, store = wiring
+    r = _rot(steps=_steps(("a", 30), ("b", 30)))
+    store.upsert(r)
+    # Initial tick fires step 0.
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    assert push.push.call_count == 1
+    # Force step 0 again at the same wall-clock; tick fires again.
+    scheduler.force_step(r, 0, datetime(2026, 6, 15, 0, 1, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 1, tzinfo=UTC))
+    assert push.push.call_count == 2
+
+
+def test_force_step_continues_cycle_from_there(wiring) -> None:
+    """After force_step(idx=1), step 2 should fire after step 1's dwell
+    elapses — proving the cycle 'continues from here' rather than
+    snapping back to the deterministic schedule on the next tick."""
+    scheduler, push, store = wiring
+    r = _rot(steps=_steps(("a", 30), ("b", 30), ("c", 30)))
+    store.upsert(r)
+    # Force step 1 at 00:00. Step 1 fires now.
+    scheduler.force_step(r, 1, datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    args, _ = push.push.call_args
+    assert args[0] == "b"  # step 1's page
+    # 29 minutes in: still step 1, no fresh push.
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 29, tzinfo=UTC))
+    assert push.push.call_count == 1
+    # 30 minutes in: step transitions to step 2 (page "c") — would
+    # have been step 0 if we'd followed the anchor-deterministic
+    # schedule.
+    scheduler._tick_once(datetime(2026, 6, 15, 0, 30, tzinfo=UTC))
+    assert push.push.call_count == 2
+    args, _ = push.push.call_args
+    assert args[0] == "c"
+
+
+def test_force_step_invalid_index_raises(wiring) -> None:
+    scheduler, _push, store = wiring
+    r = _rot(steps=_steps(("a", 30), ("b", 30)))
+    store.upsert(r)
+    with pytest.raises(IndexError):
+        scheduler.force_step(r, 5, datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+
+
+def test_clear_anchor_override_resets_to_deterministic(wiring) -> None:
+    """Disabling or deleting a rotation drops the override so a later
+    re-enable resumes its anchor-deterministic schedule.
+
+    Uses an explicit UTC tz provider on the scheduler so the assertion
+    isn't sensitive to the host's local timezone (the fixture's default
+    of host-local would lose this guarantee on hosts where UTC 00:00
+    isn't aligned with the rotation's anchor)."""
+    scheduler, _push, store = wiring
+    scheduler._tz_provider = lambda: UTC
+    r = _rot(steps=_steps(("a", 30), ("b", 30), ("c", 30)))
+    store.upsert(r)
+    scheduler.force_step(r, 2, datetime(2026, 6, 15, 0, 0, tzinfo=UTC))
+    forced = scheduler.compute_step_state(r, datetime(2026, 6, 15, 0, 1, tzinfo=UTC))
+    assert forced is not None and forced.step_index == 2
+    scheduler.clear_anchor_override(r.id)
+    cleared = scheduler.compute_step_state(r, datetime(2026, 6, 15, 0, 1, tzinfo=UTC))
+    assert cleared is not None
+    assert cleared.step_index == 0  # back to anchor-deterministic
+    assert cleared.forced_at is None
+
+
+def test_override_garbage_collected_when_next_anchor_catches_up(wiring) -> None:
+    """A force_step set on Monday at 12:00 must NOT bleed into
+    Tuesday — once the next daily anchor passes, the override is
+    silently dropped and the deterministic schedule resumes."""
+    scheduler, _push, store = wiring
+    scheduler._tz_provider = lambda: UTC
+    # 4 steps of 15min each = 1h cycle, anchored 09:00 daily.
+    r = _rot(
+        anchor="09:00",
+        steps=_steps(("a", 15), ("b", 15), ("c", 15), ("d", 15)),
+    )
+    store.upsert(r)
+    # Monday 12:00 UTC, force step 3.
+    monday_noon = datetime(2026, 6, 15, 12, 0, tzinfo=UTC)
+    scheduler.force_step(r, 3, monday_noon)
+    on_monday = scheduler.compute_step_state(r, monday_noon)
+    assert on_monday is not None and on_monday.forced_at is not None
+    # Tuesday 09:30 UTC: the daily anchor has rolled over. State must
+    # reflect deterministic position (30 min past anchor = step 2).
+    tuesday_morning = datetime(2026, 6, 16, 9, 30, tzinfo=UTC)
+    on_tuesday = scheduler.compute_step_state(r, tuesday_morning)
+    assert on_tuesday is not None
+    assert on_tuesday.forced_at is None
+    assert on_tuesday.step_index == 2
+    # And the override map is empty (GC'd).
+    assert r.id not in scheduler._rotation_force_state

@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.0], 2026-06-13
+
+### Added
+
+- **Live rotation countdown + per-step "play now" button.** Each
+  active rotation on Settings → Rotations now renders a live
+  progress bar above its step list, ticking every second toward the
+  next step transition. When the countdown hits zero the page soft-
+  reloads so the server's recompute drives the next step's bar.
+- **Manual step override.** Every step row gets a small play icon
+  (visible on hover) that re-anchors the cycle so the clicked step
+  starts at the moment of the click and subsequent steps follow at
+  their normal dwell intervals — "play this dashboard now and
+  continue from here". The override is in-memory only; a server
+  restart resumes the rotation's anchor-deterministic schedule.
+  Disabling or deleting a rotation drops its override.
+- New POST `/<rotation_id>/play/<step_index>` route, new
+  `Scheduler.compute_step_state` / `Scheduler.force_step` /
+  `Scheduler.clear_anchor_override` methods, new `StepState`
+  dataclass exposing the dwell-window edges for the template.
+  [`app/scheduler.py`](app/scheduler.py),
+  [`app/rotation_routes.py`](app/rotation_routes.py),
+  [`templates/rotations.html`](templates/rotations.html),
+  [`static/rotations.js`](static/rotations.js),
+  [`static/style/schedules.css`](static/style/schedules.css).
+- Six new tests in
+  [`tests/test_rotation_scheduler.py`](tests/test_rotation_scheduler.py)
+  cover the override math (jumps to requested step, continues from
+  there, clears `_last_step` so the same-step case re-fires, raises
+  on invalid index, GCs on next-day anchor, clears via
+  `clear_anchor_override`).
+
 ## [0.46.10], 2026-06-13
 
 ### Fixed
