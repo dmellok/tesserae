@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.47.4"
+version = "0.47.5"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -42,6 +42,10 @@ dependencies = [
     # tesserae.local + an _http._tcp service so the appliance is
     # reachable by name without touching the host's hostname.
     "zeroconf>=0.130,<1",
+    # Pure-Python QR code generator (no transitive deps, ~50 KB).
+    # Used by the recipes widget to render a scannable link back to
+    # the source recipe page in the card's bottom-right corner.
+    "segno>=1.6,<2",
 ]
 
 [project.scripts]

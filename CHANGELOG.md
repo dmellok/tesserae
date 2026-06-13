@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.5], 2026-06-14
+
+### Added
+
+- **`segno` as a host dependency.** Pure-Python QR code generator
+  (~50 KB, no transitive deps). Available to any widget or
+  renderer that wants to embed a scannable link without us baking
+  per-plugin QR code into client-side JS. First consumer is the
+  community `recipes` widget at
+  [github.com/dmellok/tesserae-recipes](https://github.com/dmellok/tesserae-recipes);
+  any future widget can `import segno` directly.
+  [`pyproject.toml`](pyproject.toml).
+
 ## [0.47.4], 2026-06-14
 
 ### Added
