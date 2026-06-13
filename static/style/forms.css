@@ -1193,3 +1193,68 @@ input[type="range"].slider:focus::-moz-range-thumb {
    it the vertical breathing room the inline ``margin: var(--t-space-4) 0`` was supplying. */
 .card--wizard-info { margin: var(--t-space-4) 0; }
 .card--wizard-info-footnote { font-size: var(--t-size-sm); }
+
+/* ----- Variable picker (variables_textarea field type) ----------------
+   Click-to-insert chips that drop their placeholder text at the
+   textarea's cursor position. Sits beneath the textarea, grouped by
+   category. JS in static/variables-textarea.js handles the insert. */
+.field--variables-textarea .variables-picker {
+  margin-top: var(--t-space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  background: var(--t-surface, var(--t-bg-soft, #f5f4ef));
+  border: 1px solid var(--t-border, rgba(0, 0, 0, 0.08));
+  border-radius: var(--t-radius-sm, 6px);
+}
+.variables-picker-group {
+  display: flex;
+  align-items: baseline;
+  gap: var(--t-space-2);
+  flex-wrap: wrap;
+}
+.variables-picker-label {
+  font-size: var(--t-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--t-fg-soft, var(--text-muted));
+  flex: 0 0 auto;
+  min-width: 4.5em;
+}
+.variables-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 auto;
+}
+.variables-picker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px var(--t-space-2);
+  font-family: var(--t-font-mono, ui-monospace, monospace);
+  font-size: var(--t-size-sm);
+  background: var(--t-bg, white);
+  border: 1px solid var(--t-border, rgba(0, 0, 0, 0.12));
+  border-radius: var(--t-radius-pill, 999px);
+  cursor: pointer;
+  color: var(--t-fg, inherit);
+  line-height: 1.3;
+  transition: background-color 0.1s ease;
+}
+.variables-picker-chip:hover {
+  background: var(--t-accent, #0d8c7e);
+  color: white;
+  border-color: var(--t-accent, #0d8c7e);
+}
+.variables-picker-chip:focus-visible {
+  outline: 2px solid var(--t-accent, #0d8c7e);
+  outline-offset: 1px;
+}
+.variables-picker-chip code {
+  background: transparent;
+  padding: 0;
+  font: inherit;
+}

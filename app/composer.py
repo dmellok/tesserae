@@ -311,6 +311,24 @@ def _fetch_plugin_data(
         settings = settings_store.get_for_runtime(
             "plugins", plugin_id, plugin.manifest.get("settings", [])
         )
+    # Server-level home location, used as a fallback when a cell's own
+    # latitude/longitude is empty. Saves the user from re-typing the
+    # same coordinates on every weather / sky / ai_* widget. Empty
+    # string in settings.json means "not set"; the widget treats that
+    # as 0.0 and renders an error state. Widgets opt in by reading
+    # ctx["home_lat"] / ctx["home_lon"] in their fetch().
+    home_lat = 0.0
+    home_lon = 0.0
+    if settings_store is not None:
+        app_section = settings_store.get_section("app") or {}
+        try:
+            home_lat = float(app_section.get("latitude") or 0.0)
+        except (TypeError, ValueError):
+            home_lat = 0.0
+        try:
+            home_lon = float(app_section.get("longitude") or 0.0)
+        except (TypeError, ValueError):
+            home_lon = 0.0
     try:
         with capability_scope(plugin.capabilities):
             return fetch_fn(
@@ -323,6 +341,8 @@ def _fetch_plugin_data(
                     "cell_h": cell_h,
                     "preview": preview,
                     "data_dir": str(plugin.data_dir),
+                    "home_lat": home_lat,
+                    "home_lon": home_lon,
                 },
             )
     except CapabilityDenied as err:

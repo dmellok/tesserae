@@ -152,6 +152,49 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{#- Textarea + click-to-insert variable picker. ``variables`` is a list
+   of ``{value, label, category}`` records; rendered as grouped chips
+   under the textarea. Clicking a chip drops ``value`` at the textarea's
+   current cursor position (or appends if the cursor isn't there). The
+   editor's input listener picks the change up like any other field
+   change. -#}
+{%- macro variables_textarea_field(field_id, name, label, value='', rows=6, placeholder='', variables=[], help=None) -%}
+<div class="field field--variables-textarea" data-variables-textarea>
+  <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
+  <textarea id="{{ field_id }}" name="{{ name }}" rows="{{ rows }}"
+            data-variables-target
+            {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}>{{ value|default('', true) }}</textarea>
+  {% if variables %}
+  {# Group chips by category. Categories render in the order they're
+     first seen; chips inside a category render in the order given. #}
+  {% set categories = [] %}
+  {% set grouped = {} %}
+  {% for v in variables %}
+    {% set cat = v.get('category', 'Variables') %}
+    {% if cat not in categories %}{% set _ = categories.append(cat) %}{% endif %}
+    {% set _ = grouped.setdefault(cat, []).append(v) %}
+  {% endfor %}
+  <div class="variables-picker" data-variables-picker
+       data-target="{{ field_id }}">
+    {% for cat in categories %}
+    <div class="variables-picker-group">
+      <span class="variables-picker-label">{{ cat }}</span>
+      <div class="variables-picker-chips">
+        {% for v in grouped[cat] %}
+        <button type="button" class="variables-picker-chip"
+                data-variable-value="{{ v.value }}"
+                title="{{ v.get('label', v.value) }} — click to insert">
+          <code>{{ v.value }}</code>
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{%- endmacro -%}
+
 {#- Per-entity name + icon override list. Pairs with a multiselect in
    the same fieldset: ``static/entity-overrides.js`` reads which entities
    are ticked there and renders one row (name field + icon picker) per
@@ -312,7 +355,16 @@ macro here instead.
   {% elif ftype == 'multiselect' %}
     {{ multiselect_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
   {% elif ftype == 'textarea' %}
-    {{ textarea_field(field_id, name, label, value=value, help=help_text) }}
+    {{ textarea_field(field_id, name, label, value=value,
+                      rows=spec.get('rows', 3),
+                      placeholder=spec.get('placeholder', ''),
+                      help=help_text) }}
+  {% elif ftype == 'variables_textarea' %}
+    {{ variables_textarea_field(field_id, name, label, value=value,
+                                rows=spec.get('rows', 6),
+                                placeholder=spec.get('placeholder', ''),
+                                variables=spec.get('variables', []),
+                                help=help_text) }}
   {% elif ftype == 'entity_overrides' %}
     {{ entity_overrides_field(field_id, name, label, value=value, help=help_text) }}
   {% elif ftype == 'slider' %}

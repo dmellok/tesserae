@@ -18,8 +18,8 @@ def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
     del settings
-    lat = float(options.get("latitude", 0.0))
-    lon = float(options.get("longitude", 0.0))
+    lat = float(options.get("latitude") or ctx.get("home_lat") or 0.0)
+    lon = float(options.get("longitude") or ctx.get("home_lon") or 0.0)
 
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)

@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.46.7], 2026-06-13
+
+### Added
+
+- **`variables_textarea` field type** for cell options. Renders the
+  textarea plus a click-to-insert chip rack grouped by category;
+  clicking a chip drops its `{placeholder}` at the textarea's cursor
+  position. Used by the new `ai_brief` community widget, available to
+  any plugin that wants to ship a templatable prompt with discoverable
+  placeholders. New macro in [`templates/_components.html`](templates/_components.html),
+  JS at [`static/variables-textarea.js`](static/variables-textarea.js),
+  styles in [`static/style/forms.css`](static/style/forms.css).
+- **`home_lat` / `home_lon` injected into widget `ctx`** from the
+  server-level home location (`app.latitude` / `app.longitude`).
+  Widgets opt in by reading `ctx.get("home_lat")` as a fallback when
+  the cell's own latitude/longitude is empty, so users don't re-type
+  coordinates on every weather / sky / ai widget. The bundled
+  `weather_now`, `weather_forecast`, `weather_hourly`,
+  `weather_now_scenic`, and `clock_sunrise_sunset` widgets are wired
+  to use it.
+
+### Fixed
+
+- **`auto_field` now passes `rows` and `placeholder` through to
+  `textarea_field`.** Previously a plugin declaring
+  `{"type": "textarea", "rows": 14}` got the macro's default of 3
+  rows silently. Same fix applies to `placeholder`.
+
 ## [0.46.6], 2026-06-13
 
 ### Added
