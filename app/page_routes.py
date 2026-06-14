@@ -420,6 +420,53 @@ def _preview_scale(panel_w: int, panel_h: int = 0) -> float:
 # -- page-level routes --------------------------------------------
 
 
+def _group_pages_for_index(pages: list[Page], devices: Any) -> list[tuple[Any, list[Page]]]:
+    """Bucket pages by primary (first still-existing) device for the
+    Dashboards list. Returns ordered ``(device_or_None, pages)`` tuples:
+    bound device groups sorted by ``display_name`` (case-insensitive),
+    then an "Unbound" group at the end when there are unbound pages.
+    Pages within each group are alphabetical by name (case-insensitive,
+    tie-break on id for stability). Empty groups are dropped, so a
+    device with zero bound pages never renders a section head.
+
+    Primary-device resolution skips ids that no longer resolve through
+    the registry, so a half-deleted binding (`device_ids=["gone",
+    "kitchen"]`) falls through to the next live device rather than
+    landing in Unbound; a page with no live bindings goes to Unbound.
+
+    Pulled out of ``index()`` so unit tests can hit the grouping logic
+    without standing up a full Flask app + Page store."""
+    bound: dict[str, tuple[Any, list[Page]]] = {}
+    unbound: list[Page] = []
+    for page in pages:
+        primary = None
+        if devices is not None:
+            for did in page.device_ids:
+                candidate = devices.devices.get(did)
+                if candidate is not None:
+                    primary = candidate
+                    break
+        if primary is None:
+            unbound.append(page)
+            continue
+        slot = bound.setdefault(primary.id, (primary, []))
+        slot[1].append(page)
+
+    def page_sort_key(p: Page) -> tuple[str, str]:
+        return (p.name.casefold(), p.id)
+
+    out: list[tuple[Any, list[Page]]] = []
+    for _device_id, (device, pages_in_group) in sorted(
+        bound.items(), key=lambda kv: (kv[1][0].display_name.casefold(), kv[0])
+    ):
+        pages_in_group.sort(key=page_sort_key)
+        out.append((device, pages_in_group))
+    if unbound:
+        unbound.sort(key=page_sort_key)
+        out.append((None, unbound))
+    return out
+
+
 @bp.get("")
 def index() -> str:
     pages = _store().list()
@@ -443,8 +490,13 @@ def index() -> str:
         return names
 
     page_devices = {p.id: _device_names(p) for p in pages}
+    page_groups = _group_pages_for_index(pages, devices)
     return render_template(
-        "pages_list.html", pages=pages, page_dims=page_dims, page_devices=page_devices
+        "pages_list.html",
+        pages=pages,
+        page_dims=page_dims,
+        page_devices=page_devices,
+        page_groups=page_groups,
     )
 
 

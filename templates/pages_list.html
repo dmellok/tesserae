@@ -26,48 +26,104 @@
 </div>
 {% else %}
 <p class="dashboard-count">{{ pages|length }} dashboard{{ '' if pages|length == 1 else 's' }}</p>
-<ul class="pages-list">
-  {% for page in pages %}
-  {% set d = page_dims.get(page.id) %}
-  <li class="page-row">
-    <span class="page-icon-tile" aria-hidden="true">
-      <i class="ph ph-{{ page.icon or 'cube' }}"></i>
-    </span>
-    <a class="page-row-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
-      <span class="page-name">{{ page.name }}</span>
-      <span class="page-meta">
-        {% set devs = page_devices.get(page.id) %}
-        {% if devs %}<i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs|join(', ') }}{% else %}<i class="ph ph-monitor" aria-hidden="true"></i> Virtual panel{% endif %}
-        {% if d %}<span class="muted"> · </span>{{ d.w }}×{{ d.h }}{% endif %}
-        <span class="muted"> · </span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}
-        {% if page.theme %}<span class="muted"> · </span>theme: {{ page.theme }}{% endif %}
+{% for device, pages_in_group in page_groups %}
+<section class="pages-group">
+  <h3 class="pages-group-head">
+    <i class="ph-bold ph-{{ device.icon if device else 'monitor' }}" aria-hidden="true"></i>
+    <span>{{ device.display_name if device else 'Unbound (virtual panel)' }}</span>
+    <span class="pages-group-count">{{ pages_in_group|length }}</span>
+  </h3>
+  <ul class="pages-list">
+    {% for page in pages_in_group %}
+    {% set d = page_dims.get(page.id) %}
+    <li class="page-row">
+      <span class="page-icon-tile" aria-hidden="true">
+        <i class="ph ph-{{ page.icon or 'cube' }}"></i>
       </span>
-    </a>
-    <div class="page-actions">
-      <a class="page-action" href="{{ url_for('pages.edit', page_id=page.id) }}">
-        <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+      <a class="page-row-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
+        <span class="page-name">{{ page.name }}</span>
+        <span class="page-meta">
+          {% set devs = page_devices.get(page.id) %}
+          {% if devs %}
+            <i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs[0] }}
+            {% if devs|length > 1 %}
+              <span class="pages-group-more" title="Also on: {{ devs[1:]|join(', ') }}">+{{ devs|length - 1 }}</span>
+            {% endif %}
+          {% else %}
+            <i class="ph ph-monitor" aria-hidden="true"></i> Virtual panel
+          {% endif %}
+          {% if d %}<span class="muted"> · </span>{{ d.w }}×{{ d.h }}{% endif %}
+          <span class="muted"> · </span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}
+          {% if page.theme %}<span class="muted"> · </span>theme: {{ page.theme }}{% endif %}
+        </span>
       </a>
-      <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
-        <input type="hidden" name="page_id" value="{{ page.id }}">
-        {# Stay on the dashboards list after pushing, the default lands
-           on Send → History, which is jarring when the user is just
-           triaging dashboards rather than composing a send. #}
-        <input type="hidden" name="return_to" value="dashboards">
-        <button type="submit" class="page-action" title="Push this dashboard to its panel">
-          <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
-        </button>
-      </form>
-      <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
-            onsubmit="return confirm('Delete this dashboard?');">
-        <button type="submit" class="page-action page-action-danger" title="Delete dashboard"
-                aria-label="Delete dashboard">
-          <i class="ph ph-trash" aria-hidden="true"></i>
-        </button>
-      </form>
-    </div>
-  </li>
-  {% endfor %}
-</ul>
+      <div class="page-actions">
+        <a class="page-action" href="{{ url_for('pages.edit', page_id=page.id) }}">
+          <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+        </a>
+        <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
+          <input type="hidden" name="page_id" value="{{ page.id }}">
+          {# Stay on the dashboards list after pushing, the default lands
+             on Send → History, which is jarring when the user is just
+             triaging dashboards rather than composing a send. #}
+          <input type="hidden" name="return_to" value="dashboards">
+          <button type="submit" class="page-action" title="Push this dashboard to its panel">
+            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
+          </button>
+        </form>
+        <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
+              onsubmit="return confirm('Delete this dashboard?');">
+          <button type="submit" class="page-action page-action-danger" title="Delete dashboard"
+                  aria-label="Delete dashboard">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+          </button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+
+<style>
+  .pages-group { margin-top: 1.4rem; }
+  .pages-group:first-of-type { margin-top: 0.8rem; }
+  .pages-group-head {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0 0 0.55rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--t-border);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--t-fg-soft);
+  }
+  .pages-group-head > i { color: var(--t-accent, currentColor); font-size: 1rem; }
+  .pages-group-count {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: var(--t-muted);
+    letter-spacing: 0;
+    text-transform: none;
+    font-weight: 600;
+  }
+  .pages-group-more {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 0.25rem;
+    padding: 0.05rem 0.4rem;
+    background: var(--t-surface-sunk);
+    border: 1px solid var(--t-border);
+    border-radius: 999px;
+    font-size: 0.72rem;
+    color: var(--t-fg-soft);
+    font-weight: 700;
+    cursor: help;
+  }
+</style>
 {% endif %}
 
 <script>

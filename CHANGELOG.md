@@ -6,6 +6,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.6], 2026-06-14
+
+### Changed
+
+- **Dashboards list groups pages by device.** Settings → Dashboards
+  no longer renders one flat insertion-order list. Pages now bucket
+  under the first bound device that still resolves, each section
+  head labelled with the device name + icon + a small count chip.
+  Within each section pages are alphabetical (case-insensitive);
+  device sections are alphabetical by display name; an **Unbound
+  (virtual panel)** section always sits last for pages with no
+  device binding. Pages bound to multiple devices appear once,
+  under their primary, with a small `+N` chip whose `title`
+  tooltip lists the other devices. A primary device that's been
+  deleted falls through to the next still-existing device in the
+  binding list, so half-deleted topologies don't lose their pages
+  to the Unbound bucket.
+  [`app/page_routes.py`](app/page_routes.py),
+  [`templates/pages_list.html`](templates/pages_list.html).
+
 ## [0.47.5], 2026-06-14
 
 ### Added

@@ -685,3 +685,107 @@ def test_ensure_fit_rescales_on_orientation_flip(app: Flask) -> None:
     for c in out.cells:
         assert c.x + c.w <= 480
         assert c.y + c.h <= 800
+
+
+# -- pages-list grouping by device ----------------------------------
+
+
+class _StubDevice:
+    """Minimal duck-typed stand-in for ``app.device_loader.Device`` for
+    the grouping helper's purposes: it only reads ``id``, ``display_name``
+    and ``icon``."""
+
+    def __init__(self, did: str, *, display_name: str, icon: str = "monitor") -> None:
+        self.id = did
+        self.display_name = display_name
+        self.icon = icon
+
+
+class _StubRegistry:
+    def __init__(self, devices: list[_StubDevice]) -> None:
+        self.devices = {d.id: d for d in devices}
+
+
+def _page(pid: str, name: str, device_ids: list[str] | None = None):
+    from app.state.page_store import Page
+
+    return Page(id=pid, name=name, device_ids=device_ids or [], cells=[])
+
+
+def test_group_pages_sorts_by_device_then_name() -> None:
+    """Two devices with multiple pages each: device groups come out
+    alphabetical by ``display_name``, and pages inside each group are
+    case-insensitive alphabetical by ``name``."""
+    from app.page_routes import _group_pages_for_index
+
+    kitchen = _StubDevice("kitchen", display_name="Kitchen Panel")
+    studio = _StubDevice("studio", display_name="Studio Display")
+    registry = _StubRegistry([kitchen, studio])
+    pages = [
+        _page("s2", "Sunset board", ["studio"]),
+        _page("k2", "Pantry list", ["kitchen"]),
+        _page("k1", "Calendar", ["kitchen"]),
+        _page("s1", "Morning briefing", ["studio"]),
+    ]
+    groups = _group_pages_for_index(pages, registry)
+    assert [d.id for d, _ in groups] == ["kitchen", "studio"]
+    assert [p.id for p in groups[0][1]] == ["k1", "k2"]
+    assert [p.id for p in groups[1][1]] == ["s1", "s2"]
+
+
+def test_group_pages_unbound_sorts_last() -> None:
+    """An unbound page (no device_ids) lands in a None-keyed Unbound
+    group that always sits after every bound device group."""
+    from app.page_routes import _group_pages_for_index
+
+    kitchen = _StubDevice("kitchen", display_name="Kitchen Panel")
+    registry = _StubRegistry([kitchen])
+    pages = [
+        _page("u1", "Floating dashboard", []),
+        _page("k1", "Calendar", ["kitchen"]),
+    ]
+    groups = _group_pages_for_index(pages, registry)
+    assert len(groups) == 2
+    assert groups[0][0].id == "kitchen"
+    assert groups[1][0] is None
+    assert [p.id for p in groups[1][1]] == ["u1"]
+
+
+def test_group_pages_primary_device_deletion_falls_through() -> None:
+    """When a page's first device id no longer resolves, the helper
+    walks to the next device in the list. The page lands in the group
+    of its first live device, NOT Unbound."""
+    from app.page_routes import _group_pages_for_index
+
+    kitchen = _StubDevice("kitchen", display_name="Kitchen Panel")
+    registry = _StubRegistry([kitchen])
+    pages = [_page("p1", "Recipes", ["ghost", "kitchen"])]
+    groups = _group_pages_for_index(pages, registry)
+    assert len(groups) == 1
+    assert groups[0][0].id == "kitchen"
+
+
+def test_group_pages_all_devices_missing_falls_to_unbound() -> None:
+    """A page bound only to deleted devices falls all the way through
+    to Unbound rather than rendering against a phantom device."""
+    from app.page_routes import _group_pages_for_index
+
+    registry = _StubRegistry([])
+    pages = [_page("p1", "Recipes", ["ghost-a", "ghost-b"])]
+    groups = _group_pages_for_index(pages, registry)
+    assert len(groups) == 1
+    assert groups[0][0] is None
+    assert [p.id for p in groups[0][1]] == ["p1"]
+
+
+def test_group_pages_no_device_registry_treats_everything_as_unbound() -> None:
+    """``devices=None`` (bare/test boot without a devices/ dir): every
+    page falls through to Unbound rather than crashing on a missing
+    registry attribute."""
+    from app.page_routes import _group_pages_for_index
+
+    pages = [_page("p1", "A", ["k1"]), _page("p2", "B", [])]
+    groups = _group_pages_for_index(pages, devices=None)
+    assert len(groups) == 1
+    assert groups[0][0] is None
+    assert [p.id for p in groups[0][1]] == ["p1", "p2"]
