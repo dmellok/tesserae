@@ -64,7 +64,7 @@
 </section>
 {% endif %}
 
-{% if entries or tags %}
+{% if entries or tags or kinds %}
 <section class="card">
   <header class="card-head">
     <div class="card-head-row">
@@ -80,12 +80,32 @@
       </div>
     </div>
   </header>
+  {% if kinds and kinds|length > 1 %}
+  <div class="filter-chips filter-chips--kinds" role="tablist" aria-label="Filter by type">
+    <a href="{{ url_for('marketplace.browse', tag=active_tag) }}"
+       class="pill {% if not active_kind %}is-accent{% endif %}"
+       role="tab" aria-selected="{{ 'true' if not active_kind else 'false' }}">
+      All <span class="muted">({{ kinds|sum(attribute='count') }})</span>
+    </a>
+    {% for k in kinds %}
+    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=k.key) }}"
+       class="pill {% if active_kind == k.key %}is-accent{% endif %}"
+       role="tab" aria-selected="{{ 'true' if active_kind == k.key else 'false' }}">
+      {% if k.key == 'widget' %}<i class="ph ph-puzzle-piece" aria-hidden="true"></i>
+      {% elif k.key == 'theme' %}<i class="ph ph-paint-brush" aria-hidden="true"></i>
+      {% elif k.key == 'font' %}<i class="ph ph-text-aa" aria-hidden="true"></i>
+      {% endif %}
+      {{ k.label }} <span class="muted">({{ k.count }})</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
   {% if tags %}
   <div class="filter-chips">
-    <a href="{{ url_for('marketplace.browse') }}"
+    <a href="{{ url_for('marketplace.browse', kind=active_kind) }}"
        class="pill {% if not active_tag %}is-accent{% endif %}">All</a>
     {% for tag in tags %}
-    <a href="{{ url_for('marketplace.browse', tag=tag) }}"
+    <a href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind) }}"
        class="pill {% if active_tag == tag %}is-accent{% endif %}">{{ tag }}</a>
     {% endfor %}
   </div>
@@ -195,7 +215,7 @@
       {% if e.tags %}
       <div class="marketplace-tags">
         {% for tag in e.tags %}
-        <a class="pill" href="{{ url_for('marketplace.browse', tag=tag) }}">{{ tag }}</a>
+        <a class="pill" href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind) }}">{{ tag }}</a>
         {% endfor %}
       </div>
       {% endif %}
@@ -241,17 +261,22 @@
 </div>
 {% else %}
 <section class="card">
-  {{ card_head('No widgets to show', icon_name='package') }}
+  {{ card_head('Nothing to show', icon_name='package') }}
   <p class="field-help">
-    {% if active_tag %}
-    No widgets matched the <code>{{ active_tag }}</code> filter. Try
+    {% if active_kind and active_tag %}
+    No entries matched <code>{{ active_kind }}</code> + <code>{{ active_tag }}</code>. Try
+    <a href="{{ url_for('marketplace.browse') }}">All</a>.
+    {% elif active_kind %}
+    No entries of type <code>{{ active_kind }}</code> in the catalog yet. Try
+    <a href="{{ url_for('marketplace.browse') }}">All</a>.
+    {% elif active_tag %}
+    No entries matched the <code>{{ active_tag }}</code> filter. Try
     <a href="{{ url_for('marketplace.browse') }}">All</a>.
     {% elif stale %}
     The catalog couldn’t be refreshed and there’s no cached snapshot
     available. Check your network or the catalog URL.
     {% else %}
-    The catalog at <code>{{ index_url }}</code> is empty or hasn’t shipped
-    any widgets yet.
+    The catalog at <code>{{ index_url }}</code> is empty.
     {% endif %}
   </p>
 </section>
@@ -265,6 +290,17 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     margin-top: 0.5rem;
+  }
+  .filter-chips--kinds {
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.4rem;
+    border-bottom: 1px solid var(--t-border, rgba(128, 128, 128, 0.2));
+  }
+  .filter-chips--kinds .pill {
+    font-weight: 600;
+  }
+  .filter-chips--kinds .pill i {
+    margin-right: 0.25rem;
   }
   .marketplace-grid {
     display: grid;

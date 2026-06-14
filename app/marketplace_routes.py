@@ -66,12 +66,17 @@ def _mark_restart_pending() -> None:
     current_app.config["MARKETPLACE_RESTART_PENDING"] = True
 
 
-def _filter_entries(entries: list[CatalogEntry], *, tag: str | None) -> list[CatalogEntry]:
-    """Apply the tag-chip filter from the Browse page query string.
-    No tag (or unknown tag) returns everything."""
-    if not tag:
-        return list(entries)
-    return [e for e in entries if tag in e.tags]
+def _filter_entries(
+    entries: list[CatalogEntry], *, tag: str | None, kind: str | None
+) -> list[CatalogEntry]:
+    """Apply the chip filters from the Browse page query string.
+    No tag/kind (or unknown value) returns everything."""
+    out = list(entries)
+    if tag:
+        out = [e for e in out if tag in e.tags]
+    if kind:
+        out = [e for e in out if e.kind == kind]
+    return out
 
 
 def _entries_payload(
@@ -188,6 +193,32 @@ def _collect_tags(entries: list[CatalogEntry]) -> list[str]:
     return sorted(seen)
 
 
+# Kind chips render in this fixed order. Widget first (the bulk of the
+# catalog), then themes (visual), then fonts (typographic). Unknown
+# kinds fall to the end alphabetically so a future kind shows up
+# without a code change.
+_KIND_ORDER = ["widget", "theme", "font"]
+_KIND_LABELS = {"widget": "Widgets", "theme": "Themes", "font": "Fonts"}
+
+
+def _collect_kinds(entries: list[CatalogEntry]) -> list[dict[str, Any]]:
+    """Per-kind counts for the chip row, in display order. Kinds with
+    zero entries are omitted so the row stays useful (a catalog with
+    no themes shouldn't show a "Themes (0)" chip)."""
+    counts: dict[str, int] = {}
+    for entry in entries:
+        counts[entry.kind] = counts.get(entry.kind, 0) + 1
+    ordered: list[dict[str, Any]] = []
+    for k in _KIND_ORDER:
+        if counts.get(k):
+            ordered.append({"key": k, "label": _KIND_LABELS[k], "count": counts[k]})
+    for k in sorted(counts):
+        if k in _KIND_ORDER:
+            continue
+        ordered.append({"key": k, "label": k.title(), "count": counts[k]})
+    return ordered
+
+
 @bp.get("/browse")
 def browse() -> str:
     """Render the Browse page. Failures to fetch the index don't
@@ -199,7 +230,9 @@ def browse() -> str:
             "plugins_browse.html",
             entries=[],
             tags=[],
+            kinds=[],
             active_tag=None,
+            active_kind=None,
             installed_count=0,
             index_url="",
             stale=False,
@@ -219,13 +252,20 @@ def browse() -> str:
             entries = cached
             stale = True
     active_tag = request.args.get("tag") or None
-    entries = _filter_entries(entries, tag=active_tag)
+    active_kind = request.args.get("kind") or None
+    # Kinds are derived from the full cached index (or the live one if
+    # no cache), so toggling a kind chip doesn't make the other chips
+    # disappear. Same logic as tags.
+    full_index = mkt.cached_index() or entries
+    entries = _filter_entries(entries, tag=active_tag, kind=active_kind)
     installed = mkt.installed()
     return render_template(
         "plugins_browse.html",
         entries=_entries_payload(entries, installed, mkt.screenshots_base(), mkt.plugins_dir()),
-        tags=_collect_tags(mkt.cached_index() or entries),
+        tags=_collect_tags(full_index),
+        kinds=_collect_kinds(full_index),
         active_tag=active_tag,
+        active_kind=active_kind,
         installed_count=len(installed),
         index_url=mkt.index_url(),
         stale=stale,
