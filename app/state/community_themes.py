@@ -140,9 +140,7 @@ class CommunityThemeStore:
         if not isinstance(name, str) or not name.strip():
             return None
         family_raw = raw.get("family") or "community"
-        family: ThemeFamily = (
-            family_raw if family_raw in _KNOWN_FAMILIES else "community"  # type: ignore[assignment]
-        )
+        family: ThemeFamily = family_raw if family_raw in _KNOWN_FAMILIES else "community"
         tagline = raw.get("tagline")
         if tagline is not None and not isinstance(tagline, str):
             tagline = None

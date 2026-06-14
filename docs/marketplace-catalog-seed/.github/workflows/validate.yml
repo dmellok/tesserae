@@ -103,8 +103,13 @@ jobs:
                       f"got {actual_sha[:12]}...)"
                   )
                   continue
-              # Bundle: catalog-declared folders must match tarball
-              if "folders" in w:
+              # Bundle: catalog-declared folders must match tarball.
+              # Skip for kind=theme: theme tarballs are flat <id>.json +
+              # <id>.css pairs, not plugin folders, so detect_layout
+              # (which looks for plugin.json) would always report an
+              # empty layout. Theme tarballs get their own pair-based
+              # claim check in the kind=theme block below.
+              if "folders" in w and w.get("kind") != "theme":
                   declared = sorted(w["folders"])
                   try:
                       actual = detect_layout(body, wid)

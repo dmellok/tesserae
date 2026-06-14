@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.10], 2026-06-14
+
+### Fixed
+
+- **CI failures introduced in 0.47.8 / 0.47.9.** Two mypy strict
+  errors: `CatalogEntry.kind`'s Literal didn't include `"theme"` so
+  the install path's `kind == "theme"` branch was reported as a
+  non-overlapping equality, and `community_themes.py` carried an
+  unused `type: ignore` after the ThemeFamily literal was widened.
+  Plus a catalog-side validate.yml fix that landed via the seed
+  copy: the widget-bundle layout check ran on theme entries too and
+  always reported "tarball contains []" because theme tarballs are
+  flat `<id>.json` + `<id>.css` pairs, not plugin folders.
+
 ## [0.47.9], 2026-06-14
 
 ### Changed

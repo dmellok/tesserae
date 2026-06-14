@@ -110,7 +110,7 @@ class CatalogEntry:
     author_name: str
     author_github: str | None
     tags: list[str]
-    kind: Literal["widget", "font"]
+    kind: Literal["widget", "font", "theme"]
     tesserae_compat: str
     official: bool
     screenshot_sizes: list[str]
