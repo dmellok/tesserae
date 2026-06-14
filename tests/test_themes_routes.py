@@ -394,3 +394,97 @@ def _luminance(hex_color: str) -> float:
     s = hex_color.lstrip("#")
     r, g, b = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+# -- per-theme enable/disable switch (Phase 1) -----------------------
+
+
+def test_picker_options_filters_disabled_ids() -> None:
+    """A non-empty ``disabled_ids`` set drops matching themes from the
+    picker shape; remaining themes keep their original order so we don't
+    silently reshuffle the dropdown."""
+    from app.state.theme_registry import BUNDLED_THEMES, picker_options
+
+    bundled_subset = list(BUNDLED_THEMES[:4])
+    out = picker_options(bundled_subset, disabled_ids={bundled_subset[1].id})
+    ids = [o["value"] for o in out]
+    assert bundled_subset[1].id not in ids
+    assert ids == [t.id for i, t in enumerate(bundled_subset) if i != 1]
+
+
+def test_picker_options_no_filter_returns_all() -> None:
+    """No ``disabled_ids`` argument (or empty set) ⇒ full pass-through;
+    behaviour matches the pre-toggle picker exactly."""
+    from app.state.theme_registry import BUNDLED_THEMES, picker_options
+
+    bundled_subset = list(BUNDLED_THEMES[:5])
+    assert [o["value"] for o in picker_options(bundled_subset)] == [t.id for t in bundled_subset]
+    assert [o["value"] for o in picker_options(bundled_subset, disabled_ids=set())] == [
+        t.id for t in bundled_subset
+    ]
+
+
+def test_toggle_enabled_adds_id_to_disabled_list(app: Flask) -> None:
+    """POSTing toggle-enabled on a previously-enabled theme adds its id
+    to ``settings.app.disabled_theme_ids`` (which is the truth source
+    the page editor's picker filters against)."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/themes/tangerine/toggle-enabled", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    settings = app.config["SETTINGS_STORE"].get_section("app")
+    assert "tangerine" in (settings.get("disabled_theme_ids") or [])
+
+
+def test_toggle_enabled_removes_id_when_already_disabled(app: Flask) -> None:
+    """Toggling a disabled theme flips it back on (the route's a real
+    toggle, not a one-way disable)."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/themes/tangerine/toggle-enabled")
+    client.post("/themes/tangerine/toggle-enabled")
+    settings = app.config["SETTINGS_STORE"].get_section("app")
+    assert "tangerine" not in (settings.get("disabled_theme_ids") or [])
+
+
+def test_toggle_enabled_unknown_theme_404s(app: Flask) -> None:
+    """A typo'd theme id 404s rather than silently writing the bad id
+    into the disabled list (which would then accumulate phantoms)."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/themes/not-a-real-theme/toggle-enabled")
+    assert resp.status_code == 404
+
+
+def test_page_editor_picker_omits_disabled_themes(app: Flask) -> None:
+    """End-to-end: disable a theme via the toggle, then load the page
+    editor and confirm the disabled theme is gone from the rendered
+    theme select while everything else is present."""
+    client = app.test_client()
+    _sign_in(client)
+    # Create a fresh page so we have an editor URL to load.
+    create = client.post(
+        "/pages/new", data={"name": "Disable-test", "layout": "single"}, follow_redirects=False
+    )
+    assert create.status_code in (302, 303)
+    page_url = create.headers["Location"]
+    # Disable a theme everyone has: "tangerine".
+    client.post("/themes/tangerine/toggle-enabled")
+    body = client.get(page_url).get_data(as_text=True)
+    # Theme select on the page renders <option value="...">; the
+    # disabled theme's value should not appear there.
+    assert '<option value="tangerine"' not in body
+    # A non-disabled theme is still in the picker.
+    assert '<option value="light"' in body
+
+
+def test_themes_strip_still_shows_disabled_themes(app: Flask) -> None:
+    """Disabling a theme hides it from PICKERS but the themes browse
+    strip keeps showing it (with a 'hidden' marker) so the user can
+    flip it back on without remembering its id."""
+    client = app.test_client()
+    _sign_in(client)
+    client.post("/themes/tangerine/toggle-enabled")
+    body = client.get("/themes").get_data(as_text=True)
+    assert 'data-theme="tangerine"' in body
+    assert "hidden" in body  # the small badge text

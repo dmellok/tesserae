@@ -378,7 +378,21 @@ def _editor_context(page: Page) -> dict[str, Any]:
         if user_themes_store is not None
         else None
     )
-    theme_options = picker_options(build_registry(user_themes=user_themes))
+    # Honour the per-user "hide this theme from the picker" list
+    # (settings.app.disabled_theme_ids). Themes the user opted out of
+    # disappear from BOTH the page-level select and the per-cell
+    # override picker. The cascade still loads every CSS block, so
+    # pages already bound to a disabled theme keep rendering — only
+    # the pickers narrow.
+    disabled_ids_raw = _settings_store().get_section("app").get("disabled_theme_ids") or []
+    disabled_ids = (
+        {str(x) for x in disabled_ids_raw if isinstance(x, str)}
+        if isinstance(disabled_ids_raw, list)
+        else set()
+    )
+    theme_options = picker_options(
+        build_registry(user_themes=user_themes), disabled_ids=disabled_ids
+    )
 
     # Schedules pinned to this page. The editor renders them in a card
     # under the live preview so you can see (and create) what fires

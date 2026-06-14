@@ -195,7 +195,9 @@ _PICKER_GROUP_LABELS: dict[ThemeFamily, str] = {
 }
 
 
-def picker_options(themes: list[Theme]) -> list[dict[str, str]]:
+def picker_options(
+    themes: list[Theme], disabled_ids: set[str] | None = None
+) -> list[dict[str, str]]:
     """Shape themes for the page editor's ``select_field`` macro.
 
     Each option dict has ``value`` (theme id), ``label``
@@ -203,7 +205,22 @@ def picker_options(themes: list[Theme]) -> list[dict[str, str]]:
     so the picker is byte-identical to the previous hardcoded list
     while the data flows from a single source. Replaces the duplicated
     cell + page theme option blocks in ``templates/page_editor.html``.
-    """
+
+    ``disabled_ids`` is an opt-out set sourced from
+    ``settings.app.disabled_theme_ids`` — themes the user has hidden
+    from their pickers. The themes browse page deliberately ignores
+    this filter so disabled themes remain visible (and re-enable-able)
+    from there; only pickers narrow against the set."""
+    if disabled_ids:
+        return [
+            {
+                "value": t.id,
+                "label": t.picker_label(),
+                "group": _PICKER_GROUP_LABELS.get(t.family, t.family),
+            }
+            for t in themes
+            if t.id not in disabled_ids
+        ]
     return [
         {
             "value": t.id,

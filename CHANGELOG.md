@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.7], 2026-06-14
+
+### Added
+
+- **Per-theme "Show in picker" toggle.** Tesserae ships 43 bundled
+  themes; the page editor's theme select was a long scroll past
+  themes most users never use. Each theme card now carries a small
+  eye-toggle (open / closed) and the detail pane gets a matching
+  "Hide from picker" / "Show in picker" button. Hidden themes drop
+  out of the page-editor's theme picker AND the per-cell override
+  picker, but the CSS block stays loaded, so any dashboard already
+  using a hidden theme keeps rendering correctly. The themes browse
+  page deliberately still shows every theme (with a "hidden" badge
+  and faded card) so re-enabling never requires remembering an id.
+  Stored as `settings.app.disabled_theme_ids: list[str]` — opt-in
+  per Tesserae instance.
+  [`app/state/theme_registry.py`](app/state/theme_registry.py),
+  [`app/themes_routes.py`](app/themes_routes.py),
+  [`app/page_routes.py`](app/page_routes.py),
+  [`templates/themes.html`](templates/themes.html),
+  [`static/style/themes.css`](static/style/themes.css).
+
 ## [0.47.6], 2026-06-14
 
 ### Changed

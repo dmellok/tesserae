@@ -34,6 +34,7 @@ from app.palette_extract import (
     assign_to_tokens,
     extract_dominant,
 )
+from app.state.settings_store import SettingsStore
 from app.state.theme_registry import (
     BUNDLED_THEMES,
     FAMILY_LABELS,
@@ -59,6 +60,21 @@ bp = Blueprint("themes", __name__, url_prefix="/themes")
 
 def _store() -> UserThemeStore:
     return current_app.config["USER_THEMES_STORE"]  # type: ignore[no-any-return]
+
+
+def _settings_store() -> SettingsStore:
+    return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
+
+
+def _disabled_theme_ids() -> set[str]:
+    """Read the user's hidden-from-picker list. Stored under
+    ``settings.app.disabled_theme_ids`` as a plain list; we normalise
+    to a set for membership checks. Empty / missing → empty set, so a
+    fresh install behaves exactly as before."""
+    raw = _settings_store().get_section("app").get("disabled_theme_ids") or []
+    if not isinstance(raw, list):
+        return set()
+    return {str(x) for x in raw if isinstance(x, str)}
 
 
 def _bundled_id_set() -> set[str]:
@@ -179,6 +195,7 @@ def _render_index(
         theme = existing
         action_url = url_for("themes.update", theme_id=existing.id)
 
+    disabled_ids = _disabled_theme_ids()
     return render_template(
         "themes.html",
         families=FAMILY_ORDER,
@@ -191,6 +208,8 @@ def _render_index(
         theme=_template_view(theme),
         bundled_themes=BUNDLED_THEMES,
         action_url=action_url,
+        disabled_ids=disabled_ids,
+        selected_disabled=(theme.id in disabled_ids) if not is_new else False,
     )
 
 
@@ -266,6 +285,33 @@ def delete(theme_id: str) -> Response:
     store.delete(theme_id)
     flash(f"Deleted theme {target.name!r}.", "ok")
     return redirect(url_for("themes.index"))
+
+
+@bp.post("/<theme_id>/toggle-enabled")
+def toggle_enabled(theme_id: str) -> Response:
+    """Add or remove ``theme_id`` from
+    ``settings.app.disabled_theme_ids``. Disabled themes drop out of
+    the page editor's theme picker (and per-cell override picker), but
+    stay rendered in the cascade so any page already using one keeps
+    its look. The themes browse page still shows every theme so users
+    can re-enable from there.
+
+    Returns the user back to the themes page with the same theme
+    selected (matches the Duplicate/Delete UX): a quick visual
+    confirmation that the toggle took without losing the user's place."""
+    registry, _user_themes = _all_themes()
+    if not any(t.id == theme_id for t in registry):
+        abort(404)
+    disabled = _disabled_theme_ids()
+    if theme_id in disabled:
+        disabled.discard(theme_id)
+        message = "shown in the picker"
+    else:
+        disabled.add(theme_id)
+        message = "hidden from the picker"
+    _settings_store().patch_section("app", {"disabled_theme_ids": sorted(disabled)})
+    flash(f"Theme {message}.", "ok")
+    return redirect(url_for("themes.show", theme_id=theme_id))
 
 
 @bp.post("/<theme_id>/duplicate")

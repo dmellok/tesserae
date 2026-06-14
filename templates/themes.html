@@ -62,7 +62,8 @@
         <h3 class="themes-strip-head">{{ family_labels[family] }}</h3>
         <ul class="themes-strip-list">
           {% for t in grouped[family] %}
-          <li>
+          {% set is_disabled = t.id in disabled_ids %}
+          <li class="themes-strip-li {% if is_disabled %}is-hidden{% endif %}">
             <a class="themes-strip-item {% if selected_id == t.id %}is-active{% endif %}"
                href="{{ url_for('themes.show', theme_id=t.id) }}"
                data-theme="{{ t.id }}">
@@ -76,8 +77,16 @@
               <span class="themes-strip-meta">
                 <span class="themes-strip-name">{{ t.name }}</span>
                 {% if t.user %}<span class="themes-strip-tag">yours</span>{% endif %}
+                {% if is_disabled %}<span class="themes-strip-tag themes-strip-tag--hidden">hidden</span>{% endif %}
               </span>
             </a>
+            <form method="post" action="{{ url_for('themes.toggle_enabled', theme_id=t.id) }}"
+                  class="themes-strip-toggle"
+                  title="{% if is_disabled %}Show this theme in the picker{% else %}Hide this theme from the picker (it still applies to pages already using it){% endif %}">
+              <button type="submit" aria-label="{% if is_disabled %}Show {{ t.name }} in picker{% else %}Hide {{ t.name }} from picker{% endif %}">
+                <i class="ph {% if is_disabled %}ph-eye-slash{% else %}ph-eye{% endif %}" aria-hidden="true"></i>
+              </button>
+            </form>
           </li>
           {% endfor %}
         </ul>
@@ -96,6 +105,15 @@
         {% endif %}
       </h2>
       <div class="themes-builder-head-actions">
+        {% if not is_new %}
+        <form method="post" action="{{ url_for('themes.toggle_enabled', theme_id=theme.id) }}" class="inline">
+          <button type="submit" class="button ghost"
+                  title="{% if selected_disabled %}Show this theme in the picker again{% else %}Hide this theme from the picker. Dashboards already using it keep rendering correctly.{% endif %}">
+            <i class="ph {% if selected_disabled %}ph-eye{% else %}ph-eye-slash{% endif %}" aria-hidden="true"></i>
+            <span>{% if selected_disabled %}Show in picker{% else %}Hide from picker{% endif %}</span>
+          </button>
+        </form>
+        {% endif %}
         {% if is_bundled %}
         <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
           <button type="submit" class="button primary">

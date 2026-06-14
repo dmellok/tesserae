@@ -252,6 +252,54 @@
   font-size: var(--t-size-xs);
   color: var(--text-muted);
 }
+.themes-strip-tag--hidden {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Per-theme show/hide toggle parked on the right of each strip card.
+   Reveals on hover/focus so the strip stays clean at rest; on touch
+   devices a tap on the card surfaces the parent, which the browser
+   then keeps active. */
+.themes-strip-li {
+  position: relative;
+}
+.themes-strip-li.is-hidden .themes-strip-item {
+  opacity: 0.5;
+}
+.themes-strip-toggle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 var(--t-space-2);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.themes-strip-li:hover .themes-strip-toggle,
+.themes-strip-li:focus-within .themes-strip-toggle,
+.themes-strip-li.is-hidden .themes-strip-toggle {
+  opacity: 1;
+}
+.themes-strip-toggle > button {
+  background: transparent;
+  border: 0;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.themes-strip-toggle > button:hover,
+.themes-strip-toggle > button:focus-visible {
+  background: var(--surface-sunken);
+  color: var(--text-primary);
+  outline: none;
+}
 
 /* ---- Builder pane -------------------------------------------------- */
 
