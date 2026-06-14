@@ -61,7 +61,17 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     "/api/log",
     "/api/trmnl/",
 )
-_LOOPBACK_PATHS: Final[tuple[str, ...]] = ("/compose/",)
+_LOOPBACK_PATHS: Final[tuple[str, ...]] = (
+    "/compose/",
+    # Theme CSS endpoints. ``/compose/<id>`` references both via
+    # ``<link>`` tags, so the Playwright renderer fetches them while
+    # building a panel push. Without the bypass the gate redirects to
+    # /login, the CSS comes back as HTML, and community/user themes
+    # silently fall back to bundled defaults on the panel even though
+    # the in-browser preview (authed session) renders them correctly.
+    "/themes/user.css",
+    "/themes/community.css",
+)
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/")
 # Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin
 # index, which stays authed). The composer's dynamic import pulls

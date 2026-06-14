@@ -158,6 +158,28 @@ def test_plugin_asset_blocked_from_non_loopback(app_with_gate: Flask) -> None:
     assert resp.status_code == 403
 
 
+def test_theme_css_loopback_bypass(app_with_gate: Flask) -> None:
+    """The Playwright renderer fetches /themes/user.css + /themes/community.css
+    as subresources of /compose/<id> during a panel push, with no session.
+    Without this bypass the gate redirects to /login, the <link> resolves
+    to HTML, and community/user themes silently fall back to defaults on
+    the panel even though the in-browser preview renders them correctly.
+    """
+    client = app_with_gate.test_client()
+    for path in ("/themes/user.css", "/themes/community.css"):
+        resp = client.get(path, environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        assert resp.status_code == 200, path
+        assert resp.mimetype.startswith("text/css"), (path, resp.mimetype)
+
+
+def test_theme_css_blocked_from_non_loopback(app_with_gate: Flask) -> None:
+    """Outside loopback the theme CSS endpoints still need a session."""
+    client = app_with_gate.test_client()
+    for path in ("/themes/user.css", "/themes/community.css"):
+        resp = client.get(path, environ_overrides={"REMOTE_ADDR": "10.0.0.5"})
+        assert resp.status_code in (302, 403), path
+
+
 def test_plugin_index_still_gated(app_with_gate: Flask) -> None:
     """/plugins/ (admin index) lists plugin internals and loader errors -
     must stay behind auth, even from loopback."""
