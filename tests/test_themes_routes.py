@@ -430,10 +430,10 @@ def test_toggle_enabled_adds_id_to_disabled_list(app: Flask) -> None:
     the page editor's picker filters against)."""
     client = app.test_client()
     _sign_in(client)
-    resp = client.post("/themes/tangerine/toggle-enabled", follow_redirects=False)
+    resp = client.post("/themes/sepia/toggle-enabled", follow_redirects=False)
     assert resp.status_code in (302, 303)
     settings = app.config["SETTINGS_STORE"].get_section("app")
-    assert "tangerine" in (settings.get("disabled_theme_ids") or [])
+    assert "sepia" in (settings.get("disabled_theme_ids") or [])
 
 
 def test_toggle_enabled_removes_id_when_already_disabled(app: Flask) -> None:
@@ -441,10 +441,10 @@ def test_toggle_enabled_removes_id_when_already_disabled(app: Flask) -> None:
     toggle, not a one-way disable)."""
     client = app.test_client()
     _sign_in(client)
-    client.post("/themes/tangerine/toggle-enabled")
-    client.post("/themes/tangerine/toggle-enabled")
+    client.post("/themes/sepia/toggle-enabled")
+    client.post("/themes/sepia/toggle-enabled")
     settings = app.config["SETTINGS_STORE"].get_section("app")
-    assert "tangerine" not in (settings.get("disabled_theme_ids") or [])
+    assert "sepia" not in (settings.get("disabled_theme_ids") or [])
 
 
 def test_toggle_enabled_unknown_theme_404s(app: Flask) -> None:
@@ -468,12 +468,12 @@ def test_page_editor_picker_omits_disabled_themes(app: Flask) -> None:
     )
     assert create.status_code in (302, 303)
     page_url = create.headers["Location"]
-    # Disable a theme everyone has: "tangerine".
-    client.post("/themes/tangerine/toggle-enabled")
+    # Disable a theme everyone has: "sepia".
+    client.post("/themes/sepia/toggle-enabled")
     body = client.get(page_url).get_data(as_text=True)
     # Theme select on the page renders <option value="...">; the
     # disabled theme's value should not appear there.
-    assert '<option value="tangerine"' not in body
+    assert '<option value="sepia"' not in body
     # A non-disabled theme is still in the picker.
     assert '<option value="light"' in body
 
@@ -484,7 +484,7 @@ def test_themes_strip_still_shows_disabled_themes(app: Flask) -> None:
     flip it back on without remembering its id."""
     client = app.test_client()
     _sign_in(client)
-    client.post("/themes/tangerine/toggle-enabled")
+    client.post("/themes/sepia/toggle-enabled")
     body = client.get("/themes").get_data(as_text=True)
-    assert 'data-theme="tangerine"' in body
+    assert 'data-theme="sepia"' in body
     assert "hidden" in body  # the small badge text

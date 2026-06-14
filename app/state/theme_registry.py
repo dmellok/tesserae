@@ -98,47 +98,17 @@ BUNDLED_THEMES: tuple[Theme, ...] = (
     Theme(id="bauhaus", name="Bauhaus", family="movement", tagline="palette only"),
     Theme(id="destijl", name="De Stijl", family="movement", tagline="palette only"),
     Theme(id="brutalist", name="Brutalist", family="movement", tagline="palette only"),
-    # Vivid family, saturated flat-colour surfaces. Distinct from the
-    # gradient family (no gradient on .w, just bold canvas + accents).
-    # Each theme's accents are picked to harmonise with its canvas
-    # hue rather than reusing a shared palette.
-    Theme(id="tangerine", name="Tangerine", family="vivid", tagline="bright orange"),
-    Theme(id="lime", name="Lime", family="vivid", tagline="electric green"),
-    Theme(id="cobalt", name="Cobalt", family="vivid", tagline="deep blue"),
-    Theme(id="magenta", name="Magenta", family="vivid", tagline="vivid fuchsia"),
-    Theme(id="emerald", name="Emerald", family="vivid", tagline="rich green"),
-    Theme(id="crimson", name="Crimson", family="vivid", tagline="deep red"),
-    Theme(id="cyan", name="Cyan", family="vivid", tagline="electric cyan"),
-    Theme(id="aubergine", name="Aubergine", family="vivid", tagline="deep purple"),
-    Theme(id="mustard", name="Mustard", family="vivid", tagline="bright yellow"),
-    Theme(id="teal-pop", name="Teal Pop", family="vivid", tagline="saturated teal"),
-    Theme(id="hot-pink", name="Hot Pink", family="vivid", tagline="bright pink"),
-    Theme(id="lavender-pop", name="Lavender Pop", family="vivid", tagline="bright lavender"),
-    Theme(id="olive-pop", name="Olive Pop", family="vivid", tagline="rich olive"),
-    Theme(id="burgundy", name="Burgundy", family="vivid", tagline="deep wine"),
-    Theme(id="forest", name="Forest", family="vivid", tagline="deep green"),
-    # Gradient family, vivid linear-gradient card surfaces via the
-    # --surface-gradient opt-in token (the rest of the Spectra system
-    # behaves the same; only .w's background changes). The renderer's
-    # Floyd-Steinberg dither approximates the gradient on the panel
-    # palette; pairs especially well with 7-colour Spectra panels.
-    Theme(id="sunset", name="Sunset", family="gradient", tagline="orange → amber"),
-    Theme(id="aurora", name="Aurora", family="gradient", tagline="teal → magenta"),
-    Theme(id="twilight", name="Twilight", family="gradient", tagline="violet night"),
-    Theme(id="spectrum", name="Spectrum", family="gradient", tagline="full pop"),
-    # Subtle gradient set, narrow hue range + lower saturation so the
-    # gradient reads as a tonal shift rather than a colour shift. All
-    # light-leaning; dark text throughout.
-    Theme(id="coral", name="Coral", family="gradient", tagline="peach → blush"),
-    Theme(id="mist", name="Mist", family="gradient", tagline="blue-gray → lavender"),
-    Theme(id="sand", name="Sand", family="gradient", tagline="cream → taupe"),
-    Theme(id="sage", name="Sage", family="gradient", tagline="moss → teal"),
-    Theme(id="linen", name="Linen", family="gradient", tagline="cream → gold"),
-    Theme(id="mauve", name="Mauve", family="gradient", tagline="rose → lavender"),
-    Theme(id="marble", name="Marble", family="gradient", tagline="ivory → pale stone"),
-    Theme(id="glacier", name="Glacier", family="gradient", tagline="teal → mint"),
-    Theme(id="honey", name="Honey", family="gradient", tagline="butter → amber"),
-    Theme(id="pearl", name="Pearl", family="gradient", tagline="blush → cream"),
+    # NOTE: the Vivid family (tangerine, lime, cobalt, magenta, emerald,
+    # crimson, cyan, aubergine, mustard, teal-pop, hot-pink, lavender-
+    # pop, olive-pop, burgundy, forest) and the Gradient family (sunset,
+    # aurora, twilight, spectrum, coral, mist, sand, sage, linen, mauve,
+    # marble, glacier, honey, pearl) shipped bundled through 0.47.8.
+    # In 0.47.9 both families moved to the community catalog as the
+    # ``vivid`` and ``gradient`` packs (github.com/dmellok/tesserae-
+    # vivid + github.com/dmellok/tesserae-gradient) — installable from
+    # Settings → Widgets → Browse community widgets. Dashboards that
+    # were already pointing at one of those theme ids keep painting
+    # correctly the moment the matching pack is installed.
 )
 
 

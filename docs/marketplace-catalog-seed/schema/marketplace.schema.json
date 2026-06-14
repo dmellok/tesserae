@@ -33,8 +33,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*$",
-          "description": "Plugin folder name. Must be unique across the catalog and must not collide with a bundled plugin."
+          "pattern": "^[a-z][a-z0-9_-]*$",
+          "description": "Catalog id. For widgets and fonts this is also the plugin folder name. Must be unique across the catalog and must not collide with a bundled plugin. Hyphens are allowed (widely used in theme ids); underscores remain canonical for widget/font folders."
         },
         "name": {
           "type": "string",
@@ -115,7 +115,7 @@
           "type": "array",
           "items": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9_]*$"
+            "pattern": "^[a-z][a-z0-9_-]*$"
           },
           "minItems": 1,
           "uniqueItems": true,

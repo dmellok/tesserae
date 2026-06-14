@@ -6,6 +6,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.9], 2026-06-14
+
+### Changed
+
+- **Vivid and Gradient theme families moved to the community catalog.**
+  29 themes (tangerine, lime, cobalt, magenta, emerald, crimson, cyan,
+  aubergine, mustard, teal-pop, hot-pink, lavender-pop, olive-pop,
+  burgundy, forest + sunset, aurora, twilight, spectrum, coral, mist,
+  sand, sage, linen, mauve, marble, glacier, honey, pearl) used to ship
+  bundled. They now live as two opt-in catalog packs:
+  [tesserae-vivid](https://github.com/dmellok/tesserae-vivid) and
+  [tesserae-gradient](https://github.com/dmellok/tesserae-gradient).
+  Install from **Settings → Widgets → Browse community widgets**. The
+  packs ship the same theme ids and CSS blocks as the bundled versions,
+  so dashboards already pinned to one of these themes paint correctly
+  the moment the matching pack is installed. **Until you install the
+  pack**, dashboards bound to one of those theme ids fall back to the
+  Light theme. The bundled set is now down to 13 themes (Light, Sepia,
+  Cool gray, High contrast, Paper, Newsprint, Vivid, Citrus, Arctic in
+  Light; Dark, Nord in Dark; Bauhaus, De Stijl, Brutalist in Movement).
+
+### Fixed
+
+- **Catalog schema's `id` + `folders` patterns now permit hyphens.**
+  Theme ids commonly use hyphens (`tonal-slate`, `teal-pop`); the
+  schema only allowed `^[a-z][a-z0-9_]*$`, which blocked valid theme
+  pack entries from validating. Pattern relaxed to `^[a-z][a-z0-9_-]*$`
+  in both `schema/marketplace.schema.json` and the seed mirror.
+  Widget ids still use underscores by convention; nothing existing
+  changes.
+
 ## [0.47.8], 2026-06-14
 
 ### Added
