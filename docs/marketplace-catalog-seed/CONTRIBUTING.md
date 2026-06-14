@@ -69,6 +69,74 @@ no widget sandbox yet.
 See `schema/marketplace.schema.json` for the full contract, including
 the closed list of supported tags.
 
+## Theme entries (`kind: theme`)
+
+Themes are even simpler than widgets: one CSS file + one tiny manifest
+per theme, no Python, no JavaScript. The tarball is flat — each theme
+is two files at the envelope root, named by id:
+
+```
+my-cool-theme-v0.1.0/
+  my-cool-theme.json   # { "id": "my-cool-theme",
+                       #   "name": "My Cool Theme",
+                       #   "family": "light",
+                       #   "tagline": "soft + sunny" }
+  my-cool-theme.css    # [data-theme="my-cool-theme"] { --bg: #...; ... }
+```
+
+**Theme packs** ship multiple themes in one entry. Just include more
+pairs at the root:
+
+```
+my-pastels-pack-v0.1.0/
+  pastel-rose.json
+  pastel-rose.css
+  pastel-mint.json
+  pastel-mint.css
+  pastel-lavender.json
+  pastel-lavender.css
+```
+
+Packs need a `folders` claim on the catalog entry listing every theme id
+the pack ships — the same field widget bundles use. The install path
+verifies the tarball's id set matches your claim exactly so a pack
+silently picking up a stray file gets caught at review time:
+
+```json
+{
+  "id": "my-pastels-pack",
+  "kind": "theme",
+  "folders": ["pastel-rose", "pastel-mint", "pastel-lavender"],
+  …
+}
+```
+
+Single-theme entries can omit `folders`; the install path then requires
+the one discovered id to match the catalog `id` exactly.
+
+The host install path validates that:
+
+- Every `<id>.json` has a matching `<id>.css` at the root (no unpaired files).
+- Every manifest's `id` field equals the file stem.
+- Every CSS file contains a `[data-theme="<id>"]` block.
+- No theme id clashes with a bundled Spectra theme.
+
+Each pair lands at `data/themes/community/<id>/theme.json` +
+`<id>/theme.css` on the host so the read side stays uniform regardless
+of pack vs single layout.
+
+`family` is one of `light` / `dark` / `movement` / `vivid` / `gradient`
+(matches the bundled Spectra families); anything else falls back to a
+generic `community` family. `tagline` is the short line shown in the
+picker (e.g. `"warm paper"`); omit if there's nothing useful to add.
+
+Themes don't have settings, data dirs, or network egress to audit, so
+the review focuses on:
+
+- The CSS block targets the declared id (mismatched ids break the cascade).
+- Every Spectra token the cells consume is set (or inherits cleanly).
+- The screenshot shows what users would actually see.
+
 ## Updates
 
 Bumping a release follows the same flow: bump `version` in your

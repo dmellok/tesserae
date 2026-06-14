@@ -6,6 +6,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.8], 2026-06-14
+
+### Added
+
+- **Themes as a catalog `kind`.** Marketplace gains a third installable
+  kind alongside `widget` and `font`. Tarball convention is flat: each
+  theme is two files at the envelope root, named by id (`<id>.json` +
+  `<id>.css`). Single-theme entries ship one pair; **packs** ship N
+  pairs and declare `folders: [...]` on the catalog entry mirroring
+  widget bundles. The install path validates pairing, manifest-id ==
+  file-stem, and `[data-theme="<id>"]` presence in the CSS; it refuses
+  any id that clashes with a bundled Spectra theme. Installed themes
+  land in `data/themes/community/<id>/theme.json` + `theme.css`. A new
+  `GET /themes/community.css` endpoint mounts all of them after the
+  bundled tokens + user themes in the cascade. The themes browse strip
+  and the page editor's theme picker (page + per-cell) now surface
+  community themes alongside bundled ones; the per-theme "Show in
+  picker" toggle from 0.47.7 works on them identically. Detail pane
+  treats community themes as read-only with a "from the catalogue"
+  label and Duplicate-to-edit affordance, parallel to bundled themes.
+  Backwards-compat: `InstalledRecord.kind` defaults to `widget` for
+  pre-0.47.8 records.
+- **`docs/dev/publishing-a-theme.md`** — contributor guide for
+  shipping a theme or theme pack through the catalog. Covers the
+  flat-file convention, the `theme.json` shape, the validated
+  contract, and the PR flow against `tesserae-widgets`.
+- **New `community` theme family** (and matching `From the catalogue`
+  picker optgroup) for installed themes that declare a family outside
+  the bundled set.
+
 ## [0.47.7], 2026-06-14
 
 ### Added

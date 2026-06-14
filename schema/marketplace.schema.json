@@ -85,8 +85,8 @@
           "description": "Used by the Browse filter chips. New tags need a host bump (intentional friction; keeps the taxonomy small)."
         },
         "kind": {
-          "enum": ["widget", "font"],
-          "description": "Only widgets and fonts are catalog-installable. Renderers + devices stay bundled."
+          "enum": ["widget", "font", "theme"],
+          "description": "Catalog-installable kinds. Widgets and fonts land in plugins/<id>/ via the same drop-a-folder loader. Themes ship a two-file tarball (theme.json + theme.css) that lands in data/themes/community/<id>/ and gets mounted via the GET /themes/community.css endpoint. Renderers + devices stay bundled."
         },
         "tesserae_compat": {
           "type": "string",

@@ -369,13 +369,21 @@ def _editor_context(page: Page) -> dict[str, Any]:
     # for the per-cell override, which drifted on every theme add.
     from app.state.theme_registry import build_registry, picker_options
 
-    # Pull user-saved themes (data/themes/user.json) into the registry
-    # so the editor's picker lists them alongside the bundled themes.
-    # Without this the picker silently drops every custom theme.
+    # Pull user-saved themes (data/themes/user.json) and any community
+    # themes installed via the marketplace into the registry so the
+    # editor's picker lists them alongside the bundled themes. Without
+    # this the picker silently drops every non-bundled theme even
+    # though the cascade is loading their CSS.
     user_themes_store = current_app.config.get("USER_THEMES_STORE")
     user_themes = (
         [t.to_registry_theme() for t in user_themes_store.list_all()]
         if user_themes_store is not None
+        else None
+    )
+    community_themes_store = current_app.config.get("COMMUNITY_THEMES_STORE")
+    community_themes = (
+        [t.to_registry_theme() for t in community_themes_store.list_all()]
+        if community_themes_store is not None
         else None
     )
     # Honour the per-user "hide this theme from the picker" list
@@ -391,7 +399,8 @@ def _editor_context(page: Page) -> dict[str, Any]:
         else set()
     )
     theme_options = picker_options(
-        build_registry(user_themes=user_themes), disabled_ids=disabled_ids
+        build_registry(user_themes=user_themes, community_themes=community_themes),
+        disabled_ids=disabled_ids,
     )
 
     # Schedules pinned to this page. The editor renders them in a card

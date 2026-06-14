@@ -35,6 +35,11 @@
      no user themes it returns a one-line comment, so the link tag
      stays unconditional and the cascade order is stable. #}
   <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
+  {# Community themes installed from the marketplace land in the same
+     cascade slot as user themes (after the bundled blocks). One
+     concatenated CSS file per source so a tab-level reload is the
+     only thing needed to pick up a freshly-installed theme. #}
+  <link rel="stylesheet" href="{{ url_for('themes.community_css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   <!-- Chart.js UMD. Loaded once at the document level so every widget
        that imports static/spectra-chart.js can read window.Chart. The

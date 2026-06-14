@@ -11,6 +11,7 @@
    paint here too. #}
 <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
 <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
+<link rel="stylesheet" href="{{ url_for('themes.community_css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='style/themes.css') }}">
 {% endblock %}
 {% block main %}
@@ -100,7 +101,7 @@
     <div class="themes-builder-head">
       <h2>
         {% if is_new %}New theme
-        {% elif is_bundled %}{{ theme.name }} <span class="muted">- bundled, read-only</span>
+        {% elif is_bundled %}{{ theme.name }} <span class="muted">- {{ 'from the catalogue' if is_community else 'bundled' }}, read-only</span>
         {% else %}Editing {{ theme.name }}
         {% endif %}
       </h2>

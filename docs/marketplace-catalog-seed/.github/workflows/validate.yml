@@ -115,6 +115,75 @@ jobs:
                       failures.append(
                           f"{wid}: declared folders {declared} but tarball contains {actual}"
                       )
+              # Theme: every <id>.json at the envelope root has a
+              # matching <id>.css, each manifest id matches its file
+              # stem, and each CSS targets [data-theme="<id>"]. Packs
+              # ship N pairs; single themes ship exactly one. Mirrors
+              # the host install path's validation.
+              if w.get("kind") == "theme":
+                  import io as _io
+                  import tarfile as _tar
+                  try:
+                      with _tar.open(fileobj=_io.BytesIO(body), mode="r:*") as tf:
+                          # Unwrap the envelope folder (GitHub archive style).
+                          names = tf.getnames()
+                          root_dirs = {n.split("/", 1)[0] for n in names if "/" in n}
+                          envelope = root_dirs.pop() + "/" if len(root_dirs) == 1 else ""
+                          # Flat file pairs at the envelope root.
+                          stems_json: dict[str, str] = {}
+                          stems_css: dict[str, str] = {}
+                          for member in tf.getmembers():
+                              if not member.isfile():
+                                  continue
+                              rel = member.name[len(envelope):] if envelope and member.name.startswith(envelope) else member.name
+                              if "/" in rel:
+                                  continue  # only root-level files matter
+                              if rel.endswith(".json"):
+                                  f = tf.extractfile(member)
+                                  if f is not None:
+                                      stems_json[rel[:-5]] = f.read().decode("utf-8", "replace")
+                              elif rel.endswith(".css"):
+                                  f = tf.extractfile(member)
+                                  if f is not None:
+                                      stems_css[rel[:-4]] = f.read().decode("utf-8", "replace")
+                          unpaired = sorted(set(stems_json) ^ set(stems_css))
+                          if unpaired:
+                              failures.append(
+                                  f"{wid}: theme tarball has unpaired files (missing: {unpaired!r})"
+                              )
+                              continue
+                          if not stems_json:
+                              failures.append(f"{wid}: theme tarball has no <id>.json + <id>.css pairs at root")
+                              continue
+                          discovered = sorted(stems_json)
+                          if "folders" in w:
+                              declared = sorted(w["folders"])
+                              if declared != discovered:
+                                  failures.append(
+                                      f"{wid}: theme pack declares folders {declared!r} "
+                                      f"but tarball contains {discovered!r}"
+                                  )
+                          elif discovered != [wid]:
+                              failures.append(
+                                  f"{wid}: single-theme tarball declares id {discovered[0]!r}, "
+                                  f"but catalog entry id is {wid!r}"
+                              )
+                          for tid in discovered:
+                              try:
+                                  manifest = json.loads(stems_json[tid])
+                              except Exception as err:
+                                  failures.append(f"{wid}/{tid}: theme.json is not valid JSON: {err}")
+                                  continue
+                              if manifest.get("id") != tid:
+                                  failures.append(
+                                      f"{wid}/{tid}: manifest id={manifest.get('id')!r} doesn't match file stem"
+                                  )
+                              if f'[data-theme="{tid}"]' not in stems_css[tid]:
+                                  failures.append(
+                                      f"{wid}/{tid}: css missing [data-theme={tid!r}] selector"
+                                  )
+                  except Exception as err:
+                      failures.append(f"{wid}: could not read theme tarball: {err}")
 
           if failures:
               print("\n".join(failures))

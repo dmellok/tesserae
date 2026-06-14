@@ -374,9 +374,14 @@ def create_app(
     # User themes live alongside core stores at ``data/themes/user.json``.
     # The store creates the directory on first save so a fresh install
     # without any custom themes leaves no empty directory behind.
+    from app.state.community_themes import CommunityThemeStore
     from app.state.user_themes import UserThemeStore
 
     user_themes_store = UserThemeStore(data_root / "themes" / "user.json")
+    # Community themes installed from the marketplace live next door.
+    # Each install drops a ``<id>/theme.json`` + ``<id>/theme.css``
+    # under this dir; the store walks it lazily on every request.
+    community_themes_store = CommunityThemeStore(data_root / "themes" / "community")
     # Global cap 2000; device heartbeats get a 500-row sub-cap so a busy
     # fleet can't evict push / scheduler / auth history. We also only log a
     # device event when the status actually changed (below), so steady
@@ -409,6 +414,7 @@ def create_app(
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
     app.config["USER_THEMES_STORE"] = user_themes_store
+    app.config["COMMUNITY_THEMES_STORE"] = community_themes_store
     app.config["EVENT_LOG"] = event_log
     # Smart-sync per-device telemetry (issue #10). Persisted under
     # data/core/device_telemetry.json. Step 1 only tracks heartbeats +
@@ -460,6 +466,9 @@ def create_app(
         schema_path=plugin_schema,
         index_schema_path=REPO_ROOT / "schema" / "marketplace.schema.json",
         index_url_provider=_SettingsIndexUrlProvider(),
+        # Community themes land alongside user-themes, next to the
+        # community-themes store reading from the same path.
+        themes_dir=community_themes_store.root,
     )
     # Self-update + backup live under Settings → System. Both are no-ops
     # under --dev (the reloader handles restarts there) and gated behind

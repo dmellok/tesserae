@@ -34,6 +34,8 @@ from app.palette_extract import (
     assign_to_tokens,
     extract_dominant,
 )
+from app.state.community_themes import CommunityThemeStore
+from app.state.community_themes import emit_css as emit_community_css
 from app.state.settings_store import SettingsStore
 from app.state.theme_registry import (
     BUNDLED_THEMES,
@@ -60,6 +62,10 @@ bp = Blueprint("themes", __name__, url_prefix="/themes")
 
 def _store() -> UserThemeStore:
     return current_app.config["USER_THEMES_STORE"]  # type: ignore[no-any-return]
+
+
+def _community_store() -> CommunityThemeStore:
+    return current_app.config["COMMUNITY_THEMES_STORE"]  # type: ignore[no-any-return]
 
 
 def _settings_store() -> SettingsStore:
@@ -89,9 +95,17 @@ def _bundled_id_set() -> set[str]:
 def _all_themes() -> tuple[list[Theme], list[UserTheme]]:
     """Return (registry_view, raw_user_themes) so callers can render
     the browse page or seed builder defaults from either side without
-    re-walking the store."""
+    re-walking the store.
+
+    Pulls community themes from the marketplace-managed dir as well,
+    so the registry the page editor + browse page see is the union of
+    bundled + community-installed + user-saved."""
     user_themes = _store().list_all()
-    registry = build_registry(user_themes=[t.to_registry_theme() for t in user_themes])
+    community_themes = _community_store().list_all()
+    registry = build_registry(
+        user_themes=[t.to_registry_theme() for t in user_themes],
+        community_themes=[t.to_registry_theme() for t in community_themes],
+    )
     return registry, user_themes
 
 
@@ -145,6 +159,19 @@ def user_css() -> Response:
     return resp
 
 
+@bp.get("/community.css")
+def community_css() -> Response:
+    """Concatenated CSS for every marketplace-installed theme. Same
+    cascade slot as user.css (loaded after the bundled spectra-tokens),
+    but pulled from ``data/themes/community/<id>/theme.css`` rather than
+    the user-themes JSON store. Cached briefly so an install / uninstall
+    surfaces within a couple of seconds across tabs."""
+    body = emit_community_css(_community_store())
+    resp = Response(body, mimetype="text/css")
+    resp.headers["Cache-Control"] = "max-age=2"
+    return resp
+
+
 @bp.get("/new")
 def new() -> Response | str:
     """Synonym for "show me the builder seeded for a fresh save."
@@ -168,6 +195,7 @@ def _render_index(
     bundled_ids = {t.id for t in BUNDLED_THEMES}
 
     is_bundled = False
+    is_community = False
     theme: UserTheme
     action_url: str
 
@@ -190,10 +218,20 @@ def _render_index(
         action_url = url_for("themes.create")
     else:
         existing = _store().get(selected_id)
-        if existing is None:
-            abort(404)
-        theme = existing
-        action_url = url_for("themes.update", theme_id=existing.id)
+        if existing is not None:
+            theme = existing
+            action_url = url_for("themes.update", theme_id=existing.id)
+        else:
+            # Community theme path: read-only like bundled, but seeded
+            # from the installed theme.css rather than the Spectra
+            # stylesheet. Duplicate-to-edit creates a new user theme.
+            community = _community_store().get(selected_id)
+            if community is None:
+                abort(404)
+            theme = _seed_from_community(community)
+            is_community = True
+            is_bundled = True  # gates the same "read-only" UI as bundled
+            action_url = url_for("themes.create")
 
     disabled_ids = _disabled_theme_ids()
     return render_template(
@@ -205,6 +243,7 @@ def _render_index(
         selected_id=theme.id if not is_new else None,
         is_new=is_new,
         is_bundled=is_bundled,
+        is_community=is_community,
         theme=_template_view(theme),
         bundled_themes=BUNDLED_THEMES,
         action_url=action_url,
@@ -383,6 +422,36 @@ def _theme_from_form(form: Any, *, fallback_id: str) -> UserTheme:
         if raw:
             kwargs[key] = raw
     return UserTheme(**kwargs)
+
+
+def _seed_from_community(community: Any) -> UserTheme:
+    """Build a :class:`UserTheme` from an installed community theme so
+    the detail pane can render its colours into the read-only swatch
+    grid. Parses the theme.css to harvest ``--bg`` / ``--surface`` /
+    ``--accent-*`` and friends, falling back to dataclass defaults for
+    anything the CSS leaves out (so a theme that only sets bg + text
+    still renders a complete swatch grid)."""
+    from app.state.theme_registry import parse_theme_blocks
+
+    seed = UserTheme(
+        id=community.id,
+        name=community.name,
+        mode="dark" if community.family == "dark" else "light",
+    )
+    try:
+        css_text = community.css_path.read_text(encoding="utf-8")
+    except OSError:
+        return seed
+    parsed = parse_theme_blocks(css_text)
+    block = parsed.get(community.id, {})
+    if not block:
+        return seed
+    valid_fields = {*UserTheme.TOKEN_FIELDS, "font_family"}
+    for css_name, value in block.items():
+        field = css_name.removeprefix("--").replace("-", "_")
+        if field in valid_fields:
+            setattr(seed, field, value.strip())
+    return seed
 
 
 def _seed_from_template(theme_id: str) -> UserTheme:

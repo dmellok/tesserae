@@ -96,6 +96,7 @@ nav:
       - Architecture: dev/architecture.md
       - Build a widget with AI: dev/writing-a-widget.md
       - Publish via the catalog: dev/publishing-a-widget.md
+      - Publish a theme: dev/publishing-a-theme.md
       - Widget contract: widgets.md
       - Cross-widget design system: widget-design-system.md
       - Design brief template: widget-design-brief.md

@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-ThemeFamily = Literal["light", "dark", "movement", "vivid", "gradient", "user"]
+ThemeFamily = Literal["light", "dark", "movement", "vivid", "gradient", "user", "community"]
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,10 @@ class Theme:
     ``user`` is True when the theme came from the user-themes store
     (filled in by :func:`build_registry` rather than declared statically);
     it gates the "delete" / "edit" buttons.
+
+    ``community`` is True when the theme came from a marketplace
+    install; the detail pane treats it as read-only (same as bundled)
+    and offers Duplicate-to-edit but not Edit / Delete in-place.
     """
 
     id: str
@@ -51,6 +55,7 @@ class Theme:
     family: ThemeFamily
     tagline: str | None = None
     user: bool = False
+    community: bool = False
 
     def picker_label(self) -> str:
         """Format for ``<option>`` text in the page editor's theme picker.
@@ -144,30 +149,41 @@ FAMILY_LABELS: dict[ThemeFamily, str] = {
     "vivid": "Vivid",
     "gradient": "Gradient",
     "user": "Your themes",
+    "community": "From the catalogue",
 }
 
 
 # Family display order on the browse page; mirrors how a hobbyist tends
 # to scan a theme catalogue (familiar defaults first, then experimental,
-# then user-curated).
+# then community / user-curated).
 FAMILY_ORDER: tuple[ThemeFamily, ...] = (
     "light",
     "dark",
     "movement",
     "vivid",
     "gradient",
+    "community",
     "user",
 )
 
 
-def build_registry(user_themes: list[Theme] | None = None) -> list[Theme]:
-    """Bundled themes + any user-saved ones, in family-then-declared order.
+def build_registry(
+    user_themes: list[Theme] | None = None,
+    community_themes: list[Theme] | None = None,
+) -> list[Theme]:
+    """Bundled themes + community themes + any user-saved ones, in
+    family-then-declared order.
 
-    ``user_themes`` is supplied at request time by the routes layer
-    (which holds the ``UserThemeStore``) so this module stays free of
-    file-I/O and easy to import from the page-editor template helpers.
+    Both list args are supplied at request time by the routes layer
+    (which holds the per-instance stores) so this module stays free of
+    file I/O and easy to import from the page-editor template helpers.
+    Order: bundled first (so the defaults stay default), then
+    community-installed, then the user's own — matches the picker
+    optgroup order on the browse page.
     """
     out: list[Theme] = list(BUNDLED_THEMES)
+    if community_themes:
+        out.extend(community_themes)
     if user_themes:
         out.extend(user_themes)
     return out
@@ -191,6 +207,7 @@ _PICKER_GROUP_LABELS: dict[ThemeFamily, str] = {
     "movement": "Movement themes",
     "vivid": "Vivid themes",
     "gradient": "Gradient themes",
+    "community": "From the catalogue",
     "user": "Your themes",
 }
 
@@ -247,6 +264,13 @@ _BLOCK_RE = re.compile(
 )
 _VAR_RE = re.compile(r"(--[a-z0-9-]+)\s*:\s*([^;]+);")
 _COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+
+
+def parse_theme_blocks(css_text: str) -> dict[str, dict[str, str]]:
+    """Public alias for ``_parse_theme_blocks`` so other modules (e.g.
+    the community-themes builder seed path) can reuse the parser
+    without depending on the underscore-prefixed name."""
+    return _parse_theme_blocks(css_text)
 
 
 def _parse_theme_blocks(css_text: str) -> dict[str, dict[str, str]]:

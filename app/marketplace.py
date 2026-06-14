@@ -178,6 +178,12 @@ class InstalledRecord:
     sha256: str
     source: str | None
     installed_at: str  # ISO 8601, UTC
+    # ``widget`` (the historical default), ``font``, or ``theme``.
+    # Stored on the record so uninstall knows whether to ``rm`` from
+    # ``plugins/`` or ``themes/community/`` without re-fetching the
+    # catalog. Defaults to ``widget`` for backwards compat with pre-
+    # 0.47.8 records that never carried the field.
+    kind: str = "widget"
 
     def to_json(self) -> dict[str, Any]:
         return asdict(self)
@@ -199,6 +205,7 @@ class InstalledRecord:
             sha256=str(raw["sha256"]),
             source=(str(raw["source"]) if raw.get("source") else None),
             installed_at=str(raw["installed_at"]),
+            kind=str(raw.get("kind") or "widget"),
         )
 
 
@@ -269,6 +276,7 @@ class Marketplace:
         index_url_provider: IndexUrlProvider,
         bundled_plugins_dir: Path | None = None,
         plugin_data_root: Path | None = None,
+        themes_dir: Path | None = None,
     ) -> None:
         """``plugins_dir`` is where this Marketplace **writes** when a
         user installs from the catalog, and where it **rms from** when
@@ -290,6 +298,11 @@ class Marketplace:
         self._plugins_dir = plugins_dir
         self._bundled_plugins_dir = bundled_plugins_dir or plugins_dir
         self._plugin_data_root = plugin_data_root or plugins_dir.parent / "data" / "plugins"
+        # Community themes land in ``<data_root>/themes/community/<id>/``
+        # alongside ``themes/user.json``. Passed in so test setups can
+        # point it at a tmp dir; defaults to a path next to the user
+        # marketplace dir for production layouts.
+        self._themes_dir = themes_dir or plugins_dir.parent / "themes" / "community"
         self._state_path = state_path
         self._schema_path = schema_path
         self._index_schema_path = index_schema_path
@@ -484,6 +497,12 @@ class Marketplace:
                 f"major version {HOST_MAJOR_VERSION}."
             )
 
+        # Themes are a different shape from widgets / fonts (two flat
+        # files vs a plugin folder). Hand off to a dedicated installer
+        # so the rest of this method stays focused on the plugin path.
+        if entry.kind == "theme":
+            return self._install_theme(entry)
+
         # Pre-flight collision check on whatever folders the catalog
         # declared (single-widget: just entry.id). Saves the user from
         # a download + extract round-trip when we already know the
@@ -642,6 +661,7 @@ class Marketplace:
             sha256=entry.release_sha256,
             source=entry.source,
             installed_at=_utcnow_iso(),
+            kind=entry.kind,  # "widget" or "font"
         )
         self._persist_record(record)
         logger.info(
@@ -652,6 +672,239 @@ class Marketplace:
             entry.release_sha256[:12],
         )
         return InstallResult(plugin_id=entry.id, version=entry.release_version)
+
+    # -- theme install ---------------------------------------------------
+
+    def _install_theme(self, entry: CatalogEntry) -> InstallResult:
+        """Install one ``kind: theme`` entry.
+
+        Two tarball shapes are accepted, mirroring widget bundles:
+
+        * **Single theme**: ``theme.json`` + ``theme.css`` at the root.
+          ``theme.json.id`` must equal ``entry.id`` so the catalog
+          identifier and the ``[data-theme="<id>"]`` selector line up.
+          One theme installs to ``themes/community/<entry.id>/``.
+
+        * **Theme pack**: per-theme subfolders each containing
+          ``theme.json`` + ``theme.css``. Each subfolder's
+          ``theme.json.id`` must equal the subfolder name. When the
+          catalog entry declares ``folders``, the set must match the
+          subfolders exactly. ``entry.id`` is the pack identifier (the
+          marketplace record key); the installed theme ids are the
+          subfolder names. Each lands in ``themes/community/<theme_id>/``.
+
+        The GitHub-style ``<repo>-<sha>/`` envelope is unwrapped
+        automatically before either layout check."""
+        from app.state.theme_registry import BUNDLED_THEMES
+
+        bundled_ids = {t.id for t in BUNDLED_THEMES}
+
+        with tempfile.TemporaryDirectory(prefix="tesserae-mkt-theme-") as tmp:
+            tmp_dir = Path(tmp)
+            tar_path = tmp_dir / "release.tar.gz"
+            try:
+                self._download(entry.release_tarball_url, tar_path)
+            except (urllib.error.URLError, TimeoutError, OSError) as err:
+                raise TarballRejected(f"Could not download theme tarball: {err}") from err
+
+            actual_sha = self._sha256(tar_path)
+            if actual_sha != entry.release_sha256:
+                raise TarballRejected(
+                    f"Tarball sha256 mismatch (expected {entry.release_sha256[:12]}…, "
+                    f"got {actual_sha[:12]}…)"
+                )
+
+            extract_dir = tmp_dir / "unpacked"
+            extract_dir.mkdir()
+            try:
+                with tarfile.open(tar_path, "r:*") as tar:
+                    tar.extractall(extract_dir, filter="data")
+            except (tarfile.TarError, OSError) as err:
+                raise TarballRejected(f"Could not extract theme tarball: {err}") from err
+
+            root = self._unwrap_envelope(extract_dir)
+            theme_layout = self._detect_theme_layout(root, entry)
+
+            # Validate each theme. No mutation before this loop fully
+            # passes — a single bad theme in a pack rejects the whole
+            # install rather than leaving a half-installed pack on disk.
+            for theme_id, manifest_path, css_path in theme_layout:
+                if theme_id in bundled_ids:
+                    raise InstallRefused(
+                        f"Theme id {theme_id!r} clashes with a bundled "
+                        "Tesserae theme; the catalog entry can't shadow it."
+                    )
+                self._validate_embedded_theme(manifest_path, css_path, theme_id=theme_id)
+
+            # Collision guard. Any destination dir that already exists
+            # must be owned by THIS catalog entry (the reinstall path),
+            # not by another catalog entry or a hand-installed folder.
+            installed = self.installed()
+            existing_record = installed.get(entry.id)
+            owned = set(existing_record.folders) if existing_record is not None else set()
+            for theme_id, _, _ in theme_layout:
+                target = self._themes_dir / theme_id
+                if not target.exists():
+                    continue
+                if theme_id in owned:
+                    continue
+                other_owner = next(
+                    (
+                        rec.catalog_id
+                        for rec in installed.values()
+                        if rec.kind == "theme" and theme_id in rec.folders
+                    ),
+                    None,
+                )
+                if other_owner is not None:
+                    raise InstallRefused(
+                        f"Theme {theme_id!r} is already installed by a different "
+                        f"catalog entry ({other_owner!r})."
+                    )
+                raise InstallRefused(
+                    f"A theme dir at {target} already exists but isn't tracked "
+                    "by the marketplace, refusing to overwrite it."
+                )
+
+            # Stage each theme into its canonical host-side dir layout
+            # (themes/community/<id>/theme.json + theme.css). The tarball
+            # is flat by convention; the host-side keeps a per-theme
+            # subfolder so the store reads a uniform shape regardless
+            # of how many themes the tarball shipped.
+            self._themes_dir.mkdir(parents=True, exist_ok=True)
+            moved: list[tuple[Path, Path | None]] = []
+            try:
+                for theme_id, manifest_path, css_path in theme_layout:
+                    target = self._themes_dir / theme_id
+                    backup: Path | None = None
+                    if target.exists():
+                        backup = target.with_name(target.name + ".old")
+                        if backup.exists():
+                            shutil.rmtree(backup)
+                        target.rename(backup)
+                    target.mkdir()
+                    shutil.move(str(manifest_path), str(target / "theme.json"))
+                    shutil.move(str(css_path), str(target / "theme.css"))
+                    moved.append((target, backup))
+            except OSError as err:
+                for target, backup in moved:
+                    if target.exists():
+                        shutil.rmtree(target, ignore_errors=True)
+                    if backup is not None and backup.exists():
+                        backup.rename(target)
+                raise InstallRefused(f"Could not move theme into place: {err}") from err
+            for _target, backup in moved:
+                if backup is not None and backup.exists():
+                    shutil.rmtree(backup, ignore_errors=True)
+
+        installed_theme_ids = sorted(tid for tid, _, _ in theme_layout)
+        record = InstalledRecord(
+            catalog_id=entry.id,
+            folders=installed_theme_ids,
+            version=entry.release_version,
+            sha256=entry.release_sha256,
+            source=entry.source,
+            installed_at=_utcnow_iso(),
+            kind="theme",
+        )
+        self._persist_record(record)
+        logger.info(
+            "marketplace: installed theme%s %s v%s (themes=%s, sha256=%s…)",
+            "" if len(installed_theme_ids) == 1 else " pack",
+            entry.id,
+            entry.release_version,
+            installed_theme_ids,
+            entry.release_sha256[:12],
+        )
+        return InstallResult(plugin_id=entry.id, version=entry.release_version)
+
+    def _detect_theme_layout(self, root: Path, entry: CatalogEntry) -> list[tuple[str, Path, Path]]:
+        """Return a sorted ``[(theme_id, manifest_path, css_path), …]``
+        list for the tarball at ``root``.
+
+        Convention (single + pack, same rule): each theme is two files
+        at the envelope root, named by id — ``<id>.json`` + ``<id>.css``.
+        A single-theme tarball just has one pair; a pack has N.
+
+        ``entry.folders`` (when declared) must match the discovered id
+        set exactly, mirroring the widget-bundle claim check. For a
+        single-theme entry, the discovered id must equal ``entry.id``.
+
+        Unpaired files (a ``.json`` without a matching ``.css`` or vice
+        versa) reject the install rather than skip silently, since they
+        almost certainly indicate a contributor mistake."""
+        manifests = {p.stem: p for p in root.iterdir() if p.is_file() and p.suffix == ".json"}
+        css_files = {p.stem: p for p in root.iterdir() if p.is_file() and p.suffix == ".css"}
+        all_ids = set(manifests) | set(css_files)
+        unpaired = sorted(tid for tid in all_ids if tid not in manifests or tid not in css_files)
+        if unpaired:
+            missing = [f"{tid}.{'css' if tid in manifests else 'json'}" for tid in unpaired]
+            raise InstallRefused(
+                f"Theme tarball has unpaired files (missing: {missing!r}). "
+                "Each theme must be one <id>.json + one <id>.css at the root."
+            )
+        ids = sorted(manifests)
+        if not ids:
+            raise InstallRefused(
+                "Theme tarball must contain one or more <id>.json + <id>.css pairs at the root."
+            )
+        if entry.folders is not None:
+            declared = set(entry.folders)
+            actual = set(ids)
+            if declared != actual:
+                raise InstallRefused(
+                    f"Theme pack declares folders {sorted(declared)!r} but tarball "
+                    f"contains {sorted(actual)!r}."
+                )
+        elif len(ids) == 1 and ids[0] != entry.id:
+            # Single-theme entries must match the catalog id so the
+            # browse card and install record stay aligned. Multi-theme
+            # tarballs without an explicit ``folders`` declaration are
+            # accepted as packs keyed off whatever ids the tarball
+            # carries.
+            raise InstallRefused(
+                f"Single-theme tarball declares id {ids[0]!r}, but the catalog "
+                f"entry id is {entry.id!r}. Add a 'folders' claim to ship a pack."
+            )
+        return [(tid, manifests[tid], css_files[tid]) for tid in ids]
+
+    def _validate_embedded_theme(
+        self, manifest_path: Path, css_path: Path, *, theme_id: str
+    ) -> None:
+        """Validate one theme's pair against the contract: manifest
+        parses + declares the right id + carries a usable name; CSS
+        targets the declared id. Raises ``InstallRefused`` with a
+        contributor-friendly message on any failure."""
+        try:
+            manifest_raw = manifest_path.read_text(encoding="utf-8")
+            manifest = json.loads(manifest_raw)
+        except (OSError, json.JSONDecodeError) as err:
+            raise InstallRefused(f"{manifest_path.name} is not readable JSON: {err}") from err
+        if not isinstance(manifest, dict):
+            raise InstallRefused(f"{manifest_path.name} must be a JSON object.")
+        declared_id = manifest.get("id")
+        if declared_id != theme_id:
+            raise InstallRefused(
+                f"{manifest_path.name} id {declared_id!r} doesn't match the file stem {theme_id!r}."
+            )
+        name = manifest.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise InstallRefused(f"{manifest_path.name} must declare a non-empty 'name'.")
+        try:
+            css_text = css_path.read_text(encoding="utf-8")
+        except OSError as err:
+            raise InstallRefused(f"{css_path.name} is not readable: {err}") from err
+        if f'[data-theme="{theme_id}"]' not in css_text:
+            raise InstallRefused(f"{css_path.name} must include a [data-theme={theme_id!r}] block.")
+
+    def _unwrap_envelope(self, extract_dir: Path) -> Path:
+        """Most archives have a single top-level folder (``<repo>-<sha>/``
+        for GitHub tarballs). Return that folder if it exists,
+        otherwise return ``extract_dir`` itself."""
+        children = [p for p in extract_dir.iterdir() if not p.name.startswith(".")]
+        if len(children) == 1 and children[0].is_dir():
+            return children[0]
+        return extract_dir
 
     # -- uninstall -------------------------------------------------------
 
@@ -683,6 +936,27 @@ class Marketplace:
         """
         installed = self.installed()
         record = installed.get(catalog_id)
+
+        # Theme records uninstall from ``themes/community/`` instead of
+        # ``plugins/``. Same record-tracked semantic, different on-disk
+        # location. ``delete_data`` is a no-op for themes; they have no
+        # per-theme data dir.
+        if record is not None and record.kind == "theme":
+            for theme_id in record.folders:
+                target_dir = self._themes_dir / theme_id
+                if target_dir.exists():
+                    try:
+                        shutil.rmtree(target_dir)
+                    except OSError as err:
+                        logger.warning(
+                            "marketplace: could not remove theme %s: %s, dropping record anyway",
+                            target_dir,
+                            err,
+                        )
+            del installed[catalog_id]
+            self._write_state(installed)
+            logger.info("marketplace: uninstalled theme %s", catalog_id)
+            return True
 
         if record is not None:
             folders = list(record.folders)

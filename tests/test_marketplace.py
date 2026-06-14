@@ -120,6 +120,7 @@ def _make_catalog_entry(
     tarball_url: str = "https://example.invalid/sample-0.0.1.tar.gz",
     folders: list[str] | None = None,
     extra_screenshot_count: int = 0,
+    kind: str = "widget",
 ) -> CatalogEntry:
     return CatalogEntry(
         id=widget_id,
@@ -129,7 +130,7 @@ def _make_catalog_entry(
         author_name="Test Author",
         author_github="testauthor",
         tags=["utility"],
-        kind="widget",
+        kind=kind,  # type: ignore[arg-type]
         tesserae_compat="1.x",
         official=False,
         screenshot_sizes=["lg"],
@@ -1167,3 +1168,233 @@ def test_install_refused_when_folder_clashes_with_bundled(tmp_path: Path) -> Non
     entry = _make_catalog_entry(widget_id="indie")
     with pytest.raises(InstallRefused, match="bundled widget"):
         mkt.install(entry)
+
+
+# -- theme catalog kind (Phase 2) -----------------------------------
+
+
+def _make_theme_tarball(
+    *,
+    envelope: str = "themes-pack-v0.1.0",
+    themes: dict[str, dict[str, Any]],
+) -> bytes:
+    """Build a theme tarball in the new flat shape: per-theme
+    ``<id>.json`` + ``<id>.css`` files at the envelope root.
+
+    ``themes`` maps theme id → manifest dict; the CSS file is generated
+    automatically with a valid ``[data-theme="<id>"]`` block."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for theme_id, manifest in themes.items():
+            manifest_bytes = json.dumps(manifest).encode("utf-8")
+            info = tarfile.TarInfo(f"{envelope}/{theme_id}.json")
+            info.size = len(manifest_bytes)
+            tar.addfile(info, io.BytesIO(manifest_bytes))
+            css_bytes = (
+                f'[data-theme="{theme_id}"]{{ --bg: #fff; --text-primary: #000; }}\n'
+            ).encode()
+            info = tarfile.TarInfo(f"{envelope}/{theme_id}.css")
+            info.size = len(css_bytes)
+            tar.addfile(info, io.BytesIO(css_bytes))
+    return buf.getvalue()
+
+
+def _theme_manifest(
+    theme_id: str = "aqua",
+    name: str = "Aqua",
+    family: str = "light",
+    tagline: str | None = None,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {"id": theme_id, "name": name, "family": family}
+    if tagline is not None:
+        out["tagline"] = tagline
+    return out
+
+
+def test_install_single_theme_happy_path(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """End-to-end install of a single-theme entry: download, validate,
+    move into themes_dir, persist a record with kind='theme'."""
+    tarball = _make_theme_tarball(themes={"aqua": _theme_manifest("aqua")})
+    url = "https://example.invalid/aqua-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="aqua", kind="theme", sha256=_sha256(tarball), tarball_url=url
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    marketplace.install(entry)
+    target = marketplace._themes_dir / "aqua"
+    assert (target / "theme.json").exists()
+    assert (target / "theme.css").exists()
+    record = marketplace.installed()["aqua"]
+    assert record.kind == "theme"
+    assert record.folders == ["aqua"]
+
+
+def test_install_theme_pack_lays_down_every_subfolder(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """A pack with N pairs at the root installs N per-theme dirs on
+    the host and records every id under ``folders``."""
+    tarball = _make_theme_tarball(
+        envelope="pastels-v0.1.0",
+        themes={
+            "pastel-rose": _theme_manifest("pastel-rose", name="Pastel Rose"),
+            "pastel-mint": _theme_manifest("pastel-mint", name="Pastel Mint"),
+            "pastel-lavender": _theme_manifest("pastel-lavender", name="Pastel Lavender"),
+        },
+    )
+    url = "https://example.invalid/pastels-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="pastels",
+        kind="theme",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["pastel-rose", "pastel-mint", "pastel-lavender"],
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    marketplace.install(entry)
+    for theme_id in ("pastel-rose", "pastel-mint", "pastel-lavender"):
+        target = marketplace._themes_dir / theme_id
+        assert (target / "theme.json").exists()
+        assert (target / "theme.css").exists()
+    record = marketplace.installed()["pastels"]
+    assert record.kind == "theme"
+    assert sorted(record.folders) == ["pastel-lavender", "pastel-mint", "pastel-rose"]
+
+
+def test_install_theme_rejects_unpaired_files(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """A lone <id>.json without a matching <id>.css is almost certainly
+    a contributor typo; reject the install rather than silently
+    skipping."""
+    # Build a tarball with one good pair + one .json with no .css partner.
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for theme_id in ("aqua",):  # complete pair
+            for ext, content in (
+                (".json", json.dumps(_theme_manifest(theme_id)).encode()),
+                (".css", f'[data-theme="{theme_id}"]{{}}'.encode()),
+            ):
+                info = tarfile.TarInfo(f"env/{theme_id}{ext}")
+                info.size = len(content)
+                tar.addfile(info, io.BytesIO(content))
+        # Orphan JSON (no matching css)
+        orphan = json.dumps(_theme_manifest("orphan")).encode()
+        info = tarfile.TarInfo("env/orphan.json")
+        info.size = len(orphan)
+        tar.addfile(info, io.BytesIO(orphan))
+    tarball = buf.getvalue()
+    url = "https://example.invalid/orphan-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="aqua", kind="theme", sha256=_sha256(tarball), tarball_url=url
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    with pytest.raises(InstallRefused, match="unpaired"):
+        marketplace.install(entry)
+
+
+def test_install_theme_rejects_id_mismatch(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """File stem MUST equal manifest id; otherwise the CSS selector
+    and the catalog id would resolve to different things."""
+    tarball = _make_theme_tarball(
+        themes={"aqua": _theme_manifest("typoed-id", name="Aqua")}  # id ≠ stem
+    )
+    url = "https://example.invalid/aqua-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="aqua", kind="theme", sha256=_sha256(tarball), tarball_url=url
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    with pytest.raises(InstallRefused, match="doesn't match"):
+        marketplace.install(entry)
+
+
+def test_install_theme_rejects_pack_with_folder_mismatch(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """When ``folders`` is declared on the catalog entry, the tarball's
+    discovered id set must match exactly — same claim check widget
+    bundles use."""
+    tarball = _make_theme_tarball(
+        envelope="pack",
+        themes={
+            "pastel-rose": _theme_manifest("pastel-rose"),
+            "pastel-mint": _theme_manifest("pastel-mint"),
+        },
+    )
+    url = "https://example.invalid/pack-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="pastels",
+        kind="theme",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["pastel-rose", "pastel-mint", "pastel-lavender"],  # claims one extra
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    with pytest.raises(InstallRefused, match="declares folders"):
+        marketplace.install(entry)
+
+
+def test_install_theme_refuses_bundled_id_clash(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """A catalog theme can't shadow a bundled Spectra theme; the install
+    refuses BEFORE moving anything to disk so the bundled cascade stays
+    authoritative."""
+    tarball = _make_theme_tarball(themes={"light": _theme_manifest("light")})
+    url = "https://example.invalid/light-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="light", kind="theme", sha256=_sha256(tarball), tarball_url=url
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    with pytest.raises(InstallRefused, match="bundled"):
+        marketplace.install(entry)
+
+
+def test_uninstall_theme_pack_removes_every_subfolder(
+    marketplace: Marketplace, url_fixture: dict[str, bytes], tmp_path: Path
+) -> None:
+    """Uninstalling a pack drops every theme dir it installed and the
+    marketplace record — no half-uninstalled state."""
+    tarball = _make_theme_tarball(
+        envelope="pack",
+        themes={
+            "pastel-rose": _theme_manifest("pastel-rose"),
+            "pastel-mint": _theme_manifest("pastel-mint"),
+        },
+    )
+    url = "https://example.invalid/pack-0.1.0.tar.gz"
+    url_fixture[url] = tarball
+    entry = _make_catalog_entry(
+        widget_id="pastels",
+        kind="theme",
+        sha256=_sha256(tarball),
+        tarball_url=url,
+        folders=["pastel-rose", "pastel-mint"],
+    )
+
+    marketplace._themes_dir = tmp_path / "themes-community"
+    marketplace.install(entry)
+    assert (marketplace._themes_dir / "pastel-rose").exists()
+    assert (marketplace._themes_dir / "pastel-mint").exists()
+
+    ok = marketplace.uninstall("pastels")
+    assert ok is True
+    assert not (marketplace._themes_dir / "pastel-rose").exists()
+    assert not (marketplace._themes_dir / "pastel-mint").exists()
+    assert "pastels" not in marketplace.installed()
