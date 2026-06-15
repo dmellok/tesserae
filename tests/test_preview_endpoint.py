@@ -98,3 +98,38 @@ def test_preview_falls_back_to_per_renderer_artifact_when_no_comp_digest(
         resp.close()
     assert status == 200
     assert body == png
+
+
+def test_render_thumbnail_writes_without_format_error(app: Flask) -> None:
+    """Regression for issue #15: the thumbnail saver used to build
+    ``tmp_path = thumb_path.with_suffix(suffix + ".tmp")``, which
+    produced ``<digest>-w160.png.tmp``. Pillow's save() then inferred
+    the format from the extension and raised
+    ``unknown file extension: .tmp``. The fix passes ``format=`` to
+    save() so the temp suffix can't break inference."""
+    from PIL import Image
+
+    renders_dir: Path = app.config["RENDERS_DIR"]
+    renders_dir.mkdir(parents=True, exist_ok=True)
+    # Real PNG bytes Pillow can decode (the stubbed bytes in other
+    # tests are detected as PNGs by extension but the decoder
+    # rejects them).
+    src = renders_dir / "thumb_real_source.png"
+    Image.new("RGB", (320, 200), (255, 0, 0)).save(src, format="PNG")
+
+    with app.test_client() as client:
+        resp = client.get("/renders/thumb_real_source.png?w=160")
+        body = resp.data
+        status = resp.status_code
+        ctype = resp.headers.get("Content-Type", "")
+        resp.close()
+
+    assert status == 200
+    assert ctype.startswith("image/")
+    assert body.startswith(b"\x89PNG")
+    # Thumbnail was written to disk under .thumbs/ and the temp file
+    # was atomically renamed. The cached thumb is what subsequent
+    # requests serve, no re-render.
+    thumb_path = renders_dir / ".thumbs" / "thumb_real_source-w160.png"
+    assert thumb_path.exists()
+    assert not (renders_dir / ".thumbs" / "thumb_real_source-w160.png.tmp").exists()

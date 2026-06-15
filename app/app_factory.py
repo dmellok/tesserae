@@ -144,8 +144,14 @@ def _serve_render_thumbnail(renders_dir: Path, filename: str, width: int) -> Res
                     (width, width * _MAX_THUMB_HEIGHT_MULTIPLIER),
                     Image.Resampling.LANCZOS,
                 )
-                tmp_path = thumb_path.with_suffix(thumb_path.suffix + ".tmp")
-                im.save(tmp_path, optimize=True)
+                # Pass format= explicitly so Pillow doesn't try to
+                # infer it from the temp path's extension. The tmp
+                # filename has ``.tmp`` appended for atomic-rename
+                # discipline, which used to break Pillow's
+                # extension-based format guess with
+                # ``unknown file extension: .tmp``.
+                tmp_path = thumb_path.with_name(thumb_path.name + ".tmp")
+                im.save(tmp_path, format=im.format or "PNG", optimize=True)
                 tmp_path.replace(thumb_path)
         except Exception:
             logger.warning("thumbnail render failed for %s", filename, exc_info=True)

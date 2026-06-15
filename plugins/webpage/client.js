@@ -11,7 +11,15 @@ function escapeHtml(s) {
   }[c]));
 }
 
-export default function render(shadow, ctx) {
+// Cap iframe wait so a slow / hung site doesn't block the whole
+// render forever. The renderer's outer wait_for_function timeout
+// will eventually fire anyway, but resolving here means the rest
+// of the cell mount Promise.all settles cleanly and
+// ``__tesseraeComposed`` only fires once this widget has visible
+// content rather than the instant the iframe element exists.
+const IFRAME_LOAD_TIMEOUT_MS = 6000;
+
+export default async function render(shadow, ctx) {
   const opts = ctx?.cell?.options || {};
   const url = String(opts.url || "").trim();
   const scaleOpt = String(opts.scale || "fit");
@@ -48,4 +56,24 @@ export default function render(shadow, ctx) {
         loading="eager"
         referrerpolicy="no-referrer"></iframe>
     </div>`;
+
+  // The iframe is its own browsing context and its content load is
+  // independent of the parent compose page's network state. Without
+  // this await, the renderer's __tesseraeComposed signal fires the
+  // instant the iframe element exists, and Playwright screenshots a
+  // blank cell. Hold the mount Promise open until the iframe's load
+  // event fires (or the cap, so a hung site doesn't pin the render).
+  const iframe = shadow.querySelector("iframe");
+  if (!iframe) return;
+  await new Promise((resolve) => {
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    iframe.addEventListener("load", done, { once: true });
+    iframe.addEventListener("error", done, { once: true });
+    setTimeout(done, IFRAME_LOAD_TIMEOUT_MS);
+  });
 }
