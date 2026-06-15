@@ -635,8 +635,202 @@ def _calendar_schedule() -> dict[str, Any]:
     }
 
 
+def _github_star_count() -> dict[str, Any]:
+    from datetime import UTC, datetime, timedelta
+
+    today = datetime.now(UTC).date()
+    history = []
+    running = 1620
+    bumps = [0, 1, 2, 0, 3, 4, 1, 2, 0, 5, 3, 1]
+    for i in range(30):
+        d = today - timedelta(days=29 - i)
+        running += bumps[i % len(bumps)]
+        history.append({"date": d.isoformat(), "total": running})
+    return {
+        "user": "dmellok",
+        "total_stars": running,
+        "total_repos": 24,
+        "top": [
+            {"name": "tesserae", "stars": 1432, "url": ""},
+            {"name": "tesserae-widgets", "stars": 187, "url": ""},
+            {"name": "vfd-dash", "stars": 64, "url": ""},
+        ],
+        "history": history,
+    }
+
+
+def _github_streak() -> dict[str, Any]:
+    return {
+        "user": "dmellok",
+        "current_streak": 47,
+        "longest_streak": 88,
+        "today_count": 6,
+        "year_total": 1840,
+    }
+
+
+def _github_pr_count() -> dict[str, Any]:
+    return {
+        "user": "dmellok",
+        "yours": {"count": 4, "oldest_days": 3},
+        "review": {"count": 3, "oldest_days": 9},
+        "total": 7,
+        "oldest_days": 9,
+        "stale_days": 7,
+    }
+
+
+def _github_ci_status() -> dict[str, Any]:
+    return {
+        "state": "failing",
+        "repos": [
+            {"repo": "dmellok/tesserae", "worst": "failure", "workflow_count": 4},
+            {"repo": "dmellok/tesserae-widgets", "worst": "success", "workflow_count": 2},
+            {"repo": "dmellok/tesserae-github", "worst": "success", "workflow_count": 1},
+        ],
+        "failing": ["dmellok/tesserae"],
+        "running": [],
+        "passing": ["dmellok/tesserae-widgets", "dmellok/tesserae-github"],
+        "total": 3,
+        "errors": [],
+    }
+
+
+def _github_star_growth() -> dict[str, Any]:
+    from datetime import UTC, datetime, timedelta
+
+    today = datetime.now(UTC).date()
+    series = []
+    running = 1180
+    seed = [0, 0, 1, 2, 3, 1, 4, 2, 5, 7]
+    for i in range(90):
+        d = today - timedelta(days=89 - i)
+        running += seed[i % len(seed)] + (i // 25)
+        series.append({"date": d.isoformat(), "total": running})
+    return {
+        "repo": "dmellok/tesserae",
+        "total_stars": running,
+        "series": series,
+        "window_days": 90,
+        "truncated": False,
+    }
+
+
+def _github_activity_heatmap() -> dict[str, Any]:
+    from datetime import UTC, datetime, timedelta
+
+    today = datetime.now(UTC)
+    start = (today - timedelta(days=83)).date()
+    while start.weekday() != 0:
+        start -= timedelta(days=1)
+    grid = []
+    cursor = start
+    end = today.date()
+    seed = [0, 2, 1, 4, 6, 3, 0, 1, 2, 0, 5, 3, 8, 12, 1, 4, 0, 0, 6, 7]
+    idx = 0
+    while cursor <= end:
+        week = []
+        for _ in range(7):
+            if cursor > end:
+                break
+            count = seed[idx % len(seed)]
+            idx += 1
+            week.append(
+                {
+                    "date": cursor.isoformat(),
+                    "count": count,
+                    "by_type": {"commits": max(0, count - 1), "prs": 1 if count > 3 else 0},
+                    "level": min(4, count // 3),
+                }
+            )
+            cursor += timedelta(days=1)
+        grid.append(week)
+    return {
+        "user": "dmellok",
+        "grid": grid,
+        "totals": {"commits": 312, "prs": 41, "issues": 18, "releases": 6, "reviews": 27},
+        "fetched": 404,
+        "busiest": {"date": (today - timedelta(days=12)).date().isoformat(), "count": 12},
+        "top_repos": [
+            {"name": "dmellok/tesserae", "count": 188},
+            {"name": "dmellok/tesserae-widgets", "count": 42},
+            {"name": "dmellok/tesserae-github", "count": 28},
+        ],
+    }
+
+
+def _github_commit_cadence() -> dict[str, Any]:
+    from datetime import UTC, datetime, timedelta
+
+    today = datetime.now(UTC).date()
+    bars = []
+    seed = [
+        3,
+        5,
+        8,
+        2,
+        6,
+        0,
+        0,
+        4,
+        7,
+        10,
+        5,
+        2,
+        0,
+        0,
+        8,
+        12,
+        6,
+        4,
+        9,
+        3,
+        0,
+        0,
+        5,
+        11,
+        7,
+        4,
+        8,
+        1,
+        0,
+        0,
+    ]
+    for i in range(30):
+        d = today - timedelta(days=29 - i)
+        bars.append({"date": d.isoformat(), "count": seed[i]})
+    last7 = sum(b["count"] for b in bars[-7:])
+    last30 = sum(b["count"] for b in bars)
+    busiest = max(bars, key=lambda b: b["count"])
+    return {
+        "repo": "dmellok/tesserae",
+        "bars": bars,
+        "last7": last7,
+        "last30": last30,
+        "weekly_avg": round(last30 / 4.3, 1),
+        "busiest": busiest,
+        "pending": False,
+    }
+
+
+def _devref_egress() -> dict[str, Any]:
+    return {
+        "scenario": "allowed",
+        "url": "https://api.github.com/zen",
+        "payload": "Approachable is better than simple.",
+    }
+
+
 SAMPLES: dict[str, Any] = {
     "calendar_schedule": _calendar_schedule,
+    "devref_egress": _devref_egress,
+    "github_activity_heatmap": _github_activity_heatmap,
+    "github_ci_status": _github_ci_status,
+    "github_commit_cadence": _github_commit_cadence,
+    "github_pr_count": _github_pr_count,
+    "github_star_count": _github_star_count,
+    "github_star_growth": _github_star_growth,
+    "github_streak": _github_streak,
     "ha_battery": _ha_battery,
     "ha_camera": _ha_camera,
     "ha_climate": _ha_climate,
