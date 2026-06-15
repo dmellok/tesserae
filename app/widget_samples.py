@@ -799,9 +799,10 @@ def _github_commit_cadence() -> dict[str, Any]:
     for i in range(30):
         d = today - timedelta(days=29 - i)
         bars.append({"date": d.isoformat(), "count": seed[i]})
-    last7 = sum(b["count"] for b in bars[-7:])
-    last30 = sum(b["count"] for b in bars)
-    busiest = max(bars, key=lambda b: b["count"])
+    last7 = sum(seed[-7:])
+    last30 = sum(seed)
+    peak_idx = max(range(30), key=lambda i: seed[i])
+    busiest = bars[peak_idx]
     return {
         "repo": "dmellok/tesserae",
         "bars": bars,
