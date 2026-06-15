@@ -87,7 +87,12 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     page_names = {p.id: p.name for p in _pages().list()}
     out: list[dict[str, Any]] = []
     for ev in rows:
-        target = page_names.get(ev.target, ev.target) if ev.source == "page" else ev.target
+        # Every type="push" row stores the page_id in ``target``,
+        # regardless of source (manual page send, scheduler tick,
+        # rotation step). Resolve to the page name uniformly; unknown
+        # targets (URL pushes, webpage one-offs) fall through to the
+        # raw value via the dict's default arg.
+        target = page_names.get(ev.target, ev.target)
         renderers = [
             {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
             for r in (ev.extra.get("renderers") or [])
