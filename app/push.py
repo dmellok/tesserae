@@ -1007,12 +1007,21 @@ class PushManager:
 
         payload = renderer.payload(digest, self._base_url_fn().rstrip("/"), settings=settings)
         url = str(payload.get("url", ""))
-        self._transport.publish(
-            renderer.topic,
-            json.dumps(payload).encode("utf-8"),
-            qos=1,
-            retain=renderer.retain,
-        )
+        # HTTP-polled devices (TRMNL clients) don't subscribe to the MQTT
+        # topic; ``/api/display`` reads the frame straight from the
+        # latest-renders map populated by ``_fan_out`` after this method
+        # returns. Skipping the publish here makes the broker truly
+        # optional for TRMNL-only setups, which is how it always should
+        # have been. The signal is the device's manifest: HTTP-polled
+        # devices declare no ``status_topic`` (per devices/<id>/device.json
+        # and ``Device.status_topic``); MQTT devices do.
+        if not self._renderer_is_http_polled(renderer):
+            self._transport.publish(
+                renderer.topic,
+                json.dumps(payload).encode("utf-8"),
+                qos=1,
+                retain=renderer.retain,
+            )
         return RendererResult(
             renderer_id=renderer.id,
             topic=renderer.topic,
@@ -1020,6 +1029,25 @@ class PushManager:
             url=url,
             bytes_written=len(artifact),
         )
+
+    def _renderer_is_http_polled(self, renderer: Renderer) -> bool:
+        """Return True when the renderer's bound device is HTTP-polled
+        (TRMNL / KOReader / anything that hits ``/api/display`` rather
+        than subscribing to MQTT). Clones set ``renderer.device`` to the
+        instance id, which the device registry indexes the same way as
+        the kind, so the same lookup works for both.
+
+        Fails closed: when the device registry isn't wired (test paths
+        without a registry) or the device id doesn't resolve, we treat
+        the renderer as MQTT-bound and let the publish run. The cost of
+        a false-negative (publish on an HTTP-polled device with no
+        broker) is the pre-fix behaviour, so we're never worse off."""
+        if self._devices is None:
+            return False
+        device = self._devices.devices.get(renderer.device)
+        if device is None:
+            return False
+        return device.status_topic is None
 
     def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, Any]:
         """Pick panel dims for a Send-page push.

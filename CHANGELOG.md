@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.1], 2026-06-16
+
+### Fixed
+
+- **TRMNL pushes no longer require an MQTT broker.** TRMNL clients are
+  HTTP-polled (`/api/display`), not MQTT subscribers, but the push
+  pipeline was unconditionally calling `transport.publish()` for every
+  renderer including HTTP-polled ones. On hosts without Mosquitto the
+  publish raised `RuntimeError: transport not connected`, the
+  latest-render pointer never got stamped, and `/api/display` kept
+  serving the placeholder image. The pipeline now skips the publish
+  for devices whose manifest declares no `status_topic`, lifting the
+  broker requirement for TRMNL-only setups. Reported by @tommerty on
+  [discussion #8](https://github.com/dmellok/tesserae/discussions/8).
+
 ## [0.49.0], 2026-06-16
 
 ### Added

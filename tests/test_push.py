@@ -406,3 +406,139 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
         miss = manager.push("multi", device_ids={"esp32_port_not_bound"})
     assert miss.status == "failed"
     assert rtp2.call_count == 0
+
+
+# -- 0.49.1 regression: HTTP-polled devices don't depend on MQTT --------
+
+
+def test_http_polled_device_skips_mqtt_publish(tmp_path: Path, composition_png: bytes) -> None:
+    """A TRMNL instance is HTTP-polled (``/api/display``), so the push
+    pipeline must not require its MQTT topic to publish successfully.
+    The frame still lands on disk + in the latest-renders map so the
+    next HTTP poll serves it; the MQTT broker is bypassed entirely.
+
+    Regression for 0.49.0, where TRMNL-only setups without a broker
+    saw ``RuntimeError: transport not connected; can't publish to
+    'tesserae/<id>/frame/trmnl'`` and the panel stayed on its
+    placeholder image."""
+    from app import device_loader, device_service, renderer_loader
+    from app.main import REPO_ROOT
+
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="trmnl_abc123",
+        kind_id="trmnl_client",
+    )
+
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(Page(id="trmnl_only", name="TRMNL only", device_ids=["trmnl_abc123"], cells=[]))
+
+    fakes: dict[str, _FakeMqttClient] = {}
+
+    def factory(client_id: str) -> _FakeMqttClient:
+        fakes["client"] = _FakeMqttClient(client_id)
+        return fakes["client"]
+
+    transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
+    transport.connect()
+
+    manager = PushManager(
+        registry=renderers,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=devices,
+    )
+
+    with patch("app.push.render_to_png", return_value=composition_png):
+        result = manager.push("trmnl_only")
+
+    assert result.status == "sent"
+    # The MQTT transport was connected but nothing should have been
+    # published; TRMNL reads frames via /api/display, not subscriptions.
+    assert fakes["client"].published == []
+    # The artifact was still written to disk so /api/display can find
+    # it, and the latest-renders map has the digest.
+    renders = list((tmp_path / "renders").iterdir())
+    assert renders, "frame artifact should still land on disk"
+    assert manager._latest_renders.get("trmnl_abc123") is not None
+
+
+def test_http_polled_push_succeeds_without_broker_connection(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """The original bug shape: no Mosquitto add-on installed means the
+    transport never connects, so ``publish()`` raises ``RuntimeError``.
+    Pre-fix this killed every TRMNL push; post-fix the HTTP-polled
+    branch never touches the transport, so the push succeeds end-to-end
+    with the transport in its initial unconnected state.
+
+    Reproduces tommerty's report on
+    https://github.com/dmellok/tesserae/discussions/8."""
+    from app import device_loader, device_service, renderer_loader
+    from app.main import REPO_ROOT
+
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="trmnl_def456",
+        kind_id="trmnl_client",
+    )
+
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(Page(id="solo", name="Solo", device_ids=["trmnl_def456"], cells=[]))
+
+    # Construct the transport but never .connect() it; this is the state
+    # the app boots into when ``core-mosquitto`` resolves to nothing.
+    transport = MqttTransport(
+        BrokerConfig(host="x"), client_factory=lambda _id: _FakeMqttClient(_id)
+    )
+    # Sanity-check the precondition: the transport is unconnected, so a
+    # raw publish would raise. The TRMNL render path must dodge that.
+    with pytest.raises(RuntimeError):
+        transport.publish("any", b"any")
+
+    manager = PushManager(
+        registry=renderers,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=devices,
+    )
+
+    with patch("app.push.render_to_png", return_value=composition_png):
+        result = manager.push("solo")
+
+    assert result.status == "sent"
+    assert all(r.error is None for r in result.renderers)
