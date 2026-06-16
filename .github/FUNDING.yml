@@ -1,0 +1,4 @@
+# Wires the "Sponsor" button on the repo header to GitHub Sponsors.
+# Goes live once the account at https://github.com/sponsors/dmellok is
+# published; until then the button stays hidden (no broken link).
+github: dmellok

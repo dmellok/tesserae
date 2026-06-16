@@ -4,6 +4,7 @@
 [![Latest release](https://img.shields.io/github/v/release/dmellok/tesserae?style=flat-square)](https://github.com/dmellok/tesserae/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/dmellok/tesserae/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/dmellok/tesserae/actions/workflows/ci.yml)
 [![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae?style=flat-square)](https://github.com/dmellok/tesserae/discussions)
+[![Sponsor](https://img.shields.io/badge/sponsor-%E2%9D%A4-pink?style=flat-square)](https://github.com/sponsors/dmellok)
 
 <p align="center">
   <a href="docs/screenshots/hero-rack.jpg">
