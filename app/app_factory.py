@@ -223,6 +223,35 @@ def create_app(
 
     app.wsgi_app = _IngressPrefixMiddleware(app.wsgi_app)  # type: ignore[method-assign]
 
+    # Trust ``X-Forwarded-*`` headers when a reverse proxy (NGINX Proxy
+    # Manager, Caddy, Cloudflare Tunnel, an HA Ingress sidecar) is in
+    # front of us. Without this, plugin OAuth callbacks ``url_for(...,
+    # _external=True)`` build URLs from the internal HTTP / port-8765
+    # connection instead of the real public ``https://...:8443`` the
+    # browser saw, and the redirect URI registered with Spotify /
+    # Google / etc. won't match.
+    #
+    # We trust ONE hop by default; that's the standard "behind one
+    # reverse proxy" topology Tesserae is run in. Operators stacking
+    # multiple proxies can override via the env var. Bare-metal
+    # deployments without any reverse proxy still work cleanly: the
+    # headers won't be present and ProxyFix becomes a no-op.
+    from werkzeug.middleware.proxy_fix import ProxyFix
+
+    try:
+        _forwarded_hops = max(0, int(os.environ.get("TESSERAE_FORWARDED_HOPS", "1")))
+    except ValueError:
+        _forwarded_hops = 1
+    if _forwarded_hops > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app,
+            x_for=_forwarded_hops,
+            x_proto=_forwarded_hops,
+            x_host=_forwarded_hops,
+            x_port=_forwarded_hops,
+            x_prefix=_forwarded_hops,
+        )
+
     # Resolve the running package version. Prefer pyproject.toml on disk
     # (so a source checkout reflects post-pip-install bumps) and fall
     # back to importlib.metadata for installed wheels. Used by both

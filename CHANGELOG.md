@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.3], 2026-06-17
+
+### Fixed
+
+- **OAuth callbacks now build the public URL when Tesserae runs behind
+  a reverse proxy.** Wired `werkzeug.middleware.proxy_fix.ProxyFix` into
+  the WSGI stack so `X-Forwarded-Proto` / `X-Forwarded-Host` /
+  `X-Forwarded-Port` from an upstream NGINX Proxy Manager, Caddy,
+  Cloudflare Tunnel, etc. are honoured. Before the fix, plugin OAuth
+  flows (e.g. Spotify Core) generated redirect URIs like
+  `http://internal-host/plugins/spotify_core/callback` from the
+  internal HTTP connection between the proxy and Tesserae, so the
+  Spotify Developer dashboard rejected the redirect URI even though
+  the user registered the correct public `https://...:8443/...` URI.
+  Reported by @dmellok during HA add-on Spotify setup behind NGINX
+  Proxy Manager on a non-standard external port.
+- Trusts one proxy hop by default. Operators stacking multiple
+  proxies can override via `TESSERAE_FORWARDED_HOPS=<n>`; `0` disables
+  ProxyFix entirely (bare-metal installs where the headers could be
+  spoofed by a client).
+
 ## [0.49.2], 2026-06-16
 
 ### Fixed
