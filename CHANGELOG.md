@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.2], 2026-06-16
+
+### Fixed
+
+- **TRMNL X devices now auto-provision at their native 1872×1404 panel
+  size.** The native TRMNL firmware's `/api/setup` request only carries
+  `ID / Content-Type / FW-Version / Model` headers; `Width` / `Height`
+  are only sent on `/api/display`. Tesserae's auto-provision was
+  reading the (absent) `Width` / `Height` and falling back to the
+  original-TRMNL 800×480 default, so the composer would design the
+  dashboard at 800×480 and the rendered PNG would come out blurry on
+  the X's 13.3" panel (even though the `/api/display` path served a
+  correctly-sized image, since per-request headers took over there).
+  Setup now looks up panel dims from the `Model` header instead:
+  `x` → 1872×1404, `og` / `TRMNL` → 800×480, anything else falls
+  back to the original-TRMNL default until we add it to the table.
+  Reported by @tommerty on
+  [discussion #8](https://github.com/dmellok/tesserae/discussions/8).
+
 ## [0.49.1], 2026-06-16
 
 ### Fixed

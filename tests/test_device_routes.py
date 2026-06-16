@@ -300,6 +300,57 @@ def test_trmnl_api_setup_auto_provisions_native_device_by_mac(app: Flask) -> Non
     assert device.manifest["panel"]["h"] == 480
 
 
+def test_trmnl_api_setup_picks_trmnl_x_panel_from_model_header(app: Flask) -> None:
+    """0.49.2 regression: native TRMNL firmware doesn't send Width/Height
+    on /api/setup (only on /api/display), so auto-provision must look up
+    panel dims from the ``Model`` header instead. A TRMNL X (Model: "x")
+    should be provisioned at its native 1872x1404, not the original-TRMNL
+    800x480 default. Reported by @tommerty on discussion #8.
+
+    Without this branch the device's stored panel stays 800x480, the
+    composer designs the dashboard at the wrong canvas size, and the
+    rendered PNG comes out blurry on the panel even though the /api/
+    display path serves a correctly-sized image (per-request Width/
+    Height take over there)."""
+    client = app.test_client()
+    resp = client.get(
+        "/api/setup",
+        headers={
+            "Id": "A1:B2:C3:D4:E5:F6",
+            "Model": "x",
+            "Fw-Version": "1.6.0",
+            # No Width / Height, matches buildSetupHeaders in
+            # the native firmware.
+        },
+    )
+    assert resp.status_code == 200
+    devs = app.config["DEVICE_REGISTRY"]
+    matches = [d for d in devs.all() if d.manifest.get("mac") == "A1:B2:C3:D4:E5:F6"]
+    assert len(matches) == 1
+    device = matches[0]
+    assert device.manifest["panel"]["w"] == 1872
+    assert device.manifest["panel"]["h"] == 1404
+
+
+def test_trmnl_api_setup_unknown_model_falls_back_to_original_panel(app: Flask) -> None:
+    """Unknown ``Model`` values (a future TRMNL we haven't added yet,
+    or a community fork) fall back to the original 800x480 default
+    rather than crashing or guessing. The user can adjust on the
+    device-settings page; the table of known models can grow in a
+    follow-up."""
+    client = app.test_client()
+    resp = client.get(
+        "/api/setup",
+        headers={"Id": "11:22:33:44:55:66", "Model": "future_trmnl_y_2030"},
+    )
+    assert resp.status_code == 200
+    devs = app.config["DEVICE_REGISTRY"]
+    matches = [d for d in devs.all() if d.manifest.get("mac") == "11:22:33:44:55:66"]
+    assert len(matches) == 1
+    assert matches[0].manifest["panel"]["w"] == 800
+    assert matches[0].manifest["panel"]["h"] == 480
+
+
 def test_trmnl_api_setup_returns_same_credentials_for_known_mac(app: Flask) -> None:
     """Second /api/setup call from the same MAC must hand back the
     same api_key + friendly_id, not auto-create another instance."""

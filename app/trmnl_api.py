@@ -132,6 +132,47 @@ def _device_by_request() -> Device | None:
     return None
 
 
+# Known TRMNL hardware models → panel pixel dimensions. The native
+# firmware's ``buildSetupHeaders`` (see
+# https://github.com/usetrmnl/trmnl-firmware/blob/main/lib/trmnl/src/api-client/request_headers.cpp)
+# sends ``ID / Content-Type / FW-Version / Model`` on /api/setup; it
+# does NOT include Width/Height (those land on /api/display). So we
+# look up panel dims from the ``Model`` header at setup time instead
+# of waiting for the first display poll, otherwise the device's
+# stored panel size stays at the original-TRMNL 800x480 default and
+# the composer designs at the wrong canvas size even though the
+# rendered PNG comes out right (the /api/display path reads dims
+# from the request headers).
+#
+# Models sourced from https://github.com/usetrmnl/trmnl-firmware
+# (``include/config.h``, ``DEVICE_MODEL`` defines) and panel pixel
+# counts from https://github.com/bitbank2/FastEPD (``BB_PANEL_*``
+# entries in ``FastEPD.inl``). Add new entries as the lineup grows;
+# unknown models fall through to the original-TRMNL default.
+_TRMNL_MODEL_PANEL: dict[str, tuple[int, int]] = {
+    # Original TRMNL (BOARD_OG and friends), 7.5" 800x480 e-paper.
+    "TRMNL": (800, 480),
+    "og": (800, 480),
+    # TRMNL X (BOARD_TRMNL_X, BOARD_TRMNL_X_EPDIY), 13.3" 1872x1404.
+    "x": (1872, 1404),
+}
+
+
+def _panel_dims_from_model(model: str | None) -> tuple[int, int]:
+    """Resolve a panel pixel size from the ``Model`` header. Matches
+    keys case-insensitively; unknown models default to the original
+    TRMNL panel so legacy clients keep working unchanged."""
+    if not model:
+        return 800, 480
+    key = model.strip()
+    if key in _TRMNL_MODEL_PANEL:
+        return _TRMNL_MODEL_PANEL[key]
+    lowered = key.lower()
+    if lowered in _TRMNL_MODEL_PANEL:
+        return _TRMNL_MODEL_PANEL[lowered]
+    return 800, 480
+
+
 def _auto_provision_by_mac(mac: str) -> Device | None:
     """Auto-create a TRMNL instance for a fresh device polling with a
     novel MAC. Matches Terminus's first-touch behaviour, the device
@@ -147,12 +188,22 @@ def _auto_provision_by_mac(mac: str) -> Device | None:
 
     mac_clean = "".join(c for c in mac.lower() if c.isalnum())
     instance_id = f"trmnl_{mac_clean[-6:]}" if mac_clean else "trmnl_new"
-    try:
-        panel_w = int(request.headers.get("Width") or request.headers.get("png-width") or 800)
-        panel_h = int(request.headers.get("Height") or request.headers.get("png-height") or 480)
-    except ValueError:
-        panel_w, panel_h = 800, 480
     model = request.headers.get("Model") or "TRMNL"
+    # Width/Height headers are present on /api/display but not
+    # /api/setup, so we look them up by Model. Width/Height still win
+    # if a non-native client (e.g. KOReader with png-width / png-height
+    # plumbed into setup) sends them, since the request is the source
+    # of truth when it actually carries the data.
+    panel_w_default, panel_h_default = _panel_dims_from_model(model)
+    try:
+        panel_w = int(
+            request.headers.get("Width") or request.headers.get("png-width") or panel_w_default
+        )
+        panel_h = int(
+            request.headers.get("Height") or request.headers.get("png-height") or panel_h_default
+        )
+    except ValueError:
+        panel_w, panel_h = panel_w_default, panel_h_default
     result = device_service.create_instance(
         devices=registry,
         renderers=renderers,
