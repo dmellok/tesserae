@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.5], 2026-06-17
+
+### Fixed
+
+- **Public URL no longer corrupts LAN device frame URLs.** Regression
+  from 0.49.4. When the Public URL setting was set (e.g.
+  `https://tesserae.example.org:8443`), the override middleware
+  rewrote `HTTP_HOST` to the public host:port. The
+  `_capture_http_port` before-request hook then captured that proxy
+  port (8443) as `DETECTED_HTTP_PORT`, and the push pipeline built
+  LAN render URLs as `http://<lan-ip>:8443/renders/…`. Devices
+  (pi_bin, pi_png, esp32) trying to fetch those frames hit the
+  reverse proxy's HTTPS port over HTTP and got 400 Bad Request, so
+  no panel could paint a new frame. Reported by @dmellok after
+  setting Public URL during Spotify setup.
+  Fix: `_capture_http_port` returns early when Public URL is set,
+  leaving `DETECTED_HTTP_PORT` at its real value (Flask bind port,
+  default 8765). External browser-facing URLs still use the Public
+  URL via the existing middleware; device-facing LAN URLs revert to
+  the actual bind port.
+
 ## [0.49.4], 2026-06-17
 
 ### Added

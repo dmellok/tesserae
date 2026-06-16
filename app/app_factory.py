@@ -858,6 +858,22 @@ def create_app(
         # back to TESSERAE_HTTP_PORT / the default instead.
         if request.headers.get("X-Ingress-Path"):
             return
+        # Same shape under a Public URL override (0.49.4): the middleware
+        # rewrites ``HTTP_HOST`` to the public host:port the browser
+        # sees, which is the reverse proxy's HTTPS port (e.g. ``:8443``),
+        # not the actual Flask bind port (still ``:8765``). Capturing
+        # ``8443`` here would emit LAN render URLs as
+        # ``http://<lan-ip>:8443/renders/…`` which devices (pi / esp32)
+        # can't fetch, NPM is HTTPS-only on that port and returns 400.
+        # Skip the capture entirely; bind-port discovery falls back to
+        # TESSERAE_HTTP_PORT / the 8765 default the device side expects.
+        settings_store = app.config.get("SETTINGS_STORE")
+        if settings_store is not None:
+            public_url = str(
+                (settings_store.get_section("app") or {}).get("public_url") or ""
+            ).strip()
+            if public_url:
+                return
         previous = app.config.get("DETECTED_HTTP_PORT")
         port = request.host.split(":", 1)[1] if ":" in request.host else None
         if not port or not port.isdigit():

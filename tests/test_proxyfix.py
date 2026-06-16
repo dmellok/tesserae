@@ -150,3 +150,41 @@ def test_public_url_setting_malformed_value_falls_back_silently(app: Flask) -> N
     url = resp.get_json()["url"]
     # Falls back to request-derived URL; doesn't 500.
     assert url.startswith("http://tesserae.local"), url
+
+
+# -- v0.49.5: Public URL must NOT corrupt DETECTED_HTTP_PORT -----------
+
+
+def test_public_url_does_not_capture_proxy_port_for_device_urls(app: Flask) -> None:
+    """Regression for 0.49.4: with Public URL set to e.g.
+    ``https://tesserae.example.org:8443`` (the reverse proxy's HTTPS
+    port), the Public URL middleware rewrites HTTP_HOST so request.host
+    reads ``tesserae.example.org:8443``. Before this fix, the
+    ``_capture_http_port`` before-request hook then stored 8443 as
+    DETECTED_HTTP_PORT, and ``detect_base_url`` built LAN render URLs
+    as ``http://<lan-ip>:8443/renders/…``, which NPM (HTTPS-only on
+    8443) returned 400 for, breaking every device's frame fetch.
+
+    The fix: ``_capture_http_port`` returns early when a Public URL is
+    set, leaving DETECTED_HTTP_PORT alone so device-facing URLs keep
+    using the actual Flask bind port (TESSERAE_HTTP_PORT / 8765)."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": "https://tesserae.example.org:8443"})
+    client = app.test_client()
+    # Hit a real endpoint so the before_request hook runs.
+    client.get("/healthz")
+    # DETECTED_HTTP_PORT must NOT be the proxy's external port (8443).
+    # It can be unset (None) or the actual Flask bind port, but never
+    # the proxy port.
+    assert app.config.get("DETECTED_HTTP_PORT") != 8443
+
+
+def test_public_url_unset_still_captures_real_port(app: Flask) -> None:
+    """Sanity check: without Public URL, the existing port-capture
+    behaviour is unchanged so users running Flask on a non-default
+    port (e.g. ``flask run --port 5050``) still see correct device URLs."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": ""})
+    client = app.test_client()
+    client.get("/healthz", headers={"Host": "192.168.1.50:5050"})
+    assert app.config.get("DETECTED_HTTP_PORT") == 5050
