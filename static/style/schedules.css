@@ -499,14 +499,24 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 .rot-step-cond > textarea {
   position: absolute;
-  left: 0;
+  /* Align the left edge of the expanded textarea with the page-select
+     column so the JSON visually belongs to its step instead of starting
+     flush with the step number. 2em matches the first grid column; the
+     gap variable matches the grid's column gap. */
+  left: calc(2em + var(--t-space-2, 0.5em));
   right: 0;
   top: calc(100% + 0.3em);
-  width: 100%;
   font-family: var(--ff-mono, ui-monospace, monospace);
   font-size: 0.85em;
   z-index: 2;
   box-sizing: border-box;
+}
+
+@media (max-width: 540px) {
+  .rot-step-cond > textarea {
+    /* Mobile grid uses a narrower step-number column. */
+    left: calc(1.5em + var(--t-space-2, 0.5em));
+  }
 }
 /* Reserve space below the row when the disclosure is open so the
    absolutely-positioned textarea doesn't overlap the next step. */
