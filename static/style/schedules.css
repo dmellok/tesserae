@@ -475,36 +475,49 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto auto; }
 }
 
-/* v0.48 per-step conditions disclosure. The summary stays inline as
-   a small chip after the remove button; the body (textarea) breaks
-   out below the row when expanded so it doesn't squeeze the existing
-   page-select and dwell inputs. */
+/* v0.48 per-step conditions disclosure. The summary renders as a
+   proper button (matches the rest of the editor's ghost-button look)
+   inline in column 6 of the step row; the textarea pops below the
+   row when expanded, aligned with the page-select column and capped
+   on the right so it doesn't extend past the dwell input. */
 .rot-step-cond > summary {
   list-style: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 0.3em;
-  padding: 0.2em 0.55em;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--t-fg, #1B1A16) 7%, transparent);
-  color: var(--t-muted);
+  gap: 0.35em;
+  padding: 0.4em 0.85em;
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 18%, transparent));
+  border-radius: var(--t-radius-1, 6px);
+  background: transparent;
+  color: var(--t-fg, #1B1A16);
   font-size: var(--t-size-sm, 0.85em);
+  font-weight: 500;
+  line-height: 1;
   user-select: none;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 .rot-step-cond > summary::-webkit-details-marker { display: none; }
+.rot-step-cond > summary:hover {
+  background: color-mix(in oklab, var(--t-fg, #1B1A16) 5%, transparent);
+}
 .rot-step-cond[open] > summary {
-  background: color-mix(in oklab, var(--t-accent, #C24F2C) 22%, transparent);
+  background: color-mix(in oklab, var(--t-accent, #C24F2C) 14%, transparent);
+  border-color: var(--t-accent, #C24F2C);
   color: var(--t-fg, #1B1A16);
 }
 .rot-step-cond > textarea {
   position: absolute;
-  /* Align the left edge of the expanded textarea with the page-select
-     column so the JSON visually belongs to its step instead of starting
-     flush with the step number. 2em matches the first grid column; the
-     gap variable matches the grid's column gap. */
+  /* Align with the page-select column on the left, and stop at the
+     same point the page-select stops (before the dwell input column).
+     Right offset = dwell col (8ch) + min col (3ch) + remove btn (auto)
+     + Conditions btn (auto) + the 4 gaps between them. We approximate
+     the "auto" cols at ~3em each because both contain a single icon /
+     short label so the value is stable. */
   left: calc(2em + var(--t-space-2, 0.5em));
-  right: 0;
+  right: calc(8ch + 3ch + 6em + var(--t-space-2, 0.5em) * 4);
+  top: calc(100% + 0.3em);
+  min-width: 14ch;
   top: calc(100% + 0.3em);
   font-family: var(--ff-mono, ui-monospace, monospace);
   font-size: 0.85em;
@@ -514,8 +527,11 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 
 @media (max-width: 540px) {
   .rot-step-cond > textarea {
-    /* Mobile grid uses a narrower step-number column. */
+    /* Mobile grid is tighter; just align with the page-select start
+       and let the right edge run to the container so the JSON has
+       room on small screens. */
     left: calc(1.5em + var(--t-space-2, 0.5em));
+    right: 0;
   }
 }
 /* Reserve space below the row when the disclosure is open so the
