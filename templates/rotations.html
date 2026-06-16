@@ -31,11 +31,14 @@
           aria-label="Remove step">
     <i class="ph ph-x" aria-hidden="true"></i>
   </button>
-  {# v0.48 per-step conditions JSON. Empty = step is always eligible. #}
-  <details class="rot-step-cond" style="grid-column:1/-1;margin-top:0.3em">
-    <summary style="font-size:0.85em;color:var(--text-muted)">Step conditions (advanced)</summary>
+  {# v0.48 per-step conditions JSON. Sits inline in the step row as a
+     small disclosure chip; the textarea pops as a second grid row
+     below this step when expanded. Empty = step is always eligible. #}
+  <details class="rot-step-cond">
+    <summary aria-label="Step conditions">
+      <i class="ph ph-funnel" aria-hidden="true"></i><span class="rot-step-cond-label">Conditions</span>
+    </summary>
     <textarea name="step_conditions_json[]" rows="2" spellcheck="false"
-              style="width:100%;font-family:var(--ff-mono,monospace);font-size:0.85em"
               placeholder='[]'>{% if step.conditions %}{{ step.conditions | tojson(indent=2) }}{% endif %}</textarea>
   </details>
 </div>

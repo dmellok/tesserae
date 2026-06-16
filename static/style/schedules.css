@@ -453,9 +453,10 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 
 .rot-step {
   display: grid;
-  grid-template-columns: 2em 1fr 8ch 3ch auto;
+  grid-template-columns: 2em 1fr 8ch 3ch auto auto;
   gap: var(--t-space-2);
   align-items: center;
+  position: relative;
 }
 
 .rot-step .rot-step-num {
@@ -471,7 +472,50 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 
 @media (max-width: 540px) {
-  .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto; }
+  .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto auto; }
+}
+
+/* v0.48 per-step conditions disclosure. The summary stays inline as
+   a small chip after the remove button; the body (textarea) breaks
+   out below the row when expanded so it doesn't squeeze the existing
+   page-select and dwell inputs. */
+.rot-step-cond > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  padding: 0.2em 0.55em;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--t-fg, #1B1A16) 7%, transparent);
+  color: var(--t-muted);
+  font-size: var(--t-size-sm, 0.85em);
+  user-select: none;
+}
+.rot-step-cond > summary::-webkit-details-marker { display: none; }
+.rot-step-cond[open] > summary {
+  background: color-mix(in oklab, var(--t-accent, #C24F2C) 22%, transparent);
+  color: var(--t-fg, #1B1A16);
+}
+.rot-step-cond > textarea {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 0.3em);
+  width: 100%;
+  font-family: var(--ff-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  z-index: 2;
+  box-sizing: border-box;
+}
+/* Reserve space below the row when the disclosure is open so the
+   absolutely-positioned textarea doesn't overlap the next step. */
+.rot-step:has(.rot-step-cond[open]) {
+  margin-bottom: 5.5em;
+}
+
+@media (max-width: 540px) {
+  .rot-step-cond-label { display: none; }
 }
 
 /* Step preview cards: page name on one line, bound devices listed below. */
