@@ -24,10 +24,10 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   key from the Flask session secret via HKDF-SHA256 with the info
   string `b"tesserae.secret_box.v1"`. The fallback logs at info on
   first use so the operator can promote to an env-pinned key later.
-- **Two calm desk widgets.** `Countdown, Date` (large N days / hours
-  hero against a target date, friendly meta line with the formatted
-  date) and `Year, Progress` (year-in-weeks or life-in-weeks dot
-  grid with a percentage hero). Both pure client-side, no network.
+- **Two new widgets.** `Countdown, Date` (large N days / hours hero
+  against a target date, friendly meta line with the formatted date)
+  and `Year, Progress` (year-in-weeks or life-in-weeks dot grid with
+  a percentage hero). Both pure client-side, no network.
 
 ### Internals
 
