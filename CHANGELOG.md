@@ -6,6 +6,108 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.47.17], 2026-06-16
+
+### Docs
+
+- **CHANGELOG backfilled for 0.47.11 through 0.47.16.** Those six
+  patch releases shipped without changelog entries; this catches up
+  the record. No runtime change.
+
+## [0.47.16], 2026-06-16
+
+### Fixed
+
+- **History rows for scheduler and rotation pushes now show the page
+  name** instead of the raw hex id. The view's name-resolution was
+  gated on `ev.source == "page"`, so manual sends got resolved but
+  scheduler / rotation events stayed as hex slugs (`875b37e3a8c1`
+  rather than the actual page name). The gate is removed; all
+  `type="push"` rows go through the page-name lookup with the dict
+  fallback covering URL / webpage one-offs. Follow-up to #15.
+
+## [0.47.15], 2026-06-16
+
+### Fixed
+
+- **Blank scheduled and rotation pushes when a page uses the
+  webpage widget (#15).** The widget mounts an iframe in a shadow
+  root; the iframe is its own browsing context whose content load
+  is not part of the parent compose page's network state. The
+  composer's `__tesseraeComposed` flag fired the instant the widget's
+  `render()` returned (synchronously, right after the iframe element
+  was created), so Playwright screenshotted a blank cell before the
+  iframe finished loading. Manual "Send page" worked most of the
+  time because that path is `_push_arbitrary_url` and renders the
+  source URL directly with Playwright's own load wait, bypassing
+  compose entirely. Fix: the webpage widget's `render()` is now async
+  and awaits the iframe's `load` event (capped at 6 s so a hung site
+  doesn't pin the render). The composer already awaits each cell's
+  render Promise, so `__tesseraeComposed` correctly waits for visible
+  content.
+
+- **`ValueError("unknown file extension: .tmp")` in the History
+  thumbnail serve path.** The atomic-rename temp filename was built
+  via `thumb_path.with_suffix(suffix + ".tmp")`, producing
+  `foo.png.tmp`. Pillow's `save()` then inferred the format from the
+  extension and raised. Cosmetic only (broken thumbnails in the
+  editor's History view, not blank panels), but logged a Python
+  traceback on every render. Fix: pass `format=` explicitly so the
+  temp filename can't break format inference.
+
+## [0.47.14], 2026-06-15
+
+### Fixed
+
+- **mypy `--strict` regression in the
+  `_github_commit_cadence` widget sample.** The sample's
+  `sum(b["count"] for b in bars)` and `max(bars, key=...)` walked a
+  `dict[str, object]` list, so mypy strict choked on the implicit
+  `int()` calls. Compute the totals from the raw `seed: list[int]`
+  directly and look up the peak by index; same payload, no type-
+  narrowing dance.
+
+## [0.47.13], 2026-06-15
+
+### Added
+
+- **Dev-gallery sample payloads for the seven new GitHub hero
+  widgets + `devref_egress`.** Lets `/_test/widgets` render
+  `github_star_count`, `github_streak`, `github_pr_count`,
+  `github_ci_status`, `github_star_growth`,
+  `github_activity_heatmap`, `github_commit_cadence`, and the
+  network-egress contract demo without needing a live GitHub token
+  or unrestricted network egress. Gallery-only; no runtime change to
+  the host.
+
+## [0.47.12], 2026-06-14
+
+### Fixed
+
+- **Community and user themes were shown correctly in the live
+  preview but rendered as the Light fallback when pushed to a
+  panel.** The `/compose/<id>` route bypasses the auth gate from
+  loopback so the in-process Playwright renderer can fetch it without
+  a session. The template references `/themes/user.css` and
+  `/themes/community.css` via `<link>` tags, but those endpoints
+  weren't on the loopback allowlist, so Playwright's subresource
+  fetches got redirected to `/login` and the panel render fell back
+  to bundled tokens only. The editor's iframe carries an authed
+  session cookie which is why preview worked. Fix: add both theme
+  CSS endpoints to `_LOOPBACK_PATHS` in `app/auth.py` + regression
+  tests.
+
+## [0.47.11], 2026-06-14
+
+### Added
+
+- **Kind filter chips on the marketplace Browse page.** Splits
+  Widgets / Themes / Fonts with per-type counts and icons; cross-
+  filters with the existing tag chips via shared query params. Sits
+  inside the Filter card so the page structure doesn't change. The
+  chip row auto-hides when only one kind is present, so a widget-only
+  catalog looks identical to before.
+
 ## [0.47.10], 2026-06-14
 
 ### Fixed
