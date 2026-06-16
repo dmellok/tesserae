@@ -602,6 +602,34 @@ def create_app(
         page = page_store.get(page_id)
         return list(page.device_ids) if page else []
 
+    # v0.48 conditional schedules / rotations: the evaluator's HA cache
+    # is refreshed by the scheduler on every tick via ``ha_get_states``.
+    # ``ha_core`` is loaded as a plugin; reaching it via the registry
+    # keeps the host loosely coupled (ha_core can be uninstalled and
+    # the evaluator just degrades to "all conditions fail-open" with
+    # an empty cache).
+    def _ha_get_states() -> list[dict[str, Any]]:
+        plugin = plugins.get("ha_core")
+        if plugin is None or plugin.server_module is None:
+            return []
+        try:
+            return list(plugin.server_module.get_states())
+        except Exception:
+            return []
+
+    def _resolve_location() -> tuple[Any, Any]:
+        app_section = settings.get_section("app") or {}
+        return app_section.get("latitude"), app_section.get("longitude")
+
+    from app.scheduler_conditions import ConditionEvaluator
+
+    condition_evaluator = ConditionEvaluator(
+        ha_get_states=_ha_get_states,
+        timezone_provider=_resolve_timezone,
+        location_provider=_resolve_location,
+    )
+    app.config["CONDITION_EVALUATOR"] = condition_evaluator
+
     scheduler = Scheduler(
         store=schedule_store,
         rotation_store=rotation_store,
@@ -611,6 +639,7 @@ def create_app(
         page_exists=lambda page_id: page_store.get(page_id) is not None,
         device_ids_for_page=_device_ids_for_page,
         device_telemetry=app.config["DEVICE_TELEMETRY"],
+        condition_evaluator=condition_evaluator,
     )
     app.config["SCHEDULER"] = scheduler
     if not testing and not is_watcher:
@@ -627,6 +656,9 @@ def create_app(
     marketplace_routes.register(app)
     app.register_blueprint(composer.bp)
     settings_routes.register(app)
+    from app import condition_routes
+
+    condition_routes.register(app)
     schedule_routes.register(app)
     from app import rotation_routes
 

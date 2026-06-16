@@ -25,6 +25,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.state.conditions import Condition
+
 DAYS_OF_WEEK_FULL: list[int] = [0, 1, 2, 3, 4, 5, 6]  # 0=Mon ... 6=Sun (ISO)
 
 
@@ -64,6 +66,19 @@ class Schedule(BaseModel):
     # the configured cadence.
     smart_sync: bool = False
     smart_sync_lead_s: int = Field(default=10, ge=0, le=600)
+
+    # Conditions are AND'd together; the schedule fires only when all
+    # resolve to true. Empty list (the default) preserves the pre-0.48
+    # "always ready when due" behaviour. See app.state.conditions for
+    # the per-kind shape rules.
+    conditions: list[Condition] = Field(default_factory=list)
+
+    # Page to push when the schedule is due but conditions failed.
+    # ``None`` (default) means "skip silently" (no History row, INFO-
+    # level log only). When set, the scheduler pushes this page
+    # instead of ``page_id`` and writes a normal History row tagged
+    # ``"scheduler_fallback"`` so the user can see which path fired.
+    fallback_page_id: str | None = None
 
     @field_validator("days_of_week")
     @classmethod

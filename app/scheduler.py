@@ -31,6 +31,7 @@ from datetime import UTC, datetime, time, timedelta, tzinfo
 from typing import Any
 
 from app.push import PushManager, PushResult
+from app.scheduler_conditions import ConditionEvaluator
 from app.state.event_log import EventLog
 from app.state.rotation_model import Rotation, RotationStep
 from app.state.rotation_store import RotationStore
@@ -215,6 +216,12 @@ class Scheduler:
         # Rotations (issue: dashboard rotation). Optional; None means
         # no rotation evaluation runs each tick. Production wires it.
         rotation_store: RotationStore | None = None,
+        # Conditional schedules + rotation steps (v0.48). Optional; None
+        # means every condition resolves to True (legacy behaviour) so
+        # existing tests don't need updating. Production wires a real
+        # evaluator backed by ha_core's state list + the app's tz +
+        # settings.app lat/lon.
+        condition_evaluator: ConditionEvaluator | None = None,
         tick_seconds: int = 30,
     ) -> None:
         """``push_manager`` is a zero-arg factory that resolves the
@@ -243,6 +250,7 @@ class Scheduler:
         self._page_exists = page_exists
         self._device_ids_for_page = device_ids_for_page
         self._device_telemetry = device_telemetry
+        self._condition_evaluator = condition_evaluator
         self._tick = tick_seconds
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -262,6 +270,12 @@ class Scheduler:
         # the same page every tick). Cleared on disable so re-enable
         # fires the current step fresh.
         self._rotation_last_step: dict[str, int] = {}
+        # rotation_id -> POSIX timestamp of the last push fired for it,
+        # used by the v0.48 minimum-hold-time gate so a flapping HA
+        # sensor near a numeric threshold doesn't thrash a priority
+        # rotation. Updated on every successful (sent / quiet / held)
+        # fire.
+        self._rotation_last_pushed_at: dict[str, float] = {}
         # rotation_id we've warned about for a missing step page; same
         # one-shot semantics as ``_warned_missing_page``.
         self._warned_missing_rotation_page: set[str] = set()
@@ -390,6 +404,14 @@ class Scheduler:
 
     def _tick_once(self, now: datetime) -> None:
         self._observe(now)
+        # v0.48: refresh the HA state cache once per tick so each
+        # condition evaluation across schedules + rotation steps reads
+        # consistent state. Best-effort; HA unreachable returns False
+        # and the evaluator falls open (every condition passes), so
+        # dashboards keep refreshing on their existing cadence even
+        # when HA is offline.
+        if self._condition_evaluator is not None:
+            self._condition_evaluator.refresh_ha_states()
         # Rotations fire FIRST so any same-tick schedule pushes land
         # last. Reason: eink panels show the most recent frame. If a
         # user has set up a daily schedule to override the rotation at
@@ -449,6 +471,10 @@ class Scheduler:
             # the same step you're already on) and the scheduler would
             # skip the push.
             self._rotation_last_step.pop(rotation.id, None)
+            # Manual force also bypasses the v0.48 min-hold gate -
+            # user intent always reaches the panel, same convention
+            # as quiet hours and conditional schedules' ``bypass``.
+            self._rotation_last_pushed_at.pop(rotation.id, None)
         return self.compute_step_state(rotation, now)
 
     def clear_anchor_override(self, rotation_id: str) -> None:
@@ -480,7 +506,17 @@ class Scheduler:
             state = self.compute_step_state(rotation, now)
             if state is None:
                 continue
-            step_index = state.step_index
+            # v0.48: route through the conditional / priority picker so
+            # an unmet condition on the current step advances to the
+            # next eligible one (scheduled mode) or so the highest-
+            # priority matching step wins (priority mode). Returns
+            # None when no step is eligible right now, which we treat
+            # as "hold on whatever was last shown".
+            time_step_index = state.step_index
+            picked = self._pick_eligible_step(rotation, time_step_index, now)
+            if picked is None:
+                continue
+            step_index = picked
             step = rotation.steps[step_index]
             if self._page_exists is not None and not self._page_exists(step.page_id):
                 with self._lock:
@@ -498,6 +534,19 @@ class Scheduler:
                 last_step = self._rotation_last_step.get(rotation.id)
             if last_step == step_index:
                 continue
+            # Minimum hold gate (v0.48): prevent flap when a condition
+            # input oscillates near a threshold. Applies in both modes;
+            # ``last_pushed_at`` is updated by ``_fire_rotation`` on
+            # every successful fire. Manual "play step now" already
+            # writes to the override and bypasses the find/fire path.
+            min_hold_s = rotation.min_hold_minutes * 60
+            if min_hold_s > 0:
+                with self._lock:
+                    last_pushed_at = self._rotation_last_pushed_at.get(rotation.id)
+                if last_pushed_at is not None:
+                    elapsed = now.timestamp() - last_pushed_at
+                    if elapsed < min_hold_s:
+                        continue
             # Smart-sync: same wake-aware gate that schedules use.
             # Hold the transition until a bound device is close to
             # waking, so the frame the panel grabs is fresh rather
@@ -514,6 +563,39 @@ class Scheduler:
             out.append((rotation, step_index))
         out.sort(key=lambda pair: (-pair[0].priority, pair[0].id))
         return out
+
+    def _pick_eligible_step(
+        self,
+        rotation: Rotation,
+        time_step_index: int,
+        now: datetime,
+    ) -> int | None:
+        """Return the index of the rotation step that should actually
+        fire, honouring conditions and the rotation's mode.
+
+        * **scheduled** (default): start at the time-based step, walk
+          forward through the cycle, return the first step whose
+          conditions pass. ``None`` if none pass; the caller treats
+          that as "hold on whatever was last shown".
+        * **priority**: walk steps in declared order and return the
+          first whose conditions pass. Step durations are ignored.
+
+        Rotations without an evaluator fall back to the time-based
+        index for scheduled mode and step 0 for priority mode."""
+        if not rotation.steps:
+            return None
+        if self._condition_evaluator is None:
+            return 0 if rotation.mode == "priority" else time_step_index
+        n = len(rotation.steps)
+        if rotation.mode == "priority":
+            order: list[int] = list(range(n))
+        else:
+            order = [(time_step_index + i) % n for i in range(n)]
+        for idx in order:
+            step = rotation.steps[idx]
+            if self._condition_evaluator.all_pass(step.conditions, when=now):
+                return idx
+        return None
 
     def _fire_rotation(
         self,
@@ -541,6 +623,10 @@ class Scheduler:
         if result.status in ("sent", "quiet"):
             with self._lock:
                 self._rotation_last_step[rotation.id] = step_index
+                # v0.48: arm the minimum-hold gate so a flapping
+                # condition input can't immediately re-trigger a
+                # step transition.
+                self._rotation_last_pushed_at[rotation.id] = now.timestamp()
         if self._event_log is not None:
             self._event_log.record(
                 type="rotation",
@@ -623,17 +709,52 @@ class Scheduler:
         now: datetime,
         *,
         respect_quiet_hours: bool = False,
+        bypass_conditions: bool = False,
     ) -> PushResult:
-        logger.info("Firing schedule %s -> page %s", schedule.id, schedule.page_id)
+        # Conditional-schedule gate (v0.48). Evaluated before the push
+        # so a held schedule incurs zero rendering cost. ``fire_now``
+        # passes ``bypass_conditions=True`` because manual intent
+        # should always reach the panel (same convention quiet hours
+        # uses). When all conditions pass we route to ``schedule.page_id``;
+        # when any fail we route to ``schedule.fallback_page_id`` if
+        # set, or skip silently.
+        target_page = schedule.page_id
+        held = False
+        if (
+            not bypass_conditions
+            and schedule.conditions
+            and self._condition_evaluator is not None
+            and not self._condition_evaluator.all_pass(schedule.conditions, when=now)
+        ):
+            held = True
+            if schedule.fallback_page_id:
+                target_page = schedule.fallback_page_id
+                logger.info(
+                    "Schedule %s: conditions failed; routing to fallback page %s",
+                    schedule.id,
+                    target_page,
+                )
+            else:
+                logger.info(
+                    "Schedule %s held: conditions not met (skipping silently)",
+                    schedule.id,
+                )
+                # Treat held like a successful fire for last_fired so
+                # the interval gate doesn't re-evaluate every tick
+                # through the held window.
+                with self._lock:
+                    self._last_fired[schedule.id] = now.timestamp()
+                return PushResult(status="held", page_id=schedule.page_id)
+        logger.info("Firing schedule %s -> page %s", schedule.id, target_page)
         # Tick-driven firings (the background loop) are automation -
         # they should respect quiet hours so a 22:30 schedule doesn't
         # wake the room. fire_now() is the manual "Fire" button on the
         # Schedules page; user intent always goes through, so it leaves
         # respect_quiet_hours off.
         result = self._push_factory().push(
-            schedule.page_id,
+            target_page,
             respect_quiet_hours=respect_quiet_hours,
-            source="scheduler",
+            source="scheduler_fallback" if held else "scheduler",
         )
         # Successful fires bump last_fired so the daily / interval gates
         # work; a failed push doesn't update it (the next tick can retry).
@@ -676,11 +797,12 @@ class Scheduler:
         return out
 
     def fire_now(self, schedule_id: str) -> PushResult | None:
-        """Manual trigger: skip every gate, fire the schedule immediately."""
+        """Manual trigger: skip every gate (quiet hours, conditions),
+        fire the schedule immediately."""
         s = self._store.get(schedule_id)
         if s is None:
             return None
-        return self._fire(s, datetime.now(UTC))
+        return self._fire(s, datetime.now(UTC), bypass_conditions=True)
 
     def status(self) -> dict[str, dict[str, float | None]]:
         """Snapshot of the scheduler's in-memory state. Used by the

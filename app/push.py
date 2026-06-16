@@ -102,7 +102,7 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
 
 logger = logging.getLogger(__name__)
 
-PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet"]
+PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet", "held"]
 
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
 # Larger downloads are rejected before going through Pillow.

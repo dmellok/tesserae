@@ -90,6 +90,41 @@ def _unique_schedule_id(base: str) -> str:
     return candidate
 
 
+def _parse_conditions_json(raw: str) -> list[dict[str, Any]]:
+    """Parse the form's ``conditions_json`` textarea contents. Empty
+    text means "no conditions"; otherwise the textarea must contain a
+    JSON array. Each element is passed through to the model which
+    validates per-source-kind shape via ``Condition``. JSON syntax
+    errors raise ``ValidationError`` so the same flash-and-re-render
+    path the rest of ``_parse_form`` uses surfaces them in the editor.
+    """
+    import json
+
+    text = (raw or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValidationError.from_exception_data(
+            "Schedule",
+            [
+                {
+                    "type": "json_invalid",
+                    "loc": ("conditions",),
+                    "input": text,
+                    "ctx": {"error": str(exc)},
+                }
+            ],
+        ) from exc
+    if not isinstance(parsed, list):
+        raise ValidationError.from_exception_data(
+            "Schedule",
+            [{"type": "list_type", "loc": ("conditions",), "input": parsed}],
+        )
+    return parsed
+
+
 def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Schedule:
     """Build a Schedule from a form dict. Raises ValidationError on bad
     input, the caller flashes and re-renders.
@@ -115,6 +150,11 @@ def _parse_form(form: dict[str, Any], *, existing_id: str | None = None) -> Sche
         # the model ignores them for daily-type schedules.
         "smart_sync": form.get("smart_sync") in ("on", "true", "1"),
         "smart_sync_lead_s": int(form.get("smart_sync_lead_s") or 10),
+        # v0.48: conditional schedules + fallback page. Empty inputs
+        # round-trip to existing-default behaviour (no conditions,
+        # no fallback).
+        "conditions": _parse_conditions_json(form.get("conditions_json") or ""),
+        "fallback_page_id": (form.get("fallback_page_id") or "").strip() or None,
     }
     if schedule_type == "interval":
         try:

@@ -36,9 +36,11 @@ mypy --strict applies via re-export through app.state.
 from __future__ import annotations
 
 import re
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.state.conditions import Condition
 
 # 0=Mon ... 6=Sun (ISO weekday minus 1). Mirrored from Schedule for
 # consistency across the two scheduling primitives.
@@ -54,6 +56,13 @@ class RotationStep(BaseModel):
 
     page_id: str = Field(min_length=1)
     dwell_minutes: DwellMinutes
+
+    # AND'd together. In scheduled mode an unmet condition causes
+    # the scheduler to advance past this step to the next eligible
+    # one in the cycle. In priority mode a met-conditions step is the
+    # first match the rotation pushes. Empty list (default) preserves
+    # the pre-0.48 "always eligible" behaviour.
+    conditions: list[Condition] = Field(default_factory=list)
 
 
 class Rotation(BaseModel):
@@ -105,6 +114,20 @@ class Rotation(BaseModel):
     # display anyway).
     smart_sync: bool = False
     smart_sync_lead_s: int = Field(default=10, ge=0, le=600)
+
+    # 0.48: priority routes always pick the highest-priority step
+    # whose conditions are met (and re-evaluate each tick); scheduled
+    # keeps the existing time-based cycle but conditional steps are
+    # skipped in favour of the next eligible one. ``scheduled`` is
+    # the default so existing rotations behave exactly as before.
+    mode: Literal["scheduled", "priority"] = "scheduled"
+
+    # Minimum time the currently-pushed step holds before the
+    # scheduler is allowed to re-evaluate and switch. Prevents flap
+    # when a condition input (HA sensor reading near a threshold,
+    # time-window edge, etc.) oscillates. Applies to both modes;
+    # manual "fire now" bypasses it.
+    min_hold_minutes: int = Field(default=5, ge=0, le=120)
 
     @field_validator("days_of_week")
     @classmethod

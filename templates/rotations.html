@@ -31,6 +31,13 @@
           aria-label="Remove step">
     <i class="ph ph-x" aria-hidden="true"></i>
   </button>
+  {# v0.48 per-step conditions JSON. Empty = step is always eligible. #}
+  <details class="rot-step-cond" style="grid-column:1/-1;margin-top:0.3em">
+    <summary style="font-size:0.85em;color:var(--text-muted)">Step conditions (advanced)</summary>
+    <textarea name="step_conditions_json[]" rows="2" spellcheck="false"
+              style="width:100%;font-family:var(--ff-mono,monospace);font-size:0.85em"
+              placeholder='[]'>{% if step.conditions %}{{ step.conditions | tojson(indent=2) }}{% endif %}</textarea>
+  </details>
 </div>
 {% endmacro %}
 
@@ -90,6 +97,24 @@
       <label for="rf-{{ r.id or 'new' }}-lead">Render lead (s)</label>
       <input type="number" id="rf-{{ r.id or 'new' }}-lead" name="smart_sync_lead_s"
              value="{{ r.smart_sync_lead_s or 10 }}" min="0" max="600" step="1">
+    </div>
+  </div>
+
+  {# v0.48 routing mode + flap-prevention gate. #}
+  <div class="field-grid">
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-mode">Routing mode</label>
+      <select id="rf-{{ r.id or 'new' }}-mode" name="mode">
+        <option value="scheduled" {% if r.mode == 'scheduled' %}selected{% endif %}>Scheduled (time-based, skip steps with failing conditions)</option>
+        <option value="priority"  {% if r.mode == 'priority' %}selected{% endif %}>Priority (always show first step whose conditions match)</option>
+      </select>
+      <p class="field-help">Priority mode ignores step durations and always picks the first step with matching conditions. A step with no conditions is the always-on fallback.</p>
+    </div>
+    <div class="field">
+      <label for="rf-{{ r.id or 'new' }}-hold">Min hold (minutes)</label>
+      <input type="number" id="rf-{{ r.id or 'new' }}-hold" name="min_hold_minutes"
+             value="{{ r.min_hold_minutes if r.min_hold_minutes is not none else 5 }}" min="0" max="120" step="1">
+      <p class="field-help">Prevents flap when a condition input oscillates near a threshold. 0 disables.</p>
     </div>
   </div>
 

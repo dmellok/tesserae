@@ -86,16 +86,39 @@ def _unique_rotation_id(base: str) -> str:
     return candidate
 
 
+def _parse_step_conditions_json(raw: str) -> list[dict[str, Any]]:
+    """Parse a single step's ``conditions_json`` cell. Empty input
+    means "no conditions"; otherwise a JSON array of condition dicts."""
+    import json
+
+    text = (raw or "").strip()
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        # Bad JSON falls through to the model validator below, which
+        # rejects the rotation with a per-step error message. We don't
+        # raise here because we still want the rest of the form to
+        # parse so the editor can show what survived.
+        return [{"__invalid__": text}]  # signals "this row failed JSON"
+    if not isinstance(parsed, list):
+        return [{"__invalid__": text}]
+    return parsed
+
+
 def _parse_steps(form: Any) -> list[RotationStep]:
     """Read the parallel ``step_page_ids[]`` + ``step_dwell_minutes[]``
-    arrays out of the form and assemble RotationSteps. Empty rows
-    (blank page_id) are dropped; the model validator catches
-    "no steps" with a useful message."""
+    + ``step_conditions_json[]`` arrays out of the form and assemble
+    RotationSteps. Empty rows (blank page_id) are dropped; the model
+    validator catches "no steps" with a useful message. Per-step
+    conditions JSON is parsed inline (empty = no conditions)."""
     getlist = form.getlist if hasattr(form, "getlist") else lambda _: []
     pages = getlist("step_page_ids[]")
     dwells = getlist("step_dwell_minutes[]")
+    conditions = getlist("step_conditions_json[]")
     out: list[RotationStep] = []
-    for page_id, dwell in zip(pages, dwells, strict=False):
+    for idx, (page_id, dwell) in enumerate(zip(pages, dwells, strict=False)):
         page_id = (page_id or "").strip()
         if not page_id:
             continue
@@ -103,13 +126,24 @@ def _parse_steps(form: Any) -> list[RotationStep]:
             dwell_int = int(dwell)
         except (TypeError, ValueError):
             continue
-        out.append(RotationStep(page_id=page_id, dwell_minutes=dwell_int))
+        raw_cond = conditions[idx] if idx < len(conditions) else ""
+        cond_list = _parse_step_conditions_json(raw_cond)
+        out.append(
+            RotationStep(
+                page_id=page_id,
+                dwell_minutes=dwell_int,
+                conditions=cond_list,  # type: ignore[arg-type]
+            )
+        )
     return out
 
 
 def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
     name = (form.get("name") or "").strip()
     rotation_id = existing_id if existing_id is not None else _unique_rotation_id(_slug_from(name))
+    mode_raw = (form.get("mode") or "scheduled").strip()
+    if mode_raw not in ("scheduled", "priority"):
+        mode_raw = "scheduled"
     payload: dict[str, Any] = {
         "id": rotation_id,
         "name": name,
@@ -125,6 +159,9 @@ def _parse_form(form: Any, *, existing_id: str | None = None) -> Rotation:
         "priority": int(form.get("priority") or 0),
         "smart_sync": form.get("smart_sync") in ("on", "true", "1"),
         "smart_sync_lead_s": int(form.get("smart_sync_lead_s") or 10),
+        # v0.48 routing + flap protection.
+        "mode": mode_raw,
+        "min_hold_minutes": int(form.get("min_hold_minutes") or 5),
         "steps": [s.model_dump() for s in _parse_steps(form)],
     }
     return Rotation.model_validate(payload)

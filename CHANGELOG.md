@@ -6,6 +6,68 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.48.0], 2026-06-16
+
+### Added
+
+- **Conditional schedules and rotations.** Schedules and rotation
+  steps can now declare zero or more `Condition` rows that the
+  scheduler evaluates at fire time. All conditions on a schedule or
+  step are AND'd; an unmet condition routes the schedule to its
+  optional `fallback_page_id` (or skips silently if unset), and an
+  unmet condition on a rotation step advances to the next eligible
+  step. Three source kinds are supported: `ha_entity` (state /
+  numeric / `in` / `present_within_seconds` against any HA entity),
+  `time_window` (HH:MM wall-clock window with optional weekday
+  mask), and `sun` (`before_sunrise`, `after_sunset`, `is_day`,
+  `is_night` with optional minute offset, computed locally from
+  `settings.app.latitude` + `longitude` so no extra HA call). The
+  evaluator's HA state cache is refreshed once per scheduler tick;
+  HA-unreachable falls open so dashboards keep refreshing on the
+  existing cadence.
+- **Rotation routing modes.** New `mode: "scheduled" | "priority"`
+  on rotations. `scheduled` (default) keeps the existing time-based
+  cycle but skips steps with failing conditions; `priority` ignores
+  step durations and always pushes the first step in declared order
+  whose conditions are met (a step with no conditions becomes the
+  always-on fallback). Existing rotations default to `scheduled`
+  with empty conditions, so behaviour is unchanged until you opt
+  in.
+- **Per-rotation flap protection.** New `min_hold_minutes` on
+  rotations (default 5 min) gates step transitions so a HA sensor
+  oscillating near a numeric threshold can't thrash the displayed
+  page. Manual "play step N" overrides bypass the gate.
+- **`POST /api/conditions/test` endpoint** for the schedule and
+  rotation editor's preview button. Accepts a JSON array of
+  condition dicts, refreshes the HA state cache, returns a
+  per-condition `{passed, observed, reason}` so the user can see
+  exactly which condition would fail and why.
+- **`"held"` push status** so the History event log can distinguish
+  "schedule didn't fire because conditions" from "schedule fired but
+  failed". Held schedules with no fallback skip the History row
+  entirely (INFO log only) to keep the audit trail focused on
+  actual pushes.
+
+### Changed
+
+- Schedule + rotation editor forms expose conditions as a raw JSON
+  textarea for the 0.48.0 ship. The full Bauhaus condition picker
+  (entity autocomplete, operator dropdown, value type-shifting) lands
+  in 0.48.1; the JSON path is the underlying contract so any picker
+  UI just produces the same payload shape.
+
+### Internals
+
+- `app/state/conditions.py` carries the per-source-kind validators;
+  `app/scheduler_conditions.py` owns the evaluator + a locally-computed
+  sunrise/sunset (NOAA-style approximation, no `astral` dep).
+- `Scheduler.__init__` gained an optional `condition_evaluator`. Tests
+  that pass `None` keep the legacy "all conditions pass" behaviour so
+  the existing 34-test scheduler suite required no updates.
+- New tests: `tests/test_scheduler_conditions.py` (11 scheduler /
+  rotation integration tests) and `tests/test_condition_routes.py`
+  (3 API endpoint tests). All 941 tests green.
+
 ## [0.47.17], 2026-06-16
 
 ### Docs

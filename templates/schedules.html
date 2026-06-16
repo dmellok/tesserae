@@ -94,6 +94,30 @@
     </div>
   </div>
 
+  {# v0.48 conditions block. Raw JSON textarea for v0.48.0; the
+     entity-picker UI lands in v0.48.1. The hint shows a copy-
+     pasteable example so users can get going without reading docs. #}
+  <details class="field-grid sf-meta">
+    <summary>Conditions + fallback page (advanced)</summary>
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-conditions">Conditions (JSON)</label>
+      <textarea id="sf-{{ s.id or 'new' }}-conditions" name="conditions_json"
+                rows="4" spellcheck="false"
+                style="font-family:var(--ff-mono,monospace);font-size:0.9em">{% if s.conditions %}{{ s.conditions | tojson(indent=2) }}{% endif %}</textarea>
+      <p class="field-help">JSON array. All conditions must be true for the schedule to fire. Empty = no conditions. Example: <code>[{"source_kind":"ha_entity","source_id":"binary_sensor.person_home","operator":"==","value":"home"}]</code></p>
+    </div>
+    <div class="field">
+      <label for="sf-{{ s.id or 'new' }}-fallback">Fallback page (optional)</label>
+      <select id="sf-{{ s.id or 'new' }}-fallback" name="fallback_page_id">
+        <option value="">Skip silently when conditions fail</option>
+        {% for p in pages %}
+          <option value="{{ p.id }}" {% if s.fallback_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+      </select>
+      <p class="field-help">Push this page when conditions fail. Leave blank to skip silently.</p>
+    </div>
+  </details>
+
   <div class="actions">
     {{ button('Save changes' if edit_mode else 'Create schedule', icon='floppy-disk' if edit_mode else 'plus') }}
     {% if edit_mode %}<a class="ghost-link" href="{{ url_for('schedules.index') }}">Cancel</a>{% endif %}
