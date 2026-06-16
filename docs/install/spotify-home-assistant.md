@@ -1,229 +1,316 @@
 # Spotify widget on Home Assistant
 
 The [Spotify widget bundle](https://github.com/dmellok/tesserae-spotify)
-(`spotify_core` + `spotify_now_playing` + `spotify_queue` +
-`spotify_album_art`) needs a one-time OAuth handshake before it can show
-your now-playing track. This guide walks through that handshake when
-you're running Tesserae as a Home Assistant App, which has one
-particular wrinkle: **Spotify will only redirect OAuth callbacks to an
-HTTPS URL** (or `http://localhost`), and the App's normal access
+(`spotify_core`, `spotify_now_playing`, `spotify_queue`,
+`spotify_album_art`, `spotify_top`) needs a one-time OAuth handshake
+before it can show your playback state. This guide walks through that
+handshake when you're running Tesserae as a Home Assistant App, which
+has one specific wrinkle: **Spotify will only redirect OAuth callbacks
+to an HTTPS URL** (or `http://127.0.0.1`), and the App's normal access
 paths don't give you a stable HTTPS URL out of the box.
 
-If you're running Tesserae as a bare-metal install on your LAN, the
-flow is simpler, see the
-[Spotify bundle README](https://github.com/dmellok/tesserae-spotify)
-instead.
+If you're running Tesserae as a bare-metal install on your LAN with
+loopback access, the flow is simpler; see the
+[Spotify bundle README](https://github.com/dmellok/tesserae-spotify).
+
+## What you'll do
+
+1. Install **NGINX Proxy Manager** + **DuckDNS** HA Apps.
+2. Set up a public HTTPS URL pointing at Tesserae on your LAN.
+3. Tell Tesserae what its public URL is via the **Settings → App →
+   Public URL** field.
+4. Register a Spotify Developer app with the matching redirect URI.
+5. Click Connect.
+
+That's it. There are several ways this can go off the rails in the
+middle steps; the rest of this guide covers each in order.
 
 ## Why this is involved
 
-Spotify's OAuth contract is: when a user clicks **Connect** in the
+Spotify's OAuth contract is: when the user clicks **Connect** in the
 widget admin page, the browser bounces to Spotify, the user authorises,
-Spotify bounces them back to a `redirect_uri` that we register up
-front. Spotify checks the redirect URI's host has either:
+Spotify bounces them back to a `redirect_uri` we registered up front.
+Spotify only allows redirect URIs that are:
 
 - a public **HTTPS** URL, or
-- the literal hostname **`localhost`** (or `127.0.0.1`).
+- the literal **`http://127.0.0.1`** (loopback IP).
 
-In an HA install, you usually reach Tesserae via one of three paths:
+In a Home Assistant install, you usually reach Tesserae via one of three
+paths:
 
 | Path | Protocol | Stable? | Spotify OK? |
 |---|---|---|---|
 | HA Ingress (sidebar tab) | HTTPS | The token in the URL changes per session | No |
-| `http://homeassistant.local:8765` | HTTP | Stable | No (not HTTPS, not localhost) |
+| `http://homeassistant.local:8765` | HTTP | Stable | No (not HTTPS, not loopback) |
 | `http://<HA-IP>:8765` | HTTP | Stable | No |
 
 So we need to give Tesserae a **stable HTTPS URL** that points at port
-8765 (stable channel) or 8766 (edge). The rest of this guide is two
-options for doing that, then the same final Spotify-app registration
-and Tesserae-side configuration for each.
+8765 (stable channel) or 8766 (edge), and tell Tesserae what that URL
+is so its plugin OAuth code uses it when building redirect URIs.
 
-## Option A: NGINX Proxy Manager + DuckDNS
+## Step 1: Install DuckDNS + NGINX Proxy Manager
 
-The most common HA pattern; if you already have these two apps
-installed (for remote access generally), you're already done with the
-hard part. Skip to **Add the Tesserae host** below.
+**Both are Home Assistant Community Add-ons.** A couple of similarly
+named alternatives exist in the store; make sure you pick the right ones
+or this guide won't work.
 
-If not, install both first:
+### DuckDNS
 
-- **DuckDNS** app (free dynamic DNS + Let's Encrypt certs):
-  Settings → Apps → app store → Search DuckDNS → Install. Get a
-  token from [duckdns.org](https://www.duckdns.org/) and pick a
-  subdomain (e.g. `myhome.duckdns.org`).
-- **Nginx Proxy Manager** app: Settings → Apps → app store →
-  Search Nginx Proxy Manager → Install. Default config is fine; open
-  the web UI from its app page.
-
-### Add the Tesserae host
-
-In NGINX Proxy Manager → Hosts → Proxy Hosts → **Add Proxy Host**:
-
-- **Domain Names**: `tesserae.myhome.duckdns.org` (use your subdomain)
-- **Forward Hostname / IP**: `homeassistant.local` (or the HA host IP)
-- **Forward Port**: `8765` (stable) or `8766` (edge)
-- **Block Common Exploits**: on
-- **Websockets Support**: on
-
-Under the **SSL** tab:
-
-- **SSL Certificate**: Request a new SSL Certificate (Let's Encrypt)
-- **Force SSL**: on
-- **HTTP/2 Support**: on
-- Accept the LE T&Cs, hit Save.
-
-Tesserae is now reachable at
-`https://tesserae.myhome.duckdns.org`. That's the URL you'll use as
-the Spotify redirect. Continue to **Register the Spotify app** below.
-
-## Option B: Tailscale Funnel
-
-Simplest if you already use Tailscale; gives you an HTTPS URL on a
-`*.ts.net` subdomain with no extra config. Needs Tailscale running on
-HA.
-
-1. Install the **Tailscale** HA app.
-2. Sign in to your Tailnet on the app's page.
-3. On the HA host's shell (Terminal & SSH app), expose Tesserae:
-
-   ```bash
-   tailscale funnel --bg --https=443 http://localhost:8765
+1. **Settings → Apps → App store → search "DuckDNS"**. Install the
+   one by *Home Assistant Community Add-ons*.
+2. Visit [duckdns.org](https://www.duckdns.org/), sign in, pick a
+   subdomain (e.g. `myhome`, giving you `myhome.duckdns.org`), copy
+   the token shown at the top.
+3. In Home Assistant, open the DuckDNS App's **Configuration** tab:
+   ```yaml
+   domains:
+     - myhome.duckdns.org
+   token: <your-duckdns-token>
    ```
+4. Start the DuckDNS App. It'll keep the DNS record pointing at your
+   home's current public IP.
 
-   (Use `:8766` for the edge channel.) The command prints the public
-   HTTPS URL: something like
-   `https://homeassistant.<your-tailnet>.ts.net`.
+### Nginx Proxy Manager
 
-Tailscale Funnel needs HTTPS Certificates enabled and Funnel allowed
-on your Tailnet (admin console → Settings → Funnel). It's free for
-personal use.
+Watch out for naming: the store may show **multiple** Nginx-named Apps.
+You want the **Home Assistant Community Add-ons** one, titled simply
+**Nginx Proxy Manager** (no extra suffix).
 
-Continue to **Register the Spotify app**.
+Avoid:
 
-## Register the Spotify app
+- **NGINX Home Assistant SSL proxy** (different App, only proxies HA
+  itself, not arbitrary services).
+- **Nginx Proxy Manager + Static Web Server** (a community fork by
+  `alexbelgium`; known to fail at startup on aarch64 with
+  `/usr/bin/env: 'bash': Permission denied`).
 
-Same for all three options above.
+Steps:
 
-1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-   and log in with your Spotify account (no developer fee).
-2. Click **Create app**.
-3. Fill in:
-   - **App name**: anything (`Tesserae` works).
+1. **Settings → Apps → App store → search "Nginx Proxy Manager"**.
+   Install the Community Add-ons one.
+2. Start it. Click **Open Web UI** (NPM also serves on port `81` if the
+   button doesn't appear). Default login: `admin@example.com` /
+   `changeme`. NPM will force you to set a real password on first login.
+
+## Step 2: Get a stable HTTPS URL
+
+There are three sub-paths depending on what your router and ISP allow.
+Pick the simplest that works for you.
+
+### 2a: The happy path (port 443 forwarded, Let's Encrypt HTTP-01)
+
+If you can forward inbound TCP port 80 AND 443 from your router to your
+HA host, this is the cleanest setup.
+
+1. **Router → port forwarding**: forward external `443 → <HA-IP>:443`
+   (TCP) and `80 → <HA-IP>:80` (TCP).
+2. **NPM → Hosts → Proxy Hosts → Add Proxy Host**.
+   - **Domain Names**: `tesserae.myhome.duckdns.org`
+   - **Scheme**: `http`
+   - **Forward Hostname / IP**: `homeassistant.local` (or your HA's LAN
+     IP, e.g. `192.168.1.50`).
+   - **Forward Port**: `8765` (stable) or `8766` (edge).
+   - **Block Common Exploits**: on.
+   - **Websockets Support**: on.
+3. **SSL tab**:
+   - **SSL Certificate**: Request a new SSL Certificate.
+   - **Force SSL**: on. **HTTP/2 Support**: on.
+   - Email + Let's Encrypt T&C.
+   - Save.
+
+NPM provisions the cert (30 – 90 seconds), turns the row's SSL dot
+green. Your URL is now `https://tesserae.myhome.duckdns.org`.
+
+### 2b: Can't forward port 80 (use DNS-01 challenge)
+
+If your router or ISP blocks inbound 80 but you can forward 443, NPM
+can still get a Let's Encrypt cert via DNS-01 using your DuckDNS token.
+
+Same NPM setup as 2a, but in the SSL tab:
+
+- Tick **Use a DNS Challenge** → **DNS Provider**: DuckDNS.
+- **Credentials File Content**: paste exactly (including the
+  `dns_duckdns_token=` prefix):
+  ```
+  dns_duckdns_token=<your-duckdns-token>
+  ```
+  One line, no quotes.
+- Continue with the rest of the SSL tab as in 2a.
+
+Forward router port `443 → <HA-IP>:443` only.
+
+### 2c: ISP blocks inbound port 443 (use non-standard port)
+
+Some ISPs block well-known inbound ports (80, 443) on residential
+plans. Test this with [yougetsignal.com/tools/open-ports](https://www.yougetsignal.com/tools/open-ports/):
+if 443 comes back **closed** even after the port forward is set up,
+this is you.
+
+Solution: use external port 8443.
+
+1. NPM **Configuration** tab → set **HTTPS/SSL Entrance port** to
+   `8443` (left field; the right side stays `443/tcp`). Save. Restart
+   NPM.
+2. Router port forward: external `8443 → <HA-IP>:8443` (TCP).
+3. Set up the NPM Proxy Host as in 2b (DNS-01 challenge, since port 80
+   inbound is almost certainly also blocked).
+
+Your URL becomes `https://tesserae.myhome.duckdns.org:8443` (the
+`:8443` matters).
+
+### Check the URL works from outside
+
+From your phone on mobile data (WiFi OFF), open your URL. You should
+land on Tesserae's login page over HTTPS with a green padlock.
+
+If it doesn't load:
+
+- Check the port is open with
+  [yougetsignal.com/tools/open-ports](https://www.yougetsignal.com/tools/open-ports/).
+- If "closed": ISP is blocking that port. Try 2c with a different port.
+- If "filtered" / "timed out": **likely CGNAT.** Your router's WAN IP
+  is in the `100.64.0.0 / 10` range and isn't actually reachable from
+  the internet. Port forwarding can't fix that; you'd need to switch
+  ISP plan to one with a real public IPv4 (often called "static IP" or
+  "public IP" add-on, sometimes free, sometimes a few dollars/month).
+
+## Step 3: Tell Tesserae its public URL
+
+This is the most important step and the one most likely to be skipped.
+Tesserae's plugin OAuth code (Spotify Core's Connect button, etc.)
+builds the redirect URI from what it thinks its own URL is. Without the
+override, it sees the internal `http://<some-internal-host>:8765`
+connection NPM forwarded, which Spotify rejects.
+
+1. Open Tesserae via the new HTTPS URL (NOT via HA Ingress).
+2. **Settings → App → Public URL** (top of the page).
+3. Paste your full URL, scheme + host + port if non-standard, no
+   trailing slash:
+   - `https://tesserae.myhome.duckdns.org` (paths 2a / 2b)
+   - `https://tesserae.myhome.duckdns.org:8443` (path 2c)
+4. Save.
+
+The setting takes effect immediately; no restart needed.
+
+## Step 4: Register the Spotify Developer app
+
+1. Go to
+   [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard),
+   log in (no developer fee).
+2. **Create app**:
+   - **App name**: anything (`Tesserae` is fine).
    - **App description**: anything.
-   - **Website**: anything (`https://github.com/dmellok/tesserae`).
-   - **Redirect URI**: this is the important one. It's your stable
-     HTTPS URL from above, plus
-     `/plugins/spotify_core/callback`. Examples:
-     - NGINX Proxy Manager: `https://tesserae.myhome.duckdns.org/plugins/spotify_core/callback`
-     - Tailscale Funnel: `https://homeassistant.<your-tailnet>.ts.net/plugins/spotify_core/callback`
-4. Tick the **APIs/SDKs** you plan to use: **Web API** is enough for
-   Tesserae.
-5. Accept the developer terms and save.
-6. On the app's overview page, click **Settings** → **Basic
-   Information**. Copy the **Client ID** and click **View client
-   secret** to copy the **Client Secret**. You'll need both in the
-   next step.
+   - **Website**: anything (`https://github.com/dmellok/tesserae` is
+     fine).
+   - **Redirect URI**: your public URL from Step 3, plus
+     `/plugins/spotify_core/callback`. The match must be exact,
+     including the port if you used 2c. Examples:
+     - `https://tesserae.myhome.duckdns.org/plugins/spotify_core/callback`
+     - `https://tesserae.myhome.duckdns.org:8443/plugins/spotify_core/callback`
+   - **APIs/SDKs**: tick **Web API**.
+3. Save.
+4. On the app's overview page: **Settings → Basic Information**.
+   Copy the **Client ID**, click **View client secret**, copy the
+   **Client Secret**.
 
-## Configure Tesserae
+## Step 5: Connect Spotify
 
-1. Open Tesserae through the stable HTTPS URL you set up above
-   (NOT through the HA sidebar ingress tab). You'll log in to the
-   admin UI as you would normally.
-2. Install the Spotify widget bundle if you haven't:
-   **top nav → Widgets → Browse community widgets → Install Spotify
-   Widgets**. Restart when prompted. (The Widgets entry is in the
-   top nav, not under Settings.)
-3. After the restart, go to **top nav → Widgets → Spotify Core**
-   (the admin page the bundle drops in, listed under "Admin pages"
-   in the dropdown).
-4. Paste your **Client ID** and **Client Secret** into the form, hit
-   Save.
-5. Click **Connect**. Your browser bounces to Spotify, you authorise
-   Tesserae to read your now-playing state, Spotify bounces you back,
-   you see a "Connected as `<your-name>`" confirmation.
-6. Now `spotify_now_playing`, `spotify_queue`, and `spotify_album_art`
-   show your live state in the composition picker. Drop them onto a
-   page like any other widget.
+1. Open Tesserae via the public HTTPS URL (still NOT via HA Ingress).
+2. Install the bundle if you haven't: **top nav → Widgets → Browse
+   community widgets → Install Spotify Widgets**. Restart when
+   prompted.
+3. **top nav → Widgets → Spotify Core** (listed under "Admin pages").
+4. Paste Client ID + Client Secret. Save.
+5. Confirm the **Redirect URI** displayed at the top of the page matches
+   exactly what you registered with Spotify. If it doesn't, double-check
+   Step 3 (the Public URL setting).
+6. Click **Connect**. Browser bounces to Spotify, you approve, it
+   bounces you back to Tesserae. You should see "Connected as
+   `<your-name>`".
+
+The widgets (`spotify_now_playing`, `spotify_queue`,
+`spotify_album_art`, `spotify_top`) now show your live state in the
+composition picker. Drop them on a page like any other widget.
+
+## Once it works, optional cleanups
+
+**You can keep using Tesserae via HA Ingress for everyday admin.** The
+OAuth tokens are stored once and refresh automatically; the public URL
+is only needed for the initial Connect click and the rare case where
+Spotify's refresh-token flow drops (usually after a Spotify password
+change or many months of disuse).
+
+**Take the public URL down if you don't need it for anything else.**
+NPM lets you disable a proxy host without deleting it (toggle on the
+list view), which makes Tesserae no longer reachable from the public
+internet while leaving the configured cert + DNS + Public URL setting
+in place. If you ever need to re-Connect, re-enable the proxy host.
+
+**If you leave the public URL up**, pick a strong admin password
+(20+ random characters from a password manager). Tesserae stores the
+bcrypt hash; brute-forcing it locally is slow but possible against a
+weak password.
 
 ## Troubleshooting
 
 **Spotify says "INVALID_CLIENT: Invalid redirect URI"**
 
-The redirect URI registered on the Spotify app dashboard must match
-the URL Tesserae is computing _exactly_, including the protocol and
-trailing path. Check:
+The redirect URI registered with Spotify must match the URL Tesserae
+displays on the Spotify Core admin page _exactly_, including scheme,
+host, port, and path.
 
-- Did you tick "Force SSL" on the proxy host? Tesserae needs to be
-  reached via `https://...`, not the raw HTTP port.
-- Does the Spotify app's redirect URI end with
-  `/plugins/spotify_core/callback`?
-- If you set up the tunnel after Spotify, hit **Save** on the Spotify
-  app dashboard after editing the redirect URI; it doesn't auto-save.
+- Confirm Tesserae's displayed Redirect URI matches what you pasted
+  into Spotify's app dashboard. If they differ, the **Public URL**
+  setting (Step 3) is wrong or unset.
+- After editing the URI on Spotify's side, hit **Save** on the
+  dashboard explicitly; it doesn't auto-save.
+
+**Tesserae's displayed Redirect URI is wrong (http://, missing port,
+mangled hostname)**
+
+You've skipped or misconfigured the Public URL setting. Go back to
+**Step 3** and paste the full public URL with scheme + host + port if
+non-standard, no trailing slash.
+
+**Port 443 (or 8443) shows "closed" on
+yougetsignal.com/tools/open-ports**
+
+Two common causes:
+
+1. NPM isn't actually listening on the host port you forwarded to.
+   Check NPM's **Configuration → Network** section. The right field
+   shows the container port (always 443/tcp for HTTPS); the left field
+   is the host port. Make sure that matches the port your router is
+   forwarding to.
+2. Your ISP blocks the port. Try a different external port (path 2c).
 
 **"Couldn't reach Spotify" or hanging on Connect**
 
-The widget's outbound calls hit `accounts.spotify.com` and
-`api.spotify.com`. The widget declares these in its `requires:`
-capability block so the runtime allows them, but a network-level
-block (HA's local DNS pointing somewhere that doesn't resolve
-`spotify.com`, a Pi-hole rule, etc.) will trip this too.
+Outbound calls hit `accounts.spotify.com` and `api.spotify.com`. The
+widget declares these in its `requires:` capability block so Tesserae
+allows them, but a network-level block (Pi-hole rule, local DNS that
+doesn't resolve `spotify.com`, etc.) will trip this.
 
 **Spotify connected once but stops working after a few hours**
 
 Tokens expire; the widget refreshes them automatically using the
 refresh token Spotify gave us. If you see the connection drop without
-recovering, check the Spotify Core admin page; there should be a
-**Reconnect** button.
+recovering, open Spotify Core's admin page and hit **Reconnect**.
 
-**I want to access Tesserae via the HA sidebar Ingress tab but the
-Spotify OAuth flow needs the public URL**
+**`/usr/bin/env: 'bash': Permission denied` when starting NPM**
 
-You can. Once the OAuth dance is complete, the tokens are stored in
-Tesserae's settings and the widgets work however you access the
-server (Ingress, public URL, LAN IP). The public HTTPS URL is only
-needed for the one-time **Connect** click.
-
-If you stop being able to reach the public URL later (you take down
-the tunnel, etc.), the widgets keep working until the refresh-token
-flow has to renew, at which point you'll need the URL back to
-re-authorise.
-
-## Security: take the tunnel down after the OAuth dance
-
-The tunnel you set up in Option A / B exposes Tesserae's full
-admin UI to the public internet. Tesserae's only auth gate is the
-single admin password you set during onboarding (no 2FA today), and
-the admin UI carries the Spotify Client Secret, any GitHub PAT,
-MQTT credentials, etc. If someone scans your endpoint and
-brute-forces the password, they have full Tesserae control and your
-widget credentials.
-
-The simplest mitigation is to **take the tunnel down once the
-Connect dance is complete**:
-
-- **NGINX Proxy Manager**: disable the proxy host (toggle on the
-  list view), or delete it entirely. Spin it back up if you ever
-  need to re-authorise.
-- **Tailscale Funnel**: `tailscale funnel off` on the HA host shell.
-
-The widgets keep working on every other access path (HA sidebar
-Ingress, `http://homeassistant.local:8765`, LAN IP). Tesserae
-caches the Spotify access + refresh tokens in its settings; the
-public URL is only needed for the one-time **Connect** click and
-for the rare case Spotify's refresh-token flow drops (very
-infrequent, typically only after a Spotify account password change
-or a long disconnect).
-
-If you'd rather leave the tunnel permanently up, say, you also
-want to access Tesserae remotely from your phone without HA Cloud,
-pick a strong admin password: 20+ random characters from a password
-manager. Tesserae stores the bcrypt hash, brute-forcing it locally
-is slow but possible against a weak password.
+You probably installed the wrong NPM add-on. See the warning in Step 1:
+the `alexbelgium/nginx_webserver_proxy` build (titled "Nginx Proxy
+Manager + Static Web Server" in the store) ships a broken aarch64
+image. Uninstall it, install the Home Assistant Community Add-ons one
+(titled simply "Nginx Proxy Manager").
 
 ## Other widgets with the same constraint
 
-The same setup works for any future Tesserae widget that needs an
-OAuth flow with an HTTPS callback. The redirect URI path changes per
-widget (e.g., `/plugins/<widget_id>/callback`) but the rest is the
-same. Existing widgets in this category:
+The same setup works for any Tesserae widget that needs an OAuth flow
+with an HTTPS callback. The redirect URI path changes per widget
+(`/plugins/<widget_id>/callback`) but the rest of the flow is
+identical. Existing widgets in this category:
 
 - [Spotify](https://github.com/dmellok/tesserae-spotify) (this guide).
 
