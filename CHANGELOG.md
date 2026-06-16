@@ -6,6 +6,74 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.0], 2026-06-16
+
+### Added
+
+- **At-rest encryption for connector secrets.** Manifest-declared
+  `secret: true` fields (HA tokens, plugin API keys, etc.) are now
+  AES-GCM-wrapped on disk and unwrapped transparently when the
+  scheduler / push / fetch pipelines read them. Wire format
+  `enc:v1:<base64(nonce||ciphertext||tag)>` carries a version tag so
+  future algorithm upgrades are mechanical. Bootstrap secrets
+  (`app.session_secret_secret`, `auth.password_hash_secret`,
+  `broker.password_secret`) stay in their existing forms because
+  they're key material or already hashed.
+- **Key resolution.** `TESSERAE_SECRET_KEY` env var (64 hex chars =
+  32 bytes) takes precedence; if absent, the box derives a stable
+  key from the Flask session secret via HKDF-SHA256 with the info
+  string `b"tesserae.secret_box.v1"`. The fallback logs at info on
+  first use so the operator can promote to an env-pinned key later.
+- **Two calm desk widgets.** `Countdown, Date` (large N days / hours
+  hero against a target date, friendly meta line with the formatted
+  date) and `Year, Progress` (year-in-weeks or life-in-weeks dot
+  grid with a percentage hero). Both pure client-side, no network.
+
+### Internals
+
+- New `app.secret_box` module wrapping PyCA `cryptography`'s AESGCM
+  + HKDF primitives.
+- `SettingsStore` gains an optional `secret_box=` constructor arg
+  and a `set_secret_box()` injector. Wrap-on-write / unwrap-on-read
+  is transparent to consumers (`get_for_runtime`, `get_for_admin`,
+  `update_for_namespace`); `get_section` recursively unwraps any
+  `_secret`-suffixed string at any depth so plugin server modules
+  that read their own state directly (e.g. `ha_core`) keep seeing
+  plaintext.
+- Legacy plaintext values keep reading (unwrap is a no-op for
+  non-prefixed input). Migration to ciphertext happens
+  opportunistically on the next save; no separate walker.
+- Wrong-key reads raise `SecretBoxError` rather than silently
+  returning an empty string, so a misconfigured `TESSERAE_SECRET_KEY`
+  surfaces immediately instead of as a 401 from HA.
+- Added `cryptography>=42,<46` as a runtime dependency. Rust-backed
+  primitives, available as a manylinux wheel so the Docker base
+  image stays slim.
+
+### Upgrade notes
+
+- **Upgrading 0.48.x → 0.49.0 needs no action.** Existing plaintext
+  secrets in `settings.json` keep working (the unwrap path is a no-op
+  for non-prefixed input). They migrate to ciphertext the next time
+  you Save any setting under Plugins / Renderers / Devices.
+- **Migrating to a new install works out of the box for the default
+  setup.** The built-in Backups and Migrate flows include
+  `settings.json`, which carries the session secret the fallback key
+  is derived from. Same secret on both machines means the same
+  decryption key, so connector secrets keep working after import.
+- **If you set `TESSERAE_SECRET_KEY`**, copy that env var to the new
+  install before importing the data zip. The key lives in your
+  environment, not in `data/`, so without it the new machine derives
+  a different key and connector secrets won't decrypt. Pinning the
+  key is recommended for real installs (`openssl rand -hex 32`)
+  because rotating the session secret then won't lock you out of
+  your own connectors.
+- **Downgrading 0.49.0 → 0.48.x.** Any secret re-saved on 0.49 is
+  stored as `enc:v1:<base64>` on disk; an older Tesserae would read
+  that literal string as your HA token and fail to authenticate. To
+  downgrade, either restore `settings.json` from a pre-0.49 backup
+  or re-save each affected secret in the older version.
+
 ## [0.48.6], 2026-06-16
 
 ### Added

@@ -767,6 +767,10 @@ docker compose up -d</code></pre>
        new host or replicating a setup. #}
     <p class="device-subhead">Migrate to another install</p>
     <p class="field-help">Export the current data folder as a zip, or import a zip from another Tesserae install. Gallery photos and the render cache are skipped either way.</p>
+    <p class="field-help">
+      <i class="ph ph-key" aria-hidden="true"></i>
+      <strong>If you set <code>TESSERAE_SECRET_KEY</code></strong> in your environment, set the same value on the new install before importing. Without it, connector secrets (HA tokens, API keys) won't decrypt and you'll need to re-enter them. The default setup (no env var) needs no extra steps.
+    </p>
 
     <div class="migrate-row">
       <a class="button ghost" href="{{ url_for('auth.system_data_export') }}">

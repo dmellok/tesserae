@@ -319,6 +319,17 @@ def create_app(
         apply_ha_options(settings)
     app.secret_key = auth.secret_key(settings)
 
+    # v0.49: at-rest encryption for manifest-declared ``secret: true``
+    # fields. Resolve the SecretBox after ``auth.secret_key`` has run
+    # (so the session secret is guaranteed to exist) and inject it
+    # back into the store; legacy plaintext values keep reading and
+    # get migrated to ciphertext on the next save.
+    from app.secret_box import SecretBox
+
+    secret_box = SecretBox.resolve(app.secret_key)
+    settings.set_secret_box(secret_box)
+    app.config["SECRET_BOX"] = secret_box
+
     plugins = plugin_loader.discover(
         plugins_dir,
         schema_path=plugin_schema,

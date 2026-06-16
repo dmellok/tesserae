@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.48.6"
+version = "0.49.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -38,6 +38,11 @@ dependencies = [
     # Bundled IANA tz database so zoneinfo (scheduler + the timezone
     # picker) has a complete, consistent zone list on any host OS.
     "tzdata",
+    # AES-GCM at-rest encryption for manifest-declared secret fields
+    # (HA tokens, plugin API keys, etc.). PyCA cryptography is the de
+    # facto Python crypto library; Rust-backed primitives, well-audited,
+    # available as a manylinux wheel so the Docker image stays slim.
+    "cryptography>=42,<46",
     # Optional mDNS advertiser (Settings → opt-in): publishes
     # tesserae.local + an _http._tcp service so the appliance is
     # reachable by name without touching the host's hostname.

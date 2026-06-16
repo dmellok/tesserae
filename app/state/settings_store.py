@@ -21,18 +21,32 @@ makes every sensitive value visually obvious. The store exposes two reads:
 * ``get_for_admin(...)`` returns the same but with secret values masked.
   Used when shipping settings back to the editor / settings page.
 
+Encryption at rest (v0.49). When a ``SecretBox`` is wired into the store,
+manifest-declared secret values are AES-GCM-wrapped on the way to disk
+and unwrapped on the way back out, transparent to consumers. Legacy
+plaintext values keep reading (the unwrap path is a no-op for non-prefixed
+input) and get migrated to ciphertext the next time the field is saved.
+The bootstrap secrets (``app.session_secret_secret``, ``auth.password_hash_secret``,
+``broker.password_secret``) bypass this path: they're read with
+``get_section`` directly, so they stay in their existing form.
+
 mypy --strict applies to this module, see pyproject.toml.
 """
 
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from app.secret_box import SecretBox, SecretBoxError, is_wrapped
+
 SECRET_MASK = "********"
+
+logger = logging.getLogger(__name__)
 
 
 def _disk_key(field_name: str, *, secret: bool) -> str:
@@ -48,11 +62,62 @@ class SettingsStore:
     is small (kilobytes) and writes are infrequent, no journaling needed.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, secret_box: SecretBox | None = None) -> None:
         self._path = path
         self._lock = threading.Lock()
         self._data: dict[str, Any] = {}
+        self._secret_box = secret_box
         self._load()
+
+    def set_secret_box(self, secret_box: SecretBox) -> None:
+        """Inject a SecretBox after construction. Used by the app
+        factory, which can only resolve the key once the session
+        secret has been read out of the store. Subsequent reads /
+        writes apply the wrap/unwrap treatment immediately, and the
+        next save migrates any pre-existing plaintext secrets to
+        ciphertext opportunistically (no separate walker)."""
+        self._secret_box = secret_box
+
+    def _maybe_unwrap(self, value: Any) -> Any:
+        """Decrypt a stored secret if it's wrapped and we have a box;
+        return as-is otherwise. Wrong-key / corrupt-payload errors
+        propagate so the operator notices instead of silently getting
+        an empty token at fetch time."""
+        if self._secret_box is None or not is_wrapped(value):
+            return value
+        try:
+            return self._secret_box.unwrap(str(value))
+        except SecretBoxError:
+            logger.exception("failed to unwrap secret in settings; refusing to fall through")
+            raise
+
+    def _maybe_wrap(self, value: Any) -> Any:
+        """Encrypt a secret on its way to disk. No-op when no box is
+        wired or when the value is non-string (e.g. an old config that
+        snuck a non-string into a secret field, leave it alone rather
+        than crash the save) or when it's already wrapped."""
+        if self._secret_box is None or not isinstance(value, str) or is_wrapped(value):
+            return value
+        return self._secret_box.wrap(value)
+
+    def _unwrap_tree(self, value: Any) -> Any:
+        """Recursively unwrap ``_secret``-suffixed string values inside
+        a dict tree. Used by ``get_section`` so plugins that read their
+        own state directly (rather than going through the manifest-aware
+        ``get_for_runtime``) still see plaintext. Non-dict / non-string
+        nodes pass through unchanged; the wrap/unwrap pair is symmetric
+        with the ``_disk_key`` suffix convention so we only touch the
+        keys we'd have written ciphertext into.
+        """
+        if isinstance(value, dict):
+            out: dict[Any, Any] = {}
+            for k, v in value.items():
+                if isinstance(k, str) and k.endswith("_secret") and isinstance(v, str):
+                    out[k] = self._maybe_unwrap(v)
+                else:
+                    out[k] = self._unwrap_tree(v)
+            return out
+        return value
 
     def _load(self) -> None:
         if not self._path.exists():
@@ -71,12 +136,25 @@ class SettingsStore:
     # -- generic section access -------------------------------------------
 
     def get_section(self, section: str) -> dict[str, Any]:
-        """Return the raw, on-disk contents of a section (with ``_secret``
-        keys intact). Most callers want ``get_for_runtime`` / ``get_for_admin``
-        instead, this is the raw access used by tests and the auth module."""
+        """Return the on-disk contents of a section (with ``_secret`` keys
+        intact). Most callers want ``get_for_runtime`` / ``get_for_admin``
+        instead; this is the raw-ish access used by the auth module and
+        by plugin server modules that pull their own state without a
+        manifest in hand.
+
+        When a SecretBox is wired, ``_secret``-suffixed string values at
+        any depth are unwrapped on the way out. Bootstrap secrets like
+        ``app.session_secret_secret`` are stored unencrypted (they're key
+        material themselves) and pass through unchanged because the
+        unwrap path is a no-op for non-prefixed input.
+        """
         with self._lock:
             section_data = self._data.get(section, {})
-            return dict(section_data) if isinstance(section_data, dict) else {}
+            if not isinstance(section_data, dict):
+                return {}
+            unwrapped = self._unwrap_tree(section_data)
+            assert isinstance(unwrapped, dict)  # type narrowing for mypy
+            return unwrapped
 
     def update_section(self, section: str, values: dict[str, Any]) -> None:
         """Replace the entire section with ``values``. The auth + app
@@ -118,7 +196,8 @@ class SettingsStore:
             is_secret = bool(field.get("secret"))
             disk = _disk_key(name, secret=is_secret)
             if disk in on_disk:
-                out[name] = on_disk[disk]
+                value = on_disk[disk]
+                out[name] = self._maybe_unwrap(value) if is_secret else value
             elif "default" in field:
                 out[name] = field["default"]
         return out
@@ -180,7 +259,7 @@ class SettingsStore:
                 if is_secret and value == SECRET_MASK:
                     # User left the masked value alone, don't overwrite.
                     continue
-                merged[disk] = value
+                merged[disk] = self._maybe_wrap(value) if is_secret else value
             ns[item_id] = merged
             self._flush()
 

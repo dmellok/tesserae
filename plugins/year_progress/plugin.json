@@ -1,0 +1,53 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Year, Progress",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "How far through the year you are. Two modes: the current calendar year as a row of weekly dots, or 'life in weeks' as a long-form grid (give a birth year). Pure client-side, no network.",
+  "icon": "ph-calendar-dots",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "cell_options": [
+    {
+      "name": "mode",
+      "type": "select",
+      "label": "Mode",
+      "default": "year",
+      "choices": [
+        { "value": "year",       "label": "Year in weeks"  },
+        { "value": "life-weeks", "label": "Life in weeks"  }
+      ]
+    },
+    {
+      "name": "birth_year",
+      "type": "number",
+      "label": "Birth year (for 'life in weeks' mode)",
+      "default": ""
+    },
+    {
+      "name": "life_expectancy_years",
+      "type": "number",
+      "label": "Life expectancy in years (for 'life in weeks' mode)",
+      "default": 80
+    },
+    {
+      "name": "show_percentage",
+      "type": "boolean",
+      "label": "Show percentage number",
+      "default": true
+    },
+    {
+      "name": "accent",
+      "type": "select",
+      "label": "Accent colour",
+      "default": "terracotta",
+      "choices": [
+        { "value": "terracotta", "label": "Terracotta" },
+        { "value": "ochre",       "label": "Ochre"      },
+        { "value": "moss",        "label": "Moss"       },
+        { "value": "teal",        "label": "Teal"       },
+        { "value": "slate",       "label": "Slate blue" }
+      ]
+    }
+  ],
+  "render": { "dither": "none", "needs_network": false }
+}
