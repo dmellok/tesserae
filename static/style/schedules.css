@@ -476,24 +476,27 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 }
 
 /* v0.48 per-step conditions disclosure. The summary renders as a
-   proper button (matches the rest of the editor's ghost-button look)
-   inline in column 6 of the step row; the textarea pops below the
-   row when expanded, aligned with the page-select column and capped
-   on the right so it doesn't extend past the dwell input. */
+   proper button matching the input + ghost button heights in the
+   row, so all controls share one baseline. The textarea pops below
+   the row when expanded, capped to the form's content width so it
+   never extends past the card. */
 .rot-step-cond > summary {
   list-style: none;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  padding: 0.4em 0.85em;
+  /* Match the padding the form's ghost buttons + inputs use so the
+     button shares the same vertical height as the X icon button and
+     the dwell input next to it. */
+  padding: var(--t-space-2) var(--t-space-3);
   border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 18%, transparent));
-  border-radius: var(--t-radius-1, 6px);
+  border-radius: var(--t-radius-sm, 6px);
   background: transparent;
   color: var(--t-fg, #1B1A16);
-  font-size: var(--t-size-sm, 0.85em);
+  font-size: var(--t-size-md, 0.95em);
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.2;
   user-select: none;
   transition: background-color 0.12s ease, border-color 0.12s ease;
 }
@@ -506,19 +509,19 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   border-color: var(--t-accent, #C24F2C);
   color: var(--t-fg, #1B1A16);
 }
+/* Textarea positioning: anchor to the right edge of the X button so
+   the panel only spans the page-select + dwell + min columns. Width
+   capped to the row's content so it can't escape the form card on
+   any viewport. */
 .rot-step-cond > textarea {
   position: absolute;
-  /* Align with the page-select column on the left, and stop at the
-     same point the page-select stops (before the dwell input column).
-     Right offset = dwell col (8ch) + min col (3ch) + remove btn (auto)
-     + Conditions btn (auto) + the 4 gaps between them. We approximate
-     the "auto" cols at ~3em each because both contain a single icon /
-     short label so the value is stable. */
   left: calc(2em + var(--t-space-2, 0.5em));
-  right: calc(8ch + 3ch + 6em + var(--t-space-2, 0.5em) * 4);
+  /* Stop the right edge before the X button + Conditions button + the
+     two gaps. Both buttons share the same padding so we measure once. */
+  right: calc(2 * (2.5em + var(--t-space-2, 0.5em)) + 4em);
   top: calc(100% + 0.3em);
+  max-width: 100%;
   min-width: 14ch;
-  top: calc(100% + 0.3em);
   font-family: var(--ff-mono, ui-monospace, monospace);
   font-size: 0.85em;
   z-index: 2;
@@ -527,9 +530,9 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 
 @media (max-width: 540px) {
   .rot-step-cond > textarea {
-    /* Mobile grid is tighter; just align with the page-select start
-       and let the right edge run to the container so the JSON has
-       room on small screens. */
+    /* On mobile the grid columns are too narrow to keep the controls
+       inline; let the textarea use the page-select column width
+       through the right edge of the row. */
     left: calc(1.5em + var(--t-space-2, 0.5em));
     right: 0;
   }
