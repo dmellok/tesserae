@@ -18,8 +18,6 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 from app.push import PushResult
 from app.scheduler import Scheduler
 from app.scheduler_conditions import ConditionEvaluator
@@ -28,7 +26,6 @@ from app.state.rotation_model import Rotation, RotationStep
 from app.state.rotation_store import RotationStore
 from app.state.schedule_model import Schedule
 from app.state.schedule_store import ScheduleStore
-
 
 # -- test plumbing -----------------------------------------------------
 
@@ -396,3 +393,96 @@ def test_rotation_without_conditions_or_mode_behaves_like_before(tmp_path: Path)
     # both steps have empty conditions.
     assert scheduler._pick_eligible_step(rotation, 1, datetime.now(UTC)) == 1
     assert scheduler._pick_eligible_step(rotation, 0, datetime.now(UTC)) == 0
+
+
+# -- v0.48 running-state pill tracking ---------------------------------
+
+
+def test_status_records_sent_after_successful_fire(tmp_path: Path) -> None:
+    """A normal fire records ``last_status="sent"`` and clears the
+    reason so the index pill renders as ``active`` (green check)."""
+    s = _hourly_schedule("morning", "dashboard_morning")
+    scheduler, _ = _scheduler(tmp_path, schedules=[s])
+    scheduler._fire(s, datetime(2026, 6, 16, 9, 0, tzinfo=UTC))
+    snap = scheduler.status()[s.id]
+    assert snap["last_status"] == "sent"
+    assert snap["last_reason"] is None
+
+
+def test_status_records_held_when_conditions_fail(tmp_path: Path) -> None:
+    """Silent-skip path: status reflects the hold so the Schedules
+    page can show ``held`` instead of a stale ``enabled`` pill."""
+    s = _hourly_schedule(
+        "morning",
+        "dashboard_morning",
+        conditions=[ha_condition("binary_sensor.home", "==", "on")],
+    )
+    scheduler, _ = _scheduler(
+        tmp_path,
+        schedules=[s],
+        ha_states=[{"entity_id": "binary_sensor.home", "state": "off"}],
+    )
+    scheduler._fire(s, datetime(2026, 6, 16, 9, 0, tzinfo=UTC))
+    snap = scheduler.status()[s.id]
+    assert snap["last_status"] == "held"
+    assert snap["last_reason"] == "conditions not met"
+
+
+def test_status_records_fallback_when_conditions_route_to_fallback(tmp_path: Path) -> None:
+    """When a fallback page absorbs the held fire, the pill says
+    ``fallback`` rather than ``active`` so the user knows a different
+    page is on the panel than the schedule's primary."""
+    s = _hourly_schedule(
+        "morning",
+        "dashboard_morning",
+        conditions=[ha_condition("binary_sensor.home", "==", "on")],
+        fallback_page_id="away_message",
+    )
+    scheduler, _ = _scheduler(
+        tmp_path,
+        schedules=[s],
+        ha_states=[{"entity_id": "binary_sensor.home", "state": "off"}],
+    )
+    scheduler._fire(s, datetime(2026, 6, 16, 9, 0, tzinfo=UTC))
+    snap = scheduler.status()[s.id]
+    assert snap["last_status"] == "sent"
+    assert snap["last_reason"] is not None
+    assert "fallback" in snap["last_reason"]
+
+
+def test_rotation_status_records_held_when_no_step_eligible(tmp_path: Path) -> None:
+    """Every step's conditions fail, so the rotation tick is held.
+    ``rotation_status`` should surface that as ``held`` with a
+    descriptive reason; the Rotations page renders an extra warm
+    held pill alongside the existing "Now / Not active" pill."""
+    rotation = _rotation(
+        "guarded",
+        steps=[
+            RotationStep(
+                page_id="urgent",
+                dwell_minutes=10,
+                conditions=[ha_condition("binary_sensor.urgent", "==", "on")],
+            ),
+            RotationStep(
+                page_id="quiet",
+                dwell_minutes=10,
+                conditions=[ha_condition("binary_sensor.quiet", "==", "on")],
+            ),
+        ],
+    )
+    scheduler, _ = _scheduler(
+        tmp_path,
+        rotations=[rotation],
+        ha_states=[
+            {"entity_id": "binary_sensor.urgent", "state": "off"},
+            {"entity_id": "binary_sensor.quiet", "state": "off"},
+        ],
+    )
+    # find_due_rotations walks every rotation; when no step is eligible
+    # it records the held state and skips the fire.
+    due = scheduler.find_due_rotations(datetime(2026, 6, 16, 12, 0, tzinfo=UTC))
+    assert due == []
+    snap = scheduler.rotation_status()[rotation.id]
+    assert snap["last_status"] == "held"
+    assert snap["last_reason"] is not None
+    assert "conditions" in snap["last_reason"]

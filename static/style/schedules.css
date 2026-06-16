@@ -19,6 +19,27 @@
   .schedule-form .sf-window { grid-column: auto; }
 }
 
+/* Conditions + fallback block. Lives outside the 3-column form grid so
+   the picker has the full form width to render its rows. The disclosure
+   summary stays compact; the open body stacks the two fields vertically
+   so the picker can breathe and the fallback select sits beneath it. */
+.schedule-form .sf-conditions {
+  margin: 0;
+}
+.schedule-form .sf-conditions > summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 600;
+  padding: var(--t-space-2) 0;
+  color: var(--t-fg, #1B1A16);
+}
+.schedule-form .sf-conditions-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-4);
+  margin-top: var(--t-space-2);
+}
+
 /* "optional" tag beside a field label. */
 .field-opt {
   font-size: var(--t-size-xs);
@@ -179,9 +200,46 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 .ghost-link .ph { font-size: 14px; }
 
 .muted { color: var(--t-muted); }
-.pill.is-ok.pill {
-  /* override the soft mix to keep enabled pill visible against the row */
+
+/* Pill: small status / tag chip used in the schedules + rotations
+   index tables. The base sets the shape + neutral background; the
+   ``is-*`` modifiers swap in tone colours via color-mix so they stay
+   readable against every theme without hand-tuned hex per variant. */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--t-space-1);
+  padding: 2px var(--t-space-2);
+  border-radius: var(--t-radius-pill);
+  background: color-mix(in oklab, var(--t-fg, #1B1A16) 7%, transparent);
+  color: var(--t-fg-soft, var(--t-muted));
+  font-size: var(--t-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.pill .ph { font-size: 12px; }
+.pill.is-ok {
   background: color-mix(in oklab, var(--t-ok) 18%, transparent);
+  color: color-mix(in oklab, var(--t-ok) 70%, var(--t-fg, #1B1A16));
+}
+.pill.is-warn {
+  background: color-mix(in oklab, var(--t-warn) 18%, transparent);
+  color: color-mix(in oklab, var(--t-warn) 70%, var(--t-fg, #1B1A16));
+}
+.pill.is-danger {
+  background: color-mix(in oklab, var(--t-danger) 18%, transparent);
+  color: color-mix(in oklab, var(--t-danger) 70%, var(--t-fg, #1B1A16));
+}
+.pill.is-accent {
+  background: color-mix(in oklab, var(--t-accent) 18%, transparent);
+  color: color-mix(in oklab, var(--t-accent) 75%, var(--t-fg, #1B1A16));
+}
+/* Held / waiting state: a warm dusty rose so it reads "paused", not
+   alarming. Sits next to is-warn without competing for attention. */
+.pill.is-held {
+  background: color-mix(in oklab, #A66161 18%, transparent);
+  color: color-mix(in oklab, #A66161 75%, var(--t-fg, #1B1A16));
 }
 
 /* ----- Schedules timeline ------------------------------------------ */
@@ -411,11 +469,15 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   bottom: 0;
 }
 
-.rotation-band--step-0 { background: #3366CC; }
-.rotation-band--step-1 { background: #C2185B; }
-.rotation-band--step-2 { background: #7CB342; }
-.rotation-band--step-3 { background: #FB8C00; }
-.rotation-band--step-4 { background: #8E24AA; }
+/* Warm palette to match Tesserae's terracotta accent. Each hue is
+   desaturated (~45-55% S) and mid-lightness so the bands read as
+   distinct without competing with the brand colour or fighting
+   anything in the rotation card around them. */
+.rotation-band--step-0 { background: #C2664A; } /* warm terra        */
+.rotation-band--step-1 { background: #C99A52; } /* honey ochre       */
+.rotation-band--step-2 { background: #8B9A65; } /* warm sage         */
+.rotation-band--step-3 { background: #A66161; } /* dusty rose        */
+.rotation-band--step-4 { background: #8C7196; } /* dusty mauve       */
 
 .rotation-actions {
   display: flex;
@@ -456,7 +518,6 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   grid-template-columns: 2em 1fr 8ch 3ch auto auto;
   gap: var(--t-space-2);
   align-items: center;
-  position: relative;
 }
 
 .rot-step .rot-step-num {
@@ -475,11 +536,30 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   .rot-step { grid-template-columns: 1.5em 1fr 6ch 2ch auto auto; }
 }
 
-/* v0.48 per-step conditions disclosure. The summary renders as a
-   proper button matching the input + ghost button heights in the
-   row, so all controls share one baseline. The textarea pops below
-   the row when expanded, capped to the form's content width so it
-   never extends past the card. */
+/* v0.48 step conditions: each step lives inside a .rot-step-wrap
+   wrapper that holds the controls row and a sibling panel beneath
+   it. The Conditions button on the right of the row is wired by JS
+   to toggle ``[hidden]`` on the panel. This avoids the previous
+   <details>+grid+display:contents combo that produced layout
+   surprises inside the CSS grid.
+
+   The button itself is a plain .ghost button so it shares the same
+   look as every other ghost button in the rest of the editor. */
+.rot-step-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.rot-step-cond-toggle[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--t-accent, #C24F2C) 14%, transparent);
+  border-color: var(--t-accent, #C24F2C);
+}
+.rot-step-cond-panel {
+  /* Full-width below the controls row. Sits inside the wrapper so it
+     pushes the next step down naturally rather than overlapping. */
+  width: 100%;
+  margin-top: 0;
+}
 .rot-step-cond > summary {
   list-style: none;
   cursor: pointer;
@@ -509,40 +589,141 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   border-color: var(--t-accent, #C24F2C);
   color: var(--t-fg, #1B1A16);
 }
-/* Textarea positioning: anchor to the right edge of the X button so
-   the panel only spans the page-select + dwell + min columns. Width
-   capped to the row's content so it can't escape the form card on
-   any viewport. */
-.rot-step-cond > textarea {
-  position: absolute;
-  left: calc(2em + var(--t-space-2, 0.5em));
-  /* Stop the right edge before the X button + Conditions button + the
-     two gaps. Both buttons share the same padding so we measure once. */
-  right: calc(2 * (2.5em + var(--t-space-2, 0.5em)) + 4em);
-  top: calc(100% + 0.3em);
-  max-width: 100%;
-  min-width: 14ch;
+
+/* v0.48 condition picker (static/condition-picker.js). Uses the
+   existing button.ghost + .dow-picker patterns so no new colours or
+   borders are introduced - this block only handles layout + spacing. */
+.condition-picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.condition-picker .cp-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.condition-picker .cp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2);
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 14%, transparent));
+  border-radius: var(--t-radius-sm, 6px);
+  background: color-mix(in oklab, var(--t-fg, #1B1A16) 2%, transparent);
+}
+.condition-picker .cp-row-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-2);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.condition-picker .cp-row-body > input[type="text"],
+.condition-picker .cp-row-body > input[type="number"] {
+  flex: 1 1 12em;
+  min-width: 8em;
+}
+.condition-picker .cp-row-body > .dow-picker {
+  margin-left: 0;
+}
+.condition-picker .cp-label {
+  color: var(--t-muted);
+  font-size: var(--t-size-sm);
+}
+.condition-picker .cp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--t-space-3);
+}
+.condition-picker .cp-status {
+  margin-left: auto;
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
+}
+.condition-picker .cp-status[data-tone="ok"]   { color: var(--t-success, #2E7D32); }
+.condition-picker .cp-status[data-tone="warn"] { color: var(--t-warn,    #B36A0A); }
+.condition-picker .cp-status[data-tone="fail"] { color: var(--t-danger,  #B0322A); }
+.condition-picker .cp-row-test {
+  margin-left: auto;
+  font-size: var(--t-size-md);
+  font-weight: 700;
+}
+.condition-picker .cp-row-test[data-tone="ok"]   { color: var(--t-success, #2E7D32); }
+.condition-picker .cp-row-test[data-tone="fail"] { color: var(--t-danger,  #B0322A); }
+.condition-picker .cp-error {
+  color: var(--t-danger, #B0322A);
+}
+.condition-picker .cp-advanced > summary {
+  cursor: pointer;
+  font-size: var(--t-size-sm);
+  color: var(--t-muted);
+  user-select: none;
+}
+.condition-picker .cp-advanced > .cp-json-editor {
+  margin-top: var(--t-space-2);
+}
+
+/* Syntax-highlighted JSON editor: a <pre> overlay shows coloured
+   tokens, the textarea sits on top with transparent text so the
+   caret + selection still work natively. They share the same
+   typography so character positions line up exactly. */
+.cp-json-editor {
+  position: relative;
+  border: 1px solid var(--t-border, color-mix(in oklab, var(--t-fg, #1B1A16) 18%, transparent));
+  border-radius: var(--t-radius-sm, 6px);
+  background: color-mix(in oklab, var(--t-fg, #1B1A16) 3%, transparent);
+  overflow: hidden;
+}
+.cp-json-editor .cp-jh,
+.cp-json-editor textarea {
+  margin: 0;
+  padding: var(--t-space-2);
   font-family: var(--ff-mono, ui-monospace, monospace);
   font-size: 0.85em;
-  z-index: 2;
+  line-height: 1.45;
+  tab-size: 2;
+  white-space: pre;
+  word-break: keep-all;
+  overflow-wrap: normal;
   box-sizing: border-box;
 }
-
-@media (max-width: 540px) {
-  .rot-step-cond > textarea {
-    /* On mobile the grid columns are too narrow to keep the controls
-       inline; let the textarea use the page-select column width
-       through the right edge of the row. */
-    left: calc(1.5em + var(--t-space-2, 0.5em));
-    right: 0;
-  }
+.cp-json-editor .cp-jh {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  color: var(--t-fg, #1B1A16);
 }
-/* Reserve space below the row when the disclosure is open so the
-   absolutely-positioned textarea doesn't overlap the next step. */
-.rot-step:has(.rot-step-cond[open]) {
-  margin-bottom: 5.5em;
+.cp-json-editor textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 10em;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--t-fg, #1B1A16);
+  resize: vertical;
+  outline: none;
 }
+.cp-json-editor textarea::selection {
+  background: color-mix(in oklab, var(--t-accent, #C24F2C) 30%, transparent);
+}
+.cp-jh-key { color: color-mix(in oklab, var(--t-accent, #C24F2C) 80%, var(--t-fg, #1B1A16)); }
+.cp-jh-str { color: color-mix(in oklab, #2E7D32 75%, var(--t-fg, #1B1A16)); }
+.cp-jh-num { color: color-mix(in oklab, #1F4E8C 80%, var(--t-fg, #1B1A16)); }
+.cp-jh-kw  { color: color-mix(in oklab, #9C3D9B 80%, var(--t-fg, #1B1A16)); font-weight: 600; }
 
+/* No-JS fallback: when the picker isn't initialized, the textarea
+   inside the condition-picker is the only thing the user can edit,
+   so it stays visible. Once the picker JS moves the textarea inside
+   .cp-json-editor it's no longer a direct child of .condition-picker
+   and this selector stops matching, the .cp-json-editor rules above
+   take over. */
 @media (max-width: 540px) {
   .rot-step-cond-label { display: none; }
 }

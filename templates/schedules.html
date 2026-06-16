@@ -94,27 +94,33 @@
     </div>
   </div>
 
-  {# v0.48 conditions block. Raw JSON textarea for v0.48.0; the
-     entity-picker UI lands in v0.48.1. The hint shows a copy-
-     pasteable example so users can get going without reading docs. #}
-  <details class="field-grid sf-meta">
-    <summary>Conditions + fallback page (advanced)</summary>
-    <div class="field">
-      <label for="sf-{{ s.id or 'new' }}-conditions">Conditions (JSON)</label>
-      <textarea id="sf-{{ s.id or 'new' }}-conditions" name="conditions_json"
-                rows="4" spellcheck="false"
-                style="font-family:var(--ff-mono,monospace);font-size:0.9em">{% if s.conditions %}{{ s.conditions | tojson(indent=2) }}{% endif %}</textarea>
-      <p class="field-help">JSON array. All conditions must be true for the schedule to fire. Empty = no conditions. Example: <code>[{"source_kind":"ha_entity","source_id":"binary_sensor.person_home","operator":"==","value":"home"}]</code></p>
-    </div>
-    <div class="field">
-      <label for="sf-{{ s.id or 'new' }}-fallback">Fallback page (optional)</label>
-      <select id="sf-{{ s.id or 'new' }}-fallback" name="fallback_page_id">
-        <option value="">Skip silently when conditions fail</option>
-        {% for p in pages %}
-          <option value="{{ p.id }}" {% if s.fallback_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
-        {% endfor %}
-      </select>
-      <p class="field-help">Push this page when conditions fail. Leave blank to skip silently.</p>
+  {# v0.48 conditions block. Full-width below smart sync; the inner
+     fields stack so the picker has room to breathe. The picker is
+     progressively enhanced: the hidden textarea (``conditions_json``)
+     is what the server reads, and the picker writes JSON back to it
+     on every change. Disable JS and the user gets the bare textarea
+     inside the ``Edit raw JSON`` disclosure, which still submits. #}
+  <details class="sf-conditions">
+    <summary>Conditions + fallback page</summary>
+    <div class="sf-conditions-body">
+      <div class="field">
+        <label>Conditions</label>
+        <div class="condition-picker" data-condition-picker>
+          <textarea name="conditions_json"
+                    rows="4" spellcheck="false">{% if s.conditions %}{{ s.conditions | tojson(indent=2) }}{% endif %}</textarea>
+        </div>
+        <p class="field-help">All conditions must be true for the schedule to fire. Empty = always.</p>
+      </div>
+      <div class="field">
+        <label for="sf-{{ s.id or 'new' }}-fallback">Fallback page (optional)</label>
+        <select id="sf-{{ s.id or 'new' }}-fallback" name="fallback_page_id">
+          <option value="">Skip silently when conditions fail</option>
+          {% for p in pages %}
+            <option value="{{ p.id }}" {% if s.fallback_page_id == p.id %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+        <p class="field-help">Push this page when conditions fail. Leave blank to skip silently.</p>
+      </div>
     </div>
   </details>
 
@@ -258,7 +264,19 @@
           {% if lf %}<time title="{{ lf.abs }}">{{ lf.rel }}</time>{% else %}<span class="muted">never</span>{% endif %}
         </td>
         <td class="col-state">
+          {# v0.48 running-state pill. ``running_states`` view-model
+             collapses (enabled? + last_status + last_reason) into a
+             single ``{label, tone, icon, tooltip}``. Falls back to the
+             old enabled/disabled binary when the view-model is missing
+             (older route handler / partial render). #}
+          {% set rs = running_states.get(s.id) if running_states else none %}
+          {% if rs %}
+          <span class="pill {{ rs.tone }}" title="{{ rs.tooltip }}">
+            <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
+          </span>
+          {% else %}
           {% if s.enabled %}<span class="pill is-ok">enabled</span>{% else %}<span class="pill">disabled</span>{% endif %}
+          {% endif %}
         </td>
         <td class="actions-col">
           <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="inline">
@@ -319,4 +337,5 @@
     });
   })();
 </script>
+<script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
 {% endblock %}

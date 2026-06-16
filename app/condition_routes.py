@@ -91,5 +91,47 @@ def test_conditions() -> tuple[Response, int] | Response:
     )
 
 
+@bp.get("/ha-entities")
+def list_ha_entities() -> Response:
+    """Powers the condition picker's entity autocomplete. Returns a
+    list of ``{value, label, domain, state}`` dicts for every entity
+    the HA core plugin can see, sorted for stable client-side fuzzy
+    filtering. Returns an empty list when ``ha_core`` isn't installed
+    or HA is unreachable; the picker degrades to a plain text input
+    in that case rather than blocking the editor."""
+    from flask import current_app, jsonify
+
+    plugin_registry = current_app.config.get("PLUGIN_REGISTRY")
+    if plugin_registry is None:
+        return jsonify({"entities": []})
+    plugin = plugin_registry.get("ha_core")
+    if plugin is None or plugin.server_module is None:
+        return jsonify({"entities": []})
+    try:
+        states = list(plugin.server_module.get_states())
+    except Exception:
+        return jsonify({"entities": []})
+
+    out: list[dict[str, Any]] = []
+    for st in states:
+        eid = str(st.get("entity_id") or "")
+        if not eid:
+            continue
+        attrs = st.get("attributes") or {}
+        friendly = str(attrs.get("friendly_name") or "")
+        domain = eid.split(".", 1)[0] if "." in eid else ""
+        out.append(
+            {
+                "value": eid,
+                "label": f"{friendly} ({eid})" if friendly else eid,
+                "friendly": friendly,
+                "domain": domain,
+                "state": str(st.get("state") or ""),
+            }
+        )
+    out.sort(key=lambda e: e["label"].lower())
+    return jsonify({"entities": out})
+
+
 def register(app: Flask) -> None:
     app.register_blueprint(bp)

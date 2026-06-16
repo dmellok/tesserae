@@ -6,6 +6,47 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.48.6], 2026-06-16
+
+### Added
+
+- **Running-state pills on Schedules and Rotations.** The State column
+  on the Schedules table and each Rotation card now surfaces what the
+  scheduler is actually doing for that record, rather than just
+  enabled / disabled. New states: `active` (last fire sent),
+  `fallback` (conditions failed, fallback page pushed), `held`
+  (silently skipped because conditions failed), `quiet hours`,
+  `failed`, and `pending` (no tick yet since process start). Each
+  pill carries a tooltip with the underlying reason so the user
+  doesn't need to tail the event log to find out why a schedule
+  isn't firing.
+- Endpoint tests for `GET /api/conditions/ha-entities` covering the
+  happy path plus three graceful-fallback branches (no `ha_core`
+  installed, `get_states()` raises, `PLUGIN_REGISTRY` absent).
+
+### Changed
+
+- Rotation 24-hour timeline bands now use a warm five-hue palette
+  (terra, honey, sage, dusty rose, dusty mauve) instead of the
+  Material-style primaries. Reads more harmoniously against the
+  brand terracotta accent and stops the bar from competing with the
+  card content.
+- Schedule editor's "Conditions + fallback page" block now sits as a
+  full-width row below Smart sync instead of being squeezed into the
+  three-column form grid, so the condition picker and fallback select
+  have room to breathe.
+
+### Internals
+
+- `Scheduler.status()` now also returns `last_status` + `last_reason`
+  per schedule; new `Scheduler.rotation_status()` exposes the same
+  shape for rotations. Both are populated on every `_fire` /
+  `_fire_rotation` and when `_pick_eligible_step` returns no
+  eligible step.
+- New `.pill` base + tone modifiers (`is-ok`, `is-warn`, `is-danger`,
+  `is-accent`, `is-held`) in `static/style/schedules.css`; the
+  previously implicit pill styling is now spelled out.
+
 ## [0.48.0], 2026-06-16
 
 ### Added

@@ -286,10 +286,42 @@ def _devices_for_page(pages: list[Any]) -> dict[str, list[dict[str, str]]]:
     return out
 
 
+def _running_state_view(
+    rotation: Rotation, status_row: dict[str, Any] | None
+) -> dict[str, str] | None:
+    """v0.48 running-state pill for the rotation card. Returns ``None``
+    when there's nothing exceptional to surface (the existing
+    Disabled / Now / Not active pill already covers normal state);
+    the template renders this as an extra sibling pill when present.
+    """
+    if not rotation.enabled:
+        return None
+    last_status = (status_row or {}).get("last_status")
+    last_reason = (status_row or {}).get("last_reason")
+    if last_status == "held":
+        return {
+            "label": "held",
+            "tone": "is-held",
+            "icon": "funnel",
+            "tooltip": (
+                f"All step conditions failed: {last_reason or 'no step is eligible right now'}."
+            ),
+        }
+    if last_status == "failed":
+        return {
+            "label": "failed",
+            "tone": "is-danger",
+            "icon": "warning-circle",
+            "tooltip": last_reason or "Last fire failed; see the events log.",
+        }
+    return None
+
+
 @bp.get("")
 def index() -> str:
     rotations = _store().all()
     pages = _pages().list()
+    rotation_status = _scheduler().rotation_status()
     return render_template(
         "rotations.html",
         rotations=rotations,
@@ -299,6 +331,7 @@ def index() -> str:
         current_step=_current_step_for_each(rotations),
         edit_id=request.args.get("edit"),
         projections={r.id: _build_projection(r) for r in rotations},
+        running_states={r.id: _running_state_view(r, rotation_status.get(r.id)) for r in rotations},
     )
 
 

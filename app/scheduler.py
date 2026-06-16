@@ -276,6 +276,15 @@ class Scheduler:
         # rotation. Updated on every successful (sent / quiet / held)
         # fire.
         self._rotation_last_pushed_at: dict[str, float] = {}
+        # v0.48 running-state pills. Tracks the most recent PushStatus
+        # the scheduler observed for each schedule / rotation, plus a
+        # human-readable reason string (e.g. "conditions not met") so
+        # the Schedules + Rotations index pages can show what the
+        # scheduler is currently doing without tailing the event log.
+        self._last_status: dict[str, str] = {}
+        self._last_reason: dict[str, str | None] = {}
+        self._rotation_last_status: dict[str, str] = {}
+        self._rotation_last_reason: dict[str, str | None] = {}
         # rotation_id we've warned about for a missing step page; same
         # one-shot semantics as ``_warned_missing_page``.
         self._warned_missing_rotation_page: set[str] = set()
@@ -515,6 +524,12 @@ class Scheduler:
             time_step_index = state.step_index
             picked = self._pick_eligible_step(rotation, time_step_index, now)
             if picked is None:
+                # All steps failed their conditions. Surface that as a
+                # held pill on the Rotations page so the user can see why
+                # the rotation isn't advancing without tailing the log.
+                with self._lock:
+                    self._rotation_last_status[rotation.id] = "held"
+                    self._rotation_last_reason[rotation.id] = "no step's conditions are met"
                 continue
             step_index = picked
             step = rotation.steps[step_index]
@@ -627,6 +642,14 @@ class Scheduler:
                 # condition input can't immediately re-trigger a
                 # step transition.
                 self._rotation_last_pushed_at[rotation.id] = now.timestamp()
+        with self._lock:
+            self._rotation_last_status[rotation.id] = result.status
+            if result.status == "failed":
+                self._rotation_last_reason[rotation.id] = result.error or "push failed"
+            elif result.status == "quiet":
+                self._rotation_last_reason[rotation.id] = "all devices in quiet hours"
+            else:
+                self._rotation_last_reason[rotation.id] = None
         if self._event_log is not None:
             self._event_log.record(
                 type="rotation",
@@ -744,6 +767,8 @@ class Scheduler:
                 # through the held window.
                 with self._lock:
                     self._last_fired[schedule.id] = now.timestamp()
+                    self._last_status[schedule.id] = "held"
+                    self._last_reason[schedule.id] = "conditions not met"
                 return PushResult(status="held", page_id=schedule.page_id)
         logger.info("Firing schedule %s -> page %s", schedule.id, target_page)
         # Tick-driven firings (the background loop) are automation -
@@ -767,6 +792,19 @@ class Scheduler:
         if result.status in ("sent", "quiet"):
             with self._lock:
                 self._last_fired[schedule.id] = now.timestamp()
+        with self._lock:
+            self._last_status[schedule.id] = result.status
+            if held:
+                # Conditions failed but a fallback page was configured;
+                # surface that on the pill so the user knows why a
+                # different page is showing.
+                self._last_reason[schedule.id] = "fallback page (conditions failed)"
+            elif result.status == "failed":
+                self._last_reason[schedule.id] = result.error or "push failed"
+            elif result.status == "quiet":
+                self._last_reason[schedule.id] = "all devices in quiet hours"
+            else:
+                self._last_reason[schedule.id] = None
         if self._event_log is not None:
             # The scheduler row links to the push event it caused, so /events
             # can click through "this schedule fired -> this push happened".
@@ -804,14 +842,50 @@ class Scheduler:
             return None
         return self._fire(s, datetime.now(UTC), bypass_conditions=True)
 
-    def status(self) -> dict[str, dict[str, float | None]]:
+    def status(self) -> dict[str, dict[str, Any]]:
         """Snapshot of the scheduler's in-memory state. Used by the
-        /schedules page to show 'last fired' next to each row."""
+        /schedules page to show 'last fired' + the v0.48 running-state
+        pill next to each row. Values:
+
+        * ``last_fired`` — POSIX timestamp of the last successful fire.
+        * ``first_seen`` — POSIX timestamp the scheduler first observed
+          this enabled schedule (suppresses daily backfill).
+        * ``last_status`` — most recent ``PushStatus`` string (sent /
+          held / quiet / failed). ``None`` if the schedule has never
+          been ticked since process start.
+        * ``last_reason`` — human-readable detail (e.g. ``"conditions
+          not met"``, ``"fallback page (conditions failed)"``). ``None``
+          on plain success.
+        """
         with self._lock:
+            ids = self._last_fired.keys() | self._first_seen.keys() | self._last_status.keys()
             return {
                 sid: {
                     "last_fired": self._last_fired.get(sid),
                     "first_seen": self._first_seen.get(sid),
+                    "last_status": self._last_status.get(sid),
+                    "last_reason": self._last_reason.get(sid),
                 }
-                for sid in {*self._last_fired.keys(), *self._first_seen.keys()}
+                for sid in ids
+            }
+
+    def rotation_status(self) -> dict[str, dict[str, Any]]:
+        """Snapshot of per-rotation runtime state, mirroring ``status``.
+        Used by the Rotations index to surface ``held`` (no step's
+        conditions met), ``quiet`` (devices asleep), and ``failed``
+        states without tailing the event log."""
+        with self._lock:
+            ids = (
+                self._rotation_last_status.keys()
+                | self._rotation_last_step.keys()
+                | self._rotation_last_pushed_at.keys()
+            )
+            return {
+                rid: {
+                    "last_status": self._rotation_last_status.get(rid),
+                    "last_reason": self._rotation_last_reason.get(rid),
+                    "last_step": self._rotation_last_step.get(rid),
+                    "last_pushed_at": self._rotation_last_pushed_at.get(rid),
+                }
+                for rid in ids
             }

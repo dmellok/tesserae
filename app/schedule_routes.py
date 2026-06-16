@@ -297,6 +297,73 @@ def _last_fired_view(epoch: float | None) -> dict[str, str] | None:
     }
 
 
+def _running_state_view(schedule: Schedule, status_row: dict[str, Any] | None) -> dict[str, str]:
+    """Compute the v0.48 running-state pill for ``schedule``.
+
+    The pill collapses (enabled? + last_status + last_reason) into a
+    single ``{label, tone, icon, tooltip}`` view-model so the template
+    can render it with one ``{{ … }}`` block. Tone strings map to the
+    ``pill.is-*`` modifier classes in schedules.css.
+    """
+    if not schedule.enabled:
+        return {
+            "label": "disabled",
+            "tone": "",
+            "icon": "pause",
+            "tooltip": "This schedule is disabled and won't fire.",
+        }
+    last_status = (status_row or {}).get("last_status")
+    last_reason = (status_row or {}).get("last_reason")
+    if last_status is None:
+        return {
+            "label": "pending",
+            "tone": "",
+            "icon": "hourglass",
+            "tooltip": "Waiting for the first fire since the scheduler started.",
+        }
+    if last_status == "held":
+        return {
+            "label": "held",
+            "tone": "is-held",
+            "icon": "funnel",
+            "tooltip": f"Last tick was silently held: {last_reason or 'conditions not met'}.",
+        }
+    if last_status == "sent":
+        if last_reason and "fallback" in last_reason:
+            return {
+                "label": "fallback",
+                "tone": "is-warn",
+                "icon": "arrow-bend-down-right",
+                "tooltip": ("Conditions failed, so the fallback page was pushed instead."),
+            }
+        return {
+            "label": "active",
+            "tone": "is-ok",
+            "icon": "check-circle",
+            "tooltip": "Last fire was sent successfully.",
+        }
+    if last_status == "quiet":
+        return {
+            "label": "quiet hours",
+            "tone": "",
+            "icon": "moon",
+            "tooltip": "Devices are in quiet hours; pushes will resume after the window.",
+        }
+    if last_status == "failed":
+        return {
+            "label": "failed",
+            "tone": "is-danger",
+            "icon": "warning-circle",
+            "tooltip": last_reason or "Last fire failed; see the events log.",
+        }
+    return {
+        "label": last_status,
+        "tone": "",
+        "icon": "circle",
+        "tooltip": last_reason or "",
+    }
+
+
 @bp.get("")
 def index() -> str:
     schedules = _store().all()
@@ -311,6 +378,7 @@ def index() -> str:
         # its opaque id. Missing ids (deleted page) fall back in-template.
         page_names={p.id: p.name for p in pages},
         last_fired={sid: _last_fired_view(st.get("last_fired")) for sid, st in status.items()},
+        running_states={s.id: _running_state_view(s, status.get(s.id)) for s in schedules},
         timeline=_build_timeline(schedules),
         edit_id=request.args.get("edit"),
         smart_sync_states=_smart_sync_states(schedules, pages),

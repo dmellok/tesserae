@@ -16,31 +16,40 @@
 {% endmacro %}
 
 {% macro step_row(idx, step, pages) %}
-<div class="rot-step" data-rot-step>
-  <span class="rot-step-num">{{ idx + 1 }}</span>
-  <select name="step_page_ids[]" required>
-    {% if not pages %}<option value="">(no dashboards yet)</option>{% endif %}
-    {% for p in pages %}
-    <option value="{{ p.id }}" {% if p.id == step.page_id %}selected{% endif %}>{{ p.name }}</option>
-    {% endfor %}
-  </select>
-  <input type="number" name="step_dwell_minutes[]" min="1" max="10080"
-         value="{{ step.dwell_minutes }}" required aria-label="Dwell minutes">
-  <span class="rot-step-unit">min</span>
-  <button type="button" class="btn btn--ghost btn--icon" data-rot-step-remove
-          aria-label="Remove step">
-    <i class="ph ph-x" aria-hidden="true"></i>
-  </button>
-  {# v0.48 per-step conditions JSON. Sits inline in the step row as a
-     small disclosure chip; the textarea pops as a second grid row
-     below this step when expanded. Empty = step is always eligible. #}
-  <details class="rot-step-cond">
-    <summary aria-label="Step conditions">
-      <i class="ph ph-funnel" aria-hidden="true"></i><span class="rot-step-cond-label">Conditions</span>
-    </summary>
-    <textarea name="step_conditions_json[]" rows="2" spellcheck="false"
-              placeholder='[]'>{% if step.conditions %}{{ step.conditions | tojson(indent=2) }}{% endif %}</textarea>
-  </details>
+{# Each step is a wrapper that contains:
+     - the controls row (page select, dwell, ×, Conditions button)
+     - a sibling panel below the row that holds the conditions picker
+   The toggle button + panel visibility are wired via JS on the
+   wrapper's ``data-rot-step`` selector so we don't fight the
+   <details> layout inside a grid. #}
+<div class="rot-step-wrap" data-rot-step>
+  <div class="rot-step">
+    <span class="rot-step-num">{{ idx + 1 }}</span>
+    <select name="step_page_ids[]" required>
+      {% if not pages %}<option value="">(no dashboards yet)</option>{% endif %}
+      {% for p in pages %}
+      <option value="{{ p.id }}" {% if p.id == step.page_id %}selected{% endif %}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+    <input type="number" name="step_dwell_minutes[]" min="1" max="10080"
+           value="{{ step.dwell_minutes }}" required aria-label="Dwell minutes">
+    <span class="rot-step-unit">min</span>
+    <button type="button" class="btn btn--ghost btn--icon" data-rot-step-remove
+            aria-label="Remove step">
+      <i class="ph ph-x" aria-hidden="true"></i>
+    </button>
+    <button type="button" class="ghost rot-step-cond-toggle"
+            aria-expanded="{% if step.conditions %}true{% else %}false{% endif %}">
+      <i class="ph ph-funnel" aria-hidden="true"></i>
+      <span class="rot-step-cond-label">Conditions{% if step.conditions %} ({{ step.conditions|length }}){% endif %}</span>
+    </button>
+  </div>
+  <div class="rot-step-cond-panel" {% if not step.conditions %}hidden{% endif %}>
+    <div class="condition-picker" data-condition-picker>
+      <textarea name="step_conditions_json[]" rows="2" spellcheck="false"
+                placeholder='[]'>{% if step.conditions %}{{ step.conditions | tojson(indent=2) }}{% endif %}</textarea>
+    </div>
+  </div>
 </div>
 {% endmacro %}
 
@@ -168,6 +177,15 @@
             <span class="pill pill--ok">Now: step {{ cur.step_index + 1 }}, {{ cur.page_name }}</span>
           {% else %}
             <span class="pill pill--warn">Not active right now</span>
+          {% endif %}
+          {# v0.48 running-state pill. Only shown when the scheduler
+             saw something worth surfacing (held / failed); normal
+             flow is covered by the pill above. #}
+          {% set rs = running_states.get(r.id) if running_states else none %}
+          {% if rs %}
+          <span class="pill {{ rs.tone }}" title="{{ rs.tooltip }}">
+            <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
+          </span>
           {% endif %}
         </div>
       </div>
@@ -333,8 +351,29 @@
       if (row) row.remove();
       renumber(container);
     });
+    // v0.48 conditions toggle. Wired here so dynamically-added steps
+    // pick up the behaviour through the container's delegated click
+    // handler. aria-expanded mirrors the panel's hidden state for
+    // assistive tech.
+    container.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('.rot-step-cond-toggle');
+      if (!btn) return;
+      var wrap = btn.closest('[data-rot-step]');
+      if (!wrap) return;
+      var panel = wrap.querySelector('.rot-step-cond-panel');
+      if (!panel) return;
+      var isOpen = !panel.hasAttribute('hidden');
+      if (isOpen) {
+        panel.setAttribute('hidden', '');
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        panel.removeAttribute('hidden');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    });
   });
 })();
 </script>
 <script src="{{ url_for('static', filename='rotations.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='condition-picker.js') }}"></script>
 {% endblock %}
