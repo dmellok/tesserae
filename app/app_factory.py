@@ -223,6 +223,47 @@ def create_app(
 
     app.wsgi_app = _IngressPrefixMiddleware(app.wsgi_app)  # type: ignore[method-assign]
 
+    # Operator-supplied ``Public URL`` override (Settings → App). Force-
+    # overrides the scheme + host + port Flask sees on every request, so
+    # ``url_for(..., _external=True)`` builds URLs from the configured
+    # public URL even when the upstream reverse proxy isn't sending the
+    # ``X-Forwarded-*`` headers ProxyFix expects. Empty value = no-op,
+    # falls back to ProxyFix + request auto-detection.
+    class _PublicUrlOverrideMiddleware:
+        """Inject ``wsgi.url_scheme`` / ``HTTP_HOST`` from the configured
+        public URL so external link generation is reverse-proxy-agnostic.
+
+        Reads the settings store per request rather than capturing at
+        startup so the operator can change the value without a restart.
+        Failing to parse the value (typo, missing scheme) silently
+        falls back to the unchanged environ, keeping the appliance
+        reachable while the bad value gets fixed.
+        """
+
+        def __init__(self, inner: Any, app_config: dict[str, Any]) -> None:
+            self._inner = inner
+            self._app_config = app_config
+
+        def __call__(self, environ: dict[str, Any], start_response: Any) -> Any:
+            store = self._app_config.get("SETTINGS_STORE")
+            if store is None:
+                return self._inner(environ, start_response)
+            try:
+                section = store.get_section("app") or {}
+                raw = str(section.get("public_url") or "").strip().rstrip("/")
+                if raw:
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(raw)
+                    if parsed.scheme and parsed.netloc:
+                        environ["wsgi.url_scheme"] = parsed.scheme
+                        environ["HTTP_HOST"] = parsed.netloc
+            except Exception:
+                pass
+            return self._inner(environ, start_response)
+
+    app.wsgi_app = _PublicUrlOverrideMiddleware(app.wsgi_app, app.config)  # type: ignore[method-assign]
+
     # Trust ``X-Forwarded-*`` headers when a reverse proxy (NGINX Proxy
     # Manager, Caddy, Cloudflare Tunnel, an HA Ingress sidecar) is in
     # front of us. Without this, plugin OAuth callbacks ``url_for(...,

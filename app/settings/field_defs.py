@@ -38,6 +38,21 @@ _TZ_CHOICES: list[dict[str, str]] = [
 
 APP_FIELDS: list[dict[str, Any]] = [
     {
+        "name": "public_url",
+        "type": "string",
+        "label": "Public URL",
+        "default": "",
+        "placeholder": "https://tesserae.example.org:8443",
+        "help": (
+            "Override the URL Tesserae uses when building external links "
+            "(plugin OAuth callbacks, HA discovery image URLs, etc.). Set "
+            "this when running behind a reverse proxy (NGINX Proxy Manager, "
+            "Caddy, Cloudflare Tunnel) whose forwarded headers don't reach "
+            "Flask cleanly. Leave blank to auto-detect from the request. "
+            "Include scheme + host + port if non-standard, no trailing slash."
+        ),
+    },
+    {
         "name": "timezone",
         "type": "select",
         "label": "Timezone",

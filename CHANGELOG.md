@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.4], 2026-06-17
+
+### Added
+
+- **"Public URL" setting under Settings → App.** Operator-supplied
+  override for the URL Tesserae uses when building external links
+  (OAuth callbacks, HA discovery image URLs, etc.). Use this when
+  running behind a reverse proxy whose `X-Forwarded-*` headers don't
+  reach Flask cleanly. NGINX Proxy Manager in particular ignores
+  `proxy_set_header` directives in its Advanced tab unless they're
+  inside a Custom Location block (an undocumented quirk that breaks
+  ProxyFix's auto-detection); setting Public URL bypasses that mess
+  entirely. Leave blank to keep the existing auto-detect behaviour.
+- Example value: `https://tesserae.example.org:8443` (no trailing
+  slash; trailing slash is stripped tolerantly). Malformed values
+  silently fall back to auto-detect so a typo doesn't lock you out.
+
 ## [0.49.3], 2026-06-17
 
 ### Fixed

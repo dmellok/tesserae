@@ -85,3 +85,68 @@ def test_no_forwarded_headers_falls_back_to_request_host(app: Flask) -> None:
     )
     url = resp.get_json()["url"]
     assert url.startswith("http://tesserae.local:8765"), url
+
+
+# -- v0.49.4: operator-supplied Public URL override --------------------
+
+
+def test_public_url_setting_overrides_request_origin(app: Flask) -> None:
+    """The app-level ``public_url`` setting is the escape hatch for
+    deployments where ProxyFix can't infer the public URL (NPM not
+    sending standard X-Forwarded-* headers, double-NAT setups, etc.).
+    When set, every request's external URL builds from the configured
+    scheme + host + port, regardless of what arrived on the wire."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": "https://tesserae.example.org:8443"})
+    client = app.test_client()
+    resp = client.get(
+        "/healthz/external_url",
+        headers={"Host": "internal-host:8765"},  # different from the configured override
+    )
+    url = resp.get_json()["url"]
+    assert url.startswith("https://tesserae.example.org:8443"), url
+
+
+def test_public_url_setting_trailing_slash_tolerated(app: Flask) -> None:
+    """Operators paste URLs from address bars, which often have a trailing
+    slash. Strip it so the resulting URL doesn't end up with a doubled
+    slash in the middle."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": "https://tesserae.example.org:8443/"})
+    client = app.test_client()
+    resp = client.get("/healthz/external_url", headers={"Host": "internal-host:8765"})
+    url = resp.get_json()["url"]
+    assert url == "https://tesserae.example.org:8443/healthz", url
+
+
+def test_public_url_setting_blank_falls_back_to_proxyfix(app: Flask) -> None:
+    """Empty ``public_url`` setting means "auto-detect"; ProxyFix +
+    request headers do their normal job. Confirms the override doesn't
+    silently override with an empty string."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": ""})
+    client = app.test_client()
+    resp = client.get(
+        "/healthz/external_url",
+        headers={"X-Forwarded-Proto": "https", "Host": "tesserae.example.org"},
+    )
+    url = resp.get_json()["url"]
+    assert url.startswith("https://tesserae.example.org"), url
+
+
+def test_public_url_setting_malformed_value_falls_back_silently(app: Flask) -> None:
+    """A typo / missing scheme in the ``public_url`` setting must not
+    crash the appliance: the bad value is ignored and Flask falls back
+    to its normal URL-building, keeping admin reachable so the operator
+    can fix the typo."""
+    store = app.config["SETTINGS_STORE"]
+    store.patch_section("app", {"public_url": "not-a-real-url"})
+    client = app.test_client()
+    resp = client.get(
+        "/healthz/external_url",
+        headers={"Host": "tesserae.local:8765"},
+    )
+    assert resp.status_code == 200
+    url = resp.get_json()["url"]
+    # Falls back to request-derived URL; doesn't 500.
+    assert url.startswith("http://tesserae.local"), url
