@@ -33,7 +33,7 @@ In an HA install, you usually reach Tesserae via one of three paths:
 | `http://<HA-IP>:8765` | HTTP | Stable | No |
 
 So we need to give Tesserae a **stable HTTPS URL** that points at port
-8765 (stable channel) or 8766 (edge). The rest of this guide is three
+8765 (stable channel) or 8766 (edge). The rest of this guide is two
 options for doing that, then the same final Spotify-app registration
 and Tesserae-side configuration for each.
 
@@ -74,35 +74,7 @@ Tesserae is now reachable at
 `https://tesserae.myhome.duckdns.org`. That's the URL you'll use as
 the Spotify redirect. Continue to **Register the Spotify app** below.
 
-## Option B: Cloudflare Tunnel
-
-Free, no port forwarding required, works behind CGNAT. Needs:
-
-- A domain on Cloudflare (free tier is fine; transfer a `$5/yr` domain
-  or use a `*.cloudflare.tld` workers domain).
-- The **Cloudflared** HA app:
-  [github.com/brenner-tobias/ha-addons](https://github.com/brenner-tobias/ha-addons)
-  has a maintained one.
-
-### Set up the tunnel
-
-1. Cloudflare dashboard → Zero Trust → Networks → Tunnels → **Create
-   a tunnel**.
-2. Name it (e.g., `home`) and copy the tunnel token.
-3. In HA, install the Cloudflared app, paste the token into its
-   options, start it.
-4. Back in the Cloudflare dashboard, on the tunnel's **Public
-   Hostname** tab: **Add a public hostname**:
-   - **Subdomain**: `tesserae`
-   - **Domain**: your domain
-   - **Type**: `HTTP`
-   - **URL**: `homeassistant.local:8765` (or `:8766` for edge)
-5. Save. Tesserae is now reachable at
-   `https://tesserae.yourdomain.tld` over Cloudflare's edge.
-
-Continue to **Register the Spotify app**.
-
-## Option C: Tailscale Funnel
+## Option B: Tailscale Funnel
 
 Simplest if you already use Tailscale; gives you an HTTPS URL on a
 `*.ts.net` subdomain with no extra config. Needs Tailscale running on
@@ -141,7 +113,6 @@ Same for all three options above.
      HTTPS URL from above, plus
      `/plugins/spotify_core/callback`. Examples:
      - NGINX Proxy Manager: `https://tesserae.myhome.duckdns.org/plugins/spotify_core/callback`
-     - Cloudflare Tunnel: `https://tesserae.yourdomain.tld/plugins/spotify_core/callback`
      - Tailscale Funnel: `https://homeassistant.<your-tailnet>.ts.net/plugins/spotify_core/callback`
 4. Tick the **APIs/SDKs** you plan to use: **Web API** is enough for
    Tesserae.
@@ -217,7 +188,7 @@ re-authorise.
 
 ## Security: take the tunnel down after the OAuth dance
 
-The tunnel you set up in Option A / B / C exposes Tesserae's full
+The tunnel you set up in Option A / B exposes Tesserae's full
 admin UI to the public internet. Tesserae's only auth gate is the
 single admin password you set during onboarding (no 2FA today), and
 the admin UI carries the Spotify Client Secret, any GitHub PAT,
@@ -231,9 +202,6 @@ Connect dance is complete**:
 - **NGINX Proxy Manager**: disable the proxy host (toggle on the
   list view), or delete it entirely. Spin it back up if you ever
   need to re-authorise.
-- **Cloudflare Tunnel**: delete the `tesserae.yourdomain.tld`
-  public hostname from the tunnel config, or stop the Cloudflared
-  app entirely.
 - **Tailscale Funnel**: `tailscale funnel off` on the HA host shell.
 
 The widgets keep working on every other access path (HA sidebar
@@ -244,19 +212,11 @@ for the rare case Spotify's refresh-token flow drops (very
 infrequent, typically only after a Spotify account password change
 or a long disconnect).
 
-If you'd rather leave the tunnel permanently up — say, you also
-want to access Tesserae remotely from your phone without HA Cloud
-— two things matter:
-
-1. **Pick a strong admin password.** 20+ random characters from a
-   password manager. Tesserae stores the bcrypt hash, brute-forcing
-   it locally is slow but possible against a weak password.
-2. **Consider Cloudflare Access** (free for personal use, up to
-   50 users). It adds an email-OTP wall in front of the public URL
-   so only you can reach Tesserae from the internet. The Spotify
-   callback path can be excluded from the policy so Spotify's edge
-   still reaches it. About 10 minutes to set up via the Cloudflare
-   Zero Trust dashboard.
+If you'd rather leave the tunnel permanently up, say, you also
+want to access Tesserae remotely from your phone without HA Cloud,
+pick a strong admin password: 20+ random characters from a password
+manager. Tesserae stores the bcrypt hash, brute-forcing it locally
+is slow but possible against a weak password.
 
 ## Other widgets with the same constraint
 
