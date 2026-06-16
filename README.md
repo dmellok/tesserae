@@ -1,9 +1,9 @@
 # Tesserae
 
-[![License](https://img.shields.io/github/license/dmellok/tesserae)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/dmellok/tesserae)](https://github.com/dmellok/tesserae/releases/latest)
-[![CI](https://github.com/dmellok/tesserae/actions/workflows/ci.yml/badge.svg)](https://github.com/dmellok/tesserae/actions/workflows/ci.yml)
-[![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae)](https://github.com/dmellok/tesserae/discussions)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/dmellok/tesserae?style=flat-square)](https://github.com/dmellok/tesserae/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/dmellok/tesserae/ci.yml?branch=main&style=flat-square&label=ci)](https://github.com/dmellok/tesserae/actions/workflows/ci.yml)
+[![GitHub Discussions](https://img.shields.io/github/discussions/dmellok/tesserae?style=flat-square)](https://github.com/dmellok/tesserae/discussions)
 
 <p align="center">
   <a href="docs/screenshots/hero-rack.jpg">
