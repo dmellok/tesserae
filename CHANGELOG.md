@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.50.1], 2026-06-17
+
+### Docs
+
+- **Bulk-renamed every standalone repo** so widgets live at
+  `tesserae-widget-<name>`, themes at `tesserae-theme-<name>`, and
+  device firmwares at `tesserae-device-<name>` (dropping the
+  `-client` suffix since "device" already implies it). 34 repos
+  renamed; GitHub's auto-redirect keeps every old link working.
+- **README, CHANGELOG, install docs, compatibility table, and
+  community widget docs** updated to the canonical names. 136
+  references across 15 files.
+- **Compatibility / settings tables**: cleaned up 20+ blank cells
+  that were rendering as a literal `, ` after the v0.31.0 em-dash
+  sweep (em-dashes had been used as "N/A" markers).
+
 ## [0.50.0], 2026-06-17
 
 ### Licence
