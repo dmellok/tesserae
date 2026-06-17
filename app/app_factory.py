@@ -29,6 +29,8 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import Flask, abort, redirect, request, send_from_directory, url_for
+from flask.json.provider import DefaultJSONProvider
+from pydantic import BaseModel
 from werkzeug.wrappers import Response
 
 from app import (
@@ -181,6 +183,21 @@ def create_app(
         static_url_path="/static",
     )
     app.testing = testing
+
+    # Pydantic models in templates: Flask's tojson filter (and jsonify)
+    # round-trip values through ``app.json.dumps``, which doesn't know
+    # how to serialize Pydantic v2 BaseModel instances by default. The
+    # rotation + schedule edit forms hand the live model's
+    # ``conditions: list[Condition]`` straight to ``| tojson``, so the
+    # second a step gains a condition the next edit re-render 500s.
+    # Patching the JSON provider once here fixes that for every caller.
+    class _PydanticJSONProvider(DefaultJSONProvider):
+        def default(self, o: Any) -> Any:
+            if isinstance(o, BaseModel):
+                return o.model_dump()
+            return super().default(o)
+
+    app.json = _PydanticJSONProvider(app)
 
     # Home Assistant Add-on / Ingress support is split in two:
     #

@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.50.2], 2026-06-17
+
+### Fixed
+
+- **Editing a rotation or schedule after saving any condition no
+  longer 500s.** The edit form seeds its conditions textarea via
+  `step.conditions | tojson`, and Flask's JSON provider couldn't
+  serialise Pydantic v2 `Condition` instances by default. App
+  factory now installs a `JSONProvider` that defers `BaseModel` to
+  `model_dump()`, which fixes the form re-render and any future
+  `jsonify(model)` use site. Regression test pins both /rotations
+  and /schedules paths.
+
 ## [0.50.1], 2026-06-17
 
 ### Docs
