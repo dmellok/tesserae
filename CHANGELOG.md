@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.50.0], 2026-06-17
+
+### Licence
+
+- **Relicensed from MIT to AGPL-3.0-or-later.** Tesserae core, the
+  catalog repo (`tesserae-widgets`), every standalone client repo
+  (`tesserae-pi-bin-client`, `tesserae-pi-png-client`), and every
+  bundled widget repo all move together.
+- **What that means for you:**
+  - **Self-hosting Tesserae on your own hardware: no change.** Run it,
+    modify it, share modifications with friends — same freedoms as
+    under MIT.
+  - **Distributing a modified version: must ship the source.** Includes
+    network-hosted modifications, which the AGPL closes (the
+    distinguishing feature vs plain GPL).
+  - **Combining Tesserae with proprietary software you ship: AGPL
+    obligations apply** to the combined work. Widgets that just plug
+    in via the documented plugin API can keep permissive licences
+    (MIT / Apache-2.0) as long as they don't ship Tesserae itself.
+- **Why:** to keep the project ecosystem open. A closed-source SaaS
+  fork wouldn't be a contribution back to the community, and AGPL is
+  the established licence for ruling that path out cleanly while
+  leaving everything else (self-hosting, study, modification,
+  contribution) wide open.
+- No code change other than the LICENCE file, SPDX identifier in
+  pyproject.toml, and licence references in docs / README.
+
 ## [0.49.6], 2026-06-17
 
 ### Fixed

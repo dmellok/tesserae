@@ -265,8 +265,11 @@ layer.
 - **Ship a `README.md`** in the widget repo explaining what it does,
   what settings it needs, and (if applicable) the API quotas or
   rate limits users should know about.
-- **Ship a `LICENSE`.** MIT is the conventional choice for community
-  widgets; it matches Tesserae itself.
+- **Ship a `LICENSE`.** AGPL-3.0-or-later is the conventional choice
+  for community widgets; it matches Tesserae itself. Permissive
+  licences (MIT, Apache-2.0) are also accepted as long as they're
+  compatible with AGPL-3 for users who combine your widget into a
+  Tesserae deployment.
 
 ## Removing an entry
 
