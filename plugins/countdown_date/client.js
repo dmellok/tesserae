@@ -213,13 +213,13 @@ export default function render(shadow, ctx) {
       font-weight: var(--fw-semi);
     }
     .cd-meta i { font-size: 1em; color: ${accent}; }
-    @container w (max-width: 260px) {
+    @container (max-width: 260px) {
       .cd-hero .suf, .cd-label, .cd-progress, .cd-meta { display: none; }
     }
-    @container w (min-width: 261px) and (max-width: 360px) {
+    @container (min-width: 261px) and (max-width: 360px) {
       .cd-label, .cd-progress, .cd-meta { display: none; }
     }
-    @container w (max-width: 460px) {
+    @container (max-width: 460px) {
       .cd-progress, .cd-meta { display: none; }
     }
   `;

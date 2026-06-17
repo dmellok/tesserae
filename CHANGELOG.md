@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.49.6], 2026-06-17
+
+### Fixed
+
+- **countdown_date and year_progress now actually respond to cell size.**
+  Both widgets used `@container w (max-width: ...)` style queries where
+  `w` is a container *name* that nothing in the codebase declares. The
+  queries silently matched nothing, so the size-tiered behaviour
+  documented at the top of each widget (xs hides everything, sm adds
+  the bar, md adds the grid, lg adds the meta footer) was never firing.
+  Both widgets just rendered the largest variant at every cell size.
+  Fix: drop the `w` name so the queries match the cell's own size
+  container (set on every `.cell` element in the composer). No
+  behaviour change for users who happened to be looking at a cell big
+  enough to fit the largest variant; users with smaller cells will now
+  see the appropriate compressed layout. Same root pattern caused
+  spotify_top's side-by-side breakpoint to silently fail; fixed in
+  the tesserae-spotify v0.2.4 catalog release.
+
 ## [0.49.5], 2026-06-17
 
 ### Fixed

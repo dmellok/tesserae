@@ -218,13 +218,13 @@ export default function render(shadow, ctx) {
       color: var(--text-muted);
       font-weight: var(--fw-semi);
     }
-    @container w (max-width: 260px) {
+    @container (max-width: 260px) {
       .yp-bar, .yp-grid-wrap, .yp-meta { display: none; }
     }
-    @container w (min-width: 261px) and (max-width: 360px) {
+    @container (min-width: 261px) and (max-width: 360px) {
       .yp-grid-wrap, .yp-meta { display: none; }
     }
-    @container w (max-width: 460px) {
+    @container (max-width: 460px) {
       .yp-meta { display: none; }
     }
   `;
