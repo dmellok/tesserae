@@ -386,4 +386,4 @@ Full list in [docs/credits](https://dmellok.github.io/tesserae/credits/).
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+AGPL-3.0-or-later, see [LICENSE](LICENSE).
