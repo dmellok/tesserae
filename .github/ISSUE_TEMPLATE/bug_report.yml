@@ -48,7 +48,7 @@ body:
     id: client
     attributes:
       label: Client repo + version
-      description: e.g. tesserae-pi-bin-client v0.4.1, KOReader trmnl-display plugin.
+      description: e.g. tesserae-device-pi-bin v0.4.1, KOReader trmnl-display plugin.
 
   - type: input
     id: broker

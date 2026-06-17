@@ -178,7 +178,7 @@ description so users see what's about to land. Catalog CI enforces
 the match when the field is present.
 
 **Worked example.** The [Dev Reference
-Bundle](https://github.com/dmellok/tesserae-devref-bundle) ships
+Bundle](https://github.com/dmellok/tesserae-widget-devref) ships
 through the catalog as `id: "devref"` with `folders: ["devref_card",
 "devref_core"]`. Read it source-by-source as a reference for the
 contract surfaces (cell options, `choices_from`, `fetch()`,

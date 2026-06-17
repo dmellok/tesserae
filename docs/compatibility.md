@@ -26,10 +26,10 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 
 | Renderer | Output | Target client(s) | What it's for |
 |---|---|---|---|
-| `esp32_bin` | `.bin` | [tesserae-esp32-bin-client (13.3" Waveshare)](https://github.com/dmellok/tesserae-esp32-bin-client)<br>[tesserae-photopainter-7.3-bin-client (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
-| `esp32_bw_bin` | `.bin` | [tesserae-esp32-bw-client (4.2" Waveshare B/W)](https://github.com/dmellok/tesserae-esp32-bw-client) | Composition PNG quantised to 1-bpp + dithered, packed 8 pixels per byte (MSB = leftmost, bit-set = white) so a width × height / 8 byte buffer paints the panel directly. Width must be a multiple of 8. |
-| `pi_bin` | `.bin` | [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
-| `pi_png` | `.png` | [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
+| `esp32_bin` | `.bin` | [tesserae-device-esp32-bin (13.3" Waveshare)](https://github.com/dmellok/tesserae-device-esp32-bin)<br>[tesserae-device-photopainter-7.3-bin (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
+| `esp32_bw_bin` | `.bin` | [tesserae-device-esp32-bw (4.2" Waveshare B/W)](https://github.com/dmellok/tesserae-device-esp32-bw) | Composition PNG quantised to 1-bpp + dithered, packed 8 pixels per byte (MSB = leftmost, bit-set = white) so a width × height / 8 byte buffer paints the panel directly. Width must be a multiple of 8. |
+| `pi_bin` | `.bin` | [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
+| `pi_png` | `.png` | [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
 
 ## Device kinds
@@ -50,7 +50,7 @@ Honest status from the maintainer's own bench. Untested doesn't mean broken, it 
 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
-| `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-esp32-bin-client; the 7.3" PhotoPainter client at tesserae-photopainter-7.3-bin-client. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
+| `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-device-esp32-bin; the 7.3" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
 | `esp32_bw_bin` | Waveshare 4.2" B/W (400×300, 1-bpp, ESP32) | :material-help-circle: Untested | Wire contract verified by unit tests (all-white → 0xFF × 15000, all-black → 0x00 × 15000, left-column → 0x80 first byte each row) but no in-the-wild paint confirmation yet. Waiting on user feedback. [Open an issue](https://github.com/dmellok/tesserae/issues) if you've flashed it. |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |

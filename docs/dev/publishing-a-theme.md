@@ -133,7 +133,7 @@ verifies:
    confirm everything looks right in `/themes` and the page editor's
    theme picker.
 3. Publish to a GitHub repo. Recommended naming:
-   `tesserae-<theme-or-pack-name>` (e.g. `tesserae-tonal`).
+   `tesserae-<theme-or-pack-name>` (e.g. `tesserae-theme-tonal`).
 4. Tag a release (e.g. `v0.1.0`). GitHub will serve the source
    tarball at
    `https://github.com/<you>/<repo>/archive/refs/tags/v0.1.0.tar.gz`.

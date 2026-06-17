@@ -1,6 +1,6 @@
 # Spotify widget on Home Assistant
 
-The [Spotify widget bundle](https://github.com/dmellok/tesserae-spotify)
+The [Spotify widget bundle](https://github.com/dmellok/tesserae-widget-spotify)
 (`spotify_core`, `spotify_now_playing`, `spotify_queue`,
 `spotify_album_art`, `spotify_top`) needs a one-time OAuth handshake
 before it can show your playback state. This guide walks through that
@@ -11,7 +11,7 @@ paths don't give you a stable HTTPS URL out of the box.
 
 If you're running Tesserae as a bare-metal install on your LAN with
 loopback access, the flow is simpler; see the
-[Spotify bundle README](https://github.com/dmellok/tesserae-spotify).
+[Spotify bundle README](https://github.com/dmellok/tesserae-widget-spotify).
 
 ## What you'll do
 
@@ -312,7 +312,7 @@ with an HTTPS callback. The redirect URI path changes per widget
 (`/plugins/<widget_id>/callback`) but the rest of the flow is
 identical. Existing widgets in this category:
 
-- [Spotify](https://github.com/dmellok/tesserae-spotify) (this guide).
+- [Spotify](https://github.com/dmellok/tesserae-widget-spotify) (this guide).
 
 GitHub's PAT-based widgets, the picture widgets' Unsplash key, and
 Apple Music are all simpler (paste a key, no callback needed).

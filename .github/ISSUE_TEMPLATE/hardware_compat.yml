@@ -30,9 +30,9 @@ body:
     attributes:
       label: Which client are you using?
       options:
-        - tesserae-pi-png-client
-        - tesserae-pi-bin-client
-        - tesserae-esp32-bin-client
+        - tesserae-device-pi-png
+        - tesserae-device-pi-bin
+        - tesserae-device-esp32-bin
         - KOReader trmnl-display plugin (BYOS)
         - Native TRMNL firmware
         - Custom / other (describe below)
@@ -43,7 +43,7 @@ body:
     id: client-version
     attributes:
       label: Client version / commit
-      placeholder: "tesserae-pi-bin-client v0.4.1"
+      placeholder: "tesserae-device-pi-bin v0.4.1"
 
   - type: input
     id: server-version

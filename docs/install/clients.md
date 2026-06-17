@@ -8,19 +8,19 @@ device-registration flow described in [Set up a device](devices.md).
 
 | Client | Transport | Default id | Best for |
 |---|---|---|---|
-| `tesserae-esp32-bin-client` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
-| `tesserae-photopainter-7.3-bin-client` | MQTT | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
-| `tesserae-esp32-bw-client` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
-| `tesserae-pi-bin-client` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
-| `tesserae-pi-png-client` | MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
+| `tesserae-device-esp32-bin` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
+| `tesserae-device-photopainter-7.3-bin` | MQTT | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
+| `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
+| `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
+| `tesserae-device-pi-png` | MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
 | `tesserae-trmnl-client` | HTTP-pull | `trmnl` | TRMNL devices + KOReader-on-Kindle |
 
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
 client and what's been tested on real hardware.
 
-## tesserae-esp32-bin-client
+## tesserae-device-esp32-bin
 
-[:material-github: dmellok/tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client)
+[:material-github: dmellok/tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin)
 · pairs with the `esp32_bin` renderer · default id `esp32`
 
 Battery-powered **ESP32-S3-WROOM-2** firmware for the Waveshare 13.3" Spectra 6
@@ -36,9 +36,9 @@ LAN at `tesserae-<id>.local`).
     [Screens & compatibility](../compatibility.md#whats-been-tested-on-real-hardware)
     for the full per-client real-hardware status table.
 
-## tesserae-photopainter-7.3-bin-client
+## tesserae-device-photopainter-7.3-bin
 
-[:material-github: dmellok/tesserae-photopainter-7.3-bin-client](https://github.com/dmellok/tesserae-photopainter-7.3-bin-client)
+[:material-github: dmellok/tesserae-device-photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin)
 · pairs with the `esp32_bin` renderer · default id `esp32`
 
 Battery-powered **ESP32-S3** firmware for the **Waveshare 7.3" PhotoPainter**
@@ -48,9 +48,9 @@ sequence baked for the PhotoPainter board. Pick `waveshare_photopainter_7_3` as
 the panel preset when registering the device so the server-side renderer uses
 the right row stride. Confirmed on real hardware.
 
-## tesserae-esp32-bw-client
+## tesserae-device-esp32-bw
 
-[:material-github: dmellok/tesserae-esp32-bw-client](https://github.com/dmellok/tesserae-esp32-bw-client)
+[:material-github: dmellok/tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw)
 · pairs with the `esp32_bw_bin` renderer · default id `esp32_bw`
 
 ESP32 firmware for the **Waveshare 4.2" B/W** e-paper panel (400×300, 1-bpp).
@@ -68,9 +68,9 @@ up without changes.
     with the result either way and the table on [Screens & compatibility](../compatibility.md)
     gets updated.
 
-## tesserae-pi-bin-client
+## tesserae-device-pi-bin
 
-[:material-github: dmellok/tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client)
+[:material-github: dmellok/tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin)
 · pairs with the `pi_bin` renderer · default id `pi_bin`
 
 A Raspberry-Pi-side Python daemon. It subscribes to
@@ -81,9 +81,9 @@ Pimoroni Inky Impression (Spectra 6 / Waveshare E6, any of the four sizes,
 auto-detected via the HAT EEPROM). The trade-off is a private-API dependency:
 the `inky` version is pinned exactly.
 
-## tesserae-pi-png-client
+## tesserae-device-pi-png
 
-[:material-github: dmellok/tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client)
+[:material-github: dmellok/tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png)
 · pairs with the `pi_png` renderer · default id `pi_png`
 
 The same Pi-side daemon shape, but it subscribes to

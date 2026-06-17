@@ -64,7 +64,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 4 folders &middot; `sky_air_traffic` `sky_aurora` `sky_bom_warnings` `sky_moon` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-sky)
+    [Source repository](https://github.com/dmellok/tesserae-widget-sky)
 
 -   **Weather Extras** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `weather_extras`
 
@@ -76,7 +76,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 3 folders &middot; `weather_air_quality` `weather_pollen_count` `weather_wind` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-weather-extras)
+    [Source repository](https://github.com/dmellok/tesserae-widget-weather-extras)
 
 </div>
 
@@ -95,7 +95,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 2 folders &middot; `clock_qlock` `clock_world` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-clock-extras)
+    [Source repository](https://github.com/dmellok/tesserae-widget-clock-extras)
 
 </div>
 
@@ -114,7 +114,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `calendar_schedule` &middot; **Version:** `v0.1.2`
 
-    [Source repository](https://github.com/dmellok/tesserae-calendar-schedule)
+    [Source repository](https://github.com/dmellok/tesserae-widget-calendar-schedule)
 
 -   **Public Holiday Countdown** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `public_holiday_countdown`
 
@@ -126,7 +126,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `public_holiday_countdown` &middot; **Version:** `v0.1.3`
 
-    [Source repository](https://github.com/dmellok/tesserae-public-holiday-countdown)
+    [Source repository](https://github.com/dmellok/tesserae-widget-public-holiday-countdown)
 
 </div>
 
@@ -145,7 +145,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 3 folders &middot; `finance_crypto` `finance_currency` `finance_stock` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-finance)
+    [Source repository](https://github.com/dmellok/tesserae-widget-finance)
 
 </div>
 
@@ -164,7 +164,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 7 folders &middot; `github_core` `github_actions` `github_activity` `github_contributions` `github_pr_queue` `github_releases` `github_repo` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-github)
+    [Source repository](https://github.com/dmellok/tesserae-widget-github)
 
 </div>
 
@@ -195,7 +195,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `picture_apple_album` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-apple-album)
+    [Source repository](https://github.com/dmellok/tesserae-widget-apple-album)
 
 -   **Paperlesspaper Art** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `paperlesspaper_art`
 
@@ -207,7 +207,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `paperlesspaper_art` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-paperlesspaper-art)
+    [Source repository](https://github.com/dmellok/tesserae-widget-paperlesspaper-art)
 
 -   **Spotify Widgets** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `spotify`
 
@@ -219,7 +219,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 4 folders &middot; `spotify_core` `spotify_now_playing` `spotify_queue` `spotify_album_art` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-spotify)
+    [Source repository](https://github.com/dmellok/tesserae-widget-spotify)
 
 -   **Unsplash** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `unsplash`
 
@@ -231,7 +231,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `picture_unsplash` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-unsplash)
+    [Source repository](https://github.com/dmellok/tesserae-widget-unsplash)
 
 </div>
 
@@ -250,7 +250,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 5 folders &middot; `f1_core` `f1_last_race` `f1_next` `f1_standings_drivers` `f1_weekend` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-f1)
+    [Source repository](https://github.com/dmellok/tesserae-widget-f1)
 
 </div>
 
@@ -269,7 +269,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `public_transport_times` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-transport)
+    [Source repository](https://github.com/dmellok/tesserae-widget-transport)
 
 </div>
 
@@ -288,7 +288,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `community_demo` &middot; **Version:** `v0.1.2`
 
-    [Source repository](https://github.com/dmellok/tesserae-community-demo)
+    [Source repository](https://github.com/dmellok/tesserae-widget-community-demo)
 
 -   **Dev Reference Bundle** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `devref`
 
@@ -300,7 +300,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 2 folders &middot; `devref_card` `devref_core` &middot; **Version:** `v0.1.2`
 
-    [Source repository](https://github.com/dmellok/tesserae-devref-bundle)
+    [Source repository](https://github.com/dmellok/tesserae-widget-devref)
 
 -   **Glances** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `glances`
 
@@ -312,7 +312,7 @@ The catalog is the right home for widgets that:
 
     **Bundle:** installs 2 folders &middot; `glances_core` `glances_status` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-glances)
+    [Source repository](https://github.com/dmellok/tesserae-widget-glances)
 
 -   **OctoPrint** <span style='background:var(--md-accent-fg-color);color:white;padding:0.05em 0.5em;border-radius:999px;font-size:0.7em;vertical-align:middle;'>verified</span> &middot; `octoprint`
 
@@ -324,7 +324,7 @@ The catalog is the right home for widgets that:
 
     **Folder:** `octoprint_status` &middot; **Version:** `v0.1.0`
 
-    [Source repository](https://github.com/dmellok/tesserae-octoprint)
+    [Source repository](https://github.com/dmellok/tesserae-widget-octoprint)
 
 </div>
 

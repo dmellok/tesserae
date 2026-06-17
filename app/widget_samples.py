@@ -686,11 +686,11 @@ def _github_ci_status() -> dict[str, Any]:
         "repos": [
             {"repo": "dmellok/tesserae", "worst": "failure", "workflow_count": 4},
             {"repo": "dmellok/tesserae-widgets", "worst": "success", "workflow_count": 2},
-            {"repo": "dmellok/tesserae-github", "worst": "success", "workflow_count": 1},
+            {"repo": "dmellok/tesserae-widget-github", "worst": "success", "workflow_count": 1},
         ],
         "failing": ["dmellok/tesserae"],
         "running": [],
-        "passing": ["dmellok/tesserae-widgets", "dmellok/tesserae-github"],
+        "passing": ["dmellok/tesserae-widgets", "dmellok/tesserae-widget-github"],
         "total": 3,
         "errors": [],
     }
@@ -754,7 +754,7 @@ def _github_activity_heatmap() -> dict[str, Any]:
         "top_repos": [
             {"name": "dmellok/tesserae", "count": 188},
             {"name": "dmellok/tesserae-widgets", "count": 42},
-            {"name": "dmellok/tesserae-github", "count": 28},
+            {"name": "dmellok/tesserae-widget-github", "count": 28},
         ],
     }
 

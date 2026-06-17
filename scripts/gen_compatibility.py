@@ -31,19 +31,19 @@ OUT = REPO_ROOT / "docs" / "compatibility.md"
 # entry is a list of ``(label, url)`` tuples.
 CLIENT_REPOS: dict[str, list[tuple[str, str]]] = {
     "pi_png": [
-        ("tesserae-pi-png-client", "https://github.com/dmellok/tesserae-pi-png-client"),
+        ("tesserae-device-pi-png", "https://github.com/dmellok/tesserae-device-pi-png"),
     ],
     "pi_bin": [
-        ("tesserae-pi-bin-client", "https://github.com/dmellok/tesserae-pi-bin-client"),
+        ("tesserae-device-pi-bin", "https://github.com/dmellok/tesserae-device-pi-bin"),
     ],
     "esp32_bin": [
         (
-            'tesserae-esp32-bin-client (13.3" Waveshare)',
-            "https://github.com/dmellok/tesserae-esp32-bin-client",
+            'tesserae-device-esp32-bin (13.3" Waveshare)',
+            "https://github.com/dmellok/tesserae-device-esp32-bin",
         ),
         (
-            'tesserae-photopainter-7.3-bin-client (7.3" PhotoPainter)',
-            "https://github.com/dmellok/tesserae-photopainter-7.3-bin-client",
+            'tesserae-device-photopainter-7.3-bin (7.3" PhotoPainter)',
+            "https://github.com/dmellok/tesserae-device-photopainter-7.3-bin",
         ),
     ],
     "trmnl_png": [

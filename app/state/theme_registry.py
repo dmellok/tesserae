@@ -105,7 +105,7 @@ BUNDLED_THEMES: tuple[Theme, ...] = (
     # marble, glacier, honey, pearl) shipped bundled through 0.47.8.
     # In 0.47.9 both families moved to the community catalog as the
     # ``vivid`` and ``gradient`` packs (github.com/dmellok/tesserae-
-    # vivid + github.com/dmellok/tesserae-gradient) — installable from
+    # vivid + github.com/dmellok/tesserae-theme-gradient) — installable from
     # Settings → Widgets → Browse community widgets. Dashboards that
     # were already pointing at one of those theme ids keep painting
     # correctly the moment the matching pack is installed.

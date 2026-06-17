@@ -53,9 +53,9 @@ Please include:
 
 - The Tesserae server in this repository.
 - The four official client repos:
-  [tesserae-pi-png-client](https://github.com/dmellok/tesserae-pi-png-client),
-  [tesserae-pi-bin-client](https://github.com/dmellok/tesserae-pi-bin-client),
-  [tesserae-esp32-bin-client](https://github.com/dmellok/tesserae-esp32-bin-client),
+  [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png),
+  [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin),
+  [tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin),
   [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client).
 - The HA App companion repo:
   [homeassistant-tesserae-addon](https://github.com/dmellok/homeassistant-tesserae-addon).
