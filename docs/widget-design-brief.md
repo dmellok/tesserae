@@ -58,9 +58,9 @@ The form fields the editor will render. Types: `string` · `textarea` ·
 
 | name | type | default | label | choices |
 |------|------|---------|-------|---------|
-| `latitude` | `number` | `-37.8136` | Latitude |, |
-| `longitude` | `number` | `144.9631` | Longitude |, |
-| `label` | `string` | `Melbourne` | Place label |, |
+| `latitude` | `number` | `-37.8136` | Latitude | |
+| `longitude` | `number` | `144.9631` | Longitude | |
+| `label` | `string` | `Melbourne` | Place label | |
 | `units` | `select` | `metric` | Units | `metric` (Metric °C) · `imperial` (Imperial °F) |
 
 !!! note "No `variant` option for visual direction"
@@ -83,7 +83,7 @@ sensitive fields with `secret: true`.
 
 | name | type | default | label | secret? |
 |------|------|---------|-------|---------|
-| `api_key` | `string` |, | API key | ✓ |
+| `api_key` | `string` | | API key | ✓ |
 
 ---
 
@@ -351,7 +351,7 @@ xs, sm, md, lg, bar collapses gracefully at xs.
 
 | name | type | default | label | choices |
 |------|------|---------|-------|---------|
-| `show_percent` | `boolean` | `true` | Show % number |, |
+| `show_percent` | `boolean` | `true` | Show % number | |
 
 ## 4. Plugin settings
 

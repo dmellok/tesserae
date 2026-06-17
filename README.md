@@ -204,13 +204,13 @@ depths, same MQTT contract shape, distinct renderers per colour gamut).
 
 | Panel | Resolution | Colours | Pi `pi_png` | Pi `pi_bin` | Tested |
 |---|---|---|---|---|---|
-| Inky pHAT | 212×104 | 2 / 3 colour | ✓ |, |, |
-| Inky wHAT | 400×300 | 2 / 3 colour | ✓ |, |, |
-| Inky Impression 4" (ACeP) | 640×400 | 7 colour (ACeP) | ✓ | ✓ |, |
-| Inky Impression 4" (PIM789) | 640×400 | 6 colour (Spectra 6) | ✓ | ✓ |, |
+| Inky pHAT | 212×104 | 2 / 3 colour | ✓ | | |
+| Inky wHAT | 400×300 | 2 / 3 colour | ✓ | | |
+| Inky Impression 4" (ACeP) | 640×400 | 7 colour (ACeP) | ✓ | ✓ | |
+| Inky Impression 4" (PIM789) | 640×400 | 6 colour (Spectra 6) | ✓ | ✓ | |
 | Inky Impression 5.7" | 600×448 | 7 colour (ACeP) | ✓ | ✓ | ✅ |
-| Inky Impression 7.3" (ACeP) | 800×480 | 7 colour (ACeP) | ✓ | ✓ |, |
-| Inky Impression 7.3" (PIM773) | 800×480 | 6 colour (Spectra 6) | ✓ | ✓ |, |
+| Inky Impression 7.3" (ACeP) | 800×480 | 7 colour (ACeP) | ✓ | ✓ | |
+| Inky Impression 7.3" (PIM773) | 800×480 | 6 colour (Spectra 6) | ✓ | ✓ | |
 | Inky Impression 13.3" | 1600×1200 | 6 colour (Spectra 6) | ✓ | ✓ | ✅ |
 
 Each device card carries a per-instance "Calibrated palette + tone
@@ -235,7 +235,7 @@ you've run a panel that isn't ticked.
 |---|---|---|---|---|
 | Waveshare 13.3" Spectra 6 (ESP32-S3) | 1200×1600 (portrait native) | 6 colour (Spectra 6) | [tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin) | ✅ |
 | Waveshare 7.3" PhotoPainter (ESP32-S3) | 800×480 (landscape native) | 6 colour (Spectra 6) | [tesserae-device-photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | ✅ |
-| Waveshare 4.2" B/W (ESP32) | 400×300 (landscape native) | 1-bit B/W (2 colour) | [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) |, |
+| Waveshare 4.2" B/W (ESP32) | 400×300 (landscape native) | 1-bit B/W (2 colour) | [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) | |
 
 ### TRMNL-compatible (HTTP pull)
 
@@ -248,7 +248,7 @@ token you paste into the client config.
 | Panel | Resolution | Colours | Client | Tested |
 |---|---|---|---|---|
 | Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | greyscale | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
-| [TRMNL device](https://usetrmnl.com/) (Seeed hardware, TRMNL firmware) | 800×480 | 1-bit | TRMNL firmware |, |
+| [TRMNL device](https://usetrmnl.com/) (Seeed hardware, TRMNL firmware) | 800×480 | 1-bit | TRMNL firmware | |
 
 The token is short on purpose (5 chars from a typeable alphabet)
 because the typical client has an on-screen keyboard. It's

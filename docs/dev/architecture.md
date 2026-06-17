@@ -65,7 +65,7 @@ id (e.g. `pi_kitchen`, `esp32_hallway`).
 | `tesserae/esp32/status` | `{battery_mv, battery_pct, rssi, ip, kind, panel_w, panel_h, fw_version}` | yes | subscribe |
 | `tesserae/esp32/config` | `{sleep_interval_s}` | yes | both |
 | `tesserae/<id>/frame/trmnl` | `{url}`, only when `trmnl_png` is enabled for a TRMNL-style device that prefers MQTT over the HTTP pull | yes | publish |
-| `tesserae/+/status` | (wildcard), any unregistered id surfaces for one-click registration in Settings → Devices |, | subscribe |
+| `tesserae/+/status` | (wildcard), any unregistered id surfaces for one-click registration in Settings → Devices | | subscribe |
 
 The `kind` / `panel_w` / `panel_h` / `fw_version` keys in a heartbeat
 are the **discovery hint**: a client that includes them gets pre-filled

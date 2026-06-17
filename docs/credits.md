@@ -9,7 +9,7 @@ here is wrong or someone's missing, please [open an issue](https://github.com/dm
 |---|---|---|---|
 | [Phosphor Icons](https://phosphoricons.com/) | Admin UI iconography (6 weights, regular, bold, fill, duotone, light, thin) | 2.x | MIT |
 | [Chart.js](https://chartjs.org/) | Finance / weather / forecast / stats charts | 4.4.0 | MIT |
-| [`widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css) + [`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css) | Shared widget design system: refined title bars, `--c-*` semantic tokens, `--wx-*` decorative tokens for the weather/sky family |, | AGPL-3.0-or-later (this repo) |
+| [`widget-bauhaus.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus.css) + [`widget-bauhaus-wx.css`](https://github.com/dmellok/tesserae/blob/main/static/style/widget-bauhaus-wx.css) | Shared widget design system: refined title bars, `--c-*` semantic tokens, `--wx-*` decorative tokens for the weather/sky family | | AGPL-3.0-or-later (this repo) |
 
 ## Bundled fonts
 
