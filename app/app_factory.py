@@ -716,8 +716,17 @@ def create_app(
         plugin = plugins.get("ha_core")
         if plugin is None or plugin.server_module is None:
             return []
+        # ha_core.server reads its base_url / token via ``current_app``,
+        # which only resolves inside a Flask request OR an active app
+        # context. The scheduler tick runs in a background thread, so
+        # without this push every refresh raises "Working outside of
+        # application context", the closure swallows it, returns [],
+        # and refresh_ha_states wipes the cache. That's the v0.51.x
+        # "every condition fails open in prod but Test conditions
+        # works fine" bug.
         try:
-            return list(plugin.server_module.get_states())
+            with app.app_context():
+                return list(plugin.server_module.get_states())
         except Exception:
             return []
 

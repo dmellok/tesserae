@@ -74,7 +74,15 @@ class ConditionEvaluator:
         and return False so the scheduler can decide whether to surface
         a warning. Per the design we fail-OPEN: any condition whose
         entity we can't observe evaluates to True so a HA outage
-        doesn't pin every dashboard."""
+        doesn't pin every dashboard.
+
+        An empty result (the closure returned []) is also treated as a
+        "couldn't see HA right now" signal rather than overwriting the
+        cache to empty. Without this guard, a closure-level exception
+        swallow + the cache wipe means every condition fails open and
+        every gated step fires. We only adopt the new snapshot when
+        it carries at least one entity, OR when the cache itself was
+        also empty (so the first successful sync still lands)."""
         if self._ha_get_states is None:
             return False
         try:
@@ -82,8 +90,19 @@ class ConditionEvaluator:
         except Exception as err:
             logger.warning("HA state refresh failed: %s", err)
             return False
+        new_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
         with self._ha_lock:
-            self._ha_cache = {s["entity_id"]: s for s in states if "entity_id" in s}
+            if not new_cache and self._ha_cache:
+                # Empty snapshot but we had data before; keep the
+                # previous one so a transient HA blip doesn't fail-open
+                # every condition.
+                logger.warning(
+                    "HA state refresh returned 0 entities; keeping previous cache "
+                    "of %d entities to avoid fail-open avalanche.",
+                    len(self._ha_cache),
+                )
+                return False
+            self._ha_cache = new_cache
         return True
 
     def ha_state(self, entity_id: str) -> dict[str, Any] | None:

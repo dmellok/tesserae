@@ -63,17 +63,20 @@
       <div class="event-conditions">
         {% if ev.extra.steps is defined %}
         {# Rotation decision: shows what each step would do right now,
-           plus which step was actually picked. #}
+           plus which step was actually picked. Page ids are resolved
+           to friendly names via the ``page_names`` lookup the route
+           pre-computed; falls back to the id when the page is missing
+           or has no display name. #}
         <div class="event-conditions-head">
           <strong>{{ ev.extra.rotation_name }}</strong>
           <span class="muted">
-            time slot: step {{ ev.extra.time_step_index + 1 }} ({{ ev.extra.time_step_page }})
+            time slot: step {{ ev.extra.time_step_index + 1 }} ({{ page_names.get(ev.extra.time_step_page, ev.extra.time_step_page) }})
             {% if ev.extra.picked_step_index is none %}
-              · <span class="event-cond-fail">held — no step passes</span>
+              · <span class="event-cond-fail">held, no step passes</span>
             {% elif ev.extra.picked_step_index == ev.extra.time_step_index %}
               · <span class="event-cond-ok">fired as scheduled</span>
             {% else %}
-              · <span class="event-cond-warn">walked to step {{ ev.extra.picked_step_index + 1 }} ({{ ev.extra.picked_step_page }})</span>
+              · <span class="event-cond-warn">walked to step {{ ev.extra.picked_step_index + 1 }} ({{ page_names.get(ev.extra.picked_step_page, ev.extra.picked_step_page) }})</span>
             {% endif %}
           </span>
         </div>
@@ -81,7 +84,7 @@
           {% for s in ev.extra.steps %}
           <li class="{% if s.passes %}is-pass{% else %}is-fail{% endif %}">
             <span class="step-num">{{ s.step_index + 1 }}</span>
-            <code>{{ s.page_id }}</code>
+            <span class="step-page">{{ page_names.get(s.page_id, s.page_id) }}</span>
             {% if s.no_conditions %}
             <span class="muted">no conditions (always passes)</span>
             {% else %}
@@ -106,8 +109,8 @@
         <div class="event-conditions-head">
           <strong>{{ ev.extra.schedule_name }}</strong>
           <span class="muted">
-            page: <code>{{ ev.extra.page_id }}</code>
-            {% if ev.extra.fallback_page_id %} · fallback: <code>{{ ev.extra.fallback_page_id }}</code>{% endif %}
+            page: <span class="step-page">{{ page_names.get(ev.extra.page_id, ev.extra.page_id) }}</span>
+            {% if ev.extra.fallback_page_id %} · fallback: <span class="step-page">{{ page_names.get(ev.extra.fallback_page_id, ev.extra.fallback_page_id) }}</span>{% endif %}
           </span>
         </div>
         <ul class="event-conditions-list">

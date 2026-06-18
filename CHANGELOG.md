@@ -6,7 +6,54 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.3], 2026-06-18
+
+### Fixed
+
+- **Rotation conditions silently fail-opening in prod.** The
+  scheduler tick's HA-state refresh runs in a background thread.
+  ``ha_core.server`` resolves its base URL + token via
+  ``current_app.config``, which is a request-scoped proxy and raises
+  ``RuntimeError: Working outside of application context`` outside
+  a Flask request. The exception was swallowed by the closure in
+  ``app_factory._ha_get_states``, which returned ``[]``, and
+  ``ConditionEvaluator.refresh_ha_states`` then replaced the cache
+  with empty. Every condition's entity was then "not in HA cache",
+  fail-open kicked in, and gated rotation steps fired regardless of
+  the entity state. The manual "Test conditions" button worked
+  because it runs in a request context. Fixed by pushing an app
+  context inside the closure so the background thread can resolve
+  ``current_app`` correctly.
+- **Defence in depth on the same bug.** ``refresh_ha_states`` now
+  refuses to overwrite a populated cache with an empty result. Logs
+  a warning instead. Without this, a future closure-level swallow
+  (or a transient HA blip that returns ``[]``) would silently fail-
+  open every condition again.
+
+### Changed
+
+- **Events page condition rows**: dropped the green/red left rail on
+  each step row in favour of a small pass/fail dot at the start of
+  the line. Page ids are now resolved to friendly names via the page
+  store (slug stays in the data layer so a later rename updates the
+  display).
+
 ## [0.51.2], 2026-06-18
+
+### Fixed
+
+- **Drawer battery item leaking into the desktop top nav.** v0.51.0
+  switched the mobile-drawer Batteries item from `<div>` to `<a>` so
+  the indicator could navigate to `/devices/battery`. That made the
+  generic `.topnav a { display: inline-flex }` rule beat the
+  unscoped `.topbar-batteries--drawer { display: none }` hide rule on
+  desktop (specificity 0,1,1 vs 0,1,0), so the drawer's icon + label
+  + device list rendered inline in the desktop header alongside the
+  popover trigger. Scoped the drawer rules to `.topnav` so the
+  specificity matches, restoring the hide-on-desktop / show-in-mobile
+  drawer behaviour.
+
+, 2026-06-18
 
 ### Fixed
 

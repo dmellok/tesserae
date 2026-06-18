@@ -235,6 +235,39 @@ def test_rotation_scheduled_mode_skips_failing_step(tmp_path: Path) -> None:
     assert idx == 1  # advanced past the unmet condition
 
 
+def test_refresh_ha_states_does_not_wipe_cache_on_empty_result(tmp_path: Path) -> None:
+    """Regression for the prod bug: ``_ha_get_states`` ran in a
+    background thread without a Flask app context, raised, was caught
+    by the closure, returned []. ``refresh_ha_states`` then replaced
+    the cache with empty, every condition fail-opened, and the gated
+    step fired. The fix keeps the previous cache when the new result
+    is empty AND we had data before."""
+    del tmp_path
+    calls: dict[str, int] = {"n": 0}
+    states_by_call = [
+        [{"entity_id": "binary_sensor.octoprint_printing", "state": "off"}],
+        [],  # second call returns nothing (HA blip / context error)
+    ]
+
+    def ha_get_states() -> list[dict[str, Any]]:
+        i = calls["n"]
+        calls["n"] += 1
+        return states_by_call[i] if i < len(states_by_call) else []
+
+    evaluator = ConditionEvaluator(ha_get_states=ha_get_states)
+
+    # First refresh: cache populated.
+    assert evaluator.refresh_ha_states() is True
+    assert evaluator.ha_state("binary_sensor.octoprint_printing") is not None
+
+    # Second refresh: empty result. Must NOT wipe the previous cache.
+    result = evaluator.refresh_ha_states()
+    assert result is False, "empty result should not be adopted"
+    assert evaluator.ha_state("binary_sensor.octoprint_printing") is not None, (
+        "previous cache should survive an empty refresh"
+    )
+
+
 def test_condition_decision_event_emitted_on_rotation_tick(tmp_path: Path) -> None:
     """Each rotation tick that involves condition evaluation should write
     one `type="conditions"` event row to the EventLog, debounced so a

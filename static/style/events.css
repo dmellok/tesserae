@@ -138,21 +138,33 @@
 }
 .event-conditions-steps > li {
   padding: var(--t-space-2);
-  border-left: 3px solid var(--t-border);
   background: var(--t-surface);
   border-radius: var(--t-radius-sm);
 }
-.event-conditions-steps > li.is-pass {
-  border-left-color: color-mix(in oklab, var(--t-ok) 70%, transparent);
+/* Small pass/fail dot at the start of each step row. Neutral grey
+   for the "no conditions" case so the eye can still parse it as a
+   condition decision row without visually misreading it as pass/fail. */
+.event-conditions-steps > li::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--t-muted);
+  margin-right: var(--t-space-2);
+  vertical-align: 0.1em;
 }
-.event-conditions-steps > li.is-fail {
-  border-left-color: color-mix(in oklab, var(--t-danger) 70%, transparent);
-}
+.event-conditions-steps > li.is-pass::before { background: var(--t-ok); }
+.event-conditions-steps > li.is-fail::before { background: var(--t-danger); }
 .event-conditions-steps .step-num {
   display: inline-block;
   width: 1.5em;
   font-weight: 700;
   color: var(--t-muted);
+}
+.step-page {
+  font-weight: 600;
+  color: var(--t-fg);
 }
 .event-conditions-list {
   list-style: none;

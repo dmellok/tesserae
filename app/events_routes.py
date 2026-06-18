@@ -76,6 +76,13 @@ def index() -> str:
     counts = {t: log.count(type=t) for t in _KNOWN_TYPES}
     counts["all"] = sum(counts.values())
 
+    # Page id → friendly name lookup for the conditions-event display;
+    # resolved at render time so renaming a page later doesn't leave
+    # historical events showing the stale name. Falls back to the id
+    # when the page is missing from the store.
+    page_store = current_app.config.get("PAGE_STORE")
+    page_names = {p.id: p.name for p in page_store.list()} if page_store else {}
+
     return render_template(
         "events.html",
         rows=rows,
@@ -84,6 +91,7 @@ def index() -> str:
         counts=counts,
         known_types=_KNOWN_TYPES,
         limit=limit,
+        page_names=page_names,
     )
 
 
