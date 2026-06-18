@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.6], 2026-06-18
+
+### Changed
+
+- **Marketplace install / uninstall auto-restarts Tesserae instead of
+  asking the user to.** The widget Browse page (Settings → Widgets →
+  Browse) used to flash "Installed X v1.0.0. Restart Tesserae to load
+  it." and leave the user to find the manual ``Restart now`` button.
+  Both endpoints now call ``Updater.restart()`` directly on success,
+  and the install / update / uninstall forms opt into the same
+  ``data-restart-form`` spinner-modal-and-poll-for-healthz UX that
+  Settings → System uses for self-update + rollback. End-to-end:
+  click Install → modal shows → server restarts (~3 s) → page
+  auto-reloads → new widget is live. When no Updater is configured
+  (test harnesses, embedded use) the endpoints fall back to the
+  legacy "Restart Tesserae to load it" prompt so nothing breaks.
+- **Refactor**: the restart-form spinner-modal markup and its
+  ``/healthz`` poll-and-reload script extracted out of
+  ``templates/settings.html`` into a shared partial
+  (``templates/_restart_modal.html``) and a static JS file
+  (``static/restart-form.js``), both included from ``_base.html``.
+  Any page that drops a ``<form data-restart-form>`` now inherits the
+  full UX. Same Settings → System forms behave identically; the
+  initial stage label is now generic ("Working…") instead of
+  update-specific ("Pulling the new revision…") since the script
+  can't actually know what the server's doing on the other side.
+
 ## [0.51.5], 2026-06-18
 
 ### Changed

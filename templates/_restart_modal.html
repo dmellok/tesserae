@@ -1,0 +1,21 @@
+{# Restart modal shown by static/restart-form.js when a form opts in
+   via ``data-restart-form``. The same modal serves Settings →
+   System (self-update + rollback) and Settings → Widgets → Browse
+   (marketplace install/uninstall), so it lives here in _base.html
+   instead of duplicated per page. CSS lives under ``.restart-modal``
+   in static/style/settings.css (already loaded globally). #}
+<div class="restart-modal" data-restart-modal hidden role="dialog" aria-modal="true" aria-labelledby="restart-modal-title">
+  <div class="restart-modal-backdrop"></div>
+  <div class="restart-modal-card">
+    <div class="restart-modal-spinner" aria-hidden="true">
+      <i class="ph-bold ph-circle-notch"></i>
+    </div>
+    <h2 id="restart-modal-title" data-restart-modal-title>Updating Tesserae</h2>
+    <p class="restart-modal-stage" data-restart-modal-stage>Working…</p>
+    <p class="restart-modal-help">
+      Keep this tab open. The page will reload automatically once the
+      server is back.
+    </p>
+    <p class="restart-modal-error" data-restart-modal-error hidden></p>
+  </div>
+</div>
