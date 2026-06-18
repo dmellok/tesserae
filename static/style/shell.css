@@ -310,8 +310,28 @@
 .topbar-batteries-popover li.is-tone-critical .topbar-batteries-pct { color: var(--t-danger); }
 .topbar-batteries-popover li.is-tone-low      .topbar-batteries-pct { color: var(--t-warn); }
 .topbar-batteries-popover li.is-tone-ok       .topbar-batteries-pct { color: var(--t-fg-soft); }
-/* Single-device case: the trigger already shows pct, so no popover. */
+/* "View charts" footer link inside the popover. Separated from the
+   list by a faint divider; hover-tinted so the affordance reads. */
+.topbar-batteries-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--t-border);
+  color: var(--t-accent);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+}
+.topbar-batteries-link:hover { background: var(--t-accent-soft); }
+.topbar-batteries-link .ph { font-size: 14px; }
+/* Single-device case: the trigger already shows pct, so the popover
+   is hidden — but we still want the icon to navigate to the page. */
 .topbar-batteries--topbar.is-single .topbar-batteries-popover { display: none; }
+.topbar-batteries--topbar.is-single > summary { cursor: pointer; }
 .topbar-batteries--topbar.is-single > summary { cursor: default; }
 /* Hover open + focus open on desktop so it behaves like a tooltip;
    click-to-toggle still works on touch via the native <details>. */

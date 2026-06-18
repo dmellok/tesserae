@@ -264,9 +264,9 @@
       {% if proj and proj.bands %}
       <div class="rotation-timeline" aria-label="Next 24 hours">
         {% for band in proj.bands %}
-        <span class="rotation-band rotation-band--step-{{ band.index % 5 }}"
+        <span class="rotation-band rotation-band--step-{{ band.index % 5 }}{% if band.held %} is-held{% elif band.conditioned_skipped %} is-shifted{% endif %}"
               style="left:{{ band.pct }}%; width:{{ band.width_pct }}%;"
-              title="{{ band.page_name }} ({{ band.dwell_minutes }} min)"></span>
+              title="{{ band.page_name }} ({{ band.dwell_minutes }} min){% if band.held %} - all step conditions failed{% elif band.conditioned_skipped %} - original time-slot step gated; this is the next eligible step{% endif %}"></span>
         {% endfor %}
       </div>
       {% endif %}

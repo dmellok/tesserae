@@ -171,18 +171,24 @@ def _build_projection(rotation: Rotation, *, total_minutes: int = 24 * 60) -> di
     """Tiny timeline-style projection of the rotation's step sequence
     over the next ``total_minutes`` minutes, anchored at the current
     moment. Powers a small horizontal preview on the index page so the
-    user can sanity-check what the rotation will display when."""
+    user can sanity-check what the rotation will display when.
+
+    Conditions are evaluated against current HA state and projected
+    forward, so a step gated on ``binary_sensor.octoprint_printing ==
+    on`` shows the WALKED-FORWARD eligible step in its time slot (the
+    same step the autonomous tick would fire) rather than the
+    time-naive cycle position. The bar's ``conditioned_skipped`` flag
+    flags slots whose original step was gated out, so the template
+    can hint that the layout shifted vs the configured cycle.
+    """
     now_local = datetime.now()
-    tz_provider_attr = getattr(_scheduler(), "_tz_provider", None)
+    sched = _scheduler()
+    tz_provider_attr = getattr(sched, "_tz_provider", None)
     tz = tz_provider_attr() if callable(tz_provider_attr) else None
     if tz is not None:
         now_local = datetime.now(tz)
     bands: list[dict[str, Any]] = []
     minutes_into = 0
-    # Cap iterations at one per minute of projected window, plus a
-    # small headroom. The previous hard 200-iter cap left ~30% of the
-    # bar empty for any rotation with 5-min dwells (200 * 5 = 1000 of
-    # 1440 minutes) and was worse for shorter dwells.
     iter_cap = total_minutes + 64
     safety = 0
     pages_by_id = {p.id: p.name for p in _pages().list()}
@@ -197,19 +203,44 @@ def _build_projection(rotation: Rotation, *, total_minutes: int = 24 * 60) -> di
         if picked is None:
             minutes_into += 5
             continue
-        idx, step = picked
+        time_idx, time_step = picked
+        # Apply conditions like the autonomous tick does: the user
+        # should see WHICH step will actually fire in this slot, not
+        # the time-naive cycle position.
+        eligible_idx = sched._pick_eligible_step(rotation, time_idx, sample)
+        if eligible_idx is None:
+            # All steps gated out at this moment; mark the slot as a
+            # "held" band so the template can render it muted.
+            bands.append(
+                {
+                    "index": time_idx,
+                    "page_id": None,
+                    "page_name": "Held",
+                    "start_min": minutes_into,
+                    "dwell_minutes": time_step.dwell_minutes,
+                    "pct": minutes_into / total_minutes * 100,
+                    "width_pct": time_step.dwell_minutes / total_minutes * 100,
+                    "held": True,
+                    "conditioned_skipped": True,
+                }
+            )
+            minutes_into += time_step.dwell_minutes
+            continue
+        eligible_step = rotation.steps[eligible_idx]
         bands.append(
             {
-                "index": idx,
-                "page_id": step.page_id,
-                "page_name": pages_by_id.get(step.page_id, step.page_id),
+                "index": eligible_idx,
+                "page_id": eligible_step.page_id,
+                "page_name": pages_by_id.get(eligible_step.page_id, eligible_step.page_id),
                 "start_min": minutes_into,
-                "dwell_minutes": step.dwell_minutes,
+                "dwell_minutes": time_step.dwell_minutes,
                 "pct": minutes_into / total_minutes * 100,
-                "width_pct": step.dwell_minutes / total_minutes * 100,
+                "width_pct": time_step.dwell_minutes / total_minutes * 100,
+                "held": False,
+                "conditioned_skipped": eligible_idx != time_idx,
             }
         )
-        minutes_into += step.dwell_minutes
+        minutes_into += time_step.dwell_minutes
     return {
         "total_minutes": total_minutes,
         "bands": bands,

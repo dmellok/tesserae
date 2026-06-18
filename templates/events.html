@@ -9,7 +9,7 @@
   {% else %}<span class="pill is-danger">{{ status }}</span>{% endif %}
 {% endmacro %}
 
-{% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast','telemetry':'broadcast'} %}
+{% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast','telemetry':'broadcast','conditions':'funnel'} %}
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-gear-six"></i> Settings</h1>
@@ -59,7 +59,72 @@
         {% if ev.digest %}<span class="muted">·</span><code class="digest">{{ ev.digest }}</code>{% endif %}
         {% if ev.error %}<span class="muted">·</span><span class="event-err">{{ ev.error }}</span>{% endif %}
       </div>
-      {% if ev.extra and (ev.type != 'push') %}
+      {% if ev.type == 'conditions' and ev.extra %}
+      <div class="event-conditions">
+        {% if ev.extra.steps is defined %}
+        {# Rotation decision: shows what each step would do right now,
+           plus which step was actually picked. #}
+        <div class="event-conditions-head">
+          <strong>{{ ev.extra.rotation_name }}</strong>
+          <span class="muted">
+            time slot: step {{ ev.extra.time_step_index + 1 }} ({{ ev.extra.time_step_page }})
+            {% if ev.extra.picked_step_index is none %}
+              · <span class="event-cond-fail">held — no step passes</span>
+            {% elif ev.extra.picked_step_index == ev.extra.time_step_index %}
+              · <span class="event-cond-ok">fired as scheduled</span>
+            {% else %}
+              · <span class="event-cond-warn">walked to step {{ ev.extra.picked_step_index + 1 }} ({{ ev.extra.picked_step_page }})</span>
+            {% endif %}
+          </span>
+        </div>
+        <ul class="event-conditions-steps">
+          {% for s in ev.extra.steps %}
+          <li class="{% if s.passes %}is-pass{% else %}is-fail{% endif %}">
+            <span class="step-num">{{ s.step_index + 1 }}</span>
+            <code>{{ s.page_id }}</code>
+            {% if s.no_conditions %}
+            <span class="muted">no conditions (always passes)</span>
+            {% else %}
+            <ul class="event-conditions-list">
+              {% for c in s.conditions %}
+              <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
+                {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
+                <code>{{ c.source_id or c.source_kind }}</code>
+                {{ c.operator }}
+                <code>{{ c.value|tojson }}</code>
+                <span class="muted">observed: {{ c.observed }}</span>
+                {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        {# Schedule decision: single set of conditions, single outcome. #}
+        <div class="event-conditions-head">
+          <strong>{{ ev.extra.schedule_name }}</strong>
+          <span class="muted">
+            page: <code>{{ ev.extra.page_id }}</code>
+            {% if ev.extra.fallback_page_id %} · fallback: <code>{{ ev.extra.fallback_page_id }}</code>{% endif %}
+          </span>
+        </div>
+        <ul class="event-conditions-list">
+          {% for c in ev.extra.conditions %}
+          <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
+            {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
+            <code>{{ c.source_id or c.source_kind }}</code>
+            {{ c.operator }}
+            <code>{{ c.value|tojson }}</code>
+            <span class="muted">observed: {{ c.observed }}</span>
+            {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+      {% elif ev.extra and (ev.type != 'push') %}
       <pre class="event-extra">{{ ev.extra|tojson }}</pre>
       {% endif %}
     </div>

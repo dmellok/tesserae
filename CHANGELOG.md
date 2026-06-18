@@ -6,6 +6,61 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.0], 2026-06-18
+
+### Added
+
+- **`device_battery` widget.** Dashboard tile listing every
+  registered device reporting a `battery_pct` heartbeat. Sorted
+  lowest-charge-first with critical/low/ok tone colouring, fill bar
+  per device, optional days-to-empty estimate, container-query size
+  tiers (xs through lg).
+- **Persistent battery history.** New `BatteryHistory` SQLite store at
+  `data/core/battery_history.db` writes one row per battery-carrying
+  heartbeat. Both MQTT (`transport_wiring`) and TRMNL HTTP-pull
+  (`trmnl_api`) hook into it, so every device kind that reports
+  battery accumulates history.
+- **`/devices/battery` admin page.** Per-device card with name + current
+  percentage, Chart.js trace tied to `--t-accent` (theme-reactive),
+  stats table (samples, drain rate %/day, projected days-to-20%, days-to-0%).
+  Selectable window: 1d / 3d / 7d / 14d / 30d / 90d. Status dot
+  in the top-right corner conveys tone without a screaming rail.
+  Reachable from the existing top-bar battery indicator (single
+  device → direct link, multi-device → "View charts & trends"
+  footer link in the popover).
+- **Linear-regression projection.** 8-sample minimum, returns no
+  projection for flat/charging batteries (the slope is reported
+  alone). Powers both the widget's days-to-empty line and the admin
+  page's reaches-20%/reaches-0% columns.
+- **Condition decision logging.** Every rotation tick that evaluates
+  step conditions, and every schedule fire involving conditions,
+  writes one `type="conditions"` event row with per-condition
+  observed values, pass/fail, the time-slot step vs the actually
+  picked step, and any fail-open reason. Surfaced as a new filter
+  chip on `/events?type=conditions` with a structured "why" panel
+  per row. Debounced so a quiet rotation doesn't flood the log every
+  30 seconds.
+
+### Changed
+
+- **Rotation projection bar** now respects conditions: the band shown
+  in each time slot is the step the picker would actually pick, not
+  the time-naive cycle position. Slots where all steps gate out
+  render with a diagonal "Held" stripe; slots where the picker walked
+  past the original step get a small amber underline so the user can
+  see "the cycle shifted here".
+- **Rotation projection bar palette.** Replaced the warm-everything
+  terra/ochre/sage/rose/mauve set with a monochromatic ladder built
+  from `--t-accent` at five intensities so the bar reads as one
+  coherent strip and tracks the active theme.
+
+### Notes
+
+- No downsampling yet; at the default 15-min wake cadence each device
+  grows the store by ~35 k rows / year. SQLite is comfortable through
+  multi-million rows, so we'll add a rolldown when a real install
+  hits multi-year retention.
+
 ## [0.50.3], 2026-06-18
 
 ### Fixed

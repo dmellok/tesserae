@@ -469,15 +469,34 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
   bottom: 0;
 }
 
-/* Warm palette to match Tesserae's terracotta accent. Each hue is
-   desaturated (~45-55% S) and mid-lightness so the bands read as
-   distinct without competing with the brand colour or fighting
-   anything in the rotation card around them. */
-.rotation-band--step-0 { background: #C2664A; } /* warm terra        */
-.rotation-band--step-1 { background: #C99A52; } /* honey ochre       */
-.rotation-band--step-2 { background: #8B9A65; } /* warm sage         */
-.rotation-band--step-3 { background: #A66161; } /* dusty rose        */
-.rotation-band--step-4 { background: #8C7196; } /* dusty mauve       */
+/* Monochromatic ladder built from the page accent. Each step is the
+   same hue at a different intensity, so the bar reads as a single
+   coherent strip rather than competing colours, and it tracks the
+   active theme + dark mode automatically. Step 0 is strongest, step
+   4 lightest, then it cycles. */
+.rotation-band--step-0 { background: color-mix(in oklab, var(--t-accent) 90%, var(--t-surface)); }
+.rotation-band--step-1 { background: color-mix(in oklab, var(--t-accent) 70%, var(--t-surface)); }
+.rotation-band--step-2 { background: color-mix(in oklab, var(--t-accent) 50%, var(--t-surface)); }
+.rotation-band--step-3 { background: color-mix(in oklab, var(--t-accent) 35%, var(--t-surface)); }
+.rotation-band--step-4 { background: color-mix(in oklab, var(--t-accent) 20%, var(--t-surface)); }
+/* "Held" bands appear when conditions gate every step at that moment.
+   Renders as a faint diagonal stripe so the user sees "nothing will
+   fire here" without a confusing solid colour. */
+.rotation-band.is-held {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklab, var(--t-muted) 28%, var(--t-surface)),
+    color-mix(in oklab, var(--t-muted) 28%, var(--t-surface)) 6px,
+    color-mix(in oklab, var(--t-muted) 14%, var(--t-surface)) 6px,
+    color-mix(in oklab, var(--t-muted) 14%, var(--t-surface)) 12px
+  );
+}
+/* Subtle dot in the corner so the user sees this slot's step was
+   walked-past due to a failing condition (the autonomous tick fires
+   the next eligible step instead). */
+.rotation-band.is-shifted {
+  box-shadow: inset 0 -2px 0 color-mix(in oklab, var(--t-warn) 70%, transparent);
+}
 
 .rotation-actions {
   display: flex;

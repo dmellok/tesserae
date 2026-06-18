@@ -36,6 +36,7 @@ from werkzeug.wrappers import Response
 from app import (
     auth,
     composer,
+    device_battery_routes,
     device_loader,
     events_routes,
     history_routes,
@@ -524,9 +525,14 @@ def create_app(
     # data/core/device_telemetry.json. Step 1 only tracks heartbeats +
     # computes predictions; the scheduler hook that acts on them is
     # step 2 of the same feature.
+    from app.state.battery_history import BatteryHistory
     from app.state.device_telemetry import TelemetryStore
 
     app.config["DEVICE_TELEMETRY"] = TelemetryStore(data_root / "core" / "device_telemetry.json")
+    # Per-device battery history: one row per heartbeat with a
+    # battery_pct field. Drives the device_battery widget's
+    # "days-to-empty" projection and the /devices/battery admin page.
+    app.config["BATTERY_HISTORY"] = BatteryHistory(data_root / "core" / "battery_history.db")
     app.config["PREVIEW_CACHE"] = {}
     app.config["RENDERS_DIR"] = renders_dir
     app.config["DEVICE_STATUS"] = status_cache
@@ -763,6 +769,7 @@ def create_app(
     rotation_routes.register(app)
     send_routes.register(app)
     history_routes.register(app)
+    device_battery_routes.register(app)
     events_routes.register(app)
     page_routes.register(app)
     onboarding.register(app)

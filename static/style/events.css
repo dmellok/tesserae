@@ -104,6 +104,79 @@
   max-height: 120px;
 }
 
+/* Condition-decision rows: the "why" panel that explains what each
+   step's conditions resolved to and which step the scheduler picked.
+   Built from event.extra; sits where event-extra would otherwise show
+   the raw JSON dump. */
+.event-conditions {
+  margin: var(--t-space-2) 0 0;
+  padding: var(--t-space-3);
+  background: var(--t-surface-soft);
+  border-radius: var(--t-radius-sm);
+  font-size: var(--t-size-xs);
+  line-height: 1.5;
+}
+.event-conditions-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--t-space-2);
+  align-items: baseline;
+  margin-bottom: var(--t-space-2);
+}
+.event-conditions-head strong { font-weight: 700; }
+.event-cond-ok    { color: var(--t-ok); font-weight: 600; }
+.event-cond-warn  { color: var(--t-warn); font-weight: 600; }
+.event-cond-fail  { color: var(--t-danger); font-weight: 600; }
+.event-cond-reason { color: var(--t-muted); font-style: italic; }
+.event-conditions-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.event-conditions-steps > li {
+  padding: var(--t-space-2);
+  border-left: 3px solid var(--t-border);
+  background: var(--t-surface);
+  border-radius: var(--t-radius-sm);
+}
+.event-conditions-steps > li.is-pass {
+  border-left-color: color-mix(in oklab, var(--t-ok) 70%, transparent);
+}
+.event-conditions-steps > li.is-fail {
+  border-left-color: color-mix(in oklab, var(--t-danger) 70%, transparent);
+}
+.event-conditions-steps .step-num {
+  display: inline-block;
+  width: 1.5em;
+  font-weight: 700;
+  color: var(--t-muted);
+}
+.event-conditions-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--t-space-1) 0 0 1.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.event-conditions-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.event-conditions-list > li.is-pass .ph { color: var(--t-ok); }
+.event-conditions-list > li.is-fail .ph { color: var(--t-danger); }
+.event-conditions-list code {
+  font-size: 0.9em;
+  background: var(--t-surface-sunk);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
 .event-thumb {
   width: 72px;
   height: 54px;

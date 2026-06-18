@@ -278,6 +278,30 @@ def _subscribe_device_status(
                 )
             except Exception:
                 logger.exception("telemetry: record_heartbeat failed for %s", device.id)
+        # Battery history: append one sample per heartbeat so the
+        # device_battery widget + /devices/battery admin page can plot
+        # the drain curve and project days-to-empty. Skipped when the
+        # heartbeat is an error or carries no battery_pct (mains
+        # devices like the Pi paths).
+        battery_history = app.config.get("BATTERY_HISTORY")
+        if (
+            battery_history is not None
+            and "error" not in parsed
+            and parsed.get("battery_pct") is not None
+        ):
+            try:
+                battery_history.record(
+                    device.id,
+                    pct=int(parsed["battery_pct"]),
+                    battery_mv=(
+                        int(parsed["battery_mv"]) if parsed.get("battery_mv") is not None else None
+                    ),
+                    timestamp=received_at,
+                )
+            except (TypeError, ValueError):
+                pass
+            except Exception:
+                logger.exception("battery_history: record failed for %s", device.id)
         # Only log when the status actually changed (or carries an error).
         # The live cache + HA sensors still see every heartbeat; this just
         # keeps steady heartbeats from churning the capped event log.

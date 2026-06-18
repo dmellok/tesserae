@@ -197,7 +197,8 @@
       </a>
       {% if nav_batteries %}
       {% set _drawer_worst = nav_batteries[0] %}
-      <div class="topbar-batteries topbar-batteries--drawer is-tone-{{ _drawer_worst.tone }}">
+      <a href="{{ url_for('device_battery.index') }}"
+         class="topbar-batteries topbar-batteries--drawer is-tone-{{ _drawer_worst.tone }}{% if request.endpoint == 'device_battery.index' %} is-active{% endif %}">
         <i class="ph-bold ph-battery-{% if _drawer_worst.tone == 'critical' %}warning{% elif _drawer_worst.tone == 'low' %}low{% else %}medium{% endif %}" aria-hidden="true"></i>
         <span class="topbar-batteries-label">Batteries</span>
         <ul class="topbar-batteries-drawer-list">
@@ -208,7 +209,7 @@
           </li>
           {% endfor %}
         </ul>
-      </div>
+      </a>
       {% endif %}
       <button type="button" class="theme-toggle theme-toggle--drawer" data-theme-toggle aria-label="Toggle dark mode">
         <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
@@ -219,18 +220,22 @@
     {% endblock %}
     {% if nav_batteries %}
     {% set _worst = nav_batteries[0] %}
-    {# Topbar battery indicator. Single device renders icon + pct
-       inline; multiple devices use a <details> popover so hover on
-       desktop + click on mobile both work without JS. Worst battery
-       paints the trigger so the user notices the most urgent. #}
-    <details class="topbar-batteries topbar-batteries--topbar is-tone-{{ _worst.tone }}{% if nav_batteries|length == 1 %} is-single{% endif %}" data-batteries>
+    {# Topbar battery indicator. Single device renders as a plain link
+       (icon + pct) straight to the admin page; multiple devices use a
+       <details> popover so hover on desktop + click on mobile both work
+       without JS, with a "View charts" footer link. #}
+    {% if nav_batteries|length == 1 %}
+    <a href="{{ url_for('device_battery.index') }}"
+       class="topbar-batteries topbar-batteries--topbar is-tone-{{ _worst.tone }} is-single"
+       aria-label="Device battery: {{ _worst.name }} at {{ _worst.pct }} percent">
+      <i class="ph-bold ph-battery-{% if _worst.tone == 'critical' %}warning{% elif _worst.tone == 'low' %}low{% else %}medium{% endif %}" aria-hidden="true"></i>
+      <span class="topbar-batteries-pct">{{ _worst.pct }}%</span>
+    </a>
+    {% else %}
+    <details class="topbar-batteries topbar-batteries--topbar is-tone-{{ _worst.tone }}" data-batteries>
       <summary aria-label="Device batteries">
         <i class="ph-bold ph-battery-{% if _worst.tone == 'critical' %}warning{% elif _worst.tone == 'low' %}low{% else %}medium{% endif %}" aria-hidden="true"></i>
-        {% if nav_batteries|length == 1 %}
-        <span class="topbar-batteries-pct">{{ _worst.pct }}%</span>
-        {% else %}
         <span class="topbar-batteries-count">{{ nav_batteries|length }}</span>
-        {% endif %}
       </summary>
       <div class="topbar-batteries-popover" role="dialog" aria-label="Device batteries">
         <header class="topbar-batteries-head">Device batteries</header>
@@ -242,8 +247,13 @@
           </li>
           {% endfor %}
         </ul>
+        <a class="topbar-batteries-link" href="{{ url_for('device_battery.index') }}">
+          View charts &amp; trends
+          <i class="ph ph-arrow-right" aria-hidden="true"></i>
+        </a>
       </div>
     </details>
+    {% endif %}
     {% endif %}
     <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Toggle dark mode">
       <i class="ph ph-sun is-light-only" aria-hidden="true"></i>

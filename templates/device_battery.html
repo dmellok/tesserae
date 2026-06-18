@@ -1,0 +1,426 @@
+{% extends "_base.html" %}
+{% from "_components.html" import card_head %}
+{% block title %}Device batteries, Tesserae{% endblock %}
+{% block page_class %}page-wide{% endblock %}
+
+{% block main %}
+<section class="card">
+  {{ card_head('Device batteries', icon_name='battery-charging',
+               blurb='Recorded battery levels per device, with a projected days-to-empty from the last ' ~ window_days ~ ' days of history.') }}
+
+  <nav class="event-type-filter event-type-filter--standalone" role="tablist" aria-label="History window">
+    {% for w in window_options %}
+      <a href="{{ url_for('device_battery.index', window=w) }}" role="tab"
+         class="chip {% if w == window_days %}is-active{% endif %}"
+         title="Show {{ w }} day window">
+        <i class="ph ph-clock" aria-hidden="true"></i>
+        <span>{{ w }}d</span>
+      </a>
+    {% endfor %}
+  </nav>
+
+  {% if not cards %}
+    <p class="u-muted" style="margin: var(--space-5) 0;">
+      No battery history yet. Once a registered device sends a heartbeat with a
+      <code>battery_pct</code> field, samples land here and you'll see a trace
+      plus a days-to-empty estimate.
+    </p>
+  {% else %}
+    <div class="battery-cards">
+      {% for c in cards %}
+        {% set pct = c.current.pct if c.current.pct is defined else None %}
+        {% set tone = 'critical' if pct is not none and pct <= 10
+                       else 'low'  if pct is not none and pct <= 30
+                       else 'ok' %}
+        {% set show_id = c.id != c.name %}
+        <article class="battery-card" data-tone="{{ tone }}">
+          <span class="battery-status-dot"
+                title="{{ 'Critical' if tone == 'critical' else 'Low' if tone == 'low' else 'OK' }}"
+                aria-label="Battery status: {{ tone }}"></span>
+          <header class="battery-card-head">
+            <div class="battery-card-name">
+              <h3>{{ c.name }}</h3>
+              {% if show_id %}<p class="battery-card-id">{{ c.id }}</p>{% endif %}
+            </div>
+            {% if pct is not none %}
+              <div class="battery-card-pct">
+                <span class="battery-card-pct-value">{{ pct }}</span><span class="battery-card-pct-unit">%</span>
+              </div>
+            {% endif %}
+          </header>
+
+          {% if c.series %}
+            <div class="battery-chart-wrap">
+              <canvas class="battery-chart"
+                      data-series='{{ c.series | tojson }}'
+                      data-tone="{{ tone }}"
+                      data-window-days="{{ window_days }}"
+                      aria-label="Battery percent over the last {{ window_days }} days"></canvas>
+            </div>
+          {% else %}
+            <p class="battery-empty">No samples in this window.</p>
+          {% endif %}
+
+          <div class="battery-stats-wrap">
+            <table class="battery-stats">
+              <thead>
+                <tr>
+                  <th>Samples</th>
+                  {% if c.prediction %}
+                    <th>Drain rate</th>
+                    <th>Reaches 20%</th>
+                    <th>Reaches 0%</th>
+                  {% else %}
+                    <th colspan="3">Status</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{{ c.samples }}</td>
+                  {% if c.prediction %}
+                    {% set slope = c.prediction.slope_per_day %}
+                    <td>{{ '%+.1f' % slope }} <span class="battery-unit">%/day</span></td>
+                    {% if c.prediction.days_to_20pct is not none %}
+                      <td>{{ '%.1f' % c.prediction.days_to_20pct }} <span class="battery-unit">days</span></td>
+                    {% else %}
+                      <td class="is-muted">—</td>
+                    {% endif %}
+                    {% if c.prediction.days_to_empty is not none %}
+                      <td>{{ '%.1f' % c.prediction.days_to_empty }} <span class="battery-unit">days</span></td>
+                    {% else %}
+                      <td class="is-muted">—</td>
+                    {% endif %}
+                  {% else %}
+                    <td class="is-muted" colspan="3">Need at least 8 samples for a prediction.</td>
+                  {% endif %}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% endif %}
+</section>
+
+<style>
+  /* Tesserae admin tokens (--t-*). Spacing scale: space-7 = 32px,
+     space-8 = 48px. The big gap between cards is what gives the page
+     its breathing room. */
+  .battery-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--t-space-8);
+    margin-top: var(--t-space-6);
+  }
+  .battery-card {
+    background: var(--t-surface);
+    border: 1px solid var(--t-border);
+    border-radius: var(--t-radius-md);
+    padding: var(--t-space-6) var(--t-space-7);
+    display: flex;
+    flex-direction: column;
+    gap: var(--t-space-5);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  /* Status dot in the top-right corner of each card. Semantic
+     --t-ok/warn/danger so it tracks the theme. Subtle ring around it
+     so it reads as a pill / indicator rather than a stray dot. */
+  .battery-status-dot {
+    position: absolute;
+    top: var(--t-space-5);
+    right: var(--t-space-5);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--t-ok);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-ok) 18%, transparent);
+  }
+  .battery-card[data-tone="critical"] .battery-status-dot {
+    background: var(--t-danger);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-danger) 18%, transparent);
+  }
+  .battery-card[data-tone="low"] .battery-status-dot {
+    background: var(--t-warn);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-warn) 18%, transparent);
+  }
+  .battery-card[data-tone="ok"] .battery-status-dot {
+    background: var(--t-ok);
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--t-ok) 18%, transparent);
+  }
+
+  .battery-card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--t-space-4);
+  }
+  .battery-card-name h3 {
+    margin: 0;
+    font-size: var(--t-size-lg, 1.25rem);
+    line-height: 1.15;
+    color: var(--t-fg);
+  }
+  .battery-card-id {
+    margin: var(--t-space-1) 0 0;
+    font-size: var(--t-size-xs, 0.75rem);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--t-muted);
+  }
+  .battery-card-pct {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .battery-card-pct-value {
+    font-weight: 800;
+    font-size: 2.75rem;
+    color: var(--t-fg);
+  }
+  .battery-card-pct-unit {
+    font-weight: 600;
+    font-size: 1.25rem;
+    color: var(--t-muted);
+  }
+  .battery-card[data-tone="critical"] .battery-card-pct-value { color: var(--t-danger); }
+  .battery-card[data-tone="low"]      .battery-card-pct-value { color: var(--t-warn); }
+  .battery-card[data-tone="ok"]       .battery-card-pct-value { color: var(--t-ok); }
+
+  /* Chart.js needs a positioned fixed-height parent or it grows
+     unbounded on every resize tick. */
+  .battery-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 240px;
+    margin: var(--t-space-2) 0;
+  }
+  .battery-chart {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+  }
+  .battery-empty {
+    margin: 0;
+    padding: var(--t-space-6) 0;
+    text-align: center;
+    color: var(--t-muted);
+  }
+
+  /* Stats table. Sunken inside the card so it reads as a distinct
+     summary block, with clear column headings and tabular values. */
+  .battery-stats-wrap {
+    background: var(--t-surface-sunk);
+    border-radius: var(--t-radius-sm);
+    padding: var(--t-space-4) var(--t-space-5);
+  }
+  .battery-stats {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+  }
+  .battery-stats th {
+    font-weight: 600;
+    font-size: var(--t-size-xs, 0.75rem);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--t-muted);
+    padding: 0 var(--t-space-4) var(--t-space-2) 0;
+  }
+  .battery-stats td {
+    padding: 0 var(--t-space-4) 0 0;
+    font-weight: 600;
+    font-size: var(--t-size-md, 1rem);
+    font-variant-numeric: tabular-nums;
+    vertical-align: baseline;
+    color: var(--t-fg);
+  }
+  .battery-unit {
+    font-weight: 500;
+    font-size: var(--t-size-xs, 0.75rem);
+    color: var(--t-muted);
+    margin-left: 2px;
+  }
+  .battery-stats td.is-muted {
+    font-weight: 400;
+    color: var(--t-muted);
+  }
+</style>
+
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script>
+  (function () {
+    function readToken(name, fallback) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      return (v || fallback).trim();
+    }
+
+    function toRgba(input, alpha) {
+      var s = (input || "").trim();
+      if (s.indexOf("#") === 0) {
+        var h = s.slice(1);
+        if (h.length === 3) {
+          h = h.split("").map(function (c) { return c + c; }).join("");
+        }
+        if (h.length < 6) return "rgba(80, 100, 140, " + alpha + ")";
+        var r = parseInt(h.slice(0, 2), 16);
+        var g = parseInt(h.slice(2, 4), 16);
+        var b = parseInt(h.slice(4, 6), 16);
+        return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+      }
+      // ``rgb(...)`` / ``rgba(...)`` shorthand: swap in the new alpha.
+      var m = s.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*[0-9.]+)?\)/);
+      if (m) return "rgba(" + m[1] + "," + m[2] + "," + m[3] + "," + alpha + ")";
+      // Unknown form (e.g. ``color-mix`` returning a CSS value the
+      // browser hasn't computed): fall back to the slate-blue default.
+      return "rgba(80, 100, 140, " + alpha + ")";
+    }
+
+    function init() {
+      if (typeof Chart === "undefined") return;
+      var mutedHex = readToken("--t-muted", "#71706c");
+      var textPrimary = readToken("--t-fg", "#18181b");
+      // One chart colour for the whole page, matching the active chip
+      // and the battery icon in the header. Theme-switch reactive
+      // because we read it at render time.
+      var accent = readToken("--t-accent", "#0d8c7e");
+
+      document.querySelectorAll(".battery-chart").forEach(function (canvas) {
+        var raw = canvas.dataset.series;
+        if (!raw) return;
+        var series;
+        try { series = JSON.parse(raw); } catch (e) { return; }
+        if (!Array.isArray(series) || series.length === 0) return;
+
+        var points = series.map(function (p) { return { x: p.t_ms, y: p.pct }; });
+        var windowDays = parseInt(canvas.dataset.windowDays, 10) || 7;
+        var nowMs = Date.now();
+        var DAY = 86400 * 1000;
+        // Honour the requested window when there's data to fill it,
+        // but clip to the actual data span when data is much shorter
+        // (e.g. user picks 90d on a 7-day-old install: don't show 83
+        // days of empty axis with data crammed at the right). Small
+        // padding so the oldest point isn't sitting on the axis edge.
+        var requestedMinX = nowMs - windowDays * DAY;
+        var dataMinX = points.length ? points[0].x : requestedMinX;
+        var minX = Math.max(requestedMinX, dataMinX - DAY * 0.25);
+        var displayedDays = (nowMs - minX) / DAY;
+        // Tick step picked from the *displayed* span (not the requested
+        // window). Without this Chart.js picks ~6 fractional ticks and a
+        // 3-day window renders as "Jun 15, Jun 16, Jun 16, Jun 17, Jun
+        // 17, Jun 18" because adjacent ticks round to the same date.
+        var stepMs;
+        if (displayedDays <= 1)       stepMs = 4 * 3600 * 1000;   // every 4 hours
+        else if (displayedDays <= 3)  stepMs = DAY;               // daily
+        else if (displayedDays <= 14) stepMs = 2 * DAY;           // every 2 days
+        else if (displayedDays <= 30) stepMs = 5 * DAY;           // every 5 days
+        else                          stepMs = 14 * DAY;          // every 2 weeks
+
+        var ctx = canvas.getContext("2d");
+        // Gradient stays under the line; fades almost completely by
+        // 70% of the canvas height so it doesn't fill the whole 0-100
+        // axis area when the line is sitting up near 90%.
+        var rect = canvas.getBoundingClientRect();
+        var gradient = ctx.createLinearGradient(0, 0, 0, rect.height || 240);
+        gradient.addColorStop(0, toRgba(accent, 0.22));
+        gradient.addColorStop(0.7, toRgba(accent, 0.04));
+        gradient.addColorStop(1, toRgba(accent, 0));
+
+        new Chart(ctx, {
+          type: "line",
+          data: {
+            datasets: [{
+              data: points,
+              borderColor: accent,
+              backgroundColor: gradient,
+              tension: 0.25,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              pointHoverBackgroundColor: accent,
+              pointHoverBorderColor: accent,
+              borderWidth: 2,
+              fill: "origin",
+            }],
+          },
+          options: {
+            animation: false,
+            maintainAspectRatio: false,
+            responsive: true,
+            layout: { padding: { top: 8, right: 8, bottom: 0, left: 0 } },
+            interaction: { mode: "nearest", intersect: false, axis: "x" },
+            scales: {
+              x: {
+                type: "linear",
+                min: minX,
+                max: nowMs,
+                ticks: {
+                  stepSize: stepMs,
+                  callback: function (value) {
+                    var d = new Date(value);
+                    if (displayedDays <= 1) {
+                      // Clock time only; date repeats meaninglessly.
+                      return d.toLocaleTimeString(undefined, {
+                        hour: "numeric", minute: "2-digit",
+                      });
+                    }
+                    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                  },
+                  color: mutedHex,
+                  font: { size: 11 },
+                  padding: 6,
+                },
+                grid: { display: false },
+                border: { color: toRgba(mutedHex, 0.35) },
+              },
+              y: {
+                min: 0,
+                max: 100,
+                ticks: {
+                  color: mutedHex,
+                  stepSize: 25,
+                  font: { size: 11 },
+                  callback: function (v) { return v + "%"; },
+                  padding: 6,
+                },
+                grid: { color: toRgba(mutedHex, 0.1), drawTicks: false },
+                border: { display: false },
+              },
+            },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: textPrimary,
+                titleColor: "#fff",
+                bodyColor: "#fff",
+                displayColors: false,
+                titleFont: { size: 11, weight: "normal" },
+                bodyFont: { size: 13, weight: "bold" },
+                padding: 8,
+                callbacks: {
+                  title: function (items) {
+                    if (!items.length) return "";
+                    return new Date(items[0].parsed.x).toLocaleString(undefined, {
+                      month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+                    });
+                  },
+                  label: function (item) { return item.parsed.y + "%"; },
+                },
+              },
+            },
+          },
+        });
+      });
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", init);
+    } else {
+      init();
+    }
+  })();
+</script>
+{% endblock %}

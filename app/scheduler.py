@@ -288,6 +288,12 @@ class Scheduler:
         # rotation_id we've warned about for a missing step page; same
         # one-shot semantics as ``_warned_missing_page``.
         self._warned_missing_rotation_page: set[str] = set()
+        # Debounce key for condition-decision events so we don't write
+        # a row on every 30s tick; only when the per-step pass/fail
+        # outcome or picked step changes. Maps rotation_id/schedule_id
+        # -> stable hash of the previous decision.
+        self._rotation_last_condition_key: dict[str, Any] = {}
+        self._schedule_last_condition_key: dict[str, Any] = {}
         # Manual "play step N now and continue from there" overrides.
         # Map rotation_id -> (clicked_at_utc, step_index). The cycle
         # math treats clicked_at as the start of step_index's dwell
@@ -523,6 +529,11 @@ class Scheduler:
             # as "hold on whatever was last shown".
             time_step_index = state.step_index
             picked = self._pick_eligible_step(rotation, time_step_index, now)
+            # Observability: write one ``conditions`` event row per
+            # decision so the Events page shows what the scheduler
+            # actually saw (HA state, pass/fail per condition, time
+            # vs picked step). Debounced inside the helper.
+            self._record_rotation_condition_decision(rotation, time_step_index, picked, now)
             if picked is None:
                 # All steps failed their conditions. Surface that as a
                 # held pill on the Rotations page so the user can see why
@@ -578,6 +589,143 @@ class Scheduler:
             out.append((rotation, step_index))
         out.sort(key=lambda pair: (-pair[0].priority, pair[0].id))
         return out
+
+    def _record_rotation_condition_decision(
+        self,
+        rotation: Rotation,
+        time_step_index: int,
+        picked_step_index: int | None,
+        now: datetime,
+    ) -> None:
+        """Write one ``conditions`` event row describing this rotation's
+        condition evaluation. No-op when no step has conditions, no
+        event log is wired, or no evaluator is configured. Debounced
+        per-rotation: a quiet rotation that ticks every 30 seconds with
+        identical state writes one row, not 2880 a day."""
+        if self._event_log is None or self._condition_evaluator is None:
+            return
+        if all(not step.conditions for step in rotation.steps):
+            return  # no conditions in play; nothing to surface
+        step_results: list[dict[str, Any]] = []
+        for idx, step in enumerate(rotation.steps):
+            if not step.conditions:
+                step_results.append(
+                    {
+                        "step_index": idx,
+                        "page_id": step.page_id,
+                        "passes": True,
+                        "no_conditions": True,
+                        "conditions": [],
+                    }
+                )
+                continue
+            results = self._condition_evaluator.evaluate(step.conditions, when=now)
+            step_results.append(
+                {
+                    "step_index": idx,
+                    "page_id": step.page_id,
+                    "passes": all(r.passed for r in results),
+                    "conditions": [
+                        {
+                            "source_kind": r.condition.source_kind,
+                            "source_id": r.condition.source_id,
+                            "operator": r.condition.operator,
+                            "value": r.condition.value,
+                            "observed": r.observed,
+                            "passed": r.passed,
+                            "reason": r.reason,
+                        }
+                        for r in results
+                    ],
+                }
+            )
+        key = (
+            time_step_index,
+            picked_step_index,
+            tuple(
+                (
+                    sr["step_index"],
+                    sr["passes"],
+                    tuple((c["passed"], c["observed"]) for c in sr["conditions"]),
+                )
+                for sr in step_results
+            ),
+        )
+        with self._lock:
+            prev = self._rotation_last_condition_key.get(rotation.id)
+            if prev == key:
+                return
+            self._rotation_last_condition_key[rotation.id] = key
+        if picked_step_index is None:
+            status = "held"
+        elif picked_step_index == time_step_index:
+            status = "passed"
+        else:
+            status = "shifted"
+        self._event_log.record(
+            type="conditions",
+            source="rotation",
+            target=rotation.id,
+            status=status,
+            extra={
+                "rotation_name": rotation.name,
+                "mode": rotation.mode,
+                "time_step_index": time_step_index,
+                "time_step_page": rotation.steps[time_step_index].page_id,
+                "picked_step_index": picked_step_index,
+                "picked_step_page": (
+                    rotation.steps[picked_step_index].page_id
+                    if picked_step_index is not None
+                    else None
+                ),
+                "steps": step_results,
+            },
+        )
+
+    def _record_schedule_condition_decision(
+        self,
+        schedule: Schedule,
+        passed: bool,
+        now: datetime,
+    ) -> None:
+        """One row per condition evaluation on a Schedule. Same debounce
+        + no-op semantics as the rotation variant."""
+        if self._event_log is None or self._condition_evaluator is None:
+            return
+        if not schedule.conditions:
+            return
+        results = self._condition_evaluator.evaluate(schedule.conditions, when=now)
+        conditions = [
+            {
+                "source_kind": r.condition.source_kind,
+                "source_id": r.condition.source_id,
+                "operator": r.condition.operator,
+                "value": r.condition.value,
+                "observed": r.observed,
+                "passed": r.passed,
+                "reason": r.reason,
+            }
+            for r in results
+        ]
+        key = (passed, tuple((c["passed"], c["observed"]) for c in conditions))
+        with self._lock:
+            prev = self._schedule_last_condition_key.get(schedule.id)
+            if prev == key:
+                return
+            self._schedule_last_condition_key[schedule.id] = key
+        status = "passed" if passed else "fallback" if schedule.fallback_page_id else "held"
+        self._event_log.record(
+            type="conditions",
+            source="schedule",
+            target=schedule.id,
+            status=status,
+            extra={
+                "schedule_name": schedule.name,
+                "page_id": schedule.page_id,
+                "fallback_page_id": schedule.fallback_page_id,
+                "conditions": conditions,
+            },
+        )
 
     def _pick_eligible_step(
         self,
@@ -743,13 +891,14 @@ class Scheduler:
         # set, or skip silently.
         target_page = schedule.page_id
         held = False
-        if (
-            not bypass_conditions
-            and schedule.conditions
-            and self._condition_evaluator is not None
-            and not self._condition_evaluator.all_pass(schedule.conditions, when=now)
-        ):
-            held = True
+        if not bypass_conditions and schedule.conditions and self._condition_evaluator is not None:
+            passed = self._condition_evaluator.all_pass(schedule.conditions, when=now)
+            # Observability: surface the per-condition evaluation on
+            # the Events page, same shape as rotation decisions.
+            self._record_schedule_condition_decision(schedule, passed, now)
+            if not passed:
+                held = True
+        if held:
             if schedule.fallback_page_id:
                 target_page = schedule.fallback_page_id
                 logger.info(

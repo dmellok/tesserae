@@ -35,7 +35,15 @@ from app.state.event_log import EventLog, EventRow
 bp = Blueprint("events", __name__, url_prefix="/events")
 
 
-_KNOWN_TYPES: tuple[str, ...] = ("push", "renderer", "device", "scheduler", "auth", "telemetry")
+_KNOWN_TYPES: tuple[str, ...] = (
+    "push",
+    "renderer",
+    "device",
+    "scheduler",
+    "conditions",
+    "auth",
+    "telemetry",
+)
 _MAX_LIMIT: int = 500
 # Default page size, keep tight so the IMG thumbnails on /events stay
 # in a reasonable bitmap-cache footprint. Each push row's thumbnail

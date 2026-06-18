@@ -235,6 +235,131 @@ def test_rotation_scheduled_mode_skips_failing_step(tmp_path: Path) -> None:
     assert idx == 1  # advanced past the unmet condition
 
 
+def test_condition_decision_event_emitted_on_rotation_tick(tmp_path: Path) -> None:
+    """Each rotation tick that involves condition evaluation should write
+    one `type="conditions"` event row to the EventLog, debounced so a
+    quiet 30-second tick loop doesn't flood the log."""
+    from app.state.event_log import EventLog
+
+    rotation = _rotation(
+        "trmnl",
+        steps=[
+            RotationStep(page_id="todo", dwell_minutes=5),
+            RotationStep(
+                page_id="3d_print",
+                dwell_minutes=5,
+                conditions=[ha_condition("binary_sensor.octoprint_printing", "==", "on")],
+            ),
+        ],
+    )
+    push = _StubPushManager()
+    schedule_store = ScheduleStore(tmp_path / "schedules.json")
+    rotation_store = RotationStore(tmp_path / "rotations.json")
+    rotation_store.upsert(rotation)
+    evaluator = ConditionEvaluator(
+        ha_get_states=lambda: [{"entity_id": "binary_sensor.octoprint_printing", "state": "off"}],
+    )
+    evaluator.refresh_ha_states()
+    event_log = EventLog(tmp_path / "events.db", cap=200)
+    scheduler = Scheduler(
+        store=schedule_store,
+        rotation_store=rotation_store,
+        push_manager=lambda: push,  # type: ignore[arg-type]
+        condition_evaluator=evaluator,
+        event_log=event_log,
+    )
+
+    # Run the tick. The picker walks past step 1 (3D Print) and picks
+    # step 0; a "conditions" event with status="shifted" should land.
+    now = datetime(2026, 6, 18, 0, 5, tzinfo=UTC)  # in step 1's time slot
+    scheduler._tick_once(now)
+    rows = event_log.list(type="conditions")
+    assert len(rows) == 1, f"expected one conditions event, got {[r.target for r in rows]}"
+    row = rows[0]
+    assert row.target == "trmnl"
+    assert row.source == "rotation"
+    assert row.status == "shifted"
+    extra = row.extra
+    assert extra["picked_step_index"] != extra["time_step_index"], (
+        "picked step should differ from time-slot step when conditions failed"
+    )
+    # The per-condition detail block should carry observed values so the
+    # user can see the printer was 'off' when the decision was made.
+    step1 = next(s for s in extra["steps"] if s["step_index"] == 1)
+    assert step1["passes"] is False
+    cond = step1["conditions"][0]
+    assert cond["source_id"] == "binary_sensor.octoprint_printing"
+    assert cond["passed"] is False
+    assert "off" in cond["observed"]
+
+    # A second identical tick should be debounced (no new row).
+    scheduler._tick_once(now + timedelta(seconds=30))
+    rows_after = event_log.list(type="conditions")
+    assert len(rows_after) == 1, (
+        f"identical decision should be debounced; got {len(rows_after)} rows"
+    )
+
+
+def test_autonomous_tick_skips_conditioned_step_in_full_cycle(tmp_path: Path) -> None:
+    """End-to-end of the user's reported bug shape: a 4-step rotation
+    where the LAST step is gated on an HA entity. Walk the cycle from
+    minute 0 through one full lap and assert the gated step never
+    fires while the entity says no, but the other three do."""
+    rotation = _rotation(
+        "trmnl",
+        # 5-minute dwells, so step 3 (3D Print) owns the 15-20 min
+        # slot of every 20-min cycle.
+        steps=[
+            RotationStep(page_id="trmnl_todo", dwell_minutes=5),
+            RotationStep(page_id="trmnl_gen_image", dwell_minutes=5),
+            RotationStep(page_id="trmnl_home_assistant", dwell_minutes=5),
+            RotationStep(
+                page_id="trmnl_3d_print",
+                dwell_minutes=5,
+                conditions=[
+                    ha_condition("binary_sensor.octoprint_printing", "==", "on"),
+                ],
+            ),
+        ],
+        min_hold_minutes=0,  # so transitions land each tick boundary
+    )
+    scheduler, push = _scheduler(
+        tmp_path,
+        rotations=[rotation],
+        ha_states=[
+            # Printer is OFF, exactly like the user's screenshot.
+            {"entity_id": "binary_sensor.octoprint_printing", "state": "off"},
+        ],
+    )
+
+    # Walk one full 20-minute cycle plus a bit, ticking every 5 minutes.
+    # Step 3's slot is 15-20 min; the picker should walk past it and
+    # fire step 0 (TRMNL - Todo) instead each time the slot comes round.
+    ticks = [
+        datetime(2026, 6, 18, 0, 0, tzinfo=UTC),
+        datetime(2026, 6, 18, 0, 5, tzinfo=UTC),
+        datetime(2026, 6, 18, 0, 10, tzinfo=UTC),
+        datetime(2026, 6, 18, 0, 15, tzinfo=UTC),
+        datetime(2026, 6, 18, 0, 20, tzinfo=UTC),
+    ]
+    for t in ticks:
+        scheduler._tick_once(t)
+
+    fired_pages = [page_id for page_id, _src in push.calls]
+    # No fire of the gated step.
+    assert "trmnl_3d_print" not in fired_pages, (
+        f"3D Print step fired despite printer being OFF; calls were {push.calls}"
+    )
+    # The other three should have all fired at their natural slots, in
+    # order: Todo, Gen Image, Home Assistant.
+    assert "trmnl_todo" in fired_pages
+    assert "trmnl_gen_image" in fired_pages
+    assert "trmnl_home_assistant" in fired_pages
+    # And when the picker hits step 3's slot but walks to step 0, it
+    # may or may not re-fire Todo depending on last_step; either way,
+    # 3d_print stays off the list.
+
+
 def test_rotation_scheduled_mode_returns_none_when_all_fail(tmp_path: Path) -> None:
     rotation = _rotation(
         "kitchen",

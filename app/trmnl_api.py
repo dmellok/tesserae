@@ -291,10 +291,33 @@ def _update_status_from_headers(device: Device) -> dict[str, Any]:
     cache = _device_status()
     prev = cache.get(device.id, {}).get("parsed", {})
     merged = merge_status_parsed(prev, parsed)
+    received_at = time.time()
     cache[device.id] = {
-        "received_at": time.time(),
+        "received_at": received_at,
         "parsed": merged,
     }
+    # Battery history: same hook the MQTT subscriber writes through, so
+    # TRMNL poll-based devices accumulate the same drain-rate samples
+    # the admin page + widget expect. Mirrors the MQTT path's guards.
+    battery_history = current_app.config.get("BATTERY_HISTORY")
+    if (
+        battery_history is not None
+        and "error" not in parsed
+        and parsed.get("battery_pct") is not None
+    ):
+        try:
+            battery_history.record(
+                device.id,
+                pct=int(parsed["battery_pct"]),
+                battery_mv=(
+                    int(parsed["battery_mv"]) if parsed.get("battery_mv") is not None else None
+                ),
+                timestamp=received_at,
+            )
+        except (TypeError, ValueError):
+            pass
+        except Exception:
+            logger.exception("battery_history: record failed for %s", device.id)
     ha = current_app.config.get("HA_DISCOVERY")
     if ha is not None:
         try:
