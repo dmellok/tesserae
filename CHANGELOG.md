@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.2], 2026-06-18
+
+### Fixed
+
+- **Drawer battery item leaking into the desktop top nav.** v0.51.0
+  switched the mobile-drawer Batteries item from `<div>` to `<a>` so
+  the indicator could navigate to `/devices/battery`. That made the
+  generic `.topnav a { display: inline-flex }` rule beat the
+  unscoped `.topbar-batteries--drawer { display: none }` hide rule on
+  desktop (specificity 0,1,1 vs 0,1,0), so the drawer's icon + label
+  + device list rendered inline in the desktop header alongside the
+  popover trigger. Scoped the drawer rules to `.topnav` so the
+  specificity matches, restoring the hide-on-desktop / show-in-mobile
+  drawer behaviour.
+
 ## [0.51.1], 2026-06-18
 
 ### Fixed

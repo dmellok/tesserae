@@ -346,8 +346,11 @@
   }
 }
 /* The drawer variant collapses into a labelled list, no popover
-   nesting inside the mobile sidebar. */
-.topbar-batteries--drawer { display: none; }
+   nesting inside the mobile sidebar. Scoped to .topnav so this rule's
+   specificity matches the generic .topnav a rule above — without that
+   the drawer batteries (now an <a> for the link entry-point) leak
+   into the desktop top nav. */
+.topnav .topbar-batteries--drawer { display: none; }
 
 /* Hamburger + sidebar (mobile/tablet) ------------------------------ */
 
@@ -415,23 +418,26 @@
   /* Drawer-only theme toggle takes over inside the drawer. */
   .theme-toggle--topbar { display: none; }
   /* Topbar battery indicator is hidden in mobile; the drawer variant
-     below renders the same data inline. */
+     below renders the same data inline. Drawer rules scoped to .topnav
+     so the specificity beats the generic .topnav a inline-flex rule
+     (otherwise the <a>-wrapped drawer batteries inherit nav-link
+     layout instead of the block list shape we want here). */
   .topbar-batteries--topbar { display: none; }
-  .topbar-batteries--drawer {
+  .topnav .topbar-batteries--drawer {
     display: block;
     padding: var(--t-space-3) var(--t-space-3);
     color: var(--t-fg-soft);
     font-size: 0.85rem;
   }
-  .topbar-batteries--drawer .topbar-batteries-label {
+  .topnav .topbar-batteries--drawer .topbar-batteries-label {
     display: inline-flex;
     align-items: center;
     gap: var(--t-space-2);
     font-weight: 600;
   }
-  .topbar-batteries--drawer .ph { font-size: 18px; }
-  .topbar-batteries--drawer.is-tone-critical { color: var(--t-danger); }
-  .topbar-batteries--drawer.is-tone-low      { color: var(--t-warn); }
+  .topnav .topbar-batteries--drawer .ph { font-size: 18px; }
+  .topnav .topbar-batteries--drawer.is-tone-critical { color: var(--t-danger); }
+  .topnav .topbar-batteries--drawer.is-tone-low      { color: var(--t-warn); }
   .topbar-batteries-drawer-list {
     list-style: none;
     padding: var(--t-space-2) 0 0;
