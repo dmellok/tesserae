@@ -403,13 +403,21 @@ def delete(rotation_id: str) -> Response:
 def fire(rotation_id: str) -> Response:
     """Manual fire: pushes whichever step the rotation is currently
     on. Useful for "I changed the steps, show me the new current
-    page now without waiting for the next tick"."""
+    page now without waiting for the next tick".
+
+    Honours per-step conditions exactly like the scheduler tick: if the
+    time-current step has a failing condition we walk forward to the
+    next eligible step (scheduled mode) or pick the highest-priority
+    matching step (priority mode). Use the per-step "Play this step"
+    button to bypass conditions explicitly.
+    """
     rotation = _store().get(rotation_id)
     if rotation is None:
         flash(f"No rotation with id {rotation_id!r}.", "error")
         return redirect(url_for("rotations.index"))
     sched = _scheduler()
-    state = sched.compute_step_state(rotation, datetime.now(UTC))
+    now = datetime.now(UTC)
+    state = sched.compute_step_state(rotation, now)
     if state is None:
         flash(
             f"Rotation {rotation.name!r} isn't active right now "
@@ -417,9 +425,16 @@ def fire(rotation_id: str) -> Response:
             "warn",
         )
         return redirect(url_for("rotations.index"))
-    result = sched._fire_rotation(rotation, state.step_index, datetime.now(UTC))
+    eligible = sched._pick_eligible_step(rotation, state.step_index, now)
+    if eligible is None:
+        flash(
+            f"Rotation {rotation.name!r}: no step's conditions are met right now.",
+            "warn",
+        )
+        return redirect(url_for("rotations.index"))
+    result = sched._fire_rotation(rotation, eligible, now)
     if result.status == "sent":
-        flash(f"Fired rotation {rotation_id!r} (step {state.step_index}).", "ok")
+        flash(f"Fired rotation {rotation_id!r} (step {eligible}).", "ok")
     else:
         flash(
             f"Fired rotation {rotation_id!r}: {result.status}, {result.error or ''}",

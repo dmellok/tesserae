@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.50.3], 2026-06-18
+
+### Fixed
+
+- **Manual "Fire now" button on rotations now respects per-step
+  conditions.** The autonomous scheduler tick already walked past
+  steps whose conditions failed (an `octoprint_printing == on`
+  condition would skip the 3D-print step when the printer was idle).
+  The manual Fire button called ``_fire_rotation`` straight from the
+  time-based step index, bypassing the eligibility check, so a user
+  hitting "Fire now" while the gated step was time-current would push
+  it regardless of the entity state. Routed manual Fire through the
+  same ``_pick_eligible_step`` path as the tick; the per-step
+  "Play this step" button keeps its bypass since explicit per-step
+  intent is the whole point of that button.
+- **Rotation projection bar fills the full 24h window.** The timeline
+  preview's inner loop was capped at 200 iterations, so a rotation
+  with 5-minute dwells covered only 1000 of 1440 minutes (~69% of the
+  bar). Cap is now proportional to the window so short-dwell
+  rotations fill end to end.
+
 ## [0.50.2], 2026-06-17
 
 ### Fixed
