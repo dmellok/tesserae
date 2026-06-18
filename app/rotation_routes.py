@@ -179,9 +179,14 @@ def _build_projection(rotation: Rotation, *, total_minutes: int = 24 * 60) -> di
         now_local = datetime.now(tz)
     bands: list[dict[str, Any]] = []
     minutes_into = 0
+    # Cap iterations at one per minute of projected window, plus a
+    # small headroom. The previous hard 200-iter cap left ~30% of the
+    # bar empty for any rotation with 5-min dwells (200 * 5 = 1000 of
+    # 1440 minutes) and was worse for shorter dwells.
+    iter_cap = total_minutes + 64
     safety = 0
     pages_by_id = {p.id: p.name for p in _pages().list()}
-    while minutes_into < total_minutes and safety < 200:
+    while minutes_into < total_minutes and safety < iter_cap:
         safety += 1
         sample_time = (
             now_local.astimezone(UTC) if now_local.tzinfo is not None else now_local.astimezone()
@@ -207,7 +212,7 @@ def _build_projection(rotation: Rotation, *, total_minutes: int = 24 * 60) -> di
         minutes_into += step.dwell_minutes
     return {
         "total_minutes": total_minutes,
-        "bands": bands[:200],
+        "bands": bands,
     }
 
 

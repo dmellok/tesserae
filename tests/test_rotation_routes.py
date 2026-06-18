@@ -16,6 +16,7 @@ import pytest
 from flask import Flask
 
 from app.main import REPO_ROOT, create_app
+from app.rotation_routes import _build_projection
 from app.state.conditions import Condition
 from app.state.rotation_model import Rotation, RotationStep
 from app.state.rotation_store import RotationStore
@@ -106,3 +107,32 @@ def test_schedule_index_renders_with_condition(app: Flask, tmp_path: Path) -> No
     assert resp.status_code == 200, resp.get_data(as_text=True)[:500]
     body = resp.get_data(as_text=True)
     assert "after_sunset" in body
+
+
+def test_projection_covers_full_window_for_short_dwells(app: Flask) -> None:
+    """Regression for the projection-bar gap: the old hard-coded 200
+    iter cap meant short-dwell rotations only filled ~70% of the 24h
+    timeline. The iteration cap now scales with the window so every
+    realistic rotation fills the bar."""
+    rotation = Rotation(
+        id="trmnl",
+        name="TRMNL Rotation",
+        anchor="00:00",
+        steps=[
+            RotationStep(page_id="home", dwell_minutes=5),
+            RotationStep(page_id="home", dwell_minutes=5),
+            RotationStep(page_id="home", dwell_minutes=5),
+            RotationStep(page_id="home", dwell_minutes=5),
+        ],
+    )
+    with app.app_context():
+        proj = _build_projection(rotation, total_minutes=24 * 60)
+    bands = proj["bands"]
+    assert bands, "projection produced no bands"
+    last = bands[-1]
+    coverage_minutes = last["start_min"] + last["dwell_minutes"]
+    # Within one step of the full window is "filled" for our purposes.
+    assert coverage_minutes >= 24 * 60 - 5, (
+        f"projection only covers {coverage_minutes} of {24 * 60} minutes; "
+        "likely hit the iter cap mid-cycle"
+    )
