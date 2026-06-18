@@ -951,6 +951,12 @@ def create_app(
             ),
             "nav_batteries": _collect_battery_status(app),
             "app_settings": app_settings,
+            # Lights the topbar "Restart required" button when set by
+            # the marketplace install/uninstall routes. Cleared on
+            # the next process start (Updater.restart re-execs).
+            "marketplace_restart_pending": bool(
+                app.config.get("MARKETPLACE_RESTART_PENDING", False)
+            ),
         }
 
     @app.get("/")

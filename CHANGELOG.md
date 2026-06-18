@@ -10,28 +10,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Changed
 
-- **Marketplace install / uninstall auto-restarts Tesserae instead of
-  asking the user to.** The widget Browse page (Settings → Widgets →
-  Browse) used to flash "Installed X v1.0.0. Restart Tesserae to load
-  it." and leave the user to find the manual ``Restart now`` button.
-  Both endpoints now call ``Updater.restart()`` directly on success,
-  and the install / update / uninstall forms opt into the same
-  ``data-restart-form`` spinner-modal-and-poll-for-healthz UX that
-  Settings → System uses for self-update + rollback. End-to-end:
-  click Install → modal shows → server restarts (~3 s) → page
-  auto-reloads → new widget is live. When no Updater is configured
-  (test harnesses, embedded use) the endpoints fall back to the
-  legacy "Restart Tesserae to load it" prompt so nothing breaks.
+- **Marketplace install/uninstall queues a restart instead of asking
+  the user to find a button.** A new "Restart required" button lights
+  up in the topbar (rendered site-wide from ``_base.html`` via a
+  ``marketplace_restart_pending`` context-processor flag) whenever
+  one or more widget installs or uninstalls are waiting on a process
+  restart. Click any number of Install / Update / Uninstall buttons
+  on Settings -> Widgets -> Browse; the chip stays lit until you hit
+  it, which opens the spinner modal, kicks ``Updater.restart()``, and
+  auto-reloads the page when the new process is back. Earlier in this
+  release I tried an auto-restart-per-install model: it broke the
+  "queue several widgets at once" workflow that users actually want,
+  so this re-do scopes the single auto-restart wire to the explicit
+  ``/plugins/browse/restart`` endpoint and treats install/uninstall
+  as queueable.
+- **``static/restart-form.js`` no longer crashes the UX when the POST
+  itself fails.** The restart-after-submit handler used to land in
+  the outer ``.catch`` if ``fetch(form.action)`` rejected with
+  "Failed to fetch" (the server killing the connection before
+  flushing the response, common when the Werkzeug reloader races the
+  restart timer in ``--dev``, occasional in production too). The
+  POST-level rejection is now squashed into a resolved chain so the
+  ``/healthz`` down-then-up poll becomes the source of truth: if the
+  server really is restarting, the modal transitions cleanly through
+  ``Restarting -> Waiting for it to come back -> Up. Reloading``; if
+  it isn't, the 120 s ``/healthz`` poll times out and the error path
+  fires (now correctly attributing the timeout, not the POST blip).
 - **Refactor**: the restart-form spinner-modal markup and its
   ``/healthz`` poll-and-reload script extracted out of
   ``templates/settings.html`` into a shared partial
   (``templates/_restart_modal.html``) and a static JS file
   (``static/restart-form.js``), both included from ``_base.html``.
-  Any page that drops a ``<form data-restart-form>`` now inherits the
-  full UX. Same Settings → System forms behave identically; the
-  initial stage label is now generic ("Working…") instead of
-  update-specific ("Pulling the new revision…") since the script
-  can't actually know what the server's doing on the other side.
+  Any page that drops a ``<form data-restart-form>`` now inherits
+  the full UX, which is why the new topbar restart chip works
+  identically to Settings -> System's self-update + rollback.
 
 ## [0.51.5], 2026-06-18
 

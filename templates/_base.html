@@ -255,6 +255,22 @@
     </details>
     {% endif %}
     {% endif %}
+    {% if marketplace_restart_pending %}
+    {# Lit by the marketplace context-processor flag while one or more
+       installs/uninstalls are waiting on a process restart. Posts to
+       the existing /plugins/browse/restart endpoint via the shared
+       data-restart-form handler so clicking it opens the spinner
+       modal and auto-reloads when the new process is back. Sits
+       between batteries and the theme toggle so it's prominent
+       without colliding with the per-page actions. #}
+    <form method="post" action="{{ url_for('marketplace.restart') }}" class="inline topbar-restart-form"
+          data-restart-form data-restart-label="Restarting Tesserae">
+      <button type="submit" class="topbar-restart" title="Restart Tesserae to load installed/uninstalled widgets">
+        <i class="ph-bold ph-arrow-clockwise" aria-hidden="true"></i>
+        <span class="topbar-restart-label">Restart required</span>
+      </button>
+    </form>
+    {% endif %}
     <button type="button" class="theme-toggle theme-toggle--topbar" data-theme-toggle aria-label="Toggle dark mode">
       <i class="ph ph-sun is-light-only" aria-hidden="true"></i>
       <i class="ph ph-moon is-dark-only" aria-hidden="true"></i>

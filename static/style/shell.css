@@ -940,3 +940,50 @@ body.modal-open { overflow: hidden; }
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Topbar "Restart required" button. Lit by the marketplace context
+   processor when one or more widget installs/uninstalls are waiting
+   on a process restart. Sits between any batteries indicator and the
+   theme toggle. ``--t-warn`` tone draws the eye without being as
+   loud as a danger pill. Posts to /plugins/browse/restart via
+   data-restart-form so clicking it opens the spinner modal and the
+   page auto-reloads when the new process is back. */
+.topbar-restart-form { margin: 0; }
+.topbar-restart-form { margin-left: auto; }
+/* When batteries are also shown, batteries already grabbed the auto
+   margin, so this row of trailing items collapses cleanly. */
+.topbar-batteries--topbar ~ .topbar-restart-form { margin-left: 0; }
+.topbar-restart-form + .theme-toggle--topbar { margin-left: 4px; }
+.topbar-restart {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--t-radius-sm);
+  border: 1px solid color-mix(in srgb, var(--t-warn, #c98a00) 50%, transparent);
+  background: color-mix(in srgb, var(--t-warn, #c98a00) 14%, transparent);
+  color: var(--t-fg, #1a1a1a);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.topbar-restart:hover,
+.topbar-restart:focus-visible {
+  background: color-mix(in srgb, var(--t-warn, #c98a00) 24%, transparent);
+  border-color: var(--t-warn, #c98a00);
+}
+.topbar-restart .ph,
+.topbar-restart .ph-bold {
+  color: var(--t-warn, #c98a00);
+  font-size: 16px;
+}
+/* Hide the label on narrow widths so the chip stays a single icon
+   on mobile without crowding the row. The icon-only form keeps a
+   tooltip via the form's ``title`` attribute. */
+@media (max-width: 640px) {
+  .topbar-restart-label { display: none; }
+  .topbar-restart { padding: 0 10px; }
+}

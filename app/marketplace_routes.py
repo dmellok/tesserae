@@ -7,16 +7,19 @@ trust-sensitive work, fetch / validate / sha256 / extract / persist;
 this module just translates between form data and that API and flashes
 the outcome.
 
-Restart-required UX: install + uninstall auto-trigger the same
-``Updater.restart()`` re-exec the self-updater uses, and the install
-button opts into the shared ``data-restart-form`` modal so the page
-shows a "restarting / waiting / reloading" spinner and auto-reloads
-when the new process is back. Live in-process re-discovery of the
-registry would need blueprint deregistration + safe
-``importlib.reload``, which Flask doesn't support cleanly, so we
-treat every marketplace mutation as "restart to pick it up". The
-manual ``Restart now`` button stays as a fallback for environments
-without an Updater configured (test harnesses, embedded use).
+Restart-required UX: install + uninstall set
+``MARKETPLACE_RESTART_PENDING`` on the app config and flash a
+notice, but DON'T auto-restart the process. Reason: users often
+install several widgets in a row, and forcing a restart after each
+one is friction. Instead a persistent "Restart required" button
+lights up in the topbar (rendered from ``_base.html`` via the
+``marketplace_restart_pending`` context-processor flag) and the
+user clicks it once when they're done batching, which hits
+:func:`restart` here to call ``app.config['UPDATER'].restart()``
+for the re-exec. Live in-process re-discovery of the registry would
+need blueprint deregistration + safe ``importlib.reload``, which
+Flask doesn't support cleanly, so we treat every marketplace
+mutation as "restart to pick it up".
 """
 
 from __future__ import annotations
@@ -68,25 +71,6 @@ def _restart_pending() -> bool:
 
 def _mark_restart_pending() -> None:
     current_app.config["MARKETPLACE_RESTART_PENDING"] = True
-
-
-def _schedule_restart() -> bool:
-    """Kick the Updater's re-exec path so a successful install/uninstall
-    auto-applies without the user having to find the manual Restart
-    button. Returns True when a restart was scheduled, False when no
-    Updater is configured (test harnesses, embedded use). On False the
-    caller still flashes the "Restart Tesserae to load it" prompt so
-    the user knows what to do; on True we flash a "restarting" notice
-    that the restart-form JS will overlay with the modal anyway."""
-    updater = current_app.config.get("UPDATER")
-    if updater is None:
-        return False
-    try:
-        updater.restart()
-    except Exception:
-        logger.exception("marketplace: auto-restart after install/uninstall raised")
-        return False
-    return True
 
 
 def _filter_entries(
@@ -327,16 +311,12 @@ def install() -> Response:
         flash("Install failed with an unexpected error (see server log).", "error")
         return redirect(url_for("marketplace.browse"))
     _mark_restart_pending()
-    if _schedule_restart():
-        flash(
-            f"Installed {entry.name} v{result.version}. Restarting Tesserae…",
-            "ok",
-        )
-    else:
-        flash(
-            f"Installed {entry.name} v{result.version}. Restart Tesserae to load it.",
-            "ok",
-        )
+    flash(
+        f"Installed {entry.name} v{result.version}. Click "
+        '"Restart required" in the top bar when you\'re done installing '
+        "to load it (you can queue more installs first).",
+        "ok",
+    )
     return redirect(url_for("marketplace.browse"))
 
 
@@ -371,10 +351,10 @@ def uninstall() -> Response:
     msg = f"Uninstalled {catalog_id}."
     if delete_data:
         msg += " Plugin data dir(s) also removed."
-    if _schedule_restart():
-        msg += " Restarting Tesserae…"
-    else:
-        msg += " Restart Tesserae to drop it from the running registry."
+    msg += (
+        ' Click "Restart required" in the top bar when you\'re done'
+        " to drop it from the running registry."
+    )
     flash(msg, "ok")
     return redirect(url_for("marketplace.browse"))
 

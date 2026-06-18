@@ -117,18 +117,22 @@
       const stopRotate = rotateStages(startedAt);
 
       const fd = new FormData(form);
-      fetch(form.action, {
+      // ``fetch`` can reject the POST itself with "Failed to fetch" if
+      // the server kills the connection before flushing the response.
+      // That happens routinely in --dev (werkzeug reloader races the
+      // ``Updater.restart`` timer) and occasionally in production when
+      // delay_s is short. ``/healthz`` is the source of truth for what
+      // the server is actually doing, so we squash POST-level errors
+      // into a resolved chain and let the down-then-up poll decide
+      // whether the server is restarting or genuinely broken.
+      const submit = fetch(form.action, {
         method: "POST",
         body: fd,
         credentials: "same-origin",
         redirect: "follow",
-      })
+      }).catch(() => null);
+      submit
         .then(() => {
-          // Whether the response is 2xx or 3xx, the server has accepted
-          // the request and scheduled the restart. We can't tell a
-          // success-with-restart from a flash-error redirect without
-          // parsing the response body; treat any returned response as
-          // "server is about to restart" and poll /healthz.
           stopRotate();
           setStage("Restarting…");
           return waitForServerDown("/healthz", Date.now());
@@ -142,11 +146,14 @@
           setTimeout(() => window.location.reload(), 400);
         })
         .catch((err) => {
+          // Only reachable if poll() timed out waiting for /healthz to
+          // come back, i.e. the server really didn't recover. The POST
+          // failure path is squashed above so it can't trigger this.
           stopRotate();
           showError(
             "Couldn't confirm the server came back. " +
               "It may have restarted anyway, reload the page manually to check. " +
-              "(" + (err && err.message ? err.message : "network error") + ")"
+              "(" + (err && err.message ? err.message : "timed out") + ")"
           );
         });
     });

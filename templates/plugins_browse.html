@@ -12,8 +12,8 @@
   </h1>
   <p class="lede">
     A catalog of community-contributed widgets, audit-reviewed before they
-    land here. Pick one to install: Tesserae auto-restarts to load it, then
-    it appears alongside the bundled widgets in the dashboard editor.
+    land here. Pick the ones you want; once you're done, click
+    <strong>Restart required</strong> in the top bar to load them.
   </p>
 </header>
 
@@ -220,14 +220,15 @@
       </div>
       {% endif %}
 
-      {# Install / Update / Uninstall forms opt into ``data-restart-form``
-         so the shared restart-form.js handler intercepts the submit,
-         shows the spinner modal, and auto-reloads when the server is
-         back. The endpoint kicks Updater.restart() on success. #}
+      {# Install / Update / Uninstall just set the restart-pending
+         flag on the server and redirect back here with a flash. The
+         topbar "Restart required" button (rendered from _base.html
+         when ``marketplace_restart_pending`` is set) opens the spinner
+         modal + restart. This lets users queue several installs and
+         restart once. #}
       <footer class="marketplace-actions">
         {% if not e.installed %}
-        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline"
-              data-restart-form data-restart-label="Installing {{ e.name }}">
+        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
           <button type="submit" class="primary">
             <i class="ph ph-download-simple" aria-hidden="true"></i><span>Install</span>
@@ -235,8 +236,7 @@
         </form>
         {% else %}
         {% if e.update_available %}
-        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline"
-              data-restart-form data-restart-label="Updating {{ e.name }}">
+        <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
           <button type="submit" class="primary">
             <i class="ph ph-arrow-up-circle" aria-hidden="true"></i><span>Update to v{{ e.version }}</span>
@@ -244,8 +244,7 @@
         </form>
         {% endif %}
         <form method="post" action="{{ url_for('marketplace.uninstall') }}" class="inline"
-              data-restart-form data-restart-label="Uninstalling {{ e.name }}"
-              data-restart-confirm="Uninstall {{ e.name }}? (Data dir is kept; tick the box below first to delete that too.)">
+              onsubmit="return confirm('Uninstall {{ e.name }}? (Data dir is kept; tick the box below first to delete that too.)');">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
           <label class="inline-check muted" title="Also delete plugin data dir(s)">
             <input type="checkbox" name="delete_data" value="1">
