@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.4], 2026-06-18
+
+### Fixed
+
+- **TRMNL battery samples weren't accumulating in history.** The
+  battery-history hook in `trmnl_api._update_status_from_headers`
+  (and the matching path in `transport_wiring._subscribe_device_status`)
+  read `parsed.get("battery_pct")`, but TRMNL kit firmware only sends
+  the `battery-voltage` header. `parse_status` lands `battery_pct=None`
+  in that case; the LiPo-curve derivation runs INSIDE
+  `merge_status_parsed`, so the populated value lives on `merged`,
+  not `parsed`. Result: the hook always skipped the record. Fixed by
+  reading `merged` for both the check and the values; same fix in the
+  MQTT path so any future voltage-only firmware accumulates too.
+
+### Changed
+
+- **`/history` no longer fills with empty renders from quiet hours.**
+  Rows with status `quiet` (every bound device in its quiet window)
+  or `held` (schedule conditions kept the default page suppressed and
+  no fallback was configured) are now hidden from the History page
+  by default. A "Show skipped" chip in the filter row brings them
+  back when you actually want to see why a slot didn't fire. The
+  underlying events are still written to the EventLog and visible at
+  `/events`, so nothing's lost. `EventLog.list` gains an
+  `exclude_statuses` parameter for the new filter shape.
+- **Footer**: GitHub icon now sits next to the version number; small
+  Sponsor link (Phosphor heart) pointing at github.com/sponsors/dmellok;
+  link to dmello.io with the external-link icon and a
+  `?utm_source=tesserae_<version>&utm_medium=footer` tag so visitor
+  analytics surface which Tesserae version drove the click.
+
 ## [0.51.3], 2026-06-18
 
 ### Fixed

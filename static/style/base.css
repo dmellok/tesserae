@@ -426,3 +426,15 @@ a:hover { color: var(--t-accent-hover); }
   color: var(--t-fg);
   border-bottom-style: solid;
 }
+.app-footer a .ph {
+  font-size: 0.95em;
+  vertical-align: -0.08em;
+  margin-right: 2px;
+  border: 0;
+}
+.app-footer a:last-child .ph { margin-right: 0; margin-left: 2px; }
+.app-footer-sep {
+  margin: 0 var(--t-space-2);
+  opacity: 0.5;
+  border: 0;
+}

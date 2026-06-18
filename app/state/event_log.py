@@ -251,6 +251,7 @@ class EventLog:
         *,
         type: str | None = None,
         source: str | None = None,
+        exclude_statuses: tuple[str, ...] | None = None,
         limit: int = 100,
     ) -> list[EventRow]:
         sql = "SELECT * FROM events"
@@ -262,6 +263,10 @@ class EventLog:
         if source is not None:
             clauses.append("source = ?")
             params.append(source)
+        if exclude_statuses:
+            placeholders = ",".join("?" * len(exclude_statuses))
+            clauses.append(f"status NOT IN ({placeholders})")
+            params.extend(exclude_statuses)
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY id DESC LIMIT ?"

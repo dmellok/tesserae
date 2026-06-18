@@ -283,18 +283,24 @@ def _subscribe_device_status(
         # the drain curve and project days-to-empty. Skipped when the
         # heartbeat is an error or carries no battery_pct (mains
         # devices like the Pi paths).
+        #
+        # Reads ``merged`` not ``parsed`` so the
+        # ``merge_status_parsed``-derived ``battery_pct`` (from a fresh
+        # ``battery_mv`` via the LiPo curve) is visible. Firmwares that
+        # publish only voltage land as ``parsed["battery_pct"] = None``
+        # and the derivation runs during the merge above.
         battery_history = app.config.get("BATTERY_HISTORY")
         if (
             battery_history is not None
             and "error" not in parsed
-            and parsed.get("battery_pct") is not None
+            and merged.get("battery_pct") is not None
         ):
             try:
                 battery_history.record(
                     device.id,
-                    pct=int(parsed["battery_pct"]),
+                    pct=int(merged["battery_pct"]),
                     battery_mv=(
-                        int(parsed["battery_mv"]) if parsed.get("battery_mv") is not None else None
+                        int(merged["battery_mv"]) if merged.get("battery_mv") is not None else None
                     ),
                     timestamp=received_at,
                 )

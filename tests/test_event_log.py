@@ -104,3 +104,22 @@ def test_status_changed_meaningfully() -> None:
     assert status_changed_meaningfully(prev, same) is False
     # A real field change does.
     assert status_changed_meaningfully(prev, {"state": "rendering", "battery_pct": 80}) is True
+
+
+def test_list_exclude_statuses_filters_them_out(tmp_path: Path) -> None:
+    """``exclude_statuses`` should skip those status values entirely so
+    the History page can hide quiet-hours / held-by-conditions rows
+    without losing them from the underlying log."""
+    log = EventLog(tmp_path / "events.db")
+    log.record(type="push", source="page", target="home", status="sent")
+    log.record(type="push", source="scheduler", target="evening", status="quiet")
+    log.record(type="push", source="scheduler", target="evening", status="held")
+    log.record(type="push", source="webhook", target="home", status="failed")
+
+    # Default: all rows visible.
+    rows = log.list(type="push")
+    assert {r.status for r in rows} == {"sent", "quiet", "held", "failed"}
+
+    # With the exclude_statuses set the History route passes:
+    rows = log.list(type="push", exclude_statuses=("quiet", "held"))
+    assert {r.status for r in rows} == {"sent", "failed"}

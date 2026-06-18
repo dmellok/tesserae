@@ -76,6 +76,23 @@
   {% if chips %}
   <nav class="event-type-filter event-type-filter--standalone" role="tablist" aria-label="Filter by source">
     {% for chip in chips %}{{ filter_chip(chip) }}{% endfor %}
+    {# Toggle: by default we hide quiet-hours and held statuses since
+       those are "nothing reached the panel" outcomes that bury real
+       pushes. Click to opt back in when you actually want to see why
+       a slot didn't fire. #}
+    {% if include_skipped %}
+      <a href="{{ url_for('history.index', source=active_source) }}"
+         class="chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
+        <i class="ph ph-eye" aria-hidden="true"></i>
+        <span>Skipped shown</span>
+      </a>
+    {% else %}
+      <a href="{{ url_for('history.index', source=active_source, include_skipped=1) }}"
+         class="chip" title="Show pushes skipped by quiet hours or condition holds">
+        <i class="ph ph-eye-closed" aria-hidden="true"></i>
+        <span>Show skipped</span>
+      </a>
+    {% endif %}
   </nav>
   {% endif %}
   {% if not history %}

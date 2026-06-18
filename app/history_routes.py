@@ -114,12 +114,36 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     return out
 
 
+# Statuses we hide from the History view by default. These are the
+# "nothing actually went to the panel" outcomes that bury real fires
+# under noise: quiet-hours skips (every bound device was inside its
+# quiet window) and condition-held schedules (the gate kept the
+# default page suppressed and no fallback was configured). Show them
+# with ``?include_skipped=1`` when you actually need to see why a
+# slot didn't fire.
+_DEFAULT_HIDDEN_STATUSES: tuple[str, ...] = ("quiet", "held")
+
+
 @bp.get("")
 def index() -> str:
     raw_source = (request.args.get("source") or "").strip()
     source = raw_source or None
+    include_skipped = (request.args.get("include_skipped") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
     events = _events()
-    history = history_view(events.list(type="push", source=source, limit=100))
+    exclude_statuses = None if include_skipped else _DEFAULT_HIDDEN_STATUSES
+    history = history_view(
+        events.list(
+            type="push",
+            source=source,
+            exclude_statuses=exclude_statuses,
+            limit=100,
+        )
+    )
     # Per-source counts power the filter-chip badges. We include zero-
     # count chips for the canonical sources so the filter row is stable
     # across page loads (chips don't appear/disappear as the log churns).
@@ -141,6 +165,7 @@ def index() -> str:
         history=history,
         chips=chips,
         active_source=source,
+        include_skipped=include_skipped,
     )
 
 

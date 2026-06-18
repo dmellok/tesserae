@@ -298,19 +298,25 @@ def _update_status_from_headers(device: Device) -> dict[str, Any]:
     }
     # Battery history: same hook the MQTT subscriber writes through, so
     # TRMNL poll-based devices accumulate the same drain-rate samples
-    # the admin page + widget expect. Mirrors the MQTT path's guards.
+    # the admin page + widget expect.
+    #
+    # Reads ``merged`` not ``parsed`` so the
+    # ``merge_status_parsed``-derived ``battery_pct`` (from
+    # ``battery_mv`` via the LiPo curve) is visible. TRMNL kit firmware
+    # only sends the voltage header, so parse_status returns
+    # ``battery_pct=None`` and the derivation runs during the merge.
     battery_history = current_app.config.get("BATTERY_HISTORY")
     if (
         battery_history is not None
         and "error" not in parsed
-        and parsed.get("battery_pct") is not None
+        and merged.get("battery_pct") is not None
     ):
         try:
             battery_history.record(
                 device.id,
-                pct=int(parsed["battery_pct"]),
+                pct=int(merged["battery_pct"]),
                 battery_mv=(
-                    int(parsed["battery_mv"]) if parsed.get("battery_mv") is not None else None
+                    int(merged["battery_mv"]) if merged.get("battery_mv") is not None else None
                 ),
                 timestamp=received_at,
             )
