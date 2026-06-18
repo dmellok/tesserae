@@ -282,17 +282,22 @@
   <main class="page {% block page_class %}{% endblock %}">
     {% block main %}{% endblock %}
   </main>
+  {# All footer links use ``rel="noreferrer noopener"``: ``noreferrer``
+     strips the HTTP Referer header so we never leak the host's IP or
+     hostname (loopback, LAN IP, ``tesserae.lan``) to the destination,
+     ``noopener`` blocks ``window.opener`` window-fixation. Attribution
+     for dmello.io still works via the UTM tags carried in the URL. #}
   <footer class="app-footer" aria-label="Project info">
-    <a href="https://github.com/dmellok/tesserae/releases/tag/v{{ config.APP_VERSION }}" target="_blank" rel="noopener" title="View v{{ config.APP_VERSION }} on GitHub">
+    <a href="https://github.com/dmellok/tesserae/releases/tag/v{{ config.APP_VERSION }}" target="_blank" rel="noreferrer noopener" title="View v{{ config.APP_VERSION }} on GitHub">
       <i class="ph ph-github-logo" aria-hidden="true"></i> Tesserae v{{ config.APP_VERSION }}
     </a>
     <span class="app-footer-sep" aria-hidden="true">·</span>
-    <a href="https://github.com/sponsors/dmellok" target="_blank" rel="noopener" title="Sponsor Tesserae on GitHub">
+    <a href="https://github.com/sponsors/dmellok" target="_blank" rel="noreferrer noopener" title="Sponsor Tesserae on GitHub">
       <i class="ph ph-heart" aria-hidden="true"></i> Sponsor
     </a>
     <span class="app-footer-sep" aria-hidden="true">·</span>
-    <a href="https://dmello.io?utm_source=tesserae_{{ config.APP_VERSION }}&utm_medium=footer" target="_blank" rel="noopener" title="Kayden's blog">
-      dmello.io <i class="ph ph-arrow-square-out" aria-hidden="true"></i>
+    <a href="https://dmello.io?utm_source=tesserae_{{ config.APP_VERSION }}&utm_medium=footer&utm_campaign=tesserae" target="_blank" rel="noreferrer noopener" title="Kayden's blog">
+      <i class="ph ph-arrow-square-out" aria-hidden="true"></i> dmello.io
     </a>
   </footer>
   <script src="{{ url_for('static', filename='components.js') }}"></script>

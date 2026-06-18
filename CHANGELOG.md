@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.5], 2026-06-18
+
+### Changed
+
+- **Footer links no longer leak host hostname/IP in the Referer
+  header.** All three outbound links (GitHub release tag, Sponsors,
+  dmello.io) gain ``rel="noreferrer noopener"`` so the destination
+  never sees the Tesserae host's address. On loopback that was just
+  ``127.0.0.1``; on LAN installs it could have been the host's LAN IP
+  or ``tesserae.lan``-style hostname, neither of which we want to
+  hand to a third party by accident. Attribution for the dmello.io
+  link still works via UTM tags carried in the URL itself, those
+  aren't affected by the Referer policy. The dmello.io URL also
+  gains ``utm_campaign=tesserae`` so the dedicated Campaign panel in
+  Umami breaks out Tesserae-driven clicks without having to pivot
+  through UTM Source.
+- **Footer**: the dmello.io link's external-link icon moves to the
+  left so all three footer entries lead with their glyph.
+
 ## [0.51.4], 2026-06-18
 
 ### Fixed
