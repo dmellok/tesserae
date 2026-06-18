@@ -115,7 +115,7 @@ def index() -> str:
         device_ids = set(current.keys()) | set(store.device_ids())
         # Stable display order: name asc, falling back to id.
         names = {d.id: d.display_name for d in (registry.devices.values() if registry else [])}
-        for device_id in sorted(device_ids, key=lambda i: (names.get(i, i)).lower()):
+        for device_id in sorted(device_ids, key=lambda i: (names.get(i) or i).lower()):
             cards.append(
                 _device_card(
                     device_id,

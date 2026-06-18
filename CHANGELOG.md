@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.1], 2026-06-18
+
+### Fixed
+
+- **mypy CI on strict-typed modules.** `BatteryHistory.recent` had a
+  bare `tuple` type annotation (no parameters) and
+  `device_battery_routes.index` did `(names.get(i, i)).lower()` when
+  `display_name` could be `None`. Both flagged by mypy --strict on the
+  v0.51.0 push.
+
 ## [0.51.0], 2026-06-18
 
 ### Added

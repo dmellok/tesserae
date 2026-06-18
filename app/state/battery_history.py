@@ -32,6 +32,7 @@ import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +153,7 @@ class BatteryHistory:
             "WHERE device_id = ? AND timestamp >= ? "
             "ORDER BY timestamp ASC"
         )
-        params: tuple = (device_id, cutoff)
+        params: tuple[Any, ...] = (device_id, cutoff)
         if limit is not None:
             sql += " LIMIT ?"
             params = (device_id, cutoff, int(limit))
