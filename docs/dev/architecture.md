@@ -30,6 +30,7 @@ or a new widget is a contained change.
 │                    ├─ pi_bin_client   (tesserae/pi_bin/status)      │
 │                    ├─ pi_png_client   (tesserae/pi_png/status)      │
 │                    ├─ esp32_client    (status + pub/sub config)     │
+│                    ├─ pico_bin_client (RP2350, retained, landscape) │
 │                    └─ trmnl_client    (HTTP poll, no broker needed) │
 └─────────────────────────────────────────────────────────────────────┘
 ```

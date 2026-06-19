@@ -1,0 +1,31 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Pico BIN client",
+  "icon": "device-tablet",
+  "version": "0.1.0",
+  "description": "Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. Subscribes to tesserae/pico_bin/frame/bin (retained), wakes on sleep_interval_s, fetches the current .bin frame, paints, publishes a heartbeat with battery / RSSI / IP, then goes back to deep sleep. Landscape-native packing (consumes the pi_bin-style buffer); the firmware does the on-device 90 deg rotate + column-600 dual-controller split.",
+  "renderers": ["pico_bin"],
+  "status_topic": "tesserae/pico_bin/status",
+  "config_topic": "tesserae/pico_bin/config",
+  "panel": { "w": 1600, "h": 1200, "orientation": "landscape", "name": "Inky Impression 13.3″ Spectra 6" },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 900,
+      "min": 30,
+      "max": 604800,
+      "presets": [
+        {"value": 60,    "label": "1 minute"},
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "Custom value is in seconds."
+    }
+  }
+}

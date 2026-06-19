@@ -6,6 +6,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.7], 2026-06-18
+
+### Added
+
+- **New device kind ``pico_bin_client`` + renderer ``pico_bin`` for the
+  battery-powered Pico Plus 2 firmware** (``tesserae-device-pico-bin``,
+  in development) that drives a Pimoroni Inky-style Spectra 6 panel
+  over SPI. The split exists because neither existing kind matched the
+  new firmware's needs: ``pi_bin`` packs landscape-native (correct) but
+  publishes non-retained, and a deep-sleep client that just woke up
+  would miss the current frame on first wake. ``esp32_bin`` retains
+  (correct) but packs portrait-native (wrong for the Inky-library-style
+  on-device rotation the Pico firmware does). ``pico_bin`` is byte-
+  identical to ``pi_bin`` for the same input (content-addressed disk
+  storage shares one file when both targets are active), but flips
+  ``retain: true`` so freshly-woken clients see the current frame.
+  ``pico_bin_client`` inherits ``esp32_client``'s ``sleep_interval_s``
+  config schema + heartbeat contract (battery_mv / battery_pct / rssi /
+  ip / sleep_until / next_sleep_s). Default panel is the Inky
+  Impression 13.3" Spectra 6 (1600x1200 landscape).
+- ``app/discovery.py`` and ``docs/dev/architecture.md`` now enumerate
+  ``pico_bin_client`` alongside the existing kinds; the auto-generated
+  ``docs/compatibility.md`` regen picks it up automatically.
+
+### Changed
+
+- **Settings: Renderers tab is now dev-only.** In prod every base
+  renderer's user-facing settings (dither, saturation, contrast,
+  calibrated) are already surfaced per-device-instance on the
+  Devices tab via the ``device_setting: true`` flag on each field,
+  so the base Renderers page was duplicate surface for the typical
+  install. The tab is now rendered only when ``--dev`` is set so
+  plugin authors poking at base-renderer wiring still have a UI;
+  the route itself is unchanged so deep-linking still works in
+  prod.
+
 ## [0.51.6], 2026-06-18
 
 ### Changed

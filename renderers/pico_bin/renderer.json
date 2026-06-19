@@ -1,0 +1,60 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Pico BIN client (retained 4-bpp .bin)",
+  "version": "0.1.0",
+  "description": "Composition PNG packed into the panel-native landscape 4-bpp buffer the battery-powered Pico Plus 2 firmware (tesserae-device-pico-bin) streams onto a Pimoroni Inky-style Spectra 6 panel over SPI. Published retained to tesserae/pico_bin/frame/bin so a deep-sleep client that just woke up sees the current frame on first wake. Byte-identical packing to pi_bin; content-addressed disk storage means both renderers share a single file on disk when both targets are active.",
+  "orientation": "composition",
+  "mime": "application/octet-stream",
+  "extension": "bin",
+  "topic_pattern": "tesserae/{device}/frame/bin",
+  "device": "pico_bin",
+  "retain": true,
+  "settings": [
+    {
+      "name": "dither",
+      "type": "select",
+      "label": "Dither mode",
+      "default": "floyd-steinberg",
+      "device_setting": true,
+      "choices": [
+        { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
+        { "value": "atkinson", "label": "Atkinson (contrasty, clean solids)" },
+        { "value": "jarvis", "label": "Jarvis-Judice-Ninke (smoothest)" },
+        { "value": "stucki", "label": "Stucki" },
+        { "value": "bayer-8x8", "label": "Bayer 8x8 (ordered)" },
+        { "value": "halftone", "label": "Halftone dots" },
+        { "value": "crosshatch", "label": "Crosshatch" },
+        { "value": "none", "label": "None (snap to palette)" }
+      ]
+    },
+    {
+      "name": "saturation",
+      "type": "slider",
+      "label": "Pre-quantise saturation",
+      "default": 1.4,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "device_setting": true,
+      "help": "Spectra 6 has only six pure colours; boosting saturation before the dither pass pushes near-palette tones onto exact palette values, killing speckle. 1.4 is the recommended out-of-the-box value; bump to 1.6+ for photos."
+    },
+    {
+      "name": "contrast",
+      "type": "slider",
+      "label": "Pre-quantise contrast",
+      "default": 1.0,
+      "min": 0,
+      "max": 3,
+      "step": 0.05,
+      "device_setting": true
+    },
+    {
+      "name": "calibrated",
+      "type": "boolean",
+      "label": "Calibrated palette + tone mapping",
+      "default": false,
+      "device_setting": true,
+      "help": "Experimental. Dithers against the panel's measured colours (a dusty red instead of pure red, etc.) and compresses the source range into the panel's reproducible band so Floyd-Steinberg has somewhere to spread error. Helps on photographic / colour-heavy content; can introduce a cool tint on neutral greys because the calibrated white is slightly green-blue. A/B with your actual dashboards before leaving on. Calibration data ported from the paperlesspaper/epdoptimize project (Apache 2.0)."
+    }
+  ]
+}

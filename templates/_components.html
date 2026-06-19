@@ -310,9 +310,22 @@ macro here instead.
    two pages share a single navigation. Pass the active area key
    (one of: server, renderers, devices, plugins, events). -#}
 {%- macro settings_tabs(active) -%}
+{#- Renderers is a dev-only tab. In prod every base renderer's settings
+   are surfaced per-device-instance on the Devices tab anyway (the
+   dither / saturation / contrast fields are declared
+   ``device_setting: true``), so the base Renderers page is just noise
+   for the typical install. Keep it reachable in --dev for plugin
+   authors poking at base-renderer wiring; the route itself stays
+   unchanged so deep-linking still works in prod. -#}
 {%- set tabs = [
   ('server',    'Server',    'desktop-tower',     url_for('auth.settings_area', area='server')),
+] -%}
+{%- if config.DEV_MODE -%}
+{%- set tabs = tabs + [
   ('renderers', 'Renderers', 'image-square',      url_for('auth.settings_area', area='renderers')),
+] -%}
+{%- endif -%}
+{%- set tabs = tabs + [
   ('devices',   'Devices',   'devices',           url_for('auth.settings_area', area='devices')),
   ('plugins',   'Widgets',   'puzzle-piece',      url_for('auth.settings_area', area='plugins')),
   ('system',    'System',    'wrench',            url_for('auth.settings_area', area='system')),
