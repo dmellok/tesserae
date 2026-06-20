@@ -6,6 +6,46 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.55.1], 2026-06-21
+
+### Fixed
+
+- **Deleted devices kept lingering on /devices/battery + the
+  live status cache.** ``devices_delete`` already purged the
+  smart-sync telemetry but not the battery history or the
+  ``DEVICE_STATUS`` dict; the battery dashboard intentionally
+  surfaces devices with stored history (so an offline-but-
+  registered device still gets a card), which re-rendered the
+  dead device. Adds the missing
+  ``battery_history.forget(instance_id)`` + ``status_cache.pop()``
+  calls + a regression test.
+
+### Changed
+
+- Per-instance device cards on Settings → Devices now collapse
+  by default. Calibration-mid cards still open by default
+  (the "which number is in the top-left" form needs to be
+  visible without an extra click).
+- "Built-in device kinds" card (the #22 prototype) is no
+  longer rendered. The KindOverridesStore + routes + partial
+  remain in the repo, ready for a future revisit once an
+  admin workflow that's clearly better than editing
+  ``devices/<kind>/device.json`` directly emerges.
+- Discovered strip + unified Add device card moved INSIDE the
+  flex container so they share the 16px gap with the per-
+  instance cards (previously they sat as siblings to the
+  section loop and had no inter-card gap).
+
+### Added
+
+- ``scripts/capture_ui_uplift_screenshots.py`` — playwright-
+  driven capture for the UI uplift design handoff bundle.
+  Boots an isolated testing-mode Tesserae on a free port, seeds
+  a populated fleet (two devices, two pages, an interval
+  schedule with HA/Sun conditions, a two-step rotation), and
+  walks 15 routes including New-schedule-form + edit-form-with-
+  conditions-open variants for Schedules and Rotations.
+
 ## [0.55.0], 2026-06-21
 
 Settings → Devices tab adopts the v0.54 design system end-to-end,
