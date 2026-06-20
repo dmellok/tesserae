@@ -652,8 +652,10 @@ def _humanize_signal(rssi: object) -> dict[str, Any] | None:
     """Map raw RSSI (negative dBm) to a {bars, label, sub} tile. Returns
     None when no value is reported so the template can fall back to a
     'no heartbeat' tile instead of a misleading 0-bar reading."""
+    if not isinstance(rssi, (int, float, str)):
+        return None
     try:
-        value = int(rssi)  # type: ignore[arg-type]
+        value = int(rssi)
     except (TypeError, ValueError):
         return None
     if value >= -55:

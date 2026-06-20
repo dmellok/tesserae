@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.54.2], 2026-06-21
+
+### Fixed
+
+- CI mypy strict check rejected ``_humanize_signal`` in
+  ``app.settings.index_routes``: the ``int(rssi)  # type:
+  ignore[arg-type]`` line had an unused type-ignore (the failure was
+  a ``call-overload``, not an ``arg-type``) AND the underlying call
+  was still wrong because ``int(object)`` isn't a valid overload.
+  Switched to an ``isinstance(rssi, (int, float, str))`` narrow
+  before the ``int()`` call, so the type-checker sees a real branch
+  with no escape hatch. Runtime behaviour unchanged.
+
 ## [0.54.1], 2026-06-21
 
 ### Changed
