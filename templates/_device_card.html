@@ -1,0 +1,450 @@
+{# Device card v2 (handoff redesign, 2026-06-20).
+   Header strip + Connection details disclosure + tab nav (Status /
+   General / Rendering / Schedule) + sticky save bar + footer toolbar.
+   Wraps one ``section`` dict shaped by ``_build_sections`` in
+   app.settings.index_routes. Older sections fall back to the legacy
+   card; this template is invoked from settings.html only when
+   ``section.kind == 'device'``. #}
+
+{% from "_components.html" import auto_field, button, info_pop, number_input,
+    select_field, slider, switch, text_input with context %}
+
+{# Active tab from the querystring so deep links land on the right
+   panel after a save+redirect. Falls back to "status" when the param
+   is missing or unknown. #}
+{% set active_tab = request.args.get('tab', 'status') %}
+{% if active_tab not in ('status', 'general', 'rendering', 'schedule') %}
+  {% set active_tab = 'status' %}
+{% endif %}
+
+<section class="card dx-device-card" id="{{ section.id }}" data-device-card>
+
+  {# HEADER STRIP #}
+  <header class="dx-card-header">
+    <div class="dx-header-icon">
+      <i class="ph ph-{{ section.icon or KIND_ICONS.get(section.kind, 'device-mobile') }}" aria-hidden="true"></i>
+    </div>
+    <div class="dx-header-title">
+      <h2 class="dx-title">
+        <span class="dx-title-name">{{ section.device_name or section.title.replace('Device: ', '') }}</span>
+        <span class="dx-transport-badge">{{ section.transport_badge or 'MQTT' }}</span>
+      </h2>
+      <div class="dx-status-line">
+        <span class="dx-status-dot is-{{ section.status.health }}" aria-hidden="true"></span>
+        {% if section.status.smart_sync_header and section.status.smart_sync_header.tone != 'muted' %}
+        <span class="dx-status-headline dx-tone-{{ section.status.smart_sync_header.tone }}">
+          {{ section.status.smart_sync_header.tag.split(' · ')[0] }}
+        </span>
+        {% endif %}
+        <span class="dx-status-muted">last seen {{ section.status.relative }}</span>
+      </div>
+    </div>
+    <button type="button" class="dx-collapse-btn" data-device-toggle aria-expanded="true">
+      <span class="when-open">Hide settings</span>
+      <span class="when-closed">Show settings</span>
+      <i class="ph ph-caret-down" aria-hidden="true"></i>
+    </button>
+  </header>
+
+  <div class="dx-card-body" data-device-body>
+
+    {# CONNECTION DETAILS DISCLOSURE #}
+    {% if section.connection_details %}
+    <details class="dx-conn-details">
+      <summary>
+        <i class="ph ph-caret-right" aria-hidden="true"></i>
+        <span>Connection details</span>
+      </summary>
+      <dl class="dx-conn-grid">
+        {% for row in section.connection_details %}
+        <div>
+          <dt>{{ row.label }}</dt>
+          <dd>
+            <code{% if not row.monospace %} class="dx-conn-plain"{% endif %}>{{ row.value }}</code>
+            {% if row.action == 'reveal' and section.reveal_token_endpoint %}
+            <form method="post" action="{{ section.reveal_token_endpoint }}"
+                  class="form form--inline"
+                  onsubmit="return confirm('Show the full access token? Anyone watching your screen will see it.');">
+              <button type="submit" class="dx-reveal-btn">Reveal</button>
+            </form>
+            {% endif %}
+          </dd>
+        </div>
+        {% endfor %}
+        {% if section.set_transport_endpoint %}
+        <div>
+          <dt>Transport</dt>
+          <dd>
+            <span class="dx-transport-current">{{ section.transport_badge }}</span>
+            <form method="post" action="{{ section.set_transport_endpoint }}"
+                  class="form form--inline"
+                  onsubmit="return confirm({% if section.transport == 'rest' %}'Switch this device to MQTT? The firmware will need its broker settings re-flashed.'{% else %}'Switch this device to REST? An access token will be minted (or reused) and shown to copy into firmware.'{% endif %});">
+              <input type="hidden" name="transport" value="{% if section.transport == 'rest' %}mqtt{% else %}rest{% endif %}">
+              <button type="submit" class="dx-reveal-btn">
+                Switch to {% if section.transport == 'rest' %}MQTT{% else %}REST{% endif %}
+              </button>
+            </form>
+          </dd>
+        </div>
+        {% endif %}
+      </dl>
+    </details>
+    {% endif %}
+
+    {# TAB BAR #}
+    <nav class="dx-tabs" role="tablist" aria-label="Device settings">
+      {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('rendering', 'Rendering'), ('schedule', 'Schedule')] %}
+      <button type="button" role="tab"
+              data-tab="{{ tab_id }}"
+              class="dx-tab{% if tab_id == active_tab %} is-active{% endif %}"
+              aria-selected="{% if tab_id == active_tab %}true{% else %}false{% endif %}">
+        {{ tab_label }}
+      </button>
+      {% endfor %}
+    </nav>
+
+    {# COMBINED FORM (wraps all 4 tab panels; Status + Schedule have read-only content) #}
+    {% if section.combined_endpoint %}
+    <form method="post" action="{{ section.combined_endpoint }}" class="form dx-device-form" data-dirty-form>
+
+      {# STATUS TAB (read-only) #}
+      <section role="tabpanel" data-panel="status"
+               class="dx-panel{% if active_tab == 'status' %} is-active{% endif %}"
+               aria-hidden="{% if active_tab == 'status' %}false{% else %}true{% endif %}">
+        {% set tiles = section.status.tiles %}
+        <div class="dx-stat-grid">
+          {# SIGNAL #}
+          <div class="dx-stat-tile">
+            <div class="dx-stat-label">Signal</div>
+            <div class="dx-stat-value">
+              {% if tiles.signal %}
+              <span class="dx-bars" aria-hidden="true">
+                {% for n in [1, 2, 3, 4] %}
+                <span class="dx-bar{% if n <= tiles.signal.bars %} is-on{% endif %}"></span>
+                {% endfor %}
+              </span>
+              <span>{{ tiles.signal.label }}</span>
+              {% else %}
+              <span class="dx-muted">No reading</span>
+              {% endif %}
+            </div>
+            <div class="dx-stat-sub">{% if tiles.signal %}{{ tiles.signal.sub }}{% else %}-{% endif %}</div>
+          </div>
+          {# POWER #}
+          <div class="dx-stat-tile">
+            <div class="dx-stat-label">Power</div>
+            <div class="dx-stat-value">{{ tiles.power.label }}</div>
+            <div class="dx-stat-sub">{{ tiles.power.sub or '-' }}</div>
+          </div>
+          {# FIRMWARE #}
+          <div class="dx-stat-tile">
+            <div class="dx-stat-label">Firmware</div>
+            <div class="dx-stat-value">
+              {% if tiles.firmware %}{{ tiles.firmware.value }}{% else %}<span class="dx-muted">Unknown</span>{% endif %}
+            </div>
+            <div class="dx-stat-sub">
+              {% if tiles.firmware and tiles.firmware.sub %}<code>{{ tiles.firmware.sub }}</code>{% else %}-{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {# SMART SYNC PANEL #}
+        {% if section.status.smart_sync and section.status.smart_sync.state != 'off' %}
+        {% set ss = section.status.smart_sync %}
+        {% set ssh = section.status.smart_sync_header %}
+        <section class="dx-smart-sync">
+          <div class="dx-smart-sync-head">
+            <div class="dx-smart-sync-head-left">
+              <span class="dx-smart-sync-label">SMART SYNC</span>
+              <span class="dx-smart-sync-pill dx-tone-{{ ssh.tone }}">{{ ssh.tag }}</span>
+            </div>
+            <span class="dx-smart-sync-confidence">confidence {{ ss.confidence|default(0) }}/10</span>
+          </div>
+          <div class="dx-smart-sync-meter">
+            <div class="dx-smart-sync-meter-fill dx-tone-{{ ssh.tone }}"
+                 style="width: {{ ssh.confidence_pct }}%;"></div>
+          </div>
+          <p class="dx-smart-sync-explainer">{{ ssh.explainer }}</p>
+          <dl class="dx-smart-sync-grid">
+            <div>
+              <dt>Last heartbeat</dt>
+              <dd>{{ ss.last_heartbeat_rel or section.status.relative }}</dd>
+            </div>
+            <div>
+              <dt>Next wake</dt>
+              <dd>{{ ss.predicted_rel or '-' }}</dd>
+            </div>
+            <div>
+              <dt>Sleep cycle</dt>
+              <dd>{% if ss.interval_s %}{{ ss.interval_s }} s{% else %}-{% endif %}</dd>
+            </div>
+            <div>
+              <dt>Last offset</dt>
+              <dd class="{% if ss.offset_text and ss.offset_text.startswith('+') %}dx-tone-ok{% endif %}">
+                {{ ss.offset_text or '-' }}
+              </dd>
+            </div>
+          </dl>
+        </section>
+        {% endif %}
+
+        {# Raw parsed dict, kept as an opt-in disclosure so debugging
+           is one click away without crowding the tiles. #}
+        {% if section.status.parsed %}
+        <details class="dx-advanced-diag">
+          <summary>
+            <i class="ph ph-caret-right" aria-hidden="true"></i>
+            <span>Advanced diagnostics</span>
+          </summary>
+          <dl class="status-fields">
+            {% for key, value in section.status.parsed.items() %}
+            <div><dt>{{ key }}</dt><dd>{{ value if value is not none else '-' }}</dd></div>
+            {% endfor %}
+          </dl>
+        </details>
+        {% endif %}
+      </section>
+
+      {# GENERAL TAB #}
+      <section role="tabpanel" data-panel="general"
+               class="dx-panel{% if active_tab == 'general' %} is-active{% endif %}"
+               aria-hidden="{% if active_tab == 'general' %}false{% else %}true{% endif %}">
+
+        {% if section.device_name is not none %}
+        <div class="dx-field-grid">
+          {{ text_input(section.id ~ '-device-name', 'device_name', 'Display name',
+              value=section.device_name, required=True) }}
+
+          {# Existing icon picker; kept here as the General-tab Icon control. #}
+          {% set current_icon = section.icon or 'device-mobile' %}
+          {% set picker_id = section.id ~ '-icon' %}
+          <input type="hidden" name="device_icon" value="{{ current_icon }}"
+                 data-icon-value data-icon-picker-id="{{ picker_id }}">
+          <div class="field">
+            <label for="{{ picker_id }}-btn">Icon</label>
+            <div class="icon-picker" data-icon-picker data-icon-picker-id="{{ picker_id }}">
+              <button type="button" id="{{ picker_id }}-btn" class="icon-picker-trigger" data-icon-trigger>
+                <span class="icon-picker-current"><i class="ph ph-{{ current_icon }}" aria-hidden="true"></i></span>
+                <span class="icon-picker-label" data-icon-label>{{ current_icon }}</span>
+                <i class="ph ph-caret-down caret-soft" aria-hidden="true" style="margin-left:auto;"></i>
+              </button>
+              <div class="icon-picker-popover" data-icon-popover hidden>
+                <div class="icon-picker-search">
+                  <input type="search" placeholder="Search icons…" data-icon-search autocomplete="off" spellcheck="false">
+                </div>
+                <div class="icon-picker-grid" data-icon-grid></div>
+                <div class="icon-picker-empty" data-icon-empty hidden>No icons match that search.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {# Device kind config fields (sleep_interval_s, etc). Shown
+           here on the General tab since they govern the wake cadence. #}
+        {% if section.fields %}
+        {% for field in section.fields %}
+          {% set value = section.state.get(field.name, field.get('default', '')) %}
+          {% set field_id = section.id ~ '-' ~ field.name %}
+          {{ auto_field(field_id, field.name, field, value) }}
+        {% endfor %}
+        {% endif %}
+
+        {# Per-device quiet hours override + dependent dim of Start/End. #}
+        {% if section.quiet_hours_endpoint %}
+        <div class="dx-quiet-hours" data-dep-group>
+          <hr class="dx-divider">
+          {{ switch(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Override quiet hours',
+                    checked=section.quiet_hours.get('enabled', False),
+                    help='Use a different no-refresh window for this device. When off, this device follows the global quiet-hours window in Settings → Server.') }}
+          <div class="dx-field-grid" data-dep-target>
+            {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
+                          value=section.quiet_hours.get('start', ''),
+                          placeholder='HH:MM', type='time') }}
+            {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
+                          value=section.quiet_hours.get('end', ''),
+                          placeholder='HH:MM', type='time') }}
+          </div>
+        </div>
+        {% endif %}
+      </section>
+
+      {# RENDERING TAB #}
+      <section role="tabpanel" data-panel="rendering"
+               class="dx-panel{% if active_tab == 'rendering' %} is-active{% endif %}"
+               aria-hidden="{% if active_tab == 'rendering' %}false{% else %}true{% endif %}">
+
+        {% for pq in section.picture_quality %}
+        {# Per-clone picture-quality fields (dither, saturation, contrast,
+           calibrated palette). Field names are namespaced
+           ``<clone_id>:<field>`` so the combined-save handler can route
+           them back to the right clone's settings. Heading is always
+           rendered so tests + a11y readers can find the subsection
+           regardless of clone count. #}
+        <p class="device-subhead">{{ pq.base_name }} settings</p>
+        {% for field in pq.fields %}
+          {% set value = pq.state.get(field.name, field.get('default', '')) %}
+          {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
+          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+        {% endfor %}
+        {% endfor %}
+
+        {% if section.panel %}
+        <div class="dx-panel-orientation">
+          <hr class="dx-divider">
+          <p class="device-subhead">Panel &amp; orientation</p>
+          {{ select_field(section.id ~ '-orientation', 'panel_orientation', 'Rotation',
+              value=section.panel.get('orientation', 'landscape'),
+              options=[{'value':'landscape','label':'0°'},
+                       {'value':'portrait','label':'90°'},
+                       {'value':'landscape_flipped','label':'180°'},
+                       {'value':'portrait_flipped','label':'270°'}],
+              help='Clockwise turn to match the mount.') }}
+          <div class="dx-field-grid">
+            {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
+            {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
+          </div>
+          {% if section.status.reported_panel_hint %}
+          <p class="dx-hint">
+            <i class="ph ph-info" aria-hidden="true"></i>
+            {{ section.status.reported_panel_hint }}
+          </p>
+          {% endif %}
+          {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
+          {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
+              help='Inset content by this many pixels on every edge so it clears a mat or bezel.') }}
+          {% if section.gamut_capable %}
+          {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
+              value=section.panel.get('gamut', 'waveshare_e6'),
+              options=[{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
+                       {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}]) }}
+          {% endif %}
+        </div>
+        {% endif %}
+      </section>
+
+      {# SCHEDULE TAB (read-only timetable filtered to this device) #}
+      <section role="tabpanel" data-panel="schedule"
+               class="dx-panel{% if active_tab == 'schedule' %} is-active{% endif %}"
+               aria-hidden="{% if active_tab == 'schedule' %}false{% else %}true{% endif %}">
+        {% if section.timetable_entries %}
+        <ul class="timetable-list">
+          {% for entry in section.timetable_entries %}
+          <li class="timetable-row {% if not entry.enabled %}is-disabled{% endif %}">
+            <div class="timetable-when">
+              {% if entry.type == 'daily' %}
+                <strong>Daily</strong>
+              {% elif entry.window_start and entry.window_end %}
+                <strong>{{ entry.window_start }} → {{ entry.window_end }}</strong>
+              {% elif entry.window_start %}
+                <strong>from {{ entry.window_start }}</strong>
+              {% else %}
+                <strong>Always</strong>
+              {% endif %}
+              <span class="muted"> · {{ entry.days_label }}</span>
+              {% if entry.interval_minutes %}
+              <span class="muted"> · every {{ entry.interval_minutes }} min</span>
+              {% endif %}
+            </div>
+            <div class="timetable-what">
+              <i class="ph ph-squares-four" aria-hidden="true"></i>
+              <span>{{ entry.page_name }}</span>
+              {% if not entry.enabled %}<span class="pill">disabled</span>{% endif %}
+            </div>
+            <div class="timetable-edit">
+              <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">
+                <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+              </a>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        <p class="field-help">
+          Schedules whose target dashboard is bound to this device. Edit in the
+          <a href="{{ url_for('schedules.index') }}">Schedules</a> page.
+        </p>
+        {% else %}
+        <div class="dx-empty">
+          <div class="dx-empty-icon"><i class="ph ph-calendar-blank" aria-hidden="true"></i></div>
+          <p class="dx-empty-title">No dashboards scheduled yet</p>
+          <p class="dx-empty-help">
+            Bind a page to this device and add a schedule, it'll show up here.
+          </p>
+          <a class="button primary" href="{{ url_for('schedules.index') }}">
+            <i class="ph ph-calendar-plus" aria-hidden="true"></i>
+            <span>Open Schedules</span>
+          </a>
+        </div>
+        {% endif %}
+      </section>
+
+      {# STICKY SAVE BAR (revealed by JS when the form is dirty) #}
+      <div class="dx-save-bar" data-save-bar hidden>
+        <span class="dx-save-bar-msg">You have unsaved changes</span>
+        <div class="dx-save-bar-actions">
+          <button type="reset" class="dx-save-bar-discard">Discard</button>
+          <button type="submit" class="dx-save-bar-save">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+            <span>Save changes</span>
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
+    {# FOOTER ACTION ROW (separate forms; cannot live inside the combined form) #}
+    {% if section.calibrate_endpoint or section.regenerate_token_endpoint or section.delete_endpoint %}
+    <footer class="dx-card-footer">
+      <div class="dx-footer-left">
+        {% if section.calibrate_endpoint %}
+          {% if calibrating == section.device_id %}
+          <div class="calibrate-block calibrate-prompt-block">
+            <p class="field-help calibrate-prompt">
+              A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
+              <strong>which number is in the top-left corner?</strong>
+            </p>
+            <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+              <div class="calibrate-choices">
+                {% for n in [1, 2, 3, 4] %}
+                <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+                {% endfor %}
+              </div>
+            </form>
+            <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+              <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
+            </form>
+          </div>
+          {% else %}
+          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+            <button type="submit" class="dx-footer-btn">
+              <i class="ph ph-compass" aria-hidden="true"></i>
+              <span>Calibrate</span>
+            </button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="dx-footer-right">
+        {% if section.regenerate_token_endpoint %}
+        <form method="post" action="{{ section.regenerate_token_endpoint }}" class="form form--inline"
+              onsubmit="return confirm('Regenerate the access token? The current token stops working immediately.');">
+          <button type="submit" class="dx-footer-btn">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+            <span>Regenerate token</span>
+          </button>
+        </form>
+        {% endif %}
+        {% if section.delete_endpoint %}
+        <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline"
+              onsubmit="return confirm('Delete this device? Its renderers stop publishing.');">
+          <button type="submit" class="dx-footer-btn dx-danger">
+            <i class="ph ph-trash" aria-hidden="true"></i>
+            <span>Delete</span>
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </footer>
+    {% endif %}
+  </div>{# /dx-card-body #}
+</section>

@@ -257,6 +257,53 @@ def devices_regenerate_token(instance_id: str) -> Response:
     return redirect_to
 
 
+@bp.post("/settings/devices/<instance_id>/reveal-token")
+def devices_reveal_token(instance_id: str) -> Response:
+    """Reveal the full access token for a device (issue #20). The
+    Connection details strip on the device card masks the token to
+    its first 4 chars + "..."; admins who closed the one-shot reveal
+    modal previously had no path back to the value without reading
+    the on-disk manifest. This route stashes the token in the same
+    session reveal slot the regenerate flow uses, so the next page
+    render pops the modal with the existing token.
+
+    The reveal is logged to the EventLog so an admin can audit who
+    surfaced the token and when."""
+    anchor = f"device-{instance_id}"
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+    devs = devices()
+    device = devs.get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+    token = device.manifest.get("access_token")
+    if not isinstance(token, str) or not token:
+        flash(f"{device.name!r} doesn't use access tokens.", "error")
+        return redirect_to
+
+    session["_trmnl_token_reveal"] = {
+        "device_id": device.id,
+        "device_name": device.name,
+        "token": token,
+    }
+    event_log = current_app.config.get("EVENT_LOG")
+    if event_log is not None:
+        try:
+            event_log.record(
+                type="device",
+                source="settings_ui",
+                target=device.id,
+                status="ok",
+                extra={"action": "token_revealed"},
+            )
+        except Exception:
+            current_app.logger.exception(
+                "event_log: record(token_revealed) failed for %s", device.id
+            )
+    return redirect_to
+
+
 @bp.get("/settings/devices/discovered.json")
 def devices_discovered_json() -> Response:
     """Current discovered devices as JSON. The Devices page + setup wizard

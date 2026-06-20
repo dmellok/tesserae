@@ -36,6 +36,11 @@
 <script src="{{ url_for('static', filename='discovery-poll.js') }}"></script>
 {% endif %}
 
+{# Settings page controller (handoff redesign): drives the device card
+   tabs + sticky save bar + dependent dim. No-op if the page has no
+   ``[data-device-card]`` elements (eg the System or Events tabs). #}
+<script src="{{ url_for('static', filename='pages/settings.js') }}"></script>
+
 {% if active_area == 'devices' and discovered_devices %}
 {# Discovery: devices that are publishing heartbeats but haven't been
    registered yet. The wildcard listener on tesserae/+/status fills this
@@ -184,9 +189,23 @@
 {% endif %}
 
 {% set KIND_ICONS = {'app':'desktop-tower','panel':'frame-corners','broker':'broadcast','renderer':'image-square','device':'device-mobile','plugin':'puzzle-piece'} %}
+{# Wrap the section loop in a scope class so the server tab can opt into
+   the handoff-redesigned section-card visual treatment (white card +
+   shadow + 22px padding) without rewriting the per-card markup. The
+   ``dx-server-area`` selector in settings.css applies the override; on
+   other tabs (renderers / devices / plugins / system / events) the
+   classic .card look is preserved. #}
+<div class="settings-section-list {% if active_area == 'server' %}dx-server-area{% endif %}">
 {% for section in sections %}
-<section class="card {% if section.kind == 'panel' %}panel-section{% endif %} {% if section.kind == 'device' %}device-card{% endif %}" id="{{ section.id }}">
-  {% if section.kind == 'device' %}
+{% if section.kind == 'device' %}
+{# Device cards use the redesigned partial (header strip + tabs +
+   sticky save bar + footer). The partial owns its own <section>
+   wrapper, so the non-device branch below renders the legacy
+   .card markup unchanged for app/broker/renderer/plugin sections. #}
+{% include '_device_card.html' %}
+{% else %}
+<section class="card {% if section.kind == 'panel' %}panel-section{% endif %}" id="{{ section.id }}">
+  {% if False %}{# Dead branch kept to bound the legacy device markup below. #}
   {# Device cards collapse to header + status by default. The whole
      summary doubles as the toggle: click anywhere on the header (or
      the dedicated chevron) to expand the configurable subsections.
@@ -623,7 +642,9 @@
   </div>
   {% endif %}
 </section>
+{% endif %}{# /device kind branch #}
 {% endfor %}
+</div>{# /.settings-section-list #}
 
 {# Server-tab footer: compact diagnostics + session actions. These
    live at the bottom so the configuration cards (App / Broker /

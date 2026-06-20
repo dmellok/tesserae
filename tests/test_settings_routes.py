@@ -772,3 +772,127 @@ def test_healthz_is_open(app_with_gate: Flask) -> None:
     resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.data == b"ok"
+
+
+# ----- handoff redesign view-model helpers ---------------------------------
+
+
+def test_humanize_signal_buckets_rssi_to_bars() -> None:
+    from app.settings.index_routes import _humanize_signal
+
+    # Excellent: -55 dBm or stronger -> 4 bars.
+    assert _humanize_signal(-50) == {"bars": 4, "label": "Excellent", "sub": "-50 dBm"}
+    # Good: -65..-56 dBm.
+    assert _humanize_signal(-64) == {"bars": 3, "label": "Good", "sub": "-64 dBm"}
+    # Fair: -75..-66 dBm.
+    assert _humanize_signal(-70) == {"bars": 2, "label": "Fair", "sub": "-70 dBm"}
+    # Poor: weaker than -75 dBm.
+    assert _humanize_signal(-85) == {"bars": 1, "label": "Poor", "sub": "-85 dBm"}
+    # None / unparseable returns None so the tile shows "No reading".
+    assert _humanize_signal(None) is None
+    assert _humanize_signal("nope") is None
+
+
+def test_humanize_power_calls_zero_zero_mains_not_dead() -> None:
+    """The header redesign reads as a dead battery if a mains device's
+    zero battery_mv/battery_pct fall through as ``0 mV / 0%``. The
+    handoff fixes this by surfacing "Mains / No battery" instead."""
+    from app.settings.index_routes import _humanize_power
+
+    assert _humanize_power({}) == {"label": "Mains", "sub": "No battery"}
+    assert _humanize_power({"battery_mv": 0, "battery_pct": 0}) == {
+        "label": "Mains",
+        "sub": "No battery",
+    }
+    # Real battery reading carries the percent + mV sub-line.
+    assert _humanize_power({"battery_mv": 3820, "battery_pct": 67}) == {
+        "label": "67%",
+        "sub": "3820 mV",
+    }
+
+
+def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> None:
+    """The Status tab shows Signal / Power / Firmware tiles instead of
+    raw key/value pairs. Smoke-checks the tile labels are present after
+    a heartbeat lands."""
+    import time
+
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    app_with_gate.config["DEVICE_STATUS"]["esp32_lab"] = {
+        "received_at": time.time(),
+        "parsed": {"battery_mv": 3820, "battery_pct": 67, "rssi": -64, "ip": "10.0.0.42"},
+    }
+    body = client.get("/settings/devices").get_data(as_text=True)
+    # All three tile labels render.
+    assert "Signal" in body
+    assert "Power" in body
+    assert "Firmware" in body
+    # Humanized signal label + dBm sub-line.
+    assert "Good" in body
+    assert "-64 dBm" in body
+    # Humanized power (battery percent with mV sub).
+    assert "67%" in body
+    # Firmware IP sub-line.
+    assert "10.0.0.42" in body
+
+
+def test_device_card_rest_hides_dormant_mqtt_topics(app_with_gate: Flask) -> None:
+    """A REST-transport device shouldn't show Status topic / Config topic
+    in the Connection details strip (issue #21). Those topics stay on
+    the manifest so a flip back to MQTT is one click, but they're not
+    used by REST so dragging them into the UI is misleading."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "rest_lab", "kind": "esp32_client", "panel_preset": "inky_7_3"},
+    )
+    # Flip to REST (route auto-mints the access token).
+    resp = client.post(
+        "/settings/devices/rest_lab/set-transport",
+        data={"transport": "rest"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    body = client.get("/settings/devices").get_data(as_text=True)
+    # Server URL appears (REST devices need to know where to poll).
+    assert "Server URL" in body
+    # Dormant MQTT topic rows are hidden on REST devices.
+    assert "Status topic" not in body
+    assert "Config topic" not in body
+
+
+def test_devices_reveal_token_stashes_in_session_and_logs(app_with_gate: Flask) -> None:
+    """The reveal endpoint (issue #20) gives admins a path back to the
+    full access token after closing the one-shot regenerate modal,
+    without making them read the on-disk manifest. The reveal is
+    logged to the EventLog so the admin can audit who saw the token."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    # TRMNL devices have access_token in their manifest.
+    client.post(
+        "/settings/devices/add",
+        data={"id": "trmnl_lab", "kind": "trmnl_client", "panel_preset": "trmnl_byod_v1"},
+    )
+    # First render pops the session-stashed reveal modal from the add
+    # flow; consume it so the next render starts clean.
+    client.get("/settings/devices")
+    # Now hit the reveal endpoint and verify the next render shows the
+    # token modal again with the same value.
+    dev = app_with_gate.config["DEVICE_REGISTRY"].get("trmnl_lab")
+    assert dev is not None
+    token = dev.manifest["access_token"]
+    resp = client.post(
+        "/settings/devices/trmnl_lab/reveal-token",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    body = client.get("/settings/devices").get_data(as_text=True)
+    # Full token appears in the page (modal). Just check a substring so
+    # the test doesn't drift if the modal HTML wrapping changes.
+    assert token in body

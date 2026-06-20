@@ -615,3 +615,781 @@
   font-weight: 600;
   letter-spacing: 0.08em;
 }
+
+
+/* =====================================================================
+   Device card v2 + Server-tab section cards (2026-06 handoff redesign).
+   Scoped under .dx-* so the legacy .device-card-* + .card styles still
+   apply to any view that hasn't migrated. Tokens follow the handoff
+   exactly; the global --t-* set remains the source of truth elsewhere.
+   ===================================================================== */
+
+.dx-device-card {
+  --dx-teal: #15846a;
+  --dx-teal-hover: #127059;
+  --dx-teal-hover-2: #179476;
+  --dx-teal-soft: #e7f2ee;
+  --dx-ink: #2b2b29;
+  --dx-ink-soft: #56564f;
+  --dx-muted: #8a8a82;
+  --dx-faint: #9a9a93;
+  --dx-faint-2: #a3a39b;
+  --dx-surface: #ffffff;
+  --dx-inset: #f7f6f3;
+  --dx-footer-bg: #fbfaf7;
+  --dx-border: #e6e5e0;
+  --dx-border-soft: #efeee9;
+  --dx-border-faint: #f1f0eb;
+  --dx-input-border: #dedcd6;
+  --dx-warn: #e0902f;
+  --dx-warn-text: #b9741f;
+  --dx-warn-bg: #f6ead0;
+  --dx-warn-band-bg: #fbf8f1;
+  --dx-warn-band-border: #efe8d6;
+  --dx-warn-meter-track: #ece4cf;
+  --dx-ok: #2e9e6e;
+  --dx-danger: #c0392b;
+  --dx-danger-border: #ecc9c4;
+  --dx-danger-hover: #fbeeec;
+  --dx-save-bar: #23231f;
+
+  padding: 0;
+  background: var(--dx-surface);
+  border: 1px solid var(--dx-border);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.04);
+  overflow: hidden;
+  margin: 0 0 var(--t-space-4);
+}
+
+/* HEADER STRIP --------------------------------------------------- */
+.dx-device-card .dx-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--dx-border-soft);
+}
+.dx-device-card .dx-header-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--dx-teal-soft);
+  color: var(--dx-teal);
+  font-size: 19px;
+}
+.dx-device-card .dx-header-title { flex: 1 1 auto; min-width: 0; }
+.dx-device-card .dx-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--dx-ink);
+}
+.dx-device-card .dx-title-name { min-width: 0; }
+.dx-device-card .dx-transport-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dx-faint);
+  background: var(--dx-border-faint);
+  border: 1px solid var(--dx-border);
+  padding: 2px 7px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.dx-device-card .dx-status-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #6c6c66;
+}
+.dx-device-card .dx-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dx-muted);
+}
+.dx-device-card .dx-status-dot.is-ok { background: var(--dx-ok); }
+.dx-device-card .dx-status-dot.is-warn { background: var(--dx-warn); animation: dx-pulse 1.8s ease-in-out infinite; }
+.dx-device-card .dx-status-dot.is-stale { background: var(--dx-danger); }
+.dx-device-card .dx-status-dot.is-unknown { background: var(--dx-muted); }
+@keyframes dx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.dx-device-card .dx-status-headline { font-weight: 600; }
+.dx-device-card .dx-status-muted { color: #6c6c66; }
+.dx-device-card .dx-tone-ok { color: var(--dx-ok); }
+.dx-device-card .dx-tone-warn { color: var(--dx-warn-text); }
+.dx-device-card .dx-tone-muted { color: var(--dx-muted); }
+.dx-device-card .dx-collapse-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 7px;
+  border: 1px solid #e1e0db;
+  background: var(--dx-surface);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dx-ink-soft);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.dx-device-card .dx-collapse-btn:hover {
+  border-color: #cdccc6;
+  background: #faf9f6;
+}
+.dx-device-card .dx-collapse-btn .ph-caret-down { transition: transform 0.18s ease; font-size: 14px; }
+.dx-device-card[data-collapsed="true"] .dx-collapse-btn .ph-caret-down { transform: rotate(-90deg); }
+.dx-device-card .dx-collapse-btn .when-closed { display: none; }
+.dx-device-card[data-collapsed="true"] .dx-collapse-btn .when-open { display: none; }
+.dx-device-card[data-collapsed="true"] .dx-collapse-btn .when-closed { display: inline; }
+.dx-device-card[data-collapsed="true"] .dx-card-body { display: none; }
+.dx-device-card[data-collapsed="true"] .dx-card-header { border-bottom-color: transparent; }
+
+/* CONNECTION DETAILS ----------------------------------------------- */
+.dx-conn-details { border-bottom: 1px solid var(--dx-border-soft); }
+.dx-conn-details > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 22px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dx-faint);
+}
+.dx-conn-details > summary::-webkit-details-marker { display: none; }
+.dx-conn-details > summary:hover { color: var(--dx-ink-soft); }
+.dx-conn-details > summary .ph-caret-right {
+  transition: transform 120ms ease;
+  font-size: 13px;
+}
+.dx-conn-details[open] > summary .ph-caret-right { transform: rotate(90deg); }
+.dx-conn-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 18px;
+  padding: 0 22px 16px 42px;
+  margin: 0;
+  font-size: 13px;
+}
+.dx-conn-grid > div { display: contents; }
+.dx-conn-grid dt {
+  color: var(--dx-faint);
+  font-weight: 600;
+}
+.dx-conn-grid dd {
+  margin: 0;
+  color: var(--dx-ink);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+}
+.dx-conn-grid dd code {
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+}
+.dx-conn-grid dd .dx-conn-plain {
+  font-family: inherit;
+}
+.dx-conn-grid .form--inline { display: inline-flex; margin: 0; }
+.dx-reveal-btn {
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  font: inherit;
+  font-family: var(--t-font);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dx-teal);
+  cursor: pointer;
+}
+.dx-reveal-btn:hover { color: var(--dx-teal-hover); text-decoration: underline; }
+.dx-transport-current { font-weight: 600; }
+
+/* TAB BAR --------------------------------------------------------- */
+.dx-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--dx-border);
+}
+.dx-tab {
+  background: none;
+  border: 0;
+  padding: 12px 15px;
+  margin-bottom: -1px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #8f8f88;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+.dx-tab:hover { color: var(--dx-ink-soft); }
+.dx-tab.is-active {
+  color: var(--dx-teal);
+  border-bottom-color: var(--dx-teal);
+}
+
+/* TAB PANELS ------------------------------------------------------ */
+.dx-panel {
+  display: none;
+  padding: 22px;
+}
+.dx-panel.is-active { display: block; }
+
+/* STATUS TAB ------------------------------------------------------ */
+.dx-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.dx-stat-tile {
+  background: var(--dx-inset);
+  border: 1px solid #ecebe6;
+  border-radius: 8px;
+  padding: 13px 14px;
+}
+.dx-stat-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--dx-faint);
+}
+.dx-stat-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--dx-ink);
+  margin-top: 4px;
+}
+.dx-stat-sub {
+  font-size: 11px;
+  color: var(--dx-faint-2);
+  margin-top: 4px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.dx-stat-sub code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+}
+.dx-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 14px;
+}
+.dx-bar {
+  width: 3px;
+  background: #dcdbd5;
+  border-radius: 1px;
+}
+.dx-bar:nth-child(1) { height: 35%; }
+.dx-bar:nth-child(2) { height: 55%; }
+.dx-bar:nth-child(3) { height: 75%; }
+.dx-bar:nth-child(4) { height: 100%; }
+.dx-bar.is-on { background: var(--dx-ok); }
+.dx-muted { color: var(--dx-faint-2); font-weight: 500; }
+
+/* SMART SYNC ------------------------------------------------------ */
+.dx-smart-sync {
+  border: 1px solid #ecebe6;
+  border-radius: 8px;
+  margin-top: 14px;
+  overflow: hidden;
+}
+.dx-smart-sync-head {
+  background: var(--dx-warn-band-bg);
+  border-bottom: 1px solid var(--dx-warn-band-border);
+  padding: 13px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dx-smart-sync-head-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dx-smart-sync-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dx-ink-soft);
+}
+.dx-smart-sync-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dx-warn-text);
+  background: var(--dx-warn-bg);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+.dx-smart-sync-pill.dx-tone-ok { color: var(--dx-ok); background: #e2f4ec; }
+.dx-smart-sync-pill.dx-tone-muted { color: var(--dx-muted); background: var(--dx-border-faint); }
+.dx-smart-sync-confidence {
+  font-size: 11px;
+  color: var(--dx-ink-soft);
+}
+.dx-smart-sync-meter {
+  height: 5px;
+  background: var(--dx-warn-meter-track);
+  margin: 0;
+}
+.dx-smart-sync-meter-fill {
+  height: 100%;
+  background: var(--dx-warn);
+  transition: width 220ms ease;
+}
+.dx-smart-sync-meter-fill.dx-tone-ok { background: var(--dx-ok); }
+.dx-smart-sync-meter-fill.dx-tone-muted { background: var(--dx-faint-2); }
+.dx-smart-sync-explainer {
+  padding: 12px 16px 0;
+  margin: 0;
+  font-size: 12px;
+  color: #7d7d75;
+}
+.dx-smart-sync-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin: 12px 0 0;
+  padding: 0;
+}
+.dx-smart-sync-grid > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--dx-border-faint);
+}
+.dx-smart-sync-grid > div:nth-child(2n) { border-left: 1px solid var(--dx-border-faint); }
+.dx-smart-sync-grid dt {
+  font-size: 12.5px;
+  color: var(--dx-muted);
+  margin: 0;
+}
+.dx-smart-sync-grid dd {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ADVANCED DIAGNOSTICS ------------------------------------------- */
+.dx-advanced-diag {
+  margin-top: 14px;
+  border-top: 1px dashed var(--dx-border);
+  padding-top: 12px;
+}
+.dx-advanced-diag > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dx-faint);
+}
+.dx-advanced-diag > summary::-webkit-details-marker { display: none; }
+.dx-advanced-diag > summary:hover { color: var(--dx-ink-soft); }
+.dx-advanced-diag > summary .ph-caret-right { transition: transform 120ms ease; }
+.dx-advanced-diag[open] > summary .ph-caret-right { transform: rotate(90deg); }
+.dx-advanced-diag .status-fields { margin-top: 10px; }
+
+/* GENERAL + RENDERING TABS --------------------------------------- */
+.dx-device-card .dx-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 540px) { .dx-device-card .dx-field-grid { grid-template-columns: 1fr; } }
+.dx-device-card .dx-panel > .field + .field,
+.dx-device-card .dx-panel > .field-grid + .field,
+.dx-device-card .dx-panel > .field + .field-grid { margin-top: 16px; }
+.dx-divider {
+  border: 0;
+  height: 1px;
+  background: var(--dx-border-faint);
+  margin: 18px 0;
+}
+.dx-quiet-hours .field-grid,
+.dx-quiet-hours .dx-field-grid {
+  transition: opacity 120ms ease;
+}
+.dx-quiet-hours[data-dep-off] [data-dep-target] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.dx-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--dx-faint);
+}
+.dx-hint .ph-info { color: var(--dx-faint-2); margin-top: 1px; }
+.dx-panel-orientation .device-subhead { margin-bottom: 10px; }
+.dx-device-card input[type="range"] { accent-color: var(--dx-teal); }
+
+/* SCHEDULE TAB --------------------------------------------------- */
+.dx-empty {
+  text-align: center;
+  padding: 32px 22px;
+}
+.dx-empty-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #f3f2ee;
+  color: var(--dx-faint);
+  font-size: 20px;
+  margin: 0 auto 12px;
+}
+.dx-empty-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dx-ink);
+  margin: 0 0 4px;
+}
+.dx-empty-help {
+  font-size: 12.5px;
+  color: var(--dx-faint);
+  margin: 0 0 18px;
+}
+.dx-empty .button.primary {
+  background: var(--dx-teal);
+  color: #fff;
+  border: 0;
+  padding: 8px 14px;
+  border-radius: 7px;
+  font-weight: 600;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.dx-empty .button.primary:hover { background: var(--dx-teal-hover); }
+
+/* STICKY SAVE BAR ------------------------------------------------ */
+.dx-save-bar {
+  position: sticky;
+  bottom: 20px;
+  margin: 14px 22px 18px;
+  background: var(--dx-save-bar);
+  color: #fff;
+  border-radius: 10px;
+  padding: 12px 14px 12px 18px;
+  box-shadow: 0 8px 24px rgba(20, 20, 15, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: dx-slide-up 0.22s ease;
+  z-index: 5;
+}
+.dx-save-bar[hidden] { display: none; }
+.dx-save-bar-msg { font-size: 13px; }
+.dx-save-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dx-save-bar-discard,
+.dx-save-bar-save {
+  background: none;
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dx-save-bar-discard { color: #d6d6d0; }
+.dx-save-bar-discard:hover { color: #fff; }
+.dx-save-bar-save {
+  background: var(--dx-teal);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dx-save-bar-save:hover { background: var(--dx-teal-hover-2); }
+@keyframes dx-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* FOOTER ACTION ROW --------------------------------------------- */
+.dx-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  background: var(--dx-footer-bg);
+  border-top: 1px solid var(--dx-border-soft);
+  flex-wrap: wrap;
+}
+.dx-footer-left,
+.dx-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dx-card-footer .form--inline { margin: 0; }
+.dx-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  background: var(--dx-surface);
+  border: 1px solid #e1e0db;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dx-ink-soft);
+  cursor: pointer;
+}
+.dx-footer-btn:hover { background: var(--dx-border-faint); }
+.dx-footer-btn.dx-danger {
+  color: var(--dx-danger);
+  border-color: var(--dx-danger-border);
+  background: transparent;
+}
+.dx-footer-btn.dx-danger:hover {
+  background: var(--dx-danger-hover);
+  border-color: #e0a89f;
+}
+.dx-card-footer .calibrate-block { flex: 1 1 auto; margin: 0; }
+.dx-card-footer .calibrate-prompt-block .calibrate-prompt { margin: 0 0 8px; }
+.dx-card-footer .calibrate-prompt-block .calibrate-choices {
+  display: flex;
+  gap: 6px;
+}
+@media (max-width: 540px) {
+  .dx-card-footer { flex-direction: column; align-items: stretch; }
+  .dx-footer-left, .dx-footer-right { justify-content: flex-start; }
+}
+
+/* =====================================================================
+   Server-tab section cards (handoff redesign). Reuses the same tokens
+   as the device card; one card per logical group with a header row +
+   stacked toggle rows. Master toggles live in the section header so
+   dependent fields below can dim.
+   ===================================================================== */
+
+.dx-server-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+.dx-section-card {
+  --dx-teal: #15846a;
+  --dx-teal-hover: #127059;
+  --dx-ink: #2b2b29;
+  --dx-ink-soft: #56564f;
+  --dx-faint: #9a9a93;
+  --dx-faint-2: #a3a39b;
+  --dx-border: #e6e5e0;
+  --dx-border-faint: #f1f0eb;
+  --dx-input-border: #dedcd6;
+  --dx-inset: #f3f2ee;
+
+  background: #fff;
+  border: 1px solid var(--dx-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.04);
+  padding: 22px 24px;
+}
+.dx-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.dx-section-head > div { flex: 1 1 auto; min-width: 0; }
+.dx-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--dx-ink);
+}
+.dx-section-desc {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--dx-faint);
+}
+.dx-section-meta {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dx-faint);
+}
+.dx-section-meta code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  color: var(--dx-ink-soft);
+  background: var(--dx-inset);
+  border: 1px solid #e8e7e1;
+  border-radius: 5px;
+  padding: 2px 7px;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 6px;
+}
+.dx-section-card .field { margin-top: 12px; }
+.dx-section-card .field-grid { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 540px) { .dx-section-card .field-grid { grid-template-columns: 1fr; } }
+.dx-section-card .field-help { color: var(--dx-faint-2); font-size: 11.5px; }
+.dx-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--dx-border-faint);
+}
+.dx-toggle-row:last-child { border-bottom: 0; }
+.dx-toggle-row-text { flex: 1 1 auto; min-width: 0; }
+.dx-toggle-row-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dx-ink);
+}
+.dx-toggle-row-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--dx-faint);
+}
+.dx-section-card[data-dep-off] [data-dep-target] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.dx-section-card[data-dep-off] [data-dep-target] input { pointer-events: none; }
+
+/* Page header for redesigned settings (used by the server tab). */
+.dx-settings-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+.dx-settings-head-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #e7f2ee;
+  color: #15846a;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  flex: 0 0 auto;
+}
+.dx-settings-head h1 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.dx-settings-head-sub {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: #7a7a74;
+}
+
+/* Server-tab card visual overlay. Applied via .dx-server-area on the
+   <div> wrapping the section loop in settings.html; restyles each
+   .card to match the handoff section card while leaving the per-card
+   markup unchanged. Only the visual treatment changes; field defs,
+   form actions, and helper macros stay where they are. */
+.dx-server-area > .card {
+  --dx-teal: #15846a;
+  --dx-ink: #2b2b29;
+  --dx-faint: #9a9a93;
+  --dx-border: #e6e5e0;
+  --dx-border-faint: #f1f0eb;
+  --dx-inset: #f3f2ee;
+  background: #fff;
+  border: 1px solid var(--dx-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.04);
+  padding: 22px 24px;
+  margin: 0 0 16px;
+}
+.dx-server-area > .card > .card-head {
+  margin-bottom: 14px;
+  align-items: flex-start;
+}
+.dx-server-area > .card > .card-head h2 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--dx-ink);
+  margin: 0;
+}
+.dx-server-area > .card > .card-head .lede,
+.dx-server-area > .card > .card-head + .lede {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--dx-faint);
+}
+.dx-server-area > .card .meta dt {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dx-faint);
+}
+.dx-server-area > .card .meta dd code {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12.5px;
+  color: #56564f;
+  background: var(--dx-inset);
+  border: 1px solid #e8e7e1;
+  border-radius: 5px;
+  padding: 2px 7px;
+}

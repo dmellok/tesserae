@@ -6,6 +6,76 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.54.0], 2026-06-20
+
+### Changed
+
+- **Settings → Devices: per-device card redesign.** Each device card
+  now opens to a tabbed layout (Status / General / Rendering /
+  Schedule) instead of one long scroll. Status replaces the raw
+  diagnostics dict with three humanized tiles, signal bars + dBm
+  reading, mains-or-percent power label, firmware + IP, plus a
+  Smart Sync panel with a confidence meter and a plain-English
+  explainer. Editable controls live on General + Rendering; the
+  Schedule tab pulls the per-device timetable. A sticky save bar
+  reveals only when the form is dirty and animates in / out;
+  Discard resets every field to its initial value.
+- **Connection details disclosure.** Renderer id, instance-of,
+  server URL, and the access token (with a Reveal button on REST
+  devices) now collapse behind a "Connection details" disclosure
+  at the top of the card instead of always taking up meta-block
+  space. Transport flip moves into this disclosure too, so it sits
+  next to the current transport label and confirms before flipping
+  (issue #19).
+- **Reveal full token (issue #20).** Admins who closed the
+  one-shot reveal modal previously had to ``cat`` the on-disk
+  manifest to recover the token; a "Reveal" affordance on the
+  Connection details strip now POSTs ``/settings/devices/<id>/
+  reveal-token`` (with explicit confirmation), stashes the token
+  in the session reveal slot, and logs the reveal to the
+  EventLog for audit.
+- **Dormant MQTT meta hidden on REST devices (issue #21).** REST
+  instances no longer surface the dormant ``status_topic`` /
+  ``config_topic`` rows in the meta block; they keep on the
+  manifest so a flip back to MQTT remains one click.
+- **Server tab visual restyling.** Each card on Settings → Server
+  picks up the handoff redesign's surface treatment (white card,
+  ``border-radius: 12px``, ``0 1px 2px`` shadow, 22px padding) so
+  the Server tab reads with the same visual hierarchy as the
+  redesigned device card. Field-set grouping into 7 named
+  sections is intentionally deferred.
+
+### Added
+
+- **Status humanization helpers** (``_humanize_signal``,
+  ``_humanize_power``, ``_humanize_firmware``, ``_status_tiles``,
+  ``_smart_sync_header``, ``_reported_panel_hint``) on the
+  Settings index walker, with unit tests. Mains devices (Pi /
+  ESP32 dev boards) now read as ``Mains · No battery`` instead
+  of ``0 mV / 0%`` (which looked like a dead battery), and the
+  Rendering tab carries a reconcile hint when the device-reported
+  panel dims are swapped relative to the edit form because of a
+  90°/270° rotation.
+- **``static/pages/settings.js`` controller** (no framework, no
+  build) wiring tab switching with querystring persistence, dirty
+  tracking + sticky save bar, dependent-field dimming for the
+  quiet-hours override, and a collapse toggle.
+
+### Notes
+
+- Device-card data shape on the section dict gains four fields
+  (``connection_details``, ``transport_badge``,
+  ``reveal_token_endpoint``, plus humanized fields under
+  ``status``); the existing ``meta`` dict + the per-field branches
+  in the legacy template stay in place so any out-of-tree callers
+  rendering the old shape keep working.
+- Backlog issues #16 (unify add forms), #17 (split Discovered
+  strip), #18 (the device card restructure that landed here), #19
+  (transport flip), #20 (token reveal), #21 (dormant MQTT meta),
+  and #22 (per-kind defaults overrides) tracked the cleanup. #18
+  through #21 are addressed in this release; #16, #17, and #22
+  remain open.
+
 ## [0.53.2], 2026-06-20
 
 ### Fixed

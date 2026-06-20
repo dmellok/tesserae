@@ -55,12 +55,15 @@ def test_device_section_renders_with_no_heartbeat(app: Flask) -> None:
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     # Built-in kind cards are hidden, only instances appear.
-    assert "Device: Pi BIN client</span>" not in body
-    assert "Device: Pi PNG client</span>" not in body
-    assert "Device: ESP32 client</span>" not in body
+    assert "Pi BIN client</span>" not in body
+    assert "Pi PNG client</span>" not in body
+    assert "ESP32 client</span>" not in body
     # Registered instances do show up, with the "no heartbeat" status state.
-    assert "Device: Lab ESP32" in body
-    assert "Device: Kitchen Pi" in body
+    # The handoff-redesigned device card uses the bare device name in
+    # the header (no "Device: " prefix); the data layer's title still
+    # carries the prefix for non-device callers.
+    assert "Lab ESP32" in body
+    assert "Kitchen Pi" in body
     assert "no heartbeat received yet" in body
     # ESP32 instance inherits its kind's config_topic, so the sleep
     # interval form lives on the instance card.

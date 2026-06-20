@@ -375,6 +375,8 @@ def _build_sections() -> list[dict[str, Any]]:
                     else None
                 ),
                 "meta": _device_meta_block(device, is_instance),
+                "connection_details": _device_connection_details(device, is_instance),
+                "transport_badge": _transport_badge(device),
                 "status": _status_view(device),
                 # The colour-gamut control only matters for the .bin Pi path
                 # (pi_bin packs server-side to a fixed palette). PNG clients
@@ -392,6 +394,16 @@ def _build_sections() -> list[dict[str, Any]]:
                 # grow a meaningless control.
                 "regenerate_token_endpoint": (
                     url_for("auth.devices_regenerate_token", instance_id=device.id)
+                    if is_instance and "access_token" in device.manifest
+                    else None
+                ),
+                # Reveal-token endpoint (issue #20). The Connection details
+                # row shows the masked token; the Reveal button POSTs here
+                # with an explicit confirmation and the route logs the
+                # reveal to the EventLog for audit. Only present on devices
+                # that have a token (REST + TRMNL); MQTT devices skip it.
+                "reveal_token_endpoint": (
+                    url_for("auth.devices_reveal_token", instance_id=device.id)
                     if is_instance and "access_token" in device.manifest
                     else None
                 ),
@@ -518,16 +530,190 @@ def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
     return meta
 
 
+# Short transport label used by the device card's header badge.
+_TRANSPORT_BADGE = {"rest": "REST", "mqtt": "MQTT"}
+
+
+def _transport_badge(device: Device) -> str:
+    """One-word transport label for the device card header badge.
+    Returns "HTTP" for legacy TRMNL devices (access-token + MQTT)
+    so the header still reads cleanly when the card is collapsed."""
+    if device.transport == "rest":
+        return "REST"
+    if isinstance(device.manifest.get("access_token"), str) and device.manifest.get("access_token"):
+        return "HTTP"
+    return _TRANSPORT_BADGE.get(device.transport or "mqtt", "MQTT")
+
+
+def _device_connection_details(device: Device, is_instance: bool) -> list[dict[str, Any]]:
+    """Structured rows for the Connection details disclosure on the
+    device card. Each row is {label, value, monospace, action}; the
+    template renders ``action == 'reveal'`` rows with a Reveal button
+    next to the masked value (issue #20). Branches by transport so
+    REST devices don't show dormant MQTT topic rows (issue #21)."""
+    rows: list[dict[str, Any]] = [
+        {"label": "Renderer", "value": ", ".join(device.renderer_ids), "monospace": True}
+    ]
+    if is_instance:
+        rows.append({"label": "Instance of", "value": str(device.kind_of), "monospace": True})
+    access_token = device.manifest.get("access_token")
+    if device.transport == "rest":
+        rows.append({"label": "Server URL", "value": f"http://{request.host}", "monospace": True})
+        if isinstance(access_token, str) and access_token:
+            rows.append(
+                {
+                    "label": "Access token",
+                    "value": f"{access_token[:4]}··············",
+                    "monospace": True,
+                    "action": "reveal",
+                }
+            )
+    elif isinstance(access_token, str) and access_token:
+        rows.append({"label": "Server URL", "value": f"http://{request.host}", "monospace": True})
+        rows.append({"label": "Access token", "value": access_token, "monospace": True})
+    else:
+        if device.status_topic:
+            rows.append({"label": "Status topic", "value": device.status_topic, "monospace": True})
+        if device.config_topic:
+            rows.append({"label": "Config topic", "value": device.config_topic, "monospace": True})
+    return rows
+
+
+def _humanize_signal(rssi: object) -> dict[str, Any] | None:
+    """Map raw RSSI (negative dBm) to a {bars, label, sub} tile. Returns
+    None when no value is reported so the template can fall back to a
+    'no heartbeat' tile instead of a misleading 0-bar reading."""
+    try:
+        value = int(rssi)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if value >= -55:
+        bars, label = 4, "Excellent"
+    elif value >= -65:
+        bars, label = 3, "Good"
+    elif value >= -75:
+        bars, label = 2, "Fair"
+    else:
+        bars, label = 1, "Poor"
+    return {"bars": bars, "label": label, "sub": f"{value} dBm"}
+
+
+def _humanize_power(parsed: dict[str, Any]) -> dict[str, Any]:
+    """Map battery_mv / battery_pct to a {label, sub} tile. Treats both
+    fields being absent or zero as a mains device so a Pi or ESP32 dev
+    board doesn't read as a dead battery (regression #/the-pico)."""
+    pct = parsed.get("battery_pct")
+    mv = parsed.get("battery_mv")
+    if pct is None and mv is None:
+        return {"label": "Mains", "sub": "No battery"}
+    if isinstance(pct, (int, float)) and pct <= 0 and isinstance(mv, (int, float)) and mv <= 0:
+        return {"label": "Mains", "sub": "No battery"}
+    if isinstance(pct, (int, float)):
+        sub = f"{int(mv)} mV" if isinstance(mv, (int, float)) else None
+        return {"label": f"{int(pct)}%", "sub": sub}
+    if isinstance(mv, (int, float)):
+        return {"label": f"{int(mv)} mV", "sub": None}
+    return {"label": "Unknown", "sub": None}
+
+
+def _humanize_firmware(parsed: dict[str, Any]) -> dict[str, Any] | None:
+    """Map parsed fw_version + ip into a {value, sub} tile. Returns None
+    when neither field was reported so the template can collapse the
+    tile rather than render an empty box."""
+    fw = parsed.get("fw_version") or parsed.get("firmware") or parsed.get("version")
+    ip = parsed.get("ip") or parsed.get("ip_addr") or parsed.get("address")
+    if fw is None and ip is None:
+        return None
+    return {"value": str(fw) if fw is not None else "Unknown", "sub": str(ip) if ip else None}
+
+
+def _status_tiles(parsed: dict[str, Any]) -> dict[str, Any]:
+    """Three-tile humanized summary used on the Status tab of the
+    device card (Signal / Power / Firmware)."""
+    return {
+        "signal": _humanize_signal(parsed.get("rssi")),
+        "power": _humanize_power(parsed),
+        "firmware": _humanize_firmware(parsed),
+    }
+
+
+def _smart_sync_header(ss: dict[str, Any]) -> dict[str, Any]:
+    """Build the inline header pill + meter fields for the Smart Sync
+    panel: a short tag ("Trusted" / "Warming up · 2 of 3 wakes" /
+    "Waiting") and a 0-10 confidence meter percent."""
+    state = ss.get("state")
+    confidence = ss.get("confidence") or 0
+    confidence_pct = min(100, max(0, int(confidence) * 10))
+    if state == "active":
+        return {
+            "tag": "Trusted",
+            "tone": "ok",
+            "confidence_pct": confidence_pct,
+            "explainer": "This device's wakes land within ±60 s; the scheduler is JIT-rendering for it.",
+        }
+    if state == "warming":
+        wakes = int(confidence)
+        return {
+            "tag": f"Warming up · {wakes} of 3 wakes",
+            "tone": "warn",
+            "confidence_pct": confidence_pct,
+            "explainer": "One more on-time wake will flip this device to Trusted and widen its sync window.",
+        }
+    if state == "waiting":
+        return {
+            "tag": "Waiting for heartbeat",
+            "tone": "muted",
+            "confidence_pct": 0,
+            "explainer": "Once the device wakes and publishes its heartbeat you'll see a prediction here.",
+        }
+    return {
+        "tag": "Unavailable",
+        "tone": "muted",
+        "confidence_pct": 0,
+        "explainer": ss.get("reason") or "",
+    }
+
+
+def _reported_panel_hint(device: Device, parsed: dict[str, Any]) -> str | None:
+    """Reconcile the panel's reported width/height with the editable
+    panel.w/h so the user understands why the numbers don't match when
+    they're rotated. Returns a sentence like "Device reports 1600 × 1200
+    — values are swapped here because rotation is 90°." or None when
+    nothing's been reported yet."""
+    reported_w = parsed.get("panel_w") or parsed.get("reported_w") or parsed.get("width")
+    reported_h = parsed.get("panel_h") or parsed.get("reported_h") or parsed.get("height")
+    if reported_w is None or reported_h is None:
+        return None
+    try:
+        rw, rh = int(reported_w), int(reported_h)
+    except (TypeError, ValueError):
+        return None
+    panel = device.panel or {}
+    cur_w, cur_h = int(panel.get("w") or 0), int(panel.get("h") or 0)
+    orientation = panel.get("orientation", "landscape")
+    rotated = orientation in ("portrait", "portrait_flipped")
+    if rotated and (cur_w, cur_h) == (rh, rw):
+        suffix = " — values are swapped here because rotation is 90° / 270°."
+    else:
+        suffix = ""
+    return f"Device reports {rw} × {rh}{suffix}"
+
+
 def _status_view(device: Device) -> dict[str, Any]:
     """Build the status-block dict the template renders above the config
     form: freshness class (ok / warn / stale / unknown), relative time,
-    the parsed key/value pairs, and the smart-sync telemetry summary."""
+    the parsed key/value pairs, humanized status tiles, the smart-sync
+    telemetry summary, and a reconcile hint for the panel dims."""
     cache = device_status().get(device.id)
+    smart_sync = _smart_sync_view(device.id)
     base: dict[str, Any] = {
         "health": "unknown",
         "relative": "no heartbeat received yet",
         "parsed": {},
-        "smart_sync": _smart_sync_view(device.id),
+        "tiles": _status_tiles({}),
+        "smart_sync": smart_sync,
+        "smart_sync_header": _smart_sync_header(smart_sync),
+        "reported_panel_hint": None,
     }
     if cache is None:
         return base
@@ -538,11 +724,14 @@ def _status_view(device: Device) -> dict[str, Any]:
         health = "warn"
     else:
         health = "stale"
+    parsed = cache.get("parsed", {})
     base.update(
         {
             "health": health,
             "relative": format_relative(age),
-            "parsed": cache.get("parsed", {}),
+            "parsed": parsed,
+            "tiles": _status_tiles(parsed),
+            "reported_panel_hint": _reported_panel_hint(device, parsed),
         }
     )
     return base
