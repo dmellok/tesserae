@@ -324,6 +324,14 @@ def devices_register_discovered(discovered_id: str) -> Response:
             default_id = "trmnl_" + discovered_token[:5]
         else:
             default_id = "trmnl_new"
+    # REST-discovered devices (via POST /api/v1/device/discover) carry
+    # a ``transport: "rest"`` hint in the cache payload AND a MAC. We
+    # propagate both into the new instance so the firmware's next
+    # discover POST claims the token by MAC match, and the push
+    # pipeline skips MQTT publish.
+    is_rest_discovery = entry.parsed.get("transport") == "rest"
+    transport_arg = "rest" if is_rest_discovery else None
+    mac_arg = str(entry.parsed.get("mac") or "").strip() or None if is_rest_discovery else None
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers(),
@@ -333,6 +341,8 @@ def devices_register_discovered(discovered_id: str) -> Response:
         name=form.get("name") or "",
         panel_overrides=panel_overrides,
         access_token=discovered_token if isinstance(discovered_token, str) else None,
+        mac=mac_arg,
+        transport=transport_arg,
     )
     if not result.ok or result.device is None:
         flash(result.error or "Failed to register device.", "error")

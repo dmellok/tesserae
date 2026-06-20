@@ -50,6 +50,7 @@
         <div class="discovery-id"><code>{{ d.id }}</code></div>
         <dl class="discovery-meta">
           <div><dt>Kind</dt><dd>{{ d.kind or '-' }}</dd></div>
+          {% if d.parsed.transport == 'rest' %}<div><dt>Transport</dt><dd><span class="pill is-ok">REST, auto-claim on register</span></dd></div>{% endif %}
           {% if d.parsed.needs_pairing %}<div><dt>Status</dt><dd><span class="pill is-warn">Unpaired, click Register to mint a token</span></dd></div>{% endif %}
           {% if d.parsed.access_token %}<div><dt>Access token</dt><dd><code>{{ d.parsed.access_token }}</code></dd></div>{% endif %}
           {% if d.parsed.model %}<div><dt>Model</dt><dd><code>{{ d.parsed.model }}</code></dd></div>{% endif %}

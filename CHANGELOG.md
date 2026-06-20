@@ -6,6 +6,53 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.53.0], 2026-06-20
+
+### Added
+
+- **Discover-then-claim flow for REST devices: zero typing on the
+  firmware side.** New devices auto-register without pairing codes:
+  firmware POSTs ``/api/v1/device/discover`` with its proposed
+  device_id + kind + MAC; the entry appears in the Settings ->
+  Devices Discovered strip; admin clicks Register on the card; the
+  resulting instance carries the captured MAC + ``transport: "rest"``;
+  the firmware's next discover POST matches by MAC and receives its
+  ``device_token`` + ``config``. No pairing code typed, no flashed
+  credentials. Mirrors the MQTT discovery UX (heartbeat -> admin
+  clicks Register) but without needing a broker.
+- ``POST /api/v1/device/discover`` extended with the MAC-match
+  claim path. Response shapes:
+  - ``{registered: true, device_token, device_id, config,
+    server_time}`` when the MAC matches a registered instance.
+  - ``{registered: false, discovered: true, retry_after_s, next_step}``
+    otherwise. Firmware sleeps and retries.
+- DiscoveryCache entries carry a ``transport: "rest"`` hint on the
+  parsed payload when sourced from ``/discover``, so the admin's
+  Register click creates an instance with the right transport (and
+  the MAC) without further input.
+- Settings -> Devices Discovered strip shows a green
+  "REST, auto-claim on register" pill on REST-sourced entries so
+  the admin can tell the new flow apart from the legacy MQTT
+  discovery on the same strip.
+- ``devices_register_discovered`` propagates the cached MAC +
+  transport hint through to ``create_instance`` so the
+  resulting REST instance is immediately claimable by the
+  matching firmware.
+
+### Notes
+
+- The pairing-code flow (``/api/v1/device/register`` with
+  ``X-Pairing-Code``) stays supported for users who want admin-
+  driven gating before any instance is created. The discover-claim
+  flow is the friendlier default; pairing is the stricter option.
+- MAC matching is case- and separator-insensitive
+  (``aa:bb:cc:dd:ee:ff`` matches ``AABBCCDDEEFF`` matches
+  ``aabb-ccdd-eeff``).
+- MAC is not a secret (it's on the wire), but the security boundary
+  is the admin's deliberate Register click. The rate limiter on
+  ``/discover`` shields against a misconfigured firmware spamming
+  the cache.
+
 ## [0.52.5], 2026-06-20
 
 ### Fixed

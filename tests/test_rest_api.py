@@ -334,6 +334,92 @@ def test_discover_endpoint_rejects_missing_device_id(app: Flask) -> None:
     assert resp.status_code == 400
 
 
+def test_discover_endpoint_tags_cache_entry_as_rest(app: Flask) -> None:
+    """The cache entry needs a ``transport: "rest"`` hint so the
+    admin's Register click on Settings -> Devices creates a REST-
+    mode instance (not an MQTT one)."""
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "fresh_pico_2",
+                "kind": "pico_bin_client",
+                "mac": "aabbccddeeff",
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["registered"] is False
+    cache = app.config["DISCOVERY_CACHE"]
+    entry = cache.get("fresh_pico_2")
+    assert entry is not None
+    assert entry.parsed.get("transport") == "rest"
+
+
+def test_discover_returns_token_when_mac_matches_registered_instance(app: Flask) -> None:
+    """Discover-then-claim flow: admin clicked Register on a previous
+    Discovered entry, the resulting instance has the firmware's MAC
+    on its manifest. On the firmware's next discover POST the MAC
+    matches and the server returns the device's access token. No
+    pairing code involved."""
+    # Pre-register an instance with the MAC that the firmware will
+    # present next. Mirrors what devices_register_discovered would
+    # have done after the admin clicked Register.
+    from app import device_service
+
+    devices_registry = app.config["DEVICE_REGISTRY"]
+    renderers = app.config["RENDERER_REGISTRY"]
+    result = device_service.create_instance(
+        devices=devices_registry,
+        renderers=renderers,
+        data_root=app.config["DEVICE_DATA_ROOT"],
+        instance_id="claimed_pico",
+        kind_id="pico_bin_client",
+        mac="aa:bb:cc:dd:ee:ff",
+        transport="rest",
+    )
+    assert result.device is not None
+    expected_token = result.device.manifest["access_token"]
+
+    # Firmware does its discover POST with the matching MAC.
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "claimed_pico",
+                "kind": "pico_bin_client",
+                "mac": "AABBCCDDEEFF",  # different format, same MAC
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["registered"] is True
+    assert body["device_token"] == expected_token
+    assert body["device_id"] == "claimed_pico"
+    assert "config" in body
+
+
+def test_discover_does_not_claim_when_mac_missing(app: Flask) -> None:
+    """A discover POST without a MAC can't match-by-MAC; falls through
+    to the standard cache-and-tell-firmware-to-retry path even if an
+    instance exists with that device id."""
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps({"device_id": "no_mac_pico", "kind": "pico_bin_client"}),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["registered"] is False
+
+
 def test_discover_endpoint_rate_limited(app: Flask) -> None:
     """Discovery shares the register endpoint's rate limiter; an
     attacker spamming discoveries gets 429 after the cap."""

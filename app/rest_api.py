@@ -335,25 +335,57 @@ def _client_id_for_rate_limit() -> str:
     return request.remote_addr or "unknown"
 
 
+def _claim_device_by_mac(mac: str) -> Device | None:
+    """Look for a registered device instance whose stored MAC matches
+    the given MAC. Used by the discover-then-claim flow: when admin
+    clicks Register on a discovered device, the resulting instance
+    carries the discovered MAC; subsequent ``/discover`` POSTs from
+    that firmware match the MAC and receive the device's access token
+    without needing a pairing code.
+
+    Case-insensitive compare; spec-MAC formats (with or without colons,
+    upper or lower case) normalise to lower-no-separators."""
+    target = mac.strip().lower().replace(":", "").replace("-", "")
+    if not target:
+        return None
+    for dev in _devices().all():
+        if dev.kind_of is None:
+            continue
+        stored = dev.manifest.get("mac")
+        if not isinstance(stored, str) or not stored:
+            continue
+        normalised = stored.strip().lower().replace(":", "").replace("-", "")
+        if normalised == target:
+            return dev
+    return None
+
+
 @bp.post("/discover")
 def post_discover() -> Response:
-    """Unauthenticated discovery announce.
+    """Unauthenticated discovery + auto-claim.
 
-    A firmware that just connected to WiFi but doesn't yet have a
-    pairing code (admin hasn't generated one, or hasn't typed it into
-    the firmware's setup form yet) POSTs here so the admin can see it
-    in the Discovered strip on Settings -> Devices and issue a code
-    targeted at this specific device. Mirrors the MQTT wildcard
-    discovery path (``tesserae/+/status`` heartbeats), just over HTTP.
+    Two paths depending on whether the admin has already registered a
+    device with the firmware's MAC:
 
-    Body shape (same shape DiscoveryCache.record consumes):
+    * **Already registered (MAC matches a stored instance)**: return
+      the existing device token + config. Firmware persists the token
+      and proceeds to the normal wake loop. No pairing code typing
+      needed.
+    * **Not yet registered**: cache the announce in the Discovered
+      strip on Settings -> Devices so the admin can one-click Register.
+      Response carries ``registered: false`` + a ``retry_after_s`` hint
+      telling the firmware when to poll again. Firmware sleeps,
+      reconnects, retries discover. On the wake cycle after admin
+      clicks Register, the MAC match path fires and the firmware
+      receives its token.
+
+    Body shape:
         {"device_id": "...", "kind": "...", "panel_w": int,
          "panel_h": int, "fw_version": "...", "mac": "..." }
 
-    Rate-limited per client IP using the same limiter as ``/register``;
-    successful announces don't release the bucket (unlike register)
-    because announcing is cheap and replay-friendly, so an attacker
-    spamming the cache would still be throttled."""
+    Rate-limited per client IP using the same limiter as ``/register``.
+    Successful claims do NOT release the bucket (a misconfigured
+    firmware spamming announces would otherwise pummel the server)."""
     limiter = current_app.config.get("REGISTER_RATE_LIMITER")
     client_id = _client_id_for_rate_limit()
     if limiter is not None:
@@ -369,20 +401,48 @@ def post_discover() -> Response:
     device_id = str(body.get("device_id") or "").strip().lower()
     if not device_id:
         return _error(400, "device_id is required")
+    mac = str(body.get("mac") or "").strip()
 
+    # MAC-match claim: if admin already registered a device whose
+    # manifest carries this MAC, hand back the token + config so the
+    # firmware can stop polling discover and start its real wake loop.
+    if mac:
+        claimed = _claim_device_by_mac(mac)
+        if claimed is not None:
+            token = claimed.manifest.get("access_token")
+            if isinstance(token, str) and token:
+                return jsonify(
+                    {
+                        "status": 200,
+                        "registered": True,
+                        "device_token": token,
+                        "device_id": claimed.id,
+                        "config": _current_config(claimed),
+                        "server_time": time.time(),
+                    }
+                )
+
+    # Not yet registered: add to the Discovered strip so admin can
+    # one-click register. The transport hint lives in the body so the
+    # admin UI knows to create a REST instance (not an MQTT one) when
+    # the admin clicks Register on this entry.
+    body_with_hint = dict(body)
+    body_with_hint["transport"] = "rest"
     discovery_cache = current_app.config.get("DISCOVERY_CACHE")
     if discovery_cache is None:
         return _error(503, "discovery cache not configured")
 
-    payload = json.dumps(body).encode("utf-8")
+    payload = json.dumps(body_with_hint).encode("utf-8")
     entry = discovery_cache.record(device_id, payload)
     if entry is None:
         return _error(400, "device_id rejected (malformed or empty payload)")
     return jsonify(
         {
             "status": 200,
+            "registered": False,
             "discovered": True,
-            "next_step": "Generate a pairing code in Tesserae's Settings -> Devices, then POST /api/v1/device/register with X-Pairing-Code.",
+            "retry_after_s": 30,
+            "next_step": "Open Settings -> Devices and click Register on this device's card. The firmware should retry discover; the next POST will return device_token.",
         }
     )
 
