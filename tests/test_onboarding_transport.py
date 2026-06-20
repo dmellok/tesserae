@@ -25,13 +25,13 @@ from app.onboarding import is_onboarded
 
 @pytest.fixture
 def app(tmp_path: Path) -> Flask:
-    a = create_app(
-        testing=False,
-        data_root=tmp_path,
-        plugins_dir=REPO_ROOT / "plugins",
-        renderers_dir=REPO_ROOT / "renderers",
-        devices_dir=REPO_ROOT / "devices",
-    )
+    # ``testing=True`` is what tests/test_onboarding.py uses. It skips
+    # the embedded-amqtt-broker startup that ``save_broker`` triggers
+    # via ``_rebuild_transport()``, so the MQTT-path tests don't try to
+    # bind 1883 on a CI runner. The transport's wire-shape persistence
+    # is what these tests are actually exercising; the broker side
+    # already has its own tests.
+    a = create_app(testing=True, data_root=tmp_path, devices_dir=REPO_ROOT / "devices")
     a.config["TESTING"] = True
     return a
 

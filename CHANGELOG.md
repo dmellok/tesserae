@@ -6,6 +6,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.5], 2026-06-20
+
+### Fixed
+
+- **CI red on the v0.52.2 onboarding-transport tests.** My new fixture
+  in ``tests/test_onboarding_transport.py`` used
+  ``create_app(testing=False, ...)`` which triggers the embedded amqtt
+  broker startup when the MQTT-path test posts ``use_builtin=on`` and
+  ``save_broker`` calls ``_rebuild_transport()``. Locally amqtt starts
+  in <1s; the CI runner can't bind 1883 in time and the broker thread
+  raises a ``RuntimeError: embedded broker did not become ready within
+  5.0s``, which pytest surfaces as an unhandled-thread-exception
+  warning that fails the suite.
+  Fixed by switching the fixture to ``create_app(testing=True, ...)``
+  matching the pre-existing ``tests/test_onboarding.py`` pattern.
+  ``testing=True`` skips the embedded-broker startup the same way it
+  does for the existing MQTT tests. The wire-shape persistence (the
+  actual assertion target of these tests) is what they're testing,
+  not the broker side.
+
 ## [0.52.4], 2026-06-20
 
 ### Fixed
