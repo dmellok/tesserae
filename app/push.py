@@ -1036,23 +1036,34 @@ class PushManager:
         )
 
     def _renderer_is_http_polled(self, renderer: Renderer) -> bool:
-        """Return True when the renderer's bound device is HTTP-polled
-        (TRMNL / KOReader / anything that hits ``/api/display`` rather
-        than subscribing to MQTT). Clones set ``renderer.device`` to the
-        instance id, which the device registry indexes the same way as
-        the kind, so the same lookup works for both.
+        """Return True when the renderer's bound device fetches frames
+        over HTTP rather than subscribing to a broker. Two paths:
+
+        * ``device.status_topic is None`` — the legacy signal for
+          TRMNL / KOReader / anything that hits ``/api/display``.
+          Kinds opt in by declaring no MQTT topics at all.
+        * ``device.transport == "rest"`` — the new per-instance signal
+          for the v0.52 REST API. Same kind can have MQTT instances
+          AND REST instances; the transport field on each instance
+          decides.
+
+        Clones set ``renderer.device`` to the instance id, which the
+        device registry indexes the same way as the kind, so the same
+        lookup works for both.
 
         Fails closed: when the device registry isn't wired (test paths
         without a registry) or the device id doesn't resolve, we treat
         the renderer as MQTT-bound and let the publish run. The cost of
-        a false-negative (publish on an HTTP-polled device with no
-        broker) is the pre-fix behaviour, so we're never worse off."""
+        a false-negative (publish on a REST device with no broker) is
+        the pre-v0.52 behaviour, so we're never worse off."""
         if self._devices is None:
             return False
         device = self._devices.devices.get(renderer.device)
         if device is None:
             return False
-        return device.status_topic is None
+        if device.status_topic is None:
+            return True
+        return device.transport == "rest"
 
     def _panel_dims_for_send(self, device_id: str | None = None) -> dict[str, Any]:
         """Pick panel dims for a Send-page push.

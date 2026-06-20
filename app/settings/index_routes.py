@@ -45,6 +45,27 @@ from ._shared import (
 from .field_defs import APP_FIELDS, BROKER_FIELDS, PANEL_FIELDS
 
 
+def _pending_pairings() -> list[dict[str, Any]]:
+    """Snapshot of currently-valid REST pairing codes for the Devices
+    tab's Pair card. The store lives in app.config under
+    ``PAIRING_STORE`` and is installed by app_factory. Defensive
+    against the store not being installed (test paths without REST
+    wiring) so the existing Settings page keeps rendering."""
+    store = current_app.config.get("PAIRING_STORE")
+    if store is None:
+        return []
+    return [
+        {
+            "code": p.code,
+            "issued_at": p.issued_at,
+            "expires_at": p.expires_at,
+            "note": p.note,
+            "seconds_left": max(0, int(p.expires_at - time.time())),
+        }
+        for p in store.list_pending()
+    ]
+
+
 @bp.get("/settings")
 def settings() -> Response:
     """Land on the Server sub-page by default."""
@@ -181,6 +202,13 @@ def settings_area(area: str) -> str | Response:
         system_password_set=system_password_set,
         system_password_required=system_password_required,
         trmnl_token_reveal=trmnl_token_reveal,
+        # Pending REST pairing codes for the Devices area's Pair card.
+        # Only computed on the devices tab; the template doesn't reference
+        # it elsewhere. Empty list when no codes are live OR when the
+        # store isn't wired (the testing harness doesn't always install
+        # one).
+        pairing_codes=_pending_pairings() if area == "devices" else [],
+        pairing_reveal=session.pop("_rest_pairing_reveal", None),
     )
 
 

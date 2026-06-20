@@ -404,7 +404,11 @@ def post_register() -> Response:
         panel_overrides=panel_overrides,
         access_token=None,  # let create_instance mint one
         mac=str(body.get("mac") or "").strip() or None,
-        api_key_strength="typeable",
+        api_key_strength="typeable",  # ignored for REST devices, see below
+        # Mark the instance REST-mode so the push pipeline skips
+        # broker publishes and the admin UI shows the right transport
+        # column. Persists on the manifest as ``transport: "rest"``.
+        transport="rest",
     )
     if result.error is not None or result.device is None:
         # The pairing code was already consumed. Re-issue it so the

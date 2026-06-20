@@ -201,6 +201,7 @@ def create_instance(
     access_token: str | None = None,
     mac: str | None = None,
     api_key_strength: str = "typeable",
+    transport: str | None = None,
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
@@ -224,14 +225,27 @@ def create_instance(
     if kind is None or kind.kind_of is not None:
         return InstanceResult(None, f"Unknown device kind {kind_id!r}.")
 
+    # Normalise transport: "rest" | "mqtt" | None (=> "mqtt" default).
+    # Stored on the manifest so the push pipeline knows whether to
+    # publish to MQTT or skip in favour of the REST poll path. Only
+    # written when explicitly "rest" so existing v0.51-and-earlier
+    # instances continue to read as MQTT without any field at all.
+    normalised_transport: str | None = None
+    if isinstance(transport, str) and transport.strip().lower() == "rest":
+        normalised_transport = "rest"
+
     manifest: dict[str, Any] = {
         "id": instance_id,
         "kind": kind_id,
         "name": name.strip() or f"{kind.name} ({instance_id})",
     }
+    if normalised_transport == "rest":
+        manifest["transport"] = "rest"
     # Kinds that don't speak MQTT (e.g. HTTP-polled TRMNL) declare no
-    # status/config topic at all. Skip both derivations cleanly rather
-    # than synthesising a placeholder.
+    # status/config topic at all. REST instances ALSO skip these: the
+    # status/config flows happen over /api/v1/device/<id>/*, not topics.
+    # Keep the topics derivable on the manifest so a user can convert a
+    # REST instance back to MQTT later without re-registering.
     if kind.status_topic:
         manifest["status_topic"] = derive_topic(kind.status_topic, instance_id, suffix="status")
     if kind.config_topic:
@@ -253,26 +267,35 @@ def create_instance(
     #  * Discovered register: caller hands us the token the client is
     #    already polling with, preserve it so the user doesn't have
     #    to update the client config after registering.
-    if _kind_uses_access_token(kind):
+    if _kind_uses_access_token(kind) or normalised_transport == "rest":
         # api_key_strength="native" mints the high-entropy 20-char
         # alphanumeric used by the official Terminus BYOS contract,
         # safe to use when the device stores its key in flash. The
         # default "typeable" keeps the 5-char form for the KOReader
         # path where the user types the token on the Kindle's
-        # on-screen keyboard.
+        # on-screen keyboard. REST devices use the native strength
+        # because they store the token in NVS/flash + match it via
+        # bearer header; no human typing involved after pairing.
+        effective_strength = api_key_strength
+        if normalised_transport == "rest" and not _kind_uses_access_token(kind):
+            effective_strength = "native"
         if access_token:
             manifest["access_token"] = access_token
-        elif api_key_strength == "native":
+        elif effective_strength == "native":
             manifest["access_token"] = generate_native_access_token(devices)
         else:
             manifest["access_token"] = generate_access_token(devices)
         # TRMNL clients expect a six-character ``friendly_id`` they can
         # show on the setup screen as a stable, human-readable id.
-        # Generated once at creation, never rotates.
-        manifest["friendly_id"] = generate_friendly_id(devices)
+        # Skip for non-TRMNL REST devices, the field has no protocol
+        # meaning for them.
+        if _kind_uses_access_token(kind):
+            manifest["friendly_id"] = generate_friendly_id(devices)
         # MAC address (when auto-provisioning from /api/setup) becomes
         # the device's primary identity for /api/display auth, matching
-        # the Terminus BYOS model.
+        # the Terminus BYOS model. REST devices include it when
+        # firmware reports it so the admin UI can show "MAC = ..."
+        # alongside battery / IP.
         if mac:
             manifest["mac"] = mac.strip()
 

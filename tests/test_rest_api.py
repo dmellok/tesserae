@@ -319,6 +319,54 @@ def test_admin_pairing_issue_returns_code_when_authed(app: Flask) -> None:
     assert reg.status_code == 201
 
 
+def test_register_marks_instance_as_rest_transport(app: Flask) -> None:
+    """Phase 1b: a REST-registered instance carries ``transport: "rest"``
+    on its manifest so the push pipeline knows to skip MQTT publish."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    _register_via_api(client, code=code, device_id="bedroom_pico")
+    devices = app.config["DEVICE_REGISTRY"]
+    instance = devices.get("bedroom_pico")
+    assert instance is not None
+    assert instance.transport == "rest"
+    assert instance.manifest.get("transport") == "rest"
+
+
+def test_existing_mqtt_instances_default_to_mqtt_transport(app: Flask) -> None:
+    """Backward compat: a pre-0.52 instance manifest with no ``transport``
+    field reads as MQTT, which keeps the push pipeline behaving as before."""
+    devices = app.config["DEVICE_REGISTRY"]
+    # Pi BIN client kinds ship without a transport field on the kind
+    # manifest (transport is per-instance). The kind itself, being
+    # treated as a Device, should default to mqtt.
+    pi_kind = devices.get("pi_bin_client")
+    assert pi_kind is not None
+    assert pi_kind.transport == "mqtt"
+
+
+def test_push_pipeline_skips_publish_for_rest_devices(app: Flask) -> None:
+    """End-to-end: a REST-mode instance's renderer clone is detected as
+    http-polled, so ``_renderer_is_http_polled`` short-circuits the MQTT
+    publish in ``_publish_artifact``. The transport mock would otherwise
+    record a publish call we don't want."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    _register_via_api(client, code=code, device_id="bedroom_pico")
+    push_mgr = app.config["PUSH_MANAGER"]
+    renderers = app.config["RENDERER_REGISTRY"]
+    # The cloned renderer for our REST device.
+    clone = renderers.get("pico_bin__bedroom_pico")
+    assert clone is not None
+    assert push_mgr._renderer_is_http_polled(clone) is True
+    # And the base mqtt-bound renderer is NOT marked http-polled, so
+    # existing MQTT clients still publish normally.
+    base = renderers.get("pi_bin")
+    assert base is not None
+    assert push_mgr._renderer_is_http_polled(base) is False
+
+
 def test_admin_pairing_pending_lists_unredeemed_codes(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

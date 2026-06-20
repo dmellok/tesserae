@@ -98,6 +98,22 @@ class Device:
         return [str(r) for r in self.manifest.get("renderers", [])]
 
     @property
+    def transport(self) -> str:
+        """Which transport delivers frames to this device. ``"mqtt"`` is
+        the default for backward compat (every pre-0.52 instance keeps
+        working unchanged). ``"rest"`` means the device polls
+        ``/api/v1/device/<id>/*`` instead, so the push pipeline skips the
+        MQTT publish for it.
+
+        Kinds themselves don't carry a transport (transport is per-
+        instance, not per-kind), so a missing field on a kind just
+        reads as the default and never enters the push path."""
+        raw = self.manifest.get("transport")
+        if isinstance(raw, str) and raw.strip().lower() == "rest":
+            return "rest"
+        return "mqtt"
+
+    @property
     def status_topic(self) -> str | None:
         """MQTT topic for status heartbeats. ``None`` for devices that
         don't use MQTT, e.g. TRMNL clients poll ``/api/display`` and
@@ -417,6 +433,13 @@ def load_instance_file(
     inst_manifest["name"] = str(raw_inst.get("name") or kind.name)
     if isinstance(raw_inst.get("icon"), str) and raw_inst["icon"].strip():
         inst_manifest["icon"] = raw_inst["icon"].strip()
+    # Per-instance transport selection (added v0.52). When ``"rest"``
+    # the push pipeline skips MQTT publish (the device polls
+    # /api/v1/device/<id>/frame instead). Absence is treated as MQTT
+    # by Device.transport so every pre-0.52 instance file reads as
+    # MQTT without rewriting on upgrade.
+    if isinstance(raw_inst.get("transport"), str) and raw_inst["transport"].strip():
+        inst_manifest["transport"] = raw_inst["transport"].strip().lower()
     if raw_inst.get("status_topic"):
         inst_manifest["status_topic"] = str(raw_inst["status_topic"])
     if "config_topic" in raw_inst:

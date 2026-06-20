@@ -114,6 +114,70 @@
 </section>
 {% endif %}
 
+{% if active_area == 'devices' %}
+{# REST pair flow. Sibling to "Add device" (which is the manual MQTT path).
+   Generates a 6-digit code with a 10-min TTL; the firmware POSTs the code
+   to /api/v1/device/register and registers itself. The instance gets
+   ``transport: "rest"`` automatically so the push pipeline skips broker
+   publishes for it. #}
+<section class="card" id="pair-device">
+  {{ card_head('Pair new device (REST)', icon_name='qr-code',
+               blurb='No broker. Issue a 6-digit code, paste it into your firmware\'s setup form, the device registers itself and starts polling /api/v1/device/<id>/frame for frames. The code is single-use and expires in 10 minutes.') }}
+
+  {% if pairing_reveal %}
+  <div class="pair-reveal" role="status" aria-live="polite">
+    <p class="muted">Code just issued. Copy it now and paste into firmware:</p>
+    <div class="pair-code">
+      <code data-pair-code>{{ pairing_reveal.code }}</code>
+      <button type="button" class="ghost" data-copy-pair-code>
+        <i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span>
+      </button>
+    </div>
+    {% if pairing_reveal.note %}
+    <p class="muted">Note: {{ pairing_reveal.note }}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ url_for('auth.devices_pair_issue') }}" class="form">
+    {{ text_input('pair-note', 'note', 'Optional note', value='',
+                  placeholder='e.g. for bedroom Pico',
+                  help='Shown alongside the code on this page so you can tell parallel codes apart.') }}
+    <div class="actions">{{ button('Issue pairing code', icon='plus') }}</div>
+  </form>
+
+  {% if pairing_codes %}
+  <h3 class="muted" style="margin-top: var(--t-space-4);">Pending codes</h3>
+  <table class="pair-codes-table">
+    <thead>
+      <tr><th>Code</th><th>Expires in</th><th>Note</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for p in pairing_codes %}
+      <tr>
+        <td><code>{{ p.code }}</code></td>
+        <td>
+          {% set m = (p.seconds_left // 60) %}
+          {% set s = (p.seconds_left % 60) %}
+          {{ m }}m {{ '%02d' % s }}s
+        </td>
+        <td>{{ p.note or '-' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('auth.devices_pair_revoke', code=p.code) }}" class="inline"
+                onsubmit="return confirm('Revoke code {{ p.code }}?');">
+            <button type="submit" class="ghost danger" title="Revoke this pairing code">
+              <i class="ph ph-trash" aria-hidden="true"></i><span>Revoke</span>
+            </button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endif %}
+
 {% if not sections %}
 <p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
 {% endif %}
@@ -1181,6 +1245,36 @@ docker compose up -d</code></pre>
         }
         last = orient.value;
       });
+    });
+  })();
+
+  // Copy-pair-code button on the REST Pair card. Self-contained IIFE
+  // because the markup is only present on the devices tab; on other
+  // tabs the querySelector returns null and the function bails.
+  (function () {
+    const btn = document.querySelector('[data-copy-pair-code]');
+    const code = document.querySelector('[data-pair-code]');
+    if (!btn || !code) return;
+    btn.addEventListener('click', async () => {
+      const value = code.textContent.trim();
+      let ok = false;
+      try {
+        await navigator.clipboard.writeText(value);
+        ok = true;
+      } catch {
+        // Older / locked-down browsers (HTTPS-required clipboard).
+        // Range-select the code so the user can Cmd/Ctrl+C themselves.
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const original = btn.innerHTML;
+      btn.innerHTML = ok
+        ? '<i class="ph ph-check" aria-hidden="true"></i><span>Copied</span>'
+        : '<i class="ph ph-warning" aria-hidden="true"></i><span>Select + copy</span>';
+      setTimeout(() => { btn.innerHTML = original; }, 1800);
     });
   })();
 </script>

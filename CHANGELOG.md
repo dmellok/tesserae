@@ -6,6 +6,57 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.1], 2026-06-20
+
+### Added
+
+- **REST transport Phase 1b: per-device transport selection +
+  Pair card UI.**
+- **``Device.transport`` field on instance manifests.** New optional
+  ``"transport": "rest"`` key, default ``"mqtt"`` for any pre-0.52
+  instance (no rewrite needed on upgrade). ``Device.transport``
+  property reads it; ``device_loader.load_instance_file`` propagates
+  the field through the kind-manifest merge so a REST-mode
+  instance keeps its transport choice across restarts.
+  ``create_instance`` accepts the field as a kwarg, persists it on
+  the manifest, and automatically mints an ``access_token`` for
+  ``transport="rest"`` (with ``"native"`` strength: 20-char
+  alphanumeric, stored in firmware flash, never hand-typed).
+- **Push pipeline skips MQTT publish for REST devices.**
+  ``PushManager._renderer_is_http_polled`` now returns True for
+  either a kind with no ``status_topic`` (the legacy TRMNL signal)
+  OR a per-instance ``transport == "rest"`` (the new v0.52 signal).
+  Same kind can have MQTT instances AND REST instances; the
+  transport field on each instance decides whether a publish runs.
+- **REST ``POST /api/v1/device/register`` automatically tags new
+  instances as ``transport: "rest"``.** Devices that arrive via the
+  pairing-code flow are REST-mode from creation; no broker calls
+  ever happen for them.
+- **Settings -> Devices: Pair card.** New section sits next to
+  Add device (which stays the MQTT manual path). Generates a
+  6-digit code via the existing ``PairingStore``, shows a copy-
+  friendly reveal, lists pending codes with their remaining TTL +
+  the user's note, and lets the admin revoke any code mid-flight.
+  POST endpoints:
+  - ``POST /settings/devices/pair`` (issue)
+  - ``POST /settings/devices/pair/<code>/revoke``
+  Both session-gated. The ``/api/v1/device/admin/pairing/*`` JSON
+  endpoints stay too, useful for curl-from-terminal testing and
+  any future scripted provisioning.
+
+### Notes
+
+- Existing MQTT instances and existing MQTT clients keep working
+  unchanged. The "transport" field is opt-in; missing field reads
+  as ``"mqtt"`` everywhere.
+- Phase 1c remaining: drop-a-folder ``transports/<id>/`` loader
+  refactor that pulls the existing MQTT path + new REST path under
+  one loader, mirroring renderers/ and devices/. That's a pure
+  restructuring step for future-transport extensibility; no user-
+  visible change.
+- Phase 2 (default-to-REST onboarding + bundled-amqtt-not-auto-
+  enabled) still to come.
+
 ## [0.52.0], 2026-06-20
 
 ### Added

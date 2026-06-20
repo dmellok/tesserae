@@ -568,3 +568,50 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* REST Pair card on Settings -> Devices. Lives next to the Add device
+   card; layout mirrors the broader card system so it inherits padding /
+   typography without bespoke values. */
+.pair-reveal {
+  margin: 0 0 var(--t-space-3) 0;
+  padding: var(--t-space-3);
+  border: 1px solid color-mix(in srgb, var(--t-ok, #1f8a4c) 40%, transparent);
+  background: color-mix(in srgb, var(--t-ok, #1f8a4c) 8%, transparent);
+  border-radius: var(--t-radius-sm);
+}
+.pair-reveal .pair-code {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  margin: var(--t-space-2) 0;
+}
+.pair-reveal .pair-code code {
+  font-family: var(--t-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 6px 12px;
+  border-radius: var(--t-radius-sm);
+  background: var(--t-bg, #fff);
+  border: 1px solid var(--t-fg-soft, #d0d3da);
+}
+.pair-codes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.pair-codes-table th,
+.pair-codes-table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--t-fg-soft, #c8ccd4) 35%, transparent);
+}
+.pair-codes-table th {
+  font-weight: 600;
+  color: var(--t-fg-soft, #6b7079);
+}
+.pair-codes-table code {
+  font-family: var(--t-mono, ui-monospace, SFMono-Regular, monospace);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
