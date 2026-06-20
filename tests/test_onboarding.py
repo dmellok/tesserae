@@ -94,7 +94,13 @@ def test_finish_persists_telemetry_opt_out(app: Flask) -> None:
 def test_broker_builtin_enables_embedded(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    resp = client.post("/onboarding/broker", data={"use_builtin": "on"}, follow_redirects=False)
+    # v0.52: explicit transport=mqtt because the default is now REST
+    # and an absent transport field short-circuits broker setup.
+    resp = client.post(
+        "/onboarding/broker",
+        data={"transport": "mqtt", "use_builtin": "on"},
+        follow_redirects=False,
+    )
     assert resp.location.endswith("/onboarding/device")
     assert app.config["SETTINGS_STORE"].get_section("broker")["embedded_enabled"] is True
 
@@ -104,7 +110,12 @@ def test_broker_builtin_binds_all_and_saves_creds(app: Flask) -> None:
     _sign_in(client)
     client.post(
         "/onboarding/broker",
-        data={"use_builtin": "on", "builtin_username": "tess", "builtin_password": "s3cret"},
+        data={
+            "transport": "mqtt",
+            "use_builtin": "on",
+            "builtin_username": "tess",
+            "builtin_password": "s3cret",
+        },
     )
     broker = app.config["SETTINGS_STORE"].get_section("broker")
     assert broker["embedded_enabled"] is True
@@ -127,7 +138,13 @@ def test_broker_external_saves_host(app: Flask) -> None:
     _sign_in(client)
     client.post(
         "/onboarding/broker",
-        data={"host": "192.168.1.50", "port": "1883", "username": "u", "password": "p"},
+        data={
+            "transport": "mqtt",
+            "host": "192.168.1.50",
+            "port": "1883",
+            "username": "u",
+            "password": "p",
+        },
     )
     broker = app.config["SETTINGS_STORE"].get_section("broker")
     assert broker["host"] == "192.168.1.50"
@@ -162,7 +179,12 @@ def test_broker_step_under_ha_ignores_stale_use_builtin_post(tmp_path: Path) -> 
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     resp = client.post(
         "/onboarding/broker",
-        data={"use_builtin": "on", "host": "core-mosquitto", "port": "1883"},
+        data={
+            "transport": "mqtt",
+            "use_builtin": "on",
+            "host": "core-mosquitto",
+            "port": "1883",
+        },
         follow_redirects=False,
     )
     assert resp.status_code == 302
