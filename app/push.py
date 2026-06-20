@@ -496,6 +496,11 @@ class PushManager:
                             viewport_w=viewport_w,
                             viewport_h=viewport_h,
                             timezone_id=self._render_timezone_id(),
+                            # External URL render, not our /compose/ page.
+                            # Tells the renderer to skip the 15s composer-
+                            # mount wait and to use networkidle for the
+                            # initial goto so SPAs hydrate before screenshot.
+                            is_composer=False,
                         ),
                         pool=self._browser_pool_fn(),
                     )

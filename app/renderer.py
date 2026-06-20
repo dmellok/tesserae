@@ -122,6 +122,25 @@ class RenderRequest:
     # to UTC). ``None`` leaves Chromium on its default behaviour, which
     # is what unit tests + the local dev server want.
     timezone_id: str | None = None
+    # True when this URL points at our own ``/compose/<id>`` page, False
+    # for arbitrary external URLs from the Send → Webpage tab. The two
+    # cases need different wait strategies:
+    #
+    # * Composer renders own the page, so we can rely on
+    #   ``window.__tesseraeComposed = true`` as the "screenshot now"
+    #   signal, AND we deliberately use ``wait_until="load"`` for the
+    #   initial nav because composer pages keep network busy long after
+    #   they're visually ready (widget client.js + font + Phosphor CSS
+    #   fetches).
+    # * External URLs (``is_composer=False``) have no composer signal,
+    #   so we'd just stall 15s waiting for a flag that never fires; AND
+    #   they're often SPAs that don't paint anything meaningful until
+    #   their JS hydrates the page (Reddit's the obvious example), so
+    #   ``wait_until="load"`` screenshots an empty React shell. For
+    #   external URLs we honour the request's declared ``wait_until``
+    #   (defaulting to ``networkidle`` so JS-driven hydration completes
+    #   before screenshot), and skip the composer-signal wait.
+    is_composer: bool = True
 
 
 @dataclass(frozen=True)
@@ -284,13 +303,36 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         t0 = time.monotonic()
         # ``load`` fires when the main document + critical subresources
         # have downloaded, fast and deterministic. ``networkidle`` was
-        # the previous default but routinely timed out (widget client.js
-        # imports, font fetches, and Phosphor CSS keep network busy long
-        # after the page is visually ready). When goto's networkidle
-        # timed out, Playwright aborted the navigation and the next
-        # ``page.evaluate`` stalled for ~60s waiting for stability -
-        # which is how a normal render ballooned to 73s.
-        if request.wait_until == "networkidle":
+        # the previous default for composer renders but routinely timed
+        # out (widget client.js imports, font fetches, and Phosphor CSS
+        # keep network busy long after the page is visually ready). When
+        # goto's networkidle timed out, Playwright aborted the navigation
+        # and the next ``page.evaluate`` stalled for ~60s waiting for
+        # stability, which is how a normal render ballooned to 73s.
+        #
+        # External URLs (``is_composer=False``) are a different beast.
+        # SPAs like reddit.com render only an empty shell at ``load`` and
+        # don't paint real content until JS has hydrated, so screenshotting
+        # at ``load`` captures a blank page. But picking ``networkidle``
+        # for the goto itself hard-fails on ad-heavy news sites (Guardian,
+        # arstechnica) where the network never idles. The compromise is
+        # a hybrid: nav on ``load`` so we never hard-fail, then a brief
+        # best-effort wait for ``networkidle`` so JS-driven SPAs get a
+        # chance to settle. Sites whose networks won't idle hit the
+        # ``wait_for_load_state`` timeout and we screenshot what we have.
+        if not request.is_composer:
+            # External URL: goto on "load" so ad-heavy sites don't hard-
+            # fail at the navigation step, then a brief best-effort wait
+            # for networkidle so SPAs get time to hydrate.
+            page.goto(request.url, wait_until="load")
+            try:
+                page.wait_for_load_state("networkidle", timeout=8_000)
+            except PlaywrightError:
+                logger.debug("external url networkidle wait gave up", exc_info=True)
+        elif request.wait_until == "networkidle":
+            # Composer render: translate the dataclass default
+            # ``networkidle`` to ``load`` because widget CSS/JS keep
+            # network busy long after the page is visually ready.
             page.goto(request.url, wait_until="load")
         else:
             page.goto(request.url, wait_until=request.wait_until)
@@ -300,13 +342,19 @@ def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) 
         # "page is ready to screenshot" signal than networkidle. The
         # poll is best-effort: if it times out (a stuck widget mount)
         # we screenshot whatever's rendered rather than failing.
-        try:
-            page.wait_for_function(
-                "window.__tesseraeComposed === true",
-                timeout=request.timeout_ms,
-            )
-        except PlaywrightError as err:
-            logger.warning("composer mount wait timed out: %s", err)
+        #
+        # Skipped entirely for external URLs: ``__tesseraeComposed`` is a
+        # composer.js-only signal that has no meaning on reddit.com /
+        # bbc.com / any other site, and waiting 15s for a flag that
+        # never fires is the bulk of why Send → Webpage felt slow.
+        if request.is_composer:
+            try:
+                page.wait_for_function(
+                    "window.__tesseraeComposed === true",
+                    timeout=request.timeout_ms,
+                )
+            except PlaywrightError as err:
+                logger.warning("composer mount wait timed out: %s", err)
         t1 = time.monotonic()
         # Block on every <img> the page (including shadow roots) has
         # already issued a request for, capped at 5 s. The compose-

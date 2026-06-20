@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.8], 2026-06-20
+
+### Fixed
+
+- **Send -> Webpage no longer renders external URLs as a blank page**
+  (most visibly with JS-driven SPAs, but the underlying defect cost
+  every external URL a ~15s wait). Two compounding bugs:
+  1. ``app/renderer.py``'s ``_screenshot_attempt`` waited up to 15 s
+     for ``window.__tesseraeComposed === true`` on every render. That
+     flag is set by composer.js after every dashboard cell mounts; on
+     an external URL it never fires, so the wait always burned the
+     full 15 s before falling through. Cost: every Send -> Webpage
+     push waited an extra 15 s for nothing.
+  2. The goto used ``wait_until="load"`` for every render (the
+     composer-tuned default), which fires before SPAs have hydrated.
+     For Reddit-style React-shell sites the screenshot captured an
+     empty shell. The original ``networkidle`` choice was abandoned
+     because composer renders stalled at it.
+  ``RenderRequest`` gains an ``is_composer`` flag, default True for
+  the composition path, set False by ``Push.push_webpage``. When
+  False the renderer skips the composer-mount wait and uses a hybrid
+  wait strategy: ``goto`` on ``load`` so ad-heavy pages don't hard-
+  fail at navigation, then a best-effort 8 s
+  ``wait_for_load_state("networkidle")`` so SPAs get time to
+  hydrate. Sites whose networks never idle (analytics-heavy news
+  sites) hit the wait_for timeout and we screenshot what's painted.
+- **Caveat (not fixed)**: Reddit specifically still renders as a
+  near-blank page because Cloudflare's bot gate serves an empty
+  "You've been blocked by network security" page to Playwright,
+  regardless of wait strategy. That's a server-side block on their
+  side; routing around it needs either a stealth-flavoured browser
+  build or RSS-style fetch path, which is a much larger change.
+
 ## [0.51.7], 2026-06-18
 
 ### Added
