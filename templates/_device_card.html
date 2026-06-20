@@ -17,7 +17,10 @@
   {% set active_tab = 'status' %}
 {% endif %}
 
-<section class="card dx-device-card" id="{{ section.id }}" data-device-card>
+<section class="card dx-device-card"
+         id="{{ section.id }}"
+         data-device-card
+         data-collapsed="{% if calibrating == section.device_id %}false{% else %}true{% endif %}">
 
   {# HEADER STRIP #}
   <header class="dx-card-header">
@@ -39,7 +42,8 @@
         <span class="dx-status-muted">last seen {{ section.status.relative }}</span>
       </div>
     </div>
-    <button type="button" class="dx-collapse-btn" data-device-toggle aria-expanded="true">
+    <button type="button" class="dx-collapse-btn" data-device-toggle
+            aria-expanded="{% if calibrating == section.device_id %}true{% else %}false{% endif %}">
       <span class="when-open">Hide settings</span>
       <span class="when-closed">Show settings</span>
       <i class="ph ph-caret-down" aria-hidden="true"></i>

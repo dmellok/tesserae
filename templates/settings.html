@@ -42,21 +42,6 @@
    ``[data-device-card]`` elements (eg the System or Events tabs). #}
 <script src="{{ url_for('static', filename='pages/settings.js') }}"></script>
 
-{% if active_area == 'devices' %}
-{# Discovered devices strip (issue #17). Splits into REST-announced
-   and MQTT-discovered sub-groups; renders the radar empty state
-   when both are empty. See ``_discovered_strip.html`` for layout. #}
-{% include '_discovered_strip.html' %}
-{% endif %}
-
-{% if active_area == 'devices' and device_kinds %}
-{# Unified Add device card (issue #16). Replaces the previous Add
-   device + Pair new device (REST) + standalone Pending codes
-   cards. See ``_add_device_card.html`` for the segmented-control
-   layout. #}
-{% include '_add_device_card.html' %}
-{% endif %}
-
 {% if not sections and active_area in ('renderers', 'plugins') %}
 {# Only useful on tabs whose entire purpose IS the per-section list
    (Renderers, Widgets/Plugins). System + Events render their own
@@ -82,6 +67,16 @@
    None on other tabs so this falls through cleanly. #}
 {% if active_area == 'server' and app_field_groups %}
 {% include '_server_settings.html' %}
+{% endif %}
+
+{# Devices tab: Discovered strip + unified Add device card precede
+   the per-instance device cards so they all share the flex gap of
+   the settings-section-list wrapper. #}
+{% if active_area == 'devices' %}
+{% include '_discovered_strip.html' %}
+{% endif %}
+{% if active_area == 'devices' and device_kinds %}
+{% include '_add_device_card.html' %}
 {% endif %}
 
 {% for section in sections %}
@@ -540,13 +535,11 @@
 {% endif %}{# /device kind branch #}
 {% endfor %}
 
-{% if active_area == 'devices' and kind_default_rows %}
-{# Built-in device kinds (issue #22). Renders at the bottom of the
-   Devices tab, after every per-instance device card, so the
-   "defaults for new instances" framing reads as a layer below the
-   live devices instead of competing for attention with them. #}
-{% include '_kind_defaults_card.html' %}
-{% endif %}
+{# Built-in device kinds card (issue #22) was prototyped here but the
+   backend layer + UI surfaced no clear admin workflow that wasn't
+   already covered by per-instance overrides + ``device.json`` edits.
+   The KindOverridesStore + routes + partial stay in the repo for a
+   future revisit; the include is intentionally not rendered. #}
 </div>{# /.settings-section-list #}
 
 {# Server-tab footer: compact diagnostics + session actions. These
