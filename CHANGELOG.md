@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.54.3], 2026-06-21
+
+### Fixed
+
+- **Dark-mode support for the redesigned cards.** The new
+  ``.dx-device-card`` + ``.dx-section-card`` rules hard-coded light-
+  mode hex values for backgrounds, borders, and text, so under
+  ``<html data-theme="dark">`` they stayed white-on-dark and read
+  as broken. Added a ``:root[data-theme="dark"]`` override block
+  that maps every dx-* colour onto the existing slate ``--t-*``
+  palette declared in ``base.css``. Smart Sync band keeps its warm
+  tones (status indicator), the save bar stays dark (intentionally
+  always dark), and the teal accent flips to its dark-mode value.
+
 ## [0.54.2], 2026-06-21
 
 ### Fixed

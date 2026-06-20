@@ -1643,3 +1643,206 @@
 .dx-section-card[data-dep-off] .dx-section-body select {
   background: var(--dx-inset, #f3f2ee);
 }
+
+
+/* =====================================================================
+   Dark-theme overrides for the handoff-redesigned cards. Toggled via
+   ``<html data-theme="dark">`` (same hook the rest of the app uses).
+   Cards keep their layout + spacing; only colours flip. Hard-coded
+   hex values in the dx-* rules above are the light-mode source of
+   truth; the block below maps them onto the slate-leaning dark
+   palette declared in ``base.css``. The teal accent + the warm
+   smart-sync band stay constant so they read as status colour in
+   both modes. The save bar is intentionally always dark, so it
+   stays as-is across themes.
+   ===================================================================== */
+
+:root[data-theme="dark"] .dx-device-card,
+:root[data-theme="dark"] .dx-section-card {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  color: var(--t-fg);
+  box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
+}
+:root[data-theme="dark"] .dx-device-card:hover {
+  border-color: var(--t-border-strong);
+  box-shadow: var(--t-shadow), var(--t-shadow-inset);
+}
+
+/* Header strip */
+:root[data-theme="dark"] .dx-device-card .dx-card-header,
+:root[data-theme="dark"] .dx-section-card .dx-section-head {
+  border-bottom-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-device-card .dx-header-icon,
+:root[data-theme="dark"] .dx-section-card .dx-section-icon {
+  background: color-mix(in oklab, var(--t-accent) 22%, var(--t-surface));
+  color: var(--t-accent);
+}
+:root[data-theme="dark"] .dx-device-card .dx-title { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-device-card .dx-transport-badge {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg-soft);
+}
+:root[data-theme="dark"] .dx-device-card .dx-status-line,
+:root[data-theme="dark"] .dx-device-card .dx-status-muted { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-device-card .dx-collapse-btn {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg);
+}
+:root[data-theme="dark"] .dx-device-card .dx-collapse-btn:hover {
+  background: var(--t-surface-raised);
+  border-color: var(--t-border-strong);
+}
+
+/* Connection details */
+:root[data-theme="dark"] .dx-conn-details { border-bottom-color: var(--t-border); }
+:root[data-theme="dark"] .dx-conn-details > summary { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-conn-details > summary:hover { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-conn-grid dt { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-conn-grid dd { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-reveal-btn { color: var(--t-accent); }
+:root[data-theme="dark"] .dx-reveal-btn:hover { color: var(--t-accent-hover); }
+
+/* Tabs */
+:root[data-theme="dark"] .dx-tabs { border-bottom-color: var(--t-border); }
+:root[data-theme="dark"] .dx-tab { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-tab:hover,
+:root[data-theme="dark"] .dx-tab:focus,
+:root[data-theme="dark"] .dx-tab:focus-visible { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-tab.is-active { color: var(--t-accent); }
+
+/* Status tab tiles */
+:root[data-theme="dark"] .dx-stat-tile {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-stat-label { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-stat-value { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-stat-sub { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-bar { background: var(--t-border-strong); }
+:root[data-theme="dark"] .dx-bar.is-on { background: var(--t-ok); }
+:root[data-theme="dark"] .dx-muted { color: var(--t-muted); }
+
+/* Smart sync panel keeps its warm tones intentionally (status
+   indicator), but bumps the band background so the contrast against
+   a dark card body still reads. */
+:root[data-theme="dark"] .dx-smart-sync { border-color: var(--t-border); }
+:root[data-theme="dark"] .dx-smart-sync-head {
+  background: color-mix(in oklab, #e0902f 16%, var(--t-surface));
+  border-bottom-color: color-mix(in oklab, #e0902f 30%, var(--t-surface));
+}
+:root[data-theme="dark"] .dx-smart-sync-label { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-smart-sync-confidence { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-smart-sync-meter {
+  background: color-mix(in oklab, #e0902f 22%, var(--t-surface));
+}
+:root[data-theme="dark"] .dx-smart-sync-explainer { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-smart-sync-grid > div { border-top-color: var(--t-border); }
+:root[data-theme="dark"] .dx-smart-sync-grid > div:nth-child(2n) { border-left-color: var(--t-border); }
+:root[data-theme="dark"] .dx-smart-sync-grid dt { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-smart-sync-grid dd { color: var(--t-fg); }
+
+/* Advanced diagnostics + Schedule empty state */
+:root[data-theme="dark"] .dx-advanced-diag {
+  border-top-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-advanced-diag > summary { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-advanced-diag > summary:hover { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-empty-icon {
+  background: var(--t-surface-soft);
+  color: var(--t-muted);
+}
+:root[data-theme="dark"] .dx-empty-title { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-empty-help { color: var(--t-muted); }
+
+/* General + Rendering tab field treatment */
+:root[data-theme="dark"] .dx-divider { background: var(--t-border); }
+:root[data-theme="dark"] .dx-hint { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-hint .ph-info { color: var(--t-muted); }
+
+/* Footer action row */
+:root[data-theme="dark"] .dx-card-footer {
+  background: var(--t-surface-soft);
+  border-top-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-footer-btn {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  color: var(--t-fg);
+}
+:root[data-theme="dark"] .dx-footer-btn:hover {
+  background: var(--t-surface-raised);
+  border-color: var(--t-border-strong);
+}
+:root[data-theme="dark"] .dx-footer-btn.dx-danger {
+  color: var(--t-danger);
+  border-color: color-mix(in oklab, var(--t-danger) 50%, transparent);
+  background: transparent;
+}
+:root[data-theme="dark"] .dx-footer-btn.dx-danger:hover {
+  background: var(--t-danger-bg);
+  border-color: var(--t-danger);
+}
+
+/* Server-tab section card chrome */
+:root[data-theme="dark"] .dx-section-title { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-section-desc { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-section-meta { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-section-meta code {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg-soft);
+}
+:root[data-theme="dark"] .dx-section-head {
+  border-bottom-color: var(--t-border);
+}
+
+/* Server-tab section body: inputs, labels, separators, slider. */
+:root[data-theme="dark"] .dx-section-body .field + .field,
+:root[data-theme="dark"] .dx-section-body .field + .dx-toggle-row,
+:root[data-theme="dark"] .dx-section-body > .dx-toggle-row + .field,
+:root[data-theme="dark"] .dx-section-body > .dx-toggle-row + .dx-toggle-row {
+  border-top-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-section-body .field label { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-section-body .field input:not([type="range"]):not([type="checkbox"]),
+:root[data-theme="dark"] .dx-section-body .field select,
+:root[data-theme="dark"] .dx-section-body .field textarea {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg);
+}
+:root[data-theme="dark"] .dx-section-body .field .field-help { color: var(--t-muted); }
+
+/* Toggle row (label-left / switch-right) */
+:root[data-theme="dark"] .dx-toggle-row-label { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-toggle-row-desc { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-toggle-track { background: var(--t-border-strong); }
+:root[data-theme="dark"] .dx-toggle-switch input:checked + .dx-toggle-track {
+  background: var(--t-accent);
+}
+
+/* Dependent-dim background gets a slightly sunk tint instead of the
+   light-mode cream wash. */
+:root[data-theme="dark"] .dx-section-card[data-dep-off] .dx-section-body input,
+:root[data-theme="dark"] .dx-section-card[data-dep-off] .dx-section-body select {
+  background: var(--t-surface-sunk);
+}
+
+/* Legacy ``.dx-server-area > .card`` overlay (still used by any
+   non-converted card on the server tab). */
+:root[data-theme="dark"] .dx-server-area > .card {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+  box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
+}
+:root[data-theme="dark"] .dx-server-area > .card > .card-head h2 { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-server-area > .card .meta dt { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-server-area > .card .meta dd code {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg-soft);
+}
