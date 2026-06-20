@@ -785,6 +785,15 @@ def create_app(
     themes_routes.register(app)
     webhook_routes.register(app)
     trmnl_api.register(app)
+    # New REST transport: per-device bearer-token HTTP endpoints under
+    # /api/v1/device/*. Lives alongside MQTT (both transports active at
+    # the same time); will become the new default for first-time
+    # installs once Phase 2 lands. See notes/rest-transport-design.md.
+    from app import rest_api
+    from app.state.pairing_store import PairingStore
+
+    app.config["PAIRING_STORE"] = PairingStore()
+    rest_api.register(app)
 
     if not testing:
         auth.install_gate(app, settings)

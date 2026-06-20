@@ -6,6 +6,64 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.0], 2026-06-20
+
+### Added
+
+- **REST transport, Phase 1: ``/api/v1/device/*`` endpoints landed
+  alongside MQTT.** Background: amqtt 0.11.x has reliability issues
+  for retained-message delivery, and the Mosquitto alternative is
+  high-friction for new users (install service, edit config, generate
+  creds, paste them into every firmware). The new REST transport
+  removes the broker from the new-install path entirely; existing
+  MQTT setups keep working unchanged. See
+  ``notes/rest-transport-design.md`` for the full scoping.
+- **Endpoints** (all auth via per-device ``Authorization: Bearer
+  <token>``; same primitive TRMNL devices use):
+  - ``GET /api/v1/device/<id>/frame``: returns the latest rendered
+    frame's URL + format + panel dims + render id. ``ETag`` header
+    carries the render digest; firmware sends ``If-None-Match`` on
+    subsequent wakes and gets ``304 Not Modified`` when nothing
+    changed (skip fetch + paint = save battery on Spectra 6 panels).
+    ``204`` when no frame has been rendered for the device yet.
+  - ``POST /api/v1/device/<id>/status``: heartbeat body parsed via
+    the device kind's existing ``parse_status`` (same hook the MQTT
+    path uses) and merged into the live ``DEVICE_STATUS`` cache, so
+    Settings -> Devices shows REST-mode device freshness uniformly
+    with MQTT-mode. Response piggybacks the current per-device
+    config and a ``next_poll_s`` field telling the firmware when to
+    wake again. One round-trip per wake; no separate config poll
+    needed.
+  - ``POST /api/v1/device/register``: first-boot pairing. Firmware
+    presents an ``X-Pairing-Code`` header (the 6-digit code the
+    admin generated via PairingStore.issue), the body declares the
+    chosen device id + kind + panel dims, the server creates the
+    instance and returns a per-device ``device_token``. Idempotent
+    on the device-id-already-exists case (firmware retries get the
+    existing token, not a duplicate). Single-use codes with 10-min
+    TTL, in-memory only.
+  - ``POST /api/v1/device/<id>/log``: optional client-side log
+    line, appended to the EventLog so the Events page surfaces
+    firmware diagnostics alongside server events.
+- ``app/state/pairing_store.py``: thread-safe pairing-code store
+  with TTL + single-use + constant-time compare. Pluggable in the
+  app config under ``PAIRING_STORE``.
+- ``app/rest_api.py``: the endpoint module. Mirrors
+  ``app/trmnl_api.py``'s structure (auth helpers, registry lookups)
+  but kind-agnostic so any device kind can be served over REST.
+
+### Notes
+
+- This is Phase 1 (REST beside MQTT, both transports active for every
+  device). Phase 1b will decouple the push pipeline so a REST-only
+  device skips the MQTT publish. Phase 2 flips the default in
+  onboarding. See ``notes/rest-transport-design.md`` and the per-
+  firmware prompts in ``notes/prompts/``.
+- The Devices admin UI still issues pairing codes via the existing
+  TRMNL token machinery for now; a dedicated "Pair new device"
+  button on Settings -> Devices that wraps ``PairingStore.issue``
+  is a small follow-up.
+
 ## [0.51.9], 2026-06-20
 
 ### Added
