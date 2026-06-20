@@ -15,6 +15,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import time
 import uuid
 from typing import Any
 
@@ -26,6 +27,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from werkzeug.wrappers import Response
@@ -104,7 +106,13 @@ def is_onboarded(settings: SettingsStore) -> bool:
         return True
     # Treat an already-configured install as onboarded so the wizard never
     # ambushes someone who set things up before it existed (broker set, a
-    # device registered, or a dashboard created).
+    # device registered, dashboard created, OR the user picked REST via
+    # the v0.52 transport-choice screen).
+    app_section = settings.get_section("app")
+    if app_section.get("default_transport"):
+        # default_transport persisted = user has been through the v0.52
+        # transport step at least once, treat the install as onboarded.
+        return True
     broker = settings.get_section("broker")
     if broker.get("host") or broker.get("embedded_enabled"):
         return True
@@ -126,6 +134,15 @@ def mark_onboarded(settings: SettingsStore) -> None:
 
 
 def _broker_done() -> bool:
+    """The transport step (still called 'broker' for URL stability) is
+    considered done in three cases:
+    * The user picked the REST transport (no broker setup needed).
+    * The user set an external broker host.
+    * The user enabled the built-in broker.
+    """
+    app_section = _settings().get_section("app")
+    if app_section.get("default_transport") == "rest":
+        return True
     broker = _settings().get_section("broker")
     return bool(broker.get("host")) or bool(broker.get("embedded_enabled"))
 
@@ -174,6 +191,11 @@ def step(step: str) -> Response | str:
     if step == "broker":
         broker = _settings().get_section("broker")
         ctx["broker"] = broker
+        # v0.52 transport-choice radio. Default to REST for fresh
+        # installs (no broker setup needed); preserve the user's
+        # earlier choice if they're revisiting the step.
+        app_section = _settings().get_section("app")
+        ctx["default_transport"] = str(app_section.get("default_transport") or "rest")
         port = int(broker.get("embedded_port") or 1883)
         ctx["builtin_port"] = port
         # Address clients point at when using the built-in broker. detect_
@@ -194,6 +216,27 @@ def step(step: str) -> Response | str:
         if ctx["ha_ingress"] and not broker.get("host"):
             ctx["broker"] = {**broker, "host": "core-mosquitto", "port": 1883}
     elif step == "device":
+        app_section = _settings().get_section("app")
+        ctx["default_transport"] = str(app_section.get("default_transport") or "rest")
+        # When the user picked REST on the previous step, offer to
+        # issue a pairing code right here so a freshly-flashed firmware
+        # can register against this server without the user backtracking
+        # to Settings -> Devices.
+        if ctx["default_transport"] == "rest":
+            store = current_app.config.get("PAIRING_STORE")
+            if store is not None:
+                ctx["pairing_codes"] = [
+                    {
+                        "code": p.code,
+                        "expires_at": p.expires_at,
+                        "note": p.note,
+                        "seconds_left": max(0, int(p.expires_at - time.time())),
+                    }
+                    for p in store.list_pending()
+                ]
+            else:
+                ctx["pairing_codes"] = []
+            ctx["pairing_reveal"] = session.pop("_rest_pairing_reveal", None)
         # ``panel`` rides along on each kind so the form's preset
         # selector can auto-sync to the kind's declared size when the
         # user picks a kind, and so the resulting w/h match Settings →
@@ -226,8 +269,30 @@ def step(step: str) -> Response | str:
 @bp.post("/broker")
 def save_broker() -> Response:
     """Enable the built-in broker, or point the transport at an external
-    one, then rebuild so the connection takes effect immediately."""
+    one, then rebuild so the connection takes effect immediately.
+
+    v0.52 added a transport-choice radio above the broker form. When the
+    user picks ``rest`` (the default for new installs), the broker setup
+    is skipped entirely: persist ``app.default_transport = "rest"`` and
+    advance to the device step. The broker section stays unconfigured
+    until the user explicitly opts back into MQTT later."""
     form = request.form
+
+    # Transport choice. Defaults to ``rest`` for fresh installs so the
+    # new-user path skips broker setup altogether.
+    chosen_transport = (form.get("transport") or "rest").strip().lower()
+    if chosen_transport not in ("rest", "mqtt"):
+        chosen_transport = "rest"
+    _settings().patch_section("app", {"default_transport": chosen_transport})
+
+    if chosen_transport == "rest":
+        # No broker needed. Devices pair via /api/v1/device/register and
+        # poll /api/v1/device/<id>/frame. Skip the broker-rebuild
+        # entirely so an unconfigured broker doesn't churn the
+        # transport thread.
+        flash("Transport: REST. No broker needed; pair devices on the next step.", "ok")
+        return redirect(url_for("onboarding.step", step="device"))
+
     # Under HA the built-in broker is intentionally not offered (see the
     # broker step template + transport_wiring.HA_INGRESS_MODE guard).
     # Treat any stale ``use_builtin`` post as "external broker" so a

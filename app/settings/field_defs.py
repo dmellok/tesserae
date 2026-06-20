@@ -38,6 +38,23 @@ _TZ_CHOICES: list[dict[str, str]] = [
 
 APP_FIELDS: list[dict[str, Any]] = [
     {
+        "name": "default_transport",
+        "type": "select",
+        "label": "Default transport for new devices",
+        "default": "rest",
+        "choices": [
+            {"value": "rest", "label": "REST API (recommended, no broker needed)"},
+            {"value": "mqtt", "label": "MQTT (broker required, lower latency)"},
+        ],
+        "help": (
+            "Which transport new device instances default to. REST means devices poll "
+            "Tesserae over HTTP (no broker setup, simpler new-install path). MQTT means "
+            "devices subscribe to a broker. You can pick the transport per device on "
+            "Settings → Devices regardless of this default; this only seeds the choice "
+            "in the onboarding wizard + the Pair vs Add-device entry points."
+        ),
+    },
+    {
         "name": "public_url",
         "type": "string",
         "label": "Public URL",

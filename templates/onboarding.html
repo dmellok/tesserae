@@ -35,13 +35,33 @@
 
     {# ---------- Broker ---------- #}
     {% elif step == 'broker' %}
-    <h1>Connect a broker</h1>
-    {% if ha_ingress %}
-    <p class="lede">Point Tesserae at an MQTT broker. Home Assistant's Mosquitto App lives at <code>core-mosquitto</code>, that's filled in below, change it if you run a different broker.</p>
-    {% else %}
-    <p class="lede">Tesserae publishes frames over MQTT. Use the built-in broker if you don't already run one, or point at an existing broker.</p>
-    {% endif %}
-    <form method="post" action="{{ url_for('onboarding.save_broker') }}" class="form wizard-broker-form">
+    <h1>Pick a transport</h1>
+    <p class="lede">How devices fetch frames from Tesserae. REST is the no-broker option, default for new installs. MQTT is the lower-latency option if you already run a broker (or you're a Home Assistant user with Mosquitto installed).</p>
+    <form method="post" action="{{ url_for('onboarding.save_broker') }}" class="form wizard-broker-form" data-transport-form>
+      <fieldset class="wizard-transport-choice">
+        <legend class="visually-hidden">Transport</legend>
+        <label class="transport-radio">
+          <input type="radio" name="transport" value="rest" {% if default_transport != 'mqtt' %}checked{% endif %} data-transport-rest>
+          <span class="transport-radio-body">
+            <strong>REST API <span class="muted">(recommended)</span></strong>
+            <span class="muted">Devices poll <code>/api/v1/device/&lt;id&gt;/frame</code> over HTTP. No broker setup. Pair each device with a 6-digit code on the next step.</span>
+          </span>
+        </label>
+        <label class="transport-radio">
+          <input type="radio" name="transport" value="mqtt" {% if default_transport == 'mqtt' %}checked{% endif %} data-transport-mqtt>
+          <span class="transport-radio-body">
+            <strong>MQTT</strong>
+            <span class="muted">Devices subscribe to a broker for frame announces. Lower latency, but you need a broker (built-in or external).</span>
+          </span>
+        </label>
+      </fieldset>
+
+      <div class="wizard-broker-mqtt-fields" data-transport-mqtt-fields {% if default_transport != 'mqtt' %}hidden{% endif %}>
+        {% if ha_ingress %}
+        <p class="lede">Point Tesserae at an MQTT broker. Home Assistant's Mosquitto App lives at <code>core-mosquitto</code>, that's filled in below, change it if you run a different broker.</p>
+        {% else %}
+        <p class="lede">Use the built-in broker if you don't already run one, or point at an existing broker.</p>
+        {% endif %}
       {% if not ha_ingress %}
       <div class="field field--switch">
         <label class="switch" for="use-builtin">
@@ -78,14 +98,90 @@
         {{ text_input('broker-user', 'username', 'Username (optional)', value=broker.get('username', '')) }}
         {{ text_input('broker-pass', 'password', 'Password (optional)', value='', type='password') }}
       </div>
+      </div>{# wizard-broker-mqtt-fields #}
       <div class="wizard-nav">
         <a class="ghost" href="{{ url_for('onboarding.step', step='welcome') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
         {{ button('Save & continue', icon='arrow-right') }}
       </div>
     </form>
+    <script>
+      // Toggle the MQTT broker fields based on the transport radio.
+      // No-JS users see whichever group was open by default (REST → MQTT
+      // fields hidden via the `hidden` attribute); JS users get live
+      // toggling without a page round-trip.
+      (function () {
+        const form = document.querySelector('[data-transport-form]');
+        if (!form) return;
+        const mqtt = form.querySelector('[data-transport-mqtt]');
+        const mqttFields = form.querySelector('[data-transport-mqtt-fields]');
+        if (!mqtt || !mqttFields) return;
+        const sync = () => { mqttFields.hidden = !mqtt.checked; };
+        form.addEventListener('change', (ev) => {
+          if (ev.target && ev.target.name === 'transport') sync();
+        });
+        sync();
+      })();
+    </script>
 
     {# ---------- Device ---------- #}
     {% elif step == 'device' %}
+    {% if default_transport == 'rest' %}
+    <h1>Pair a device</h1>
+    <p class="lede">Flash a Tesserae client for your panel, then generate a pairing code below. The firmware POSTs the code to <code>/api/v1/device/register</code> and the device is registered. The code is single-use and expires in 10 minutes.</p>
+
+    {% if pairing_reveal %}
+    <div class="pair-reveal" role="status" aria-live="polite">
+      <p class="muted">Code just issued. Copy it now and paste into firmware:</p>
+      <div class="pair-code">
+        <code data-pair-code>{{ pairing_reveal.code }}</code>
+        <button type="button" class="ghost" data-copy-pair-code>
+          <i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span>
+        </button>
+      </div>
+      {% if pairing_reveal.note %}
+      <p class="muted">Note: {{ pairing_reveal.note }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('auth.devices_pair_issue') }}" class="form">
+      {{ text_input('onboard-pair-note', 'note', 'Optional note', value='',
+                    placeholder='e.g. for bedroom Pico',
+                    help='Shown alongside the code so parallel codes are easy to tell apart.') }}
+      <div class="actions">{{ button('Issue pairing code', icon='plus') }}</div>
+    </form>
+
+    {% if pairing_codes %}
+    <h2 class="wizard-subhead">Pending codes</h2>
+    <ul class="wizard-discovered">
+      {% for p in pairing_codes %}
+      <li>
+        <span><code>{{ p.code }}</code> · expires in {{ p.seconds_left // 60 }}m {{ '%02d' % (p.seconds_left % 60) }}s {% if p.note %} · {{ p.note }}{% endif %}</span>
+        <form method="post" action="{{ url_for('auth.devices_pair_revoke', code=p.code) }}" class="form form--inline"
+              onsubmit="return confirm('Revoke code {{ p.code }}?');">
+          <div class="actions">{{ button('Revoke', icon='trash', variant='ghost') }}</div>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if instances %}
+    <div class="wizard-registered">
+      <p class="field-help">Registered:</p>
+      <ul>{% for d in instances %}<li><i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i> {{ d.name }} <code>{{ d.id }}</code></li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <div class="wizard-nav">
+      <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      {% if instances %}
+      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      {% else %}
+      <a class="ghost" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Skip for now</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      {% endif %}
+    </div>
+    {% else %}
     <h1>Register a device</h1>
     <p class="lede">Flash a client for your panel (see the README). When it publishes a heartbeat it appears below for one-click registration, or add one by hand.</p>
     {# Live discovery: refresh when a client announces itself so the user
@@ -148,6 +244,7 @@
       <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
       <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
+    {% endif %}{# default_transport rest vs mqtt #}
 
     {# ---------- Dashboard ---------- #}
     {% elif step == 'dashboard' %}
@@ -277,6 +374,32 @@
     presetSelect.addEventListener('change', syncCustom);
     kindSelect.addEventListener('change', applyKind);
     applyKind();
+  })();
+
+  // Copy-pair-code button. Present on the REST flavour of the device
+  // step when a code was just issued; absent (and the IIFE bails) on
+  // every other step.
+  (function () {
+    const btn = document.querySelector('[data-copy-pair-code]');
+    const code = document.querySelector('[data-pair-code]');
+    if (!btn || !code) return;
+    btn.addEventListener('click', async () => {
+      const value = code.textContent.trim();
+      let ok = false;
+      try { await navigator.clipboard.writeText(value); ok = true; }
+      catch {
+        const range = document.createRange();
+        range.selectNodeContents(code);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      const original = btn.innerHTML;
+      btn.innerHTML = ok
+        ? '<i class="ph ph-check" aria-hidden="true"></i><span>Copied</span>'
+        : '<i class="ph ph-warning" aria-hidden="true"></i><span>Select + copy</span>';
+      setTimeout(() => { btn.innerHTML = original; }, 1800);
+    });
   })();
 </script>
 {% endblock %}

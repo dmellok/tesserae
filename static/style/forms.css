@@ -1258,3 +1258,38 @@ input[type="range"].slider:focus::-moz-range-thumb {
   padding: 0;
   font: inherit;
 }
+
+/* Onboarding transport-choice radio (v0.52 Phase 2). Two stacked cards
+   the user clicks to pick REST or MQTT. Mirrors the layout pattern of
+   the other wizard radios; no new design vocabulary. */
+.wizard-transport-choice {
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--t-space-3) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--t-space-2);
+}
+.transport-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--t-space-2);
+  padding: var(--t-space-3);
+  border: 1px solid var(--t-fg-soft, #d0d3da);
+  border-radius: var(--t-radius-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.transport-radio:hover { background: color-mix(in srgb, var(--t-accent, #1c5cd6) 6%, transparent); }
+.transport-radio:has(input:checked) {
+  border-color: var(--t-accent, #1c5cd6);
+  background: color-mix(in srgb, var(--t-accent, #1c5cd6) 8%, transparent);
+}
+.transport-radio input[type="radio"] {
+  margin-top: 4px;
+  accent-color: var(--t-accent, #1c5cd6);
+}
+.transport-radio-body { display: flex; flex-direction: column; gap: 2px; }
+.transport-radio-body strong { font-size: 15px; }
+.transport-radio-body .muted { font-size: 13px; }
+.wizard-broker-mqtt-fields[hidden] { display: none; }

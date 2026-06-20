@@ -6,6 +6,49 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.2], 2026-06-20
+
+### Changed
+
+- **REST transport Phase 2: REST is now the default for new
+  installs.** Fresh installs no longer hit the broker setup detour
+  on first boot.
+- **Onboarding wizard reframes the broker step as a transport
+  choice.** New top-level radio: REST (recommended, no broker
+  needed) vs MQTT (broker required). REST is checked by default.
+  Picking REST persists ``app.default_transport = "rest"`` and
+  skips the broker save entirely; picking MQTT keeps the existing
+  built-in / external broker flow. The wizard URL stays at
+  ``/onboarding/broker`` for stability; the step's heading reads
+  "Pick a transport" now.
+- **Onboarding device step branches by chosen transport.** REST
+  users see a Pair card inline (issue + show + revoke 6-digit
+  pairing codes, same store the Settings -> Devices Pair card
+  uses) instead of the classic MQTT discovery + add-device form.
+  MQTT users see the existing flow unchanged.
+- **``is_onboarded`` recognises a REST install as onboarded.**
+  Without this, a REST user who finished the wizard would get the
+  wizard again on the next visit (the legacy "has broker host?"
+  signal never fires for REST users). Now ``app.default_transport``
+  being set is the same signal.
+- **New ``app.default_transport`` setting** under Settings -> App.
+  Default ``rest``; pickable as ``mqtt`` for users who want MQTT
+  as the new-device default after onboarding.
+
+### Notes
+
+- Existing MQTT installs see zero behaviour change. The wizard
+  only runs on installs that aren't already considered onboarded;
+  a real install with a broker host or a registered device skips
+  the wizard entirely.
+- The bundled embedded amqtt broker stays in tree and stays
+  available, just no longer auto-enabled by the wizard's default
+  path.
+- Phase 1c (the ``transports/<id>/`` drop-a-folder loader
+  refactor) deferred indefinitely. Pure infrastructure churn with
+  no user-visible payoff until a third transport actually arrives;
+  not worth the refactor cost now.
+
 ## [0.52.1], 2026-06-20
 
 ### Added
