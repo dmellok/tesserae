@@ -11,7 +11,7 @@
   <ol class="wizard-steps" aria-label="Setup progress">
     {% for s in steps %}
     <li class="wizard-step {% if s.current %}is-current{% elif s.done %}is-done{% endif %}">
-      <span class="wizard-step-dot">{% if s.done and not s.current %}<i class="ph-fill ph-fill-check-circle" aria-hidden="true"></i>{% else %}{{ loop.index }}{% endif %}</span>
+      <span class="wizard-step-dot">{% if s.done and not s.current %}<i class="ph-fill ph-check-circle" aria-hidden="true"></i>{% else %}{{ loop.index }}{% endif %}</span>
       <span class="wizard-step-label">{{ s.label }}</span>
     </li>
     {% endfor %}
@@ -24,8 +24,8 @@
     <h1>Welcome to Tesserae</h1>
     <p class="lede">Four quick steps to get a dashboard onto your first panel. You can skip any time and configure things later under Settings.</p>
     <ol class="wizard-overview">
-      <li><strong>Broker</strong>, where frames are published.</li>
-      <li><strong>Device</strong>, register the panel that paints them.</li>
+      <li><strong>Transport</strong>, REST API (no broker needed) or MQTT.</li>
+      <li><strong>Device</strong>, pair the panel with a 6-digit code (REST) or register it via discovery (MQTT).</li>
       <li><strong>Dashboard</strong>, a starter layout, pushed to the panel.</li>
     </ol>
     <div class="wizard-nav">

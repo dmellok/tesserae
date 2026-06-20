@@ -6,6 +6,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.4], 2026-06-20
+
+### Fixed
+
+- **Onboarding step pip showed an empty circle on completed-but-not-
+  current steps.** The icon classname was ``ph-fill ph-fill-check-
+  circle``; Phosphor uses ``ph-fill`` for the weight and
+  ``ph-<icon>`` for the glyph, so ``ph-fill-check-circle`` resolved
+  to no CSS rule and the ``<i>`` rendered empty. The branched-out
+  digit (the step number) was also hidden, so completed steps in
+  the progress bar appeared as blank circles. Fix is a one-word
+  classname correction.
+- **Onboarding welcome copy still listed "Broker" as step 2.**
+  v0.52.2 reframed that step as a transport choice with REST as
+  the default; the welcome overview and the progress-pip label
+  were missed in that pass. Now reads "Transport" everywhere,
+  with the inline copy explaining REST (no broker) vs MQTT.
+  Wizard URL stays ``/onboarding/broker`` for backward
+  compatibility with bookmarks and the ``save_broker`` route.
+
 ## [0.52.3], 2026-06-20
 
 ### Added

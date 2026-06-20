@@ -53,7 +53,11 @@ bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 STEPS: tuple[str, ...] = ("welcome", "broker", "device", "dashboard", "telemetry")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
-    "broker": "Broker",
+    # The route step id is still "broker" for URL stability (see
+    # save_broker), but the user-facing label now reflects the v0.52.2
+    # reframe to a transport choice. REST users don't touch a broker
+    # at all.
+    "broker": "Transport",
     "device": "Device",
     "dashboard": "Dashboard",
     "telemetry": "Help out",
