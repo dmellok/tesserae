@@ -6,6 +6,49 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.54.1], 2026-06-21
+
+### Changed
+
+- **Settings → Server: handoff redesign for the App fields.** Single
+  "App" card replaced with seven grouped section cards (Network &
+  integrations, Location & time, Quiet hours, Low-battery warnings,
+  Display & performance, Widget marketplace, Privacy). Quiet hours
+  + Low-battery carry their master toggle in the section header and
+  dim the dependent controls below when off. The Network card pins
+  a read-only ``NETWORK IP`` chip to its header. Sticky save bar
+  matches the device-card pattern.
+- **MQTT broker + Virtual panel cards adopt the same section-card
+  pattern.** Icon-in-header + title + description + switches as
+  full-row toggle rows + the same sticky save bar. The legacy
+  external-vs-embedded broker show/hide JS still fires, just on the
+  restyled markup.
+- **The dx-section-card pattern is applied globally to Renderers and
+  Widgets too**, so every settings tab shares one visual treatment.
+  Side-effect: ``.dx-*`` rules are no longer scoped to
+  ``.dx-server-area``, so plugin/renderer cards on the Widgets/
+  Renderers tabs also get the teal icon-in-square header.
+- **Description-text colours unified across the app.** ``.lede``
+  steps to 13.5px / ``#7a7a74`` (the handoff page-subtitle
+  treatment); ``.field-help`` steps to 12px / ``#9a9a93`` (matching
+  the new ``.dx-toggle-row-desc``). All four description classes
+  now share one colour family with a size hierarchy.
+
+### Fixed
+
+- ``settings_tabs`` Events tab labelled "Events" with the pulse
+  icon (was incorrectly rendering as a second "Settings" h1 with
+  the gear icon).
+- ``rotations.html`` page header gains the arrows-clockwise icon
+  and switches from ``<p class="muted">`` to ``<p class="lede">``
+  so it matches every other top-level page.
+- Stray "No system sections yet." paragraph removed from the
+  System tab (the loop is intentionally empty there).
+- Gap below the settings tabs is now identical on every sub-page.
+  ``.settings-stack { margin-top }`` + ``.dx-server-cards
+  { margin-top }`` were stacking with the tab bar's own bottom
+  margin (32px instead of 16px on System / Server).
+
 ## [0.54.0], 2026-06-20
 
 ### Changed

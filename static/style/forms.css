@@ -119,8 +119,8 @@
 
 .field-help {
   margin: var(--t-space-1) 0 0;
-  font-size: var(--t-size-sm);
-  color: var(--t-fg-soft);
+  font-size: 12px;
+  color: #9a9a93;
   line-height: 1.5;
 }
 

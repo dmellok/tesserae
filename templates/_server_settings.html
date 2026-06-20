@@ -1,0 +1,103 @@
+{# Server tab grouped layout (handoff redesign).
+   Walks ``app_field_groups`` (built by _build_app_field_groups in
+   app.settings.index_routes) and emits one section card per group.
+   Each card carries an optional master switch in its header row +
+   a dependent body that dims when the master is off. The whole
+   thing posts to one endpoint (the same one the legacy App card
+   uses) so save semantics don't change. #}
+
+{% from "_components.html" import auto_field, info_pop, switch with context %}
+
+<form method="post" action="{{ app_field_groups[0].endpoint if app_field_groups else '' }}"
+      class="form dx-server-form" data-dirty-form>
+  <div class="dx-server-cards">
+
+    {% for group in app_field_groups %}
+    <section class="dx-section-card"
+             data-group="{{ group.id }}"
+             {% if group.master_field %}data-dep-group{% endif %}>
+
+      <header class="dx-section-head">
+        {% if group.icon %}
+        <span class="dx-section-icon" aria-hidden="true">
+          <i class="ph ph-{{ group.icon }}"></i>
+        </span>
+        {% endif %}
+        <div class="dx-section-titleblock">
+          <h3 class="dx-section-title">{{ group.title }}</h3>
+          <p class="dx-section-desc">{{ group.description }}</p>
+        </div>
+
+        {# Network card carries a NETWORK IP chip; Quiet hours / Low-
+           battery carry their master toggle in the header row. #}
+        {% if group.meta_label and group.meta_value %}
+        <div class="dx-section-meta">
+          {{ group.meta_label }}
+          <code>{{ group.meta_value }}</code>
+        </div>
+        {% endif %}
+
+        {% if group.master_field %}
+        {% set master = group.master_field %}
+        <label class="dx-toggle-switch" for="server-{{ master.name }}">
+          <input id="server-{{ master.name }}"
+                 type="checkbox"
+                 name="{{ master.name }}"
+                 value="on"
+                 {% if group.master_state %}checked{% endif %}
+                 data-master>
+          <span class="dx-toggle-track" aria-hidden="true">
+            <span class="dx-toggle-knob"></span>
+          </span>
+        </label>
+        {% endif %}
+      </header>
+
+      <div class="dx-section-body" {% if group.master_field %}data-dep-target{% endif %}>
+        {% for field in group.fields %}
+          {% set value = group.state.get(field.name, field.get('default', '')) %}
+          {% set field_id = 'server-' ~ field.name %}
+
+          {% if field.type == 'switch' %}
+            {# Full-row toggle: label + description on the left, switch
+               right-aligned. Replaces the auto_field switch which puts
+               the switch first. Description comes from field.help. #}
+            <div class="dx-toggle-row">
+              <div class="dx-toggle-row-text">
+                <label class="dx-toggle-row-label" for="{{ field_id }}">{{ field.label }}</label>
+                {% if field.help %}<p class="dx-toggle-row-desc">{{ field.help }}</p>{% endif %}
+              </div>
+              <label class="dx-toggle-switch" for="{{ field_id }}">
+                <input id="{{ field_id }}"
+                       type="checkbox"
+                       name="{{ field.name }}"
+                       value="on"
+                       {% if value %}checked{% endif %}>
+                <span class="dx-toggle-track" aria-hidden="true">
+                  <span class="dx-toggle-knob"></span>
+                </span>
+              </label>
+            </div>
+          {% else %}
+            {{ auto_field(field_id, field.name, field, value) }}
+          {% endif %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+
+  </div>{# /dx-server-cards #}
+
+  {# Sticky save bar reused from the device card. The combined form
+     above feeds it; Save POSTs, Discard resets. #}
+  <div class="dx-save-bar dx-save-bar--server" data-save-bar hidden>
+    <span class="dx-save-bar-msg">You have unsaved changes</span>
+    <div class="dx-save-bar-actions">
+      <button type="reset" class="dx-save-bar-discard">Discard</button>
+      <button type="submit" class="dx-save-bar-save">
+        <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+        <span>Save changes</span>
+      </button>
+    </div>
+  </div>
+</form>

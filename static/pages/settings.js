@@ -88,7 +88,11 @@
   // checkbox or [role=switch] inside) and one or more ``data-dep-target``
   // blocks that dim + disable when the master is off.
   function initDepGroup(group) {
+    // ``[data-master]`` is the explicit marker (server-tab section
+    // headers use it); fall back to a name match or the first checkbox
+    // so the device-card quiet-hours block keeps working unchanged.
     const master =
+      group.querySelector('[data-master]') ||
       group.querySelector('input[type="checkbox"][name*="enabled"]') ||
       group.querySelector('input[type="checkbox"]');
     if (!master) return;

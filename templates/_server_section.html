@@ -1,0 +1,129 @@
+{# Generic server-tab section card (handoff redesign).
+   Renders one section dict (broker / virtual panel / etc.) in the
+   dx-section-card pattern: icon-in-header + title + description, then
+   a body that lays out fields with the same toggle-row treatment the
+   App-grouped partial uses. Switches render as label-left / switch-
+   right rows; everything else falls through to auto_field. The form
+   keeps the section's existing endpoint so save semantics are
+   unchanged; only the visual treatment differs.
+
+   Broker has an extra wrinkle: the external (host/port/username/
+   password) and embedded_* fields render in two grouped blocks the
+   existing JS shows/hides off the ``embedded_enabled`` switch.
+   Preserved here as-is. #}
+
+{% from "_components.html" import auto_field with context %}
+
+{% set icon_name = section.icon or KIND_ICONS.get(section.kind, 'gear-six') %}
+
+<section class="dx-section-card{% if section.kind == 'panel' %} panel-section{% endif %}"
+         id="{{ section.id }}">
+  <form method="post" action="{{ section.endpoint }}"
+        class="form dx-legacy-server-form" data-dirty-form>
+
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true">
+        <i class="ph ph-{{ icon_name }}"></i>
+      </span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">{{ section.title }}</h3>
+        {% if section.blurb %}
+        <p class="dx-section-desc">{{ section.blurb }}</p>
+        {% endif %}
+      </div>
+      {# Surface the section's meta dict (e.g. broker's MQTT URL) as a
+         right-aligned read-only chip, same shape as the Network card's
+         NETWORK IP chip. The legacy section may carry multiple meta
+         rows; show only the first to keep the header tidy. #}
+      {% if section.meta %}
+      {% for key, value in section.meta.items() %}
+        {% if loop.first %}
+        <div class="dx-section-meta">
+          {{ key|upper }}
+          <code>{{ value }}</code>
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% endif %}
+    </header>
+
+    <div class="dx-section-body">
+
+      {# Optional renderer-style enable toggle. Kept off the broker
+         path; broker's enabled state is the embedded_enabled mode
+         switch, not a binary on/off. #}
+      {% if section.supports_toggle %}
+      <div class="dx-toggle-row">
+        <div class="dx-toggle-row-text">
+          <label class="dx-toggle-row-label" for="{{ section.id }}-enabled">Enabled</label>
+          <p class="dx-toggle-row-desc">Push pipeline skips this renderer when off, settings stay saved.</p>
+        </div>
+        <label class="dx-toggle-switch" for="{{ section.id }}-enabled">
+          <input id="{{ section.id }}-enabled" type="checkbox" name="_enabled" value="on"
+                 {% if section.enabled %}checked{% endif %}>
+          <span class="dx-toggle-track" aria-hidden="true">
+            <span class="dx-toggle-knob"></span>
+          </span>
+        </label>
+      </div>
+      {% endif %}
+
+      {# Fields. Switches render as toggle rows; everything else uses
+         auto_field. Broker's external/embedded groups stay wrapped so
+         the existing show/hide JS keeps working. #}
+      {% set ns = namespace(group=none) %}
+      {% for field in section.fields %}
+        {% set value = section.state.get(field.name, field.get('default', '')) %}
+        {% set field_id = section.id ~ '-' ~ field.name %}
+
+        {% set this_group = none %}
+        {% if section.kind == 'broker' %}
+          {% if field.name in ('host', 'port', 'username', 'password') %}
+            {% set this_group = 'external' %}
+          {% elif field.name in ('embedded_port', 'embedded_bind', 'embedded_username', 'embedded_password') %}
+            {% set this_group = 'embedded' %}
+          {% endif %}
+        {% endif %}
+        {% if this_group != ns.group %}
+          {% if ns.group %}</div>{% endif %}
+          {% if this_group == 'external' %}<div class="external-broker-fields">
+          {% elif this_group == 'embedded' %}<div class="embedded-broker-fields">{% endif %}
+          {% set ns.group = this_group %}
+        {% endif %}
+
+        {% if field.type == 'switch' %}
+          <div class="dx-toggle-row">
+            <div class="dx-toggle-row-text">
+              <label class="dx-toggle-row-label" for="{{ field_id }}">{{ field.label }}</label>
+              {% if field.help %}<p class="dx-toggle-row-desc">{{ field.help }}</p>{% endif %}
+            </div>
+            <label class="dx-toggle-switch" for="{{ field_id }}">
+              <input id="{{ field_id }}" type="checkbox" name="{{ field.name }}" value="on"
+                     {% if value %}checked{% endif %}>
+              <span class="dx-toggle-track" aria-hidden="true">
+                <span class="dx-toggle-knob"></span>
+              </span>
+            </label>
+          </div>
+        {% elif section.kind == 'panel' and field.name in ('panel_w', 'panel_h') %}
+          <div class="panel-custom-fields">{{ auto_field(field_id, field.name, field, value) }}</div>
+        {% else %}
+          {{ auto_field(field_id, field.name, field, value) }}
+        {% endif %}
+      {% endfor %}
+      {% if ns.group %}</div>{% endif %}
+
+    </div>{# /dx-section-body #}
+
+    <div class="dx-save-bar dx-save-bar--server" data-save-bar hidden>
+      <span class="dx-save-bar-msg">You have unsaved changes</span>
+      <div class="dx-save-bar-actions">
+        <button type="reset" class="dx-save-bar-discard">Discard</button>
+        <button type="submit" class="dx-save-bar-save">
+          <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+          <span>Save changes</span>
+        </button>
+      </div>
+    </div>
+  </form>
+</section>

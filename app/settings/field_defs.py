@@ -36,12 +36,19 @@ _TZ_CHOICES: list[dict[str, str]] = [
 ]
 
 
+# Per-field ``group`` keys put each App-section field into one of the
+# seven section cards on the redesigned Settings → Server page. The
+# field-name / label / help text / disk layout are all unchanged; only
+# the rendering order + visual grouping reads from ``group`` +
+# ``APP_FIELD_GROUPS`` below. Legacy callers iterating APP_FIELDS keep
+# working.
 APP_FIELDS: list[dict[str, Any]] = [
     {
         "name": "default_transport",
         "type": "select",
         "label": "Default transport for new devices",
         "default": "rest",
+        "group": "network",
         "choices": [
             {"value": "rest", "label": "REST API (recommended, no broker needed)"},
             {"value": "mqtt", "label": "MQTT (broker required, lower latency)"},
@@ -59,6 +66,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "string",
         "label": "Public URL",
         "default": "",
+        "group": "network",
         "placeholder": "https://tesserae.example.org:8443",
         "help": (
             "Override the URL Tesserae uses when building external links "
@@ -74,6 +82,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "select",
         "label": "Timezone",
         "default": "system",
+        "group": "location",
         "choices": _TZ_CHOICES,
         "help": (
             "Used by the scheduler when interpreting daily fire times and "
@@ -85,6 +94,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "number",
         "label": "Latitude",
         "default": "",
+        "group": "location",
         "step": "any",  # decimal degrees, a default step of 1 rejects e.g. -37.8136
         "help": (
             "Default location for weather / sky / sunrise widgets, so you don't "
@@ -97,6 +107,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "number",
         "label": "Longitude",
         "default": "",
+        "group": "location",
         "step": "any",
         "help": "Decimal degrees, e.g. 144.9631. Paired with Latitude above.",
     },
@@ -105,6 +116,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Home Assistant MQTT discovery",
         "default": False,
+        "group": "network",
         "help": (
             "Publish HA autodiscovery configs so a button per saved dashboard, "
             "an image entity for the most-recent render, and diagnostic sensors "
@@ -116,6 +128,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Advertise tesserae.local over mDNS",
         "default": False,
+        "group": "network",
         "help": (
             "Announce this server as tesserae.local (and an _http._tcp service) "
             "over mDNS / Bonjour so you can reach it by name without changing "
@@ -127,6 +140,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Quiet hours",
         "default": False,
+        "group": "quiet_hours",
+        "group_role": "master",
         "help": (
             "Suppress automated pushes (scheduler firings, webhook calls) during "
             "a daily time window, typical use is to stop the panel waking the room "
@@ -140,6 +155,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "time",
         "label": "Quiet hours start",
         "default": "22:00",
+        "group": "quiet_hours",
+        "group_role": "dependent",
         "help": "When the daily quiet window begins. Honours Settings → Server → App → Timezone.",
     },
     {
@@ -147,6 +164,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "time",
         "label": "Quiet hours end",
         "default": "07:00",
+        "group": "quiet_hours",
+        "group_role": "dependent",
         "help": (
             "When the daily quiet window ends. If end < start, the window wraps "
             "across midnight (e.g. 22:00 → 07:00 = overnight)."
@@ -157,6 +176,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Low-battery overlay on device pushes",
         "default": True,
+        "group": "low_battery",
+        "group_role": "master",
         "help": (
             "When a device with a battery (TRMNL, ESP32) reports a charge "
             "below the threshold, paint a small low-battery chip in the "
@@ -175,6 +196,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "max": 50,
         "step": 1,
         "unit": "%",
+        "group": "low_battery",
+        "group_role": "dependent",
         "help": (
             "Battery percent at or below which the overlay paints. Default "
             "15%, raise if you want earlier warning, lower if 15% already "
@@ -186,6 +209,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Lock mobile zoom",
         "default": True,
+        "group": "display",
         "help": (
             "Prevents pinch-to-zoom and double-tap-to-zoom on the admin UI "
             "when accessed from a phone. iOS Safari ignores the standard "
@@ -201,6 +225,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Keep the renderer browser warm",
         "default": True,
+        "group": "display",
         "help": (
             "Holds a single Chromium process resident between renders, so each "
             "push reuses it rather than launching cold. Cuts per-push render time "
@@ -215,6 +240,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "string",
         "label": "Marketplace catalog URL",
         "default": ("https://raw.githubusercontent.com/dmellok/tesserae-widgets/main/widgets.json"),
+        "group": "marketplace",
         "help": (
             "Where Settings → Plugins → Browse pulls the community widget "
             "catalog from. Defaults to the official catalog (audit-only, "
@@ -227,6 +253,7 @@ APP_FIELDS: list[dict[str, Any]] = [
         "type": "switch",
         "label": "Send anonymous usage telemetry",
         "default": False,
+        "group": "privacy",
         "help": (
             "Two events to the project's analytics backend, app.started "
             "(version + platform) and update.applied (from/to short SHA + "
@@ -236,6 +263,66 @@ APP_FIELDS: list[dict[str, Any]] = [
             "Tesserae and what versions they're on, flip it off here if "
             "you'd rather not. TESSERAE_TELEMETRY=0 also disables."
         ),
+    },
+]
+
+
+# Server tab section cards. Order here is the render order; each entry
+# names a card. ``master`` is the field name whose switch lives in the
+# section header and dims the rest of the card when off (Quiet hours +
+# Low-battery use this); None for cards with no master toggle.
+# ``meta`` is a small read-only chip pinned to the section header
+# (currently used by the Network card for ``NETWORK IP``).
+APP_FIELD_GROUPS: list[dict[str, Any]] = [
+    {
+        "id": "network",
+        "title": "Network & integrations",
+        "description": "How devices reach this server and which integrations are advertised.",
+        "icon": "globe",
+        "master": None,
+        "meta_label": "NETWORK IP",
+    },
+    {
+        "id": "location",
+        "title": "Location & time",
+        "description": "Default coordinates for weather widgets and the scheduler's timezone.",
+        "icon": "compass",
+        "master": None,
+    },
+    {
+        "id": "quiet_hours",
+        "title": "Quiet hours",
+        "description": "Pause automated pushes during a nightly window. Devices can override.",
+        "icon": "moon",
+        "master": "quiet_hours_enabled",
+    },
+    {
+        "id": "low_battery",
+        "title": "Low-battery warnings",
+        "description": "Overlay a warning badge on pushes to battery-powered devices running low.",
+        "icon": "battery-warning",
+        "master": "low_battery_overlay",
+    },
+    {
+        "id": "display",
+        "title": "Display & performance",
+        "description": "Tune how the admin UI and renderer behave.",
+        "icon": "gauge",
+        "master": None,
+    },
+    {
+        "id": "marketplace",
+        "title": "Widget marketplace",
+        "description": "Where the Browse page pulls community widget metadata from.",
+        "icon": "storefront",
+        "master": None,
+    },
+    {
+        "id": "privacy",
+        "title": "Privacy",
+        "description": "What leaves this server. No image content or device names are ever sent.",
+        "icon": "shield-check",
+        "master": None,
     },
 ]
 

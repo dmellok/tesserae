@@ -42,7 +42,7 @@ from ._shared import (
     renderers,
     settings_store,
 )
-from .field_defs import APP_FIELDS, BROKER_FIELDS, PANEL_FIELDS
+from .field_defs import APP_FIELD_GROUPS, APP_FIELDS, BROKER_FIELDS, PANEL_FIELDS
 
 
 def _pending_pairings() -> list[dict[str, Any]]:
@@ -79,6 +79,15 @@ def settings_area(area: str) -> str | Response:
     if area not in AREA_KINDS:
         return Response(f"unknown settings area {area!r}", status=404)
     sections = [s for s in _build_sections() if s["kind"] in AREA_KINDS[area]]
+    # Server tab: replace the single "App" card with the seven grouped
+    # section cards (Network / Location / Quiet hours / Low-battery /
+    # Display / Marketplace / Privacy). The Broker + Virtual-panel
+    # cards stay where they are. ``app_field_groups`` is None on
+    # other tabs so the template's conditional skips it.
+    app_field_groups: list[dict[str, Any]] | None = None
+    if area == "server":
+        app_field_groups = _build_app_field_groups()
+        sections = [s for s in sections if s["kind"] != "app"]
     # Devices area needs the kinds list (for the Add-device form) so the
     # template doesn't have to dig into the registry directly.
     device_kinds_list = (
@@ -173,6 +182,7 @@ def settings_area(area: str) -> str | Response:
     return render_template(
         "settings.html",
         sections=sections,
+        app_field_groups=app_field_groups,
         active_area=area,
         areas=AREAS,
         device_kinds=device_kinds_list,
@@ -213,6 +223,65 @@ def settings_area(area: str) -> str | Response:
 
 
 # -- internals: section building ---------------------------------------
+
+
+def _build_app_field_groups() -> list[dict[str, Any]]:
+    """Compose the seven grouped section cards for the redesigned
+    Settings → Server page. Iterates ``APP_FIELD_GROUPS`` for the
+    visual order + master-toggle wiring, then fans out the matching
+    ``APP_FIELDS`` entries by their ``group`` key. Each group dict
+    carries everything the template needs:
+
+    * ``title`` / ``description`` / ``icon`` – the section header.
+    * ``master_field`` (or None) – the field with ``group_role:
+      "master"`` whose switch lives in the header row.
+    * ``master_state`` – the current value of the master, so dependent
+      controls below can render dimmed on the first paint.
+    * ``fields`` – dependent + plain fields, in declared order.
+    * ``meta_label`` / ``meta_value`` – read-only chip pinned to the
+      header (currently Network gets the NETWORK IP).
+
+    The shape mirrors a regular section dict (``id`` / ``state`` /
+    ``endpoint``) so the template can render the group with the same
+    form-post path the legacy App card uses; the save handler still
+    receives a flat ``{name: value}`` POST.
+    """
+    store = settings_store()
+    app_raw = store.get_section("app")
+    state = _values_for_core("app", APP_FIELDS, app_raw)
+    endpoint = url_for("auth.settings_update", section_kind="app")
+    network_ip = detect_local_ip()
+
+    groups: list[dict[str, Any]] = []
+    for spec in APP_FIELD_GROUPS:
+        group_fields = [f for f in APP_FIELDS if f.get("group") == spec["id"]]
+        master_field = next(
+            (f for f in group_fields if f.get("group_role") == "master"),
+            None,
+        )
+        # Dependent + plain fields render under the section body. The
+        # master keeps its place in the header so it isn't duplicated.
+        body_fields = [f for f in group_fields if f.get("group_role") != "master"]
+        master_state = state.get(master_field["name"]) if master_field else None
+        meta_value = None
+        if spec.get("meta_label") == "NETWORK IP":
+            meta_value = network_ip
+        groups.append(
+            {
+                "id": spec["id"],
+                "title": spec["title"],
+                "description": spec["description"],
+                "icon": spec["icon"],
+                "master_field": master_field,
+                "master_state": master_state,
+                "fields": body_fields,
+                "state": state,
+                "endpoint": endpoint,
+                "meta_label": spec.get("meta_label"),
+                "meta_value": meta_value,
+            }
+        )
+    return groups
 
 
 def _build_sections() -> list[dict[str, Any]]:

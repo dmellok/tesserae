@@ -1,12 +1,13 @@
 {% extends "_base.html" %}
 {% from "_components.html" import auto_field, button, card_head, info_pop, number_input, select_field, settings_tabs, slider, switch, text_input %}
-{% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Widgets'} %}
-{% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece'} %}
+{% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Widgets','system':'System'} %}
+{% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece','system':'wrench'} %}
 {% set AREA_BLURBS = {
   'server':'Server-wide configuration: base URL, MQTT broker, Home Assistant discovery, virtual panel fallback.',
   'renderers':'Per-renderer transform + payload settings.',
   'devices':'Latest heartbeat + outbound config for each loaded device. Add a second display below, each one gets its own MQTT topic and panel size.',
   'plugins':'Settings declared by each loaded widget. Secrets stay masked between saves.',
+  'system':'Updates, backups, authentication, and telemetry for this Tesserae install.',
 } %}
 {% block title %}Settings: {{ AREA_TITLES[active_area] }}, Tesserae{% endblock %}
 {% block main %}
@@ -184,7 +185,12 @@
 </section>
 {% endif %}
 
-{% if not sections %}
+{% if not sections and active_area in ('renderers', 'plugins') %}
+{# Only useful on tabs whose entire purpose IS the per-section list
+   (Renderers, Widgets/Plugins). System + Events render their own
+   custom cards instead, so this stray "no sections" line just
+   read as broken when the user landed on System with an empty
+   loop. #}
 <p class="lede">No {{ AREA_TITLES[active_area]|lower }} sections yet.</p>
 {% endif %}
 
@@ -196,6 +202,16 @@
    other tabs (renderers / devices / plugins / system / events) the
    classic .card look is preserved. #}
 <div class="settings-section-list {% if active_area == 'server' %}dx-server-area{% endif %}">
+
+{# Server tab: render the seven grouped section cards (Network &
+   integrations / Location & time / Quiet hours / Low-battery /
+   Display & performance / Marketplace / Privacy) ahead of the
+   remaining Broker + Virtual-panel cards. ``app_field_groups`` is
+   None on other tabs so this falls through cleanly. #}
+{% if active_area == 'server' and app_field_groups %}
+{% include '_server_settings.html' %}
+{% endif %}
+
 {% for section in sections %}
 {% if section.kind == 'device' %}
 {# Device cards use the redesigned partial (header strip + tabs +
@@ -203,6 +219,13 @@
    wrapper, so the non-device branch below renders the legacy
    .card markup unchanged for app/broker/renderer/plugin sections. #}
 {% include '_device_card.html' %}
+{% elif section.kind in ('broker', 'panel', 'renderer', 'plugin') %}
+{# All non-device section cards (Broker, Virtual panel, Renderers,
+   Plugins) share the dx-section-card pattern: icon in header,
+   title + description, switches as toggle rows, sticky save bar.
+   Replaces the legacy .card markup further down (kept as dead
+   ``{% if False %}`` to bound the file edit). #}
+{% include '_server_section.html' %}
 {% else %}
 <section class="card {% if section.kind == 'panel' %}panel-section{% endif %}" id="{{ section.id }}">
   {% if False %}{# Dead branch kept to bound the legacy device markup below. #}

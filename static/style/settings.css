@@ -18,8 +18,12 @@
   display: flex;
   flex-direction: column;
   gap: var(--t-space-4);
-  margin-top: var(--t-space-4);
 }
+/* Reset legacy .card { margin: 0 0 16px } so flex gap is the single
+   source of truth between cards (otherwise margin + gap stack to 32px
+   on the System page). Match the settings-section-list reset further
+   down so all tabs share one vertical rhythm. */
+.settings-stack > * { margin: 0; }
 
 /* Updates card: channel select + check-button on one row.
    Without form--row, the .actions block right-aligns onto its own line
@@ -654,12 +658,19 @@
   --dx-save-bar: #23231f;
 
   padding: 0;
-  background: var(--dx-surface);
-  border: 1px solid var(--dx-border);
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.04);
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius-md);
+  box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
   overflow: hidden;
   margin: 0 0 var(--t-space-4);
+  transition:
+    border-color var(--t-trans-fast),
+    box-shadow var(--t-trans);
+}
+.dx-device-card:hover {
+  box-shadow: var(--t-shadow), var(--t-shadow-inset);
+  border-color: color-mix(in oklab, var(--t-border-strong) 80%, var(--t-border));
 }
 
 /* HEADER STRIP --------------------------------------------------- */
@@ -836,23 +847,27 @@
   border-bottom: 1px solid var(--dx-border);
 }
 .dx-tab {
-  background: none;
+  background: transparent;
   border: 0;
+  box-shadow: none;
   padding: 12px 15px;
-  margin-bottom: -1px;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   color: #8f8f88;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 120ms ease, border-color 120ms ease;
+  transition: color 120ms ease;
 }
-.dx-tab:hover { color: var(--dx-ink-soft); }
-.dx-tab.is-active {
-  color: var(--dx-teal);
-  border-bottom-color: var(--dx-teal);
+.dx-tab:hover,
+.dx-tab:focus,
+.dx-tab:focus-visible {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--dx-ink-soft);
+  outline: none;
 }
+.dx-tab.is-active { color: var(--dx-teal); }
 
 /* TAB PANELS ------------------------------------------------------ */
 .dx-panel {
@@ -1223,7 +1238,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  margin-top: 16px;
 }
 .dx-section-card {
   --dx-teal: #15846a;
@@ -1392,4 +1406,240 @@
   border: 1px solid #e8e7e1;
   border-radius: 5px;
   padding: 2px 7px;
+}
+
+/* ---------- Server tab: grouped section cards + toggle pattern ------ */
+
+.dx-server-area { margin: 0; }
+/* All section cards in the settings loop stack with a consistent
+   16px gap, regardless of tab. Replaces the per-card
+   ``margin-bottom`` the old .card style relied on so flex gap is
+   the single source of truth for vertical rhythm. The ``*`` reset
+   nukes both the legacy ``.card { margin: 0 0 16px }`` AND any
+   default ``<form>`` user-agent margin so the first item sits
+   flush against the tab bar (16px from the tab bar's own margin-
+   bottom, same as every other tab). */
+.settings-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-section-list > * { margin: 0; }
+.settings-section-list > form { margin: 0; padding: 0; }
+.dx-server-cards { display: flex; flex-direction: column; gap: 16px; }
+.dx-section-card { margin: 0; }
+.dx-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--dx-border-faint, #f1f0eb);
+}
+.dx-section-head .dx-section-titleblock { flex: 1 1 auto; min-width: 0; }
+.dx-section-icon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #e7f2ee;
+  color: #15846a;
+  font-size: 19px;
+}
+.dx-section-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dx-faint, #9a9a93);
+}
+.dx-section-body { display: flex; flex-direction: column; gap: 0; }
+.dx-section-body .field {
+  padding: 12px 0;
+  margin: 0;
+}
+.dx-section-body .field + .field,
+.dx-section-body .field + .dx-toggle-row,
+.dx-section-body > .dx-toggle-row + .field,
+.dx-section-body > .dx-toggle-row + .dx-toggle-row {
+  border-top: 1px solid var(--dx-border-faint, #f1f0eb);
+}
+.dx-section-body .field label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dx-ink-soft, #56564f);
+  margin-bottom: 7px;
+  display: block;
+}
+.dx-section-body .field input:not([type="range"]):not([type="checkbox"]),
+.dx-section-body .field select,
+.dx-section-body .field textarea {
+  border-radius: 8px;
+  border: 1px solid var(--dx-input-border, #dedcd6);
+  background: #fff;
+  padding: 11px 13px;
+  font-size: 14px;
+  width: 100%;
+}
+/* Sliders carry their own track + thumb chrome via .field--slider,
+   keep them out of the input-box treatment above (the rectangular
+   border + padding wraps the range thumb in a halo otherwise). */
+.dx-section-body .field--slider { padding-block: 14px; }
+.dx-section-body .field .field-help {
+  font-size: 11.5px;
+  color: var(--dx-faint-2, #a3a39b);
+  margin-top: 6px;
+}
+
+/* Full-row toggle (label + description left, switch right). */
+.dx-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 15px 0;
+}
+.dx-toggle-row-text { flex: 1 1 auto; min-width: 0; }
+.dx-toggle-row-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dx-ink, #2b2b29);
+  cursor: pointer;
+}
+.dx-toggle-row-desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--dx-faint, #9a9a93);
+  line-height: 1.45;
+}
+
+/* Visual switch (used by toggle rows and by master toggles in the
+   section header). 46×26 track + 20px knob per the spec. */
+.dx-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.dx-toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.dx-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: #cfcec8;
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+.dx-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease;
+}
+.dx-toggle-switch input:checked + .dx-toggle-track { background: #15846a; }
+.dx-toggle-switch input:checked + .dx-toggle-track .dx-toggle-knob {
+  transform: translateX(20px);
+}
+.dx-toggle-switch input:focus-visible + .dx-toggle-track {
+  outline: 2px solid #15846a;
+  outline-offset: 2px;
+}
+
+/* Sticky save bar variant for the server tab: fixed at the bottom of
+   the viewport, centered, with the same dark surface + teal save
+   button as the device card. ``--dx-save-bar`` + the teal tokens are
+   scoped on the device card, so re-declare them here for the server
+   variant (the bar lives at the page level, outside the card). */
+.dx-save-bar--server {
+  --dx-save-bar: #23231f;
+  --dx-teal: #15846a;
+  --dx-teal-hover-2: #179476;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  width: min(720px, calc(100% - 32px));
+  z-index: 50;
+  background: var(--dx-save-bar);
+  color: #fff;
+  border-radius: 10px;
+  padding: 12px 14px 12px 18px;
+  box-shadow: 0 8px 24px rgba(20, 20, 15, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dx-save-bar--server .dx-save-bar-msg { font-size: 13px; color: #fff; }
+.dx-save-bar--server .dx-save-bar-discard { color: #d6d6d0; }
+.dx-save-bar--server .dx-save-bar-discard:hover { color: #fff; }
+.dx-save-bar--server .dx-save-bar-save {
+  background: var(--dx-teal);
+  color: #fff;
+}
+.dx-save-bar--server .dx-save-bar-save:hover { background: var(--dx-teal-hover-2); }
+.dx-save-bar--server .dx-save-bar-discard,
+.dx-save-bar--server .dx-save-bar-save {
+  background: transparent;
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dx-save-bar--server .dx-save-bar-save {
+  background: var(--dx-teal);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dx-save-bar--server .dx-save-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Hide the inline Save button on the legacy server-tab forms (Broker
+   + Virtual panel) since they now use the sticky save bar instead. */
+.dx-legacy-server-form > .actions { display: none; }
+@keyframes dx-slide-up-fixed {
+  from { transform: translateX(-50%) translateY(120%); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+.dx-save-bar--server:not([hidden]) { animation: dx-slide-up-fixed 0.22s ease; }
+
+/* Section dependent-dim: applied when the section header's master
+   toggle is off. JS toggles ``data-dep-off`` on the section card. */
+.dx-section-card[data-dep-off] .dx-section-body {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.dx-section-card[data-dep-off] .dx-section-body input,
+.dx-section-card[data-dep-off] .dx-section-body select {
+  background: var(--dx-inset, #f3f2ee);
 }
