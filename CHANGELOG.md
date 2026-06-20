@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.53.2], 2026-06-20
+
+### Fixed
+
+- **``GET /send`` returned 500 when any device's panel had
+  ``w == 0`` or ``h == 0``.** ``device_panel(dev)`` builds a
+  Pydantic ``Panel`` which validates ``w > 0`` and ``h > 0``, and
+  ``send_routes._device_options`` iterates every registered
+  instance and calls it without a try/except, so a single corrupted
+  device 500'd the whole page. After the fix the bad device is
+  skipped with a warning log and the rest of the fleet remains
+  pickable.
+- **The discover-and-claim flow no longer registers instances with a
+  zero panel.** Firmware that reports ``panel_w: 0`` / ``panel_h: 0``
+  in a ``/api/v1/device/discover`` POST (a default-int from a C
+  struct that wasn't populated) now falls back to the kind's
+  default panel instead of corrupting the instance. Fix lives in
+  both ``app.settings.devices_routes.devices_register_discovered``
+  and ``app.onboarding.register_discovered``.
+
+### Notes
+
+- An existing instance with ``panel: {w: 0, h: 0}`` keeps showing up
+  in Settings → Devices (so the admin can fix it via Panel form) but
+  is now skipped on /send so the page works again. Fixing the bad
+  instance via the admin UI's Panel form (pick a preset or type the
+  real dims) restores it as a send target.
+
 ## [0.53.1], 2026-06-20
 
 ### Fixed

@@ -82,7 +82,23 @@ def _device_options() -> list[dict[str, Any]]:
     for dev in sorted(registry.devices.values(), key=lambda d: d.name.lower()):
         if dev.kind_of is None or dev.panel is None:
             continue
-        panel = device_panel(dev)
+        # device_panel() builds a Pydantic ``Panel`` which validates
+        # w > 0, h > 0. A device instance with corrupted panel dims
+        # (e.g. saved with panel_w = 0 by an older discover-claim
+        # registration before v0.53.2 guarded against it) would
+        # raise here and 500 the entire /send page. Skip silently
+        # with a log line so the rest of the device list stays
+        # usable; admin can fix the bad instance via Settings →
+        # Devices → Panel.
+        try:
+            panel = device_panel(dev)
+        except Exception:
+            current_app.logger.warning(
+                "send: skipping device %r with invalid panel %r",
+                dev.id,
+                dev.panel,
+            )
+            continue
         if panel is None:
             continue
         opts.append(

@@ -316,3 +316,61 @@ def test_send_gallery_pushes_resolved_image(app: Flask, tmp_path: Path, monkeypa
     assert args[0] == b"\xff\xd8\xff"
     assert kwargs["fit"] == "fill"
     assert kwargs["device_id"] == dev
+
+
+def test_send_page_survives_device_with_invalid_panel(app: Flask) -> None:
+    """v0.53.2 regression: a single device with a corrupted panel
+    (w=0 / h=0) used to raise pydantic ValidationError out of
+    ``device_panel`` and 500 the whole /send page. After the fix,
+    that one device is skipped with a warning and the rest of the
+    fleet remains usable.
+
+    Repros the 'after installing a widget, navigating to the send page
+    gives me Internal Server Error' report where a discover-claim
+    flow had registered an instance with panel_w=0 / panel_h=0."""
+    client = app.test_client()
+    _sign_in(client)
+    # A good device first so we can tell apart "empty list" from "the
+    # good device survived the bad one".
+    good = _register_device(client, device_id="good_esp32", kind="esp32_client")
+
+    # Inject a corrupted instance by hand. ``create_instance`` won't
+    # accept w=0 today (Panel validation in panel_overrides_from_form),
+    # so monkey-patch the manifest dict in place instead.
+    devices = app.config["DEVICE_REGISTRY"]
+    # Add a synthetic broken instance.
+    from pathlib import Path as _Path
+
+    from app.device_loader import Device
+
+    broken_path = _Path(app.config["DEVICE_DATA_ROOT"]) / "broken.json"
+    broken_manifest = {
+        "id": "broken",
+        "kind": "esp32_client",
+        "name": "Broken device",
+        "tesserae_compat": "1.x",
+        "version": "0.1.0",
+        "renderers": ["esp32_bin"],
+        "panel": {"w": 0, "h": 0},
+    }
+    import json as _json
+
+    broken_path.write_text(_json.dumps(broken_manifest))
+    broken = Device(
+        id="broken",
+        path=broken_path,
+        manifest=broken_manifest,
+        module=devices.get("esp32_client").module,
+        data_dir=app.config["DEVICE_DATA_ROOT"],
+        kind_of="esp32_client",
+    )
+    devices.devices["broken"] = broken
+
+    # GET /send should NOT 500. The good device should appear in the
+    # picker; the broken one should be skipped silently.
+    resp = client.get("/send", follow_redirects=False)
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert good in body
+    # The broken device's id mustn't appear as a checkbox value.
+    assert 'value="broken"' not in body

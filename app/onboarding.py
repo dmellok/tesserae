@@ -366,10 +366,12 @@ def register_discovered(discovered_id: str) -> Response:
     if entry is None or not entry.kind:
         flash("That device is no longer announcing itself, add it by hand.", "error")
         return redirect(url_for("onboarding.step", step="device"))
+    # Guard against firmware reporting panel dims as zero; mirrors the
+    # check in app.settings.devices_routes.devices_register_discovered.
     overrides: dict[str, Any] = {}
-    if entry.panel_w is not None:
+    if entry.panel_w is not None and entry.panel_w > 0:
         overrides["w"] = entry.panel_w
-    if entry.panel_h is not None:
+    if entry.panel_h is not None and entry.panel_h > 0:
         overrides["h"] = entry.panel_h
     result = device_service.create_instance(
         devices=_devices(),

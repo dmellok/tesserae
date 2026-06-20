@@ -291,10 +291,15 @@ def devices_register_discovered(discovered_id: str) -> Response:
         )
         return redirect(url_for("auth.settings_area", area="devices"))
 
+    # Guard against firmware reporting panel_w / panel_h as zero (a
+    # default-int from a C struct that wasn't populated). Without this
+    # check the resulting instance lands with a corrupted panel that
+    # Panel(w > 0, h > 0) rejects later, breaking /send. Better to let
+    # create_instance fall back to the kind's default panel.
     panel_overrides: dict[str, Any] = {}
-    if entry.panel_w is not None:
+    if entry.panel_w is not None and entry.panel_w > 0:
         panel_overrides["w"] = entry.panel_w
-    if entry.panel_h is not None:
+    if entry.panel_h is not None and entry.panel_h > 0:
         panel_overrides["h"] = entry.panel_h
 
     # TRMNL discoveries carry the original access_token in the cache
