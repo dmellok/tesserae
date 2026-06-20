@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 
 from app.main import REPO_ROOT
-from app.transport_loader import Transport, TransportRegistry, discover
+from app.transport_loader import TransportRegistry, discover
 
 
 @pytest.fixture

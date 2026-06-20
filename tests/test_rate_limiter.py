@@ -17,7 +17,6 @@ from flask import Flask
 from app.main import REPO_ROOT, create_app
 from app.state.rate_limiter import RateLimiter
 
-
 # -- unit tests --------------------------------------------------------
 
 
