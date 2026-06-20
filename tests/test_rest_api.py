@@ -288,10 +288,77 @@ def test_status_response_includes_config_and_next_poll(app: Flask) -> None:
     assert "next_poll_s" in body
     # Default for pico_bin_client is 900s (15min) per device.json schema.
     assert body["next_poll_s"] == 900
-    # The merged status is now in the cache, tagged with the rest transport.
+    # The merged status is now in the cache, in the same shape the MQTT
+    # path uses ({"received_at": ts, "parsed": {...}}) so the Devices
+    # UI's _status_view reads it correctly.
     cache = app.config["DEVICE_STATUS"]
-    assert cache["bedroom_pico"]["battery_pct"] == 72
-    assert cache["bedroom_pico"]["transport"] == "rest"
+    record = cache["bedroom_pico"]
+    assert record["parsed"]["battery_pct"] == 72
+    assert record["received_at"] > 0
+
+
+def test_rest_status_updates_received_at_so_last_seen_is_fresh(app: Flask) -> None:
+    """v0.53 regression: a REST device heartbeat must write
+    ``received_at`` to the status cache so the Devices admin page's
+    "last seen" / freshness dot updates instead of reading 0 (epoch).
+
+    Pre-v0.53.1 the REST handler wrote a flat dict with ``last_seen``;
+    the UI reads ``received_at``, so REST devices appeared stuck at
+    "20624 days ago" in the admin UI. This test pins the field
+    contract so a future refactor can't reintroduce the drift."""
+    import time as _t
+
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="freshness_pico")
+    token = resp.get_json()["device_token"]
+
+    before = _t.time()
+    resp = client.post(
+        "/api/v1/device/freshness_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 50, "rssi": -55}),
+    )
+    after = _t.time()
+    assert resp.status_code == 200
+
+    cache = app.config["DEVICE_STATUS"]["freshness_pico"]
+    # The Devices UI's _status_view reads cache.get("received_at", 0)
+    # then computes ``age = now - received_at``. If this returns 0 the
+    # UI shows "20624 days ago".
+    assert "received_at" in cache, "received_at must be set on REST heartbeats"
+    assert before <= cache["received_at"] <= after + 1
+    # Parsed dict lives nested under "parsed", same as the MQTT path,
+    # so _status_view's cache.get("parsed", {}) finds the diagnostic
+    # fields instead of returning empty.
+    assert cache["parsed"]["battery_pct"] == 50
+    assert cache["parsed"]["rssi"] == -55
+
+
+def test_rest_status_records_battery_history(app: Flask) -> None:
+    """The device_battery widget plots heartbeats from the
+    BATTERY_HISTORY store. Pre-v0.53.1 the REST handler skipped this
+    side effect, so REST devices never showed up on the battery
+    page. After the fix, a heartbeat with battery_pct lands a sample."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="batt_pico")
+    token = resp.get_json()["device_token"]
+
+    history = app.config.get("BATTERY_HISTORY")
+    assert history is not None
+    # Drive a status post with a battery reading.
+    resp = client.post(
+        "/api/v1/device/batt_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 80, "battery_mv": 3900, "rssi": -50}),
+    )
+    assert resp.status_code == 200
+    samples = list(history.recent("batt_pico", limit=10))
+    assert samples, "REST heartbeat must record into battery history"
+    assert samples[0].pct == 80
 
 
 # -- log ---------------------------------------------------------------

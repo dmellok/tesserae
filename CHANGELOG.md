@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.53.1], 2026-06-20
+
+### Fixed
+
+- **REST device "last seen" stuck at epoch 0.** The v0.52 REST status
+  handler wrote a flat dict ``{... "last_seen": ts, "transport":
+  "rest"}`` to ``DEVICE_STATUS``, but the Devices admin page's
+  ``_status_view`` reads ``cache["received_at"]`` and
+  ``cache["parsed"]`` (the shape the MQTT path uses). The mismatched
+  field names meant REST device freshness always showed "20624 days
+  ago" (now - 0) and the diagnostic-fields dl rendered empty.
+- **REST devices missing from smart-sync telemetry and battery
+  history.** The MQTT status path records to
+  ``DEVICE_TELEMETRY`` (issue #10) and ``BATTERY_HISTORY`` on every
+  heartbeat; the v0.52 REST path skipped both, so REST devices never
+  appeared on the device_battery widget and the scheduler had no
+  wake-prediction data for them.
+
+### Changed
+
+- ``app/transport_wiring.py`` gains a public ``record_status_heartbeat``
+  helper. Both the MQTT subscribe callback in
+  ``_subscribe_device_status`` and the REST ``POST /<id>/status`` route
+  call this helper, so the live status cache update + telemetry +
+  battery history + EventLog row + HA discovery notify all stay in one
+  place. A future third transport can't drift the way the initial REST
+  handler did.
+
+### Notes
+
+- The pre-fix REST cache records (with ``last_seen``) are simply
+  overwritten on the next heartbeat with the correct
+  ``{received_at, parsed}`` shape; no migration needed.
+- Tests:
+  - ``test_rest_status_updates_received_at_so_last_seen_is_fresh``
+    pins the field contract.
+  - ``test_rest_status_records_battery_history`` proves the
+    BATTERY_HISTORY side effect runs.
+
 ## [0.53.0], 2026-06-20
 
 ### Added

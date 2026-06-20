@@ -19,6 +19,7 @@ import os
 import re
 import secrets
 import socket
+import time
 from pathlib import Path
 from typing import Any
 
@@ -230,6 +231,115 @@ def merge_status_parsed(prev: dict[str, Any], new: dict[str, Any]) -> dict[str, 
 # -- subscriptions ------------------------------------------------------
 
 
+def record_status_heartbeat(
+    *,
+    app: Flask,
+    device: Any,
+    payload: bytes,
+    status_cache: dict[str, dict[str, Any]],
+    event_log: EventLog,
+    event_target: str,
+) -> None:
+    """Single source of truth for "a device heartbeat just arrived":
+
+    * Parse the body via the device kind's ``parse_status`` hook.
+    * Merge with the previous reading (preserves last-known fields when
+      the heartbeat is partial, derives ``battery_pct`` from
+      ``battery_mv`` via the LiPo curve, etc.).
+    * Update the live ``DEVICE_STATUS`` cache so the Devices admin
+      page picks up the new ``received_at`` + ``parsed`` block.
+    * Append a smart-sync telemetry sample (issue #10) so the
+      scheduler's JIT wake-prediction has fresh data.
+    * Append a battery-history sample so the device_battery widget
+      can plot drain.
+    * Append a row to the EventLog when the status changed
+      meaningfully (steady heartbeats don't churn the capped log).
+    * Notify HA discovery so MQTT sensors update.
+
+    Both the MQTT subscribe callback in ``_subscribe_device_status``
+    and the REST status endpoint in ``app.rest_api`` call this. Keeping
+    the side effects in one helper means a future third transport
+    can't accidentally skip telemetry/battery/event-log updates the
+    way the initial v0.52 REST handler did."""
+    parsed = device.parse_status(payload)
+    received_at = time.time()
+    prev = status_cache.get(device.id, {}).get("parsed", {})
+    merged = merge_status_parsed(prev, parsed)
+    status_cache[device.id] = {
+        "received_at": received_at,
+        "parsed": merged,
+    }
+    # Smart sync (issue #10): record telemetry for the scheduler's
+    # JIT prediction. Pulls the configured sleep_interval_s from
+    # the per-device settings section as a fallback when the
+    # firmware doesn't publish ``sleep_until`` / ``next_sleep_s``
+    # itself. Step 1 only tracks; the scheduler hook is step 2.
+    telemetry = app.config.get("DEVICE_TELEMETRY")
+    if telemetry is not None and "error" not in parsed:
+        settings: SettingsStore = app.config["SETTINGS_STORE"]
+        device_settings = (settings.get_section("devices") or {}).get(device.id) or {}
+        configured_sleep_s = device_settings.get("sleep_interval_s")
+        try:
+            telemetry.record_heartbeat(
+                device.id,
+                received_at=received_at,
+                parsed=parsed,
+                configured_sleep_s=(
+                    int(configured_sleep_s) if configured_sleep_s is not None else None
+                ),
+            )
+        except Exception:
+            logger.exception("telemetry: record_heartbeat failed for %s", device.id)
+    # Battery history: append one sample per heartbeat so the
+    # device_battery widget + /devices/battery admin page can plot
+    # the drain curve and project days-to-empty. Skipped when the
+    # heartbeat is an error or carries no battery_pct (mains
+    # devices like the Pi paths).
+    #
+    # Reads ``merged`` not ``parsed`` so the
+    # ``merge_status_parsed``-derived ``battery_pct`` (from a fresh
+    # ``battery_mv`` via the LiPo curve) is visible. Firmwares that
+    # publish only voltage land as ``parsed["battery_pct"] = None``
+    # and the derivation runs during the merge above.
+    battery_history = app.config.get("BATTERY_HISTORY")
+    if (
+        battery_history is not None
+        and "error" not in parsed
+        and merged.get("battery_pct") is not None
+    ):
+        try:
+            battery_history.record(
+                device.id,
+                pct=int(merged["battery_pct"]),
+                battery_mv=(
+                    int(merged["battery_mv"]) if merged.get("battery_mv") is not None else None
+                ),
+                timestamp=received_at,
+            )
+        except (TypeError, ValueError):
+            pass
+        except Exception:
+            logger.exception("battery_history: record failed for %s", device.id)
+    # Only log when the status actually changed (or carries an error).
+    # The live cache + HA sensors still see every heartbeat; this just
+    # keeps steady heartbeats from churning the capped event log.
+    if "error" in parsed or status_changed_meaningfully(prev, merged):
+        event_log.record(
+            type="device",
+            source=device.id,
+            target=event_target,
+            status="error" if "error" in parsed else "ok",
+            error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
+            extra={"parsed": merged},
+        )
+    ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
+    if ha is not None:
+        try:
+            ha.note_device_heartbeat(device.id, merged)
+        except Exception:
+            logger.exception("HA discovery: heartbeat notify failed for %s", device.id)
+
+
 def _subscribe_device_status(
     transport: MqttTransport,
     device: device_loader.Device,
@@ -245,87 +355,17 @@ def _subscribe_device_status(
     a flood of frequent heartbeats. When HA discovery is running, the
     heartbeat also feeds that display's last-seen / battery / signal / IP
     sensors."""
-    import time
 
     def on_status(topic: str, payload: bytes) -> None:
         del topic
-        parsed = device.parse_status(payload)
-        received_at = time.time()
-        prev = status_cache.get(device.id, {}).get("parsed", {})
-        merged = merge_status_parsed(prev, parsed)
-        status_cache[device.id] = {
-            "received_at": received_at,
-            "parsed": merged,
-        }
-        # Smart sync (issue #10): record telemetry for the scheduler's
-        # JIT prediction. Pulls the configured sleep_interval_s from
-        # the per-device settings section as a fallback when the
-        # firmware doesn't publish ``sleep_until`` / ``next_sleep_s``
-        # itself. Step 1 only tracks; the scheduler hook is step 2.
-        telemetry = app.config.get("DEVICE_TELEMETRY")
-        if telemetry is not None and "error" not in parsed:
-            settings: SettingsStore = app.config["SETTINGS_STORE"]
-            device_settings = (settings.get_section("devices") or {}).get(device.id) or {}
-            configured_sleep_s = device_settings.get("sleep_interval_s")
-            try:
-                telemetry.record_heartbeat(
-                    device.id,
-                    received_at=received_at,
-                    parsed=parsed,
-                    configured_sleep_s=(
-                        int(configured_sleep_s) if configured_sleep_s is not None else None
-                    ),
-                )
-            except Exception:
-                logger.exception("telemetry: record_heartbeat failed for %s", device.id)
-        # Battery history: append one sample per heartbeat so the
-        # device_battery widget + /devices/battery admin page can plot
-        # the drain curve and project days-to-empty. Skipped when the
-        # heartbeat is an error or carries no battery_pct (mains
-        # devices like the Pi paths).
-        #
-        # Reads ``merged`` not ``parsed`` so the
-        # ``merge_status_parsed``-derived ``battery_pct`` (from a fresh
-        # ``battery_mv`` via the LiPo curve) is visible. Firmwares that
-        # publish only voltage land as ``parsed["battery_pct"] = None``
-        # and the derivation runs during the merge above.
-        battery_history = app.config.get("BATTERY_HISTORY")
-        if (
-            battery_history is not None
-            and "error" not in parsed
-            and merged.get("battery_pct") is not None
-        ):
-            try:
-                battery_history.record(
-                    device.id,
-                    pct=int(merged["battery_pct"]),
-                    battery_mv=(
-                        int(merged["battery_mv"]) if merged.get("battery_mv") is not None else None
-                    ),
-                    timestamp=received_at,
-                )
-            except (TypeError, ValueError):
-                pass
-            except Exception:
-                logger.exception("battery_history: record failed for %s", device.id)
-        # Only log when the status actually changed (or carries an error).
-        # The live cache + HA sensors still see every heartbeat; this just
-        # keeps steady heartbeats from churning the capped event log.
-        if "error" in parsed or status_changed_meaningfully(prev, merged):
-            event_log.record(
-                type="device",
-                source=device.id,
-                target=device.status_topic or "",
-                status="error" if "error" in parsed else "ok",
-                error=parsed.get("error") if isinstance(parsed.get("error"), str) else None,
-                extra={"parsed": merged},
-            )
-        ha: HomeAssistantDiscovery | None = app.config.get("HA_DISCOVERY")
-        if ha is not None:
-            try:
-                ha.note_device_heartbeat(device.id, merged)
-            except Exception:
-                logger.exception("HA discovery: heartbeat notify failed for %s", device.id)
+        record_status_heartbeat(
+            app=app,
+            device=device,
+            payload=payload,
+            status_cache=status_cache,
+            event_log=event_log,
+            event_target=device.status_topic or "",
+        )
 
     # Devices without a status topic (e.g. HTTP-polled TRMNL clients)
     # don't get an MQTT subscription, their status arrives via the

@@ -245,31 +245,39 @@ def get_frame(device_id: str) -> Response:
 
 @bp.post("/<device_id>/status")
 def post_status(device_id: str) -> Response:
-    """Device heartbeat. Body JSON is parsed through the device kind's
-    ``parse_status`` (same hook the MQTT path uses), merged into the
-    in-memory ``DEVICE_STATUS`` cache, and responded to with the
-    current config + next poll cadence."""
+    """Device heartbeat. Body JSON parsed through the device kind's
+    ``parse_status`` (same hook MQTT uses) and fed through the shared
+    ``record_status_heartbeat`` so the live status cache, smart-sync
+    telemetry, battery history, event log, and HA discovery all get
+    the same updates the MQTT path produces. Response carries the
+    current per-device config + next poll cadence."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
 
-    raw = request.get_data() or b""
-    try:
-        parsed = device.parse_status(raw)
-    except Exception:
-        logger.exception("rest_api: %s.parse_status raised", device.id)
-        parsed = {"error": "parse_status raised"}
+    # Shared with the MQTT subscriber so the side effects don't drift.
+    # Pre-v0.53.1 this path wrote a flat dict with a ``last_seen``
+    # field, which the Devices UI's ``_status_view`` doesn't read
+    # (it looks for ``received_at`` + ``parsed``), so REST device
+    # "last seen" was stuck at epoch 0. Telemetry + battery history
+    # were also skipped.
+    from app.transport_wiring import record_status_heartbeat
 
-    # Merge with the existing cache so partial heartbeats (only RSSI,
-    # only IP) preserve previously-known values.
-    from app.transport_wiring import merge_status_parsed
-
-    cache = _device_status_cache()
-    prev = dict(cache.get(device.id) or {})
-    merged = merge_status_parsed(prev, parsed)
-    merged["last_seen"] = time.time()
-    merged["transport"] = "rest"  # so the Devices page can show "via REST"
-    cache[device.id] = merged
+    events = _events()
+    if events is not None:
+        record_status_heartbeat(
+            app=current_app._get_current_object(),  # type: ignore[attr-defined]
+            device=device,
+            payload=request.get_data() or b"",
+            status_cache=_device_status_cache(),
+            event_log=events,
+            # MQTT path uses the status_topic here; REST devices
+            # generally still have one on the manifest (kinds derive
+            # it), but for events the conventional shape is "rest://
+            # <device_id>/status" so an Events page row can be told
+            # apart from the MQTT version at a glance.
+            event_target=f"rest://{device.id}/status",
+        )
 
     return jsonify(
         {
