@@ -109,11 +109,11 @@ def main() -> None:
         # Issue #17: the Discovered strip's first child block on the
         # Devices tab.
         ("17-discovered-strip-current.png", "/settings/devices", "#discovered-devices"),
-        # Issue #22: no kind-defaults editing UI exists, so the
-        # supporting shot is one of the user-instance cards showing
-        # the "Instance of: <kind>" row (in Connection details). That
-        # makes the asymmetry visible — instances are editable,
-        # kinds aren't.
+        # Issue #22: the "Built-in device kinds" card at the bottom of
+        # the Devices tab, with one collapsible row per kind. Captures
+        # both the row list (collapsed default) and a per-instance
+        # device card (Lounge) for comparison.
+        ("22-kind-defaults-current.png", "/settings/devices", "#kind-defaults"),
         ("22-device-card-current.png", "/settings/devices", "#device-lounge"),
     ]
 

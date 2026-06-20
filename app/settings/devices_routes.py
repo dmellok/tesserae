@@ -304,6 +304,104 @@ def devices_reveal_token(instance_id: str) -> Response:
     return redirect_to
 
 
+@bp.post("/settings/devices/kinds/<kind_id>/defaults")
+def devices_kind_defaults_save(kind_id: str) -> Response:
+    """Persist a per-kind defaults override (issue #22). Whitelisted
+    fields only: ``display_name``, ``panel_preset``, ``panel_w``,
+    ``panel_h``, ``panel_orientation``, ``sleep_interval_s``. The
+    store does its own validation + coercion; this route just
+    parses the form, dispatches to ``KindOverridesStore.set()``, and
+    flashes a result.
+
+    Built-in kinds only (``kind.kind_of`` is ``None``); instances
+    have their own per-instance editing path."""
+    from app.state.kind_overrides import KindOverridesStore
+
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=f"kind-{kind_id}"))
+    devs = devices()
+    kind = devs.get(kind_id)
+    if kind is None or kind.kind_of is not None:
+        flash(f"Unknown built-in kind {kind_id!r}.", "error")
+        return redirect_to
+
+    values: dict[str, Any] = {}
+    if "display_name" in request.form:
+        values["display_name"] = request.form.get("display_name", "")
+    if "panel_preset" in request.form:
+        values["panel_preset"] = request.form.get("panel_preset", "")
+    if "panel_w" in request.form:
+        values["panel_w"] = request.form.get("panel_w", "")
+    if "panel_h" in request.form:
+        values["panel_h"] = request.form.get("panel_h", "")
+    if "panel_orientation" in request.form:
+        values["panel_orientation"] = request.form.get("panel_orientation", "")
+    if "sleep_interval_s" in request.form:
+        values["sleep_interval_s"] = request.form.get("sleep_interval_s", "")
+
+    store = KindOverridesStore(device_data_root())
+    saved = store.set(kind_id, values)
+    event_log = current_app.config.get("EVENT_LOG")
+    if event_log is not None:
+        try:
+            event_log.record(
+                type="device",
+                source="settings_ui",
+                target=kind_id,
+                status="ok",
+                extra={"action": "kind_defaults_saved", "values": saved},
+            )
+        except Exception:
+            current_app.logger.exception(
+                "event_log: record(kind_defaults_saved) failed for %s", kind_id
+            )
+    flash(
+        f"Defaults saved for {kind.name!r}. New instances of this kind will use them."
+        if saved
+        else f"Cleared overrides for {kind.name!r}; reverting to bundled defaults.",
+        "ok",
+    )
+    return redirect_to
+
+
+@bp.post("/settings/devices/kinds/<kind_id>/reset")
+def devices_kind_defaults_reset(kind_id: str) -> Response:
+    """Delete the per-kind overrides file and revert to bundled
+    defaults (issue #22). Used by the inline confirm bar on the
+    kind row."""
+    from app.state.kind_overrides import KindOverridesStore
+
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=f"kind-{kind_id}"))
+    devs = devices()
+    kind = devs.get(kind_id)
+    if kind is None or kind.kind_of is not None:
+        flash(f"Unknown built-in kind {kind_id!r}.", "error")
+        return redirect_to
+
+    store = KindOverridesStore(device_data_root())
+    removed = store.delete(kind_id)
+    event_log = current_app.config.get("EVENT_LOG")
+    if event_log is not None:
+        try:
+            event_log.record(
+                type="device",
+                source="settings_ui",
+                target=kind_id,
+                status="ok",
+                extra={"action": "kind_defaults_reset", "removed": removed},
+            )
+        except Exception:
+            current_app.logger.exception(
+                "event_log: record(kind_defaults_reset) failed for %s", kind_id
+            )
+    flash(
+        f"Reset {kind.name!r} defaults to built-in."
+        if removed
+        else f"{kind.name!r} already on built-in defaults.",
+        "ok",
+    )
+    return redirect_to
+
+
 @bp.get("/settings/devices/discovered.json")
 def devices_discovered_json() -> Response:
     """Current discovered devices as JSON. The Devices page + setup wizard

@@ -1,0 +1,146 @@
+{# Built-in device kinds card (issue #22). Lives at the bottom of
+   Settings → Devices, below the per-instance cards. One collapsible
+   row per built-in kind exposing the editable defaults layer
+   ``data/devices/_kind_overrides/<kind_id>.json``.
+
+   Inputs (set in ``app.settings.index_routes._build_kind_default_rows``):
+   - ``kind_default_rows`` — list of dicts: id, name, icon, current,
+     has_override, plugin_source, save_endpoint, reset_endpoint
+   - ``panel_preset_choices`` — same shape used by the Add-device form
+#}
+
+{% from "_components.html" import number_input, select_field, text_input with context %}
+
+{% if kind_default_rows %}
+<section class="dx-section-card" id="kind-defaults">
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-puzzle-piece"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Built-in device kinds</h3>
+      <p class="dx-section-desc">Defaults applied when creating a new instance of each kind. Existing instances aren't affected. Kinds can't be renamed or deleted.</p>
+    </div>
+  </header>
+
+  <div class="dx-section-body">
+    <ul class="dx-kind-list">
+      {% for row in kind_default_rows %}
+      <li class="dx-kind-row" id="kind-{{ row.id }}" data-kind-row>
+
+        {# Collapsed header: whole strip is the click target. Caret
+           rotates 180° when the row is open. #}
+        <button type="button" class="dx-kind-summary" data-kind-toggle>
+          <span class="dx-kind-icon" aria-hidden="true"><i class="ph ph-{{ row.icon }}"></i></span>
+          <span class="dx-kind-text">
+            <span class="dx-kind-name">{{ row.name }}
+              {% if row.has_override %}<span class="dx-modified-badge">MODIFIED</span>{% endif %}
+              {% if row.plugin_source %}<span class="dx-plugin-source">from plugin: {{ row.plugin_source }}</span>{% endif %}
+            </span>
+            <span class="dx-kind-id"><code>{{ row.id }}</code></span>
+          </span>
+          <span class="dx-kind-cta">
+            <span class="when-closed">Edit defaults</span>
+            <span class="when-open">Close</span>
+            <i class="ph ph-caret-down dx-kind-chevron" aria-hidden="true"></i>
+          </span>
+        </button>
+
+        {# Expanded form. Stays in the DOM (hidden when closed) so a
+           stray input event doesn't dirty the page-level save bar
+           when the user is scrolling past. The save form wraps all
+           inputs + Save; the reset form is a SIBLING (HTML disallows
+           nested forms) referenced from the same actions row by id. #}
+        <div class="dx-kind-form" data-kind-body hidden>
+          <hr class="dx-divider">
+          <form method="post" action="{{ row.save_endpoint }}" class="form" data-dirty-form id="kind-{{ row.id }}-save">
+            {{ text_input(
+                'kind-' ~ row.id ~ '-display-name',
+                'display_name',
+                'Default display name',
+                value=row.current.display_name,
+                placeholder='e.g. {room} ' ~ row.name,
+                help='Use {room} as a placeholder filled in at registration.') }}
+            <div class="dx-field-grid">
+              {{ select_field(
+                  'kind-' ~ row.id ~ '-preset',
+                  'panel_preset',
+                  'Default panel preset',
+                  value=row.current.panel_preset,
+                  options=panel_preset_choices) }}
+              {{ select_field(
+                  'kind-' ~ row.id ~ '-sleep',
+                  'sleep_interval_s',
+                  'Default sleep interval',
+                  value=row.current.sleep_interval_s,
+                  options=[{'value':60,'label':'1 minute'},
+                           {'value':300,'label':'5 minutes'},
+                           {'value':900,'label':'15 minutes'},
+                           {'value':1800,'label':'30 minutes'},
+                           {'value':3600,'label':'1 hour'}]) }}
+            </div>
+            <div class="dx-field-grid">
+              {{ number_input(
+                  'kind-' ~ row.id ~ '-w',
+                  'panel_w',
+                  'Custom width (px)',
+                  value=row.current.panel_w,
+                  min=1,
+                  step=1) }}
+              {{ number_input(
+                  'kind-' ~ row.id ~ '-h',
+                  'panel_h',
+                  'Custom height (px)',
+                  value=row.current.panel_h,
+                  min=1,
+                  step=1) }}
+            </div>
+            {{ select_field(
+                'kind-' ~ row.id ~ '-orientation',
+                'panel_orientation',
+                'Default rotation',
+                value=row.current.panel_orientation,
+                options=[{'value':'landscape','label':'0°'},
+                         {'value':'portrait','label':'90°'},
+                         {'value':'landscape_flipped','label':'180°'},
+                         {'value':'portrait_flipped','label':'270°'}]) }}
+          </form>
+
+          {# Reset form is a SIBLING (nested forms are invalid HTML).
+             The reset button below references this form by id via the
+             ``form`` attribute. No JS fallback: the onsubmit confirm
+             handles the "no JS at all" case. #}
+          <form method="post" action="{{ row.reset_endpoint }}" class="form form--inline"
+                id="kind-{{ row.id }}-reset"
+                onsubmit="return confirm('Reset {{ row.id }} defaults to built-in?');"></form>
+
+          {# Actions row: ghost Reset to built-in (opens inline
+             confirm bar via JS), primary Save defaults. Both buttons
+             use ``form="..."`` so they're not nested inside either
+             form's <form> element. #}
+          <div class="dx-kind-actions" data-kind-actions>
+            <button type="button" class="dx-btn-ghost-sm" data-kind-reset>
+              <i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><span>Reset to built-in</span>
+            </button>
+            <button type="submit" form="kind-{{ row.id }}-save" class="dx-btn-primary-sm">
+              <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>Save defaults</span>
+            </button>
+          </div>
+
+          {# Inline confirm bar, swapped in by JS when the user
+             clicks the Reset button above. Submit posts via the
+             sibling reset form (referenced by id). #}
+          <div class="dx-inline-confirm" data-kind-confirm hidden>
+            <span>Reset <code>{{ row.id }}</code> defaults to built-in?</span>
+            <div class="dx-inline-confirm-actions">
+              <button type="button" class="dx-btn-ghost-sm" data-kind-confirm-cancel>Cancel</button>
+              <button type="submit" form="kind-{{ row.id }}-reset" class="dx-btn-danger-sm">
+                <i class="ph ph-trash" aria-hidden="true"></i><span>Reset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}

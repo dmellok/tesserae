@@ -539,6 +539,14 @@
 </section>
 {% endif %}{# /device kind branch #}
 {% endfor %}
+
+{% if active_area == 'devices' and kind_default_rows %}
+{# Built-in device kinds (issue #22). Renders at the bottom of the
+   Devices tab, after every per-instance device card, so the
+   "defaults for new instances" framing reads as a layer below the
+   live devices instead of competing for attention with them. #}
+{% include '_kind_defaults_card.html' %}
+{% endif %}
 </div>{# /.settings-section-list #}
 
 {# Server-tab footer: compact diagnostics + session actions. These

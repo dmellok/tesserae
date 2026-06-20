@@ -201,9 +201,11 @@ def settings_area(area: str) -> str | Response:
         if default_transport not in ("rest", "mqtt"):
             default_transport = "rest"
         broker_configured = bool((_broker_raw.get("host") or "").strip())
+        kind_default_rows = _build_kind_default_rows()
     else:
         default_transport = "rest"
         broker_configured = False
+        kind_default_rows = []
 
     return render_template(
         "settings.html",
@@ -220,6 +222,7 @@ def settings_area(area: str) -> str | Response:
         discovered_sig=discovered_sig,
         default_transport=default_transport,
         broker_configured=broker_configured,
+        kind_default_rows=kind_default_rows,
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.
         calibrating=request.args.get("calibrating") or "",
@@ -253,6 +256,55 @@ def settings_area(area: str) -> str | Response:
 
 
 # -- internals: section building ---------------------------------------
+
+
+_SLEEP_INTERVAL_CHOICES: list[dict[str, Any]] = [
+    {"value": 60, "label": "1 minute"},
+    {"value": 300, "label": "5 minutes"},
+    {"value": 900, "label": "15 minutes"},
+    {"value": 1800, "label": "30 minutes"},
+    {"value": 3600, "label": "1 hour"},
+]
+
+
+def _build_kind_default_rows() -> list[dict[str, Any]]:
+    """Build the per-kind defaults rows for the "Built-in device
+    kinds" card on the Devices tab (issue #22).
+
+    One entry per built-in kind (``device.kind_of is None``), in the
+    same order the Add-device "Kind" dropdown surfaces them.
+    ``has_override`` drives the MODIFIED badge; the rest of the dict
+    is what the inline form needs to render preselected values.
+    Plugin-defined kinds get a ``plugin_source`` annotation; that
+    branch is deliberately empty for now (out of scope per the
+    handoff) but the column is reserved so the template doesn't
+    need to grow when it lands."""
+    from app.state.kind_overrides import KindOverridesStore
+
+    store = KindOverridesStore(current_app.config["DEVICE_DATA_ROOT"])
+    rows: list[dict[str, Any]] = []
+    for d in device_kinds():
+        panel = d.panel or {}
+        rows.append(
+            {
+                "id": d.id,
+                "name": d.name,
+                "icon": d.icon or "cpu",
+                "current": {
+                    "display_name": str(d.manifest.get("display_name_default") or d.name or ""),
+                    "panel_preset": str(panel.get("preset") or "custom"),
+                    "panel_w": int(panel.get("w") or 0),
+                    "panel_h": int(panel.get("h") or 0),
+                    "panel_orientation": str(panel.get("orientation") or "landscape"),
+                    "sleep_interval_s": int(d.manifest.get("sleep_interval_s_default") or 300),
+                },
+                "has_override": store.has_override(d.id),
+                "plugin_source": None,
+                "save_endpoint": url_for("auth.devices_kind_defaults_save", kind_id=d.id),
+                "reset_endpoint": url_for("auth.devices_kind_defaults_reset", kind_id=d.id),
+            }
+        )
+    return rows
 
 
 def _build_app_field_groups() -> list[dict[str, Any]]:

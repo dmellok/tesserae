@@ -242,6 +242,57 @@ def _load_schema(schema_path: Path) -> dict[str, Any]:
     return raw
 
 
+def _apply_kind_override(manifest: dict[str, Any], override: dict[str, Any]) -> None:
+    """Merge a per-kind override dict (already whitelisted + coerced
+    by ``KindOverridesStore``) into a kind manifest in place.
+
+    The five fields map as follows:
+
+    * ``display_name`` → ``manifest["display_name_default"]``: read by
+      ``create_instance`` when the user submits the Add-device form
+      with no display name.
+    * ``panel_preset`` → ``manifest["panel"]["w"/"h"]`` (resolved via
+      ``app.panel.PANEL_PRESETS``). ``"custom"`` defers to the
+      ``panel_w`` / ``panel_h`` keys below.
+    * ``panel_w`` / ``panel_h`` → ``manifest["panel"]["w"/"h"]``
+      (overrides preset values if both are present and preset is
+      ``"custom"``; ignored otherwise).
+    * ``panel_orientation`` → ``manifest["panel"]["orientation"]``.
+    * ``sleep_interval_s`` → ``manifest["sleep_interval_s_default"]``.
+
+    Anything outside the whitelist is already gone before we get here.
+    """
+    from app.panel import PANEL_PRESETS
+
+    panel = manifest.setdefault("panel", {})
+    if not isinstance(panel, dict):
+        panel = {}
+        manifest["panel"] = panel
+
+    preset_id = override.get("panel_preset")
+    if isinstance(preset_id, str) and preset_id in PANEL_PRESETS:
+        p = PANEL_PRESETS[preset_id]
+        panel["w"] = p.w
+        panel["h"] = p.h
+        panel["preset"] = preset_id
+
+    if override.get("panel_w") and override.get("panel_h"):
+        panel["w"] = int(override["panel_w"])
+        panel["h"] = int(override["panel_h"])
+
+    orientation = override.get("panel_orientation")
+    if isinstance(orientation, str):
+        panel["orientation"] = orientation
+
+    display_name = override.get("display_name")
+    if isinstance(display_name, str) and display_name:
+        manifest["display_name_default"] = display_name
+
+    sleep = override.get("sleep_interval_s")
+    if isinstance(sleep, int) and sleep > 0:
+        manifest["sleep_interval_s_default"] = sleep
+
+
 def _import_device_module(device_id: str, module_path: Path) -> ModuleType:
     spec = importlib.util.spec_from_file_location(
         f"_tesserae_devices.{device_id}.device", module_path
@@ -290,6 +341,13 @@ def discover(
         return registry
 
     schema = _load_schema(schema_path)
+    # Built-in kinds can carry a small overrides layer (issue #22)
+    # under ``data/devices/_kind_overrides/<kind_id>.json``. Resolve
+    # the store once per discover() call so each kind's manifest can
+    # be merged before the Device dataclass is constructed.
+    from app.state.kind_overrides import KindOverridesStore
+
+    kind_overrides_store = KindOverridesStore(data_root)
 
     for child in sorted(devices_dir.iterdir()):
         if not child.is_dir() or child.name.startswith((".", "_")):
@@ -359,6 +417,15 @@ def discover(
 
         data_dir = data_root / device_id
         data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Apply any per-kind override layer before the manifest is
+        # frozen onto the Device. Whitelist + coercion happens inside
+        # KindOverridesStore.get(); the helper below merges the
+        # resulting dict into the manifest's panel block + a few
+        # top-level default keys (issue #22).
+        override = kind_overrides_store.get(device_id)
+        if override:
+            _apply_kind_override(manifest, override)
 
         registry.devices[device_id] = Device(
             id=device_id,

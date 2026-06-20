@@ -6,6 +6,69 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.55.0], 2026-06-21
+
+Settings → Devices tab adopts the v0.54 design system end-to-end,
+closing the remaining UX backlog from the v0.54 handoff
+(issues #16, #17, #22).
+
+### Changed
+
+- **#17 — Discovered strip splits by transport.** The single
+  homogeneous list becomes a section card with two transport-
+  grouped sub-strips: REST-announced (auto-claim on register)
+  first, then MQTT-discovered. Each sub-group carries a count
+  pill + a one-line explainer; empty groups vanish and the
+  radar empty state takes over when both are empty. Row layout
+  is identical across groups so the distinction is structural,
+  not buried in a single pill.
+- **#16 — Unified Add device card.** "Add device" + "Pair new
+  device (REST)" + the standalone Pending codes table collapse
+  into one ``.dx-section-card`` with a transport segmented
+  control at the top (REST-default). Both branches stay in the
+  DOM so typed values are preserved across flips. The REST
+  branch surfaces pending codes inline; the MQTT branch shows
+  a warning band linking to Server → MQTT broker when
+  ``broker.host`` isn't set. Pair-code reveal moves from an
+  inline block to a modal that shares its shell with the TRMNL
+  token reveal so the two reveal flows look + behave the same.
+- **#22 — Built-in device kinds card (new).** Adds an editable
+  defaults layer per built-in kind under
+  ``data/devices/_kind_overrides/<kind_id>.json``. UI is a
+  collapsible row per kind with the editable fields
+  (display-name default, panel preset, custom W/H, default
+  rotation, default sleep interval) and an inline confirm bar
+  for the Reset action. Override applied at load time so
+  subsequent ``create_instance`` reads see the new defaults.
+
+### Added
+
+- ``app.state.kind_overrides.KindOverridesStore`` — JSON-per-
+  kind store with a five-field whitelist + per-field coercion;
+  empty saves remove the file (revert to bundled defaults).
+- ``app.device_loader._apply_kind_override`` — merge helper
+  that maps the override into the manifest's panel block + a
+  pair of top-level default keys
+  (``display_name_default`` / ``sleep_interval_s_default``).
+- ``POST /settings/devices/kinds/<kind_id>/defaults`` +
+  ``POST /settings/devices/kinds/<kind_id>/reset`` — save /
+  reset endpoints with EventLog audit rows.
+- ``scripts/capture_ux_screenshots.py`` — playwright
+  capture script that boots an isolated testing-mode Tesserae
+  on a free port, pre-populates the discovered + registered
+  fixtures, and writes current-state PNGs into
+  ``notes/design-handoffs/ux-backlog/reference/current-state/``.
+
+### Notes
+
+- Plugin-defined kinds aren't currently surfaced in the kinds
+  card; the view-model carries a reserved ``plugin_source``
+  column for the future. Out of scope per the handoff brief.
+- The pair-reveal previously used a session-stashed inline
+  block at the top of the Pair card. That block is gone; the
+  same session key now drives a modal that matches the
+  TRMNL token reveal's shape (close + copy + Done button).
+
 ## [0.54.3], 2026-06-21
 
 ### Fixed

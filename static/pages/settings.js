@@ -155,6 +155,39 @@
     });
   }
 
+  // ---- Kind defaults rows (issue #22) ---------------------------------
+  // Whole-row click toggles the inline form. Reset button swaps the
+  // actions row for an inline confirm bar; Cancel reverts.
+  function initKindRow(row) {
+    const toggle = row.querySelector('[data-kind-toggle]');
+    const body = row.querySelector('[data-kind-body]');
+    const actions = row.querySelector('[data-kind-actions]');
+    const confirm = row.querySelector('[data-kind-confirm]');
+    const resetBtn = row.querySelector('[data-kind-reset]');
+    const cancelBtn = row.querySelector('[data-kind-confirm-cancel]');
+
+    if (toggle && body) {
+      toggle.addEventListener('click', function () {
+        const open = body.hidden;
+        body.hidden = !open;
+        row.classList.toggle('is-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+    }
+    if (resetBtn && actions && confirm) {
+      resetBtn.addEventListener('click', function () {
+        actions.hidden = true;
+        confirm.hidden = false;
+      });
+    }
+    if (cancelBtn && actions && confirm) {
+      cancelBtn.addEventListener('click', function () {
+        confirm.hidden = true;
+        actions.hidden = false;
+      });
+    }
+  }
+
   ready(function () {
     document.querySelectorAll('[data-device-card]').forEach(function (card) {
       initDeviceCard(card);
@@ -163,5 +196,6 @@
     document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
     document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);
     document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
+    document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
   });
 })();
