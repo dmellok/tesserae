@@ -192,3 +192,17 @@ printf '\nThen visit %shttp://localhost:%s/%s\n' "$C_BOLD" "$PORT" "$C_OFF"
 printf '\nFirst-run: the app will prompt for an admin password at /setup.\n'
 printf '\nOther devices on your LAN: replace localhost with this machine'"'"'s\n'
 printf 'IP. The server binds 0.0.0.0 by default.\n'
+
+if [[ "$OS" == "Linux" ]] && command -v systemctl >/dev/null 2>&1; then
+  printf '\n%sAuto-start on reboot (optional)%s\n' "$C_BOLD" "$C_OFF"
+  printf 'Run as a systemd service so it survives reboots + restarts on crash:\n'
+  printf '  cd %s && ./scripts/install-systemd.sh\n' "$INSTALL_DIR"
+fi
+
+# ---------- comment about NOT setting up systemd ----------
+# The earlier comment block at the top of this script said "What it
+# does NOT do: Set up systemd / launchd auto-start". The systemd half
+# of that is now covered by scripts/install-systemd.sh, which the user
+# runs as a deliberate follow-up step. Keep this installer focused on
+# the cross-platform install path and let install-systemd.sh own the
+# Linux-specific service wiring.

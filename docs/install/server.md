@@ -65,6 +65,45 @@ when you're hacking on the admin.
     LF line endings. `git pull` to get the `.gitattributes` fix, or run the
     manual steps above with `.venv\Scripts\python.exe -m app.main`.
 
+## Run as a service (Linux)
+
+So Tesserae survives reboots + restarts on crash, install it as a systemd
+service. After the main installer finishes:
+
+```sh
+cd ~/tesserae
+./scripts/install-systemd.sh
+```
+
+The script:
+
+- Refuses on macOS / non-systemd distros (use launchd / your own supervisor there)
+- Generates a unit file from your install dir, port, and current user
+- `sudo` installs it to `/etc/systemd/system/tesserae.service`
+- `enable`s it (auto-start on reboot) and `start`s it now
+- Prints the `systemctl` / `journalctl` commands you'll use day-to-day
+
+Common follow-ups:
+
+```sh
+sudo systemctl status tesserae       # is it running?
+sudo systemctl restart tesserae      # bounce after an upgrade
+sudo journalctl -u tesserae -f       # tail the logs
+```
+
+To uninstall the service (leaves the install dir alone):
+
+```sh
+sudo systemctl disable --now tesserae
+sudo rm /etc/systemd/system/tesserae.service
+sudo systemctl daemon-reload
+```
+
+The script supports a few env vars to override defaults: `TESSERAE_DIR`,
+`TESSERAE_PORT`, `TESSERAE_SERVICE_NAME` (rename the unit for parallel installs),
+`TESSERAE_USER` (run as someone other than yourself), `NONINTERACTIVE=1` to skip
+prompts.
+
 ## First run
 
 1. Open `http://127.0.0.1:8765/`, on first boot you're sent to `/setup` to pick an admin password.

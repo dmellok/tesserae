@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.51.9], 2026-06-20
+
+### Added
+
+- **``scripts/install-systemd.sh``: optional follow-up to ``install.sh``
+  that wires Tesserae as a systemd service on Linux** so it survives
+  reboots + restarts on crash. Refuses on non-Linux / non-systemd
+  platforms (macOS gets launchd separately). Generates the unit file
+  from the install dir + port + current user, ``sudo`` installs to
+  ``/etc/systemd/system/tesserae.service``, enables it (auto-start on
+  reboot), and starts it now. Idempotent: re-running prompts before
+  overwriting an existing unit. Env-var overrides for unattended
+  installs: ``TESSERAE_DIR``, ``TESSERAE_PORT``,
+  ``TESSERAE_SERVICE_NAME`` (rename for parallel installs),
+  ``TESSERAE_USER``, ``NONINTERACTIVE=1``. ``install.sh`` now points
+  Linux users at this script in its Done message, and
+  ``docs/install/server.md`` has a "Run as a service (Linux)"
+  section with the common ``systemctl``/``journalctl`` recipes.
+
 ## [0.51.8], 2026-06-20
 
 ### Fixed
