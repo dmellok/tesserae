@@ -453,6 +453,65 @@ def _persist_token(device: Device, token: str) -> None:
     device.manifest["access_token"] = token
 
 
+# -- admin: pairing-code issue + list ------------------------------------
+#
+# These endpoints live under /api/v1/device/admin/* and are gated by
+# the admin session (the Flask cookie), NOT by a per-device bearer
+# token. The session check has to be inline because /api/v1/ is on
+# the auth gate's open-paths list (so per-device endpoints aren't
+# bounced to /login). They're the wire-protocol stand-in for the
+# "Pair new device" button that will land on Settings -> Devices.
+
+
+def _require_admin_session() -> Response | None:
+    from app.auth import is_authed
+
+    if is_authed():
+        return None
+    return _error(401, "admin session required")
+
+
+@bp.post("/admin/pairing/issue")
+def admin_pairing_issue() -> Response:
+    """Mint a fresh 6-digit pairing code. Used by the admin UI's
+    forthcoming "Pair new device" flow and by curl-from-terminal
+    testing. Body is optional JSON ``{"note": "for bedroom Pico"}``."""
+    err = _require_admin_session()
+    if err is not None:
+        return err
+    body = request.get_json(silent=True) or {}
+    note = str(body.get("note") or "").strip() if isinstance(body, dict) else ""
+    record = _pairings().issue(note=note)
+    return jsonify(
+        {
+            "code": record.code,
+            "expires_at": record.expires_at,
+            "ttl_s": int(record.expires_at - record.issued_at),
+            "note": record.note,
+        }
+    )
+
+
+@bp.get("/admin/pairing/pending")
+def admin_pairing_pending() -> Response:
+    """List pending (unredeemed, unexpired) pairing codes. Lets the
+    admin UI show "you have a code waiting" so a second issue doesn't
+    create accidental duplicates."""
+    err = _require_admin_session()
+    if err is not None:
+        return err
+    pending = [
+        {
+            "code": p.code,
+            "issued_at": p.issued_at,
+            "expires_at": p.expires_at,
+            "note": p.note,
+        }
+        for p in _pairings().list_pending()
+    ]
+    return jsonify({"pending": pending})
+
+
 # -- blueprint registration ---------------------------------------------
 
 

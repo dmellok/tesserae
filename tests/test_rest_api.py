@@ -297,6 +297,39 @@ def test_status_response_includes_config_and_next_poll(app: Flask) -> None:
 # -- log ---------------------------------------------------------------
 
 
+def test_admin_pairing_issue_requires_session(app: Flask) -> None:
+    """Admin endpoints are session-gated despite living under /api/v1/
+    (which is otherwise auth-bypassed). Unauth'd callers get 401."""
+    client = app.test_client()
+    # No /setup call -> no session.
+    resp = client.post("/api/v1/device/admin/pairing/issue")
+    assert resp.status_code == 401
+
+
+def test_admin_pairing_issue_returns_code_when_authed(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/api/v1/device/admin/pairing/issue")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["code"].isdigit() and len(body["code"]) == 6
+    # Code is consumable by the register endpoint.
+    code = body["code"]
+    reg = _register_via_api(client, code=code, device_id="just_for_test")
+    assert reg.status_code == 201
+
+
+def test_admin_pairing_pending_lists_unredeemed_codes(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    a = client.post("/api/v1/device/admin/pairing/issue").get_json()["code"]
+    b = client.post("/api/v1/device/admin/pairing/issue").get_json()["code"]
+    resp = client.get("/api/v1/device/admin/pairing/pending")
+    assert resp.status_code == 200
+    codes = [p["code"] for p in resp.get_json()["pending"]]
+    assert a in codes and b in codes
+
+
 def test_log_endpoint_appends_to_event_log(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
