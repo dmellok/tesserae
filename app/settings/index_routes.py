@@ -100,6 +100,14 @@ def settings_area(area: str) -> str | Response:
         if area == "devices"
         else []
     )
+    # Issue #17: the Discovered strip splits by transport so the
+    # structural distinction (REST auto-claim by MAC vs MQTT
+    # publishes-on-topic) is visible at a glance, not buried in a
+    # single green pill. ``parsed.transport == "rest"`` flags
+    # auto-claim rows; everything else (no parsed.transport, or
+    # an explicit ``"mqtt"``) lands in the MQTT group.
+    discovered_rest = [d for d in discovered if d.get("parsed", {}).get("transport") == "rest"]
+    discovered_mqtt = [d for d in discovered if d.get("parsed", {}).get("transport") != "rest"]
     # Signature of what we're rendering, so the client-side poller knows
     # the baseline and can auto-refresh when the discovered set changes.
     discovered_sig = ",".join(sorted(f"{d['id']}:{d.get('kind') or ''}" for d in discovered))
@@ -189,6 +197,8 @@ def settings_area(area: str) -> str | Response:
         panel_preset_choices=PANEL_PRESET_CHOICES if area == "devices" else [],
         panel_presets=PANEL_PRESETS if area == "devices" else {},
         discovered_devices=discovered,
+        discovered_rest=discovered_rest,
+        discovered_mqtt=discovered_mqtt,
         discovered_sig=discovered_sig,
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.

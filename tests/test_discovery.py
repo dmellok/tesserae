@@ -209,7 +209,12 @@ def test_discovered_devices_render_on_devices_page(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     body = client.get("/settings/devices").get_data(as_text=True)
-    assert "Discovered devices" in body
+    # Issue #17 retitled the section from "Discovered devices" to just
+    # "Discovered" (the description carries the explainer now), and
+    # the row is grouped under "MQTT-DISCOVERED" since the test entry
+    # carries no ``transport`` hint.
+    assert "Discovered" in body
+    assert "MQTT-discovered" in body
     assert "esp32_attic" in body
     assert "esp32_client" in body
     assert "640×384" in body
