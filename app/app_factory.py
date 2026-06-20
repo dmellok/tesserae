@@ -512,6 +512,23 @@ def create_app(
     _install_capability_hooks()
     app.config["RENDERER_REGISTRY"] = renderers
     app.config["DEVICE_REGISTRY"] = devices
+
+    # Transport registry (v0.52 Phase 1c). Discovers every
+    # transports/<id>/transport.json at boot and exposes the
+    # metadata so the Settings UI can list MQTT + REST (and any
+    # future transport someone drops in) without each transport
+    # having to register itself in code. The actual MQTT and REST
+    # implementations live in app/transport.py + app/rest_api.py
+    # respectively; the loader is metadata + visibility, not a
+    # rewrite of the working wiring.
+    from app import transport_loader
+
+    transports_dir = REPO_ROOT / "transports"
+    transport_schema = REPO_ROOT / "schema" / "transport.schema.json"
+    transports = transport_loader.discover(transports_dir, schema_path=transport_schema)
+    for terr in transports.errors:
+        logger.warning("transport loader: %s, %s", terr.transport_id, terr.message)
+    app.config["TRANSPORT_REGISTRY"] = transports
     app.config["DEVICE_DATA_ROOT"] = device_data_root
     app.config["DEVICE_SCHEMA_PATH"] = device_schema
     app.config["DISCOVERY_CACHE"] = discovery_cache
@@ -793,6 +810,14 @@ def create_app(
     from app.state.pairing_store import PairingStore
 
     app.config["PAIRING_STORE"] = PairingStore()
+    # Rate limiter shielding /api/v1/device/register from pairing-code
+    # brute force. 10 failed attempts per IP per 60s window; successful
+    # registrations release the bucket (an attacker has to BURN codes,
+    # not guess them). In-memory only; a restart wipes counters, which
+    # is acceptable given the short window.
+    from app.state.rate_limiter import RateLimiter
+
+    app.config["REGISTER_RATE_LIMITER"] = RateLimiter(max_attempts=10, window_s=60)
     rest_api.register(app)
 
     if not testing:

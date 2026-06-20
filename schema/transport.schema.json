@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/transport.schema.json",
+  "title": "Tesserae transport manifest",
+  "description": "Shape of transport.json. Declares one delivery channel by which devices receive frames + post status: MQTT (push, subscribed to a broker), REST (pull, polled over HTTP), or whatever future shapes land. Manifests are metadata-only: the actual transport implementation lives in app/transport.py (MQTT) or app/rest_api.py (REST). The transport_loader discovers manifests at startup so the Settings UI can show which transports are active without each transport having to register itself in code.",
+  "type": "object",
+  "required": ["tesserae_compat", "id", "name", "version", "kind"],
+  "properties": {
+    "tesserae_compat": {
+      "type": "string",
+      "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$",
+      "description": "Major version range this transport works against (e.g. '1.x'). The loader rejects mismatches."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*$",
+      "description": "Unique transport id, matches the folder name under transports/. Used as Device.transport's value when assigning a device to this transport."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+].*)?$" },
+    "description": { "type": "string" },
+    "kind": {
+      "enum": ["push", "pull"],
+      "description": "Whether the transport pushes frames to devices (e.g. MQTT publish) or serves them on pull (e.g. HTTP GET). Informational; the push pipeline branches on this to know whether transport.publish gets called per render."
+    },
+    "broker_required": {
+      "type": "boolean",
+      "description": "True when the transport needs a broker / external service (MQTT). False for self-contained transports (REST, served by Tesserae itself). Used by the Settings UI to hint at setup requirements."
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Per-feature capability map. Each entry is a boolean. Recognised keys: frame_delivery, device_status, device_config, discovery, retain_semantics, push_to_device.",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "default_for_new_devices": {
+      "type": "boolean",
+      "description": "Whether the onboarding wizard / Pair card defaults to this transport when adding new devices. Only one transport should declare this true; if multiple do, the loader picks the first alphabetically."
+    }
+  },
+  "additionalProperties": true
+}

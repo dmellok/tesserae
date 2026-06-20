@@ -2,10 +2,18 @@
 
 Tesserae is the **server**: it serves the admin UI, renders dashboards, and
 publishes frames out to your panels. It runs on macOS, Linux, Raspberry Pi,
-and Windows. Most clients (Pi / ESP32) consume frames via MQTT, so for those
-you'll want an **MQTT broker** (e.g. Mosquitto, or the one built into Home
-Assistant) and at least one [client](clients.md) to paint a panel. TRMNL /
-KOReader devices poll the server over HTTP instead, no broker required.
+and Windows.
+
+Two transports for getting frames out to panels:
+
+- **REST** (default for new installs in v0.52+). Clients poll Tesserae
+  over HTTP. No broker required; the simplest setup. See the
+  [REST transport](rest-transport.md) page for the full flow.
+- **MQTT** (the original). Clients subscribe to a broker. Lower
+  per-wake latency but you need a broker (the bundled amqtt or an
+  external Mosquitto, or the one Home Assistant ships). TRMNL /
+  KOReader devices have always polled over HTTP regardless of this
+  choice.
 
 !!! tip "Or use Docker (or Home Assistant)"
     If you'd rather not touch Python, the [Docker install path](docker.md)

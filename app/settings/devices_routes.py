@@ -140,6 +140,78 @@ def devices_pair_revoke(code: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices") + "#pair-device")
 
 
+@bp.post("/settings/devices/<instance_id>/set-transport")
+def devices_set_transport(instance_id: str) -> Response:
+    """Flip a device instance between MQTT and REST transports.
+
+    The transport field on the instance manifest decides whether the
+    push pipeline does an MQTT publish for this device. Both halves
+    of the flip are reversible without losing the device's id, panel
+    settings, etc.
+
+    MQTT → REST:
+        - Sets ``transport: "rest"`` on the manifest.
+        - Mints a per-device access_token if one isn't already there
+          (kinds that aren't TRMNL-style won't have one yet).
+        - Pops a one-shot reveal modal so the user can copy the token
+          straight into firmware without having to query the file.
+
+    REST → MQTT:
+        - Removes the ``transport`` field (absence reads as MQTT per
+          ``Device.transport``).
+        - Keeps the access_token in place so flipping back to REST
+          later doesn't force re-pairing.
+        - The status/config topics derived at instance creation stay
+          on the manifest, so MQTT mode works without re-deriving."""
+    anchor = f"device-{instance_id}"
+    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+    devs = devices()
+    device = devs.get(instance_id)
+    if device is None or device.kind_of is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect_to
+
+    new_transport = (request.form.get("transport") or "").strip().lower()
+    if new_transport not in ("mqtt", "rest"):
+        flash("Transport must be 'mqtt' or 'rest'.", "error")
+        return redirect_to
+
+    try:
+        raw = json.loads(device.path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        flash(f"Couldn't read {device.path.name}: {err}", "error")
+        return redirect_to
+
+    if new_transport == "rest":
+        raw["transport"] = "rest"
+        device.manifest["transport"] = "rest"
+        token = device.manifest.get("access_token")
+        if not isinstance(token, str) or not token:
+            token = device_service.generate_native_access_token(devs)
+            raw["access_token"] = token
+            device.manifest["access_token"] = token
+            # One-shot reveal for the user to copy into firmware.
+            session["_trmnl_token_reveal"] = {
+                "device_id": device.id,
+                "device_name": device.name,
+                "token": token,
+            }
+        flash(f"{device.name} switched to REST transport.", "ok")
+    else:
+        # REST → MQTT. Drop the transport field; access_token stays so
+        # a flip back to REST is just one click + reveals the same token.
+        raw.pop("transport", None)
+        device.manifest.pop("transport", None)
+        flash(f"{device.name} switched to MQTT transport.", "ok")
+
+    device.path.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+    # Push pipeline reads ``device.transport`` per render; no transport
+    # rebuild needed (MQTT broker connection unchanged, REST routes
+    # already registered).
+    return redirect_to
+
+
 @bp.post("/settings/devices/<instance_id>/regenerate-token")
 def devices_regenerate_token(instance_id: str) -> Response:
     """Mint a fresh access token for a TRMNL device.

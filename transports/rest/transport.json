@@ -1,0 +1,18 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "rest",
+  "name": "REST API",
+  "version": "1.0.0",
+  "description": "HTTP-polled. Devices fetch /api/v1/device/<id>/frame on their wake cycle, POST heartbeats to /api/v1/device/<id>/status, and pair via /api/v1/device/register. No broker required; Tesserae itself is the only service involved. Slightly higher per-wake latency than MQTT (poll interval + HTTP round trip), but the new-install path is friction-free. The implementation lives in app/rest_api.py + app/state/pairing_store.py.",
+  "kind": "pull",
+  "broker_required": false,
+  "capabilities": {
+    "frame_delivery": true,
+    "device_status": true,
+    "device_config": true,
+    "discovery": false,
+    "retain_semantics": true,
+    "push_to_device": false
+  },
+  "default_for_new_devices": true
+}

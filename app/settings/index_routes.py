@@ -395,6 +395,18 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance and "access_token" in device.manifest
                     else None
                 ),
+                # Transport flip (v0.52 Phase 1b). Instance-only; flips
+                # between MQTT and REST without losing the device's id /
+                # panel / per-clone renderer settings. ``transport`` is
+                # the CURRENT transport, the template uses it to decide
+                # the button label and the new value to POST. None on
+                # kinds (only instances flip).
+                "set_transport_endpoint": (
+                    url_for("auth.devices_set_transport", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "transport": device.transport if is_instance else None,
                 # The Display-name field reads ``device_name`` (raw) for
                 # the input's value, separately from ``title`` (which gets
                 # a "Device: " prefix for the card heading). Instance-only;
@@ -470,20 +482,35 @@ def _build_sections() -> list[dict[str, Any]]:
 
 def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:
     """Compose the meta key/value block shown at the top of each
-    device card. Branches on transport: MQTT devices get their
-    status/config topics; HTTP-polled devices (TRMNL) get a transport
-    label, their access token (it's a short typeable string, not
-    really a secret), and the server URL the client should point at."""
+    device card. Branches on transport:
+
+    * REST devices (``Device.transport == "rest"``, set by the pairing
+      flow): surface the per-device access token + the server URL the
+      firmware should point at. Skip MQTT topics; they're not used.
+    * MQTT instances declaring an access_token (TRMNL clients):
+      backward-compat shape, HTTP polling + token + server URL.
+    * Other MQTT devices: status / config topic pair.
+    """
     meta: dict[str, Any] = {"Renderers": ", ".join(device.renderer_ids)}
     access_token = device.manifest.get("access_token")
-    if isinstance(access_token, str) and access_token:
-        # HTTP-polled device, surface the token + server URL so the
-        # user can configure their client without leaving the page.
+    if device.transport == "rest":
+        # v0.52 REST device. Mask the token (first 4 + "...") so a
+        # screenshot of the Devices page doesn't leak it; the user can
+        # still copy the full thing via the soon-to-land "show token"
+        # action on the device card.
+        masked = f"{access_token[:4]}…" if isinstance(access_token, str) and access_token else "-"
+        meta["Transport"] = "REST"
+        meta["Access token"] = masked
+        meta["Server URL"] = f"http://{request.host}"
+    elif isinstance(access_token, str) and access_token:
+        # Pre-v0.52 HTTP-polled device (TRMNL). Same shape as before,
+        # except the transport label is more specific.
         meta["Transport"] = "HTTP polling"
         meta["Access token"] = access_token
         meta["Server URL"] = f"http://{request.host}"
     else:
         # MQTT device, keep the topic-pair display.
+        meta["Transport"] = "MQTT"
         meta["Status topic"] = device.status_topic or "-"
         meta["Config topic"] = device.config_topic or "-"
     if is_instance:

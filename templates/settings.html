@@ -557,8 +557,24 @@
      within the .card so it still reads as part of the device.
      Renders for any section that has either endpoint (non-device
      sections like renderers won't, so the block is skipped). #}
-  {% if section.calibrate_endpoint or section.delete_endpoint or section.regenerate_token_endpoint %}
+  {% if section.calibrate_endpoint or section.delete_endpoint or section.regenerate_token_endpoint or section.set_transport_endpoint %}
   <div class="device-footer">
+    {% if section.set_transport_endpoint %}
+    {# Transport flip (v0.52 Phase 1b). MQTT ↔ REST without losing the
+       device's id / panel / per-clone renderer settings. Token
+       persists across flips so the firmware doesn't need to re-pair. #}
+    <form method="post" action="{{ section.set_transport_endpoint }}" class="form form--inline"
+          onsubmit="return confirm({% if section.transport == 'rest' %}'Switch this device to MQTT? The firmware will need its broker settings re-flashed.'{% else %}'Switch this device to REST? An access token will be minted (or reused) and shown to copy into firmware.'{% endif %});">
+      <input type="hidden" name="transport" value="{% if section.transport == 'rest' %}mqtt{% else %}rest{% endif %}">
+      <div class="actions">
+        {% if section.transport == 'rest' %}
+        {{ button('Switch to MQTT', icon='arrows-left-right', variant='ghost') }}
+        {% else %}
+        {{ button('Switch to REST', icon='arrows-left-right', variant='ghost') }}
+        {% endif %}
+      </div>
+    </form>
+    {% endif %}
     {% if section.regenerate_token_endpoint %}
     {# Regenerate access token, present only on TRMNL-style devices.
        Old token stops working the moment this is clicked, so the

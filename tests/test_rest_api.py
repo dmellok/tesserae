@@ -297,6 +297,66 @@ def test_status_response_includes_config_and_next_poll(app: Flask) -> None:
 # -- log ---------------------------------------------------------------
 
 
+def test_discover_endpoint_adds_to_discovery_cache(app: Flask) -> None:
+    """REST discovery announce: a firmware without a pairing code POSTs
+    to /discover, the entry shows up in the DiscoveryCache, and the
+    Settings -> Devices page picks it up alongside MQTT-discovered
+    devices."""
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "fresh_pico",
+                "kind": "pico_bin_client",
+                "panel_w": 1600,
+                "panel_h": 1200,
+                "fw_version": "0.0.1",
+                "mac": "aabbccddeeff",
+            }
+        ),
+    )
+    assert resp.status_code == 200
+    cache = app.config["DISCOVERY_CACHE"]
+    discovered = {d.id: d for d in cache.all()}
+    assert "fresh_pico" in discovered
+    assert discovered["fresh_pico"].parsed.get("kind") == "pico_bin_client"
+
+
+def test_discover_endpoint_rejects_missing_device_id(app: Flask) -> None:
+    client = app.test_client()
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=json.dumps({"kind": "pico_bin_client"}),
+    )
+    assert resp.status_code == 400
+
+
+def test_discover_endpoint_rate_limited(app: Flask) -> None:
+    """Discovery shares the register endpoint's rate limiter; an
+    attacker spamming discoveries gets 429 after the cap."""
+    from app.state.rate_limiter import RateLimiter
+
+    app.config["REGISTER_RATE_LIMITER"] = RateLimiter(max_attempts=2, window_s=60)
+    client = app.test_client()
+    body = json.dumps({"device_id": "spam_pico", "kind": "pico_bin_client"})
+    for _ in range(2):
+        resp = client.post(
+            "/api/v1/device/discover",
+            headers={"Content-Type": "application/json"},
+            data=body,
+        )
+        assert resp.status_code == 200
+    resp = client.post(
+        "/api/v1/device/discover",
+        headers={"Content-Type": "application/json"},
+        data=body,
+    )
+    assert resp.status_code == 429
+
+
 def test_admin_pairing_issue_requires_session(app: Flask) -> None:
     """Admin endpoints are session-gated despite living under /api/v1/
     (which is otherwise auth-bypassed). Unauth'd callers get 401."""

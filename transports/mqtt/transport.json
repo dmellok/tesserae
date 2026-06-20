@@ -1,0 +1,18 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "mqtt",
+  "name": "MQTT",
+  "version": "1.0.0",
+  "description": "Publish/subscribe over an MQTT broker. Devices subscribe to a retained frame topic and receive each new render as a published message; status heartbeats flow back to Tesserae on a per-device status topic. Lower latency than REST (no polling interval), but needs a broker (the bundled amqtt or an external Mosquitto). The implementation lives in app/transport.py + app/transport_wiring.py + app/embedded_broker.py.",
+  "kind": "push",
+  "broker_required": true,
+  "capabilities": {
+    "frame_delivery": true,
+    "device_status": true,
+    "device_config": true,
+    "discovery": true,
+    "retain_semantics": true,
+    "push_to_device": true
+  },
+  "default_for_new_devices": false
+}

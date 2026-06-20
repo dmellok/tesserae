@@ -36,6 +36,7 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 import time
@@ -322,6 +323,70 @@ def post_log(device_id: str) -> Response:
 _VALID_KIND_RE = __import__("re").compile(r"^[a-z][a-z0-9_]*$")
 
 
+def _client_id_for_rate_limit() -> str:
+    """The key the rate limiter buckets attempts by. Uses
+    ``X-Forwarded-For`` when a reverse proxy is in front (Nginx Proxy
+    Manager, Caddy, Cloudflare Tunnel) and falls back to the direct
+    peer address. Trailing whitespace stripped; first value only when
+    multiple are present (we trust only the closest proxy)."""
+    forwarded = (request.headers.get("X-Forwarded-For") or "").strip()
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()
+    return request.remote_addr or "unknown"
+
+
+@bp.post("/discover")
+def post_discover() -> Response:
+    """Unauthenticated discovery announce.
+
+    A firmware that just connected to WiFi but doesn't yet have a
+    pairing code (admin hasn't generated one, or hasn't typed it into
+    the firmware's setup form yet) POSTs here so the admin can see it
+    in the Discovered strip on Settings -> Devices and issue a code
+    targeted at this specific device. Mirrors the MQTT wildcard
+    discovery path (``tesserae/+/status`` heartbeats), just over HTTP.
+
+    Body shape (same shape DiscoveryCache.record consumes):
+        {"device_id": "...", "kind": "...", "panel_w": int,
+         "panel_h": int, "fw_version": "...", "mac": "..." }
+
+    Rate-limited per client IP using the same limiter as ``/register``;
+    successful announces don't release the bucket (unlike register)
+    because announcing is cheap and replay-friendly, so an attacker
+    spamming the cache would still be throttled."""
+    limiter = current_app.config.get("REGISTER_RATE_LIMITER")
+    client_id = _client_id_for_rate_limit()
+    if limiter is not None:
+        decision = limiter.check_and_consume(client_id)
+        if not decision.allowed:
+            resp = _error(429, "too many discovery attempts; slow down")
+            resp.headers["Retry-After"] = str(decision.retry_after_s)
+            return resp
+
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return _error(400, "body must be a JSON object")
+    device_id = str(body.get("device_id") or "").strip().lower()
+    if not device_id:
+        return _error(400, "device_id is required")
+
+    discovery_cache = current_app.config.get("DISCOVERY_CACHE")
+    if discovery_cache is None:
+        return _error(503, "discovery cache not configured")
+
+    payload = json.dumps(body).encode("utf-8")
+    entry = discovery_cache.record(device_id, payload)
+    if entry is None:
+        return _error(400, "device_id rejected (malformed or empty payload)")
+    return jsonify(
+        {
+            "status": 200,
+            "discovered": True,
+            "next_step": "Generate a pairing code in Tesserae's Settings -> Devices, then POST /api/v1/device/register with X-Pairing-Code.",
+        }
+    )
+
+
 @bp.post("/register")
 def post_register() -> Response:
     """First-boot device pairing.
@@ -331,7 +396,23 @@ def post_register() -> Response:
     declaring its chosen id + kind + panel dims + firmware version.
     On success the server creates the device instance, mints a per-
     device ``access_token``, and returns it. The pairing code is
-    burned (single-use)."""
+    burned (single-use).
+
+    Rate-limited per client IP: 6-digit codes have only 20 bits of
+    entropy, so an unrate-limited brute force on the LAN could try
+    millions of codes per minute and crack a random code in seconds.
+    The limiter caps FAILED attempts (successful registrations
+    release the bucket since they burned a code; the attacker
+    can't grind a single IP without being noticed)."""
+    limiter = current_app.config.get("REGISTER_RATE_LIMITER")
+    client_id = _client_id_for_rate_limit()
+    if limiter is not None:
+        decision = limiter.check_and_consume(client_id)
+        if not decision.allowed:
+            resp = _error(429, "too many failed pairing attempts; slow down")
+            resp.headers["Retry-After"] = str(decision.retry_after_s)
+            return resp
+
     code = request.headers.get("X-Pairing-Code", "").strip()
     if not code:
         return _error(400, "missing X-Pairing-Code header")
@@ -384,6 +465,8 @@ def post_register() -> Response:
             # the MQTT path). Mint one now and persist.
             token = generate_access_token(devices_registry)
             _persist_token(existing, token)
+        if limiter is not None:
+            limiter.record_success(client_id)
         return jsonify(
             {
                 "status": 200,
@@ -426,6 +509,8 @@ def post_register() -> Response:
         token = generate_access_token(devices_registry)
         _persist_token(result.device, token)
 
+    if limiter is not None:
+        limiter.record_success(client_id)
     resp = jsonify(
         {
             "status": 201,

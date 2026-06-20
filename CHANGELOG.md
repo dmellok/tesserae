@@ -6,6 +6,75 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.52.3], 2026-06-20
+
+### Added
+
+- **Phase 1c: ``transports/<id>/`` drop-a-folder discovery surface.**
+  New ``transports/mqtt/transport.json`` + ``transports/rest/transport.json``
+  metadata manifests + ``app/transport_loader.py`` that walks the dir
+  at startup and exposes a ``TransportRegistry`` under
+  ``app.config["TRANSPORT_REGISTRY"]``. Mirrors the pattern of
+  renderers/ and devices/. The MQTT and REST implementations stay
+  where they live (app/transport.py + app/transport_wiring.py +
+  app/embedded_broker.py for MQTT; app/rest_api.py for REST); the
+  loader is metadata + visibility, not a rewrite. Future third
+  transports (WebSocket, gRPC, MQTT 5) can be added by dropping a
+  folder and landing their implementation, no manifest field needs
+  threading through five places. ``schema/transport.schema.json``
+  validates manifests.
+- **Per-device transport flip (MQTT ↔ REST).** New form on each
+  device card on Settings → Devices: "Switch to REST" or
+  "Switch to MQTT". Backed by ``POST /settings/devices/<id>/set-
+  transport``. Flip preserves the device's id, panel settings, and
+  per-clone renderer settings. MQTT → REST mints (or reuses) an
+  access token and shows it in the one-shot reveal modal so the
+  user can copy it into firmware. REST → MQTT drops the transport
+  field; the token stays so flipping back is one click.
+- **Transport column on the Devices area.** Each device card's
+  meta block now shows the device's transport explicitly ("Transport:
+  MQTT" / "Transport: REST" / "Transport: HTTP polling"). REST
+  devices show the first 4 chars of their access token + "..." (so
+  a screenshot of Settings → Devices doesn't leak the full token).
+- **Rate limit on ``POST /api/v1/device/register``.** 10 failed
+  attempts per client IP per 60s window; successful registrations
+  release the bucket so a user pairing several devices in a row
+  isn't penalised. 6-digit codes have only ~20 bits of entropy;
+  this caps brute force at <1 attempt/minute averaged. Sliding
+  window, in-memory, lives in ``app/state/rate_limiter.py``.
+  Returns 429 + ``Retry-After`` header when exceeded.
+- **``POST /api/v1/device/discover``.** Unauthenticated announce
+  endpoint for firmware that booted but doesn't yet have a pairing
+  code. Adds the firmware to the existing ``DiscoveryCache``; it
+  shows up in the Settings → Devices Discovered strip alongside
+  MQTT-discovered devices. Shares the register endpoint's rate
+  limiter to prevent Discovered-strip spam.
+- **Public docs for the REST transport.**
+  ``docs/install/rest-transport.md`` covers the full end-to-end
+  flow: when to pick REST vs MQTT, the pairing UI walkthrough, the
+  endpoint reference, transport-flip semantics, security notes, and
+  migration tips. Linked from ``docs/install/server.md`` and the
+  mkdocs nav. The firmware prompts in ``notes/prompts/`` are
+  referenced as the next step for porting existing firmware.
+
+### Changed
+
+- ``app/settings/index_routes.py``'s ``_device_meta_block`` branches
+  on ``Device.transport == "rest"`` first, then the legacy TRMNL
+  ``access_token``-on-instance signal, then defaults to MQTT.
+
+### Notes
+
+- The "drop-a-folder" pattern for transports is intentionally
+  metadata-only. MQTT and REST have fundamentally different shapes
+  (push vs pull, persistent connection vs HTTP request, broker-
+  mediated vs direct). Forcing a common Transport ABC on them
+  would be a fiction that obscures more than it reveals. The
+  loader surfaces capabilities + identity; each transport's
+  actual wiring stays where it makes sense in the app.
+- Existing MQTT installs see zero behaviour change. The new
+  endpoints, rate limiter, and UI controls are additive.
+
 ## [0.52.2], 2026-06-20
 
 ### Changed
