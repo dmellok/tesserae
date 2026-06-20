@@ -121,6 +121,40 @@
     }
   }
 
+  // ---- Transport segmented control (Add device card, issue #16) -------
+  // Two buttons inside [data-segmented-group]; clicking flips the active
+  // button + swaps [hidden] on [data-transport-branch="rest|mqtt"]. Both
+  // branches stay in the DOM, so typed values in the inactive branch are
+  // preserved across flips.
+  function initSegmented(group) {
+    const card = group.closest('[data-add-device-card]') || group;
+    const buttons = group.querySelectorAll('[data-segmented-btn]');
+    if (buttons.length === 0) return;
+    const branches = card.querySelectorAll('[data-transport-branch]');
+    const helps = {
+      rest: card.querySelector('[data-segmented-help-rest]'),
+      mqtt: card.querySelector('[data-segmented-help-mqtt]'),
+    };
+    buttons.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const target = btn.getAttribute('data-segmented-btn');
+        buttons.forEach(function (b) {
+          const on = b === btn;
+          b.classList.toggle('is-active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        branches.forEach(function (br) {
+          const on = br.getAttribute('data-transport-branch') === target;
+          br.hidden = !on;
+        });
+        Object.keys(helps).forEach(function (k) {
+          if (helps[k]) helps[k].hidden = k !== target;
+        });
+        card.setAttribute('data-transport', target);
+      });
+    });
+  }
+
   ready(function () {
     document.querySelectorAll('[data-device-card]').forEach(function (card) {
       initDeviceCard(card);
@@ -128,5 +162,6 @@
     });
     document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
     document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);
+    document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
   });
 })();

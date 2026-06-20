@@ -1870,6 +1870,37 @@
   color: var(--t-fg);
 }
 
+/* Add device (#16) dark mode */
+:root[data-theme="dark"] .dx-hint-band {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+  color: var(--t-fg-soft);
+}
+:root[data-theme="dark"] .dx-hint-band strong { color: var(--t-fg); }
+:root[data-theme="dark"] .dx-warn-band {
+  background: color-mix(in oklab, #e0902f 16%, var(--t-surface));
+  border-color: color-mix(in oklab, #e0902f 30%, var(--t-surface));
+  color: #f3c97e;
+}
+:root[data-theme="dark"] .dx-warn-band .ph-warning { color: #f3c97e; }
+:root[data-theme="dark"] .dx-warn-band a { color: var(--t-accent); }
+:root[data-theme="dark"] .dx-warn-band a:hover { color: var(--t-accent-hover); }
+:root[data-theme="dark"] .dx-segmented-label { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-segmented {
+  background: var(--t-surface-soft);
+  border-color: var(--t-border);
+}
+:root[data-theme="dark"] .dx-segmented-btn { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-segmented-btn:hover { color: var(--t-fg-soft); }
+:root[data-theme="dark"] .dx-segmented-btn.is-active {
+  background: var(--t-surface-raised);
+  color: var(--t-fg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+:root[data-theme="dark"] .dx-segmented-help { color: var(--t-muted); }
+:root[data-theme="dark"] .dx-btn-primary { background: var(--t-accent); color: var(--t-accent-fg); }
+:root[data-theme="dark"] .dx-btn-primary:hover { background: var(--t-accent-hover); }
+
 /* Legacy ``.dx-server-area > .card`` overlay (still used by any
    non-converted card on the server tab). */
 :root[data-theme="dark"] .dx-server-area > .card {
@@ -2071,3 +2102,144 @@
   .dx-discovered-row { flex-direction: column; align-items: flex-start; }
   .dx-discovered-actions { width: 100%; justify-content: flex-start; }
 }
+
+
+/* ---------- Add device (issue #16): hint band, warn band, segmented
+   control, pair row, primary button. The card itself reuses the
+   shared .dx-section-card chrome. ---------------------------------- */
+
+.dx-hint-band {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #f6f5f1;
+  border: 1px solid #e8e7e1;
+  border-radius: 9px;
+  font-size: 12px;
+  color: #56564f;
+  line-height: 1.5;
+}
+.dx-hint-band .ph-info {
+  color: #a3a39b;
+  flex: 0 0 auto;
+  font-size: 14px;
+  margin-top: 1px;
+}
+.dx-hint-band p { margin: 0; }
+.dx-hint-band strong { color: #2b2b29; font-weight: 600; }
+
+.dx-warn-band {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  background: #fcf6ea;
+  border: 1px solid #ecdcbc;
+  border-radius: 9px;
+  font-size: 12px;
+  color: #a06a1e;
+  line-height: 1.5;
+}
+.dx-warn-band .ph-warning { color: #b9741f; flex: 0 0 auto; font-size: 14px; margin-top: 1px; }
+.dx-warn-band p { margin: 0; }
+.dx-warn-band a {
+  color: #15846a;
+  font-weight: 600;
+  text-decoration: none;
+}
+.dx-warn-band a:hover { color: #127059; text-decoration: underline; }
+
+/* Segmented control (transport) */
+.dx-segmented-group {
+  margin: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dx-segmented-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #56564f;
+}
+.dx-segmented {
+  display: inline-flex;
+  background: #f0efe9;
+  border: 1px solid #dedcd6;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 2px;
+  align-self: flex-start;
+}
+.dx-segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #9a9a93;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+.dx-segmented-btn:hover { color: #56564f; }
+.dx-segmented-btn.is-active {
+  background: #fff;
+  color: #2b2b29;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(20, 20, 15, 0.06);
+}
+.dx-segmented-help {
+  margin: 0;
+  font-size: 11.5px;
+  color: #a3a39b;
+  line-height: 1.5;
+}
+
+/* Pair row: note input on the left, action button on the right. */
+.dx-pair-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dx-pair-input { flex: 1 1 320px; min-width: 0; }
+.dx-pair-action { flex: 0 0 auto; }
+
+.dx-pending-codes { margin-top: 14px; }
+
+/* Add-device branch (REST or MQTT). Wrapping div so the existing
+   .form's grid layout cascades cleanly. */
+.dx-add-branch { margin-top: 4px; }
+
+/* Right-aligned action button row for the MQTT add form. */
+.dx-actions-right {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+/* Larger primary button (used for "Issue pairing code" + "Add device"). */
+.dx-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: #15846a;
+  color: #fff;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.dx-btn-primary:hover { background: #179476; }
+.dx-btn-primary .ph { font-size: 14px; }

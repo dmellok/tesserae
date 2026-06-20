@@ -187,6 +187,24 @@ def settings_area(area: str) -> str | Response:
     system_password_set = _auth.password_is_set(settings_store())
     system_password_required = _auth.password_required(settings_store())
 
+    # Issue #16 unified Add-device card needs the default transport
+    # (REST or MQTT) + a "broker_configured" flag so the MQTT branch
+    # can show a "set up the broker first" warning band when no
+    # external host is set. ``broker.host`` is the canonical signal
+    # for the warning (per the design handoff); the built-in
+    # embedded broker doesn't satisfy it, so the user has to point
+    # at a configured external host before adding MQTT devices.
+    if area == "devices":
+        _app_raw = settings_store().get_section("app")
+        _broker_raw = settings_store().get_section("broker")
+        default_transport = (_app_raw.get("default_transport") or "rest").strip().lower()
+        if default_transport not in ("rest", "mqtt"):
+            default_transport = "rest"
+        broker_configured = bool((_broker_raw.get("host") or "").strip())
+    else:
+        default_transport = "rest"
+        broker_configured = False
+
     return render_template(
         "settings.html",
         sections=sections,
@@ -200,6 +218,8 @@ def settings_area(area: str) -> str | Response:
         discovered_rest=discovered_rest,
         discovered_mqtt=discovered_mqtt,
         discovered_sig=discovered_sig,
+        default_transport=default_transport,
+        broker_configured=broker_configured,
         # When set (via ?calibrating=<id>), the matching device card shows
         # the "which number is in the top-left?" answer form.
         calibrating=request.args.get("calibrating") or "",

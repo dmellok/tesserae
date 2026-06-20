@@ -102,11 +102,10 @@ def main() -> None:
     # bounding box (cropped) so each issue gets a focused view.
     targets = [
         ("settings-devices-full-page.png", "/settings/devices", None),
-        # Issue #16: the two parallel "add device" entry points sit
-        # back-to-back on the Devices tab. Capture both cards by
-        # grabbing them with a CSS combinator.
+        # Issue #16: previous "Add device" + "Pair new device (REST)"
+        # cards now unified into one ``#add-device`` card with a
+        # transport segmented control. One screenshot covers both.
         ("16-add-device-current.png", "/settings/devices", "#add-device"),
-        ("16-pair-device-current.png", "/settings/devices", "#pair-device"),
         # Issue #17: the Discovered strip's first child block on the
         # Devices tab.
         ("17-discovered-strip-current.png", "/settings/devices", "#discovered-devices"),

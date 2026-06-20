@@ -50,103 +50,11 @@
 {% endif %}
 
 {% if active_area == 'devices' and device_kinds %}
-{# Multi-head: register a second physical display of the same kind.
-   The kind contributes parse/validate + renderer modules; this form
-   collects the instance-specific id, name, and panel dims. #}
-<section class="card" id="add-device">
-  {{ card_head('Add device', icon_name='plus-circle', blurb='Register another physical display. Picks a kind for its protocol + renderers; the id becomes its MQTT topic prefix.') }}
-  <p class="field-help" style="margin: 0 0 var(--t-space-3) 0;">
-    <i class="ph ph-info" aria-hidden="true"></i>
-    <strong>Native TRMNL hardware</strong> (XIAO DIY kit, commercial TRMNL devices) doesn't need this form, point the device at this Tesserae's URL via its captive portal and it'll register itself the moment it polls. Only add a TRMNL device manually for the <strong>KOReader on Kindle</strong> path, where the user types the access token on the Kindle's on-screen keyboard.
-  </p>
-  <form method="post" action="{{ url_for('auth.devices_add') }}" class="form add-device-form">
-    {{ text_input('add-device-id', 'id', 'Device id', value='', placeholder='esp32_kitchen', required=True,
-                  help='Lowercase letters, digits, underscore, hyphen (2–32 chars). Used as the MQTT topic prefix: tesserae/<id>/...') }}
-    {% set kind_options = [] %}
-    {% for k in device_kinds %}{% set _ = kind_options.append({'value': k.id, 'label': k.name}) %}{% endfor %}
-    {{ select_field('add-device-kind', 'kind', 'Kind', value=device_kinds[0].id, options=kind_options) }}
-    {{ text_input('add-device-name', 'name', 'Display name', value='', placeholder='Kitchen panel') }}
-    {{ select_field('add-device-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
-                    help='Pick a common panel, or Custom to set width / height by hand.') }}
-    <div class="add-device-custom-fields">
-      {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
-      {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
-    </div>
-    {{ select_field('add-device-orientation', 'panel_orientation', 'Rotation', value='landscape',
-                    options=[{'value':'landscape','label':'0°'},
-                             {'value':'portrait','label':'90°'},
-                             {'value':'landscape_flipped','label':'180°'},
-                             {'value':'portrait_flipped','label':'270°'}],
-                    help='Clockwise turn applied to match how the panel is mounted. 0° = native (wide); 90°/270° render tall; 180° is upside-down. Not sure? Use Calibrate after adding.') }}
-    <div class="actions">{{ button('Add device', icon='plus') }}</div>
-  </form>
-  <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
-  <script type="application/json" id="add-device-presets">{{ panel_presets|tojson }}</script>
-</section>
-{% endif %}
-
-{% if active_area == 'devices' %}
-{# REST pair flow. Sibling to "Add device" (which is the manual MQTT path).
-   Generates a 6-digit code with a 10-min TTL; the firmware POSTs the code
-   to /api/v1/device/register and registers itself. The instance gets
-   ``transport: "rest"`` automatically so the push pipeline skips broker
-   publishes for it. #}
-<section class="card" id="pair-device">
-  {{ card_head('Pair new device (REST)', icon_name='qr-code',
-               blurb='No broker. Issue a 6-digit code, paste it into your firmware\'s setup form, the device registers itself and starts polling /api/v1/device/<id>/frame for frames. The code is single-use and expires in 10 minutes.') }}
-
-  {% if pairing_reveal %}
-  <div class="pair-reveal" role="status" aria-live="polite">
-    <p class="muted">Code just issued. Copy it now and paste into firmware:</p>
-    <div class="pair-code">
-      <code data-pair-code>{{ pairing_reveal.code }}</code>
-      <button type="button" class="ghost" data-copy-pair-code>
-        <i class="ph ph-copy" aria-hidden="true"></i><span>Copy</span>
-      </button>
-    </div>
-    {% if pairing_reveal.note %}
-    <p class="muted">Note: {{ pairing_reveal.note }}</p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  <form method="post" action="{{ url_for('auth.devices_pair_issue') }}" class="form">
-    {{ text_input('pair-note', 'note', 'Optional note', value='',
-                  placeholder='e.g. for bedroom Pico',
-                  help='Shown alongside the code on this page so you can tell parallel codes apart.') }}
-    <div class="actions">{{ button('Issue pairing code', icon='plus') }}</div>
-  </form>
-
-  {% if pairing_codes %}
-  <h3 class="muted" style="margin-top: var(--t-space-4);">Pending codes</h3>
-  <table class="pair-codes-table">
-    <thead>
-      <tr><th>Code</th><th>Expires in</th><th>Note</th><th></th></tr>
-    </thead>
-    <tbody>
-    {% for p in pairing_codes %}
-      <tr>
-        <td><code>{{ p.code }}</code></td>
-        <td>
-          {% set m = (p.seconds_left // 60) %}
-          {% set s = (p.seconds_left % 60) %}
-          {{ m }}m {{ '%02d' % s }}s
-        </td>
-        <td>{{ p.note or '-' }}</td>
-        <td>
-          <form method="post" action="{{ url_for('auth.devices_pair_revoke', code=p.code) }}" class="inline"
-                onsubmit="return confirm('Revoke code {{ p.code }}?');">
-            <button type="submit" class="ghost danger" title="Revoke this pairing code">
-              <i class="ph ph-trash" aria-hidden="true"></i><span>Revoke</span>
-            </button>
-          </form>
-        </td>
-      </tr>
-    {% endfor %}
-    </tbody>
-  </table>
-  {% endif %}
-</section>
+{# Unified Add device card (issue #16). Replaces the previous Add
+   device + Pair new device (REST) + standalone Pending codes
+   cards. See ``_add_device_card.html`` for the segmented-control
+   layout. #}
+{% include '_add_device_card.html' %}
 {% endif %}
 
 {% if not sections and active_area in ('renderers', 'plugins') %}
@@ -1140,6 +1048,77 @@ docker compose up -d</code></pre>
     function close() {
       modal.remove();
       document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try {
+          await navigator.clipboard.writeText(value);
+          ok = true;
+        } catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok
+          ? '<i class="ph ph-check"></i> Copied'
+          : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
+{% endif %}
+
+{# REST pairing-code reveal modal (issue #16, unified reveal).
+   Pops once after ``auth.devices_pair_issue`` writes the code into
+   ``session._rest_pairing_reveal``; same modal shell as the TRMNL
+   token reveal above, just a different label + body copy. #}
+{% if pairing_reveal %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="pair-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="pair-reveal-title"><i class="ph ph-qr-code"></i> Pairing code</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Type this 6-digit code into the firmware's setup form. The device will POST it to <code>/api/v1/device/register</code>, mint an access token, and start polling for frames. Codes are single-use and expire in 10 minutes.</p>
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ pairing_reveal.code }}" readonly data-modal-token aria-label="Pairing code">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+      {% if pairing_reveal.note %}
+      <p class="field-help">Note: {{ pairing_reveal.note }}</p>
+      {% endif %}
+      <p class="field-help">Server URL: <code>http://{{ request.host }}</code></p>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[aria-labelledby="pair-reveal-title"]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      if (!document.querySelector('.modal')) document.body.classList.remove('modal-open');
     }
     modal.addEventListener('click', (ev) => {
       if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();

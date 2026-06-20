@@ -1,0 +1,164 @@
+{# Unified Add device card (issue #16).
+   Replaces the previous Add device + Pair new device (REST) +
+   standalone Pending codes cards with one .dx-section-card that
+   carries a transport segmented control at the top, REST-default
+   (matches the onboarding wizard's default_transport setting).
+
+   Both transport branches stay in the DOM at once; ``initTransport
+   Segmented`` in static/pages/settings.js toggles ``[hidden]`` on
+   the inactive branch. Typed values in the hidden branch are
+   preserved (the inputs stay in the DOM); flipping the segmented
+   control doesn't clear them.
+
+   Inputs:
+   - ``default_transport`` — "rest" | "mqtt"
+   - ``broker_configured`` — bool, drives the MQTT warning band
+   - ``device_kinds`` / ``panel_preset_choices`` / ``panel_presets``
+   - ``pairing_codes`` — list of REST pending codes
+#}
+
+{% from "_components.html" import number_input, select_field, text_input with context %}
+
+<section class="dx-section-card" id="add-device" data-add-device-card data-transport="{{ default_transport }}">
+
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-plus-circle"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Add device</h3>
+      <p class="dx-section-desc">Register another physical display. Choose how it talks to the server, then fill in the details below.</p>
+    </div>
+  </header>
+
+  <div class="dx-section-body">
+
+    {# TRMNL hint band — same copy as before, just restyled. #}
+    <div class="dx-hint-band">
+      <i class="ph ph-info" aria-hidden="true"></i>
+      <p>
+        <strong>Native TRMNL hardware</strong> (XIAO DIY kit, commercial TRMNL devices) doesn't need this form, point the device at this server's URL via its captive portal and it registers itself on first poll. Only add one manually for the <strong>KOReader on Kindle</strong> path, where the user types the access token on the Kindle's on-screen keyboard.
+      </p>
+    </div>
+
+    {# Transport segmented control. Two buttons, REST-default. #}
+    <div class="dx-segmented-group" data-segmented-group>
+      <label class="dx-segmented-label">Transport</label>
+      <div class="dx-segmented" role="tablist" aria-label="Transport for this device">
+        <button type="button"
+                class="dx-segmented-btn{% if default_transport == 'rest' %} is-active{% endif %}"
+                data-segmented-btn="rest"
+                role="tab"
+                aria-selected="{% if default_transport == 'rest' %}true{% else %}false{% endif %}">
+          <i class="ph ph-globe" aria-hidden="true"></i><span>REST API</span>
+        </button>
+        <button type="button"
+                class="dx-segmented-btn{% if default_transport == 'mqtt' %} is-active{% endif %}"
+                data-segmented-btn="mqtt"
+                role="tab"
+                aria-selected="{% if default_transport == 'mqtt' %}true{% else %}false{% endif %}">
+          <i class="ph ph-broadcast" aria-hidden="true"></i><span>MQTT broker</span>
+        </button>
+      </div>
+      <p class="dx-segmented-help" data-segmented-help-rest{% if default_transport != 'rest' %} hidden{% endif %}>
+        REST is the recommended default, devices pair with a one-time code, no broker required.
+      </p>
+      <p class="dx-segmented-help" data-segmented-help-mqtt{% if default_transport != 'mqtt' %} hidden{% endif %}>
+        MQTT devices publish heartbeats to the broker; topics are derived from the device id.
+      </p>
+    </div>
+
+    {# REST branch: note field + Issue pairing code button +
+       pending-codes inline list (only when 1+ pending). #}
+    <div class="dx-add-branch dx-add-branch--rest"
+         data-transport-branch="rest"
+         {% if default_transport != 'rest' %}hidden{% endif %}>
+      <form method="post" action="{{ url_for('auth.devices_pair_issue') }}" class="form">
+        <div class="dx-pair-row">
+          <div class="dx-pair-input">
+            {{ text_input('add-pair-note', 'note', 'Optional note', value='',
+                          placeholder='e.g. for the bedroom Pico',
+                          help='Shown next to the pairing code so you remember which device it is for.') }}
+          </div>
+          <div class="dx-pair-action">
+            <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Issue pairing code</span></button>
+          </div>
+        </div>
+      </form>
+
+      {% if pairing_codes %}
+      <div class="dx-pending-codes">
+        <div class="dx-discovered-sublabel">
+          <span>PENDING CODES</span>
+          <span class="dx-count-pill">{{ pairing_codes|length }}</span>
+        </div>
+        <ul class="dx-discovered-list">
+          {% for p in pairing_codes %}
+          <li class="dx-discovered-row">
+            <div class="dx-discovered-info">
+              <div class="dx-discovered-id"><code>{{ p.code }}</code></div>
+              <div class="dx-discovered-meta">
+                <span class="dx-meta-pair">
+                  <span class="dx-meta-k">Expires in</span>
+                  {% set m = (p.seconds_left // 60) %}{% set s = (p.seconds_left % 60) %}
+                  <span class="dx-meta-v">{{ m }}m {{ '%02d' % s }}s</span>
+                </span>
+                <span class="dx-meta-pair"><span class="dx-meta-k">Note</span><span class="dx-meta-v">{{ p.note or '—' }}</span></span>
+              </div>
+            </div>
+            <div class="dx-discovered-actions">
+              <form method="post" action="{{ url_for('auth.devices_pair_revoke', code=p.code) }}" class="form form--inline"
+                    onsubmit="return confirm('Revoke code {{ p.code }}?');">
+                <button type="submit" class="dx-btn-ghost-sm"><i class="ph ph-trash" aria-hidden="true"></i><span>Revoke</span></button>
+              </form>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+    </div>
+
+    {# MQTT branch: warning band if broker.host isn't configured;
+       then the original Add-device form. #}
+    <div class="dx-add-branch dx-add-branch--mqtt"
+         data-transport-branch="mqtt"
+         {% if default_transport != 'mqtt' %}hidden{% endif %}>
+
+      {% if not broker_configured %}
+      <div class="dx-warn-band" role="alert">
+        <i class="ph ph-warning" aria-hidden="true"></i>
+        <p>
+          No MQTT broker is configured yet.
+          <a href="{{ url_for('auth.settings_area', area='server') }}#broker">Set it up in Server → MQTT broker →</a>
+        </p>
+      </div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('auth.devices_add') }}" class="form add-device-form">
+        {{ text_input('add-device-id', 'id', 'Device id', value='', placeholder='esp32_kitchen', required=True,
+                      help='Used to derive the MQTT topics. Lowercase, no spaces.') }}
+        {% set kind_options = [] %}
+        {% for k in device_kinds %}{% set _ = kind_options.append({'value': k.id, 'label': k.name}) %}{% endfor %}
+        {{ select_field('add-device-kind', 'kind', 'Kind', value=device_kinds[0].id if device_kinds else '', options=kind_options) }}
+        {{ text_input('add-device-name', 'name', 'Display name', value='', placeholder='Kitchen panel') }}
+        {{ select_field('add-device-preset', 'panel_preset', 'Panel size', value='', options=panel_preset_choices,
+                        help='Pick a common panel, or Custom to set width / height by hand.') }}
+        <div class="add-device-custom-fields">
+          {{ number_input('add-device-w', 'panel_w', 'Panel width (px)', value='', min=1, step=1) }}
+          {{ number_input('add-device-h', 'panel_h', 'Panel height (px)', value='', min=1, step=1) }}
+        </div>
+        {{ select_field('add-device-orientation', 'panel_orientation', 'Rotation', value='landscape',
+                        options=[{'value':'landscape','label':'0°'},
+                                 {'value':'portrait','label':'90°'},
+                                 {'value':'landscape_flipped','label':'180°'},
+                                 {'value':'portrait_flipped','label':'270°'}],
+                        help='Clockwise turn applied to match how the panel is mounted.') }}
+        <div class="dx-actions-right">
+          <button type="submit" class="dx-btn-primary"><i class="ph ph-plus" aria-hidden="true"></i><span>Add device</span></button>
+        </div>
+      </form>
+      <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
+      <script type="application/json" id="add-device-presets">{{ panel_presets|tojson }}</script>
+    </div>
+
+  </div>
+</section>

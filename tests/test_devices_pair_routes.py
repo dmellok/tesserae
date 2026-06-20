@@ -45,24 +45,43 @@ def test_devices_pair_issue_redirects_back_with_a_reveal(app: Flask) -> None:
     assert "/settings/devices" in resp.location
 
     # The redirect target's session has the reveal payload, which
-    # renders into the Pair card on the next GET. Hit the GET and
+    # renders into the pair-reveal modal on the next GET (issue #16
+    # unified the inline pair-reveal into a modal that shares its
+    # shell with the TRMNL token reveal modal). Hit the GET and
     # confirm the code shows up in the page.
     page = client.get("/settings/devices", follow_redirects=True)
     assert page.status_code == 200
     body = page.get_data(as_text=True)
-    # The reveal block carries the literal note we passed.
+    # The reveal modal carries the literal note we passed.
     assert "manual test" in body
-    # And a 6-digit code is highlighted in the data-pair-code element.
+    # And a 6-digit code is highlighted in the token-input element
+    # (shared modal markup with data-modal-token + aria-label
+    # "Pairing code").
     import re
 
-    match = re.search(r"data-pair-code>(\d{6})</code>", body)
-    assert match is not None, "no 6-digit code rendered in pair-reveal"
+    match = re.search(
+        r'aria-label="Pairing code"[^>]*value="(\d{6})"|value="(\d{6})"[^>]*aria-label="Pairing code"',
+        body,
+    )
+    if match is None:
+        # The element ordering of value/aria-label varies between
+        # browsers' rendering; fall back to a plain 6-digit search
+        # inside the pair-reveal modal block.
+        modal_match = re.search(
+            r'aria-labelledby="pair-reveal-title".*?value="(\d{6})"',
+            body,
+            re.S,
+        )
+        assert modal_match is not None, "no 6-digit code rendered in pair-reveal modal"
+        code = modal_match.group(1)
+    else:
+        code = match.group(1) or match.group(2)
 
     # The store should also report exactly one pending code.
     store = app.config["PAIRING_STORE"]
     pending = store.list_pending()
     assert len(pending) == 1
-    assert pending[0].code == match.group(1)
+    assert pending[0].code == code
     assert pending[0].note == "manual test"
 
 
