@@ -96,9 +96,7 @@ def test_store_delete_removes_file(tmp_path: Path) -> None:
 # ----- Routes: save + reset --------------------------------------------
 
 
-def test_devices_kind_defaults_save_persists_to_disk(
-    app_with_gate: Flask, tmp_path: Path
-) -> None:
+def test_devices_kind_defaults_save_persists_to_disk(app_with_gate: Flask, tmp_path: Path) -> None:
     client = app_with_gate.test_client()
     _sign_in(client)
     resp = client.post(
@@ -125,9 +123,7 @@ def test_devices_kind_defaults_save_persists_to_disk(
     }
 
 
-def test_devices_kind_defaults_reset_removes_file(
-    app_with_gate: Flask, tmp_path: Path
-) -> None:
+def test_devices_kind_defaults_reset_removes_file(app_with_gate: Flask, tmp_path: Path) -> None:
     client = app_with_gate.test_client()
     _sign_in(client)
     # First save something to override.
@@ -160,27 +156,9 @@ def test_devices_kind_defaults_save_404s_on_unknown_kind(app_with_gate: Flask) -
     assert resp.status_code == 302
 
 
-# ----- Settings page rendering ----------------------------------------
-
-
-def test_built_in_kinds_card_renders_on_devices_tab(app_with_gate: Flask) -> None:
-    client = app_with_gate.test_client()
-    _sign_in(client)
-    body = client.get("/settings/devices").get_data(as_text=True)
-    # Section header + at least one kind row + the form anchor.
-    assert "Built-in device kinds" in body
-    assert "esp32_client" in body
-    # Modified badge is absent before any override is saved.
-    assert "MODIFIED" not in body
-
-
-def test_built_in_kinds_card_flags_modified_after_save(app_with_gate: Flask) -> None:
-    client = app_with_gate.test_client()
-    _sign_in(client)
-    client.post(
-        "/settings/devices/kinds/esp32_client/defaults",
-        data={"display_name": "Custom ESP"},
-    )
-    body = client.get("/settings/devices").get_data(as_text=True)
-    # The MODIFIED badge appears once an override is recorded.
-    assert "MODIFIED" in body
+# The "Built-in device kinds" card was prototyped but intentionally
+# hidden in v0.55.0 (no clear admin workflow over editing
+# ``devices/<kind>/device.json`` directly). The backend store +
+# routes are kept around for a future revisit; the rendering tests
+# were dropped along with the include. Re-enable when the include
+# returns.

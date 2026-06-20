@@ -425,6 +425,40 @@ def test_delete_device_instance_removes_clones(app_with_gate: Flask, tmp_path: P
     assert not (tmp_path / "devices" / "esp32_kitchen.json").exists()
 
 
+def test_delete_device_purges_battery_history_and_status_cache(
+    app_with_gate: Flask,
+) -> None:
+    """A deleted device should not linger on the /devices/battery
+    dashboard or in the live status cache. Both stores keyed records
+    on device id and outlived the registry entry before this fix; the
+    battery page kept rendering a card for the dead device because
+    its index iterates ``BatteryHistory.device_ids()`` union with
+    currently-reporting devices."""
+    import time as _time
+
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_attic", "kind": "esp32_client"},
+    )
+    # Plant one battery sample + one status cache entry the way the
+    # transport wiring would on a real heartbeat.
+    battery = app_with_gate.config["BATTERY_HISTORY"]
+    battery.record("esp32_attic", pct=72, battery_mv=3820, timestamp=_time.time())
+    app_with_gate.config["DEVICE_STATUS"]["esp32_attic"] = {
+        "received_at": _time.time(),
+        "parsed": {"battery_pct": 72},
+    }
+    assert "esp32_attic" in battery.device_ids()
+    assert "esp32_attic" in app_with_gate.config["DEVICE_STATUS"]
+
+    resp = client.post("/settings/devices/esp32_attic/delete", follow_redirects=False)
+    assert resp.status_code == 302
+    assert "esp32_attic" not in battery.device_ids()
+    assert "esp32_attic" not in app_with_gate.config["DEVICE_STATUS"]
+
+
 def test_update_panel_changes_instance_dims(app_with_gate: Flask, tmp_path: Path) -> None:
     """The per-instance panel form rewrites the instance JSON and reloads
     it so the new dims are live without a restart."""

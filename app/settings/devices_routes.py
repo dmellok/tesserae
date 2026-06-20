@@ -838,6 +838,23 @@ def devices_delete(instance_id: str) -> Response:
     telemetry = current_app.config.get("DEVICE_TELEMETRY")
     if telemetry is not None:
         telemetry.forget(instance_id)
+    # Same purge for the battery_history store. Without this the
+    # ``/devices/battery`` dashboard kept showing a card for the
+    # deleted device (the index iterates ``store.device_ids()``
+    # union with currently-reporting devices, and historical rows
+    # in the SQLite table outlived the registry entry).
+    battery_history = current_app.config.get("BATTERY_HISTORY")
+    if battery_history is not None:
+        try:
+            battery_history.forget(instance_id)
+        except Exception:
+            current_app.logger.exception("battery_history: forget failed for %s", instance_id)
+    # And the live device_status cache so a stale "last seen" or
+    # parsed-heartbeat block doesn't tail-render anywhere (events,
+    # ha-discovery refresh callbacks, etc).
+    status_cache = current_app.config.get("DEVICE_STATUS")
+    if isinstance(status_cache, dict):
+        status_cache.pop(instance_id, None)
     rebuild_transport_fn()()
     flash(f"Deleted device {result.device.name!r}.", "ok")
     return redirect(url_for("auth.settings_area", area="devices"))
