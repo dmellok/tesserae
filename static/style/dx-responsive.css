@@ -1,0 +1,128 @@
+/* ============================================================
+ *  Mobile responsive pass for the v0.56 admin surface
+ *
+ *  Most admin pages were built at desktop widths and lost their
+ *  bearings on phones (≤640 px) when the user's screenshots
+ *  surfaced overflow in v0.63.8: dashboards/history/widgets rows
+ *  starved of width, rotation + schedule + settings form inputs
+ *  flowing off their cards, the MQTT-broker section header
+ *  trying to put a URL input on the same line as its title.
+ *
+ *  v0.63.9 adds the missing collapses in one file rather than
+ *  scatter them across the per-page sheets, so the responsive
+ *  behaviour is discoverable in one place and easy to audit.
+ * ============================================================ */
+
+/* Universal mobile defensive — inputs/selects must never push
+   their grid cell wider than its parent. ``min-width: 0`` defeats
+   the implicit ``min-content`` floor a flex item picks up from
+   its contents (long ip addresses, placeholder text, etc.). */
+@media (max-width: 640px) {
+  input, select, textarea {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  /* Section card breathing room. 22/24 padding fills too much of
+     a phone's content area; halve it so the inner body actually
+     has room for the form rows. */
+  .dx-section-card {
+    padding: 16px 14px;
+  }
+
+  /* Section header: title block + meta + cta sit horizontally
+     at desktop; below 640 px the trailing meta or cta wraps
+     onto its own line. */
+  .dx-section-head {
+    flex-wrap: wrap;
+  }
+  .dx-section-head .dx-section-meta {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  /* Field grids collapse to a single column. Pages already
+     declare their own breakpoints, but the page-default
+     ``.field-grid`` (auto-fit minmax(180px, 1fr)) leaves narrow
+     cells that mash labels into 2-word stacks. Force one. */
+  .field-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tabs row scrolls horizontally instead of wrapping to two
+     lines (Settings has 6+ tabs that wrap into ugly stacks). */
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .tabs .tab {
+    flex: 0 0 auto;
+  }
+
+  /* History row collapse — same shape as dashboards in v0.63.8.
+     Thumb stays on top-left, time + body wrap to the next line,
+     actions push to the bottom of the row. */
+  .dx-history-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .dx-history-thumb { flex: 0 0 64px; }
+  .dx-history-time,
+  .dx-history-mid {
+    flex: 1 1 auto;
+  }
+  .dx-history-end {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+
+  /* Widgets index rows collapse. Pre-fix the icon + title +
+     "Open admin" button competed for horizontal space and the
+     description text wrapped one word per line. */
+  .dx-widget-row {
+    flex-wrap: wrap;
+  }
+  .dx-widget-text {
+    width: 100%;
+    flex: 1 1 100%;
+  }
+  .dx-widget-row .dx-discovered-actions {
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  /* Plugin index per-kind heading: icon + title + description +
+     count chip on the right. The count chip wraps cleanly. */
+  .dx-section-head .dx-meta-strip {
+    width: 100%;
+  }
+
+  /* Settings: server-tab cards have a header row with the URL
+     input pinned on the right. Same wrap pattern. */
+  .dx-server-card-head,
+  .dx-server-section-head {
+    flex-wrap: wrap;
+  }
+  .dx-server-card-head > *:last-child,
+  .dx-server-section-head > *:last-child {
+    width: 100%;
+    margin-top: 6px;
+  }
+}
+
+/* Even tighter at sub-tablet phone widths (≤ 480 px). The card
+   padding compresses further; the dashboard create row's input +
+   button stack vertically. */
+@media (max-width: 480px) {
+  .dx-section-card {
+    padding: 14px 12px;
+  }
+  .dx-pair-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dx-pair-input { flex: 1 1 100%; }
+  .dx-pair-action { width: 100%; }
+  .dx-pair-action .dx-btn-primary { width: 100%; justify-content: center; }
+}

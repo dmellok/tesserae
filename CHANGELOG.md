@@ -6,6 +6,44 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.9], 2026-06-21
+
+### Fixed
+
+- **Mobile overflow pass** (Rotations + History + Widgets +
+  Settings + Schedule editor + Rotation editor). Four screenshots
+  in a row surfaced the same root: pages built at desktop widths
+  had no responsive collapse at narrow viewports, so form heads
+  with trailing meta + input chrome overflowed their cards,
+  row-style content (history rows, widget rows) starved their
+  middle column of width, and the field-grid clung to multi-
+  column layouts past the point of usability.
+  - New ``static/style/dx-responsive.css`` (~110 lines) holds
+    the entire mobile pass. Loaded last in ``_base.html`` so its
+    ``@media`` rules win against any per-page sheet's
+    breakpoints.
+  - ``html, body { overflow-x: hidden; max-width: 100% }`` in
+    base.css as a safety net so a stray wide descendant can't
+    force horizontal page scroll.
+  - Section card padding compresses 22/24 → 16/14 at ≤640 px,
+    then 14/12 at ≤480 px.
+  - ``.dx-section-head`` flex-wraps so trailing meta / cta /
+    URL inputs drop below the title.
+  - History + Widgets row layouts collapse to stacked at
+    ≤640 px (same pattern Dashboards picked up in v0.63.8).
+  - Tabs row scrolls horizontally instead of wrapping to two
+    lines on small screens.
+  - Dashboard create-row stacks at ≤480 px (Create-dashboard
+    button goes full-width below the input).
+- **Rotation status pill pinned to the top-right corner of its
+  card**. The "Not active right now" / "Now: step N…" pill was
+  flowing inside the section head row, vertically centred next
+  to the title. Switched to ``position: absolute; top: 18px;
+  right: 22px`` on the card so the pill always hugs the card's
+  top-right corner regardless of how tall the title block grows.
+  At ≤640 px the pin releases and the pill flows back below the
+  title (would otherwise overlap a narrow title block).
+
 ## [0.63.8], 2026-06-21
 
 ### Fixed

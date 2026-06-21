@@ -13,13 +13,19 @@
  *  here. This file is purely the *read view* uplift.
  * ============================================================ */
 
-/* HEAD ROW: teal icon + title + id + status pills on the right.
-   Override the shared .dx-section-head's left alignment so the
-   status pill column floats right and wraps cleanly under the
-   title on narrow viewports. */
+/* HEAD ROW: teal icon + title + id on the left, status pills
+   pinned to the top-right corner of the rotation card. Position
+   absolute on the pill stack so they always hug the card's top
+   edge regardless of how tall the title block grows (long names,
+   wrapped descriptions). The header gets right padding so the
+   title block doesn't slide under the pills. */
+.rotation-card {
+  position: relative;
+}
 .dx-rotation-head {
   align-items: flex-start;
   flex-wrap: wrap;
+  padding-right: 220px;
 }
 .dx-rotation-head .dx-section-desc code {
   font-family: var(--t-font-mono);
@@ -31,10 +37,28 @@
   padding: 1px 6px;
 }
 .dx-rotation-status {
+  position: absolute;
+  top: 18px;
+  right: 22px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  justify-content: flex-end;
+  max-width: 60%;
+}
+@media (max-width: 640px) {
+  /* On narrow viewports the absolute pin would overlap the
+     title; flow it back into the header layout and let it wrap
+     to its own line below the title block. */
+  .dx-rotation-head { padding-right: 0; }
+  .dx-rotation-status {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+    max-width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 /* META STRIP: anchor, cycle minutes, step count. Uses the

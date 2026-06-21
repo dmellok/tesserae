@@ -295,6 +295,12 @@ body.dev-mode {
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
+/* Belt-and-braces guard against any inner element forcing a
+   horizontal scrollbar on the page itself (e.g. a wide condition
+   picker row, a code block with no wrap, an embedded preview).
+   Individual scrollable surfaces (.dx-code, .preview-frame, the
+   composer canvas) handle their own overflow inside their box. */
+html, body { overflow-x: hidden; max-width: 100%; }
 
 body.admin {
   background: var(--t-bg);
