@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.3], 2026-06-21
+
+### Changed
+
+- **Page editor: outer card chrome flips to ``.dx-section-card``**.
+  Five live ``<section class="card">`` blocks (per-cell card +
+  Live preview + Dashboard + Layout + Schedules) become
+  ``.dx-section-card`` so the editor reads as siblings of the
+  rest of v0.56-uplifted pages. The custom drag-tile-to-canvas
+  interaction model + the bespoke cell-card header styling are
+  preserved; only the outer shell flipped. ``card_head`` adapter
+  carries the header chrome inside each card.
+
 ## [0.63.2], 2026-06-21
 
 ### Changed

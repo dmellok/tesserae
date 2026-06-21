@@ -4,7 +4,7 @@
 
 {% macro cell_form(cell, idx) %}
 {% set plugin = (plugins | selectattr('id', 'equalto', cell.plugin) | list | first) if cell.plugin else None %}
-<section class="card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
+<section class="dx-section-card cell-card" id="cell-{{ cell.id }}" data-cell-id="{{ cell.id }}">
   <header class="card-head cell-card-head">
     <h2>
       <span>Cell {{ idx }}</span>
@@ -178,7 +178,7 @@
 
 <div class="editor-grid" data-page-id="{{ page.id }}" data-cell-count="{{ page.cells|length }}">
 
-  <section class="card preview-card">
+  <section class="dx-section-card preview-card">
     {{ card_head('Live preview', icon_name='monitor-play', blurb='Click a cell to edit it. Updates after every change.') }}
     {# One preview per distinct aspect ratio among the selected devices.
        preview_groups is a single virtual-panel group when nothing is
@@ -212,7 +212,7 @@
   </section>
 
   <div class="editor-column">
-    <section class="card">
+    <section class="dx-section-card">
       {{ card_head('Dashboard', icon_name='note-pencil', blurb='Font + matting + spacing applied to every cell.') }}
       <form method="post" action="{{ url_for('pages.update', page_id=page.id) }}" class="form" data-editor-form>
         {# No `name` here, the header rename form owns it. A stale hidden
@@ -313,7 +313,7 @@
       </form>
     </section>
 
-    <section class="card">
+    <section class="dx-section-card">
       {{ card_head('Layout', icon_name='grid-four', blurb='Pick a preset to (re)split the panel. Open “Custom layout” to drag edges or insert cells freely.') }}
 
       <div class="layout-grid" style="--panel-aspect: {{ panel.w }} / {{ panel.h }};">
@@ -406,7 +406,7 @@
        desktop the preview stays sticky in the right column; on
        mobile this card stacks below the cell editors with the
        preview pinned to the top. #}
-    <section class="card schedules-card">
+    <section class="dx-section-card schedules-card">
       {{ card_head('Schedules', icon_name='alarm',
          blurb='Pushes that fire this dashboard. The Schedules page is the canonical edit surface.') }}
       {% if schedules_for_page %}
