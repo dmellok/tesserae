@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.61.0], 2026-06-21
+
+### Added
+
+- **pi_bin_client / pi_png_client: sleep interval setting**
+  ([devices/pi_bin_client/device.json](devices/pi_bin_client/device.json),
+  [devices/pi_png_client/device.json](devices/pi_png_client/device.json)).
+  Both Pi clients now declare a ``sleep_interval_s`` field in their
+  ``config_schema`` (default 15 min, bounds 30 s – 7 days) with the
+  same preset list the ESP32 client carries. REST-polled instances
+  pick the new cadence up via the existing ``_next_poll_s`` /
+  ``_current_config`` helpers in [app/rest_api.py](app/rest_api.py),
+  which already echo per-device config back to the client in the
+  ``/api/v1/device/<id>/status`` response. MQTT-driven instances
+  ignore the field (they wake on retained-frame publishes).
+  ``validate_config`` enforces the bounds server-side before a
+  typoed cadence reaches the client. Manifest version bumped on
+  both kinds (0.1.0 → 0.2.0).
+
 ## [0.60.5], 2026-06-21
 
 ### Fixed

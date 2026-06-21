@@ -1,4 +1,4 @@
-"""pi_client device contract.
+"""pi_png_client device contract.
 
 Pi-side listener heartbeats are expected to be JSON. Tesserae doesn't
 dictate the schema, whatever the listener publishes flows through and
@@ -6,15 +6,25 @@ gets surfaced in the UI. The few well-known keys (``state``, ``last_paint_at``,
 ``last_error``) are pulled out of the parsed payload by the settings template
 when they're present; everything else is shown as a generic key/value pair.
 
-The Pi client has no remote config, sleep / display tuning lives on the
-device. We omit ``config_topic`` from the manifest so the settings page
-doesn't render an empty config form for it.
+REST-polled instances honour ``sleep_interval_s`` from the device config:
+Tesserae echoes the configured cadence back to the client in the
+``/api/v1/device/<id>/status`` response (``next_poll_s``), and
+``_next_poll_s`` in ``app/rest_api.py`` pulls the value from settings.
+MQTT-driven instances ignore the field (they wake on retained-frame
+publishes), but the form is still presented so the user has one place to
+configure cadence regardless of transport.
 """
 
 from __future__ import annotations
 
 import json
 from typing import Any
+
+# Bounds match config_schema in device.json. Duplicated here on purpose:
+# the manifest lives next to the form (UI affordance), the constants live
+# next to validate_config (server-side guard), neither one trusts the other.
+SLEEP_INTERVAL_MIN_S = 30
+SLEEP_INTERVAL_MAX_S = 7 * 24 * 60 * 60
 
 
 def parse_status(payload: bytes) -> dict[str, Any]:
@@ -32,3 +42,23 @@ def parse_status(payload: bytes) -> dict[str, Any]:
     if not isinstance(decoded, dict):
         return {"raw": decoded}
     return decoded
+
+
+def validate_config(payload: dict[str, Any]) -> tuple[bool, str | None]:
+    """Check the payload makes sense before it goes back to the client.
+
+    REST clients pick the new value up on the next ``/api/v1/device/<id>/
+    status`` poll; a typoed cadence would otherwise pin the device to a
+    minutes-long wake cycle until the next manual fix.
+    """
+    if "sleep_interval_s" not in payload:
+        return False, "missing 'sleep_interval_s'"
+    try:
+        interval = int(payload["sleep_interval_s"])
+    except (TypeError, ValueError):
+        return False, "sleep_interval_s must be an integer"
+    if interval < SLEEP_INTERVAL_MIN_S:
+        return False, f"sleep_interval_s must be >= {SLEEP_INTERVAL_MIN_S} (got {interval})"
+    if interval > SLEEP_INTERVAL_MAX_S:
+        return False, f"sleep_interval_s must be <= {SLEEP_INTERVAL_MAX_S} (got {interval})"
+    return True, None

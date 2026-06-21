@@ -2,9 +2,29 @@
   "tesserae_compat": "1.x",
   "name": "Pi PNG client",
   "icon": "monitor",
-  "version": "0.1.0",
-  "description": "Raspberry-Pi-side client that consumes the PNG frame. Subscribes to tesserae/pi_png/frame/png; publishes a heartbeat with idle/rendering state and the last paint timestamp.",
+  "version": "0.2.0",
+  "description": "Raspberry-Pi-side client that consumes the PNG frame. Subscribes to tesserae/pi_png/frame/png; publishes a heartbeat with idle/rendering state and the last paint timestamp. REST-polled instances also honour sleep_interval_s — Tesserae echoes the configured cadence back in the /api/v1/device/<id>/status response as next_poll_s so the client knows when to wake.",
   "renderers": ["pi_png"],
   "status_topic": "tesserae/pi_png/status",
-  "panel": { "w": 1424, "h": 1200, "orientation": "landscape", "name": "Inky Impression 13.3″" }
+  "panel": { "w": 1424, "h": 1200, "orientation": "landscape", "name": "Inky Impression 13.3″" },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 900,
+      "min": 30,
+      "max": 604800,
+      "presets": [
+        {"value": 60,    "label": "1 minute"},
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "How long the client sleeps between frame fetches when polling via REST. MQTT-driven instances ignore this value (they wake on retained-frame publishes). Custom value is in seconds."
+    }
+  }
 }

@@ -26,8 +26,12 @@ def test_manifest_fields(pi_png_client) -> None:
     assert pi_png_client.name == "Pi PNG client"
     assert pi_png_client.renderer_ids == ["pi_png"]
     assert pi_png_client.status_topic == "tesserae/pi_png/status"
-    # No config_topic declared, UI won't render a config form for this device.
+    # No config_topic declared — REST clients pick up the cadence from the
+    # /api/v1/device/<id>/status response, MQTT clients ignore it.
     assert pi_png_client.config_topic is None
+    # sleep_interval_s lives in the config_schema so the device form
+    # renders the field + the REST API has a value to echo as next_poll_s.
+    assert "sleep_interval_s" in (pi_png_client.config_schema or {})
 
 
 def test_parse_status_round_trips_json(pi_png_client) -> None:
@@ -43,3 +47,32 @@ def test_parse_status_handles_empty(pi_png_client) -> None:
 def test_parse_status_handles_non_json(pi_png_client) -> None:
     parsed = pi_png_client.parse_status(b"hello there")
     assert parsed == {"raw": "hello there"}
+
+
+def test_validate_config_accepts_in_range(pi_png_client) -> None:
+    ok, err = pi_png_client.validate_config({"sleep_interval_s": 900})
+    assert ok and err is None
+
+
+def test_validate_config_rejects_below_min(pi_png_client) -> None:
+    ok, err = pi_png_client.validate_config({"sleep_interval_s": 10})
+    assert not ok
+    assert err is not None and ">=" in err
+
+
+def test_validate_config_rejects_above_max(pi_png_client) -> None:
+    ok, err = pi_png_client.validate_config({"sleep_interval_s": 7 * 86400 + 1})
+    assert not ok
+    assert err is not None and "<=" in err
+
+
+def test_validate_config_rejects_non_integer(pi_png_client) -> None:
+    ok, err = pi_png_client.validate_config({"sleep_interval_s": "fifteen"})
+    assert not ok
+    assert err is not None
+
+
+def test_validate_config_requires_field(pi_png_client) -> None:
+    ok, err = pi_png_client.validate_config({})
+    assert not ok
+    assert err is not None and "missing" in err
