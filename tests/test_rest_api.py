@@ -286,8 +286,10 @@ def test_status_response_includes_config_and_next_poll(app: Flask) -> None:
     body = resp.get_json()
     assert "config" in body
     assert "next_poll_s" in body
-    # Default for pico_bin_client is 900s (15min) per device.json schema.
-    assert body["next_poll_s"] == 900
+    # Default for pico_bin_client is 60s per device.json schema (every
+    # device kind now defaults to a tight cadence so newly-paired
+    # devices stay responsive until the user picks a longer one).
+    assert body["next_poll_s"] == 60
     # The merged status is now in the cache, in the same shape the MQTT
     # path uses ({"received_at": ts, "parsed": {...}}) so the Devices
     # UI's _status_view reads it correctly.
