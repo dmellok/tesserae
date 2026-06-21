@@ -43,19 +43,46 @@ def test_index_renders_empty_state_with_no_history(app: Flask) -> None:
 
 def test_index_renders_card_with_history_and_prediction(app: Flask, tmp_path: Path) -> None:
     store: BatteryHistory = app.config["BATTERY_HISTORY"]
-    now = time.time()
-    for i in range(10):
-        store.record("esp32", pct=100 - i * 5, timestamp=now - (10 - i) * 86400 / 2)
     client = app.test_client()
     _sign_in(client)
+    # v0.55.2 filter: only cards for currently-registered devices
+    # render, so the instance has to exist in the registry before
+    # planting history (deleted devices intentionally don't render).
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_attic", "kind": "esp32_client", "name": "Attic ESP"},
+    )
+    now = time.time()
+    for i in range(10):
+        store.record("esp32_attic", pct=100 - i * 5, timestamp=now - (10 - i) * 86400 / 2)
     resp = client.get("/devices/battery?window=7")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "esp32" in body
+    assert "esp32_attic" in body
     assert "battery-chart" in body
     # Prediction metadata should be on the page somewhere; the heading
     # is "Drain rate" when a regression succeeded.
     assert "Drain rate" in body or "Need at least 8 samples" in body
+
+
+def test_index_hides_orphan_history_for_unregistered_devices(app: Flask, tmp_path: Path) -> None:
+    """Historical battery rows for a device that's no longer in the
+    registry must not render. The previous logic was
+    ``current.keys() | store.device_ids()`` which kept showing pre-
+    v0.55.1 deleted devices because SQLite rows survived the
+    registry drop. v0.55.2 intersects with the live registry so
+    orphan history is excluded at read time."""
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    now = time.time()
+    # Plant history for a device id that's NOT registered. With the
+    # old union logic the dashboard would render a card for it; with
+    # the registry intersect it must not.
+    for i in range(6):
+        store.record("ghost_device", pct=80 - i * 2, timestamp=now - (6 - i) * 86400)
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    assert "ghost_device" not in body
 
 
 def test_series_json_returns_points_and_prediction(app: Flask) -> None:

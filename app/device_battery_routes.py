@@ -109,10 +109,19 @@ def index() -> str:
     if store is not None:
         registry = _registry()
         current = _current_battery_per_device()
-        # Devices we actually want to show: any device currently
-        # reporting a battery + any device with stored history (even
-        # if it's offline right now).
-        device_ids = set(current.keys()) | set(store.device_ids())
+        # Show registered devices only, with their current + historical
+        # battery data. The previous logic was
+        # ``current.keys() | store.device_ids()`` which leaked deleted
+        # devices in two ways: stored history rows survived a registry
+        # drop (SQLite outlives the in-memory registry), and stale
+        # DEVICE_STATUS entries from a process where v0.55.1's purge
+        # hadn't yet run also stayed visible. Intersecting both sources
+        # with ``registered_ids`` is the load-bearing fix: a device
+        # has to be in the live registry to render a card here, so any
+        # historical or cached data for a no-longer-present device is
+        # excluded at read time even when on-disk orphan rows linger.
+        registered_ids = {d.id for d in (registry.devices.values() if registry else [])}
+        device_ids = (set(current.keys()) | set(store.device_ids())) & registered_ids
         # Stable display order: name asc, falling back to id.
         names = {d.id: d.display_name for d in (registry.devices.values() if registry else [])}
         for device_id in sorted(device_ids, key=lambda i: (names.get(i) or i).lower()):
