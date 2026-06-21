@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.2], 2026-06-21
+
+### Changed
+
+- **Settings page: remaining live ``<section class="card">``
+  blocks flip to ``.dx-section-card``**. Three small cards (top-
+  level Diagnostics + Server-tab Diagnostics + Sign-out) were
+  still on the legacy card class while everything else around
+  them had already moved. The pragmatic ``card_head`` adapter in
+  settings.css handles the header chrome; this is just the outer
+  shell. Most of the file's remaining ``class="card"`` matches
+  live inside ``{% if False %}`` dead-branch guards left over
+  from the device-card v2 migration.
+
 ## [0.63.1], 2026-06-21
 
 ### Changed
