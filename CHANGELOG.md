@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.59.0], 2026-06-21
+
+Tier 4 (final) of the v0.56 admin-UI uplift. Onboarding and Themes
+flip onto the section-card chrome, closing the four-tier arc.
+
+### Changed
+
+- **Onboarding** (``/onboarding``): the wizard step body card flips
+  to ``.dx-section-card``. Every per-step "Back" link is dropped
+  (per the spec: forward-only wizard with Skip as the escape
+  hatch). The step-pip indicator + Skip setup link stay; pips were
+  already polished in v0.54.1.
+- **Themes** (``/themes``): the Update theme primary button swaps
+  to ``.dx-btn-primary``. The bespoke 3-column layout + reactive
+  live preview already track the form state, so the design's
+  "preview updates as you edit" requirement was already met at
+  v0.55 fidelity; no additional JS wiring needed.
+
+### Notes
+
+- Closes the 4-tier admin-UI uplift arc (v0.56.0 → v0.59.0).
+  Every top-level admin page outside the composer + page editor
+  is now on the shared ``.dx-section-card`` chrome + status pill +
+  filter chip vocabulary.
+- A page-level "the composer needs design love" follow-up is on
+  the backlog; it has a custom interaction model that didn't fit
+  the tier-based card uplift.
+
 ## [0.58.0], 2026-06-21
 
 Tier 3 of the v0.56 admin-UI uplift. Schedules, Rotations, and the

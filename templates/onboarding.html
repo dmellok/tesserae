@@ -17,7 +17,7 @@
     {% endfor %}
   </ol>
 
-  <div class="card wizard-card">
+  <div class="dx-section-card wizard-card">
 
     {# ---------- Welcome ---------- #}
     {% if step == 'welcome' %}
@@ -100,7 +100,7 @@
       </div>
       </div>{# wizard-broker-mqtt-fields #}
       <div class="wizard-nav">
-        <a class="ghost" href="{{ url_for('onboarding.step', step='welcome') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+        <span></span>
         {{ button('Save & continue', icon='arrow-right') }}
       </div>
     </form>
@@ -174,7 +174,7 @@
     {% endif %}
 
     <div class="wizard-nav">
-      <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      <span></span>
       {% if instances %}
       <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       {% else %}
@@ -241,7 +241,7 @@
     <p class="field-help wizard-hint"><i class="ph ph-compass" aria-hidden="true"></i> Mounted sideways or upside-down? Calibrate it from the device card (Settings → Devices) after setup.</p>
 
     <div class="wizard-nav">
-      <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      <span></span>
       <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
     {% endif %}{# default_transport rest vs mqtt #}
@@ -265,14 +265,14 @@
       {% endfor %}
     </ul>
     <div class="wizard-nav">
-      <a class="ghost" href="{{ url_for('onboarding.step', step='device') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+      <span></span>
       <a class="primary" href="{{ url_for('onboarding.step', step='telemetry') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
     {% else %}
     <p class="lede">Create a ready-made dashboard, a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
     <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
       <div class="wizard-nav">
-        <a class="ghost" href="{{ url_for('onboarding.step', step='device') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+        <span></span>
         {{ button('Create a starter dashboard', icon='sparkle') }}
       </div>
     </form>
@@ -304,7 +304,7 @@
       </label>
 
       <div class="wizard-nav">
-        <a class="ghost" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>Back</span></a>
+        <span></span>
         <div class="actions">{{ button('Finish', icon='check', variant='primary') }}</div>
       </div>
     </form>
