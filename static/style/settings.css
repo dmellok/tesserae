@@ -2678,10 +2678,19 @@
 .dx-disclosure-body { margin-top: 10px; }
 
 /* Icon-only ghost button variant (delete actions on Dashboards,
-   History, etc). Same chrome as .dx-btn-ghost-sm but square. */
+   History, etc). Same chrome as .dx-btn-ghost-sm but pinned to a
+   consistent square so a row of icon-only buttons reads as a
+   balanced row regardless of each glyph's intrinsic width.
+   ``min-width: 32px`` previously meant a row of three buttons
+   with mixed glyph widths (pause + paper-plane + pencil) rendered
+   as three different sizes — pencil-simple is intrinsically
+   narrower than paper-plane-tilt so it hit the floor and read
+   visually smaller next to the others. */
 .dx-btn-icon-only {
-  padding: 6px 8px;
-  min-width: 32px;
+  padding: 0;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
   justify-content: center;
 }
 .dx-btn-icon-only .ph { font-size: 14px; }
