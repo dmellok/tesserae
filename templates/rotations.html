@@ -385,6 +385,29 @@
         btn.setAttribute('aria-expanded', 'true');
       }
     });
+
+    // v0.62.4 live conditions count. The condition-picker writes
+    // back to its hidden <textarea> on every add/remove/edit, so
+    // the textarea's ``change`` event is the cleanest signal. Walk
+    // the JSON, count valid array entries, update the step's
+    // toggle label in place. Works for the initial server-rendered
+    // count too because the picker fires a synthetic change on
+    // first render.
+    container.addEventListener('change', function (ev) {
+      var ta = ev.target;
+      if (!ta || ta.tagName !== 'TEXTAREA') return;
+      if (ta.name !== 'step_conditions_json[]') return;
+      var wrap = ta.closest('[data-rot-step]');
+      if (!wrap) return;
+      var label = wrap.querySelector('.rot-step-cond-label');
+      if (!label) return;
+      var n = 0;
+      try {
+        var parsed = JSON.parse((ta.value || '').trim() || '[]');
+        if (Array.isArray(parsed)) n = parsed.length;
+      } catch (e) { /* parse error: leave label as last good value */ return; }
+      label.textContent = n > 0 ? 'Conditions (' + n + ')' : 'Conditions';
+    });
   });
 })();
 </script>

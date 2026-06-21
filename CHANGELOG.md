@@ -6,6 +6,47 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.4], 2026-06-21
+
+### Fixed
+
+- **Day-of-week chips now centre properly**. The v0.62.2/0.62.3
+  attempts didn't account for the hidden checkbox AND anonymous
+  whitespace text nodes both still acting as flex items between
+  the input and the visible span. Took the input out of flow
+  entirely (``position: absolute; opacity: 0``) so it covers the
+  chip for click handling without consuming any layout, then
+  flipped the chip itself to ``display: grid; place-items: center``
+  so positioning is unambiguous.
+- **Smart sync row vertical alignment**. The switch component is
+  a single-line label; the neighbouring Render lead field has a
+  label-above-input stack. Without ``align-items: center`` on the
+  parent grid, the toggle floated next to the input's label
+  instead of the input itself. Added the alignment override to
+  ``.rotation-form .field-grid``, plus a flex layout on
+  ``.field--switch`` so the trailing ``info_pop`` button sits
+  inline with the toggle instead of wrapping to its own line.
+
+### Added
+
+- **Conditions toggle: live count update**. The
+  ``Conditions (N)`` label now reflects condition adds/removes in
+  the picker, not just the server-rendered initial count. The
+  condition picker already fires a synthetic ``change`` event on
+  its hidden textarea whenever ``writeRows`` runs; the rotation
+  form's container delegates on that event, parses the JSON, and
+  updates the matching step's toggle label in place.
+
+### Changed
+
+- **Condition picker rows: responsive layout**. The kind select
+  was stretching to full row width at narrow viewports because
+  it was the only flex child on its line. Constrained it to
+  content width (max 180 px), pinned the remove button to the
+  right edge via ``margin-left: auto``, and rebalanced the
+  ``.cp-row-body`` flex weights so entity/operator/value wrap
+  consistently.
+
 ## [0.62.3], 2026-06-21
 
 ### Fixed
