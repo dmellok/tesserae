@@ -34,3 +34,38 @@
   border: 1px solid var(--t-pill-neutral-border, #e2e1db);
   font-weight: 600;
 }
+
+/* Mobile collapse (≤ 640px). The row is flex with the dashboard
+   main (icon + name + meta strip) on the left and the
+   ``.dx-discovered-actions`` group on the right. At narrow
+   widths the three buttons claim ~200 px on the right, leaving
+   ~80 px for the name + meta — which is what the v0.63.x
+   screenshots showed wrapping one word per line. Flip to a
+   column layout so the actions drop below the row content
+   instead of starving it of width. Mirrors the same pattern
+   ``.dx-discovered-row`` already uses on Devices. */
+@media (max-width: 640px) {
+  .dx-dashboard-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .dx-dashboard-main {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .dx-dashboard-row .dx-discovered-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* The dashboard name is a single-line truncation by default so a
+   long title doesn't push the meta strip out of the row. The
+   meta strip below it can wrap freely. */
+.dx-dashboard-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

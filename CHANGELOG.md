@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.8], 2026-06-21
+
+### Fixed
+
+- **Dashboards page now responsive at phone widths**. The row
+  layout (icon + name + meta strip on the left, three action
+  buttons on the right) was fine at desktop but starved the left
+  half of horizontal space on a 390-px viewport — the dashboard
+  name wrapped one word per line and the buttons visually
+  overlapped the meta strip. Added a ``@media (max-width: 640px)``
+  collapse that flips ``.dx-dashboard-row`` to a column layout
+  with the actions dropping below the row content. Same pattern
+  ``.dx-discovered-row`` on Devices already uses. Also added a
+  single-line truncation on ``.dx-dashboard-name`` so a long
+  title doesn't push the meta strip out of the row.
+
 ## [0.63.7], 2026-06-21
 
 ### Changed
