@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.11], 2026-06-21
+
+### Added
+
+- **CORS on the ``/api/v1/device/*`` REST API**. Every response
+  now carries ``Access-Control-Allow-Origin: *`` plus
+  ``Allow-Methods`` / ``Allow-Headers`` / ``Expose-Headers``;
+  ``OPTIONS`` requests short-circuit to a 204 with the same
+  headers. Unblocks browser-based callers: the in-browser
+  device emulator at ``emulator.tesserae.ink`` (planned), the
+  "Test push" UI in the future HTTP-push transport (#23), and
+  any other browser tool that needs to pair + poll a Tesserae
+  server. ``Allow-Origin: *`` is safe here because every endpoint
+  already requires a Bearer token — the token is the security
+  boundary, not the origin. Admin UI / settings / plugin routes
+  outside this blueprint are unaffected.
+
 ## [0.63.10], 2026-06-21
 
 ### Fixed

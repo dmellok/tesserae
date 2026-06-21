@@ -58,6 +58,52 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("rest_api", __name__, url_prefix="/api/v1/device")
 
 
+# -- CORS ----------------------------------------------------------------
+#
+# The REST API was originally designed for server-to-server flows (the
+# Pi clients, the ESP32 firmware) which don't care about CORS. From
+# v0.63.11 the same API is callable from a browser (the in-browser
+# device emulator at emulator.tesserae.ink, future "Test push" UI on
+# the device card, anything else browser-based that needs to pair +
+# poll). Browsers refuse cross-origin requests unless the response
+# carries the ``Access-Control-Allow-*`` headers below; pre-v0.63.11
+# the emulator just got a CORS error and the fetch never reached our
+# code.
+#
+# ``Access-Control-Allow-Origin: *`` is safe here because every
+# endpoint already requires a Bearer token. The token is the security
+# boundary, not the origin. Browser-based callers that don't have the
+# token can't extract anything from a wildcard allow.
+#
+# Routes outside this blueprint (admin UI, settings, plugins/browse)
+# aren't affected — those are same-origin from the admin page and
+# don't want random origins poking at them anyway.
+
+
+@bp.before_request
+def _cors_preflight():  # type: ignore[no-untyped-def]
+    """Short-circuit OPTIONS preflight with a 204 + the headers the
+    ``after_request`` hook will paint on it. Without this, OPTIONS
+    requests fall through to the route handlers (which expect GET /
+    POST) and return 405 — Chrome / Safari then refuse to fire the
+    real request."""
+    if request.method == "OPTIONS":
+        return Response(status=204)
+    return None
+
+
+@bp.after_request
+def _cors_headers(resp: Response) -> Response:
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = (
+        "Authorization, Content-Type, If-None-Match, X-Tesserae-Token"
+    )
+    resp.headers["Access-Control-Expose-Headers"] = "ETag"
+    resp.headers["Access-Control-Max-Age"] = "86400"
+    return resp
+
+
 # -- registry helpers ----------------------------------------------------
 
 

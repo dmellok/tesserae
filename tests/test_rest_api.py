@@ -650,3 +650,61 @@ def test_log_endpoint_appends_to_event_log(app: Flask) -> None:
     assert matches, "no client_log event recorded"
     assert matches[0].status == "warn"
     assert matches[0].extra.get("msg") == "panel busy timeout"
+
+
+# -- CORS ---------------------------------------------------------------
+
+
+def test_cors_headers_present_on_normal_response(app: Flask) -> None:
+    """Browser-based callers (the device emulator at
+    emulator.tesserae.ink, future in-browser test-push UI) need the
+    Access-Control-Allow-* headers on every REST API response."""
+    client = app.test_client()
+    resp = client.get("/api/v1/device/nonexistent/frame")
+    # Auth fails before frame logic, but the after_request hook still
+    # paints the headers — that's what we're verifying.
+    assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+    assert "GET" in resp.headers.get("Access-Control-Allow-Methods", "")
+    assert "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
+    assert "Authorization" in resp.headers.get("Access-Control-Allow-Headers", "")
+    assert "ETag" in resp.headers.get("Access-Control-Expose-Headers", "")
+
+
+def test_cors_preflight_returns_204(app: Flask) -> None:
+    """OPTIONS preflight short-circuits to 204 with the CORS headers
+    attached, instead of falling through to the route handlers
+    (which would 405 on an OPTIONS request)."""
+    client = app.test_client()
+    resp = client.options(
+        "/api/v1/device/bedroom_pico/frame",
+        headers={
+            "Origin": "https://emulator.tesserae.ink",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization",
+        },
+    )
+    assert resp.status_code == 204
+    assert resp.headers.get("Access-Control-Allow-Origin") == "*"
+    assert "Authorization" in resp.headers.get("Access-Control-Allow-Headers", "")
+
+
+def test_cors_preflight_for_status_post(app: Flask) -> None:
+    """The status endpoint is the POST path the emulator hits most
+    often (heartbeats every poll). Confirm OPTIONS works there too."""
+    client = app.test_client()
+    resp = client.options("/api/v1/device/bedroom_pico/status")
+    assert resp.status_code == 204
+    assert "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
+
+
+def test_cors_headers_on_auth_failure(app: Flask) -> None:
+    """A 401 from a missing/invalid token must still carry the CORS
+    headers — otherwise the browser swallows the response and the
+    emulator can't even surface the auth error to the user."""
+    client = app.test_client()
+    resp = client.get(
+        "/api/v1/device/bedroom_pico/frame",
+        headers={"Authorization": "Bearer wrong-token"},
+    )
+    assert resp.status_code in (401, 403)
+    assert resp.headers.get("Access-Control-Allow-Origin") == "*"
