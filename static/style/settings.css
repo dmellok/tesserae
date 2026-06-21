@@ -3221,40 +3221,8 @@
 
 /* ============================================================
  *  6e. PAGE — Dashboards (/pages)
- *     Single fused section card: inline create + grouped saved
- *     dashboards. Groups by device, alphabetical within group.
- *     CANDIDATE FOR EXTRACTION → dx-dashboards.css
+ *     EXTRACTED → static/style/dx-dashboards.css (v0.63.6).
  * ============================================================ */
-
-/* Dashboards (v0.60). Inline create row at the top, then one
-   group per device with a small heading + alphabetical row list.
-   The form sits inside the same section card so there is no
-   sibling gap between "New" and "Saved" — the surfaces fuse. */
-.dx-dashboard-create {
-  padding-bottom: 14px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--t-border, #ecebe5);
-}
-.dx-dashboard-group + .dx-dashboard-group { margin-top: 18px; }
-.dx-dashboard-group-head {
-  margin: 0 0 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--t-fg-soft, #56564f);
-  text-transform: none;
-}
-.dx-dashboard-group-head .ph { color: var(--t-accent, #15846a); font-size: 14px; }
-.dx-dashboard-group-head .dx-pill {
-  margin-left: 2px;
-  background: var(--t-pill-neutral-bg, #f0efea);
-  color: var(--t-pill-neutral-fg, #56564f);
-  border: 1px solid var(--t-pill-neutral-border, #e2e1db);
-  font-weight: 600;
-}
 
 /* History: square thumbnail at the left of each push row. Click
    opens the same lightbox as the timestamp link. ``--empty`` is a
@@ -3285,87 +3253,5 @@
 
 /* ============================================================
  *  6f. PAGE — Widgets Browse (/plugins/browse)
- *     Search input + outlined-pill chips (spec style). The chip
- *     active state uses the per-type swatch via dx-mkt-chip.
- *     CANDIDATE FOR EXTRACTION → dx-marketplace.css
+ *     EXTRACTED → static/style/dx-marketplace.css (v0.63.7).
  * ============================================================ */
-
-/* Marketplace search input (Widgets Browse spec). Sits between the
-   filter header and the kind/tag chip rows. Magnifier glyph is
-   absolute-positioned inside the input wrapper so the icon hugs
-   the left edge regardless of input width. */
-.dx-marketplace-search {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 12px;
-}
-.dx-marketplace-search > .ph-magnifying-glass {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--t-muted, #9a9a93);
-  font-size: 14px;
-  pointer-events: none;
-}
-.dx-marketplace-search > .dx-input {
-  flex: 1 1 auto;
-  padding-left: 34px;
-}
-.dx-marketplace-search > .dx-btn-ghost-sm {
-  flex: 0 0 auto;
-}
-
-/* Browse spec chip set (v0.60 polish). Outlined pill with a tiny
-   count badge; active state fills with the accent tint and ink
-   shifts to teal. Matches the spec's segmented control look more
-   closely than the legacy ``.pill`` chip vocabulary. */
-.dx-mkt-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.dx-mkt-chips--kinds {
-  padding-bottom: 12px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--t-border, #ecebe5);
-}
-.dx-mkt-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 11px;
-  font-size: 12px;
-  font-weight: 650;
-  border-radius: 8px;
-  border: 1px solid var(--t-input-border, #dedcd6);
-  color: var(--t-fg-soft, #56564f);
-  background: transparent;
-  text-decoration: none;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
-}
-.dx-mkt-chip:hover {
-  border-color: var(--t-accent, #15846a);
-  color: var(--t-accent, #15846a);
-}
-.dx-mkt-chip.is-active {
-  background: var(--t-accent-tint, #dcefe8);
-  color: var(--t-accent, #15846a);
-  border-color: var(--t-accent, #15846a);
-}
-.dx-mkt-chip .ph { font-size: 13px; }
-.dx-mkt-chip-count {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 1px 7px;
-  border-radius: 99px;
-  background: var(--t-pill-neutral-bg, #f0efea);
-  color: var(--t-pill-neutral-fg, #56564f);
-}
-.dx-mkt-chip.is-active .dx-mkt-chip-count {
-  background: #fff;
-  color: var(--t-accent, #15846a);
-}

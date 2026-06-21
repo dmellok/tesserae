@@ -1,0 +1,36 @@
+/* ============================================================
+ *  /pages — v0.60 Dashboards list
+ *
+ *  Single fused section card: inline create row at the top, then
+ *  one group per device with a small heading + alphabetical row
+ *  list. The form sits inside the same section card so there is
+ *  no sibling gap between "New" and "Saved" — the surfaces fuse.
+ *
+ *  v0.63.6 extracted from settings.css. No rules changed.
+ * ============================================================ */
+
+.dx-dashboard-create {
+  padding-bottom: 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--t-border, #ecebe5);
+}
+.dx-dashboard-group + .dx-dashboard-group { margin-top: 18px; }
+.dx-dashboard-group-head {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--t-fg-soft, #56564f);
+  text-transform: none;
+}
+.dx-dashboard-group-head .ph { color: var(--t-accent, #15846a); font-size: 14px; }
+.dx-dashboard-group-head .dx-pill {
+  margin-left: 2px;
+  background: var(--t-pill-neutral-bg, #f0efea);
+  color: var(--t-pill-neutral-fg, #56564f);
+  border: 1px solid var(--t-pill-neutral-border, #e2e1db);
+  font-weight: 600;
+}

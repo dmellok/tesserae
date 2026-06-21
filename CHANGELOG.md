@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.6], 2026-06-21
+
+### Changed
+
+- **settings.css → dx-dashboards.css + dx-marketplace.css**.
+  Dashboards (~35 lines, ``.dx-dashboard-create`` / ``-group``
+  / ``-group-head``) and Widgets Browse (~85 lines, ``.dx-mkt-
+  search`` / ``.dx-mkt-chips`` / ``.dx-mkt-chip``) each move
+  to their own stylesheet. Batched as one release because the
+  two blocks together are small. Cascade order preserved. No
+  rules changed.
+
 ## [0.63.5], 2026-06-21
 
 ### Changed
