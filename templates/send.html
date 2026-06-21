@@ -29,16 +29,24 @@
 {% endmacro %}
 
 {% macro preview_card(title, blurb=None) %}
-<section class="card send-pair-preview">
-  {{ card_head(title, icon_name='monitor-play', blurb=blurb) }}
-  <div class="preview-frame"
-       data-fit-preview
-       data-panel-w="{{ panel.w }}"
-       data-panel-h="{{ panel.h }}"
-       style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
-    {{ caller() }}
+<section class="dx-section-card send-pair-preview">
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-monitor-play"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">{{ title }}</h3>
+      {% if blurb %}<p class="dx-section-desc">{{ blurb }}</p>{% endif %}
+    </div>
+  </header>
+  <div class="dx-section-body">
+    <div class="preview-frame"
+         data-fit-preview
+         data-panel-w="{{ panel.w }}"
+         data-panel-h="{{ panel.h }}"
+         style="aspect-ratio: {{ panel.w }} / {{ panel.h }};">
+      {{ caller() }}
+    </div>
+    <p class="muted preview-dims">{{ panel.w }} × {{ panel.h }}</p>
   </div>
-  <p class="muted preview-dims">{{ panel.w }} × {{ panel.h }}</p>
 </section>
 {% endmacro %}
 
@@ -129,8 +137,14 @@
 {# ----- Gallery tab (only when arriving from a gallery image) ----- #}
 {% if gallery %}
 <div class="send-pair" id="tab-gallery" {% if tab != 'gallery' %}hidden{% endif %}>
-  <section class="card send-pair-options">
-    {{ card_head('Gallery image', icon_name='image-square') }}
+  <section class="dx-section-card send-pair-options">
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-image-square"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Gallery image</h3>
+        <p class="dx-section-desc">Push the gallery image you arrived from. Pick the displays + image fit below.</p>
+      </div>
+    </header>
     <form method="post" action="{{ url_for('send.send_gallery') }}" class="form">
       <input type="hidden" name="g_folder" value="{{ gallery.folder }}">
       <input type="hidden" name="g_file" value="{{ gallery.file }}">
@@ -138,7 +152,7 @@
       {{ device_picker('gallery-device') }}
       {{ fit_picker('gallery-fit') }}
       <div class="actions">
-        <button type="submit" class="primary" data-requires-device-pick>
+        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
           <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push image</span>
         </button>
       </div>
@@ -153,8 +167,14 @@
 
 {# ----- File tab ----- #}
 <div class="send-pair" id="tab-file" {% if tab != 'file' %}hidden{% endif %}>
-  <section class="card send-pair-options">
-    {{ card_head('Upload a file', icon_name='upload-simple') }}
+  <section class="dx-section-card send-pair-options">
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-upload-simple"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Upload a file</h3>
+        <p class="dx-section-desc">Drop an image or browse — PNG, JPEG, GIF, or BMP up to 16 MiB. Picks the target displays + fit below.</p>
+      </div>
+    </header>
     <form method="post" action="{{ url_for('send.send_file') }}" enctype="multipart/form-data" class="form">
       <label class="dropzone" data-dropzone>
         <input type="file" id="file-image" name="image" accept="image/*" required class="dropzone-input" data-dropzone-input>
@@ -178,7 +198,7 @@
       {{ device_picker('file-device') }}
       {{ fit_picker('file-fit') }}
       <div class="actions">
-        <button type="submit" class="primary" data-requires-device-pick>
+        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
           <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push file</span>
         </button>
         {{ info_pop('The renderers fit the upload to the configured ' ~ panel.w ~ ' × ' ~ panel.h ~ ' panel.') }}
@@ -197,8 +217,14 @@
 
 {# ----- URL tab ----- #}
 <div class="send-pair" id="tab-url" {% if tab != 'url' %}hidden{% endif %}>
-  <section class="card send-pair-options">
-    {{ card_head('Image URL', icon_name='link') }}
+  <section class="dx-section-card send-pair-options">
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-link"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Image URL</h3>
+        <p class="dx-section-desc">Paste an image URL. Downloaded server-side (16 MiB max). Same fit/push path as File.</p>
+      </div>
+    </header>
     <form method="post" action="{{ url_for('send.send_url') }}" class="form">
       <div class="field">
         <label for="url-input">URL{{ info_pop('Downloaded server-side (16 MiB max). Same fit/push path as file upload.') }}</label>
@@ -209,7 +235,7 @@
       {{ device_picker('url-device') }}
       {{ fit_picker('url-fit') }}
       <div class="actions">
-        <button type="submit" class="primary" data-requires-device-pick>
+        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
           <i class="ph ph-download-simple" aria-hidden="true"></i><span>Fetch &amp; push</span>
         </button>
       </div>
@@ -227,8 +253,14 @@
 
 {# ----- Webpage tab ----- #}
 <div class="send-pair" id="tab-webpage" {% if tab != 'webpage' %}hidden{% endif %}>
-  <section class="card send-pair-options">
-    {{ card_head('Webpage', icon_name='globe') }}
+  <section class="dx-section-card send-pair-options">
+    <header class="dx-section-head">
+      <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-globe"></i></span>
+      <div class="dx-section-titleblock">
+        <h3 class="dx-section-title">Webpage</h3>
+        <p class="dx-section-desc">Render any webpage in headless Chromium, then fit + push. Defaults match your panel size.</p>
+      </div>
+    </header>
     <form method="post" action="{{ url_for('send.send_webpage') }}" class="form" target="webpage-preview-iframe">
       <div class="field">
         <label for="webpage-url">URL{{ info_pop('Rendered headlessly with Chromium at the viewport below, then fit + pushed.') }}</label>
@@ -251,7 +283,7 @@
       {{ device_picker('webpage-device') }}
       {{ fit_picker('webpage-fit') }}
       <div class="actions">
-        <button type="submit" class="primary" data-requires-device-pick>
+        <button type="submit" class="dx-btn-primary" data-requires-device-pick>
           <i class="ph ph-browser" aria-hidden="true"></i><span>Render &amp; push</span>
         </button>
       </div>

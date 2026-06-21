@@ -28,7 +28,7 @@
       <div class="card-head-action">
         <form method="post" action="{{ url_for('marketplace.restart') }}" class="inline"
               onsubmit="return confirm('Restart Tesserae now? In-flight requests will drop.');">
-          <button type="submit" class="primary">
+          <button type="submit" class="dx-btn-primary">
             <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Restart now</span>
           </button>
         </form>
@@ -45,7 +45,7 @@
 {% endif %}
 
 {% if not index_url %}
-<section class="card">
+<section class="dx-section-card">
   {{ card_head('Marketplace disabled', icon_name='prohibit') }}
   <p class="field-help">
     The marketplace catalog URL is empty under
@@ -58,14 +58,14 @@
 {% else %}
 
 {% if error %}
-<section class="card">
+<section class="dx-section-card">
   {{ card_head('Couldn’t refresh the catalog', icon_name='warning') }}
   <p class="field-help">{{ error }}{% if stale %} Showing the last successfully cached entries.{% endif %}</p>
 </section>
 {% endif %}
 
 {% if entries or tags or kinds %}
-<section class="card">
+<section class="dx-section-card">
   <header class="card-head">
     <div class="card-head-row">
       <h2>
@@ -116,7 +116,7 @@
 {% if entries %}
 <div class="marketplace-grid">
   {% for e in entries %}
-  <article class="card marketplace-card">
+  <article class="dx-section-card marketplace-card">
     {% if e.screenshot_urls and e.screenshot_urls|length > 1 %}
     <div class="marketplace-thumb marketplace-thumb-carousel"
          role="region" aria-label="screenshots for {{ e.name }}"
@@ -230,7 +230,7 @@
         {% if not e.installed %}
         <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
-          <button type="submit" class="primary">
+          <button type="submit" class="dx-btn-primary">
             <i class="ph ph-download-simple" aria-hidden="true"></i><span>Install</span>
           </button>
         </form>
@@ -238,7 +238,7 @@
         {% if e.update_available %}
         <form method="post" action="{{ url_for('marketplace.install') }}" class="inline">
           <input type="hidden" name="catalog_id" value="{{ e.id }}">
-          <button type="submit" class="primary">
+          <button type="submit" class="dx-btn-primary">
             <i class="ph ph-arrow-up-circle" aria-hidden="true"></i><span>Update to v{{ e.version }}</span>
           </button>
         </form>
@@ -266,7 +266,7 @@
   {% endfor %}
 </div>
 {% else %}
-<section class="card">
+<section class="dx-section-card">
   {{ card_head('Nothing to show', icon_name='package') }}
   <p class="field-help">
     {% if active_kind and active_tag %}

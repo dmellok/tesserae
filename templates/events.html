@@ -1,151 +1,180 @@
 {% extends "_base.html" %}
-{% from "_components.html" import settings_tabs %}
+{% from "_components.html" import section_card, settings_tabs %}
 {% block title %}Events, Tesserae{% endblock %}
 
+{% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast','telemetry':'broadcast','conditions':'funnel','device':'device-mobile'} %}
+
 {% macro status_pill(status) %}
-  {% if status in ('sent','ok') %}<span class="pill is-ok">{{ status }}</span>
-  {% elif status == 'busy' %}<span class="pill is-warn">{{ status }}</span>
-  {% elif status == 'denied' %}<span class="pill is-warn">{{ status }}</span>
-  {% else %}<span class="pill is-danger">{{ status }}</span>{% endif %}
+  {% if status in ('sent','ok') %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>{{ status }}</span>
+  {% elif status == 'busy' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>{{ status }}</span>
+  {% elif status == 'denied' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>{{ status }}</span>
+  {% else %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>{{ status }}</span>{% endif %}
 {% endmacro %}
 
-{% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast','telemetry':'broadcast','conditions':'funnel'} %}
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-pulse" aria-hidden="true"></i> Events</h1>
-  <p class="lede">
-    Cross-cutting event timeline. Every push attempt, renderer transform,
-    device heartbeat, scheduler fire, and auth event lands here. Newest
-    first; capped at {{ limit }}. New events stream in live via SSE.
-  </p>
+  <p class="lede">Cross-cutting event timeline. Every push attempt, renderer transform, device heartbeat, scheduler fire, and auth event lands here. Newest first; capped at {{ limit }}. New events stream in live.</p>
 </header>
 
 {{ settings_tabs('events') }}
 
-<div class="events-toolbar">
-  <span class="live-dot" data-live-indicator data-state="connecting">
-    <i class="ph-fill ph-circle" aria-hidden="true"></i><span>connecting…</span>
-  </span>
-  <nav class="event-type-filter" role="tablist">
-    <a href="?type=all" role="tab" class="chip {% if selected == 'all' %}is-active{% endif %}">
-      <i class="ph ph-list-bullets" aria-hidden="true"></i>
-      <span>All</span><span class="muted">{{ counts.all }}</span>
-    </a>
-    {% for t in known_types %}
-    <a href="?type={{ t }}" role="tab" class="chip {% if selected == t %}is-active{% endif %}">
-      <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
-      <span>{{ t|capitalize }}</span><span class="muted">{{ counts[t] }}</span>
-    </a>
-    {% endfor %}
-  </nav>
-</div>
+<nav class="dx-filter-strip" role="tablist" aria-label="Filter by event type">
+  <a href="?type=all" role="tab" class="dx-filter-chip{% if selected == 'all' %} is-active{% endif %}">
+    <i class="ph ph-list-bullets" aria-hidden="true"></i>
+    <span>All</span><span class="dx-count-pill">{{ counts.all }}</span>
+  </a>
+  {% for t in known_types %}
+  <a href="?type={{ t }}" role="tab" class="dx-filter-chip{% if selected == t %} is-active{% endif %}">
+    <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
+    <span>{{ t|capitalize }}</span><span class="dx-count-pill">{{ counts[t] }}</span>
+  </a>
+  {% endfor %}
+</nav>
 
-{% if not rows %}
-<p class="lede">No events of this kind yet.</p>
-{% else %}
-<ul class="events">
-  {% for ev in rows %}
-  <li class="event-row event--{{ ev.type }}" data-event-id="{{ ev.id }}">
-    <div class="event-type">{{ ev.type }}</div>
-    <div class="event-body">
-      <div class="event-line">
-        {{ status_pill(ev.status) }}
-        <span class="event-source">{{ ev.source }}</span>
-        <code class="event-target">{{ ev.target }}</code>
-      </div>
-      <div class="event-sub">
-        <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|fmt_time }}</time>
-        {% if ev.duration_s %}<span class="muted">·</span><span>{{ '%.3f'|format(ev.duration_s) }} s</span>{% endif %}
-        {% if ev.digest %}<span class="muted">·</span><code class="digest">{{ ev.digest }}</code>{% endif %}
-        {% if ev.error %}<span class="muted">·</span><span class="event-err">{{ ev.error }}</span>{% endif %}
-      </div>
-      {% if ev.type == 'conditions' and ev.extra %}
-      <div class="event-conditions">
-        {% if ev.extra.steps is defined %}
-        {# Rotation decision: shows what each step would do right now,
-           plus which step was actually picked. Page ids are resolved
-           to friendly names via the ``page_names`` lookup the route
-           pre-computed; falls back to the id when the page is missing
-           or has no display name. #}
-        <div class="event-conditions-head">
-          <strong>{{ ev.extra.rotation_name }}</strong>
-          <span class="muted">
-            time slot: step {{ ev.extra.time_step_index + 1 }} ({{ page_names.get(ev.extra.time_step_page, ev.extra.time_step_page) }})
-            {% if ev.extra.picked_step_index is none %}
-              · <span class="event-cond-fail">held, no step passes</span>
-            {% elif ev.extra.picked_step_index == ev.extra.time_step_index %}
-              · <span class="event-cond-ok">fired as scheduled</span>
-            {% else %}
-              · <span class="event-cond-warn">walked to step {{ ev.extra.picked_step_index + 1 }} ({{ page_names.get(ev.extra.picked_step_page, ev.extra.picked_step_page) }})</span>
-            {% endif %}
-          </span>
+{% call section_card(icon='pulse', title='Event timeline',
+                     description='Click any row to expand the raw event payload — useful for diagnosing scheduler decisions, condition holds, or render errors.',
+                     meta={'label': '', 'value': rows|length}) %}
+  <div class="dx-events-toolbar">
+    <span class="dx-listening" data-live-indicator data-state="connecting">
+      <span class="dx-listening-dot"></span>
+      <span class="dx-listening-label">Connecting…</span>
+    </span>
+  </div>
+
+  {% if not rows %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-pulse" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">No events of this kind yet</p>
+    <p class="dx-empty-help">New events stream in live as soon as they happen.</p>
+  </div>
+  {% else %}
+  <ul class="dx-discovered-list dx-events-list">
+    {% for ev in rows %}
+    <li class="dx-inset-row dx-event-row dx-event-row--{{ ev.type }}" data-event-id="{{ ev.id }}">
+      <button type="button" class="dx-event-summary" data-event-toggle aria-expanded="false">
+        <span class="dx-event-icon"><i class="ph ph-{{ TYPE_ICONS.get(ev.type, 'circle') }}" aria-hidden="true"></i></span>
+        <div class="dx-event-body">
+          <div class="dx-event-head">
+            <span class="dx-pill dx-event-type">{{ ev.type }}</span>
+            {{ status_pill(ev.status) }}
+            <span class="dx-event-source">{{ ev.source }}</span>
+            <code class="dx-event-target">{{ ev.target }}</code>
+          </div>
+          <div class="dx-event-meta">
+            <time datetime="{{ ev.timestamp }}">{{ ev.timestamp|fmt_time }}</time>
+            {% if ev.duration_s %}<span class="muted">·</span><span>{{ '%.3f'|format(ev.duration_s) }} s</span>{% endif %}
+            {% if ev.digest %}<span class="muted">·</span><code class="dx-event-digest">{{ ev.digest }}</code>{% endif %}
+            {% if ev.error %}<span class="muted">·</span><span class="dx-event-err">{{ ev.error }}</span>{% endif %}
+          </div>
         </div>
-        <ul class="event-conditions-steps">
-          {% for s in ev.extra.steps %}
-          <li class="{% if s.passes %}is-pass{% else %}is-fail{% endif %}">
-            <span class="step-num">{{ s.step_index + 1 }}</span>
-            <span class="step-page">{{ page_names.get(s.page_id, s.page_id) }}</span>
-            {% if s.no_conditions %}
-            <span class="muted">no conditions (always passes)</span>
-            {% else %}
-            <ul class="event-conditions-list">
-              {% for c in s.conditions %}
-              <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
-                {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
-                <code>{{ c.source_id or c.source_kind }}</code>
-                {{ c.operator }}
-                <code>{{ c.value|tojson }}</code>
-                <span class="muted">observed: {{ c.observed }}</span>
-                {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-            {% endif %}
-          </li>
-          {% endfor %}
-        </ul>
+        <i class="ph ph-caret-right dx-event-caret" aria-hidden="true"></i>
+      </button>
+
+      <div class="dx-event-expand" data-event-expand hidden>
+        {% if ev.type == 'conditions' and ev.extra %}
+        {# Rich conditions decision view, preserved verbatim from the
+           previous template — the diagnostic detail is too valuable
+           to replace with a plain JSON dump. #}
+        <div class="event-conditions">
+          {% if ev.extra.steps is defined %}
+          <div class="event-conditions-head">
+            <strong>{{ ev.extra.rotation_name }}</strong>
+            <span class="muted">
+              time slot: step {{ ev.extra.time_step_index + 1 }} ({{ page_names.get(ev.extra.time_step_page, ev.extra.time_step_page) }})
+              {% if ev.extra.picked_step_index is none %}
+                · <span class="event-cond-fail">held, no step passes</span>
+              {% elif ev.extra.picked_step_index == ev.extra.time_step_index %}
+                · <span class="event-cond-ok">fired as scheduled</span>
+              {% else %}
+                · <span class="event-cond-warn">walked to step {{ ev.extra.picked_step_index + 1 }} ({{ page_names.get(ev.extra.picked_step_page, ev.extra.picked_step_page) }})</span>
+              {% endif %}
+            </span>
+          </div>
+          <ul class="event-conditions-steps">
+            {% for s in ev.extra.steps %}
+            <li class="{% if s.passes %}is-pass{% else %}is-fail{% endif %}">
+              <span class="step-num">{{ s.step_index + 1 }}</span>
+              <span class="step-page">{{ page_names.get(s.page_id, s.page_id) }}</span>
+              {% if s.no_conditions %}
+              <span class="muted">no conditions (always passes)</span>
+              {% else %}
+              <ul class="event-conditions-list">
+                {% for c in s.conditions %}
+                <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
+                  {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
+                  <code>{{ c.source_id or c.source_kind }}</code>
+                  {{ c.operator }}
+                  <code>{{ c.value|tojson }}</code>
+                  <span class="muted">observed: {{ c.observed }}</span>
+                  {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <div class="event-conditions-head">
+            <strong>{{ ev.extra.schedule_name }}</strong>
+            <span class="muted">
+              page: <span class="step-page">{{ page_names.get(ev.extra.page_id, ev.extra.page_id) }}</span>
+              {% if ev.extra.fallback_page_id %} · fallback: <span class="step-page">{{ page_names.get(ev.extra.fallback_page_id, ev.extra.fallback_page_id) }}</span>{% endif %}
+            </span>
+          </div>
+          <ul class="event-conditions-list">
+            {% for c in ev.extra.conditions %}
+            <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
+              {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
+              <code>{{ c.source_id or c.source_kind }}</code>
+              {{ c.operator }}
+              <code>{{ c.value|tojson }}</code>
+              <span class="muted">observed: {{ c.observed }}</span>
+              {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+        {% elif ev.extra %}
+        {# Generic raw-JSON view via the in-house highlighter. #}
+        <pre class="dx-code" data-json>{{ ev.extra|tojson(indent=2) }}</pre>
         {% else %}
-        {# Schedule decision: single set of conditions, single outcome. #}
-        <div class="event-conditions-head">
-          <strong>{{ ev.extra.schedule_name }}</strong>
-          <span class="muted">
-            page: <span class="step-page">{{ page_names.get(ev.extra.page_id, ev.extra.page_id) }}</span>
-            {% if ev.extra.fallback_page_id %} · fallback: <span class="step-page">{{ page_names.get(ev.extra.fallback_page_id, ev.extra.fallback_page_id) }}</span>{% endif %}
-          </span>
-        </div>
-        <ul class="event-conditions-list">
-          {% for c in ev.extra.conditions %}
-          <li class="{% if c.passed %}is-pass{% else %}is-fail{% endif %}">
-            {% if c.passed %}<i class="ph ph-check" aria-hidden="true"></i>{% else %}<i class="ph ph-x" aria-hidden="true"></i>{% endif %}
-            <code>{{ c.source_id or c.source_kind }}</code>
-            {{ c.operator }}
-            <code>{{ c.value|tojson }}</code>
-            <span class="muted">observed: {{ c.observed }}</span>
-            {% if c.reason %}<span class="event-cond-reason">({{ c.reason }})</span>{% endif %}
-          </li>
-          {% endfor %}
-        </ul>
+        <p class="dx-event-empty-payload">No payload recorded for this event.</p>
+        {% endif %}
+        {% if ev.type == 'push' and ev.digest %}
+        <a class="dx-event-thumb-link" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox>
+          <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
+               alt="" width="120" height="90" loading="lazy" decoding="async">
+        </a>
         {% endif %}
       </div>
-      {% elif ev.extra and (ev.type != 'push') %}
-      <pre class="event-extra">{{ ev.extra|tojson }}</pre>
-      {% endif %}
-    </div>
-    {% if ev.type == 'push' and ev.digest %}
-    {# Thumbnail src uses the ``?w=`` cached-thumbnail variant so the
-       admin's event list doesn't decode a 1600×1200 panel PNG into a
-       ~7.7 MB bitmap for every row (left a tab open overnight ⇒ multi-GB
-       browser memory). ``href`` still hits the full image so clicking
-       through to the lightbox shows the original resolution. #}
-    <a class="event-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Event #{{ ev.id }}">
-      <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
-           alt="" width="120" height="90"
-           loading="lazy" decoding="async">
-    </a>
-    {% endif %}
-  </li>
-  {% endfor %}
-</ul>
-{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{% endcall %}
+
+<script type="module" src="{{ url_for('static', filename='pages/json-highlight.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/events.js') }}"></script>
+<script>
+  // Click-to-expand for raw event payloads. Each row's button toggles
+  // [data-event-expand].hidden; rotates the caret to match the row's
+  // open state. Pure DOM ops, no framework.
+  (function () {
+    document.querySelectorAll('[data-event-toggle]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('[data-event-id]');
+        if (!row) return;
+        var body = row.querySelector('[data-event-expand]');
+        if (!body) return;
+        var open = body.hidden;
+        body.hidden = !open;
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        row.classList.toggle('is-open', open);
+      });
+    });
+  })();
+</script>
 {% endblock %}

@@ -6,6 +6,48 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.57.0], 2026-06-21
+
+Tier 2 of the v0.56 admin-UI uplift. Send, Events, and Widgets
+Browse adopt the shared section-card chrome + filter chips +
+inset-row vocabulary.
+
+### Changed
+
+- **Send** (``/send``): surgical chrome conversion. Tab strip kept;
+  every per-tab card (File / URL / Webpage / Gallery / Live preview)
+  now uses the ``.dx-section-card`` + ``.dx-section-head`` pattern
+  with the icon-in-teal-square header. Push buttons swap to
+  ``.dx-btn-primary``.
+- **Events** (``/events``): new chrome — page-level filter chip
+  strip (All / push / render / heartbeat / schedule / auth /
+  plugin / transport / telemetry / conditions) + single section
+  card with LISTENING indicator. Every event row becomes a
+  click-to-expand button; the expanded body shows the raw JSON
+  payload through the in-house JSON highlighter
+  (``static/pages/json-highlight.js``). Rich conditions decision
+  view (rotation steps, schedule outcome) preserved verbatim.
+- **Widgets Browse** (``/plugins/browse``): outer card chrome
+  flips to ``.dx-section-card``; Install / Update buttons swap to
+  ``.dx-btn-primary``. The bespoke ``marketplace-card`` grid +
+  screenshot carousel stays as-is.
+
+### Added
+
+- New ``.dx-event-*`` CSS bundle (event row + summary button +
+  expand body + caret + type-specific icon tones).
+- ``.dx-filter-strip`` + ``.dx-filter-chip`` reused across History,
+  Events, and Battery dashboard so the three pages read as one
+  filter-chip vocabulary.
+
+### Notes
+
+- The page-level click-to-expand on Events is the first user of
+  PR 0's in-house JSON highlighter; ``<pre class="dx-code"
+  data-json>`` blocks auto-highlight on DOMContentLoaded.
+- Tier 3 (Schedules + Rotations + System Settings) lands the
+  conditions builder partial as a new shared component.
+
 ## [0.56.0], 2026-06-21
 
 First tier of the v0.56 admin-UI uplift onto the v0.54 ``.dx-*``
