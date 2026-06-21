@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.13], 2026-06-21
+
+### Fixed
+
+- **CORS ``Allow-Headers`` now includes ``X-Pairing-Code``**. The
+  ``/api/v1/device/register`` endpoint reads the 6-digit pair
+  code from that header (see ``post_register`` in
+  ``app/rest_api.py``). v0.63.11 listed every other custom
+  header the API uses but missed this one, so the browser-based
+  emulator's first call — the pairing fetch — failed at
+  preflight with "Request header field x-pairing-code is not
+  allowed by Access-Control-Allow-Headers." Added a test that
+  preflights ``/register`` with the header and asserts it's in
+  the allow list.
+
 ## [0.63.12], 2026-06-21
 
 ### Added

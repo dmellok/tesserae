@@ -97,7 +97,13 @@ def _cors_headers(resp: Response) -> Response:
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = (
-        "Authorization, Content-Type, If-None-Match, X-Tesserae-Token"
+        # Authorization + Content-Type + If-None-Match are the standard
+        # ones every endpoint uses. The two ``X-Tesserae-*`` / ``X-Pairing-*``
+        # headers are Tesserae-specific: X-Tesserae-Token is the bearer-
+        # token alternative form firmware can use when an Authorization
+        # header is awkward, and X-Pairing-Code is how /register receives
+        # the 6-digit code (see ``post_register`` below).
+        "Authorization, Content-Type, If-None-Match, X-Tesserae-Token, X-Pairing-Code"
     )
     resp.headers["Access-Control-Expose-Headers"] = "ETag"
     resp.headers["Access-Control-Max-Age"] = "86400"

@@ -688,6 +688,27 @@ def test_cors_preflight_returns_204(app: Flask) -> None:
     assert "Authorization" in resp.headers.get("Access-Control-Allow-Headers", "")
 
 
+def test_cors_preflight_register_allows_pairing_code_header(app: Flask) -> None:
+    """The /register endpoint reads the 6-digit pair code from an
+    ``X-Pairing-Code`` header (see app/rest_api.py:post_register).
+    The browser sends a preflight asking whether that header is
+    allowed before firing the real POST; the response must list it
+    or Chrome / Safari refuse to send the request."""
+    client = app.test_client()
+    resp = client.options(
+        "/api/v1/device/register",
+        headers={
+            "Origin": "http://localhost:8080",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "X-Pairing-Code, Content-Type",
+        },
+    )
+    assert resp.status_code == 204
+    allowed = resp.headers.get("Access-Control-Allow-Headers", "")
+    assert "X-Pairing-Code" in allowed
+    assert "Content-Type" in allowed
+
+
 def test_cors_preflight_for_status_post(app: Flask) -> None:
     """The status endpoint is the POST path the emulator hits most
     often (heartbeats every poll). Confirm OPTIONS works there too."""
