@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.1], 2026-06-21
+
+### Changed
+
+- **Rotations form: each step becomes a self-contained sub-card**.
+  The ``.rot-step-wrap`` wrapper picks up real chrome (inset
+  background + 1px border + 12px radius + padding) so the controls
+  row and the Conditions panel underneath read as one tile per
+  step instead of two free-floating blocks. When the user opens
+  Conditions, the panel "swells" inside the same sub-card,
+  separated only by a top divider — no floating panel, no visual
+  disconnect from its step.
+- **Rotations form: Conditions toggle gains a filled active state**.
+  ``aria-expanded="true"`` swaps the ghost outline for an
+  accent-tint fill so the toggle visually pins to its expanded
+  panel, matching the spec's "active when open" pattern.
+- **Rotations form: structure pass**.
+  - New "STEPS — ROTATE THROUGH THESE IN ORDER" uppercase
+    sub-heading above the steps list (``dx-form-subhead``).
+  - ``<hr class="dx-divider">`` between the anchor / steps /
+    days / sync / routing / enabled groups so the form reads
+    as distinct logical sections.
+  - "+ Add step" affordance becomes a full-width dashed button
+    (``.dx-rot-add-step``) — reads as "drop another step here"
+    instead of "click this small thing in the corner."
+  - Form submit button flips to ``.dx-btn-primary``; Cancel
+    flips to ``.dx-btn-ghost-sm``.
+
+The condition picker itself is unchanged (works at v0.55 fidelity,
+JSON highlighter just got fixed in v0.60.1); the sub-card is the
+visual containment.
+
 ## [0.62.0], 2026-06-21
 
 The parked Rotations + Schedules uplift from v0.60.1's notes, plus

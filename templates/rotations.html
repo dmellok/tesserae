@@ -16,12 +16,16 @@
 {% endmacro %}
 
 {% macro step_row(idx, step, pages) %}
-{# Each step is a wrapper that contains:
-     - the controls row (page select, dwell, ×, Conditions button)
-     - a sibling panel below the row that holds the conditions picker
-   The toggle button + panel visibility are wired via JS on the
-   wrapper's ``data-rot-step`` selector so we don't fight the
-   <details> layout inside a grid. #}
+{# Each step is a self-contained sub-card containing:
+     - the controls row (page select, dwell, ×, Conditions toggle)
+     - the conditions panel sibling, hidden until toggled
+   When open, the panel sits visually INSIDE the same sub-card on
+   a slightly deeper inset — the step "swells" with its conditions
+   instead of the panel floating below. The toggle button + panel
+   visibility are wired via JS on the wrapper's ``data-rot-step``
+   selector. v0.62: outer wrap gets sub-card chrome, Conditions
+   toggle picks up a filled active state when expanded so the
+   pinning to its panel reads at a glance. #}
 <div class="rot-step-wrap" data-rot-step>
   <div class="rot-step">
     <span class="rot-step-num">{{ idx + 1 }}</span>
@@ -34,11 +38,11 @@
     <input type="number" name="step_dwell_minutes[]" min="1" max="10080"
            value="{{ step.dwell_minutes }}" required aria-label="Dwell minutes">
     <span class="rot-step-unit">min</span>
-    <button type="button" class="btn btn--ghost btn--icon" data-rot-step-remove
-            aria-label="Remove step">
+    <button type="button" class="dx-btn-ghost-sm dx-btn-icon-only" data-rot-step-remove
+            aria-label="Remove step" title="Remove step">
       <i class="ph ph-x" aria-hidden="true"></i>
     </button>
-    <button type="button" class="ghost rot-step-cond-toggle" aria-expanded="false">
+    <button type="button" class="dx-btn-ghost-sm rot-step-cond-toggle" aria-expanded="false">
       <i class="ph ph-funnel" aria-hidden="true"></i>
       <span class="rot-step-cond-label">Conditions{% if step.conditions %} ({{ step.conditions|length }}){% endif %}</span>
     </button>
@@ -80,26 +84,28 @@
     </div>
   </div>
 
-  <div class="field">
-    <label>Steps (rotate through these in order)</label>
-    <div class="rot-steps" data-rot-steps>
-      {% for step in r.steps %}
-        {{ step_row(loop.index0, step, pages) }}
-      {% endfor %}
-      {% if not r.steps %}
-        {{ step_row(0, {'page_id': '', 'dwell_minutes': 30}, pages) }}
-      {% endif %}
-    </div>
-    <button type="button" class="btn btn--ghost btn--sm" data-rot-step-add>
-      <i class="ph ph-plus" aria-hidden="true"></i> Add step
-    </button>
+  <hr class="dx-divider">
+
+  <p class="dx-form-subhead">Steps — rotate through these in order</p>
+  <div class="rot-steps" data-rot-steps>
+    {% for step in r.steps %}
+      {{ step_row(loop.index0, step, pages) }}
+    {% endfor %}
+    {% if not r.steps %}
+      {{ step_row(0, {'page_id': '', 'dwell_minutes': 30}, pages) }}
+    {% endif %}
   </div>
+  <button type="button" class="dx-rot-add-step" data-rot-step-add>
+    <i class="ph ph-plus" aria-hidden="true"></i>
+    <span>Add step</span>
+  </button>
+
+  <hr class="dx-divider">
 
   <div class="field">
     <label>Days of week</label>
     {{ day_picker('days_of_week', r.days_of_week) }}
   </div>
-
 
   <div class="field-grid">
     {{ switch('rf-' ~ (r.id or 'new') ~ '-smart-sync', 'smart_sync', 'Smart sync (JIT)', checked=r.smart_sync,
@@ -110,6 +116,8 @@
              value="{{ r.smart_sync_lead_s or 10 }}" min="0" max="600" step="1">
     </div>
   </div>
+
+  <hr class="dx-divider">
 
   {# v0.48 routing mode + flap-prevention gate. #}
   <div class="field-grid">
@@ -129,16 +137,18 @@
     </div>
   </div>
 
+  <hr class="dx-divider">
+
   <div class="field field--inline">
     {{ switch('rf-' ~ (r.id or 'new') ~ '-enabled', 'enabled', 'Enabled', r.enabled) }}
   </div>
 
   <div class="form-actions">
-    <button type="submit" class="btn btn--primary">
-      <i class="ph ph-floppy-disk" aria-hidden="true"></i> {{ 'Update' if edit_mode else 'Create' }}
+    <button type="submit" class="dx-btn-primary">
+      <i class="ph ph-floppy-disk" aria-hidden="true"></i><span>{{ 'Update' if edit_mode else 'Create' }}</span>
     </button>
     {% if edit_mode %}
-    <a class="btn btn--ghost" href="{{ url_for('rotations.index') }}">Cancel</a>
+    <a class="dx-btn-ghost-sm" href="{{ url_for('rotations.index') }}">Cancel</a>
     {% endif %}
   </div>
 

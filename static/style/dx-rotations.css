@@ -176,3 +176,121 @@ hr.dx-divider {
   background: color-mix(in oklab, var(--t-accent) 22%, var(--t-inset));
   border-color: color-mix(in oklab, var(--t-accent) 55%, var(--t-inset-border));
 }
+
+/* ============================================================
+ *  EDIT FORM — step sub-cards + section subheads
+ *
+ *  Each step in the New/Edit rotation form is a self-contained
+ *  sub-card: controls row at the top, optional conditions panel
+ *  swelling underneath. The Conditions toggle picks up a filled
+ *  active state when its panel is open so the visual pinning
+ *  reads at a glance. The "+ Add step" affordance becomes a
+ *  full-width dashed button below the list.
+ * ============================================================ */
+
+/* Small uppercase section label between form groups ("STEPS —
+   ROTATE THROUGH THESE IN ORDER", etc). */
+.dx-form-subhead {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--t-fg-soft);
+}
+
+/* Step list: column of sub-cards with a comfortable gap. */
+.rot-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+/* The sub-card. Inset background + 1px border + 12px radius so
+   each step reads as a tile inside the broader rotation form.
+   ``data-rot-step`` is also the JS hook for the toggle script;
+   no need to add a second class. */
+.rot-step-wrap {
+  background: var(--t-inset);
+  border: 1px solid var(--t-inset-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+/* Controls row at the top of the sub-card. The selects + dwell
+   sit on one row; ``×`` (remove) and the Conditions toggle hug
+   the right edge. The legacy schedules.css ``.rot-step`` grid
+   rule still applies for column-flex distribution; we tighten
+   the margins here so the row sits flush with the sub-card
+   chrome instead of carrying the legacy bottom margin. */
+.rot-step-wrap > .rot-step {
+  margin: 0;
+}
+
+/* Conditions toggle: ghost button outline by default. When the
+   panel below is open (aria-expanded="true") the toggle flips
+   to a filled accent state so the eye reads it as pinned to its
+   expanded panel. */
+.rot-step-cond-toggle {
+  /* Reset legacy ``.ghost`` look in case it leaks; .dx-btn-ghost-sm
+     is the canonical class now and supplies the closed-state chrome. */
+  border-radius: 8px;
+}
+.rot-step-cond-toggle[aria-expanded="true"] {
+  background: var(--t-accent-tint);
+  border-color: color-mix(in oklab, var(--t-accent) 40%, var(--t-inset-border));
+  color: var(--t-accent);
+}
+.rot-step-cond-toggle[aria-expanded="true"] > .ph {
+  color: var(--t-accent);
+}
+
+/* The conditions panel sits inside the same sub-card. Pull it
+   out to the sub-card's edges with negative inline + bottom
+   margins, then add a top divider so it reads as a related but
+   distinct sub-region. Background inherits from the wrap so
+   the surface stays cohesive; the divider does the visual work. */
+.rot-step-wrap > .rot-step-cond-panel {
+  margin: 10px -12px -10px;
+  padding: 12px;
+  border-top: 1px solid var(--t-inset-border);
+  border-radius: 0 0 12px 12px;
+}
+
+/* + Add step: full-width dashed button as the spec's "drop
+   another step here" affordance. Sits below the step list. */
+.dx-rot-add-step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 18px;
+  background: transparent;
+  border: 1.5px dashed var(--t-input-border, #dedcd6);
+  border-radius: 12px;
+  color: var(--t-fg-soft);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+.dx-rot-add-step:hover {
+  border-color: var(--t-accent);
+  color: var(--t-accent);
+  background: var(--t-accent-tint);
+}
+.dx-rot-add-step .ph {
+  font-size: 14px;
+}
+
+/* Dark-mode adaptation: inset palette already flips via base
+   tokens; we just re-tint the toggle's filled active state so
+   the accent stays legible on the dark inset surface. */
+:root[data-theme="dark"] .rot-step-cond-toggle[aria-expanded="true"] {
+  background: color-mix(in oklab, var(--t-accent) 25%, var(--t-inset));
+  border-color: color-mix(in oklab, var(--t-accent) 60%, var(--t-inset-border));
+  color: var(--t-accent);
+}
