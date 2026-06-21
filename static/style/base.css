@@ -106,6 +106,33 @@
   --t-ok:        #16a34a;
   --t-ok-bg:     #f0fdf4;
 
+  /* v0.56 admin-uplift tokens. Spec values from the
+     ``design_handoff_ui_uplift`` README; used by the .dx-* admin
+     surface (section cards, inset rows, status pills, code blocks).
+     Dark-mode equivalents live in the override block below. */
+  --t-inset:        #f6f5f1;
+  --t-inset-border: #e8e7e1;
+  --t-accent-tint:  #dcefe8;
+  --t-pill-ok-bg:     #e7f3ee;
+  --t-pill-ok-fg:     #15846a;
+  --t-pill-ok-border: #bfe3d4;
+  --t-pill-warn-bg:     #fcf6ea;
+  --t-pill-warn-fg:     #a06a1e;
+  --t-pill-warn-border: #ecdcbc;
+  --t-pill-danger-bg:     #fbeeec;
+  --t-pill-danger-fg:     #c0392b;
+  --t-pill-danger-border: #e7c6c1;
+  --t-pill-neutral-bg: #eceae4;
+  --t-pill-neutral-fg: #6a6a63;
+  --t-code-bg:     #eae7df;
+  --t-code-border: #dcd8cd;
+  --t-code-fg:     #4a463e;
+  --t-code-key:    #0f7a62;
+  --t-code-str:    #a35a2c;
+  --t-code-num:    #2f6f9e;
+  --t-code-kw:     #7d5bc6;
+  --t-code-punct:  #9a9a93;
+
   /* Typography, Inter for UI, JetBrains Mono for code / IDs /
      dimensions. Both prefer the bundled fonts_core woff2s and fall
      back to native system stacks while loading. */
@@ -205,6 +232,30 @@
   --t-warn-bg:   color-mix(in oklab, #fbbf24 18%, #181b21);
   --t-ok:        #4ade80;
   --t-ok-bg:     color-mix(in oklab, #4ade80 18%, #181b21);
+
+  /* v0.56 admin-uplift dark-mode overrides. */
+  --t-inset:        #1f232b;
+  --t-inset-border: #2a2f38;
+  --t-accent-tint:  #143029;
+  --t-pill-ok-bg:     color-mix(in oklab, #2dd4bf 18%, #181b21);
+  --t-pill-ok-fg:     #5eead4;
+  --t-pill-ok-border: color-mix(in oklab, #2dd4bf 30%, #181b21);
+  --t-pill-warn-bg:     color-mix(in oklab, #fbbf24 16%, #181b21);
+  --t-pill-warn-fg:     #f3c97e;
+  --t-pill-warn-border: color-mix(in oklab, #fbbf24 30%, #181b21);
+  --t-pill-danger-bg:     color-mix(in oklab, #f87171 18%, #181b21);
+  --t-pill-danger-fg:     #f87171;
+  --t-pill-danger-border: color-mix(in oklab, #f87171 30%, #181b21);
+  --t-pill-neutral-bg: #1f232b;
+  --t-pill-neutral-fg: #b6bcc7;
+  --t-code-bg:     #11141a;
+  --t-code-border: #2a2f38;
+  --t-code-fg:     #c8cdd6;
+  --t-code-key:    #5eead4;
+  --t-code-str:    #e0a45c;
+  --t-code-num:    #7fb4e8;
+  --t-code-kw:     #c3a6f0;
+  --t-code-punct:  #8b93a1;
 
   --t-shadow-xs: 0 1px 0 rgba(0,0,0,.40);
   --t-shadow-sm: 0 1px 2px rgba(0,0,0,.30),

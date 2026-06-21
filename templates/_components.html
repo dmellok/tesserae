@@ -410,3 +410,51 @@ macro here instead.
                   help=help_text) }}
   {% endif %}
 {%- endmacro -%}
+
+
+{#- v0.56 admin-uplift section card. The canonical chrome from the
+   v0.54 handoff (icon-in-teal-square + title + description + body)
+   wrapped in a reusable macro so every uplifted page builds the same
+   shape with one `{% call section_card(...) %}` block.
+
+   Usage:
+   {% call section_card(icon='calendar-dots', title='Schedules',
+                        description='One push per saved dashboard...',
+                        cta=None, meta=None) %}
+     ...body content (anything; tables, forms, inset rows, etc.)...
+   {% endcall %}
+
+   ``cta`` is an optional dict {label, href, icon, variant} for an
+   inline header action ('+ New schedule' on Schedules, 'Browse...'
+   on Widgets, etc). ``meta`` is an optional right-aligned chip
+   (the NETWORK IP block on the Server tab uses this shape). #}
+{%- macro section_card(icon, title, description=None, cta=None, meta=None, id=None, extra_class='') -%}
+<section class="dx-section-card {{ extra_class }}"{% if id %} id="{{ id }}"{% endif %}>
+  <header class="dx-section-head">
+    {% if icon %}
+    <span class="dx-section-icon" aria-hidden="true">
+      <i class="ph ph-{{ icon }}"></i>
+    </span>
+    {% endif %}
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">{{ title }}</h3>
+      {% if description %}<p class="dx-section-desc">{{ description }}</p>{% endif %}
+    </div>
+    {% if meta %}
+    <div class="dx-section-meta">
+      {% if meta.label %}{{ meta.label }}{% endif %}
+      {% if meta.value %}<code>{{ meta.value }}</code>{% endif %}
+    </div>
+    {% endif %}
+    {% if cta %}
+    <a href="{{ cta.href }}" class="dx-btn-{{ cta.variant or 'primary' }}">
+      {% if cta.icon %}<i class="ph ph-{{ cta.icon }}" aria-hidden="true"></i>{% endif %}
+      <span>{{ cta.label }}</span>
+    </a>
+    {% endif %}
+  </header>
+  <div class="dx-section-body">
+    {{ caller() }}
+  </div>
+</section>
+{%- endmacro -%}

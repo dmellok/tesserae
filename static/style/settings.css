@@ -2433,3 +2433,199 @@
   align-items: center;
   flex: 0 0 auto;
 }
+
+
+/* =====================================================================
+   v0.56 admin-uplift shared components (PR 0).
+
+   The .dx-section-card chrome and most of the patterns the rest of
+   the admin pages need landed during v0.54. This block adds the
+   remaining shared primitives so every uplifted page can reach for
+   the same building blocks:
+
+   * .dx-pill .is-ok / .is-warn / .is-danger / .is-neutral — status
+     chips with the spec's pill palette
+   * .dx-dow-pill — selectable day-of-week chip
+   * .dx-input — the spec's input baseline (existing fields keep
+     their forms.css styling; this is for hand-rolled inputs inside
+     uplifted pages)
+   * .dx-code + syntax-highlight class set, paired with the in-house
+     ``static/pages/json-highlight.js`` tokenizer
+   * .dx-meta-strip — small inline meta line under section titles
+     (used by Rotations' "anchor / cycle / steps" line, etc.)
+   ===================================================================== */
+
+/* Status pills. ``.is-neutral`` is the count badge tone; tones swap
+   to spec values from the v0.56 handoff and flip in dark mode via
+   the --t-pill-* override block in base.css. */
+.dx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--t-pill-neutral-bg);
+  color: var(--t-pill-neutral-fg);
+  border: 1px solid transparent;
+}
+.dx-pill.is-ok {
+  background: var(--t-pill-ok-bg);
+  color: var(--t-pill-ok-fg);
+  border-color: var(--t-pill-ok-border);
+}
+.dx-pill.is-warn {
+  background: var(--t-pill-warn-bg);
+  color: var(--t-pill-warn-fg);
+  border-color: var(--t-pill-warn-border);
+}
+.dx-pill.is-danger {
+  background: var(--t-pill-danger-bg);
+  color: var(--t-pill-danger-fg);
+  border-color: var(--t-pill-danger-border);
+}
+.dx-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+
+/* Day-of-week pill (radio-style selectable chip). Used by Schedules
+   + Rotations. Selected state = accent fill. */
+.dx-dow-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 18px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  color: var(--t-fg-soft);
+  cursor: pointer;
+  user-select: none;
+}
+.dx-dow-pill input { position: absolute; opacity: 0; pointer-events: none; }
+.dx-dow-pill:hover { border-color: var(--t-border-strong); color: var(--t-fg); }
+.dx-dow-pill:has(input:checked),
+.dx-dow-pill.is-selected {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: var(--t-accent-fg);
+}
+
+/* Standalone input baseline. ``forms.css`` handles every field
+   rendered via the ``.field`` macros; this is the lighter-weight
+   shape for hand-rolled inputs inside section cards (the spec
+   calls this the "input" baseline: 8px radius, 11×13 padding,
+   white bg, 1px border). */
+.dx-input {
+  width: 100%;
+  padding: 11px 13px;
+  font-size: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--t-input-border, var(--t-border));
+  background: var(--t-surface);
+  color: var(--t-fg);
+  font-family: inherit;
+}
+.dx-input:focus {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -1px;
+  border-color: var(--t-accent);
+}
+
+/* Inset row: shared shape behind Discovered devices, History entries,
+   Widgets index rows, Schedule conditions, Events rows. The
+   ``.dx-discovered-row`` class already exists; this is the more
+   general selector for other pages to opt into. */
+.dx-inset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+  background: var(--t-inset);
+  border: 1px solid var(--t-inset-border);
+  border-radius: 10px;
+}
+
+/* Code block (the spec's warm-taupe surface for webhook examples,
+   event payloads, condition JSON). Sits visually distinct from the
+   section card. JSON syntax-highlight tokens overlay on top via the
+   in-house json-highlight.js. */
+.dx-code {
+  margin: 0;
+  padding: 14px 16px;
+  background: var(--t-code-bg);
+  border: 1px solid var(--t-code-border);
+  border-radius: 10px;
+  color: var(--t-code-fg);
+  font-family: var(--t-font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+.dx-code-key { color: var(--t-code-key); }
+.dx-code-str { color: var(--t-code-str); }
+.dx-code-num { color: var(--t-code-num); }
+.dx-code-kw { color: var(--t-code-kw); font-weight: 600; }
+.dx-code-punct { color: var(--t-code-punct); }
+
+/* Meta strip: small horizontal row of icon-prefixed key/value pairs.
+   Used under rotation titles ("anchor 07:00 · 60 min cycle · 2
+   steps"), under schedule rows, etc. */
+.dx-meta-strip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 11.5px;
+  color: var(--t-muted);
+}
+.dx-meta-strip > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dx-meta-strip .ph { color: var(--t-muted); font-size: 13px; }
+.dx-meta-strip code {
+  background: transparent;
+  padding: 0;
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+}
+
+/* Disclosure (▸) pattern: caret-prefixed inline summary that toggles
+   a body. Used by Conditions, Edit raw JSON, Example call. The
+   summary keeps the row clickable; the body sits flush below with a
+   1px top divider. */
+.dx-disclosure { border-top: 1px solid var(--t-border); padding-top: 12px; margin-top: 12px; }
+.dx-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+  user-select: none;
+}
+.dx-disclosure > summary::-webkit-details-marker { display: none; }
+.dx-disclosure > summary:hover { color: var(--t-fg); }
+.dx-disclosure > summary .ph-caret-right {
+  transition: transform 120ms ease;
+  font-size: 12px;
+}
+.dx-disclosure[open] > summary .ph-caret-right { transform: rotate(90deg); }
+.dx-disclosure-body { margin-top: 10px; }
