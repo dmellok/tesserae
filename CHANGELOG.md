@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.4], 2026-06-21
+
+Two Send fixes from the next walkthrough.
+
+### Fixed
+
+- **Send (Live preview)**: the right card was sitting ~16px
+  below the left because the global
+  ``.dx-section-card + .dx-section-card { margin-top: 16px }``
+  sibling rule (added in v0.60.0 for stacked admin cards) was
+  also firing inside the 2-column grid. Cancelled the margin
+  scoped to ``.send-pair > .dx-section-card`` so both card
+  tops align again.
+- **Send (Live preview)**: the preview-frame was capped at 480px
+  (from the v0.60.2 patch) which left obvious empty space on a
+  page-wide layout. Lifted the cap entirely and bumped the
+  column ratio to the spec's ``1fr 1.18fr`` so the preview
+  grows to fill the available column width.
+
 ## [0.60.3], 2026-06-21
 
 Events page performance + readability, Send alignment.

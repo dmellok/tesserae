@@ -9,25 +9,34 @@
 .send-pair[hidden] { display: none !important; }
 @media (min-width: 900px) {
   .send-pair {
-    /* Options get the flexible column; the preview card grows but
-       caps at the preview-frame's max-width (720px). Both columns
-       can shrink to zero for very narrow viewports. */
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 720px);
+    /* Spec ratio: preview column slightly wider than options so the
+       portrait panel ratio doesn't get cramped. Both columns can
+       shrink to zero for very narrow viewports. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.18fr);
   }
 }
 .send-pair-options { min-width: 0; }
 .send-pair-preview {
   min-width: 0;
 }
+/* Cancel the global ``.dx-section-card + .dx-section-card``
+   16px top margin inside this grid — the rule is meant for
+   vertically stacked siblings on admin pages, but here the
+   options + preview cards are side-by-side in a 2-col grid and
+   the sibling selector still fires, pushing the preview down
+   ~16px relative to the options card. Both card tops align
+   again with this reset. */
+.send-pair > .dx-section-card + .dx-section-card { margin-top: 0; }
 .send-pair-preview .card-head { width: 100%; }
 .send-pair-preview .preview-frame {
-  /* Clamp width so a portrait panel ratio (1200x1600 -> 3:4) caps
-     at a reasonable visible height rather than dwarfing the
-     options column. The base .preview-frame still has width: 100%
-     and the inline ``aspect-ratio`` from the template; we just put
-     a ceiling on width so height stays in range. */
+  /* Let the preview use the column's full width. The base
+     ``.preview-frame`` caps at 720px (editor context); on the
+     page-wide Send layout the column is comfortably wider than
+     that, so we lift the cap to keep the preview from looking
+     pinned in a much larger card. Aspect-ratio still locks the
+     proportion. */
   margin: 0 auto;
-  max-width: 480px;
+  max-width: none;
 }
 .send-pair-preview .preview-dims {
   margin: 0;
