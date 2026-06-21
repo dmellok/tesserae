@@ -319,11 +319,18 @@ hr.dx-divider {
 .rotation-form .field select,
 .rotation-form .rot-step select,
 .rotation-form .rot-step input[type="number"],
+.schedule-form .field input[type="text"],
+.schedule-form .field input[type="number"],
+.schedule-form .field input[type="time"],
+.schedule-form .field input[type="date"],
+.schedule-form .field input[type="url"],
+.schedule-form .field input[type="email"],
+.schedule-form .field select,
 /* Condition picker rows render their selects + text inputs
    directly inside .cp-row-body (no ``.field`` ancestor), so they
    need their own selector to pick up the v0.56 input baseline.
    Same shape, same focus ring, so the condition rows read as
-   siblings of the rotation form's anchor fields. */
+   siblings of the form's anchor fields. */
 .condition-picker .cp-row-body input[type="text"],
 .condition-picker .cp-row-body input[type="number"],
 .condition-picker .cp-row-body input[type="time"],
@@ -340,6 +347,8 @@ hr.dx-divider {
 .rotation-form .field select:focus,
 .rotation-form .rot-step select:focus,
 .rotation-form .rot-step input:focus,
+.schedule-form .field input:focus,
+.schedule-form .field select:focus,
 .condition-picker .cp-row-body input:focus,
 .condition-picker .cp-row-body select:focus,
 .condition-picker .cp-row > select:focus {
@@ -395,10 +404,12 @@ hr.dx-divider {
  *  flex container. We add a flex layout on .field--switch so
  *  the popover sits inline with the toggle.
  * ============================================================ */
-.rotation-form .field-grid {
+.rotation-form .field-grid,
+.schedule-form .field-grid {
   align-items: center;
 }
-.rotation-form .field--switch {
+.rotation-form .field--switch,
+.schedule-form .field--switch {
   display: flex;
   align-items: center;
   gap: 6px;

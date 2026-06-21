@@ -13,18 +13,25 @@
  *  inside the State column.
  * ============================================================ */
 
-/* Action row inside the actions cell. Buttons sit on one line
-   with a small gap; the icon-only trash button hugs the right
-   edge. Mirrors the dx-discovered-actions vocabulary on the
-   dashboards / plugins index pages so the verbs read the same. */
+/* Action row inside the actions cell. Four icon-only buttons
+   (Disable/Enable / Fire now / Edit / Delete) sit on one line
+   with a small gap; tooltips carry the verb. ``flex-wrap`` keeps
+   the row sane at sub-tablet widths where the column might still
+   need to wrap. */
 .dx-schedule-actions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
-.dx-schedule-actions .form { margin: 0; padding: 0; }
+.dx-schedule-actions .form,
+.dx-schedule-actions .form--inline {
+  margin: 0;
+  padding: 0;
+  display: inline-flex;
+}
 
 /* Make the State column comfortably wide for the dx-pill so
    ``pending`` / ``enabled`` / ``slipped`` etc. all fit without

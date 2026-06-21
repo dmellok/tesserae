@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.5], 2026-06-21
+
+### Fixed
+
+- **Saved schedules table: action buttons stop stacking**. The
+  Disable / Fire now / Edit / Delete buttons were each wrapping
+  to their own line because the cell uses ``width: 1%`` (shrinks
+  to content) and the labelled buttons overflowed at any
+  reasonable column width. Flipped all four to ``.dx-btn-icon-
+  only`` (with title + aria-label so the verb is still
+  discoverable), pinned ``flex-wrap: nowrap`` on the action row,
+  and made the inline forms ``display: inline-flex`` so they
+  don't break the row themselves.
+- **Edit schedule form picks up the same input + alignment
+  polish as Rotations**. The v0.62.2/0.62.4 selectors were
+  scoped to ``.rotation-form``; mirror them under ``.schedule-
+  form`` so the Name / Dashboard / Interval / Active window /
+  Priority fields land on the v0.56 ``.dx-input`` baseline, the
+  Smart sync row vertically centres next to Render lead, and
+  the ``info_pop`` button sits inline with the toggle.
+
 ## [0.62.4], 2026-06-21
 
 ### Fixed

@@ -298,19 +298,20 @@
         <td class="actions-col">
           <div class="dx-schedule-actions">
             <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="form form--inline">
-              <button type="submit" class="dx-btn-ghost-sm" title="{{ 'Disable' if s.enabled else 'Enable' }}">
+              <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only"
+                      title="{{ 'Disable' if s.enabled else 'Enable' }}"
+                      aria-label="{{ 'Disable' if s.enabled else 'Enable' }}">
                 <i class="ph ph-{{ 'pause' if s.enabled else 'play' }}" aria-hidden="true"></i>
-                <span>{{ 'Disable' if s.enabled else 'Enable' }}</span>
               </button>
             </form>
             <form method="post" action="{{ url_for('schedules.fire', schedule_id=s.id) }}" class="form form--inline">
-              <button type="submit" class="dx-btn-ghost-sm" title="Fire now">
+              <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Fire now" aria-label="Fire now">
                 <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
-                <span>Fire now</span>
               </button>
             </form>
-            <a class="dx-btn-ghost-sm" href="{{ url_for('schedules.index', edit=s.id) }}">
-              <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+            <a class="dx-btn-ghost-sm dx-btn-icon-only" href="{{ url_for('schedules.index', edit=s.id) }}"
+               title="Edit schedule" aria-label="Edit schedule">
+              <i class="ph ph-pencil-simple" aria-hidden="true"></i>
             </a>
             <form method="post" action="{{ url_for('schedules.delete', schedule_id=s.id) }}"
                   class="form form--inline" onsubmit="return confirm('Delete this schedule?');">
