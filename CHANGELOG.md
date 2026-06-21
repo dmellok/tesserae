@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.12], 2026-06-21
+
+### Added
+
+- **CORS on ``/renders/<digest>.<ext>`` and ``/preview/<id>.png``**.
+  v0.63.11 added CORS to the REST API but the image endpoints
+  the API returns URLs for stayed same-origin only. A browser
+  drawing those images into a ``<canvas>`` cross-origin tainted
+  the canvas — the image displayed fine but ``getImageData()``
+  was blocked, so the device emulator's per-pixel palette-
+  quantization preview (Spectra 6 / mono / 4-grey simulation)
+  couldn't run. Added ``Access-Control-Allow-Origin: *`` to both
+  routes. No new data exposed: the image was already fetchable
+  from any origin via ``<img src>`` — the header just unlocks
+  pixel access. The auth bypass for these routes (loopback /
+  LAN-only via ``app/auth.py`` ``_LAN_PATHS``) is unchanged.
+
 ## [0.63.11], 2026-06-21
 
 ### Added

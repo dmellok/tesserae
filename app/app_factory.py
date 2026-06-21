@@ -1017,11 +1017,28 @@ def create_app(
         # push events accumulated multi-GB tabs in the wild. Thumbnails
         # cap each IMG at ~0.4 MB decoded.
         thumb_w = request.args.get("w", type=int)
+        resp: Response
         if thumb_w and 16 <= thumb_w <= 800:
             response_or_none = _serve_render_thumbnail(renders_dir, filename, thumb_w)
             if response_or_none is not None:
-                return response_or_none
-        return send_from_directory(renders_dir, filename)
+                resp = response_or_none
+            else:
+                resp = send_from_directory(renders_dir, filename)
+        else:
+            resp = send_from_directory(renders_dir, filename)
+        # CORS for browser-based callers (the device emulator at
+        # emulator.tesserae.ink in particular). The image is already
+        # fetchable from any origin via <img src> — no new data is
+        # exposed — but without CORS headers the browser taints any
+        # <canvas> the image is drawn into, blocking the per-pixel
+        # palette quantization preview the emulator wants for
+        # accurate Spectra 6 / mono / 4-grey simulation. Allow * is
+        # safe here because the route already has no auth gate (the
+        # auth.py LAN-bypass list lets any private-network client
+        # reach it, same as a real device fetching MQTT-published
+        # frame URLs).
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
 
     # Device ID validation mirrors device_service so a 404 reflects an
     # unknown device rather than a path-traversal attempt.
@@ -1069,6 +1086,11 @@ def create_app(
         # The URL is stable but the bytes change every push, make sure
         # HA / browsers refetch instead of serving a cached frame.
         resp.headers["Cache-Control"] = "no-store, max-age=0"
+        # CORS for browser-based callers; see /renders/ route above for
+        # the same reasoning. The image is already fetchable from any
+        # origin; the header just unlocks canvas pixel access for the
+        # emulator's palette-quantization preview.
+        resp.headers["Access-Control-Allow-Origin"] = "*"
         return resp
 
     @app.get("/healthz")

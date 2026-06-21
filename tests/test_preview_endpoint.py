@@ -52,6 +52,37 @@ def test_preview_serves_latest_composition_png(app: Flask) -> None:
     assert cache == "no-store, max-age=0"
 
 
+def test_preview_carries_cors_header(app: Flask) -> None:
+    """The browser-based device emulator at emulator.tesserae.ink
+    needs the CORS header so its <canvas> isn't tainted when it
+    draws the preview PNG for palette-quantization preview. The
+    image is already fetchable from any origin via <img src>; the
+    header just unlocks pixel access."""
+    _seed_latest_render(app, "emu_kitchen", "abc123def4567890", b"\x89PNG\r\n")
+    with app.test_client() as client:
+        resp = client.get("/preview/emu_kitchen.png")
+        status = resp.status_code
+        cors = resp.headers.get("Access-Control-Allow-Origin")
+        resp.close()
+    assert status == 200
+    assert cors == "*"
+
+
+def test_renders_route_carries_cors_header(app: Flask) -> None:
+    """Same shape as the preview CORS test, for the content-addressed
+    /renders/<digest>.<ext> route the per-device frame URLs point at."""
+    renders_dir = app.config["DATA_ROOT"] / "core" / "renders"
+    renders_dir.mkdir(parents=True, exist_ok=True)
+    (renders_dir / "deadbeef00000000.png").write_bytes(b"\x89PNG\r\n")
+    with app.test_client() as client:
+        resp = client.get("/renders/deadbeef00000000.png")
+        status = resp.status_code
+        cors = resp.headers.get("Access-Control-Allow-Origin")
+        resp.close()
+    assert status == 200
+    assert cors == "*"
+
+
 def test_preview_returns_404_when_no_render_yet(app: Flask) -> None:
     """A fresh device with no successful push should 404, HA's camera
     entity then shows 'unavailable' instead of a stale or fake frame."""
