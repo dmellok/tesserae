@@ -107,8 +107,8 @@
       </h2>
       <div class="themes-builder-head-actions">
         {% if not is_new %}
-        <form method="post" action="{{ url_for('themes.toggle_enabled', theme_id=theme.id) }}" class="inline">
-          <button type="submit" class="button ghost"
+        <form method="post" action="{{ url_for('themes.toggle_enabled', theme_id=theme.id) }}" class="form form--inline">
+          <button type="submit" class="dx-btn-ghost-sm"
                   title="{% if selected_disabled %}Show this theme in the picker again{% else %}Hide this theme from the picker. Dashboards already using it keep rendering correctly.{% endif %}">
             <i class="ph {% if selected_disabled %}ph-eye{% else %}ph-eye-slash{% endif %}" aria-hidden="true"></i>
             <span>{% if selected_disabled %}Show in picker{% else %}Hide from picker{% endif %}</span>
@@ -116,23 +116,23 @@
         </form>
         {% endif %}
         {% if is_bundled %}
-        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
+        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="form form--inline">
           <button type="submit" class="dx-btn-primary">
             <i class="ph ph-copy" aria-hidden="true"></i>
             <span>Duplicate to edit</span>
           </button>
         </form>
         {% elif not is_new %}
-        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="inline">
-          <button type="submit" class="button ghost"
+        <form method="post" action="{{ url_for('themes.duplicate', theme_id=theme.id) }}" class="form form--inline">
+          <button type="submit" class="dx-btn-ghost-sm"
                   onclick="return confirm('Duplicate this theme? You\'ll be editing the copy.');">
             <i class="ph ph-copy" aria-hidden="true"></i><span>Duplicate</span>
           </button>
         </form>
-        <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="inline"
+        <form method="post" action="{{ url_for('themes.delete', theme_id=theme.id) }}" class="form form--inline"
               onsubmit="return confirm('Delete {{ theme.name }}? Pages and cells using it fall back to Light.');">
-          <button type="submit" class="button ghost danger">
-            <i class="ph ph-trash" aria-hidden="true"></i><span>Delete</span>
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete theme" aria-label="Delete theme">
+            <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
         {% endif %}
@@ -146,21 +146,20 @@
          upload → tweak → save. Hidden form pane handles the multipart
          upload via fetch so the rest of the form state survives. #}
       {% if not is_bundled %}
-      <section class="card theme-builder-extract" data-theme-extract>
-        <header class="card-head">
-          <h3><i class="ph ph-image"></i> Seed from image</h3>
+      <section class="dx-section-card theme-builder-extract" data-theme-extract>
+        <header class="dx-section-head">
+          <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-image"></i></span>
+          <div class="dx-section-titleblock">
+            <h3 class="dx-section-title">Seed from image</h3>
+            <p class="dx-section-desc">Upload a photo, poster, or screenshot. Tesserae extracts the dominant colours and fills the form below. Re-uploading rerolls; you can keep editing afterwards.</p>
+          </div>
         </header>
-        <p class="field-help">
-          Upload a photo, poster, or screenshot. Tesserae extracts the
-          dominant colours and fills the form below. Re-uploading
-          reroles; you can keep editing afterwards.
-        </p>
         <div class="theme-extract-row">
           <label class="theme-extract-file">
             <input type="file" accept="image/*" data-extract-input>
             <span class="theme-extract-file-label" data-extract-file-label>Choose image…</span>
           </label>
-          <button type="button" class="button" data-extract-go>
+          <button type="button" class="dx-btn-ghost-sm" data-extract-go>
             <i class="ph ph-magic-wand" aria-hidden="true"></i><span>Extract palette</span>
           </button>
         </div>
@@ -168,8 +167,14 @@
       </section>
       {% endif %}
 
-      <section class="card">
-        <header class="card-head"><h3><i class="ph ph-tag"></i> Identity</h3></header>
+      <section class="dx-section-card">
+        <header class="dx-section-head">
+          <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-tag"></i></span>
+          <div class="dx-section-titleblock">
+            <h3 class="dx-section-title">Identity</h3>
+            <p class="dx-section-desc">Name shown in the picker, the colour mode the panel renders against, and an optional custom font family.</p>
+          </div>
+        </header>
         {{ text_input('theme-name', 'name', 'Name', value=theme.name, required=True,
                       help='Shown in the picker. The slug (URL id) is generated from this.') }}
         {{ select_field('theme-mode', 'mode', 'Mode',
@@ -182,8 +187,14 @@
                       help='Pass through as --font-family. Leave blank to inherit the Spectra default.') }}
       </section>
 
-      <section class="card theme-builder-palette">
-        <header class="card-head"><h3><i class="ph ph-paint-brush"></i> Colour palette</h3></header>
+      <section class="dx-section-card theme-builder-palette">
+        <header class="dx-section-head">
+          <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-paint-brush"></i></span>
+          <div class="dx-section-titleblock">
+            <h3 class="dx-section-title">Colour palette</h3>
+            <p class="dx-section-desc">Surface, text, and accent tokens. The preview pane tracks every change live.</p>
+          </div>
+        </header>
 
         <p class="theme-builder-group-head">Surfaces</p>
         <div class="theme-builder-fields">

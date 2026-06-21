@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.1], 2026-06-21
+
+### Changed
+
+- **Themes builder uplifted to ``section_card`` chrome**. The
+  three builder sections (Seed from image / Identity / Colour
+  palette) flip from the legacy ``<section class="card">`` +
+  ``<header class="card-head">`` markup to proper
+  ``.dx-section-card`` + ``.dx-section-head`` (teal icon square +
+  title + description). Builder head action buttons flip to
+  ``.dx-btn-ghost-sm`` / ``.dx-btn-primary``; the delete button
+  goes icon-only. The v0.59.0 release note that called Themes
+  "Tier 4 done" had only flipped the Update button; this is the
+  actual structural pass.
+
 ## [0.63.0], 2026-06-21
 
 Hygiene pass. Cleans up two pre-v0.56 selectors that survived the
