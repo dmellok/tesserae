@@ -38,13 +38,12 @@
             aria-label="Remove step">
       <i class="ph ph-x" aria-hidden="true"></i>
     </button>
-    <button type="button" class="ghost rot-step-cond-toggle"
-            aria-expanded="{% if step.conditions %}true{% else %}false{% endif %}">
+    <button type="button" class="ghost rot-step-cond-toggle" aria-expanded="false">
       <i class="ph ph-funnel" aria-hidden="true"></i>
       <span class="rot-step-cond-label">Conditions{% if step.conditions %} ({{ step.conditions|length }}){% endif %}</span>
     </button>
   </div>
-  <div class="rot-step-cond-panel" {% if not step.conditions %}hidden{% endif %}>
+  <div class="rot-step-cond-panel" hidden>
     <div class="condition-picker" data-condition-picker>
       <textarea name="step_conditions_json[]" rows="2" spellcheck="false"
                 placeholder='[]'>{% if step.conditions %}{{ step.conditions | tojson(indent=2) }}{% endif %}</textarea>

@@ -92,6 +92,15 @@
     {% for ev in history %}
     {% set is_failed = ev.status not in ('sent', 'busy', 'quiet') %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
+      {% if ev.digest %}
+      <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">
+        <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=180) }}" alt="" width="64" height="64" loading="lazy" decoding="async">
+      </a>
+      {% else %}
+      <span class="dx-history-thumb dx-history-thumb--empty" aria-hidden="true">
+        <i class="ph ph-image-square"></i>
+      </span>
+      {% endif %}
       <a class="dx-history-time" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
         <span class="dx-history-clock"><code>{{ ev.abs.split(' ')[1] if ' ' in ev.abs else ev.abs }}</code></span>
         <span class="dx-history-date">{{ ev.rel }}</span>

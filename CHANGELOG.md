@@ -6,6 +6,50 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.0], 2026-06-21
+
+Post-uplift polish from a live walkthrough of the v0.59.0 admin UI.
+Six fixes across five pages plus a missing search input on Browse.
+
+### Changed
+
+- **Dashboards** (``/pages``): the inline "New dashboard" form and
+  the saved list fuse into a single section card so there is no
+  sibling gap between them. Saved dashboards now group under their
+  bound device, alphabetical within each group, with an "Unbound"
+  group at the end. Pages without an ``icon`` set fall back to
+  ``ph-cube`` instead of ``ph-squares-four``.
+- **Schedules** / Rotations / Settings tabs: a global
+  ``.dx-section-card + .dx-section-card { margin-top: 16px; }``
+  rule gives every page with stacked section cards consistent
+  vertical rhythm without per-page CSS.
+- **History** (``/history``): each push row gains a 64×64 square
+  thumbnail on the left. Click opens the same lightbox as the
+  timestamp link. Pushes with no stored render show a placeholder
+  square so the layout stays aligned.
+- **Battery dashboard** (``/devices/battery``): the 4-tile stat
+  grid forces ``repeat(4, 1fr)`` so Samples / Drain rate / Reaches
+  20% / Reaches 0% sit in one row at desktop widths; collapses to
+  2×2 below 720px.
+- **Events** (``/events``): expanded payload uses a two-column
+  grid — raw JSON (or conditions block) fills the left column,
+  the optional 120px render thumb sits on the right — so the
+  expand region uses the full row width instead of stacking
+  narrowly under the icon. Single-column fallback on narrow
+  viewports.
+- **Rotations** (``/rotations``): the per-step Conditions panel
+  stays collapsed by default even when the saved step has
+  conditions, matching the user's expectation that the form is
+  empty until they click in.
+
+### Added
+
+- **Widgets Browse** (``/plugins/browse``): catalog search input
+  per the design spec. Free-text matches case-insensitively on
+  entry id, name, description, author, and tags. Debounced 300ms
+  auto-submit so the URL stays shareable; ``?q=`` composes with
+  the kind + tag chip filters.
+
 ## [0.59.0], 2026-06-21
 
 Tier 4 (final) of the v0.56 admin-UI uplift. Onboarding and Themes

@@ -74,15 +74,37 @@ def _mark_restart_pending() -> None:
 
 
 def _filter_entries(
-    entries: list[CatalogEntry], *, tag: str | None, kind: str | None
+    entries: list[CatalogEntry],
+    *,
+    tag: str | None,
+    kind: str | None,
+    query: str | None,
 ) -> list[CatalogEntry]:
-    """Apply the chip filters from the Browse page query string.
-    No tag/kind (or unknown value) returns everything."""
+    """Apply the chip filters + free-text query from the Browse page
+    query string. No tag/kind/query (or unknown value) returns
+    everything. Query matches case-insensitively on name, description,
+    id, author, and tags."""
     out = list(entries)
     if tag:
         out = [e for e in out if tag in e.tags]
     if kind:
         out = [e for e in out if e.kind == kind]
+    if query:
+        q = query.casefold()
+
+        def _haystack(e: CatalogEntry) -> str:
+            return " ".join(
+                str(part).casefold()
+                for part in (
+                    e.id,
+                    e.name,
+                    e.description,
+                    e.author_name or "",
+                    " ".join(e.tags),
+                )
+            )
+
+        out = [e for e in out if q in _haystack(e)]
     return out
 
 
@@ -240,6 +262,7 @@ def browse() -> str:
             kinds=[],
             active_tag=None,
             active_kind=None,
+            active_query=None,
             installed_count=0,
             index_url="",
             stale=False,
@@ -260,11 +283,12 @@ def browse() -> str:
             stale = True
     active_tag = request.args.get("tag") or None
     active_kind = request.args.get("kind") or None
+    active_query = (request.args.get("q") or "").strip() or None
     # Kinds are derived from the full cached index (or the live one if
     # no cache), so toggling a kind chip doesn't make the other chips
     # disappear. Same logic as tags.
     full_index = mkt.cached_index() or entries
-    entries = _filter_entries(entries, tag=active_tag, kind=active_kind)
+    entries = _filter_entries(entries, tag=active_tag, kind=active_kind, query=active_query)
     installed = mkt.installed()
     return render_template(
         "plugins_browse.html",
@@ -273,6 +297,7 @@ def browse() -> str:
         kinds=_collect_kinds(full_index),
         active_tag=active_tag,
         active_kind=active_kind,
+        active_query=active_query,
         installed_count=len(installed),
         index_url=mkt.index_url(),
         stale=stale,

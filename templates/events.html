@@ -72,6 +72,7 @@
       </button>
 
       <div class="dx-event-expand" data-event-expand hidden>
+        <div class="dx-event-expand-grid">
         {% if ev.type == 'conditions' and ev.extra %}
         {# Rich conditions decision view, preserved verbatim from the
            previous template — the diagnostic detail is too valuable
@@ -149,6 +150,7 @@
                alt="" width="120" height="90" loading="lazy" decoding="async">
         </a>
         {% endif %}
+        </div>
       </div>
     </li>
     {% endfor %}

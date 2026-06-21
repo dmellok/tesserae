@@ -2976,7 +2976,8 @@
   font-size: 12.5px;
 }
 
-.dx-battery-stats { gap: 8px; }
+.dx-battery-stats { gap: 8px; grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) { .dx-battery-stats { grid-template-columns: repeat(2, 1fr); } }
 .dx-battery-hint {
   margin: 0;
   font-size: 11.5px;
@@ -2991,7 +2992,7 @@
   align-items: center;
   margin-bottom: 12px;
 }
-.dx-event-row { padding: 0; }
+.dx-event-row { padding: 0; display: flex; flex-direction: column; align-items: stretch; }
 .dx-event-summary {
   display: flex;
   align-items: flex-start;
@@ -3087,19 +3088,40 @@
 .dx-event-expand {
   padding: 0 15px 14px 55px;
 }
+.dx-event-expand-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.dx-event-expand-grid > .dx-code,
+.dx-event-expand-grid > .event-conditions {
+  grid-column: 1;
+  margin: 0;
+}
+.dx-event-expand-grid > .dx-event-thumb-link {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+}
 .dx-event-empty-payload {
   margin: 0;
   font-size: 12px;
   color: var(--t-muted);
 }
 .dx-event-thumb-link {
-  display: inline-block;
-  margin-top: 10px;
+  display: block;
   border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--t-border);
+  flex: 0 0 auto;
 }
-.dx-event-thumb-link img { display: block; max-width: 240px; height: auto; }
+.dx-event-thumb-link img { display: block; width: 120px; height: auto; }
+@media (max-width: 720px) {
+  .dx-event-expand { padding: 0 15px 14px 15px; }
+  .dx-event-expand-grid { grid-template-columns: 1fr; }
+  .dx-event-expand-grid > .dx-event-thumb-link { grid-column: 1; grid-row: auto; }
+}
 
 /* Pragmatic adapter: pages that wrap their content in
    ``.dx-section-card`` but still call the legacy ``card_head``
@@ -3144,4 +3166,99 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* v0.60: consistent 16px vertical rhythm between stacked
+   ``.dx-section-card`` siblings at the page level. Earlier pages
+   relied on the legacy ``.card { margin: 0 0 16px }`` rule which
+   only fires for the legacy class; sibling section cards landed
+   flush. Combined with the per-page card chrome this gives every
+   admin page the same breathing room without per-page overrides.
+   Pages that want a single fused card (dashboards) put their two
+   surfaces inside a single ``section_card`` macro call. */
+.dx-section-card + .dx-section-card { margin-top: 16px; }
+
+/* Dashboards (v0.60). Inline create row at the top, then one
+   group per device with a small heading + alphabetical row list.
+   The form sits inside the same section card so there is no
+   sibling gap between "New" and "Saved" — the surfaces fuse. */
+.dx-dashboard-create {
+  padding-bottom: 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--t-border, #ecebe5);
+}
+.dx-dashboard-group + .dx-dashboard-group { margin-top: 18px; }
+.dx-dashboard-group-head {
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--t-fg-soft, #56564f);
+  text-transform: none;
+}
+.dx-dashboard-group-head .ph { color: var(--t-accent, #15846a); font-size: 14px; }
+.dx-dashboard-group-head .dx-pill {
+  margin-left: 2px;
+  background: var(--t-pill-neutral-bg, #f0efea);
+  color: var(--t-pill-neutral-fg, #56564f);
+  border: 1px solid var(--t-pill-neutral-border, #e2e1db);
+  font-weight: 600;
+}
+
+/* History: square thumbnail at the left of each push row. Click
+   opens the same lightbox as the timestamp link. ``--empty`` is a
+   placeholder square for events without a stored composition PNG
+   (URL pushes, errors before render). */
+.dx-history-thumb {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--t-border, #ecebe5);
+  background: var(--t-inset, #f3f2ee);
+  display: grid;
+  place-items: center;
+}
+.dx-history-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.dx-history-thumb--empty {
+  color: var(--t-muted, #9a9a93);
+  font-size: 22px;
+}
+.dx-history-row { gap: 14px; }
+
+/* Marketplace search input (Widgets Browse spec). Sits between the
+   filter header and the kind/tag chip rows. Magnifier glyph is
+   absolute-positioned inside the input wrapper so the icon hugs
+   the left edge regardless of input width. */
+.dx-marketplace-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.dx-marketplace-search > .ph-magnifying-glass {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--t-muted, #9a9a93);
+  font-size: 14px;
+  pointer-events: none;
+}
+.dx-marketplace-search > .dx-input {
+  flex: 1 1 auto;
+  padding-left: 34px;
+}
+.dx-marketplace-search > .dx-btn-ghost-sm {
+  flex: 0 0 auto;
 }

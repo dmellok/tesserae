@@ -64,7 +64,7 @@
 </section>
 {% endif %}
 
-{% if entries or tags or kinds %}
+{% if entries or tags or kinds or active_query %}
 <section class="dx-section-card">
   <header class="card-head">
     <div class="card-head-row">
@@ -80,15 +80,32 @@
       </div>
     </div>
   </header>
+  {# Free-text catalog search. GET so the result URL is shareable +
+     bookmarkable; auto-submits on input (debounced via 300ms timer).
+     Hidden inputs preserve the active tag + kind so search composes
+     with the chip filters. #}
+  <form method="get" action="{{ url_for('marketplace.browse') }}" class="dx-marketplace-search">
+    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" name="q" value="{{ active_query or '' }}"
+           class="dx-input" placeholder="Search the catalog…"
+           autocomplete="off" data-mkt-search>
+    {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
+    {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
+    {% if active_query %}
+    <a class="dx-btn-ghost-sm" href="{{ url_for('marketplace.browse', tag=active_tag, kind=active_kind) }}" aria-label="Clear search">
+      <i class="ph ph-x" aria-hidden="true"></i>
+    </a>
+    {% endif %}
+  </form>
   {% if kinds and kinds|length > 1 %}
   <div class="filter-chips filter-chips--kinds" role="tablist" aria-label="Filter by type">
-    <a href="{{ url_for('marketplace.browse', tag=active_tag) }}"
+    <a href="{{ url_for('marketplace.browse', tag=active_tag, q=active_query) }}"
        class="pill {% if not active_kind %}is-accent{% endif %}"
        role="tab" aria-selected="{{ 'true' if not active_kind else 'false' }}">
       All <span class="muted">({{ kinds|sum(attribute='count') }})</span>
     </a>
     {% for k in kinds %}
-    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=k.key) }}"
+    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=k.key, q=active_query) }}"
        class="pill {% if active_kind == k.key %}is-accent{% endif %}"
        role="tab" aria-selected="{{ 'true' if active_kind == k.key else 'false' }}">
       {% if k.key == 'widget' %}<i class="ph ph-puzzle-piece" aria-hidden="true"></i>
@@ -102,10 +119,10 @@
   {% endif %}
   {% if tags %}
   <div class="filter-chips">
-    <a href="{{ url_for('marketplace.browse', kind=active_kind) }}"
+    <a href="{{ url_for('marketplace.browse', kind=active_kind, q=active_query) }}"
        class="pill {% if not active_tag %}is-accent{% endif %}">All</a>
     {% for tag in tags %}
-    <a href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind) }}"
+    <a href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind, q=active_query) }}"
        class="pill {% if active_tag == tag %}is-accent{% endif %}">{{ tag }}</a>
     {% endfor %}
   </div>
@@ -269,7 +286,10 @@
 <section class="dx-section-card">
   {{ card_head('Nothing to show', icon_name='package') }}
   <p class="field-help">
-    {% if active_kind and active_tag %}
+    {% if active_query %}
+    Nothing matched <code>{{ active_query }}</code>. Try
+    <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=active_kind) }}">clearing the search</a>.
+    {% elif active_kind and active_tag %}
     No entries matched <code>{{ active_kind }}</code> + <code>{{ active_tag }}</code>. Try
     <a href="{{ url_for('marketplace.browse') }}">All</a>.
     {% elif active_kind %}
@@ -520,4 +540,20 @@
   }
 </style>
 <script src="{{ url_for('static', filename='plugins_browse_carousel.js') }}" defer></script>
+<script>
+  // Debounced auto-submit for the catalog search. Submits 300ms after
+  // the last keystroke so the URL stays in sync with the query without
+  // a request per character. Plain form submit so back/forward + share
+  // links Just Work.
+  (function () {
+    const input = document.querySelector('[data-mkt-search]');
+    if (!input) return;
+    const form = input.closest('form');
+    let timer = null;
+    input.addEventListener('input', function () {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(function () { form.submit(); }, 300);
+    });
+  })();
+</script>
 {% endblock %}
