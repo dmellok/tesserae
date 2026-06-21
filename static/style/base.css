@@ -302,6 +302,22 @@ html, body { margin: 0; padding: 0; }
    composer canvas) handle their own overflow inside their box. */
 html, body { overflow-x: hidden; max-width: 100%; }
 
+/* Screen-reader-only utility. Visually hidden, still announced.
+   Used for the play-step buttons inside the rotation step rows
+   (the icon carries the visible meaning; the span carries the
+   indexed label so a screen reader says "Play step 1 now"). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body.admin {
   background: var(--t-bg);
   color: var(--t-fg);

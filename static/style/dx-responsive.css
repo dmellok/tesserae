@@ -59,22 +59,47 @@
     flex: 0 0 auto;
   }
 
-  /* History row collapse — same shape as dashboards in v0.63.8.
-     Thumb stays on top-left, time + body wrap to the next line,
-     actions push to the bottom of the row. */
+  /* History row collapse. The desktop row has five columns
+     (thumb / time / mid (device + source + target) / end (status
+     + dur + actions)). Stacking each as a wrap line balloons
+     each row to ~250 px tall. Compact alternative: 2-column
+     grid — thumb in the left column spanning all rows; right
+     column stacks time / mid / end on three short lines. */
   .dx-history-row {
-    flex-wrap: wrap;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    grid-template-rows: auto auto auto;
+    column-gap: 12px;
+    row-gap: 6px;
+    align-items: start;
+    padding: 12px;
   }
-  .dx-history-thumb { flex: 0 0 64px; }
-  .dx-history-time,
+  .dx-history-thumb {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    width: 56px;
+    height: 56px;
+  }
+  .dx-history-time {
+    grid-column: 2;
+    grid-row: 1;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
   .dx-history-mid {
-    flex: 1 1 auto;
+    grid-column: 2;
+    grid-row: 2;
+    gap: 6px;
   }
   .dx-history-end {
-    width: 100%;
-    justify-content: flex-end;
-    margin-top: 6px;
+    grid-column: 2;
+    grid-row: 3;
+    width: auto;
+    justify-content: flex-start;
+    margin-top: 0;
+    flex-wrap: wrap;
   }
 
   /* Widgets index rows collapse. Pre-fix the icon + title +

@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.10], 2026-06-21
+
+### Fixed
+
+- **``.sr-only`` was used but never defined**, so the rotation
+  step rows' "Play step N now" hidden labels rendered as visible
+  text — and once v0.62.x clamped icon-only buttons to a 34×34
+  square, the visible text overflowed the box and showed up as a
+  ghost rectangle next to the icon. Added the canonical
+  visually-hidden utility class to base.css.
+- **History rows redesigned for mobile**. The v0.63.9 attempt
+  flex-wrapped each section to its own line and ballooned each
+  row to ~250 px tall on a phone. Replaced with a compact 2-col
+  grid (thumbnail in the left column spanning all rows; the
+  right column stacks time / source / status on three short
+  lines). Reads as a tight card-style row instead of a 4-line
+  pile-up.
+
 ## [0.63.9], 2026-06-21
 
 ### Fixed
