@@ -1,0 +1,206 @@
+/* ============================================================
+ *  /events — v0.56 admin-uplift Tier 2.2
+ *
+ *  Click-to-expand rows with a per-type icon swatch + filter
+ *  chips that mirror the swatch on the active state. CSS custom
+ *  properties (``--evt-fg``/``--evt-bg``/``--evt-bd``) drive
+ *  both the row icon background and the filter chip from one
+ *  source of truth so the type's colour family stays in lockstep
+ *  across both surfaces.
+ *
+ *  Expanded payload is lazy-hydrated on first click — see the
+ *  events.html bottom script. The grid puts the JSON / conditions
+ *  block on the left, the optional 120 px push thumbnail on the
+ *  right; both stack on narrow viewports.
+ *
+ *  v0.63.7 extracted from settings.css. No rules changed.
+ * ============================================================ */
+
+.dx-events-toolbar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.dx-event-row { padding: 0; display: flex; flex-direction: column; align-items: stretch; }
+.dx-event-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 15px;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+}
+.dx-event-summary:hover { background: rgba(0, 0, 0, 0.02); }
+.dx-event-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 8px;
+  color: var(--t-fg-soft);
+  font-size: 14px;
+}
+
+/* Per-event-type icon palette. Each type gets a distinct hue so
+   the row icon is recognisable at a glance, and the matching
+   filter chip mirrors the same swatch when active. Single source
+   of truth via CSS custom properties so the row icon, the filter
+   chip, and any future swatch (e.g. timeline mark) stay in lockstep. */
+.dx-event-row--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
+.dx-event-row--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-event-row--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-event-row--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-event-row--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-event-row--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-event-row--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
+.dx-event-row--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
+.dx-event-row--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
+.dx-event-row--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
+.dx-event-row--transport,
+.dx-event-row--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-event-row--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
+.dx-event-row[class*="dx-event-row--"] .dx-event-icon {
+  color: var(--evt-fg, var(--t-fg-soft));
+  background: var(--evt-bg, var(--t-surface));
+  border-color: var(--evt-bd, var(--t-border));
+}
+
+/* Filter chip per-type swatch. Inactive uses the same custom
+   properties to colour the leading icon; active swaps the bg to
+   the saturated fg and flips text white. */
+.dx-filter-chip--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
+.dx-filter-chip--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-filter-chip--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-filter-chip--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-filter-chip--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-filter-chip--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-filter-chip--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
+.dx-filter-chip--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
+.dx-filter-chip--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
+.dx-filter-chip--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
+.dx-filter-chip--transport,
+.dx-filter-chip--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-filter-chip--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
+.dx-filter-chip[class*="dx-filter-chip--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active {
+  background: var(--evt-fg, var(--t-accent));
+  border-color: var(--evt-fg, var(--t-accent));
+  color: #fff;
+}
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: #fff; }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active .dx-count-pill {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.dx-event-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dx-event-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dx-event-type {
+  background: var(--t-pill-neutral-bg);
+  color: var(--t-pill-neutral-fg);
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+.dx-event-source {
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+  font-weight: 600;
+}
+.dx-event-target {
+  font-family: var(--t-font-mono);
+  font-size: 12px;
+  color: var(--t-fg);
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dx-event-meta {
+  font-size: 11.5px;
+  color: var(--t-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dx-event-digest {
+  font-family: var(--t-font-mono);
+  background: transparent;
+  padding: 0;
+  font-size: 11px;
+  color: var(--t-muted);
+}
+.dx-event-err {
+  color: var(--t-pill-danger-fg);
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+}
+.dx-event-caret {
+  font-size: 13px;
+  color: var(--t-muted);
+  transition: transform 120ms ease;
+  flex: 0 0 auto;
+  margin-top: 4px;
+}
+.dx-event-row.is-open .dx-event-caret { transform: rotate(90deg); }
+.dx-event-expand {
+  padding: 0 15px 14px 55px;
+}
+.dx-event-expand-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+.dx-event-expand-grid > .dx-code,
+.dx-event-expand-grid > .event-conditions {
+  grid-column: 1;
+  margin: 0;
+}
+.dx-event-expand-grid > .dx-event-thumb-link {
+  grid-column: 2;
+  grid-row: 1;
+  margin: 0;
+}
+.dx-event-empty-payload {
+  margin: 0;
+  font-size: 12px;
+  color: var(--t-muted);
+}
+.dx-event-json-placeholder { min-height: 1.5em; }
+.dx-event-thumb-link {
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--t-border);
+  flex: 0 0 auto;
+}
+.dx-event-thumb-link img { display: block; width: 120px; height: auto; }
+@media (max-width: 720px) {
+  .dx-event-expand { padding: 0 15px 14px 15px; }
+  .dx-event-expand-grid { grid-template-columns: 1fr; }
+  .dx-event-expand-grid > .dx-event-thumb-link { grid-column: 1; grid-row: auto; }
+}

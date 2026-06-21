@@ -2766,130 +2766,8 @@
 
 /* ============================================================
  *  6b. PAGE — History (/history)
- *     Inset row + source/target/status three-column layout.
- *     CANDIDATE FOR EXTRACTION → dx-history.css
+ *     EXTRACTED → static/style/dx-history.css (v0.63.7).
  * ============================================================ */
-
-/* History page (Tier 1.2). Inset row split into three columns:
-   timestamp left, source/target middle, status/duration/actions
-   right. Failed rows flip the soft pink band background. */
-.dx-history-row { align-items: stretch; padding: 12px 15px; }
-.dx-history-row--failed {
-  background: var(--t-pill-danger-bg);
-  border-color: var(--t-pill-danger-border);
-}
-.dx-history-time {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 0 0 auto;
-  text-decoration: none;
-  color: inherit;
-  min-width: 70px;
-}
-.dx-history-clock code {
-  font-family: var(--t-font-mono);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--t-fg);
-  background: transparent;
-  padding: 0;
-}
-.dx-history-date {
-  font-size: 11px;
-  color: var(--t-muted);
-}
-.dx-history-mid {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.dx-history-target {
-  font-size: 13px;
-  color: var(--t-fg);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 0;
-  min-width: 0;
-}
-.dx-history-err {
-  font-size: 11.5px;
-  color: var(--t-pill-danger-fg);
-  font-family: var(--t-font-mono);
-}
-.dx-history-end {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-.dx-history-dur {
-  font-family: var(--t-font-mono);
-  font-size: 12.5px;
-  color: var(--t-fg-soft);
-  min-width: 36px;
-  text-align: right;
-}
-
-/* Device chip (small inline pill on history rows + anywhere else we
-   surface "this push went to <device>"). */
-.dx-device-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--t-fg-soft);
-}
-.dx-device-chip .ph { color: var(--t-muted); font-size: 12px; }
-
-/* Source pill — colour-coded by push origin. Lightweight pill;
-   distinct from .dx-pill status chips so the two read as different
-   categories ("how was this pushed" vs "did it land"). */
-.dx-source-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 9px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  background: var(--t-pill-neutral-bg);
-  color: var(--t-pill-neutral-fg);
-  border: 1px solid transparent;
-}
-.dx-source-page,
-.dx-source-file,
-.dx-source-url,
-.dx-source-webpage {
-  background: color-mix(in oklab, var(--t-accent) 16%, var(--t-surface));
-  color: var(--t-accent);
-}
-.dx-source-schedule,
-.dx-source-rotation {
-  background: var(--t-pill-warn-bg);
-  color: var(--t-pill-warn-fg);
-}
-.dx-source-webhook,
-.dx-source-ha {
-  background: color-mix(in oklab, #a35a2c 16%, var(--t-surface));
-  color: #a35a2c;
-}
-.dx-source-resend,
-.dx-source-manual,
-.dx-source-setup,
-.dx-source-unknown {
-  background: var(--t-pill-neutral-bg);
-  color: var(--t-pill-neutral-fg);
-}
 
 /* Page-head primary CTA: small primary button positioned under (or
    right of) the page title + lede. Used on Dashboards' "New
@@ -2956,212 +2834,21 @@
 
 /* ============================================================
  *  6c. PAGE — Events (/events)
- *     Click-to-expand rows with per-type icon swatch + filter
- *     chips that mirror the swatch on the active state. CSS
- *     custom properties (--evt-fg/bg/bd) drive both the row
- *     icon and the chip from one source of truth.
- *     CANDIDATE FOR EXTRACTION → dx-events.css
+ *     EXTRACTED → static/style/dx-events.css (v0.63.7).
  * ============================================================ */
 
-/* Events page (Tier 2.2). Row is a button (whole row clickable),
-   expanded body shows the raw JSON payload via .dx-code. */
-.dx-events-toolbar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.dx-event-row { padding: 0; display: flex; flex-direction: column; align-items: stretch; }
-.dx-event-summary {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 15px;
-  background: transparent;
-  border: 0;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  color: inherit;
-}
-.dx-event-summary:hover { background: rgba(0, 0, 0, 0.02); }
-.dx-event-icon {
-  flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  background: var(--t-surface);
-  border: 1px solid var(--t-border);
-  border-radius: 8px;
-  color: var(--t-fg-soft);
-  font-size: 14px;
-}
-/* Per-event-type icon palette. Each type gets a distinct hue so the
-   row icon is recognisable at a glance, and the matching filter
-   chip mirrors the same swatch when active. Single source of truth
-   via CSS custom properties so the row icon, the filter chip, and
-   any future swatch (e.g. timeline mark) stay in lockstep. */
-.dx-event-row--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
-.dx-event-row--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-event-row--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-event-row--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-event-row--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-event-row--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-event-row--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
-.dx-event-row--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
-.dx-event-row--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
-.dx-event-row--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
-.dx-event-row--transport,
-.dx-event-row--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-event-row--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
-.dx-event-row[class*="dx-event-row--"] .dx-event-icon {
-  color: var(--evt-fg, var(--t-fg-soft));
-  background: var(--evt-bg, var(--t-surface));
-  border-color: var(--evt-bd, var(--t-border));
-}
-
-/* Filter-chip colour matches each type. Active state fills with
-   the per-type swatch so the chosen filter reads as the same
-   colour family as the rows it surfaces. */
-.dx-filter-chip--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
-.dx-filter-chip--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-filter-chip--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
-.dx-filter-chip--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-filter-chip--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-filter-chip--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
-.dx-filter-chip--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
-.dx-filter-chip--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
-.dx-filter-chip--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
-.dx-filter-chip--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
-.dx-filter-chip--transport,
-.dx-filter-chip--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-filter-chip--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
-.dx-filter-chip[class*="dx-filter-chip--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
-/* Active state: the per-type fg becomes the chip background and the
-   chip's own text flips to white, giving each type a clearly
-   readable "selected" pill regardless of the (deliberately pastel)
-   tint colours used for the row icon backgrounds. */
-.dx-filter-chip[class*="dx-filter-chip--"].is-active {
-  background: var(--evt-fg, var(--t-accent));
-  border-color: var(--evt-fg, var(--t-accent));
-  color: #fff;
-}
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: #fff; }
-.dx-filter-chip[class*="dx-filter-chip--"].is-active .dx-count-pill {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-}
-.dx-event-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.dx-event-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.dx-event-type {
-  background: var(--t-pill-neutral-bg);
-  color: var(--t-pill-neutral-fg);
-  text-transform: lowercase;
-  letter-spacing: 0.04em;
-}
-.dx-event-source {
-  font-size: 12.5px;
-  color: var(--t-fg-soft);
-  font-weight: 600;
-}
-.dx-event-target {
-  font-family: var(--t-font-mono);
-  font-size: 12px;
-  color: var(--t-fg);
-  background: transparent;
-  padding: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1 1 0;
-  min-width: 0;
-}
-.dx-event-meta {
-  font-size: 11.5px;
-  color: var(--t-muted);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.dx-event-digest {
-  font-family: var(--t-font-mono);
-  background: transparent;
-  padding: 0;
-  font-size: 11px;
-  color: var(--t-muted);
-}
-.dx-event-err {
-  color: var(--t-pill-danger-fg);
-  font-family: var(--t-font-mono);
-  font-size: 11.5px;
-}
-.dx-event-caret {
-  font-size: 13px;
-  color: var(--t-muted);
-  transition: transform 120ms ease;
-  flex: 0 0 auto;
-  margin-top: 4px;
-}
-.dx-event-row.is-open .dx-event-caret { transform: rotate(90deg); }
-.dx-event-expand {
-  padding: 0 15px 14px 55px;
-}
-.dx-event-expand-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-}
-.dx-event-expand-grid > .dx-code,
-.dx-event-expand-grid > .event-conditions {
-  grid-column: 1;
-  margin: 0;
-}
-.dx-event-expand-grid > .dx-event-thumb-link {
-  grid-column: 2;
-  grid-row: 1;
-  margin: 0;
-}
-.dx-event-empty-payload {
-  margin: 0;
-  font-size: 12px;
-  color: var(--t-muted);
-}
-.dx-event-json-placeholder { min-height: 1.5em; }
-.dx-event-thumb-link {
-  display: block;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--t-border);
-  flex: 0 0 auto;
-}
-.dx-event-thumb-link img { display: block; width: 120px; height: auto; }
-@media (max-width: 720px) {
-  .dx-event-expand { padding: 0 15px 14px 15px; }
-  .dx-event-expand-grid { grid-template-columns: 1fr; }
-  .dx-event-expand-grid > .dx-event-thumb-link { grid-column: 1; grid-row: auto; }
-}
+/* All Events page rules (.dx-events-toolbar, .dx-event-row,
+   .dx-event-row--<type> per-type swatch, .dx-filter-chip per-type
+   colour, .dx-event-summary / -icon / -body / -head / -meta /
+   -caret / -expand / -thumb-link) now live in dx-events.css. */
 
 /* ============================================================
  *  6d. ADAPTER — legacy ``card_head`` macro inside dx-section-card
  *     Bridges pages that haven't moved off the legacy card_head
- *     macro yet (rotations, schedules, some plugin browse cases).
- *     Once those pages flip to inline ``<header class="dx-section-head">``,
- *     this block can be deleted.
+ *     macro yet (settings.html, page_editor.html, login.html,
+ *     setup.html). Once those pages flip to inline
+ *     ``<header class="dx-section-head">``, this block can be
+ *     deleted.
  * ============================================================ */
 
 /* Pragmatic adapter: pages that wrap their content in
@@ -3224,32 +2911,8 @@
  *     EXTRACTED → static/style/dx-dashboards.css (v0.63.6).
  * ============================================================ */
 
-/* History: square thumbnail at the left of each push row. Click
-   opens the same lightbox as the timestamp link. ``--empty`` is a
-   placeholder square for events without a stored composition PNG
-   (URL pushes, errors before render). */
-.dx-history-thumb {
-  flex: 0 0 auto;
-  width: 64px;
-  height: 64px;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid var(--t-border, #ecebe5);
-  background: var(--t-inset, #faf9f6);
-  display: grid;
-  place-items: center;
-}
-.dx-history-thumb img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.dx-history-thumb--empty {
-  color: var(--t-muted, #9a9a93);
-  font-size: 22px;
-}
-.dx-history-row { gap: 14px; }
+/* History thumb + row-gap rules consolidated into
+   ``static/style/dx-history.css`` in v0.63.7. */
 
 /* ============================================================
  *  6f. PAGE — Widgets Browse (/plugins/browse)

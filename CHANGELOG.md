@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.7], 2026-06-21
+
+### Changed
+
+- **settings.css → dx-history.css + dx-events.css** (the last
+  two page-specific extractions). History (~130 lines, row
+  layout + timestamp + thumbnail + source-pill palette + device
+  chip) and Events (~200 lines, per-type swatch on rows + on
+  filter chips, summary/body/expand grid, lazy-hydrate JSON
+  placeholder) move to their own stylesheets. settings.css drops
+  another ~330 lines.
+- **settings.css** now ends at ~3000 lines (down from 3370),
+  with the page-specific blocks (Battery / Dashboards /
+  Marketplace / History / Events) extracted. What remains is
+  true Settings-page styling, dx-* shared primitives, the
+  card_head adapter, and the dark-mode block — i.e. the file
+  is roughly what it should have been all along.
+
 ## [0.63.6], 2026-06-21
 
 ### Changed
