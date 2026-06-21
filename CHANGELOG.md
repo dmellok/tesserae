@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.0], 2026-06-21
+
+Hygiene pass. Cleans up two pre-v0.56 selectors that survived the
+admin UI uplift and were quietly diverging from the rest of the
+admin surface.
+
+### Fixed
+
+- **events.js targets the v0.56 markup**. Pre-v0.63 the live-SSE
+  script looked for ``.events`` / ``.event-row`` (the legacy
+  classes the template stopped emitting at v0.56). It silently
+  spawned a phantom unstyled ``<ul class="events">`` at the
+  bottom of the page on every load to receive SSE rows that the
+  user couldn't see. Rewrote to target ``.dx-events-list`` and
+  emit the full ``.dx-event-row`` / ``.dx-event-summary`` /
+  ``.dx-event-body`` / ``.dx-pill`` markup so streamed events
+  look identical to the server-rendered rows (including the
+  per-type icon swatch via ``.dx-event-row--<type>``). The
+  live indicator label now matches the static "LIVE" /
+  "Connecting…" / "Offline" treatment.
+- **Condition picker JSON highlight consolidated**. The picker
+  emitted bespoke ``cp-jh-key`` / ``cp-jh-str`` / ``cp-jh-num``
+  / ``cp-jh-kw`` classes whose palette lived in schedules.css,
+  parallel to the events page's shared ``dx-code-*`` palette in
+  settings.css. The picker now emits ``dx-code-*`` directly so
+  the condition editor + events JSON share a single source of
+  truth; the duplicated rules in schedules.css are removed.
+
 ## [0.62.5], 2026-06-21
 
 ### Fixed

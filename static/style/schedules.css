@@ -732,10 +732,11 @@ button.ghost.danger:hover { color: var(--t-danger); text-decoration: underline; 
 .cp-json-editor textarea::selection {
   background: color-mix(in oklab, var(--t-accent, #C24F2C) 30%, transparent);
 }
-.cp-jh-key { color: color-mix(in oklab, var(--t-accent, #C24F2C) 80%, var(--t-fg, #1B1A16)); }
-.cp-jh-str { color: color-mix(in oklab, #2E7D32 75%, var(--t-fg, #1B1A16)); }
-.cp-jh-num { color: color-mix(in oklab, #1F4E8C 80%, var(--t-fg, #1B1A16)); }
-.cp-jh-kw  { color: color-mix(in oklab, #9C3D9B 80%, var(--t-fg, #1B1A16)); font-weight: 600; }
+/* v0.63.0: the per-token classes (cp-jh-key / -str / -num / -kw)
+   used to live here with their own palette. The condition picker
+   now emits the shared ``dx-code-*`` token classes (single source
+   of truth across the events page + condition editor); the rules
+   live in settings.css alongside the other dx-code primitives. */
 
 /* No-JS fallback: when the picker isn't initialized, the textarea
    inside the condition-picker is the only thing the user can edit,

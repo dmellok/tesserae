@@ -1,12 +1,19 @@
-// Live events feed for /events. Subscribes via SSE; mirrors the server-
-// rendered row markup so new events look identical to existing ones.
+// Live events feed for /events. Subscribes via SSE; mirrors the v0.56
+// server-rendered row markup (.dx-event-row + per-type swatch class
+// + dx-event-summary / dx-event-body / dx-pill / dx-event-meta) so new
+// events look identical to existing ones.
+//
+// v0.63.0: rewrote to target the new .dx-events-list / .dx-event-row
+// vocabulary. Pre-v0.63 the script targeted the legacy `.events`
+// selector (which the v0.56 template stopped emitting), causing it
+// to silently spawn a phantom unstyled list at the bottom of the
+// page on every load.
 //
 // If EventSource isn't available (very old browser) the page degrades
 // gracefully to the static list, refresh to see new events.
 
 (function () {
   if (typeof EventSource === "undefined") return;
-  const list = document.querySelector(".events");
   const live = document.querySelector("[data-live-indicator]");
   // The type filter is in the URL query string; the SSE endpoint accepts
   // the same param so we get matched filtering server-side.
@@ -18,17 +25,34 @@
       ? `${prefix}/events/stream?type=${encodeURIComponent(typeFilter)}`
       : `${prefix}/events/stream`;
 
+  // Type → Phosphor icon (keep in sync with TYPE_ICONS in events.html).
+  const TYPE_ICONS = {
+    push: "paper-plane-tilt",
+    renderer: "image-square",
+    render: "image-square",
+    rotation: "arrows-clockwise",
+    heartbeat: "heartbeat",
+    scheduler: "clock-clockwise",
+    schedule: "clock-clockwise",
+    auth: "shield-check",
+    plugin: "puzzle-piece",
+    transport: "broadcast",
+    telemetry: "broadcast",
+    conditions: "funnel",
+    device: "device-mobile",
+  };
+
   function setLive(state) {
     if (!live) return;
     live.dataset.state = state;
     const label =
       state === "connected"
-        ? "live"
+        ? "LIVE"
         : state === "connecting"
-          ? "connecting…"
-          : "offline";
+          ? "Connecting…"
+          : "Offline";
     live.innerHTML =
-      '<i class="ph-fill ph-circle" aria-hidden="true"></i><span>' +
+      '<span class="dx-listening-dot"></span><span class="dx-listening-label">' +
       label +
       "</span>";
   }
@@ -43,12 +67,15 @@
           ">": "&gt;",
           '"': "&quot;",
           "'": "&#39;",
-        }[c]),
+        })[c],
     );
   }
 
   // Match the server-side fmt_time filter: "Jun  1 14:23:45" (local).
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const MONTHS = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ];
   function fmtTime(ts) {
     const d = new Date(Number(ts) * 1000);
     if (Number.isNaN(d.getTime())) return "";
@@ -63,75 +90,90 @@
         : status === "busy" || status === "denied"
           ? "is-warn"
           : "is-danger";
-    return `<span class="pill ${cls}">${escapeHtml(status)}</span>`;
+    return (
+      '<span class="dx-pill ' +
+      cls +
+      '"><span class="dx-pill-dot"></span>' +
+      escapeHtml(status) +
+      "</span>"
+    );
   }
 
   function rowHtml(ev) {
-    // Thumbnail SRC uses the ?w= cached-thumbnail variant so each row's
-    // IMG decodes to ~0.4 MB instead of ~7.7 MB (full panel render).
-    // See app/app_factory.py:_serve_render_thumbnail for context. The
-    // <a> href still points at the original so click-through hits full
-    // resolution. loading="lazy" defers off-screen decode.
-    const thumb =
-      ev.type === "push" && ev.digest
-        ? `<a class="event-thumb" href="${prefix}/renders/${encodeURIComponent(
-            ev.digest,
-          )}.png" target="_blank"><img src="${prefix}/renders/${encodeURIComponent(
-            ev.digest,
-          )}.png?w=240" alt="" width="120" height="90" loading="lazy" decoding="async"></a>`
-        : "";
-    const extraBlock =
-      ev.extra && Object.keys(ev.extra).length > 0 && ev.type !== "push"
-        ? `<pre class="event-extra">${escapeHtml(
-            JSON.stringify(ev.extra),
-          )}</pre>`
-        : "";
-    const errorBit = ev.error
-      ? `<span class="muted">·</span><span class="event-err">${escapeHtml(
-          ev.error,
-        )}</span>`
-      : "";
+    // Build the same dx-event-row body the server emits. The expanded
+    // panel is intentionally empty — the page-level click handler
+    // (events.html bottom script) lazy-hydrates from the stashed JSON
+    // on first open. For SSE-appended rows there's no stash, so the
+    // expanded view just shows the empty-payload string until the
+    // user refreshes the page and the server re-renders with extras.
+    const icon = TYPE_ICONS[ev.type] || "circle";
     const durationBit = ev.duration_s
-      ? `<span class="muted">·</span><span>${ev.duration_s.toFixed(3)} s</span>`
+      ? '<span class="muted">·</span><span>' +
+        ev.duration_s.toFixed(3) +
+        " s</span>"
       : "";
     const digestBit = ev.digest
-      ? `<span class="muted">·</span><code class="digest">${escapeHtml(
-          ev.digest,
-        )}</code>`
+      ? '<span class="muted">·</span><code class="dx-event-digest">' +
+        escapeHtml(ev.digest) +
+        "</code>"
       : "";
-    return `
-      <div class="event-type">${escapeHtml(ev.type)}</div>
-      <div class="event-body">
-        <div class="event-line">
-          ${statusPill(ev.status)}
-          <span class="event-source">${escapeHtml(ev.source)}</span>
-          <code class="event-target">${escapeHtml(ev.target)}</code>
-        </div>
-        <div class="event-sub">
-          <time datetime="${ev.timestamp}">${fmtTime(ev.timestamp)}</time>
-          ${durationBit}${digestBit}${errorBit}
-        </div>
-        ${extraBlock}
-      </div>
-      ${thumb}
-    `;
+    const errorBit = ev.error
+      ? '<span class="muted">·</span><span class="dx-event-err">' +
+        escapeHtml(ev.error) +
+        "</span>"
+      : "";
+    return (
+      '<button type="button" class="dx-event-summary" data-event-toggle aria-expanded="false">' +
+      '  <span class="dx-event-icon"><i class="ph ph-' +
+      icon +
+      '" aria-hidden="true"></i></span>' +
+      '  <div class="dx-event-body">' +
+      '    <div class="dx-event-head">' +
+      '      <span class="dx-pill dx-event-type">' +
+      escapeHtml(ev.type) +
+      "</span>" +
+      statusPill(ev.status) +
+      '      <span class="dx-event-source">' +
+      escapeHtml(ev.source) +
+      "</span>" +
+      '      <code class="dx-event-target">' +
+      escapeHtml(ev.target) +
+      "</code>" +
+      "    </div>" +
+      '    <div class="dx-event-meta">' +
+      '      <time datetime="' +
+      escapeHtml(String(ev.timestamp)) +
+      '">' +
+      escapeHtml(fmtTime(ev.timestamp)) +
+      "</time>" +
+      durationBit +
+      digestBit +
+      errorBit +
+      "    </div>" +
+      "  </div>" +
+      '  <i class="ph ph-caret-right dx-event-caret" aria-hidden="true"></i>' +
+      "</button>" +
+      '<div class="dx-event-expand" data-event-expand hidden>' +
+      '  <div class="dx-event-expand-grid">' +
+      '    <p class="dx-event-empty-payload">No payload recorded for this event.</p>' +
+      "  </div>" +
+      "</div>"
+    );
   }
 
   function ensureList() {
-    let l = document.querySelector(".events");
+    let l = document.querySelector(".dx-events-list");
     if (l) return l;
-    // The server-rendered empty state has a <p class="lede">No events…</p>
-    // when there are no rows yet; remove it and create the <ul>.
-    const empty = document.querySelector("p.lede:last-of-type");
-    if (empty && /no events of this kind yet/i.test(empty.textContent)) {
-      empty.remove();
-    }
+    // Empty state: server rendered the .dx-empty placeholder instead
+    // of the list. Replace it with a fresh <ul> so live events have
+    // a home.
+    const empty = document.querySelector(".dx-event-empty, .dx-empty");
+    if (empty) empty.remove();
     l = document.createElement("ul");
-    l.className = "events";
-    // Insert after the tabs nav.
-    const tabs = document.querySelector("nav.tabs");
-    if (tabs && tabs.parentNode) {
-      tabs.parentNode.insertBefore(l, tabs.nextSibling);
+    l.className = "dx-discovered-list dx-events-list";
+    const card = document.querySelector(".dx-section-card .dx-section-body");
+    if (card) {
+      card.appendChild(l);
     } else {
       document.querySelector(".page").appendChild(l);
     }
@@ -143,16 +185,12 @@
     // Skip if this id is already shown (server-rendered or earlier SSE).
     if (root.querySelector(`[data-event-id="${ev.id}"]`)) return;
     const li = document.createElement("li");
-    li.className = "event-row event--" + ev.type;
+    li.className = "dx-inset-row dx-event-row dx-event-row--" + ev.type;
     li.dataset.eventId = String(ev.id);
     li.innerHTML = rowHtml(ev);
     root.insertBefore(li, root.firstChild);
-    // Keep the DOM bounded so a flood doesn't blow up the page. Even
-    // with the cap, decoded image bitmaps in the browser cache add up -
-    // the thumbnail variant of /renders/* (see rowHtml above) keeps
-    // per-row decoded size at ~0.4 MB, but 100 rows is plenty for a
-    // human scanning recent events. The full server-rendered list
-    // serves the same cap.
+    // Bound the DOM so a flood doesn't blow up the page. Matches the
+    // server-side default limit (100).
     while (root.children.length > 100) root.removeChild(root.lastChild);
   }
 
@@ -174,16 +212,18 @@
     es.addEventListener("error", () => {
       setLive("offline");
       es.close();
-      // EventSource auto-reconnects, but on hard errors (server down) it
-      // can spin; back off and reconnect manually.
+      // EventSource auto-reconnects, but on hard errors (server down)
+      // it can spin; back off and reconnect manually.
       setTimeout(connect, Math.min(backoff, 15000));
       backoff = Math.min(backoff * 2, 15000);
     });
   }
 
-  // Tag existing server-rendered rows so we don't duplicate them when SSE
-  // delivers an event the server happened to render in this same response.
-  document.querySelectorAll(".event-row").forEach((li, idx) => {
+  // Tag existing server-rendered rows so we don't duplicate them when
+  // SSE delivers an event the server happened to render in this same
+  // response. v0.56+ rows already carry data-event-id; the loop is
+  // defensive for any pre-v0.56 fallback markup.
+  document.querySelectorAll(".dx-event-row").forEach((li, idx) => {
     if (!li.dataset.eventId) li.dataset.eventId = `srv-${idx}`;
   });
 

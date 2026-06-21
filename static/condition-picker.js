@@ -127,10 +127,14 @@ function highlightJson(src) {
   html = html.replace(
     /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
     (match, key, str, kw, num) => {
-      if (key) return `<span class="cp-jh-key">${match}</span>`;
-      if (str) return `<span class="cp-jh-str">${match}</span>`;
-      if (kw) return `<span class="cp-jh-kw">${match}</span>`;
-      if (num) return `<span class="cp-jh-num">${match}</span>`;
+      // v0.63.0: emit the shared ``dx-code-*`` token classes so the
+      // condition editor and the events page share a single highlight
+      // palette. Pre-v0.63 we emitted ``cp-jh-*`` classes with their
+      // own palette in schedules.css.
+      if (key) return `<span class="dx-code-key">${match}</span>`;
+      if (str) return `<span class="dx-code-str">${match}</span>`;
+      if (kw) return `<span class="dx-code-kw">${match}</span>`;
+      if (num) return `<span class="dx-code-num">${match}</span>`;
       return match;
     },
   );
