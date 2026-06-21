@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.5], 2026-06-21
+
+### Fixed
+
+- **Events page server freeze after clicking through filter
+  chips**: each chip click opens a new SSE connection to
+  ``/events/stream``; the previous connection's generator was
+  blocked in ``queue.get(timeout=15s)`` and only learned the
+  client had disconnected on the next yield (i.e. after a
+  keepalive fired up to 15 seconds later). With waitress's 8-
+  worker thread pool, eight rapid clicks pinned every thread on
+  stale SSE generators and the server stopped answering new
+  requests until cleanup eventually ran. Shortened the keepalive
+  interval to 2 seconds so dead clients are detected within ~2
+  seconds and worker threads return to the pool. v0.60.3's lazy
+  payload hydration already fixed the browser-side cumulative
+  cost; this fixes the server-side wedge.
+
 ## [0.60.4], 2026-06-21
 
 Two Send fixes from the next walkthrough.

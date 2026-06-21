@@ -97,8 +97,14 @@ def index() -> str:
 
 # SSE knobs. Keepalives prove the connection is alive when the log is
 # idle, without them, nginx / browsers eventually close the connection
-# and the page stops feeling live.
-_KEEPALIVE_INTERVAL_S: float = 15.0
+# and the page stops feeling live. The interval is also the upper bound
+# on how long a *closed* client connection stays bound to a waitress
+# worker thread — the generator only learns the socket is dead when it
+# tries to yield, so a long interval means a stale connection can hold
+# a worker for that long. With ``threads=8`` and 8 stale clients (e.g.
+# rapid chip-clicking on /events) the whole pool can wedge until the
+# next yield round. Tight here so cleanup happens within ~2 seconds.
+_KEEPALIVE_INTERVAL_S: float = 2.0
 # Per-connection inbound queue. Generous because the page caps the DOM at
 # 200 rows so a burst that overflows here is moot.
 _QUEUE_MAX: int = 200
