@@ -294,3 +294,52 @@ hr.dx-divider {
   border-color: color-mix(in oklab, var(--t-accent) 60%, var(--t-inset-border));
   color: var(--t-accent);
 }
+
+/* ============================================================
+ *  EDIT FORM — input baseline + day-of-week chip centring
+ *
+ *  The rotation form's text/time/number inputs and selects
+ *  inherit the .field shape from forms.css (6px radius, 8/12
+ *  padding, lighter border). v0.62.2 brings them up to the
+ *  v0.56 ``.dx-input`` baseline (8px radius, 11/13 padding,
+ *  slightly heavier border) so they match the rest of the admin
+ *  surface visually.
+ *
+ *  The .dow-chip text was sitting slightly off-centre because
+ *  the (zero-sized) checkbox input still consumed a flex gap on
+ *  its right. ``justify-content: center`` + ``gap: 0`` puts the
+ *  label dead-centre in the pill.
+ * ============================================================ */
+.rotation-form .field input[type="text"],
+.rotation-form .field input[type="number"],
+.rotation-form .field input[type="time"],
+.rotation-form .field input[type="date"],
+.rotation-form .field input[type="url"],
+.rotation-form .field input[type="email"],
+.rotation-form .field select,
+.rotation-form .rot-step select,
+.rotation-form .rot-step input[type="number"] {
+  padding: 11px 13px;
+  border-radius: 8px;
+  border: 1px solid var(--t-input-border, var(--t-border));
+  font-size: 14px;
+}
+.rotation-form .field input:focus,
+.rotation-form .field select:focus,
+.rotation-form .rot-step select:focus,
+.rotation-form .rot-step input:focus {
+  outline: 2px solid var(--t-accent);
+  outline-offset: -1px;
+  border-color: var(--t-accent);
+}
+
+/* Day-of-week chip centring. The hidden checkbox was a flex
+   child sharing a gap with the visible label; remove the gap and
+   centre the label inside the chip. */
+.rotation-form .dow-chip,
+.dx-section-card .dow-chip {
+  justify-content: center;
+  gap: 0;
+  min-width: 56px;
+  padding-inline: 14px;
+}

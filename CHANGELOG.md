@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.2], 2026-06-21
+
+### Fixed
+
+- **Rotation form inputs match Tesserae's v0.56 input baseline**.
+  The Name / Cycle starts / Cycle ends / Priority fields (plus
+  the page select + dwell number on each step) inherited the
+  legacy ``.field`` shape (6 px radius, 8/12 px padding, lighter
+  border). They now use the ``.dx-input`` baseline (8 px radius,
+  11/13 px padding, slightly heavier ``--t-input-border``) so the
+  form visually belongs to the same admin surface as the rest of
+  v0.56-uplifted pages.
+- **Day-of-week chips: text now sits dead-centre**. The hidden
+  checkbox inside each ``.dow-chip`` was a flex child sharing a
+  gap with the visible label, which shifted the label visually
+  right. Set ``justify-content: center; gap: 0`` on the chip and
+  gave it a minimum width so the labels read as a balanced
+  segmented control.
+
 ## [0.62.1], 2026-06-21
 
 ### Changed
