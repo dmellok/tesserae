@@ -1,0 +1,178 @@
+/* ============================================================
+ *  /rotations — v0.62 chrome
+ *
+ *  Each rotation is a ``.dx-section-card`` with a proper
+ *  ``.dx-section-head`` (teal icon square + name + id as
+ *  description + status pills). Steps preview list uses
+ *  ``.dx-inset-row`` styled as a step row; actions use the
+ *  ``.dx-btn-ghost-sm`` vocabulary.
+ *
+ *  The form macro at the bottom of templates/rotations.html
+ *  still uses the legacy ``.rot-step-*`` classes for the edit
+ *  view; those rules live in schedules.css and aren't replaced
+ *  here. This file is purely the *read view* uplift.
+ * ============================================================ */
+
+/* HEAD ROW: teal icon + title + id + status pills on the right.
+   Override the shared .dx-section-head's left alignment so the
+   status pill column floats right and wraps cleanly under the
+   title on narrow viewports. */
+.dx-rotation-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.dx-rotation-head .dx-section-desc code {
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+  background: var(--t-inset);
+  border: 1px solid var(--t-inset-border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.dx-rotation-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+/* META STRIP: anchor, cycle minutes, step count. Uses the
+   shared .dx-meta-strip vocabulary; the dx-rotation-meta
+   override gives the icons a touch more breathing room. */
+.dx-rotation-meta {
+  margin: 2px 0 14px;
+  gap: 14px;
+  color: var(--t-fg-soft);
+}
+.dx-rotation-meta .ph {
+  color: var(--t-accent);
+  font-size: 14px;
+}
+
+/* COUNTDOWN BAR: keeps its existing rotation-countdown skin
+   (defined in schedules.css) but we tighten the wrapping margin
+   so it sits flush with the meta strip + steps below. */
+.dx-rotation-countdown {
+  margin: 0 0 14px;
+}
+
+/* STEPS LIST: each step is a .dx-inset-row with the step number
+   in a tinted square on the left, page name + dwell + warning
+   stacked in the middle, and an optional play button on the
+   right when the rotation is currently active. */
+.dx-rotation-steps {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dx-rotation-step {
+  align-items: flex-start;
+  gap: 12px;
+}
+.dx-rotation-step.is-current {
+  background: var(--t-accent-tint);
+  border-color: color-mix(in oklab, var(--t-accent) 35%, var(--t-inset-border));
+}
+.dx-rotation-stepnum {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  color: var(--t-fg-soft);
+  font-size: 13px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+.dx-rotation-step.is-current .dx-rotation-stepnum {
+  background: var(--t-accent);
+  border-color: var(--t-accent);
+  color: var(--t-accent-fg, #fff);
+}
+.dx-rotation-stepbody {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dx-rotation-stepline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.dx-rotation-steppage {
+  font-weight: 650;
+  color: var(--t-fg);
+  font-size: 13.5px;
+}
+.dx-rotation-stepdwell {
+  font-size: 12px;
+  color: var(--t-muted);
+  font-family: var(--t-font-mono);
+}
+.dx-rotation-stepdevices {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  color: var(--t-fg-soft);
+}
+.dx-rotation-stepdevices li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dx-rotation-stepdevices .ph {
+  color: var(--t-fg-soft);
+  font-size: 13px;
+}
+.dx-rotation-stepwarn {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--t-pill-warn-fg);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dx-rotation-stepwarn .ph { font-size: 13px; }
+
+/* ACTIONS ROW: Disable / Fire now / Edit / Delete. The trash
+   button is icon-only so it doesn't crowd the row at narrow
+   widths. */
+.dx-rotation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* DIVIDER between read view and the inline edit form. */
+hr.dx-divider {
+  border: 0;
+  border-top: 1px solid var(--t-border);
+  margin: 18px 0;
+}
+
+/* Dark-mode lift: the inset palette in dark mode lives in
+   base.css; we just need to make sure the step number tile +
+   active step contrast still pops. */
+:root[data-theme="dark"] .dx-rotation-stepnum {
+  background: var(--t-inset);
+  border-color: var(--t-inset-border);
+  color: var(--t-fg);
+}
+:root[data-theme="dark"] .dx-rotation-step.is-current {
+  background: color-mix(in oklab, var(--t-accent) 22%, var(--t-inset));
+  border-color: color-mix(in oklab, var(--t-accent) 55%, var(--t-inset-border));
+}

@@ -1,3 +1,50 @@
+/* ============================================================
+ *  Tesserae admin styles — file map
+ * ============================================================
+ *
+ *  This file grew from "settings page only" into a junk drawer of
+ *  every ``.dx-*`` rule the admin uplift introduced. The split below
+ *  is roughly the order in which selectors fire as the page renders,
+ *  and the comment banners through the file mirror this map. Sections
+ *  are intentionally *not* moved into separate files yet — that's a
+ *  later, riskier change. For now, just navigate by these banners.
+ *
+ *    1. Settings page bits (legacy)
+ *       - footer cards, system tab, restart modal, REST pair card
+ *
+ *    2. Device card v2 (.dx-device-card chrome)
+ *       - per-device collapsible card on /settings/devices
+ *
+ *    3. Server-tab section cards (.dx-section-card + toggle pattern)
+ *       - .dx-server-area, master toggle pattern, all dx-* primitives
+ *
+ *    4. Dark-theme overrides for the cards above
+ *
+ *    5. Devices-tab redesign (.dx-discovered-* + inset rows)
+ *       - listening pulse, discovered rows, add-device hint band,
+ *         kind defaults rows
+ *
+ *    6. v0.56 admin-uplift shared components
+ *       - section_card chrome, pills, filter chips, inset rows,
+ *         marketplace search + chips, dashboard groups, history,
+ *         events (with per-type colour palette + filter chips),
+ *         battery dashboard, pragmatic ``.card-head`` adapter.
+ *
+ *  When the file gets carved up, the natural splits are:
+ *    - dx-primitives.css (sections 3 + 6's shared chrome)
+ *    - dx-events.css, dx-history.css, dx-dashboards.css,
+ *      dx-marketplace.css, dx-battery.css (page-specific bits)
+ *    - settings.css keeps sections 1-5 (true Settings UI).
+ */
+
+/* ============================================================
+ *  1. SETTINGS PAGE — legacy bits
+ *     Footer, system tab, restart modal, REST pair card. These
+ *     pre-date the v0.56 chrome and still use the legacy ``.card``
+ *     vocabulary in places. Leave them be until the Settings page
+ *     itself gets a refresh pass.
+ * ============================================================ */
+
 /* ----- Settings footer (diagnostics + session, compact) -----------
    Two compact cards laid out side by side at desktop, stacking under
    each other on phone. The cards have less padding and a smaller
@@ -2717,6 +2764,12 @@
   color: var(--t-accent-fg);
 }
 
+/* ============================================================
+ *  6b. PAGE — History (/history)
+ *     Inset row + source/target/status three-column layout.
+ *     CANDIDATE FOR EXTRACTION → dx-history.css
+ * ============================================================ */
+
 /* History page (Tier 1.2). Inset row split into three columns:
    timestamp left, source/target middle, status/duration/actions
    right. Failed rows flip the soft pink band background. */
@@ -2894,6 +2947,13 @@
   background: var(--t-pill-danger-bg);
 }
 
+/* ============================================================
+ *  6a. PAGE — Battery dashboard (/devices/battery)
+ *     Per-device sub-cards with Chart.js canvas + 4-tile stat
+ *     grid (samples / drain rate / reaches 20% / reaches 0%).
+ *     CANDIDATE FOR EXTRACTION → dx-battery.css
+ * ============================================================ */
+
 /* Battery dashboard (Tier 1.4). Per-device sub-cards stacked
    vertically inside the parent section card; each carries a header
    with name + pct, a Chart.js canvas, and the 4-tile stat grid. */
@@ -2984,6 +3044,15 @@
   color: var(--t-muted);
   text-align: center;
 }
+
+/* ============================================================
+ *  6c. PAGE — Events (/events)
+ *     Click-to-expand rows with per-type icon swatch + filter
+ *     chips that mirror the swatch on the active state. CSS
+ *     custom properties (--evt-fg/bg/bd) drive both the row
+ *     icon and the chip from one source of truth.
+ *     CANDIDATE FOR EXTRACTION → dx-events.css
+ * ============================================================ */
 
 /* Events page (Tier 2.2). Row is a button (whole row clickable),
    expanded body shows the raw JSON payload via .dx-code. */
@@ -3178,6 +3247,14 @@
   .dx-event-expand-grid > .dx-event-thumb-link { grid-column: 1; grid-row: auto; }
 }
 
+/* ============================================================
+ *  6d. ADAPTER — legacy ``card_head`` macro inside dx-section-card
+ *     Bridges pages that haven't moved off the legacy card_head
+ *     macro yet (rotations, schedules, some plugin browse cases).
+ *     Once those pages flip to inline ``<header class="dx-section-head">``,
+ *     this block can be deleted.
+ * ============================================================ */
+
 /* Pragmatic adapter: pages that wrap their content in
    ``.dx-section-card`` but still call the legacy ``card_head``
    macro (which emits ``<header class="card-head">``) pick up the
@@ -3232,6 +3309,13 @@
    Pages that want a single fused card (dashboards) put their two
    surfaces inside a single ``section_card`` macro call. */
 .dx-section-card + .dx-section-card { margin-top: 16px; }
+
+/* ============================================================
+ *  6e. PAGE — Dashboards (/pages)
+ *     Single fused section card: inline create + grouped saved
+ *     dashboards. Groups by device, alphabetical within group.
+ *     CANDIDATE FOR EXTRACTION → dx-dashboards.css
+ * ============================================================ */
 
 /* Dashboards (v0.60). Inline create row at the top, then one
    group per device with a small heading + alphabetical row list.
@@ -3289,6 +3373,13 @@
   font-size: 22px;
 }
 .dx-history-row { gap: 14px; }
+
+/* ============================================================
+ *  6f. PAGE — Widgets Browse (/plugins/browse)
+ *     Search input + outlined-pill chips (spec style). The chip
+ *     active state uses the per-type swatch via dx-mkt-chip.
+ *     CANDIDATE FOR EXTRACTION → dx-marketplace.css
+ * ============================================================ */
 
 /* Marketplace search input (Widgets Browse spec). Sits between the
    filter header and the kind/tag chip rows. Magnifier glyph is

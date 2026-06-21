@@ -1,0 +1,42 @@
+/* ============================================================
+ *  /schedules — v0.62 chrome polish
+ *
+ *  The page-level chrome (timeline card, new schedule card,
+ *  saved schedules card) already uses ``.dx-section-card +
+ *  .dx-section-head``; the rest of this file handles the
+ *  saved-schedules table styling that didn't get migrated
+ *  during the Tier 3 surgical pass.
+ *
+ *  The table is still a real ``<table>`` (the spec's flex-row
+ *  approach loses sortability for free); we just modernise the
+ *  cell typography, the action-row layout, and the pill chrome
+ *  inside the State column.
+ * ============================================================ */
+
+/* Action row inside the actions cell. Buttons sit on one line
+   with a small gap; the icon-only trash button hugs the right
+   edge. Mirrors the dx-discovered-actions vocabulary on the
+   dashboards / plugins index pages so the verbs read the same. */
+.dx-schedule-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.dx-schedule-actions .form { margin: 0; padding: 0; }
+
+/* Make the State column comfortably wide for the dx-pill so
+   ``pending`` / ``enabled`` / ``slipped`` etc. all fit without
+   wrapping under the dot. */
+.schedules-table .col-state .dx-pill {
+  white-space: nowrap;
+}
+
+/* The new schedule form section: dx-section-card chrome already
+   applied; soften the body's top padding so the field grid sits
+   close to the heading. */
+#schedule-form-card .form,
+#schedule-form-card .field-grid {
+  margin-top: 0;
+}

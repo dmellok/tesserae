@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head, button, empty_state, switch %}
+{% from "_components.html" import card_head, section_card, button, empty_state, switch %}
 {% block title %}Rotations, Tesserae{% endblock %}
 
 {% set DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
@@ -164,32 +164,33 @@
     {% for r in rotations %}
     {% set cur = current_step.get(r.id) %}
     <section class="dx-section-card rotation-card" id="rotation-{{ r.id }}">
-      <div class="rotation-head">
-        <div class="rotation-title">
-          <h2>{{ r.name }}</h2>
-          <span class="muted">{{ r.id }}</span>
+      <header class="dx-section-head dx-rotation-head">
+        <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-arrows-clockwise"></i></span>
+        <div class="dx-section-titleblock">
+          <h3 class="dx-section-title">{{ r.name }}</h3>
+          <p class="dx-section-desc"><code>{{ r.id }}</code></p>
         </div>
-        <div class="rotation-status">
+        <div class="dx-rotation-status">
           {% if not r.enabled %}
-            <span class="pill pill--off">Disabled</span>
+            <span class="dx-pill is-neutral"><span class="dx-pill-dot"></span>Disabled</span>
           {% elif cur and cur.active %}
-            <span class="pill pill--ok">Now: step {{ cur.step_index + 1 }}, {{ cur.page_name }}</span>
+            <span class="dx-pill is-ok"><span class="dx-pill-dot"></span>Now: step {{ cur.step_index + 1 }}, {{ cur.page_name }}</span>
           {% else %}
-            <span class="pill pill--warn">Not active right now</span>
+            <span class="dx-pill is-warn"><span class="dx-pill-dot"></span>Not active right now</span>
           {% endif %}
           {# v0.48 running-state pill. Only shown when the scheduler
              saw something worth surfacing (held / failed); normal
              flow is covered by the pill above. #}
           {% set rs = running_states.get(r.id) if running_states else none %}
           {% if rs %}
-          <span class="pill {{ rs.tone }}" title="{{ rs.tooltip }}">
+          <span class="dx-pill {{ rs.tone|replace('pill--','is-') }}" title="{{ rs.tooltip }}">
             <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
           </span>
           {% endif %}
         </div>
-      </div>
+      </header>
 
-      <div class="rotation-meta">
+      <div class="dx-meta-strip dx-rotation-meta">
         <span>
           <i class="ph ph-clock" aria-hidden="true"></i>
           {{ r.anchor }}{% if r.end_at %} to {{ r.end_at }}{% endif %}
@@ -199,7 +200,7 @@
       </div>
 
       {% if cur and cur.active and cur.next_transition_epoch %}
-      <div class="rotation-countdown"
+      <div class="dx-rotation-countdown rotation-countdown"
            data-rot-countdown
            data-step-started="{{ cur.step_started_epoch }}"
            data-next-transition="{{ cur.next_transition_epoch }}"
@@ -212,7 +213,7 @@
           <span class="muted">Next in </span>
           <strong data-rot-countdown-remaining>—</strong>
           {% if cur.override_in_effect %}
-          <span class="pill pill--warn" title="Manual play: the cycle was re-anchored, this lasts until tomorrow's anchor catches up.">
+          <span class="dx-pill is-warn" title="Manual play: the cycle was re-anchored, this lasts until tomorrow's anchor catches up.">
             <i class="ph ph-fast-forward" aria-hidden="true"></i> manual
           </span>
           {% endif %}
@@ -220,27 +221,18 @@
       </div>
       {% endif %}
 
-      <ol class="rotation-steps-preview">
+      <ul class="dx-rotation-steps">
         {% for step in r.steps %}
         {% set step_devices = page_devices.get(step.page_id, []) %}
-        <li {% if cur and cur.active and cur.step_index == loop.index0 %}class="is-current"{% endif %}>
-          <span class="rot-step-num">{{ loop.index }}</span>
-          <div class="rot-step-body">
-            <div class="rot-step-line">
-              <span class="rot-step-page">{{ page_names.get(step.page_id, step.page_id) }}</span>
-              <span class="rot-step-dwell muted">{{ step.dwell_minutes }} min</span>
-              {% if cur and cur.active %}
-              <form method="post" action="{{ url_for('rotations.play', rotation_id=r.id, step_index=loop.index0) }}" class="rot-step-play">
-                <button type="submit" class="btn btn--ghost btn--icon"
-                        title="Play this step now and continue the cycle from here">
-                  <i class="ph ph-play" aria-hidden="true"></i>
-                  <span class="sr-only">Play step {{ loop.index }} now</span>
-                </button>
-              </form>
-              {% endif %}
+        <li class="dx-inset-row dx-rotation-step{% if cur and cur.active and cur.step_index == loop.index0 %} is-current{% endif %}">
+          <span class="dx-rotation-stepnum">{{ loop.index }}</span>
+          <div class="dx-rotation-stepbody">
+            <div class="dx-rotation-stepline">
+              <span class="dx-rotation-steppage">{{ page_names.get(step.page_id, step.page_id) }}</span>
+              <span class="dx-rotation-stepdwell">{{ step.dwell_minutes }} min</span>
             </div>
             {% if step_devices %}
-            <ul class="rot-step-devices">
+            <ul class="dx-rotation-stepdevices">
               {% for d in step_devices %}
               <li>
                 <i class="ph ph-{{ d.icon }}" aria-hidden="true"></i>
@@ -249,15 +241,24 @@
               {% endfor %}
             </ul>
             {% else %}
-            <p class="rot-step-devices rot-step-devices--empty muted">
+            <p class="dx-rotation-stepwarn">
               <i class="ph ph-warning-circle" aria-hidden="true"></i>
               Page has no bound devices
             </p>
             {% endif %}
           </div>
+          {% if cur and cur.active %}
+          <form method="post" action="{{ url_for('rotations.play', rotation_id=r.id, step_index=loop.index0) }}" class="form form--inline">
+            <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only"
+                    title="Play this step now and continue the cycle from here">
+              <i class="ph ph-play" aria-hidden="true"></i>
+              <span class="sr-only">Play step {{ loop.index }} now</span>
+            </button>
+          </form>
+          {% endif %}
         </li>
         {% endfor %}
-      </ol>
+      </ul>
 
       {% set proj = projections.get(r.id) %}
       {% if proj and proj.bands %}
@@ -270,31 +271,31 @@
       </div>
       {% endif %}
 
-      <div class="rotation-actions">
-        <form method="post" action="{{ url_for('rotations.toggle', rotation_id=r.id) }}">
-          <button type="submit" class="btn btn--ghost btn--sm">
+      <div class="dx-rotation-actions">
+        <form method="post" action="{{ url_for('rotations.toggle', rotation_id=r.id) }}" class="form form--inline">
+          <button type="submit" class="dx-btn-ghost-sm">
             <i class="ph ph-power" aria-hidden="true"></i>
-            {{ 'Disable' if r.enabled else 'Enable' }}
+            <span>{{ 'Disable' if r.enabled else 'Enable' }}</span>
           </button>
         </form>
-        <form method="post" action="{{ url_for('rotations.fire', rotation_id=r.id) }}">
-          <button type="submit" class="btn btn--ghost btn--sm">
-            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i> Fire now
+        <form method="post" action="{{ url_for('rotations.fire', rotation_id=r.id) }}" class="form form--inline">
+          <button type="submit" class="dx-btn-ghost-sm">
+            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Fire now</span>
           </button>
         </form>
-        <a class="btn btn--ghost btn--sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-form-card">
-          <i class="ph ph-pencil" aria-hidden="true"></i> Edit
+        <a class="dx-btn-ghost-sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-form-card">
+          <i class="ph ph-pencil" aria-hidden="true"></i><span>Edit</span>
         </a>
-        <form method="post" action="{{ url_for('rotations.delete', rotation_id=r.id) }}"
+        <form method="post" action="{{ url_for('rotations.delete', rotation_id=r.id) }}" class="form form--inline"
               onsubmit="return confirm('Delete rotation {{ r.name }}?');">
-          <button type="submit" class="btn btn--ghost btn--sm btn--danger">
-            <i class="ph ph-trash" aria-hidden="true"></i> Delete
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete rotation" aria-label="Delete">
+            <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
       </div>
 
       {% if edit_id == r.id %}
-      <hr>
+      <hr class="dx-divider">
       {{ rotation_form(r, edit_mode=True, pages=pages) }}
       {% endif %}
     </section>
@@ -302,16 +303,20 @@
   </div>
   {% endif %}
 
-  {# New rotation form #}
-  <section class="dx-section-card" id="rotation-form-card">
-    {{ card_head('New rotation', icon_name='plus-circle', blurb='Pick the dashboards to cycle through and how long to dwell on each.') }}
-    {% set blank = {
-      'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
-      'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
-      'device_ids': [], 'steps': [], 'smart_sync': False, 'smart_sync_lead_s': 10,
-    } %}
+  {# New rotation form. Uses the section_card macro now so the
+     header gets the v0.56 dx-section-head chrome (teal icon square +
+     title + description) instead of going through the legacy
+     card_head adapter. #}
+  {% set blank = {
+    'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,
+    'enabled': True, 'days_of_week': [0,1,2,3,4,5,6],
+    'device_ids': [], 'steps': [], 'smart_sync': False, 'smart_sync_lead_s': 10,
+  } %}
+  {% call section_card(icon='plus-circle', title='New rotation',
+                       description='Rotations cycle one panel through multiple dashboards — step durations, a day-of-week mask, and optional smart-sync.',
+                       id='rotation-form-card') %}
     {{ rotation_form(blank, edit_mode=False, pages=pages) }}
-  </section>
+  {% endcall %}
 
   {% if not rotations %}
     {{ empty_state(

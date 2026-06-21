@@ -6,6 +6,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.0], 2026-06-21
+
+The parked Rotations + Schedules uplift from v0.60.1's notes, plus
+a navigation pass on the settings.css "junk drawer."
+
+### Changed
+
+- **Rotations** (``/rotations``): each rotation card now uses the
+  proper ``section_card`` macro — teal icon square, rotation
+  name, id as the description code, status pills on the right —
+  instead of the legacy ``.rotation-head`` markup. Steps preview
+  list converts to ``.dx-inset-row`` rows with a step-number
+  tile, page name + dwell, bound-device chips, and an inline
+  play button for the active step. Action buttons (Disable /
+  Fire now / Edit / Delete) move to the ``.dx-btn-ghost-sm``
+  vocabulary and the trash button goes icon-only. The "New
+  rotation" form gets the same ``section_card`` chrome via the
+  macro instead of going through the legacy ``card_head``
+  adapter.
+- **Schedules** (``/schedules``): saved-schedule table actions
+  flip to ``.dx-btn-ghost-sm``; state pills move from ``.pill``
+  to ``.dx-pill`` with a tone dot; trash button goes icon-only.
+  The "page deleted" warning pill picks up the danger-pill
+  chrome from the v0.56 token set.
+- **New stylesheets**: ``static/style/dx-rotations.css`` (~150
+  lines) holds the new Rotations chrome; ``dx-schedules.css``
+  (~40 lines) holds the action-row layout. Loaded after
+  ``schedules.css`` so the cascade order matches existing
+  expectations.
+- **settings.css navigation**: 3300-line file gains a top-of-
+  file Table of Contents banner + per-page section banners
+  marking the parts that are candidates for extraction (Battery,
+  History, Events, Dashboards, Marketplace). No rules moved,
+  no behaviour change — preparation for the eventual split.
+
 ## [0.61.2], 2026-06-21
 
 ### Fixed

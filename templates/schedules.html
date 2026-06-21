@@ -254,7 +254,7 @@
                The scheduler skips this row in find_due so the History
                view stays clean; surface that here so the user knows to
                edit-rebind or delete the schedule. #}
-            <span class="pill is-danger" title="The dashboard this schedule pointed at no longer exists. Edit to rebind or delete the schedule.">
+            <span class="dx-pill is-danger" title="The dashboard this schedule pointed at no longer exists. Edit to rebind or delete the schedule.">
               <i class="ph ph-warning-circle" aria-hidden="true"></i>
               page deleted
             </span>
@@ -288,35 +288,37 @@
              (older route handler / partial render). #}
           {% set rs = running_states.get(s.id) if running_states else none %}
           {% if rs %}
-          <span class="pill {{ rs.tone }}" title="{{ rs.tooltip }}">
+          <span class="dx-pill {{ rs.tone|replace('pill--','is-') }}" title="{{ rs.tooltip }}">
             <i class="ph ph-{{ rs.icon }}" aria-hidden="true"></i>{{ rs.label }}
           </span>
           {% else %}
-          {% if s.enabled %}<span class="pill is-ok">enabled</span>{% else %}<span class="pill">disabled</span>{% endif %}
+          {% if s.enabled %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>enabled</span>{% else %}<span class="dx-pill is-neutral"><span class="dx-pill-dot"></span>disabled</span>{% endif %}
           {% endif %}
         </td>
         <td class="actions-col">
-          <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="inline">
-            <button type="submit" class="ghost" title="{{ 'Disable' if s.enabled else 'Enable' }}">
-              <i class="ph ph-{{ 'pause' if s.enabled else 'play' }}" aria-hidden="true"></i>
-              <span>{{ 'Disable' if s.enabled else 'Enable' }}</span>
-            </button>
-          </form>
-          <form method="post" action="{{ url_for('schedules.fire', schedule_id=s.id) }}" class="inline">
-            <button type="submit" class="ghost" title="Fire now">
-              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
-              <span>Fire now</span>
-            </button>
-          </form>
-          <a class="ghost-link" href="{{ url_for('schedules.index', edit=s.id) }}">
-            <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
-          </a>
-          <form method="post" action="{{ url_for('schedules.delete', schedule_id=s.id) }}"
-                class="inline" onsubmit="return confirm('Delete this schedule?');">
-            <button type="submit" class="ghost danger" title="Delete">
-              <i class="ph ph-trash" aria-hidden="true"></i>
-            </button>
-          </form>
+          <div class="dx-schedule-actions">
+            <form method="post" action="{{ url_for('schedules.toggle', schedule_id=s.id) }}" class="form form--inline">
+              <button type="submit" class="dx-btn-ghost-sm" title="{{ 'Disable' if s.enabled else 'Enable' }}">
+                <i class="ph ph-{{ 'pause' if s.enabled else 'play' }}" aria-hidden="true"></i>
+                <span>{{ 'Disable' if s.enabled else 'Enable' }}</span>
+              </button>
+            </form>
+            <form method="post" action="{{ url_for('schedules.fire', schedule_id=s.id) }}" class="form form--inline">
+              <button type="submit" class="dx-btn-ghost-sm" title="Fire now">
+                <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+                <span>Fire now</span>
+              </button>
+            </form>
+            <a class="dx-btn-ghost-sm" href="{{ url_for('schedules.index', edit=s.id) }}">
+              <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
+            </a>
+            <form method="post" action="{{ url_for('schedules.delete', schedule_id=s.id) }}"
+                  class="form form--inline" onsubmit="return confirm('Delete this schedule?');">
+              <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete schedule" aria-label="Delete">
+                <i class="ph ph-trash" aria-hidden="true"></i>
+              </button>
+            </form>
+          </div>
         </td>
       </tr>
       {% endfor %}
