@@ -3036,7 +3036,7 @@
 .dx-event-row--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
 .dx-event-row--transport,
 .dx-event-row--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-event-row--device   { --evt-fg: #6b6562; --evt-bg: #efedea; --evt-bd: #ddd9d3; }
+.dx-event-row--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
 .dx-event-row[class*="dx-event-row--"] .dx-event-icon {
   color: var(--evt-fg, var(--t-fg-soft));
   background: var(--evt-bg, var(--t-surface));
@@ -3058,15 +3058,23 @@
 .dx-filter-chip--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
 .dx-filter-chip--transport,
 .dx-filter-chip--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
-.dx-filter-chip--device   { --evt-fg: #6b6562; --evt-bg: #efedea; --evt-bd: #ddd9d3; }
+.dx-filter-chip--device   { --evt-fg: #b34a8a; --evt-bg: #fbe6f1; --evt-bd: #f0c3df; }
 .dx-filter-chip[class*="dx-filter-chip--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
+/* Active state: the per-type fg becomes the chip background and the
+   chip's own text flips to white, giving each type a clearly
+   readable "selected" pill regardless of the (deliberately pastel)
+   tint colours used for the row icon backgrounds. */
 .dx-filter-chip[class*="dx-filter-chip--"].is-active {
-  background: var(--evt-bg, var(--t-accent-tint));
-  border-color: var(--evt-bd, var(--t-accent-tint));
-  color: var(--evt-fg, var(--t-accent));
+  background: var(--evt-fg, var(--t-accent));
+  border-color: var(--evt-fg, var(--t-accent));
+  color: #fff;
 }
 .dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: var(--evt-fg, var(--t-accent)); }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: #fff; }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active .dx-count-pill {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
 .dx-event-body {
   flex: 1 1 auto;
   min-width: 0;
@@ -3155,6 +3163,7 @@
   font-size: 12px;
   color: var(--t-muted);
 }
+.dx-event-json-placeholder { min-height: 1.5em; }
 .dx-event-thumb-link {
   display: block;
   border-radius: 8px;

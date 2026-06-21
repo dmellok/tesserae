@@ -17,9 +17,6 @@
 }
 .send-pair-options { min-width: 0; }
 .send-pair-preview {
-  display: grid;
-  gap: var(--t-space-3);
-  justify-items: stretch;
   min-width: 0;
 }
 .send-pair-preview .card-head { width: 100%; }

@@ -153,8 +153,14 @@
           {% endif %}
         </div>
         {% elif ev.extra %}
-        {# Generic raw-JSON view via the in-house highlighter. #}
-        <pre class="dx-code" data-json>{{ ev.extra|tojson(indent=2) }}</pre>
+        {# Generic raw-JSON view via the in-house highlighter. The
+           JSON is stashed as a script-tag payload (browsers skip
+           parsing for unknown types) and only injected + highlighted
+           on first expand. Keeps the initial DOM light when 100
+           telemetry rows would otherwise drag in ~50 KB of pretty-
+           printed JSON each and ~50 highlighter rewrites. #}
+        <pre class="dx-code dx-event-json-placeholder" data-event-json-target></pre>
+        <script type="application/json" data-event-json>{{ ev.extra|tojson(indent=2) }}</script>
         {% else %}
         <p class="dx-event-empty-payload">No payload recorded for this event.</p>
         {% endif %}
@@ -174,10 +180,15 @@
 
 <script type="module" src="{{ url_for('static', filename='pages/json-highlight.js') }}"></script>
 <script src="{{ url_for('static', filename='pages/events.js') }}"></script>
-<script>
+<script type="module">
   // Click-to-expand for raw event payloads. Each row's button toggles
-  // [data-event-expand].hidden; rotates the caret to match the row's
-  // open state. Pure DOM ops, no framework.
+  // [data-event-expand].hidden + rotates the caret. On the FIRST
+  // expand we lazily inject + syntax-highlight the JSON payload from
+  // the row's <script data-event-json> stash. This keeps the initial
+  // DOM cheap: 100 rows would otherwise carry 100 pretty-printed JSON
+  // blocks + 100 highlighter rewrites and accumulate visible lag as
+  // the user clicks through filter chips.
+  import { highlightJson } from '{{ url_for('static', filename='pages/json-highlight.js') }}';
   (function () {
     document.querySelectorAll('[data-event-toggle]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -189,6 +200,16 @@
         body.hidden = !open;
         btn.setAttribute('aria-expanded', open ? 'true' : 'false');
         row.classList.toggle('is-open', open);
+        if (open) {
+          // Lazy hydrate: inject + highlight JSON the first time the
+          // row opens. Subsequent toggles just hide/show the result.
+          var target = row.querySelector('[data-event-json-target]');
+          var stash = row.querySelector('script[data-event-json]');
+          if (target && stash && !target.dataset.hydrated) {
+            target.innerHTML = highlightJson(stash.textContent || '');
+            target.dataset.hydrated = '1';
+          }
+        }
       });
     });
   })();

@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.3], 2026-06-21
+
+Events page performance + readability, Send alignment.
+
+### Fixed
+
+- **Events page lag after clicking through filter chips**:
+  expanded payloads now lazily hydrate on first click. The JSON
+  payload is stashed in a ``<script type="application/json"
+  data-event-json>`` block per row; the in-house highlighter only
+  walks + tokenises a row's JSON when the user actually opens it.
+  Initial DOM is ~50× lighter for a 100-row telemetry view and
+  the cumulative slowdown from clicking through chip filters is
+  gone.
+- **Events filter-chip active state readability**: the active
+  chip used the per-type pastel pair (fg-on-bg) which was hard
+  to read at small sizes. Flipped to a high-contrast pattern —
+  the chip's saturated fg becomes the background and the text
+  flips to white. Count pill stays visible via a translucent
+  white tint.
+- **Events Device chip**: gained its own colour swatch (rose)
+  rather than the muted neutral that read as "no colour".
+- **Send (Live preview) alignment**: the right card's section
+  header sat lower than the left because ``.send-pair-preview``
+  was a 2-row grid with a 12px gap between header and body.
+  Reverted to plain block flow so the section_head sits at the
+  same Y as the options card's header.
+
 ## [0.60.2], 2026-06-21
 
 Three regressions from the v0.60.1 polish: search refresh, broken
