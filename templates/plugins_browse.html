@@ -98,32 +98,32 @@
     {% endif %}
   </form>
   {% if kinds and kinds|length > 1 %}
-  <div class="filter-chips filter-chips--kinds" role="tablist" aria-label="Filter by type">
+  <div class="dx-mkt-chips dx-mkt-chips--kinds" role="tablist" aria-label="Filter by type">
     <a href="{{ url_for('marketplace.browse', tag=active_tag, q=active_query) }}"
-       class="pill {% if not active_kind %}is-accent{% endif %}"
+       class="dx-mkt-chip {% if not active_kind %}is-active{% endif %}"
        role="tab" aria-selected="{{ 'true' if not active_kind else 'false' }}">
-      All <span class="muted">({{ kinds|sum(attribute='count') }})</span>
+      <span>All</span><span class="dx-mkt-chip-count">{{ kinds|sum(attribute='count') }}</span>
     </a>
     {% for k in kinds %}
     <a href="{{ url_for('marketplace.browse', tag=active_tag, kind=k.key, q=active_query) }}"
-       class="pill {% if active_kind == k.key %}is-accent{% endif %}"
+       class="dx-mkt-chip {% if active_kind == k.key %}is-active{% endif %}"
        role="tab" aria-selected="{{ 'true' if active_kind == k.key else 'false' }}">
       {% if k.key == 'widget' %}<i class="ph ph-puzzle-piece" aria-hidden="true"></i>
       {% elif k.key == 'theme' %}<i class="ph ph-paint-brush" aria-hidden="true"></i>
       {% elif k.key == 'font' %}<i class="ph ph-text-aa" aria-hidden="true"></i>
       {% endif %}
-      {{ k.label }} <span class="muted">({{ k.count }})</span>
+      <span>{{ k.label }}</span><span class="dx-mkt-chip-count">{{ k.count }}</span>
     </a>
     {% endfor %}
   </div>
   {% endif %}
   {% if tags %}
-  <div class="filter-chips">
+  <div class="dx-mkt-chips">
     <a href="{{ url_for('marketplace.browse', kind=active_kind, q=active_query) }}"
-       class="pill {% if not active_tag %}is-accent{% endif %}">All</a>
+       class="dx-mkt-chip {% if not active_tag %}is-active{% endif %}">All</a>
     {% for tag in tags %}
     <a href="{{ url_for('marketplace.browse', tag=tag, kind=active_kind, q=active_query) }}"
-       class="pill {% if active_tag == tag %}is-accent{% endif %}">{{ tag }}</a>
+       class="dx-mkt-chip {% if active_tag == tag %}is-active{% endif %}">{{ tag }}</a>
     {% endfor %}
   </div>
   {% endif %}
@@ -543,16 +543,41 @@
 <script>
   // Debounced auto-submit for the catalog search. Submits 300ms after
   // the last keystroke so the URL stays in sync with the query without
-  // a request per character. Plain form submit so back/forward + share
-  // links Just Work.
+  // a request per character. We stash a focus marker + caret position
+  // in sessionStorage right before submitting and restore them on the
+  // next render so typing never loses input focus — without that the
+  // page navigation steals the caret and the user's flow breaks.
   (function () {
     const input = document.querySelector('[data-mkt-search]');
     if (!input) return;
     const form = input.closest('form');
+    const FOCUS_KEY = 'mkt-search-focus';
+
+    // Restore focus + caret if the previous render submitted via search.
+    try {
+      const raw = sessionStorage.getItem(FOCUS_KEY);
+      if (raw) {
+        sessionStorage.removeItem(FOCUS_KEY);
+        const pos = parseInt(raw, 10);
+        input.focus();
+        if (!isNaN(pos)) {
+          const at = Math.min(pos, input.value.length);
+          input.setSelectionRange(at, at);
+        } else {
+          input.setSelectionRange(input.value.length, input.value.length);
+        }
+      }
+    } catch (e) { /* sessionStorage unavailable — focus restore is best-effort */ }
+
     let timer = null;
     input.addEventListener('input', function () {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(function () { form.submit(); }, 300);
+      timer = setTimeout(function () {
+        try {
+          sessionStorage.setItem(FOCUS_KEY, String(input.selectionStart ?? input.value.length));
+        } catch (e) { /* ignore */ }
+        form.submit();
+      }, 300);
     });
   })();
 </script>

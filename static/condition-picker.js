@@ -114,20 +114,24 @@ function defaultCondition(kind) {
 // source into spans so a CSS theme can colour strings / numbers /
 // keywords / punctuation independently. Returns a string of HTML.
 function highlightJson(src) {
-  // Escape first so we can safely insert HTML below.
+  // Escape HTML metacharacters first; quote characters are deliberately
+  // not escaped because the regex below uses real quotes as token
+  // boundaries. (The previous version matched ``&quot;`` against the
+  // escaped output, but the escape map didn't include " so the regex
+  // hit nothing and the overlay rendered as plain colourless text.)
   let html = String(src ?? "").replace(/[&<>]/g, (c) => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
   }[c]));
-  // Tokenise: strings, numbers, keywords (true/false/null), punctuation.
   html = html.replace(
-    /(\&quot;[^\&]*?\&quot;\s*:)|(\&quot;[^\&]*?\&quot;)|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
-    (match, key, str, kw) => {
+    /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*")|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (match, key, str, kw, num) => {
       if (key) return `<span class="cp-jh-key">${match}</span>`;
       if (str) return `<span class="cp-jh-str">${match}</span>`;
       if (kw) return `<span class="cp-jh-kw">${match}</span>`;
-      return `<span class="cp-jh-num">${match}</span>`;
+      if (num) return `<span class="cp-jh-num">${match}</span>`;
+      return match;
     },
   );
   return html + "\n"; // trailing newline so the overlay matches the textarea's scroll height

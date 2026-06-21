@@ -4,7 +4,13 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--t-space-5);
-  align-items: start;
+  /* ``stretch`` makes both columns share the taller column's height,
+     so the options card and preview card always bottom-align —
+     no more visually unbalanced pair where the preview's portrait
+     panel aspect ratio dwarfs the left options column. The
+     preview-frame inside is also clamped via ``max-height`` so the
+     pair doesn't grow to absurd heights on portrait panels. */
+  align-items: stretch;
 }
 .send-pair[hidden] { display: none !important; }
 @media (min-width: 900px) {
@@ -22,8 +28,25 @@
   justify-items: stretch;
   min-width: 0;
 }
+.send-pair-preview .dx-section-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--t-space-3);
+}
 .send-pair-preview .card-head { width: 100%; }
-.send-pair-preview .preview-frame { margin: 0; }
+.send-pair-preview .preview-frame {
+  margin: 0;
+  /* Clamp the preview height so a portrait panel (e.g. 1200x1600 ->
+     3:4 aspect at a 720px column = ~960px tall) doesn't make the
+     right card dwarf the left options card. Aspect ratio still
+     locks the rendering proportion; the frame just stays inside a
+     reasonable visual budget so both columns read as a paired UI.
+     The frame still scales down with viewport width. */
+  max-height: min(70vh, 640px);
+  width: auto;
+  margin-inline: auto;
+}
 .send-pair-preview .preview-dims {
   margin: 0;
   font-size: 12px;

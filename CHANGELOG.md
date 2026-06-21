@@ -6,6 +6,54 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.1], 2026-06-21
+
+Second round of post-uplift polish from a live walkthrough.
+
+### Changed
+
+- **Inset background**: lightened the warm-taupe inset surface from
+  ``#f6f5f1`` / ``#f3f2ee`` to ``#faf9f6`` so inset rows on
+  Dashboards, History, Events, Plugins index, and the per-tab
+  sub-cards on Settings sit closer to the section card surface
+  with less visual weight.
+- **Events**: per-type icon backgrounds gain distinct hues —
+  render = blue, conditions = violet, heartbeat = danger,
+  auth = mint, plugin = amber, transport/telemetry = teal,
+  device = neutral — so the event type is recognisable at a
+  glance without reading the pill.
+- **Send (Live preview)**: the preview card now stretches to
+  match the options card height (``align-items: stretch``) and
+  the preview frame is clamped to ``min(70vh, 640px)`` so a
+  portrait panel aspect ratio (1200×1600) no longer dwarfs the
+  left options column. The pair reads as a balanced 2-up.
+- **Widgets Browse**: search input preserves focus + caret
+  position across the debounced auto-submit roundtrip via a
+  sessionStorage marker — typing no longer loses focus mid-query.
+- **Widgets Browse**: kind + tag chips moved off the legacy
+  ``.pill`` vocabulary to a dedicated ``.dx-mkt-chip`` set
+  matching the spec — outlined pill with a tiny count badge,
+  filled accent tint on active.
+
+### Fixed
+
+- **Condition picker raw JSON**: the syntax highlighter was
+  matching the HTML entity ``&quot;`` against escaped output,
+  but quote characters weren't included in the escape map so the
+  regex never hit a token — the overlay rendered as plain text.
+  Switched to matching real quotes against the partially-escaped
+  string, so keys / strings / numbers / keywords now colour in
+  the rotation + schedule condition editors.
+
+### Notes
+
+- The Rotations + Schedules page-level card chrome is still on
+  the legacy ``.rotation-card`` / ``.timeline-card`` shapes from
+  before the uplift. A heavier rewrite to put them on the same
+  ``section_card`` macro as the rest of v0.56 is parked as a
+  follow-up; this release covers the spec-derived polish that
+  the existing surface needed first.
+
 ## [0.60.0], 2026-06-21
 
 Post-uplift polish from a live walkthrough of the v0.59.0 admin UI.

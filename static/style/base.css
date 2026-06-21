@@ -110,8 +110,8 @@
      ``design_handoff_ui_uplift`` README; used by the .dx-* admin
      surface (section cards, inset rows, status pills, code blocks).
      Dark-mode equivalents live in the override block below. */
-  --t-inset:        #f6f5f1;
-  --t-inset-border: #e8e7e1;
+  --t-inset:        #faf9f6;
+  --t-inset-border: #ebeae4;
   --t-accent-tint:  #dcefe8;
   --t-pill-ok-bg:     #e7f3ee;
   --t-pill-ok-fg:     #15846a;
