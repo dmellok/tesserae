@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.61.2], 2026-06-21
+
+### Fixed
+
+- **REST ``/api/v1/device/<id>/frame`` was missing renderer-specific
+  payload fields**. A pi_png client polling the endpoint logged
+  ``download/paint failed: payload missing 'rotate'`` because the
+  response only carried the REST envelope (``url``, ``format``,
+  ``panel_w/h``, ``render_id``, ``renderer_id``) and not the
+  v3-frozen ``{rotate, scale, bg, saturation}`` fields its MQTT-
+  subscribed cousins receive. ``get_frame`` now resolves the
+  renderer for the latest frame, pulls its runtime settings, and
+  merges ``renderer.payload()`` into the response. Pi BIN /
+  ESP32 / TRMNL / pico_bin REST clients pick up their renderer-
+  specific fields the same way; nothing kind-specific in the new
+  code path.
+
 ## [0.61.1], 2026-06-21
 
 ### Changed

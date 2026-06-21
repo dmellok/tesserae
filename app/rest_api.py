@@ -234,6 +234,29 @@ def get_frame(device_id: str) -> Response:
         "render_id": latest["digest"],
         "renderer_id": latest.get("renderer_id", ""),
     }
+    # Merge the renderer's MQTT-frozen payload (rotate / scale / bg /
+    # saturation for pi_png, palette_signature for the .bin renderers,
+    # etc.) so REST clients get the same fields their MQTT-subscribed
+    # cousins have always received. Without this, the pi_png reference
+    # client logs ``download/paint failed: payload missing 'rotate'``
+    # because the response only carried the REST-specific shape.
+    renderer = _renderers().get(str(latest.get("renderer_id", "")))
+    if renderer is not None:
+        try:
+            settings = _settings().get_for_runtime(
+                "renderers", renderer.id, renderer.manifest.get("settings", [])
+            )
+            base_url = request.url_root.rstrip("/")
+            extra = renderer.payload(latest["digest"], base_url, settings=settings)
+            # REST-shape keys win (the renderer.payload() ``url`` matches
+            # ``image_url`` anyway since base_url is the same).
+            for k, v in extra.items():
+                payload.setdefault(k, v)
+        except Exception:
+            current_app.logger.exception(
+                "rest /frame: renderer.payload() failed for renderer %s",
+                renderer.id,
+            )
     resp = jsonify(payload)
     resp.headers["ETag"] = etag
     resp.headers["Cache-Control"] = "no-cache"

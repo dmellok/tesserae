@@ -234,6 +234,44 @@ def test_frame_returns_url_and_etag_when_rendered(app: Flask) -> None:
     assert resp.headers["ETag"] == '"abc123"'
 
 
+def test_frame_response_carries_renderer_payload_fields(app: Flask) -> None:
+    """REST /frame must return the renderer-specific fields its MQTT-
+    subscribed cousins receive (rotate / scale / bg / saturation for
+    pi_png, etc.), not just the REST-shape envelope. A real pi_png
+    client logs ``payload missing 'rotate'`` and skips the paint
+    otherwise."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="lounge_pi", kind="pi_png_client")
+    token = resp.get_json()["device_token"]
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["lounge_pi"] = {
+        "digest": "ab9dbd3be",
+        "ext": "png",
+        "filename": "ab9dbd3be.png",
+        "renderer_id": "pi_png",
+        "timestamp": time.time(),
+        "composition_digest": "comp_ab9",
+    }
+
+    resp = client.get(
+        "/api/v1/device/lounge_pi/frame",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    # REST-shape envelope still present.
+    assert body["render_id"] == "ab9dbd3be"
+    assert body["format"] == "png"
+    # Renderer-specific fields (the v3-frozen pi_png payload) merged in.
+    assert "rotate" in body, body
+    assert "scale" in body
+    assert "bg" in body
+    assert "saturation" in body
+
+
 def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     """The save-the-firmware-a-fetch-and-paint path. A deep-sleep
     client whose last-seen ETag matches the current frame can skip
