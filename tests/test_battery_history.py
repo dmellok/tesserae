@@ -83,6 +83,69 @@ def test_predict_projects_days_to_empty_on_a_clean_drain(store: BatteryHistory) 
     assert pred.samples == 8
 
 
+def test_predict_uses_last_discharge_segment_after_a_recharge(
+    store: BatteryHistory,
+) -> None:
+    """Fleet reality: most battery devices get topped up periodically,
+    so a 7-day window often contains a charge event mid-stream. A
+    naive whole-window regression then reads as flat or rising and
+    returns no projection (this was the prod complaint after v0.55.1
+    shipped). The fix isolates the most recent monotonic-discharge
+    segment and fits on it instead.
+
+    Build a series with a clean -10 %/day drain in days 7..4, a
+    sharp +60% charge event at day 3.5, and another clean -10 %/day
+    drain in days 3..0. The whole-window regression would slope
+    positive; the last-segment regression should slope at ~-10."""
+    now = time.time()
+    # Drain phase: 70% (day 7) → 40% (day 4)
+    drain_phase_a = [(7.0, 70), (6.0, 60), (5.0, 50), (4.0, 40)]
+    # Charge event: 40% → 100% (delta=+60) at day 3.5
+    charge_phase = [(3.5, 100)]
+    # Drain phase: 100% (day 3) → 70% (day 0)
+    drain_phase_b = [(3.0, 100), (2.0, 90), (1.0, 80), (0.0, 70)]
+    for days_ago, pct in drain_phase_a + charge_phase + drain_phase_b:
+        store.record("esp32_topup", pct=pct, timestamp=now - days_ago * 86400)
+    pred = store.predict("esp32_topup", window_days=7)
+    assert pred is not None
+    # Slope read from the post-charge segment, not the whole window.
+    assert pred.slope_per_day < -1.0, (
+        f"expected a draining slope, got {pred.slope_per_day:+.2f}/day"
+    )
+    # Projection lands (not None) because the segment is monotonically
+    # draining.
+    assert pred.days_to_20pct is not None
+    assert pred.days_to_empty is not None
+    # current_pct comes from the LAST sample of the full series
+    # (which sits at 70%), not the segment.
+    assert pred.current_pct == pytest.approx(70.0, abs=2.0)
+
+
+def test_predict_falls_back_to_full_window_when_segment_too_short(
+    store: BatteryHistory,
+) -> None:
+    """If the most recent discharge segment is shorter than
+    MIN_SEGMENT_SAMPLES (e.g. a recharge happened just an hour ago),
+    fall through to the full-window regression so the user still
+    gets a slope reading."""
+    now = time.time()
+    # 8 samples over 6.5 days of clean -10 %/day drain, then a single
+    # very recent charge spike that creates a too-short post-charge
+    # segment (just one sample after the jump).
+    for i in range(8):
+        days_ago = 6.5 * (8 - i) / 8.0
+        pct = 30 - (-10.0) * days_ago
+        store.record("esp32_recent_charge", pct=round(pct), timestamp=now - days_ago * 86400)
+    # Drop a single fresh "just charged" sample. Segment is length 1 → falls back.
+    store.record("esp32_recent_charge", pct=100, timestamp=now - 60)
+    pred = store.predict("esp32_recent_charge", window_days=7)
+    assert pred is not None
+    # Full window includes the charge spike at the end, but the
+    # fallback regression on the whole series still reads negative
+    # because the bulk of the data is the clean drain.
+    assert pred.slope_per_day < 0
+
+
 def test_device_ids_returns_distinct_devices(store: BatteryHistory) -> None:
     now = time.time()
     store.record("a", pct=80, timestamp=now)

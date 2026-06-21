@@ -43,6 +43,18 @@ MIN_SAMPLES: int = 8
 # Sane upper bound. A slope of <0.01 %/day implies "this is plugged
 # in"; we return None rather than predicting in years.
 MIN_DRAIN_PER_DAY: float = 0.01
+# A charge event = a pct jump >= this between consecutive samples.
+# Used to find the most recent discharge segment so a regression
+# isn't confounded by a recharge mid-window (which would otherwise
+# read as a flat / positive slope and return no projection).
+CHARGE_JUMP_PCT: int = 5
+# Once we've isolated the most recent discharge segment we still
+# need enough points in it for the regression to be meaningful;
+# fall back to the full window otherwise. Lower than MIN_SAMPLES
+# because a segment is by definition more recent: a device on a
+# 15-min wake cadence produces ~96 samples/day, so 4 samples
+# represents at least an hour of post-charge discharge data.
+MIN_SEGMENT_SAMPLES: int = 4
 
 
 @dataclass(frozen=True)
@@ -192,11 +204,30 @@ class BatteryHistory:
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> Prediction | None:
         """Linear regression of percent vs time over the last
-        ``window_days``. ``None`` when there isn't enough data or the
-        battery's flat / charging."""
-        rows = self.recent(device_id, window_days=window_days)
-        if len(rows) < MIN_SAMPLES:
+        ``window_days``. ``None`` when there isn't enough data; a
+        Prediction with ``days_to_*=None`` when the battery's flat
+        or charging.
+
+        Critically, if the window contains a charge event (a jump
+        of ``CHARGE_JUMP_PCT`` or more between consecutive samples),
+        the regression fits ONLY the most recent discharge segment
+        — otherwise the upward jump dominates the linear fit and we
+        end up projecting a non-draining battery on a fleet that's
+        actually draining between charges. Falls back to the full
+        window when the latest segment is too short to be useful."""
+        all_rows = self.recent(device_id, window_days=window_days)
+        if len(all_rows) < MIN_SAMPLES:
             return None
+        rows = _last_discharge_segment(all_rows)
+        if len(rows) < MIN_SEGMENT_SAMPLES:
+            # Either no charge event in the window, or the segment
+            # after the last charge is too short for a meaningful
+            # fit. Fall back to the full window so a long flat or
+            # gently-draining battery still gets a slope reading.
+            # ``all_rows`` already cleared MIN_SAMPLES above, so we
+            # don't re-check here (segments intentionally accept
+            # fewer points than the full window).
+            rows = all_rows
         # x is days since the oldest sample so the regression's
         # numerical conditioning is reasonable.
         t0 = rows[0].timestamp
@@ -213,7 +244,11 @@ class BatteryHistory:
             return None
         slope = num / den  # %-points per day
         intercept = mean_y - slope * mean_x
-        current_pct = max(0.0, min(100.0, ys[-1]))
+        # Current pct: take the LAST sample of the full series, not
+        # the segment, so the projection projects from where the
+        # device actually is right now (the segment may end on an
+        # older sample if we fell back).
+        current_pct = max(0.0, min(100.0, float(all_rows[-1].pct)))
 
         if slope >= -MIN_DRAIN_PER_DAY:
             # Flat or charging. Return the slope so the caller can show
@@ -239,3 +274,18 @@ class BatteryHistory:
             samples=n,
             window_days=window_days,
         )
+
+
+def _last_discharge_segment(rows: list[BatteryRow]) -> list[BatteryRow]:
+    """Return the slice of ``rows`` starting just after the most
+    recent charge event (a pct jump of ``CHARGE_JUMP_PCT`` or more
+    between consecutive samples). When no such jump exists, returns
+    ``rows`` unchanged. Caller decides whether the resulting slice
+    is long enough to fit on."""
+    last_charge_idx = -1
+    for i in range(1, len(rows)):
+        if rows[i].pct - rows[i - 1].pct >= CHARGE_JUMP_PCT:
+            last_charge_idx = i
+    if last_charge_idx <= 0:
+        return rows
+    return rows[last_charge_idx:]
