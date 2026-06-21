@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.5], 2026-06-21
+
+### Changed
+
+- **settings.css → dx-battery.css**: Battery dashboard rules
+  (97 lines, ``dx-battery-grid`` / ``-card`` / ``-head`` / etc.)
+  moved to their own stylesheet. Cascade order preserved by
+  linking the new file in the same slot the rules previously
+  occupied (right after dx-schedules.css). No rules changed.
+  settings.css banner kept so the file map still reflects the
+  extraction.
+
 ## [0.63.4], 2026-06-21
 
 ### Changed

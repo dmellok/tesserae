@@ -1,0 +1,100 @@
+/* ============================================================
+ *  /devices/battery — v0.56 admin-uplift Tier 1.4
+ *
+ *  Per-device sub-cards stacked vertically inside the parent
+ *  section card; each carries a header with name + pct, a
+ *  Chart.js canvas, and a 4-tile stat grid (samples / drain rate
+ *  / reaches 20% / reaches 0%).
+ *
+ *  v0.63.5 extracted from settings.css to its own file. No rules
+ *  changed, no behaviour change — cascade order preserved because
+ *  this file loads in the same slot the rules previously sat in.
+ * ============================================================ */
+
+.dx-battery-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dx-battery-card {
+  background: var(--t-inset);
+  border: 1px solid var(--t-inset-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dx-battery-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dx-battery-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dx-battery-name h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-fg);
+  letter-spacing: -0.005em;
+}
+.dx-battery-id {
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  color: var(--t-muted);
+  background: transparent;
+  padding: 0;
+}
+.dx-battery-pct-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.dx-battery-pct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--t-fg);
+  line-height: 1;
+}
+.dx-battery-pct-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-muted);
+}
+.dx-battery-card[data-tone="critical"] .dx-battery-pct { color: var(--t-pill-danger-fg); }
+.dx-battery-card[data-tone="low"] .dx-battery-pct { color: var(--t-pill-warn-fg); }
+
+.dx-battery-chart {
+  position: relative;
+  width: 100%;
+  height: 180px;
+}
+.dx-battery-chart .battery-chart { display: block; width: 100% !important; height: 100% !important; }
+
+.dx-battery-empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--t-muted);
+  font-size: 12.5px;
+}
+
+.dx-battery-stats { gap: 8px; grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 720px) { .dx-battery-stats { grid-template-columns: repeat(2, 1fr); } }
+.dx-battery-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--t-muted);
+  text-align: center;
+}
