@@ -84,7 +84,21 @@ def _renderer_label(renderer_id: str) -> str:
 def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     """Shape raw event rows for the History page: page name instead of id,
     humanised time, friendly device labels."""
-    page_names = {p.id: p.name for p in _pages().list()}
+    pages = _pages().list()
+    page_names = {p.id: p.name for p in pages}
+    page_devices_map = {p.id: list(p.device_ids) for p in pages}
+    devices = _devices()
+    # Cache device id → {name, icon} for the per-row device chip on the
+    # v0.56 history view. Devices removed from the registry mid-stream
+    # drop out gracefully (the chip is just skipped).
+    device_meta: dict[str, dict[str, str]] = {}
+    if devices is not None:
+        for did, dev in devices.devices.items():
+            if dev.kind_of is not None:
+                device_meta[did] = {
+                    "name": dev.display_name,
+                    "icon": dev.icon or "monitor",
+                }
     out: list[dict[str, Any]] = []
     for ev in rows:
         # Every type="push" row stores the page_id in ``target``,
@@ -97,6 +111,11 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
             {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
             for r in (ev.extra.get("renderers") or [])
         ]
+        # Device chips: prefer device_ids carried in extra (set by the
+        # push pipeline since v0.5x), fall back to the page's
+        # device_ids when the row is bound to a saved dashboard.
+        device_ids = ev.extra.get("device_ids") or page_devices_map.get(ev.target, [])
+        target_devices = [device_meta[did] for did in device_ids if did in device_meta]
         out.append(
             {
                 "id": ev.id,
@@ -104,6 +123,7 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                 "digest": ev.digest,
                 "source": ev.source,
                 "target": target,
+                "target_devices": target_devices,
                 "rel": _relative(ev.timestamp),
                 "abs": datetime.fromtimestamp(ev.timestamp).strftime("%Y-%m-%d %H:%M:%S"),
                 "duration_s": ev.duration_s,

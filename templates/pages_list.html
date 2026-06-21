@@ -1,80 +1,78 @@
 {% extends "_base.html" %}
+{% from "_components.html" import section_card %}
 {% block title %}Dashboards, Tesserae{% endblock %}
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-squares-four"></i> Dashboards</h1>
-  <p class="lede">
-    Each dashboard is a panel-sized grid of cells you compose, render, and push to your panel.
-  </p>
+  <p class="lede">Every saved page you can push to a panel. Click one to open it in the composer, or push it as-is.</p>
 </header>
 
-{# Inline create, name the dashboard up front, then land in the editor. #}
-<form method="post" action="{{ url_for('pages.create') }}" class="card dashboard-create">
-  <span class="dashboard-create-icon" aria-hidden="true"><i class="ph ph-plus-circle"></i></span>
-  <input type="text" name="name" class="dashboard-create-input"
-         placeholder="New dashboard name" autocomplete="off" aria-label="New dashboard name">
-  <button type="submit" class="primary dashboard-create-btn">
-    <i class="ph ph-plus" aria-hidden="true"></i><span>Create dashboard</span>
-  </button>
-</form>
+{# v0.56 uplift: a single inline create card promotes "New dashboard"
+   as the primary action without requiring an extra modal step. The
+   button stays disabled until the user types a name (controlled by
+   the small script at the bottom of the page). #}
+{% call section_card(icon='plus-circle', title='New dashboard',
+                     description='Name a dashboard; you land in the composer to lay it out. You can rename / delete later.') %}
+  <form method="post" action="{{ url_for('pages.create') }}" class="dx-pair-row">
+    <div class="dx-pair-input">
+      <input type="text" name="name" class="dx-input" placeholder="e.g. Home dashboard"
+             autocomplete="off" aria-label="New dashboard name" data-new-dashboard-input>
+    </div>
+    <div class="dx-pair-action">
+      <button type="submit" class="dx-btn-primary" data-new-dashboard-btn disabled>
+        <i class="ph ph-plus" aria-hidden="true"></i><span>Create dashboard</span>
+      </button>
+    </div>
+  </form>
+{% endcall %}
 
 {% if not pages %}
-<div class="empty-state">
-  <span class="empty-state-icon"><i class="ph-duotone ph-squares-four" aria-hidden="true"></i></span>
-  <h3>No dashboards yet</h3>
-  <p class="lede">A dashboard is the canvas you assemble widgets onto. Name one above to get started.</p>
-</div>
+{% call section_card(icon='squares-four', title='No dashboards yet',
+                     description='A dashboard is the canvas you assemble widgets onto. Name one above to get started.') %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-squares-four" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">Nothing saved yet</p>
+    <p class="dx-empty-help">Type a name above and Tesserae will create an empty dashboard for you to lay out.</p>
+  </div>
+{% endcall %}
 {% else %}
-<p class="dashboard-count">{{ pages|length }} dashboard{{ '' if pages|length == 1 else 's' }}</p>
-{% for device, pages_in_group in page_groups %}
-<section class="pages-group">
-  <h3 class="pages-group-head">
-    <i class="ph-bold ph-{{ device.icon if device else 'monitor' }}" aria-hidden="true"></i>
-    <span>{{ device.display_name if device else 'Unbound (virtual panel)' }}</span>
-    <span class="pages-group-count">{{ pages_in_group|length }}</span>
-  </h3>
-  <ul class="pages-list">
-    {% for page in pages_in_group %}
+
+{% call section_card(icon='squares-four', title='Saved dashboards',
+                     description='Click a name to open it in the composer. Push the dashboard as-is, or delete it.',
+                     meta={'label': 'TOTAL', 'value': pages|length}) %}
+  <ul class="dx-discovered-list">
+    {% for page in pages %}
     {% set d = page_dims.get(page.id) %}
-    <li class="page-row">
-      <span class="page-icon-tile" aria-hidden="true">
-        <i class="ph ph-{{ page.icon or 'cube' }}"></i>
-      </span>
-      <a class="page-row-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
-        <span class="page-name">{{ page.name }}</span>
-        <span class="page-meta">
-          {% set devs = page_devices.get(page.id) %}
-          {% if devs %}
-            <i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs[0] }}
-            {% if devs|length > 1 %}
-              <span class="pages-group-more" title="Also on: {{ devs[1:]|join(', ') }}">+{{ devs|length - 1 }}</span>
-            {% endif %}
-          {% else %}
-            <i class="ph ph-monitor" aria-hidden="true"></i> Virtual panel
-          {% endif %}
-          {% if d %}<span class="muted"> · </span>{{ d.w }}×{{ d.h }}{% endif %}
-          <span class="muted"> · </span>{{ page.cells|length }} cell{{ '' if page.cells|length == 1 else 's' }}
-          {% if page.theme %}<span class="muted"> · </span>theme: {{ page.theme }}{% endif %}
+    {% set devs = page_devices.get(page.id) %}
+    <li class="dx-inset-row dx-dashboard-row">
+      <a class="dx-dashboard-main" href="{{ url_for('pages.edit', page_id=page.id) }}">
+        <span class="dx-section-icon dx-dashboard-icon" aria-hidden="true">
+          <i class="ph ph-{{ page.icon or 'squares-four' }}"></i>
         </span>
+        <div class="dx-dashboard-text">
+          <div class="dx-dashboard-name">{{ page.name }}</div>
+          <div class="dx-meta-strip">
+            <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>
+            <span><span class="dx-meta-k">Cells</span><span class="dx-meta-v">{{ page.cells|length }}</span></span>
+            <span><span class="dx-meta-k">Last pushed</span><span class="dx-meta-v">{{ page_last_pushed_rel.get(page.id, 'never') }}</span></span>
+            {% if devs %}<span><i class="ph ph-device-mobile-camera" aria-hidden="true"></i> {{ devs[0] }}{% if devs|length > 1 %} <span class="dx-pill">+{{ devs|length - 1 }}</span>{% endif %}</span>{% endif %}
+          </div>
+        </div>
       </a>
-      <div class="page-actions">
-        <a class="page-action" href="{{ url_for('pages.edit', page_id=page.id) }}">
+      <div class="dx-discovered-actions">
+        <a class="dx-btn-primary-sm" href="{{ url_for('pages.edit', page_id=page.id) }}">
           <i class="ph ph-pencil-simple" aria-hidden="true"></i><span>Edit</span>
         </a>
-        <form method="post" action="{{ url_for('send.send_page') }}" class="inline">
+        <form method="post" action="{{ url_for('send.send_page') }}" class="form form--inline">
           <input type="hidden" name="page_id" value="{{ page.id }}">
-          {# Stay on the dashboards list after pushing, the default lands
-             on Send → History, which is jarring when the user is just
-             triaging dashboards rather than composing a send. #}
           <input type="hidden" name="return_to" value="dashboards">
-          <button type="submit" class="page-action" title="Push this dashboard to its panel">
+          <button type="submit" class="dx-btn-ghost-sm" title="Push this dashboard to its panel">
             <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
           </button>
         </form>
-        <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
+        <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="form form--inline"
               onsubmit="return confirm('Delete this dashboard?');">
-          <button type="submit" class="page-action page-action-danger" title="Delete dashboard"
-                  aria-label="Delete dashboard">
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete dashboard" aria-label="Delete">
             <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
@@ -82,60 +80,17 @@
     </li>
     {% endfor %}
   </ul>
-</section>
-{% endfor %}
-
-<style>
-  .pages-group { margin-top: 1.4rem; }
-  .pages-group:first-of-type { margin-top: 0.8rem; }
-  .pages-group-head {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0 0 0.55rem;
-    padding-bottom: 0.4rem;
-    border-bottom: 1px solid var(--t-border);
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--t-fg-soft);
-  }
-  .pages-group-head > i { color: var(--t-accent, currentColor); font-size: 1rem; }
-  .pages-group-count {
-    margin-left: auto;
-    font-size: 0.72rem;
-    color: var(--t-muted);
-    letter-spacing: 0;
-    text-transform: none;
-    font-weight: 600;
-  }
-  .pages-group-more {
-    display: inline-flex;
-    align-items: center;
-    margin-left: 0.25rem;
-    padding: 0.05rem 0.4rem;
-    background: var(--t-surface-sunk);
-    border: 1px solid var(--t-border);
-    border-radius: 999px;
-    font-size: 0.72rem;
-    color: var(--t-fg-soft);
-    font-weight: 700;
-    cursor: help;
-  }
-</style>
+{% endcall %}
 {% endif %}
 
 <script>
-  // Keep "Create dashboard" disabled until a name is typed, mirrors the
-  // reference and avoids creating an accidental untitled board.
+  // Keep "Create dashboard" disabled until a name is typed.
   (function () {
-    const form = document.querySelector(".dashboard-create");
-    if (!form) return;
-    const input = form.querySelector(".dashboard-create-input");
-    const btn = form.querySelector(".dashboard-create-btn");
+    const input = document.querySelector('[data-new-dashboard-input]');
+    const btn = document.querySelector('[data-new-dashboard-btn]');
+    if (!input || !btn) return;
     const sync = () => { btn.disabled = !input.value.trim(); };
-    input.addEventListener("input", sync);
+    input.addEventListener('input', sync);
     sync();
   })();
 </script>

@@ -6,6 +6,65 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.56.0], 2026-06-21
+
+First tier of the v0.56 admin-UI uplift onto the v0.54 ``.dx-*``
+design system. Four list / dashboard pages flip onto the shared
+section-card chrome + inset rows + status pill vocabulary.
+
+### Changed
+
+- **Dashboards** (``/pages``): flat saved-list inside a single
+  section card, inline "New dashboard" name + create row, meta strip
+  per dashboard (Size / Cells / Last pushed), Edit / Push / Delete
+  inline. Drops the device-grouping accordion.
+- **History** (``/history``): filter chip strip across the top,
+  inset row per push with mono timestamp + device chip + colour-coded
+  source pill + status pill + duration + Resend / Delete icon
+  actions. Failed rows pick up the danger soft-band background.
+- **Widgets index** (``/plugins``): per-kind section cards (Widget /
+  Data / Font / etc.) with count chip + per-row icon + name + id +
+  description + admin badge + "Open admin" ghost action.
+- **Battery dashboard** (``/devices/battery``): page-level window
+  picker as the v0.56 filter strip, single outer section card, per-
+  device inset cards with name + mono id + Chart.js drain curve + the
+  4-tile stat grid (Samples / Drain rate / Reaches 20% / Reaches 0%).
+  Chart.js kept (per project decision).
+
+### Added — shared infrastructure (PR 0 of the uplift)
+
+- ``static/style/base.css`` gains the v0.56 token block
+  (``--t-inset``, ``--t-accent-tint``, ``--t-pill-{ok,warn,danger,
+  neutral}-*``, ``--t-code-{bg,border,fg,key,str,num,kw,punct}``) +
+  dark-mode equivalents.
+- ``section_card`` Jinja macro in ``templates/_components.html`` —
+  ``{% call section_card(icon, title, description, cta, meta, id) %}``
+  wraps the canonical chrome from v0.54 (icon-in-teal-square + title
+  + description + body) so every page composes via one call.
+- ``static/pages/json-highlight.js`` — in-house tokenizer (~50
+  lines, no deps) that auto-highlights every ``<pre class="dx-code"
+  data-json>`` block on the page; importable via
+  ``highlightJson(str)`` for on-the-fly use.
+- ``.dx-pill`` (status chip) + ``.dx-dow-pill`` (day-of-week chip) +
+  ``.dx-input`` (input baseline) + ``.dx-inset-row`` +
+  ``.dx-code`` (with syntax-highlight overlay) + ``.dx-meta-strip``
+  + ``.dx-disclosure`` — shared primitives for every uplifted page.
+- ``EventLog.last_event_by_target()`` — one-roundtrip MAX(timestamp)-
+  per-target query used by the Dashboards list for "last pushed".
+- ``History`` formatter now resolves ``target_devices`` (device
+  name + icon) per push row so the device chip on the history row
+  has real content.
+
+### Notes
+
+- Tier 1 of a 4-tier arc; Tiers 2-4 add the remaining pages
+  (Send + Events + Widgets Browse, Schedules + Rotations + System,
+  Onboarding + Themes).
+- Battery prediction lands now even on devices with a mid-window
+  recharge thanks to v0.55.1's segment regression: the bedside ESP32
+  in the screenshot fixture surfaces ``-5.5 %/day`` + ``Reaches 20%
+  14.5 days`` + ``Reaches 0% 18.2 days``.
+
 ## [0.55.1], 2026-06-21
 
 ### Fixed

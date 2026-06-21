@@ -27,6 +27,7 @@ URLs:
 from __future__ import annotations
 
 import logging
+import time
 import uuid
 from typing import Any
 
@@ -490,6 +491,26 @@ def _group_pages_for_index(pages: list[Page], devices: Any) -> list[tuple[Any, l
     return out
 
 
+def _humanise_age(seconds: float) -> str:
+    """Compact relative-time formatter for the dashboards list. Same
+    flavour as the device-card freshness text: "2 min ago",
+    "yesterday", "3 days ago"."""
+    if seconds < 90:
+        return "just now"
+    if seconds < 3600:
+        return f"{int(seconds / 60)} min ago"
+    if seconds < 86400:
+        hrs = int(seconds / 3600)
+        return f"{hrs} hour{'' if hrs == 1 else 's'} ago"
+    if seconds < 172_800:
+        return "yesterday"
+    if seconds < 30 * 86400:
+        return f"{int(seconds / 86400)} days ago"
+    if seconds < 365 * 86400:
+        return f"{int(seconds / (30 * 86400))} months ago"
+    return f"{int(seconds / (365 * 86400))} years ago"
+
+
 @bp.get("")
 def index() -> str:
     pages = _store().list()
@@ -514,12 +535,31 @@ def index() -> str:
 
     page_devices = {p.id: _device_names(p) for p in pages}
     page_groups = _group_pages_for_index(pages, devices)
+    # "Last pushed" per page for the redesigned Dashboards list. One
+    # SQL roundtrip aggregates MAX(timestamp) per target across every
+    # successful push row; targets with no row are absent (and
+    # surface as "never" in the template).
+    event_log = current_app.config.get("EVENT_LOG")
+    page_last_pushed: dict[str, float] = {}
+    if event_log is not None:
+        try:
+            page_last_pushed = event_log.last_event_by_target(
+                type="push", targets=[p.id for p in pages]
+            )
+        except Exception:
+            current_app.logger.exception(
+                "event_log: last_event_by_target failed; rendering without last_pushed"
+            )
+    page_last_pushed_rel = {
+        pid: _humanise_age(time.time() - ts) for pid, ts in page_last_pushed.items()
+    }
     return render_template(
         "pages_list.html",
         pages=pages,
         page_dims=page_dims,
         page_devices=page_devices,
         page_groups=page_groups,
+        page_last_pushed_rel=page_last_pushed_rel,
     )
 
 

@@ -21,7 +21,7 @@ import logging
 import sqlite3
 import threading
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -274,6 +274,37 @@ class EventLog:
         with self._lock, self._conn() as conn:
             rows = conn.execute(sql, params).fetchall()
         return [_row_to_event(r) for r in rows]
+
+    def last_event_by_target(
+        self,
+        *,
+        type: str,
+        targets: Sequence[str] | None = None,
+        statuses: tuple[str, ...] = ("sent", "ok"),
+    ) -> dict[str, float]:
+        """Most-recent timestamp per ``target`` for rows matching the
+        given ``type`` (and optional ``statuses``). Used by the
+        dashboards list to surface "last pushed at" per saved page
+        (one SQL roundtrip instead of N).
+
+        Returns a ``{target: timestamp}`` dict; targets with no
+        matching row are absent from the result."""
+        sql = "SELECT target, MAX(timestamp) AS ts FROM events WHERE type = ? AND target != '' "
+        params: list[Any] = [type]
+        if statuses:
+            placeholders = ",".join("?" * len(statuses))
+            sql += f" AND status IN ({placeholders}) "
+            params.extend(statuses)
+        if targets is not None:
+            if not targets:
+                return {}
+            placeholders = ",".join("?" * len(targets))
+            sql += f" AND target IN ({placeholders}) "
+            params.extend(targets)
+        sql += " GROUP BY target"
+        with self._lock, self._conn() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return {str(r["target"]): float(r["ts"]) for r in rows}
 
     def count(self, *, type: str | None = None) -> int:
         if type is None:

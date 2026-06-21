@@ -2629,3 +2629,357 @@
 }
 .dx-disclosure[open] > summary .ph-caret-right { transform: rotate(90deg); }
 .dx-disclosure-body { margin-top: 10px; }
+
+/* Icon-only ghost button variant (delete actions on Dashboards,
+   History, etc). Same chrome as .dx-btn-ghost-sm but square. */
+.dx-btn-icon-only {
+  padding: 6px 8px;
+  min-width: 32px;
+  justify-content: center;
+}
+.dx-btn-icon-only .ph { font-size: 14px; }
+
+/* Dashboards list (Tier 1.1). The dashboard row is built on
+   .dx-inset-row + .dx-section-icon + a meta strip; class names below
+   are dashboard-specific to keep the row layout decoupled from the
+   shared inset shape. */
+.dx-dashboard-row { align-items: center; }
+.dx-dashboard-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.dx-dashboard-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+}
+.dx-dashboard-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.dx-dashboard-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-fg);
+  letter-spacing: -0.005em;
+}
+.dx-meta-k {
+  font-weight: 600;
+  color: var(--t-muted);
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+.dx-meta-v { color: var(--t-fg-soft); font-size: 11.5px; }
+
+/* Filter strip used across History + Events. Sits as a top-of-page
+   tab nav with count-pill counters; active chip gets the accent
+   underline same as the device card tabs. */
+.dx-filter-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+.dx-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--t-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--t-border);
+  transition: color 120ms ease, background 120ms ease, border-color 120ms ease;
+}
+.dx-filter-chip:hover { color: var(--t-fg); border-color: var(--t-border-strong); }
+.dx-filter-chip.is-active {
+  background: var(--t-accent-tint);
+  color: var(--t-accent);
+  border-color: var(--t-accent-tint);
+}
+.dx-filter-chip .dx-count-pill { background: var(--t-pill-neutral-bg); color: var(--t-pill-neutral-fg); }
+.dx-filter-chip.is-active .dx-count-pill {
+  background: var(--t-accent);
+  color: var(--t-accent-fg);
+}
+
+/* History page (Tier 1.2). Inset row split into three columns:
+   timestamp left, source/target middle, status/duration/actions
+   right. Failed rows flip the soft pink band background. */
+.dx-history-row { align-items: stretch; padding: 12px 15px; }
+.dx-history-row--failed {
+  background: var(--t-pill-danger-bg);
+  border-color: var(--t-pill-danger-border);
+}
+.dx-history-time {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 0 0 auto;
+  text-decoration: none;
+  color: inherit;
+  min-width: 70px;
+}
+.dx-history-clock code {
+  font-family: var(--t-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t-fg);
+  background: transparent;
+  padding: 0;
+}
+.dx-history-date {
+  font-size: 11px;
+  color: var(--t-muted);
+}
+.dx-history-mid {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dx-history-target {
+  font-size: 13px;
+  color: var(--t-fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.dx-history-err {
+  font-size: 11.5px;
+  color: var(--t-pill-danger-fg);
+  font-family: var(--t-font-mono);
+}
+.dx-history-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.dx-history-dur {
+  font-family: var(--t-font-mono);
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Device chip (small inline pill on history rows + anywhere else we
+   surface "this push went to <device>"). */
+.dx-device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--t-fg-soft);
+}
+.dx-device-chip .ph { color: var(--t-muted); font-size: 12px; }
+
+/* Source pill — colour-coded by push origin. Lightweight pill;
+   distinct from .dx-pill status chips so the two read as different
+   categories ("how was this pushed" vs "did it land"). */
+.dx-source-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--t-pill-neutral-bg);
+  color: var(--t-pill-neutral-fg);
+  border: 1px solid transparent;
+}
+.dx-source-page,
+.dx-source-file,
+.dx-source-url,
+.dx-source-webpage {
+  background: color-mix(in oklab, var(--t-accent) 16%, var(--t-surface));
+  color: var(--t-accent);
+}
+.dx-source-schedule,
+.dx-source-rotation {
+  background: var(--t-pill-warn-bg);
+  color: var(--t-pill-warn-fg);
+}
+.dx-source-webhook,
+.dx-source-ha {
+  background: color-mix(in oklab, #a35a2c 16%, var(--t-surface));
+  color: #a35a2c;
+}
+.dx-source-resend,
+.dx-source-manual,
+.dx-source-setup,
+.dx-source-unknown {
+  background: var(--t-pill-neutral-bg);
+  color: var(--t-pill-neutral-fg);
+}
+
+/* Page-head primary CTA: small primary button positioned under (or
+   right of) the page title + lede. Used on Dashboards' "New
+   dashboard", Widgets' "Browse community widgets", etc. */
+.page-head-cta {
+  margin-top: 12px;
+}
+.page-head-cta .dx-btn-primary {
+  display: inline-flex;
+}
+
+/* Widgets index (Tier 1.3). Per-kind section cards + widget rows
+   with icon + name + meta + admin badge + description. */
+.dx-widget-row { align-items: flex-start; padding: 14px 15px; }
+.dx-widget-icon {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  margin-top: 1px;
+}
+.dx-widget-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dx-widget-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 14px;
+}
+.dx-widget-name { font-weight: 700; color: var(--t-fg); }
+.dx-widget-id {
+  font-family: var(--t-font-mono);
+  font-size: 11.5px;
+  color: var(--t-muted);
+  background: transparent;
+  padding: 0;
+}
+.dx-widget-desc {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--t-fg-soft);
+  line-height: 1.5;
+}
+
+/* Loader-errors section card variant uses the danger-band tone so it
+   reads as an attention-grabber. */
+.dx-section-card--danger {
+  border-color: var(--t-pill-danger-border);
+  background: var(--t-pill-danger-bg);
+}
+
+/* Battery dashboard (Tier 1.4). Per-device sub-cards stacked
+   vertically inside the parent section card; each carries a header
+   with name + pct, a Chart.js canvas, and the 4-tile stat grid. */
+.dx-battery-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dx-battery-card {
+  background: var(--t-inset);
+  border: 1px solid var(--t-inset-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dx-battery-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.dx-battery-name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dx-battery-name h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--t-fg);
+  letter-spacing: -0.005em;
+}
+.dx-battery-id {
+  font-family: var(--t-font-mono);
+  font-size: 11px;
+  color: var(--t-muted);
+  background: transparent;
+  padding: 0;
+}
+.dx-battery-pct-block {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+.dx-battery-pct {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--t-fg);
+  line-height: 1;
+}
+.dx-battery-pct-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-muted);
+}
+.dx-battery-card[data-tone="critical"] .dx-battery-pct { color: var(--t-pill-danger-fg); }
+.dx-battery-card[data-tone="low"] .dx-battery-pct { color: var(--t-pill-warn-fg); }
+
+.dx-battery-chart {
+  position: relative;
+  width: 100%;
+  height: 180px;
+}
+.dx-battery-chart .battery-chart { display: block; width: 100% !important; height: 100% !important; }
+
+.dx-battery-empty {
+  margin: 0;
+  padding: 24px 0;
+  text-align: center;
+  color: var(--t-muted);
+  font-size: 12.5px;
+}
+
+.dx-battery-stats { gap: 8px; }
+.dx-battery-hint {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--t-muted);
+  text-align: center;
+}

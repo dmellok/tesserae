@@ -1,151 +1,121 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head %}
+{% from "_components.html" import section_card %}
 {% block title %}History, Tesserae{% endblock %}
-{% block page_class %}page-wide{% endblock %}
 
-{% macro pill_status(status) %}
-  {% if status == 'sent' %}<span class="pill is-ok">sent</span>
-  {% elif status == 'busy' %}<span class="pill is-warn">busy</span>
-  {% elif status == 'quiet' %}<span class="pill is-warn">quiet</span>
-  {% elif status == 'not_found' %}<span class="pill is-danger">not found</span>
-  {% else %}<span class="pill is-danger">failed</span>{% endif %}
-{% endmacro %}
-
-{# Source → {label, icon, tone}. ``tone`` maps to a small accent class
-   on the chip so the eye can scan triggers (scheduler vs webhook vs
-   home_assistant) at a glance instead of reading every word. Unknown
-   sources fall through to a neutral chip with the raw source value. #}
+{# Source → {label, icon, tone} for the colour-coded source pill on
+   each push row. ``tone`` swaps the pill chrome class (`.is-schedule`
+   / `.is-dashboard` / etc) so the eye can scan triggers at a glance.
+   Unknown sources fall through to a neutral chip with the raw value. #}
 {% set SOURCE_META = {
-  'page':           ('Send page',      'paper-plane-tilt',     'accent-teal'),
-  'file':           ('File',           'image-square',         'accent-teal'),
-  'url':            ('URL',            'link-simple',          'accent-teal'),
-  'webpage':        ('Webpage',        'globe',                'accent-teal'),
-  'scheduler':      ('Schedule',       'calendar-dots',        'accent-ochre'),
-  'rotation':       ('Rotation',       'shuffle',              'accent-ochre'),
-  'webhook':        ('Webhook',        'arrow-square-in',      'accent-terracotta'),
-  'home_assistant': ('Home Assistant', 'house',                'accent-slate'),
-  'manual':         ('Manual',         'cursor-click',         'accent-slate'),
-  'resend':         ('Resend',         'arrow-clockwise',      'accent-slate'),
-  'onboarding':     ('Setup',          'sparkle',              'accent-slate'),
+  'page':           ('Send page',      'paper-plane-tilt',     'page'),
+  'file':           ('File',           'image-square',         'file'),
+  'url':            ('URL',            'link-simple',          'url'),
+  'webpage':        ('Webpage',        'globe',                'webpage'),
+  'scheduler':      ('Schedule',       'calendar-dots',        'schedule'),
+  'rotation':       ('Rotation',       'shuffle',              'rotation'),
+  'webhook':        ('Webhook',        'arrow-square-in',      'webhook'),
+  'home_assistant': ('Home Assistant', 'house',                'ha'),
+  'manual':         ('Manual',         'cursor-click',         'manual'),
+  'resend':         ('Resend',         'arrow-clockwise',      'resend'),
+  'onboarding':     ('Setup',          'sparkle',              'setup'),
 } %}
 
-{% macro pill_source(source) %}
+{% macro source_chip(source) %}
   {% set meta = SOURCE_META.get(source) %}
-  {% if meta %}
-    <span class="src-chip src-chip--{{ meta[2] }}" title="Triggered by: {{ meta[0] }}">
-      <i class="ph-fill ph-{{ meta[1] }}" aria-hidden="true"></i>
-      <span>{{ meta[0] }}</span>
-    </span>
-  {% else %}
-    <span class="src-chip" title="Triggered by: {{ source }}">
-      <i class="ph ph-question" aria-hidden="true"></i>
-      <span>{{ source }}</span>
-    </span>
-  {% endif %}
+  <span class="dx-source-chip dx-source-{{ meta[2] if meta else 'unknown' }}">
+    {{ meta[0] if meta else source }}
+  </span>
 {% endmacro %}
 
-{# Filter chip, matches the events page's .event-type-filter .chip
-   vocabulary so the two pages feel like the same product. Neutral
-   pill bg, accent-soft when active, glyph + label + a muted count
-   sub-pill at the tail. The "All" entry has source='' and resets
-   the filter. Per-source icon comes from SOURCE_META; unknown
-   sources fall through to the question mark. #}
-{% macro filter_chip(chip) %}
-  {% if chip.source == '' %}
-    <a href="{{ url_for('history.index') }}" role="tab"
-       class="chip {% if chip.active %}is-active{% endif %}"
-       title="All pushes">
-      <i class="ph ph-list-bullets" aria-hidden="true"></i>
-      <span>All</span><span class="muted">{{ chip.count }}</span>
-    </a>
-  {% else %}
-    {% set meta = SOURCE_META.get(chip.source) %}
-    <a href="{{ url_for('history.index', source=chip.source) }}" role="tab"
-       class="chip {% if chip.active %}is-active{% endif %}"
-       title="Filter to: {{ meta[0] if meta else chip.source }}">
-      <i class="ph ph-{{ meta[1] if meta else 'question' }}" aria-hidden="true"></i>
-      <span>{{ meta[0] if meta else chip.source }}</span><span class="muted">{{ chip.count }}</span>
-    </a>
-  {% endif %}
+{% macro status_chip(status) %}
+  {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>delivered</span>
+  {% elif status == 'busy' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>busy</span>
+  {% elif status == 'quiet' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>quiet</span>
+  {% elif status == 'not_found' %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>not found</span>
+  {% else %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>failed</span>{% endif %}
 {% endmacro %}
 
 {% block main %}
-<section class="card">
-  {{ card_head('History', icon_name='clock-counter-clockwise',
-               blurb='Last ' ~ history|length ~ ' push attempts across every trigger. Thumbnails are the composition PNG; per-renderer artifacts live in extras.') }}
-  {% if chips %}
-  <nav class="event-type-filter event-type-filter--standalone" role="tablist" aria-label="Filter by source">
-    {% for chip in chips %}{{ filter_chip(chip) }}{% endfor %}
-    {# Toggle: by default we hide quiet-hours and held statuses since
-       those are "nothing reached the panel" outcomes that bury real
-       pushes. Click to opt back in when you actually want to see why
-       a slot didn't fire. #}
-    {% if include_skipped %}
-      <a href="{{ url_for('history.index', source=active_source) }}"
-         class="chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
-        <i class="ph ph-eye" aria-hidden="true"></i>
-        <span>Skipped shown</span>
-      </a>
-    {% else %}
-      <a href="{{ url_for('history.index', source=active_source, include_skipped=1) }}"
-         class="chip" title="Show pushes skipped by quiet hours or condition holds">
-        <i class="ph ph-eye-closed" aria-hidden="true"></i>
-        <span>Show skipped</span>
-      </a>
-    {% endif %}
-  </nav>
-  {% endif %}
-  {% if not history %}
-  <p class="lede" data-history-empty>
-    {% if active_source %}
-      No pushes with source <strong>{{ active_source }}</strong>.
-      <a href="{{ url_for('history.index') }}">Clear filter</a>.
-    {% else %}
-      No pushes yet.
-    {% endif %}
-  </p>
+<header class="page-head">
+  <h1><i class="ph ph-clock-counter-clockwise"></i> History</h1>
+  <p class="lede">Newest pushes first. Each row links to the rendered artifact and the device it landed on.</p>
+</header>
+
+{% if chips %}
+{# Filter chip strip across the top of the page (outside the card so
+   it sits as page-level navigation). Style matches the existing
+   ``.event-type-filter`` shape but uses the v0.56 chip + count-pill
+   vocabulary so it reads as part of the new admin surface. #}
+<nav class="dx-filter-strip" role="tablist" aria-label="Filter by source">
+  {% for chip in chips %}
+  {% set meta = SOURCE_META.get(chip.source) %}
+  <a href="{{ url_for('history.index') if chip.source == '' else url_for('history.index', source=chip.source) }}"
+     role="tab"
+     class="dx-filter-chip{% if chip.active %} is-active{% endif %}"
+     title="{{ 'All pushes' if chip.source == '' else ('Filter to: ' ~ (meta[0] if meta else chip.source)) }}">
+    <i class="ph ph-{{ 'list-bullets' if chip.source == '' else (meta[1] if meta else 'question') }}" aria-hidden="true"></i>
+    <span>{{ 'All' if chip.source == '' else (meta[0] if meta else chip.source) }}</span>
+    <span class="dx-count-pill">{{ chip.count }}</span>
+  </a>
+  {% endfor %}
+  {# Skipped-pushes toggle preserves the existing behaviour, restyled. #}
+  {% if include_skipped %}
+  <a href="{{ url_for('history.index', source=active_source) }}"
+     class="dx-filter-chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
+    <i class="ph ph-eye" aria-hidden="true"></i><span>Skipped shown</span>
+  </a>
   {% else %}
-  <ul class="history">
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=1) }}"
+     class="dx-filter-chip" title="Show pushes skipped by quiet hours or condition holds">
+    <i class="ph ph-eye-closed" aria-hidden="true"></i><span>Show skipped</span>
+  </a>
+  {% endif %}
+</nav>
+{% endif %}
+
+{% call section_card(icon='clock-counter-clockwise', title='Push history',
+                     description='Every push attempted on the panel pipeline — file, URL, webpage, dashboard, or schedule fire.',
+                     meta={'label': '', 'value': history|length}) %}
+  {% if not history %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">
+      {% if active_source %}No pushes with source <strong>{{ active_source }}</strong>{% else %}No pushes yet{% endif %}
+    </p>
+    <p class="dx-empty-help">
+      {% if active_source %}<a href="{{ url_for('history.index') }}">Clear filter</a> to see all pushes.
+      {% else %}Send something from the Send page or wait for the next scheduler tick.{% endif %}
+    </p>
+  </div>
+  {% else %}
+  <ul class="dx-discovered-list">
     {% for ev in history %}
-    <li class="history-row">
-      <a class="history-thumb" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
-        {% if ev.digest %}
-        <img src="{{ url_for('renders', filename=ev.digest ~ '.png', w=240) }}"
-             alt="" width="120" height="90"
-             loading="lazy" decoding="async">
-        {% else %}
-        <span class="history-thumb-empty">no preview</span>
-        {% endif %}
+    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet') %}
+    <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
+      <a class="dx-history-time" {% if ev.digest %}href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Push #{{ ev.id }}"{% endif %}>
+        <span class="dx-history-clock"><code>{{ ev.abs.split(' ')[1] if ' ' in ev.abs else ev.abs }}</code></span>
+        <span class="dx-history-date">{{ ev.rel }}</span>
       </a>
-      <div class="history-meta">
-        <div class="history-top">
-          {{ pill_source(ev.source) }}
-          {# Only flag the exceptions, a green "sent" on every row is noise. #}
-          {% if ev.status != 'sent' %}{{ pill_status(ev.status) }}{% endif %}
-          <span class="history-target">{{ ev.target }}</span>
-        </div>
-        <div class="history-sub">
-          <time title="{{ ev.abs }}">{{ ev.rel }}</time>
-          <span class="muted">·</span>
-          <span>{{ '%.2f'|format(ev.duration_s) }} s</span>
-          {% if ev.error %}<span class="muted">·</span><span class="history-err">{{ ev.error }}</span>{% endif %}
-        </div>
-        {% if ev.renderers %}
-        <div class="history-renderers">
-          {% for r in ev.renderers %}
-          <span class="pill {% if r.error %}is-danger{% endif %}">{{ r.label }}</span>
-          {% endfor %}
-        </div>
+      <div class="dx-history-mid">
+        {% if ev.target_devices %}
+        {% for dev in ev.target_devices %}
+        <span class="dx-device-chip"><i class="ph ph-{{ dev.icon or 'monitor' }}" aria-hidden="true"></i> {{ dev.name }}</span>
+        {% endfor %}
         {% endif %}
+        {{ source_chip(ev.source) }}
+        <span class="dx-history-target">{{ ev.target }}</span>
+        {% if ev.error %}<span class="dx-history-err">{{ ev.error }}</span>{% endif %}
       </div>
-      <div class="history-actions">
-        <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="inline">
-          <button type="submit" class="ghost" {% if not ev.digest %}disabled title="no composition PNG stored"{% endif %}>
-            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i><span>Resend</span>
+      <div class="dx-history-end">
+        {{ status_chip(ev.status) }}
+        <span class="dx-history-dur">{% if ev.duration_s %}{{ '%.1f'|format(ev.duration_s) }}s{% else %}—{% endif %}</span>
+        <form method="post" action="{{ url_for('send.resend', event_id=ev.id) }}" class="form form--inline">
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" {% if not ev.digest %}disabled title="no composition PNG stored"{% else %}title="Resend this push"{% endif %}>
+            <i class="ph ph-arrow-clockwise" aria-hidden="true"></i>
           </button>
         </form>
-        <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="inline" onsubmit="return confirm('Delete this entry?');">
-          <button type="submit" class="ghost danger" title="Delete entry">
+        <form method="post" action="{{ url_for('send.delete', event_id=ev.id) }}" class="form form--inline" onsubmit="return confirm('Delete this entry?');">
+          <button type="submit" class="dx-btn-ghost-sm dx-btn-icon-only" title="Delete entry">
             <i class="ph ph-trash" aria-hidden="true"></i>
           </button>
         </form>
@@ -154,5 +124,5 @@
     {% endfor %}
   </ul>
   {% endif %}
-</section>
+{% endcall %}
 {% endblock %}

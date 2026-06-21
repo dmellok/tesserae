@@ -1,72 +1,92 @@
 {% extends "_base.html" %}
-{% from "_components.html" import card_head %}
-{% set KIND_ICONS = {'widget':'puzzle-piece','renderer':'image-square','device':'device-mobile','theme':'palette','font':'text-aa'} %}
+{% from "_components.html" import section_card %}
+{% set KIND_ICONS = {'widget':'puzzle-piece','renderer':'image-square','device':'device-mobile','theme':'palette','font':'text-aa','data':'database'} %}
+{% set KIND_DESC = {
+  'widget':   'Cells you compose onto a dashboard. Each one exposes its own settings + optional admin page.',
+  'data':     'Background data sources used by other widgets (HA bridges, weather, transit feeds).',
+  'font':     'Bundled fonts available to every widget; drop a folder + manifest under plugins/ to add more.',
+  'theme':    'Theme bundles loaded from disk; managed from the Themes page.',
+  'renderer': 'Renderer plugins (less common; usually shipped in-tree).',
+  'device':   'Device plugins (less common; usually shipped in-tree).',
+} %}
 {% block title %}Widgets, Tesserae{% endblock %}
+
 {% block main %}
 <header class="page-head">
   <h1><i class="ph ph-puzzle-piece"></i> Widgets</h1>
-  <p class="lede">
-    Every loaded widget, plus the supporting fonts + data plugins that
-    back them. Drop a new folder under <code>plugins/&lt;id&gt;/</code>
-    and restart to add one, or install community widgets via Browse below.
-    Widgets with a <code>blueprint()</code> in <code>server.py</code>
-    get an <em>Open admin</em> link, that's where their dedicated UI lives.
-  </p>
-  <p>
-    <a class="primary" href="{{ url_for('marketplace.browse') }}">
+  <p class="lede">Every loaded widget, plus the supporting fonts + data plugins that back them. Browse the catalog to install more.</p>
+  <div class="page-head-cta">
+    <a class="dx-btn-primary" href="{{ url_for('marketplace.browse') }}">
       <i class="ph ph-storefront" aria-hidden="true"></i>
       <span>Browse community widgets</span>
     </a>
-  </p>
+  </div>
 </header>
 
 {% if errors %}
-<section class="card">
-  {{ card_head('Loader errors', icon_name='warning-octagon', blurb='These widgets failed to load and were skipped.') }}
-  <ul class="error-list">
+{% call section_card(icon='warning-octagon', title='Loader errors',
+                     description='These widgets failed to load and were skipped. Fix the manifest or remove the folder, then restart.',
+                     extra_class='dx-section-card--danger') %}
+  <ul class="dx-discovered-list">
     {% for err in errors %}
-    <li><code>{{ err.plugin_id }}</code>, {{ err.message }} <span class="muted">({{ err.path }})</span></li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
-
-{% set kinds = plugins | groupby('kind') %}
-{% for kind, items in kinds %}
-<section class="card">
-  <header class="card-head">
-    <h2>
-      <span class="icon-box"><i class="ph ph-{{ KIND_ICONS.get(kind, 'puzzle-piece') }}" aria-hidden="true"></i></span>
-      <span>{{ kind|capitalize }}</span>
-      <span class="muted">({{ items|length }})</span>
-    </h2>
-  </header>
-  <ul class="plugin-list">
-    {% for plugin in items %}
-    <li class="plugin-row">
-      <div class="plugin-row-head">
-        <strong>{{ plugin.name }}</strong>
-        <code class="muted">{{ plugin.id }}</code>
-        <code class="muted">v{{ plugin.manifest.version }}</code>
-        {% if plugin.has_admin %}<span class="pill is-accent"><i class="ph ph-gear-six" aria-hidden="true"></i> admin page</span>{% endif %}
+    <li class="dx-inset-row">
+      <div class="dx-discovered-info">
+        <div class="dx-discovered-id"><code>{{ err.plugin_id }}</code></div>
+        <div class="dx-discovered-meta">
+          <span class="dx-meta-pair"><span class="dx-meta-k">Path</span><code>{{ err.path }}</code></span>
+          <span class="dx-meta-pair"><span class="dx-meta-k">Message</span><span class="dx-meta-v">{{ err.message }}</span></span>
+        </div>
       </div>
-      {% if plugin.manifest.description %}
-      <p class="plugin-row-desc">{{ plugin.manifest.description }}</p>
-      {% endif %}
-      {% if plugin.has_admin %}
-      <div class="plugin-row-actions">
-        <a class="ghost-link" href="{{ request.script_root }}/plugins/{{ plugin.id }}/">
-          <i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open admin</span>
-        </a>
-      </div>
-      {% endif %}
     </li>
     {% endfor %}
   </ul>
-</section>
-{% endfor %}
+{% endcall %}
+{% endif %}
 
 {% if not plugins %}
-<p class="lede">No widgets loaded. Drop one under <code>plugins/&lt;id&gt;/</code> and restart, or install community ones via Browse.</p>
+{% call section_card(icon='puzzle-piece', title='No widgets loaded',
+                     description='Drop a folder under plugins/&lt;id&gt;/ and restart, or install community ones via Browse.') %}
+  <div class="dx-empty">
+    <div class="dx-empty-icon"><i class="ph ph-puzzle-piece" aria-hidden="true"></i></div>
+    <p class="dx-empty-title">Nothing installed yet</p>
+    <p class="dx-empty-help">Click <a href="{{ url_for('marketplace.browse') }}">Browse community widgets</a> to discover new widgets, or read the install docs.</p>
+  </div>
+{% endcall %}
+{% else %}
+
+{% set kinds = plugins | groupby('kind') %}
+{% for kind, items in kinds %}
+{% call section_card(icon=KIND_ICONS.get(kind, 'puzzle-piece'),
+                     title=kind|capitalize,
+                     description=KIND_DESC.get(kind, ''),
+                     meta={'label': '', 'value': items|length}) %}
+  <ul class="dx-discovered-list">
+    {% for plugin in items %}
+    <li class="dx-inset-row dx-widget-row">
+      <span class="dx-section-icon dx-widget-icon" aria-hidden="true">
+        <i class="ph ph-{{ plugin.icon or KIND_ICONS.get(plugin.kind, 'puzzle-piece') }}"></i>
+      </span>
+      <div class="dx-widget-text">
+        <div class="dx-widget-head">
+          <span class="dx-widget-name">{{ plugin.name }}</span>
+          <code class="dx-widget-id">{{ plugin.id }} · v{{ plugin.manifest.version }}</code>
+          {% if plugin.has_admin %}<span class="dx-pill is-ok"><i class="ph ph-gear-six" aria-hidden="true"></i> admin page</span>{% endif %}
+        </div>
+        {% if plugin.manifest.description %}
+        <p class="dx-widget-desc">{{ plugin.manifest.description }}</p>
+        {% endif %}
+      </div>
+      <div class="dx-discovered-actions">
+        {% if plugin.has_admin %}
+        <a class="dx-btn-ghost-sm" href="{{ request.script_root }}/plugins/{{ plugin.id }}/">
+          <i class="ph ph-arrow-square-out" aria-hidden="true"></i><span>Open admin</span>
+        </a>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+{% endcall %}
+{% endfor %}
 {% endif %}
 {% endblock %}

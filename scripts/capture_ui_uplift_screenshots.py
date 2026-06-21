@@ -44,7 +44,7 @@ class _ThreadedWSGIServer(socketserver.ThreadingMixIn, WSGIServer):
 # instead of always rendering its default first-paint.
 ROUTES: list[tuple[str, str, str | None]] = [
     # Top-level admin
-    ("dashboards.png", "/", None),
+    ("dashboards.png", "/pages", None),
     ("send.png", "/send", None),
     # Schedules: default saved-list view + a populated New schedule
     # form (with conditions disclosure open) so the design agent sees
