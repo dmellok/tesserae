@@ -3100,3 +3100,48 @@
   border: 1px solid var(--t-border);
 }
 .dx-event-thumb-link img { display: block; max-width: 240px; height: auto; }
+
+/* Pragmatic adapter: pages that wrap their content in
+   ``.dx-section-card`` but still call the legacy ``card_head``
+   macro (which emits ``<header class="card-head">``) pick up the
+   v0.56 header chrome via this rule. Lets Tier 3+ pages flip just
+   the outer card class without touching every ``card_head`` call.
+   The macro's ``.icon-box`` -> teal-tinted square mapping happens
+   naturally because the existing ``.icon-box`` already styles to
+   the right shape; we just need to nudge the size + alignment. */
+.dx-section-card > .card-head {
+  padding: 0;
+  margin: 0 0 14px;
+}
+.dx-section-card > .card-head .card-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.dx-section-card > .card-head h2,
+.dx-section-card > .card-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--t-fg);
+}
+.dx-section-card > .card-head .icon-box {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--t-accent-tint);
+  color: var(--t-accent);
+  font-size: 18px;
+  display: grid;
+  place-items: center;
+}
+.dx-section-card > .card-head .card-head-action {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

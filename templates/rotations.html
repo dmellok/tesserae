@@ -164,7 +164,7 @@
   <div class="rotations-list">
     {% for r in rotations %}
     {% set cur = current_step.get(r.id) %}
-    <section class="card rotation-card" id="rotation-{{ r.id }}">
+    <section class="dx-section-card rotation-card" id="rotation-{{ r.id }}">
       <div class="rotation-head">
         <div class="rotation-title">
           <h2>{{ r.name }}</h2>
@@ -304,7 +304,7 @@
   {% endif %}
 
   {# New rotation form #}
-  <section class="card" id="rotation-form-card">
+  <section class="dx-section-card" id="rotation-form-card">
     {{ card_head('New rotation', icon_name='plus-circle', blurb='Pick the dashboards to cycle through and how long to dwell on each.') }}
     {% set blank = {
       'id': '', 'name': '', 'anchor': '00:00', 'end_at': '', 'priority': 0,

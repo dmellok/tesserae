@@ -145,8 +145,14 @@
   </p>
 </header>
 
-<section class="card timeline-card">
-  {{ card_head('Next 24 hours', icon_name='timer', blurb='Projected fire times for every enabled schedule. Disabled schedules sit greyed out.') }}
+<section class="dx-section-card timeline-card">
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-timer"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Next 24 hours</h3>
+      <p class="dx-section-desc">Visual lookahead for the next 24 hours of scheduled pushes. Each tick is one fire.</p>
+    </div>
+  </header>
   {% if not schedules %}
   <p class="lede">No schedules to plot, add one with <strong>New schedule</strong>.</p>
   {% elif not timeline.any_fires %}
@@ -185,9 +191,14 @@
   {% endif %}
 </section>
 
-<section class="card" id="schedule-form-card" {% if not edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
-  {{ card_head('Edit schedule' if edit_id else 'New schedule',
-               icon_name='pencil-simple' if edit_id else 'plus-circle') }}
+<section class="dx-section-card" id="schedule-form-card" {% if not edit_id and not prefill_page %}hidden{% endif %} data-new-schedule-form>
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-{% if edit_id %}pencil-simple{% else %}plus-circle{% endif %}"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">{% if edit_id %}Edit schedule{% else %}New schedule{% endif %}</h3>
+      <p class="dx-section-desc">Pick a dashboard and a cadence. Add conditions to fire only when they're met.</p>
+    </div>
+  </header>
   {% if edit_id %}
     {% set editing = (schedules | selectattr('id', 'equalto', edit_id) | list | first) %}
     {% if editing %}
@@ -201,8 +212,14 @@
   {% endif %}
 </section>
 
-<section class="card">
-  {{ card_head('Saved schedules', icon_name='list-bullets') }}
+<section class="dx-section-card">
+  <header class="dx-section-head">
+    <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-list-bullets"></i></span>
+    <div class="dx-section-titleblock">
+      <h3 class="dx-section-title">Saved schedules</h3>
+      <p class="dx-section-desc">One row per schedule. Edit times, conditions, or pause / delete inline.</p>
+    </div>
+  </header>
   {% if not schedules %}
   <p class="lede">No schedules yet, create one above.</p>
   {% else %}

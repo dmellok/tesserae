@@ -6,6 +6,41 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.58.0], 2026-06-21
+
+Tier 3 of the v0.56 admin-UI uplift. Schedules, Rotations, and the
+System Settings sub-tab flip onto the section-card chrome.
+
+### Changed
+
+- **Schedules** (``/schedules``): Next 24 hours card, New schedule
+  form, and Saved schedules table all wrapped in ``.dx-section-card``
+  with the icon-in-teal-square headers + descriptions.
+- **Rotations** (``/rotations``): existing-rotation cards + New
+  rotation form lift onto the section-card chrome.
+- **Settings → System** (``/settings/system``): every System tab
+  card (Updates / Authentication / Backups / Webhook + auxiliary
+  card--compact slots) converts to ``.dx-section-card``.
+
+### Added
+
+- Pragmatic CSS adapter for the legacy ``card_head`` macro: when a
+  page wraps content in ``.dx-section-card`` but still calls
+  ``card_head``, the existing ``<header class="card-head">`` markup
+  re-styles to the v0.56 chrome (icon-in-teal-square + 15px/700
+  title + meta + action). Lets Tier 3+ pages flip the outer card
+  class without touching every ``card_head`` call.
+
+### Notes
+
+- The conditions builder partial originally scoped to Tier 3 was
+  deferred: the existing ``condition-picker.js`` already drives the
+  per-schedule + per-rotation-step builders and works at v0.55
+  fidelity, so the surgical chrome conversion ships the visual win
+  without rebuilding the picker. Picker UI overhaul can land as a
+  follow-up.
+- Tier 4 (Onboarding + Themes) still ahead.
+
 ## [0.57.0], 2026-06-21
 
 Tier 2 of the v0.56 admin-UI uplift. Send, Events, and Widgets

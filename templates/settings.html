@@ -575,7 +575,7 @@
      directory, so the in-app updater's git-based check / apply /
      rollback flows can't run. Show the running version, ask GitHub
      for the latest release, surface the appropriate upgrade hint. #}
-  <section class="card">
+  <section class="dx-section-card">
     {% if system_in_container %}
     {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Tesserae is running from the official Docker image. Updates land via a new image, not an in-app pull, but we still check GitHub for newer releases so you know when one is out.') }}
     {% else %}
@@ -613,7 +613,7 @@ docker compose up -d</code></pre>
     {% endif %}
   </section>
   {% else %}
-  <section class="card">
+  <section class="dx-section-card">
     {{ card_head('Updates', icon_name='arrow-clockwise', blurb='Pull a newer revision of Tesserae from this repo and restart. A pre-update snapshot of data/ is always taken, and a rollback path is always one click away.') }}
 
     {% if system_state %}
@@ -637,7 +637,7 @@ docker compose up -d</code></pre>
     </form>
 
     {% if system_last_check %}
-    <section class="card card--compact">
+    <section class="dx-section-card card--compact">
       {% if system_last_check.available %}
       <p><strong>Update available</strong>, {{ system_last_check.commits_behind }} commit{% if system_last_check.commits_behind != 1 %}s{% endif %} behind <code>{{ system_last_check.target_ref }}</code> ({{ system_last_check.target_sha[:7] }}).</p>
       {% if system_last_check.changelog %}
@@ -700,7 +700,7 @@ docker compose up -d</code></pre>
   </section>
   {% endif %}
 
-  <section class="card">
+  <section class="dx-section-card">
     {{ card_head('Authentication', icon_name='lock-key', blurb='Change the admin password or turn off the password gate for a trusted LAN. Public IPs are blocked either way. Locked out? Run tesserae --reset-password on the host.') }}
 
     <p>
@@ -748,7 +748,7 @@ docker compose up -d</code></pre>
     </p>
   </section>
 
-  <section class="card">
+  <section class="dx-section-card">
     {{ card_head('Backups', icon_name='archive', blurb='Snapshot data/ to a single zip. Gallery photos and the push render cache are skipped (their dot-config still rides along) so backups stay small; restoring leaves your photos and cached renders untouched. Backups still contain real secrets (API tokens, MQTT creds, OAuth), keep them somewhere safe.') }}
 
     <form method="post" action="{{ url_for('auth.system_backup_create') }}" class="form">
@@ -874,7 +874,7 @@ docker compose up -d</code></pre>
   </section>
 
   {% if system_dev_mode %}
-  <section class="card">
+  <section class="dx-section-card">
     {{ card_head('Telemetry', icon_name='broadcast', blurb='Two events (app.started, update.applied) go to ' ~ (system_telemetry_host or 'the project backend') ~ '. Every attempt is recorded as a "telemetry" row in the Events tab so you can see exactly what landed.') }}
 
     <p>
@@ -897,7 +897,7 @@ docker compose up -d</code></pre>
   </section>
   {% endif %}
 
-  <section class="card">
+  <section class="dx-section-card">
     {{ card_head('Webhook', icon_name='webhooks-logo', blurb='POST a JSON body to /api/v1/push from anything that can fire HTTP, Home Assistant scripts, n8n, GitHub Actions, cron + curl, Shortcuts. The token is the bearer key.') }}
 
     <p>
