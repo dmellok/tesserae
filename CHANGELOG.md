@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.62.3], 2026-06-21
+
+### Fixed
+
+- **Condition picker inputs now match the v0.56 input baseline**.
+  The previous pass only styled inputs inside ``.field`` wrappers,
+  which the condition picker doesn't use — its selects + text
+  inputs land directly in ``.cp-row-body`` / ``.cp-row``. Added
+  selectors for ``.condition-picker .cp-row-body input/select``
+  + ``.condition-picker .cp-row > select`` so the HA entity
+  dropdown, source-id input, operator select, and value input
+  all read as siblings of the rotation form's anchor fields.
+- **Day-of-week chips: centring rule promoted to base
+  ``.dow-chip``** rather than scoped to ``.rotation-form``, so
+  the rule fires anywhere the chip is used (rotation form,
+  schedule form, condition picker time-window builder).
+
 ## [0.62.2], 2026-06-21
 
 ### Fixed

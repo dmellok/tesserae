@@ -318,26 +318,44 @@ hr.dx-divider {
 .rotation-form .field input[type="email"],
 .rotation-form .field select,
 .rotation-form .rot-step select,
-.rotation-form .rot-step input[type="number"] {
+.rotation-form .rot-step input[type="number"],
+/* Condition picker rows render their selects + text inputs
+   directly inside .cp-row-body (no ``.field`` ancestor), so they
+   need their own selector to pick up the v0.56 input baseline.
+   Same shape, same focus ring, so the condition rows read as
+   siblings of the rotation form's anchor fields. */
+.condition-picker .cp-row-body input[type="text"],
+.condition-picker .cp-row-body input[type="number"],
+.condition-picker .cp-row-body input[type="time"],
+.condition-picker .cp-row-body select,
+.condition-picker .cp-row > select {
   padding: 11px 13px;
   border-radius: 8px;
   border: 1px solid var(--t-input-border, var(--t-border));
   font-size: 14px;
+  background: var(--t-surface);
+  color: var(--t-fg);
 }
 .rotation-form .field input:focus,
 .rotation-form .field select:focus,
 .rotation-form .rot-step select:focus,
-.rotation-form .rot-step input:focus {
+.rotation-form .rot-step input:focus,
+.condition-picker .cp-row-body input:focus,
+.condition-picker .cp-row-body select:focus,
+.condition-picker .cp-row > select:focus {
   outline: 2px solid var(--t-accent);
   outline-offset: -1px;
   border-color: var(--t-accent);
 }
 
-/* Day-of-week chip centring. The hidden checkbox was a flex
-   child sharing a gap with the visible label; remove the gap and
-   centre the label inside the chip. */
-.rotation-form .dow-chip,
-.dx-section-card .dow-chip {
+/* Day-of-week chip centring. The hidden checkbox is a flex child
+   sharing a gap with the visible label, which shifts the label
+   visually right. Drop the gap, centre the label inside the
+   chip, and give the chip a minimum width so the row reads as a
+   balanced segmented control. Applied at .dow-chip level so the
+   rule fires anywhere the chip is used — rotation form, schedule
+   form, condition picker — not just inside .rotation-form. */
+.dow-chip {
   justify-content: center;
   gap: 0;
   min-width: 56px;
