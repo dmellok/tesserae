@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.63.4], 2026-06-21
+
+### Changed
+
+- **Login + Setup**: outer card adds the ``.dx-section-card``
+  class (keeping ``.narrow`` for max-width) so the auth-flow
+  pages inherit the v0.56 chrome (box-shadow, border-radius,
+  border) instead of the legacy card look. Surgical — the
+  ``card_head`` adapter handles the inner header chrome and
+  the form layout is otherwise unchanged. ``onboarding.html``'s
+  one remaining ``card--wizard-info`` block is intentionally
+  left on the legacy chrome; it's an info-callout role inside
+  a wizard step body, not a section card, so it doesn't map
+  onto the ``section_card`` vocabulary.
+
 ## [0.63.3], 2026-06-21
 
 ### Changed
