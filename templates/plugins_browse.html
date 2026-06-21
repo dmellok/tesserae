@@ -80,22 +80,23 @@
       </div>
     </div>
   </header>
-  {# Free-text catalog search. GET so the result URL is shareable +
-     bookmarkable; auto-submits on input (debounced via 300ms timer).
-     Hidden inputs preserve the active tag + kind so search composes
-     with the chip filters. #}
-  <form method="get" action="{{ url_for('marketplace.browse') }}" class="dx-marketplace-search">
+  {# Free-text catalog search. Client-side DOM filter so typing
+     never triggers a page navigation — the input keeps focus +
+     caret position naturally. The form still submits on Enter so
+     the result URL stays shareable (?q=... is honoured server-side
+     by ``_filter_entries``). When JS is disabled the form-submit
+     path still works. #}
+  <form method="get" action="{{ url_for('marketplace.browse') }}" class="dx-marketplace-search" data-mkt-search-form>
     <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
     <input type="search" name="q" value="{{ active_query or '' }}"
            class="dx-input" placeholder="Search the catalog…"
            autocomplete="off" data-mkt-search>
     {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
     {% if active_kind %}<input type="hidden" name="kind" value="{{ active_kind }}">{% endif %}
-    {% if active_query %}
-    <a class="dx-btn-ghost-sm" href="{{ url_for('marketplace.browse', tag=active_tag, kind=active_kind) }}" aria-label="Clear search">
+    <button type="button" class="dx-btn-ghost-sm" data-mkt-search-clear
+            aria-label="Clear search" hidden>
       <i class="ph ph-x" aria-hidden="true"></i>
-    </a>
-    {% endif %}
+    </button>
   </form>
   {% if kinds and kinds|length > 1 %}
   <div class="dx-mkt-chips dx-mkt-chips--kinds" role="tablist" aria-label="Filter by type">
@@ -133,7 +134,10 @@
 {% if entries %}
 <div class="marketplace-grid">
   {% for e in entries %}
-  <article class="dx-section-card marketplace-card">
+  {# Concatenate the searchable fields once per card so the JS
+     filter is a plain ``indexOf`` against a lower-cased string. #}
+  {% set _hay = (e.id ~ ' ' ~ e.name ~ ' ' ~ e.description ~ ' ' ~ (e.author_name or '') ~ ' ' ~ (e.tags|join(' '))) | lower %}
+  <article class="dx-section-card marketplace-card" data-search-haystack="{{ _hay }}">
     {% if e.screenshot_urls and e.screenshot_urls|length > 1 %}
     <div class="marketplace-thumb marketplace-thumb-carousel"
          role="region" aria-label="screenshots for {{ e.name }}"
@@ -541,44 +545,60 @@
 </style>
 <script src="{{ url_for('static', filename='plugins_browse_carousel.js') }}" defer></script>
 <script>
-  // Debounced auto-submit for the catalog search. Submits 300ms after
-  // the last keystroke so the URL stays in sync with the query without
-  // a request per character. We stash a focus marker + caret position
-  // in sessionStorage right before submitting and restore them on the
-  // next render so typing never loses input focus — without that the
-  // page navigation steals the caret and the user's flow breaks.
+  // Client-side catalog search. Filters the marketplace grid by
+  // showing/hiding article cards in the DOM as the user types, so
+  // focus + caret are never disturbed. The hit set is built off
+  // each card's data-search-haystack (id + name + author + tags +
+  // description, lower-cased server-side). Submitting the form
+  // (Enter or the Clear button) does a full GET so the URL / share
+  // state stays in sync; ``?q=`` is honoured server-side.
   (function () {
+    const form = document.querySelector('[data-mkt-search-form]');
     const input = document.querySelector('[data-mkt-search]');
+    const clearBtn = document.querySelector('[data-mkt-search-clear]');
+    const grid = document.querySelector('.marketplace-grid');
     if (!input) return;
-    const form = input.closest('form');
-    const FOCUS_KEY = 'mkt-search-focus';
+    const cards = grid ? Array.from(grid.querySelectorAll('[data-search-haystack]')) : [];
 
-    // Restore focus + caret if the previous render submitted via search.
-    try {
-      const raw = sessionStorage.getItem(FOCUS_KEY);
-      if (raw) {
-        sessionStorage.removeItem(FOCUS_KEY);
-        const pos = parseInt(raw, 10);
-        input.focus();
-        if (!isNaN(pos)) {
-          const at = Math.min(pos, input.value.length);
-          input.setSelectionRange(at, at);
-        } else {
-          input.setSelectionRange(input.value.length, input.value.length);
+    function apply(query) {
+      const q = (query || '').trim().toLowerCase();
+      let visible = 0;
+      cards.forEach(function (card) {
+        if (!q) {
+          card.hidden = false;
+          visible++;
+          return;
         }
+        const hay = card.dataset.searchHaystack || '';
+        const match = hay.indexOf(q) !== -1;
+        card.hidden = !match;
+        if (match) visible++;
+      });
+      if (clearBtn) clearBtn.hidden = !q;
+      // Toggle an "empty after filter" message under the grid.
+      let emptyEl = document.querySelector('[data-mkt-search-empty]');
+      if (q && visible === 0 && grid && !emptyEl) {
+        emptyEl = document.createElement('p');
+        emptyEl.setAttribute('data-mkt-search-empty', '');
+        emptyEl.className = 'dx-empty-help';
+        emptyEl.style.cssText = 'margin-top: 14px; text-align: center;';
+        emptyEl.textContent = 'No entries match that search.';
+        grid.parentNode.insertBefore(emptyEl, grid.nextSibling);
       }
-    } catch (e) { /* sessionStorage unavailable — focus restore is best-effort */ }
+      if ((!q || visible > 0) && emptyEl) emptyEl.remove();
+    }
 
-    let timer = null;
-    input.addEventListener('input', function () {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(function () {
-        try {
-          sessionStorage.setItem(FOCUS_KEY, String(input.selectionStart ?? input.value.length));
-        } catch (e) { /* ignore */ }
-        form.submit();
-      }, 300);
-    });
+    input.addEventListener('input', function () { apply(input.value); });
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        input.value = '';
+        apply('');
+        input.focus();
+      });
+    }
+    // Initial pass in case the input already has a value (e.g. URL ?q=).
+    apply(input.value);
+    // Form submit (Enter) still goes server-side so the URL updates.
   })();
 </script>
 {% endblock %}

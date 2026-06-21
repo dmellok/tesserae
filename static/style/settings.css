@@ -3019,16 +3019,54 @@
   color: var(--t-fg-soft);
   font-size: 14px;
 }
-.dx-event-row--push .dx-event-icon { color: var(--t-accent); border-color: var(--t-accent-tint); background: var(--t-accent-tint); }
-.dx-event-row--render .dx-event-icon { color: #5b8def; background: #e4ecfb; border-color: #cfddf6; }
-.dx-event-row--schedule .dx-event-icon { color: var(--t-pill-warn-fg); background: var(--t-pill-warn-bg); border-color: var(--t-pill-warn-border); }
-.dx-event-row--conditions .dx-event-icon { color: #7b59d1; background: #ece3fb; border-color: #d8c7f3; }
-.dx-event-row--heartbeat .dx-event-icon { color: #c0392b; background: var(--t-pill-danger-bg); border-color: var(--t-pill-danger-border); }
-.dx-event-row--auth .dx-event-icon { color: #1f7a5a; background: #dff2ea; border-color: #b8e0ce; }
-.dx-event-row--plugin .dx-event-icon { color: #b15a1c; background: #fbe9d4; border-color: #f0d2a8; }
-.dx-event-row--transport .dx-event-icon,
-.dx-event-row--telemetry .dx-event-icon { color: #2b6b75; background: #def0f1; border-color: #b4dde0; }
-.dx-event-row--device .dx-event-icon { color: #6b6562; background: #efedea; border-color: #ddd9d3; }
+/* Per-event-type icon palette. Each type gets a distinct hue so the
+   row icon is recognisable at a glance, and the matching filter
+   chip mirrors the same swatch when active. Single source of truth
+   via CSS custom properties so the row icon, the filter chip, and
+   any future swatch (e.g. timeline mark) stay in lockstep. */
+.dx-event-row--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
+.dx-event-row--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-event-row--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-event-row--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-event-row--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-event-row--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-event-row--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
+.dx-event-row--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
+.dx-event-row--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
+.dx-event-row--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
+.dx-event-row--transport,
+.dx-event-row--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-event-row--device   { --evt-fg: #6b6562; --evt-bg: #efedea; --evt-bd: #ddd9d3; }
+.dx-event-row[class*="dx-event-row--"] .dx-event-icon {
+  color: var(--evt-fg, var(--t-fg-soft));
+  background: var(--evt-bg, var(--t-surface));
+  border-color: var(--evt-bd, var(--t-border));
+}
+
+/* Filter-chip colour matches each type. Active state fills with
+   the per-type swatch so the chosen filter reads as the same
+   colour family as the rows it surfaces. */
+.dx-filter-chip--push     { --evt-fg: var(--t-accent, #15846a); --evt-bg: var(--t-accent-tint, #dcefe8); --evt-bd: var(--t-accent-tint, #dcefe8); }
+.dx-filter-chip--renderer { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-filter-chip--render   { --evt-fg: #5b8def; --evt-bg: #e4ecfb; --evt-bd: #cfddf6; }
+.dx-filter-chip--rotation { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-filter-chip--scheduler { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-filter-chip--schedule { --evt-fg: var(--t-pill-warn-fg); --evt-bg: var(--t-pill-warn-bg); --evt-bd: var(--t-pill-warn-border); }
+.dx-filter-chip--conditions { --evt-fg: #7b59d1; --evt-bg: #ece3fb; --evt-bd: #d8c7f3; }
+.dx-filter-chip--heartbeat { --evt-fg: #c0392b; --evt-bg: var(--t-pill-danger-bg); --evt-bd: var(--t-pill-danger-border); }
+.dx-filter-chip--auth     { --evt-fg: #1f7a5a; --evt-bg: #dff2ea; --evt-bd: #b8e0ce; }
+.dx-filter-chip--plugin   { --evt-fg: #b15a1c; --evt-bg: #fbe9d4; --evt-bd: #f0d2a8; }
+.dx-filter-chip--transport,
+.dx-filter-chip--telemetry { --evt-fg: #2b6b75; --evt-bg: #def0f1; --evt-bd: #b4dde0; }
+.dx-filter-chip--device   { --evt-fg: #6b6562; --evt-bg: #efedea; --evt-bd: #ddd9d3; }
+.dx-filter-chip[class*="dx-filter-chip--"] > .ph { color: var(--evt-fg, var(--t-fg-soft)); }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active {
+  background: var(--evt-bg, var(--t-accent-tint));
+  border-color: var(--evt-bd, var(--t-accent-tint));
+  color: var(--evt-fg, var(--t-accent));
+}
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: var(--evt-fg, var(--t-accent)); }
 .dx-event-body {
   flex: 1 1 auto;
   min-width: 0;

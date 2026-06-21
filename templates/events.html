@@ -2,7 +2,21 @@
 {% from "_components.html" import section_card, settings_tabs %}
 {% block title %}Events, Tesserae{% endblock %}
 
-{% set TYPE_ICONS = {'push':'paper-plane-tilt','render':'image-square','heartbeat':'heartbeat','schedule':'clock-clockwise','auth':'shield-check','plugin':'puzzle-piece','transport':'broadcast','telemetry':'broadcast','conditions':'funnel','device':'device-mobile'} %}
+{% set TYPE_ICONS = {
+  'push':'paper-plane-tilt',
+  'renderer':'image-square',
+  'render':'image-square',
+  'rotation':'arrows-clockwise',
+  'heartbeat':'heartbeat',
+  'scheduler':'clock-clockwise',
+  'schedule':'clock-clockwise',
+  'auth':'shield-check',
+  'plugin':'puzzle-piece',
+  'transport':'broadcast',
+  'telemetry':'broadcast',
+  'conditions':'funnel',
+  'device':'device-mobile',
+} %}
 
 {% macro status_pill(status) %}
   {% if status in ('sent','ok') %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>{{ status }}</span>
@@ -25,7 +39,7 @@
     <span>All</span><span class="dx-count-pill">{{ counts.all }}</span>
   </a>
   {% for t in known_types %}
-  <a href="?type={{ t }}" role="tab" class="dx-filter-chip{% if selected == t %} is-active{% endif %}">
+  <a href="?type={{ t }}" role="tab" class="dx-filter-chip dx-filter-chip--{{ t }}{% if selected == t %} is-active{% endif %}">
     <i class="ph ph-{{ TYPE_ICONS.get(t, 'circle') }}" aria-hidden="true"></i>
     <span>{{ t|capitalize }}</span><span class="dx-count-pill">{{ counts[t] }}</span>
   </a>

@@ -6,6 +6,43 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.60.2], 2026-06-21
+
+Three regressions from the v0.60.1 polish: search refresh, broken
+Send preview, missing event-type colours.
+
+### Fixed
+
+- **Widgets Browse search**: typing no longer refreshes the page.
+  Switched from a debounced auto-submit + sessionStorage focus
+  restore to a client-side DOM filter — each card carries a
+  ``data-search-haystack`` of its id + name + description +
+  author + tags, and the JS filter toggles ``hidden`` on a plain
+  ``indexOf`` match. Focus + caret stay put naturally. Submitting
+  the form (Enter) still does a full GET so ``?q=`` URLs stay
+  shareable, and ``_filter_entries`` server-side honours the
+  query for that case + no-JS users.
+- **Send (Live preview)**: the v0.60.1 flex + ``width: auto``
+  override collapsed the preview-frame to zero width when its
+  ``.dx-section-body`` flex container was ``align-items: center``.
+  Reverted the flex shim and replaced it with a simple
+  ``max-width: 480px`` on the preview-frame so a portrait panel
+  ratio (1200×1600 → 3:4) caps at ~640px tall while keeping the
+  frame's actual width visible.
+
+### Changed
+
+- **Events**: ``renderer`` + ``rotation`` event types now have
+  their own icon swatches (blue and teal). The previous pass
+  only added ``render`` and missed the real type strings emitted
+  by the push pipeline + scheduler. Per-type swatches are now
+  expressed as CSS custom properties (``--evt-fg/bg/bd``) so the
+  row icon and the filter chip pick up the same colour from one
+  source of truth.
+- **Events filter chips**: each chip mirrors the swatch of the
+  event type it filters by. Active state fills with the per-type
+  background instead of the generic accent tint.
+
 ## [0.60.1], 2026-06-21
 
 Second round of post-uplift polish from a live walkthrough.
