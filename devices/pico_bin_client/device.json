@@ -12,7 +12,7 @@
     "sleep_interval_s": {
       "type": "int",
       "label": "Sleep interval",
-      "default": 900,
+      "default": 60,
       "min": 30,
       "max": 604800,
       "presets": [

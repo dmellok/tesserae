@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.61.1], 2026-06-21
+
+### Changed
+
+- **Default sleep / refresh cadence dropped from 15 min to 60 s
+  across every device kind** (esp32, esp32_bw, pico_bin, pi_bin,
+  pi_png, trmnl). Newly paired devices stay responsive enough for
+  the user to log in and pick a reasonable cadence before the
+  device disappears into long sleep. Existing devices keep their
+  saved value untouched.
+
 ## [0.61.0], 2026-06-21
 
 ### Added

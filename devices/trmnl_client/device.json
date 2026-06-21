@@ -10,7 +10,7 @@
     "refresh_rate_s": {
       "type": "int",
       "label": "Refresh rate",
-      "default": 900,
+      "default": 60,
       "min": 30,
       "max": 86400,
       "presets": [
