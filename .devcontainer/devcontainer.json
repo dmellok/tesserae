@@ -1,0 +1,65 @@
+// One-click Codespaces / VS Code Dev Containers setup for Tesserae.
+//
+// What you get when this opens:
+// * Python 3.11 (the minimum Tesserae supports — matches the floor in
+//   pyproject.toml so we don't paper over a 3.11-specific bug by
+//   testing on a newer interpreter).
+// * `pip install -e '.[dev]'` already run.
+// * The production server (``tesserae`` — Waitress, NOT Flask dev
+//   reload) auto-starts on attach and binds to port 8765. The
+//   ``postAttachCommand`` backgrounds it via nohup and pipes stdout
+//   + stderr to ``/tmp/tesserae.log`` so the terminal stays free for
+//   the user. We serve prod because Codespaces is a test-drive
+//   environment, not a code-iteration loop — running prod matches
+//   what users see on their Pi / Docker host, and it dodges the
+//   Flask-dev "DO NOT USE IN PRODUCTION" banner that confuses
+//   first-time testers.
+// * Port 8765 forwarded with a VS Code preview attached, so the
+//   admin UI pops in a side panel as soon as the server is ready.
+// * fonts-noto-color-emoji installed for parity with the production
+//   Docker image (without it, flag glyphs in widgets render as
+//   monochrome boxes on Linux — macOS preview hides this issue).
+// * Ruff format-on-save wired up matching the repo's CI rules.
+//
+// Want to switch to the dev server (Flask reload, /__debug__)?
+//   pkill -f 'tesserae' && tesserae --dev
+//
+// Tail the prod server's log:
+//   tail -f /tmp/tesserae.log
+//
+// Optional follow-ups the postCreate does NOT do (keep boot fast):
+// * `playwright install chromium` — only needed for screenshot
+//   capture scripts under scripts/. Skip unless you're regenerating
+//   the widget gallery.
+// * Pulling an MQTT broker into the container — running the wizard
+//   without a broker works fine; the broker step is optional.
+{
+  "name": "Tesserae",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "forwardPorts": [8765],
+  "portsAttributes": {
+    "8765": {
+      "label": "Tesserae admin UI",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-color-emoji && sudo rm -rf /var/lib/apt/lists/* && pip install --upgrade pip && pip install -e '.[dev]'",
+  "postAttachCommand": "bash -lc 'pgrep -f \"tesserae\" >/dev/null || nohup tesserae > /tmp/tesserae.log 2>&1 &'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        },
+        "ruff.format.args": [],
+        "ruff.lint.args": []
+      }
+    }
+  }
+}
