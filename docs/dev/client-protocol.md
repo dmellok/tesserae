@@ -188,7 +188,8 @@ Fetch metadata for the current frame.
 
 **Responses**:
 
-`200 OK` — new frame is available:
+`200 OK` — new frame is available. Example for a `.bin` frame
+(packed-palette format, native ESP32 / Pico clients):
 ```json
 {
   "url": "http://192.168.1.50:8765/renders/abc123def456.bin",
@@ -196,14 +197,49 @@ Fetch metadata for the current frame.
   "panel_w": 1200,
   "panel_h": 1600,
   "render_id": "abc123def456",
-  "renderer_id": "esp32_bin__kitchen",
+  "renderer_id": "esp32_bin__kitchen"
+}
+```
+
+Example for a `.png` frame (pi_png renderer, ships extra hints for
+client-side fit):
+```json
+{
+  "url": "http://192.168.1.50:8765/renders/abc123def456.png",
+  "format": "png",
+  "panel_w": 1200,
+  "panel_h": 1600,
+  "render_id": "abc123def456",
+  "renderer_id": "pi_png__kitchen",
   "rotate": 0,
   "scale": "fit",
   "bg": "white",
   "saturation": 0.5
 }
 ```
+
 Headers: `ETag: "<digest>"`, `Cache-Control: no-cache`.
+
+**Field-by-field breakdown:**
+
+| Field | Type | Always present | Source | Meaning |
+|---|---|---|---|---|
+| `url` | string | yes | rendered artefact path | Absolute URL of the frame to download. Same-origin as the server (request scheme + host), no auth required to fetch. Filename is `<render_id>.<format>`. |
+| `format` | string | yes | file extension | `"bin"`, `"png"`, etc. Tells the client which decoder to use. Matches the topic suffix on the MQTT side (`frame/<format>`). |
+| `panel_w` | int | yes | device manifest | Panel width in pixels (composer orientation; usually landscape for `.bin` clients, can be portrait for `.png`). Sanity-check this matches your display before painting. |
+| `panel_h` | int | yes | device manifest | Panel height in pixels, same caveats as `panel_w`. |
+| `render_id` | string | yes | SHA-256 truncated to 16 hex chars | Content-addressed digest of the artefact. Stable across identical renders, so two consecutive `/frame` calls returning the same digest mean nothing changed. Use as the value for `If-None-Match` on your next request. Also serves as the `ETag` header. |
+| `renderer_id` | string | yes | `<renderer_kind>__<device_id>` | Which renderer produced this frame. Useful for log lines; not needed for paint. |
+| `rotate` | int (0–3) | **PNG only** | per-device setting | Number of 90° clockwise quarter-turns the client should apply *after* decoding the PNG. Already-baked into `.bin` output server-side, so it's not sent for bin. |
+| `scale` | string | **PNG only** | per-device setting | One of `"fit"` (letterbox), `"fill"` (crop to cover), `"stretch"` (no aspect preservation), `"blur"` (letterbox with a blurred cover behind), `"center"` (1:1 paste). Hint for client-side fit when source dims don't match panel dims. |
+| `bg` | string | **PNG only** | per-device setting | Letterbox background colour (e.g. `"white"`, `"black"`) when `scale: "fit"`. Ignored for other `scale` modes. |
+| `saturation` | float | **PNG only** | per-device setting | 0.0–1.5+ saturation multiplier the client should apply during quantization. The pi_png default is `0.5` (de-saturate for muted e-ink look); pi_bin / esp32_bin bake this server-side at the kind's default (1.4 / 1.0). |
+
+**Things to know:**
+
+- The `.bin` renderers only ship `{url, format, panel_w, panel_h, render_id, renderer_id}`. All geometry / colour transforms are done server-side before packing, so the client just unpacks nibbles and writes to SPI.
+- The `.png` renderer ships the four extra hints (`rotate`, `scale`, `bg`, `saturation`) because the PNG is in composition orientation; the client decides how to land it on the actual panel.
+- Other renderers may ship their own extras (e.g. the TRMNL renderer adds `dither` and `contrast`). The contract is: anything not listed in the "always present" set above is renderer-specific. **Clients should ignore unknown fields** so future renderers don't break older firmware.
 
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
 just `ETag: "<digest>"`. Re-paint the previously-cached frame.
@@ -214,11 +250,6 @@ brand-new device, no dashboard bound). Body:
 { "status": 204, "error": "no frame rendered yet for this device" }
 ```
 Sleep and retry; admin needs to bind a dashboard.
-
-**Extra fields**: anything beyond `url`, `format`, `panel_w`,
-`panel_h`, `render_id`, `renderer_id` is renderer-specific (e.g.
-`rotate`, `scale`, `bg` from the PNG renderer). Forward-compatible:
-clients should ignore unknown fields.
 
 ### `POST /api/v1/device/<id>/status`
 
