@@ -173,7 +173,7 @@
   <div class="rotations-list">
     {% for r in rotations %}
     {% set cur = current_step.get(r.id) %}
-    <section class="dx-section-card rotation-card" id="rotation-{{ r.id }}">
+    <section class="dx-section-card rotation-card{% if edit_id == r.id %} is-editing{% endif %}" id="rotation-{{ r.id }}">
       <header class="dx-section-head dx-rotation-head">
         <span class="dx-section-icon" aria-hidden="true"><i class="ph ph-arrows-clockwise"></i></span>
         <div class="dx-section-titleblock">
@@ -293,7 +293,7 @@
             <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Fire now</span>
           </button>
         </form>
-        <a class="dx-btn-ghost-sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-form-card">
+        <a class="dx-btn-ghost-sm" href="{{ url_for('rotations.index', edit=r.id) }}#rotation-{{ r.id }}">
           <i class="ph ph-pencil" aria-hidden="true"></i><span>Edit</span>
         </a>
         <form method="post" action="{{ url_for('rotations.delete', rotation_id=r.id) }}" class="form form--inline"

@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.3], 2026-06-22
+
+### Fixed
+
+- **Rotation edit jumped to the wrong card and lost context on
+  save**. Clicking *Edit* on a rotation routed the browser to
+  ``#rotation-form-card`` — the *New rotation* card at the bottom
+  of the page — instead of the rotation being edited. And after a
+  successful save the redirect dropped both the ``?edit=`` query
+  param and any URL fragment, leaving the user at the top of the
+  rotations list with no idea where they were. Fixed both:
+  - The *Edit* link now anchors to ``#rotation-<id>`` so the
+    browser scrolls the in-flight edit form into view.
+  - ``rotations.update``'s success + validation-error redirects
+    both append ``#rotation-<id>`` so the page lands back at the
+    just-edited card.
+- **In-flight rotation card now wears an accent halo**. The
+  rotation being edited picks up a new ``.is-editing`` class on
+  the rotation card (``.dx-rotation-status`` already pins the
+  status pill to the top-right). The card border flips to the
+  accent colour with a soft accent-tint outer shadow so the user
+  can see at a glance which card holds the edit form — useful
+  when they scroll up to compare the read view of the rotation
+  to the form below.
+
 ## [0.64.2], 2026-06-22
 
 ### Changed

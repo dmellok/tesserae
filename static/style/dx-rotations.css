@@ -22,6 +22,25 @@
 .rotation-card {
   position: relative;
 }
+
+/* Currently-being-edited rotation gets an accent border + a soft
+   accent halo so the user can see at a glance which card holds the
+   in-flight edit form. The edit Save flow scrolls the browser to
+   this card's id (see rotation_routes.update's redirect target),
+   and on landing this halo makes the destination card unambiguous
+   against the read-view cards above + below it. */
+.rotation-card.is-editing {
+  border-color: var(--t-accent, #15846a);
+  box-shadow:
+    0 0 0 3px var(--t-accent-tint, #dcefe8),
+    var(--t-shadow-sm, 0 1px 2px rgba(20, 20, 15, 0.04));
+}
+:root[data-theme="dark"] .rotation-card.is-editing {
+  border-color: var(--t-accent, #15846a);
+  box-shadow:
+    0 0 0 3px color-mix(in oklab, var(--t-accent) 35%, transparent),
+    var(--t-shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.4));
+}
 .dx-rotation-head {
   align-items: flex-start;
   flex-wrap: wrap;

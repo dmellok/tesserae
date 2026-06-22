@@ -396,11 +396,18 @@ def update(rotation_id: str) -> Response:
         rotation = _parse_form(request.form, existing_id=rotation_id)
     except ValidationError as exc:
         flash(f"Invalid rotation: {_first_error(exc)}", "error")
-        return redirect(url_for("rotations.index", edit=rotation_id))
+        # Bounce back into edit mode with the fragment pointing at
+        # the rotation card so the browser scrolls the in-flight
+        # edit form back into view instead of dropping the user at
+        # the top of the page.
+        return redirect(url_for("rotations.index", edit=rotation_id) + f"#rotation-{rotation_id}")
     rotation = rotation.model_copy(update={"id": rotation_id})
     _store().upsert(rotation)
     flash(f"Rotation {rotation.name!r} updated.", "ok")
-    return redirect(url_for("rotations.index"))
+    # Scroll back to the just-saved rotation's card so the user lands
+    # on the read view of what they just changed, instead of the top
+    # of the rotations list.
+    return redirect(url_for("rotations.index") + f"#rotation-{rotation_id}")
 
 
 @bp.post("/<rotation_id>/toggle")
