@@ -47,17 +47,19 @@ written to `data/core/.instance_id`. Tesserae never sends:
 
 ## PostHog privacy hardening
 
-The events Tesserae sends to PostHog explicitly disable the
-surveillance features that would otherwise apply by default:
+The events Tesserae sends to PostHog have the surveillance features
+that would otherwise apply by default explicitly disabled:
 
-- **No IP storage**. Each event carries `$ip = ""` so the request IP
-  is never written to the stored event.
-- **Country and region only**. PostHog enriches each event with the
-  country and region derived from the request IP at ingestion time,
-  then drops the IP itself. No city, no latitude/longitude, no
-  neighbourhood-level data. This lets the maintainer see roughly
-  where Tesserae is running so they can plan hardware support and
-  docs translations.
+- **No IP storage**. The maintainer's PostHog project has *Discard
+  client IP data* enabled, so PostHog drops the request IP at
+  ingestion (after running geo enrichment + bot detection against
+  it, before writing the event to storage). No IP ever lands on a
+  stored event row.
+- **Country, region, and city**. PostHog uses the request IP to
+  derive country / region / city columns before discarding the IP
+  itself. No precise latitude or longitude. This lets the maintainer
+  see roughly where Tesserae is running so they can plan hardware
+  support and docs translations.
 - **No person profile**. `$process_person_profile = false` keeps each
   event from creating or updating a "person" record — the install
   UUID is the only identity surface and it's never enriched.

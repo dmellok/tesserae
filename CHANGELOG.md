@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.6], 2026-06-22
+
+### Fixed
+
+- **Telemetry: accurate IP-suppression mechanism**. The
+  ``_privacy_props`` helper used to ship ``$ip: ""`` on every
+  PostHog event, claiming this prevented IP storage. It didn't —
+  ``$ip`` is a PostHog *override* for the IP used during geo
+  enrichment, not a suppression of storage. The real mechanism is
+  the project-level **Discard client IP data** toggle in PostHog
+  Project Settings, which has now been enabled on the maintainer's
+  project. The ``$ip`` property has been dropped from the payload
+  (it was a no-op), and the module docstring + privacy doc + test
+  assertions now describe the actual mechanism.
+
+### Why
+
+A live look at incoming events showed the full client IP
+(``180.181.192.166``) being stored alongside city / postal code /
+lat-lon. The ``$ip: ""`` we'd been shipping since v0.64.0 wasn't
+doing anything; PostHog was reading the request IP from the
+reverse-proxy ``X-Forwarded-For`` header and storing it
+regardless. The privacy doc + onboarding consent footnote
+promised "no IP storage" — that promise is now actually upheld by
+the project-level toggle. Behaviour for users who already
+consented to telemetry is otherwise unchanged.
+
 ## [0.64.5], 2026-06-22
 
 ### Added

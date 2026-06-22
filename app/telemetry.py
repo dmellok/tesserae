@@ -25,20 +25,22 @@ random UUID generated on first run and persisted to
 ``data/core/.instance_id`` so the same install counts as one across
 restarts.
 
-PostHog privacy configuration baked into every event:
-* ``$ip: ""`` — request IP not stored on the event. PostHog still uses
-  it server-side at ingestion to derive the country + region columns
-  the maintainer needs to see roughly where Tesserae is running, then
-  drops it. No IP ever lands on the stored event row.
-* ``$process_person_profile: false`` — no person profile created or
-  updated; the install UUID is the only identity surface and it never
-  gets enriched.
+PostHog privacy configuration:
 
-Country/region IS recorded. Earlier privacy posture was "no geo
-enrichment at all" (``$geoip_disable: true``), but the maintainer
-wants the country breakdown to plan hardware support and prioritise
-docs translations. Country + region is a coarser identifier than IP
-or city, and the IP itself is never stored.
+* IP suppression is configured at the PostHog **project** level
+  (Project Settings → IP data capture → "Discard client IP data" =
+  on). PostHog uses the request IP for geo enrichment + bot
+  detection at ingestion, then drops it before the event is stored.
+  No IP ever lands on the stored event row, but country / region /
+  city columns are still populated.
+* ``$process_person_profile: false`` is sent on every event — no
+  person profile created or updated; the install UUID is the only
+  identity surface and it never gets enriched.
+
+Country / region IS recorded. The maintainer wants the country
+breakdown to plan hardware support and prioritise docs translations.
+Country is a coarser identifier than IP, and the IP itself is
+never stored thanks to the project setting above.
 
 Pre-v0.64 the backend was a self-hosted Aptabase deployment at
 ``aptabase.dmello.io``. v0.64.0 moved to PostHog Cloud (US region;
@@ -255,19 +257,19 @@ def _platform_props(app_version: str, *, timezone: str = "") -> dict[str, object
 
 
 def _privacy_props() -> dict[str, object]:
-    """PostHog privacy kill-switches sent on EVERY event so a future
-    SDK default-flip can't quietly re-enable IP storage or person-
-    profile creation. ``$geoip_disable`` is deliberately *not* set —
-    the maintainer wants country + region columns to see where
-    Tesserae is running. PostHog still uses the request IP at
-    ingestion to derive those columns, then drops the IP itself
-    (``$ip: ""`` below)."""
+    """PostHog privacy kill-switch sent on EVERY event so a future SDK
+    default-flip can't quietly start creating person profiles for the
+    install UUID.
+
+    IP suppression is NOT done here. The ``$ip`` event property is for
+    *overriding* the IP used for geo lookup, not for suppressing
+    storage. The only mechanism that actually drops the IP is the
+    project-level **Discard client IP data** toggle in PostHog Project
+    Settings, which runs after geo enrichment + bot detection but
+    before storage. That setting is enabled on the maintainer's
+    project; this module documents the dependency but cannot enforce
+    it from the client side."""
     return {
-        # Empty ``$ip`` blocks PostHog from filling it in from the
-        # request socket — the IP is used server-side for the geo
-        # lookup at ingestion, then NOT written to the stored event.
-        # No IP ever lands on disk.
-        "$ip": "",
         # Don't create or update a person profile for the install UUID.
         # Without this PostHog would otherwise track the install as an
         # anonymous person across events, which is more identity-

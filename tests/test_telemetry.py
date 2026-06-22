@@ -305,14 +305,16 @@ def test_resolve_iana_timezone_validates_against_zoneinfo(
 def test_privacy_props_present_on_every_event(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Every event must carry the PostHog privacy kill-switches:
-    $ip empty (IP not stored on the event) and
-    $process_person_profile false (no person profile created or
-    updated). A future SDK default-flip can't quietly re-enable IP
-    storage or person profile creation while these are pinned on
-    every event. ``$geoip_disable`` is deliberately NOT set — the
-    maintainer wants country/region columns and PostHog derives them
-    from the request IP at ingestion before dropping it."""
+    """Every event must carry the PostHog privacy kill-switch
+    ``$process_person_profile: false`` so a future SDK default-flip
+    can't quietly start creating person profiles for the install UUID.
+
+    ``$geoip_disable`` is deliberately NOT set — the maintainer wants
+    country / region columns and PostHog derives them from the
+    request IP at ingestion before dropping it. IP suppression is NOT
+    done at the SDK layer; it's a project-level setting (Discard
+    client IP data), so ``$ip`` is intentionally absent from the
+    payload."""
     captured: dict[str, object] = {}
 
     def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
@@ -330,8 +332,9 @@ def test_privacy_props_present_on_every_event(
     body = captured["body"]
     assert isinstance(body, dict)
     props = body["properties"]
-    assert props["$ip"] == ""
     assert props["$process_person_profile"] is False
+    # $ip explicitly NOT sent — see docstring; suppression is project-level.
+    assert "$ip" not in props
     # $geoip_disable explicitly not set — geo enrichment is wanted.
     assert "$geoip_disable" not in props
 
