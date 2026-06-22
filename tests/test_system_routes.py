@@ -251,7 +251,7 @@ def test_telemetry_test_button_records_event_when_enabled(
         telemetry._cfg,
         enabled=True,
         host="https://analytics.example.com",
-        app_key="AK-test",
+        project_key="phc_test",
     )
     # Wire the in-process event log into the live telemetry so the test
     # route's record() lands in the same log the assertion reads.
