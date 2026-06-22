@@ -72,15 +72,13 @@ body:
     id: expected
     attributes:
       label: Expected behaviour
-    validations:
-      required: true
+      description: Optional. If "obvious from steps" feels true, skip it.
 
   - type: textarea
     id: actual
     attributes:
       label: Actual behaviour
-    validations:
-      required: true
+      description: Optional. Anything the steps don't already convey, screenshots welcome.
 
   - type: textarea
     id: logs
