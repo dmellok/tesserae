@@ -6,14 +6,21 @@
 //   testing on a newer interpreter).
 // * `pip install -e '.[dev]'` already run.
 // * The production server (``tesserae`` — Waitress, NOT Flask dev
-//   reload) auto-starts on attach and binds to port 8765. The
-//   ``postAttachCommand`` backgrounds it via nohup and pipes stdout
-//   + stderr to ``/tmp/tesserae.log`` so the terminal stays free for
-//   the user. We serve prod because Codespaces is a test-drive
-//   environment, not a code-iteration loop — running prod matches
-//   what users see on their Pi / Docker host, and it dodges the
-//   Flask-dev "DO NOT USE IN PRODUCTION" banner that confuses
-//   first-time testers.
+//   reload) auto-starts on workspace open via a VS Code task defined
+//   in ``.vscode/tasks.json`` (with ``runOn: folderOpen``). The task
+//   shows up in a dedicated terminal panel labelled "Tesserae
+//   server" so the user can scroll the log and kill / restart it
+//   visually. We previously used ``postAttachCommand`` to nohup the
+//   server in the background, but the dev container runtime would
+//   sometimes reap the detached child mid-attach, leaving the badge
+//   path silently broken. A VS Code task is the canonical
+//   "auto-start a long-running process on workspace open" pattern
+//   and survives any attach quirks. ``task.allowAutomaticTasks`` is
+//   set below so Codespaces users don't get prompted.
+// * We serve prod because Codespaces is a test-drive environment,
+//   not a code-iteration loop — running prod matches what users see
+//   on their Pi / Docker host, and dodges the Flask-dev "DO NOT USE
+//   IN PRODUCTION" banner that would confuse first-time testers.
 // * Port 8765 forwarded with a VS Code preview attached, so the
 //   admin UI pops in a side panel as soon as the server is ready.
 // * fonts-noto-color-emoji installed for parity with the production
@@ -22,10 +29,8 @@
 // * Ruff format-on-save wired up matching the repo's CI rules.
 //
 // Want to switch to the dev server (Flask reload, /__debug__)?
-//   pkill -f 'tesserae' && tesserae --dev
-//
-// Tail the prod server's log:
-//   tail -f /tmp/tesserae.log
+// Kill the running task (terminal panel ▸ trash icon) and run
+// ``tesserae --dev`` in a fresh terminal.
 //
 // Optional follow-ups the postCreate does NOT do (keep boot fast):
 // * `playwright install chromium` — only needed for screenshot
@@ -64,7 +69,6 @@
   // list file dodges the broken signature without us having to chase
   // their key rotation. Same problem hit Codespaces users on 2026-06-22.
   "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-color-emoji && sudo rm -rf /var/lib/apt/lists/* && pip install --upgrade pip && pip install -e '.[dev]'",
-  "postAttachCommand": "bash -lc 'pgrep -f \"tesserae\" >/dev/null || nohup tesserae > /tmp/tesserae.log 2>&1 &'",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -78,7 +82,12 @@
           "editor.formatOnSave": true
         },
         "ruff.format.args": [],
-        "ruff.lint.args": []
+        "ruff.lint.args": [],
+        // Lets the .vscode/tasks.json "Tesserae server" task auto-run
+        // on workspace open without prompting the user. Scoped to
+        // this Codespace via customizations.vscode.settings, so it
+        // doesn't leak into the user's global preferences.
+        "task.allowAutomaticTasks": "on"
       }
     }
   }
