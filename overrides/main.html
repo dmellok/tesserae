@@ -23,8 +23,16 @@
      tracking. We only get the page view events the snippet captures
      by default (URL, referrer, basic browser info).
    * ``respect_dnt: true`` — honour Do-Not-Track headers.
-   * ``capture_pageview: true`` — explicit because we DO want page
-     views (that's the entire reason analytics exist on the docs).
+   * ``capture_pageview: false`` — we fire ``$pageview`` ourselves
+     via the ``document$`` subscription below. Material's
+     ``navigation.instant`` feature swaps the DOM in place on link
+     clicks without re-running the head snippet, so PostHog's
+     built-in auto-capture only sees the FIRST hard load (every
+     subsequent page is invisible). Material exposes a global
+     ``document$`` RxJS observable that fires on every navigation,
+     including the initial load and every instant swap; subscribing
+     to it and calling ``posthog.capture('$pageview', …)`` ourselves
+     gives us one event per page with no duplicates and no misses.
    * ``cross_subdomain_cookie: false`` — don't try to span cookies
      across ``*.tesserae.ink``; each subdomain gets its own (smaller)
      identity surface.
@@ -48,8 +56,21 @@
       disable_session_recording: true,
       autocapture: false,
       respect_dnt: true,
-      capture_pageview: true,
+      capture_pageview: false,
       cross_subdomain_cookie: false,
+    });
+    // Material for MkDocs ``navigation.instant`` swaps the DOM in
+    // place on link clicks; this snippet only runs once, so PostHog's
+    // own auto-pageview would only fire on the first hard load.
+    // ``document$`` is Material's per-navigation RxJS observable —
+    // fires on the initial load AND every subsequent instant nav —
+    // so capturing here gives us one event per page with no
+    // duplicates and no misses.
+    document$.subscribe(function () {
+      posthog.capture('$pageview', {
+        $current_url: window.location.href,
+        $pathname: window.location.pathname,
+      });
     });
   </script>
 {% endblock %}
