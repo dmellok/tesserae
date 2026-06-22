@@ -457,9 +457,26 @@
   .preview-card {
     grid-area: preview;
     position: sticky;
-    top: calc(var(--t-space-6) + 60px);
+    /* Stick just below the editor-header (which is itself sticky at
+       top:64px and ~68px tall — name input, save status, dims tag,
+       save/push/delete row). 64 + 68 + 8 (gap) = 140px. */
+    top: 140px;
     margin: 0;
     align-self: start;
+  }
+  /* Cap the preview frame's width so the whole card fits within the
+     viewport when stuck — otherwise a portrait panel (e.g. 800×1200)
+     makes the card taller than the viewport and sticky pins only the
+     top portion, leaving the actual preview content half-visible
+     while the user scrolls the cell editors. ``--panel-ar`` is set
+     inline as ``calc(w / h)``; multiplying available vertical space
+     by that ratio gives the width that produces a card that fits.
+     The ``min()`` keeps the existing 720px cap on landscape panels
+     where height isn't the constraint. The 220px subtracts the sticky
+     top offset (~108px), card head + dims line (~80px), and a
+     comfortable bottom gap (~32px). 140 + 80 + 32 = 252. */
+  .preview-card .preview-frame {
+    max-width: min(720px, calc((100vh - 252px) * var(--panel-ar, 1.333)));
   }
 }
 

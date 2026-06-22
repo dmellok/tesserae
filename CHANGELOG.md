@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.7], 2026-06-22
+
+### Fixed
+
+- **Dashboard editor: live preview now actually sticks**. The
+  preview card has ``position: sticky`` so it stays visible as the
+  user scrolls through the cell editors below it, but
+  ``html, body { overflow-x: hidden }`` in ``base.css`` was
+  silently establishing a new scroll container and breaking
+  sticky positioning across the whole document. Swapped the
+  declaration for ``overflow-x: clip`` (same visual no-scrollbar
+  guarantee, no scroll-container side-effect), with ``hidden`` as
+  a cascade fallback for browsers without ``clip``.
+- **Dashboard editor: preview no longer hides behind the title
+  header**. The preview-card was sticky-pinned at ``top: 84px``
+  while the editor-header (sticky at ``64px``, ~68px tall) sits
+  in the same band — so the preview tucked behind the header on
+  scroll. Bumped the preview's sticky top to ``140px`` so it sits
+  cleanly below the header with an 8px gap.
+- **Dashboard editor: preview frame capped to viewport height**.
+  Portrait panels (e.g. 800×1200) made the preview card taller
+  than the viewport, so sticky pinned only the top portion. Added
+  a ``max-width`` driven by available vertical space
+  (``min(720px, (100vh - 252px) × --panel-ar)``) mirroring the
+  trick already used on mobile, so the whole card fits regardless
+  of panel orientation.
+- **Sparkline charts: spline overshoot no longer clipped**.
+  Chart.js with ``tension: 0.3`` produces a curve that overshoots
+  the data max on a sharp spike; the sparkline's y-axis was sized
+  exactly to ``max(values)`` so the overshoot got sliced off flat
+  against the top edge. Added ``grace: "12%"`` so the spline has
+  headroom to breathe.
+
 ## [0.64.6], 2026-06-22
 
 ### Fixed

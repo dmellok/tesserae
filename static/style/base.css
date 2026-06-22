@@ -299,8 +299,16 @@ html, body { margin: 0; padding: 0; }
    horizontal scrollbar on the page itself (e.g. a wide condition
    picker row, a code block with no wrap, an embedded preview).
    Individual scrollable surfaces (.dx-code, .preview-frame, the
-   composer canvas) handle their own overflow inside their box. */
-html, body { overflow-x: hidden; max-width: 100%; }
+   composer canvas) handle their own overflow inside their box.
+   ``overflow-x: clip`` is used instead of ``hidden`` because
+   ``hidden`` on html/body establishes a new scroll container and
+   silently breaks ``position: sticky`` everywhere on the page
+   (e.g. the editor's live preview, the sticky editor header).
+   ``clip`` gives the same no-scrollbar guarantee without that
+   side-effect. ``hidden`` is kept as a cascade fallback for
+   browsers that don't understand ``clip`` (pre-Safari 16, pre-
+   Chrome 90, pre-Firefox 81); they get the old behaviour. */
+html, body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
 
 /* Screen-reader-only utility. Visually hidden, still announced.
    Used for the play-step buttons inside the rotation step rows
