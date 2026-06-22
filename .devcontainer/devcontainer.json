@@ -56,7 +56,14 @@
   // at GitHub Actions time so the badge launches an
   // already-provisioned container).
   "waitFor": "postCreateCommand",
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-color-emoji && sudo rm -rf /var/lib/apt/lists/* && pip install --upgrade pip && pip install -e '.[dev]'",
+  // ``sudo rm -f /etc/apt/sources.list.d/yarn.list`` strips the Yarn
+  // apt source the base image ships with. We don't use Yarn here, and
+  // Yarn's GPG key rotates / expires periodically — when it does,
+  // ``apt-get update`` errors with ``NO_PUBKEY 62D54FD4003F6525`` and
+  // takes the whole postCreate down with it (exit 100). Removing the
+  // list file dodges the broken signature without us having to chase
+  // their key rotation. Same problem hit Codespaces users on 2026-06-22.
+  "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-color-emoji && sudo rm -rf /var/lib/apt/lists/* && pip install --upgrade pip && pip install -e '.[dev]'",
   "postAttachCommand": "bash -lc 'pgrep -f \"tesserae\" >/dev/null || nohup tesserae > /tmp/tesserae.log 2>&1 &'",
   "customizations": {
     "vscode": {
