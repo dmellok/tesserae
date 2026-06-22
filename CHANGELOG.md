@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.1], 2026-06-22
+
+### Fixed
+
+- **Telemetry copy mentioned only two of the four events**. The
+  Settings → Server → App toggle help text and the System tab's
+  Telemetry card subtitle still listed only ``app.started`` +
+  ``update.applied``. ``app.heartbeat`` (added v0.5x) and
+  ``theme.user_created`` (v0.6x) were silently shipping but the
+  user-facing copy never caught up. v0.64.0's PostHog swap was
+  a good moment to fix it; also threaded in the country/region
+  detail that's new with PostHog.
+- **CI fix for v0.64.0 rename**: ``tests/test_system_routes.py``
+  was still constructing ``TelemetryConfig`` with the old
+  ``app_key`` kwarg instead of ``project_key``. Already pushed
+  as ``4e8762b``; included here for changelog completeness.
+
 ## [0.64.0], 2026-06-21
 
 ### Changed
