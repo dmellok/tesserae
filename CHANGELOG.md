@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.4], 2026-06-22
+
+### Added
+
+- **Timezone properties on every telemetry event**. Every event
+  now carries ``timezone`` (the resolved IANA name, e.g.
+  ``Australia/Melbourne``) and ``timezone_region`` (the first
+  segment, ``Australia``) when one can be derived. The resolution
+  order is: ``settings.app.timezone`` (validated against
+  ``zoneinfo.available_timezones()``) → ``TZ`` env var → parse
+  ``/etc/localtime`` symlink target. When nothing resolves, the
+  properties are *omitted* from the event rather than shipped as
+  ``UTC`` (which would collapse every default-Docker install into
+  one bucket and lose the signal). Gives the maintainer
+  user-set geographic data without IP geolocation — works on
+  Docker, doesn't depend on the reverse-proxy's
+  ``X-Forwarded-For`` plumbing.
+
+### Notes
+
+- The v0.64.5 followup will add a timezone-picker step to the
+  onboarding wizard so new installs land with a real IANA name
+  set instead of relying on the system auto-detect path.
+
 ## [0.64.3], 2026-06-22
 
 ### Fixed

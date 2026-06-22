@@ -207,6 +207,101 @@ def test_send_posts_posthog_shaped_payload(tmp_path: Path, monkeypatch: pytest.M
     assert props["is_debug"] is False
 
 
+def test_timezone_props_present_when_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When the user has a real IANA timezone configured (or the host
+    OS auto-detect finds one), every event carries ``timezone`` and
+    ``timezone_region`` properties so the maintainer can answer
+    "where is Tesserae running" without doing IP geolocation.
+    Region is derived from the first segment of the IANA name."""
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        captured["body"] = json.loads(req.data or b"{}")
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_HOST", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_PROJECT_KEY", raising=False)
+    monkeypatch.setattr(tm, "POSTHOG_HOST", "https://test.posthog.example")
+    monkeypatch.setattr(tm, "POSTHOG_PROJECT_KEY", "phc_test_1234")
+    t = tm.Telemetry.from_settings(
+        data_root=tmp_path,
+        app_version="0.64.4",
+        settings_app={
+            "telemetry_enabled": True,
+            "timezone": "Australia/Melbourne",
+        },
+    )
+    try:
+        t.send("app.started", {})
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    body = captured["body"]
+    assert isinstance(body, dict)
+    props = body["properties"]
+    assert props["timezone"] == "Australia/Melbourne"
+    assert props["timezone_region"] == "Australia"
+
+
+def test_timezone_props_omitted_when_no_iana_name_resolves(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When the stored timezone is empty AND the system auto-detect
+    can't find an IANA name (no ``TZ`` env, no readable
+    ``/etc/localtime``), the timezone props are *omitted* from the
+    event instead of shipping junk like ``UTC`` or ``C`` that would
+    collapse every Docker install into one bucket."""
+    captured: dict[str, object] = {}
+
+    def fake_urlopen(req: urllib.request.Request, timeout: float = 0) -> _FakeResp:
+        del timeout
+        captured["body"] = json.loads(req.data or b"{}")
+        return _FakeResp()
+
+    monkeypatch.setattr("app.telemetry.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr(tm, "POSTHOG_HOST", "https://test.posthog.example")
+    monkeypatch.setattr(tm, "POSTHOG_PROJECT_KEY", "phc_test_1234")
+    monkeypatch.delenv("TESSERAE_TELEMETRY", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_HOST", raising=False)
+    monkeypatch.delenv("TESSERAE_TELEMETRY_PROJECT_KEY", raising=False)
+    monkeypatch.delenv("TZ", raising=False)
+    # Force ``_resolve_iana_timezone`` down its empty-string branch by
+    # stubbing the symlink read too.
+    monkeypatch.setattr("app.telemetry.os.readlink", lambda _path: (_ for _ in ()).throw(OSError()))
+    t = tm.Telemetry.from_settings(
+        data_root=tmp_path,
+        app_version="0.64.4",
+        settings_app={"telemetry_enabled": True, "timezone": ""},
+    )
+    try:
+        t.send("app.started", {})
+        _drain(t)
+    finally:
+        t.shutdown(timeout=1.0)
+    body = captured["body"]
+    assert isinstance(body, dict)
+    props = body["properties"]
+    assert "timezone" not in props
+    assert "timezone_region" not in props
+
+
+def test_resolve_iana_timezone_validates_against_zoneinfo(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stale or hand-edited settings file with a bogus IANA name
+    (``Foo/Bar``) falls through to system auto-detect instead of
+    shipping the bogus value. Real names round-trip."""
+    monkeypatch.delenv("TZ", raising=False)
+    monkeypatch.setattr("app.telemetry.os.readlink", lambda _path: (_ for _ in ()).throw(OSError()))
+    assert tm._resolve_iana_timezone("Foo/Bar") == ""
+    assert tm._resolve_iana_timezone("Australia/Melbourne") == "Australia/Melbourne"
+    monkeypatch.setenv("TZ", "Europe/London")
+    assert tm._resolve_iana_timezone("system") == "Europe/London"
+
+
 def test_privacy_props_present_on_every_event(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

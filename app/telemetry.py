@@ -145,6 +145,49 @@ def _env_off() -> bool:
     return raw in {"0", "false", "no", "off"}
 
 
+def _resolve_iana_timezone(stored: str) -> str:
+    """Turn the user's ``settings.app.timezone`` value into an IANA
+    name. The setting is one of: a real IANA name (``Australia/
+    Melbourne``), the literal ``system`` (auto-detect from host), or
+    empty (legacy installs that pre-date the setting).
+
+    Returns the empty string when no real IANA name can be derived —
+    the caller drops the ``timezone`` property off the event in that
+    case rather than ship junk like ``C`` or ``POSIX``.
+    """
+    import zoneinfo
+
+    available = zoneinfo.available_timezones()
+
+    # Explicit user choice wins, but validate against the IANA db so a
+    # stale settings file with a renamed zone doesn't ship garbage.
+    if stored and stored.lower() != "system" and stored in available:
+        return stored
+
+    # System auto-detect path. ``TZ`` env var is the most explicit
+    # signal (Docker images that pin TZ set this), so check it first.
+    tz_env = os.environ.get("TZ", "").strip()
+    if tz_env and tz_env in available:
+        return tz_env
+
+    # macOS / most Linux: /etc/localtime is a symlink into the IANA
+    # tzdata tree, e.g. /usr/share/zoneinfo/Australia/Melbourne. We
+    # parse the IANA name out of the link target. This is the same
+    # technique tzlocal uses; doing it inline keeps us off a new dep.
+    try:
+        link = os.readlink("/etc/localtime")
+    except OSError:
+        link = ""
+    if link:
+        marker = "zoneinfo/"
+        idx = link.find(marker)
+        if idx >= 0:
+            candidate = link[idx + len(marker) :].strip("/")
+            if candidate in available:
+                return candidate
+    return ""
+
+
 @dataclass(frozen=True)
 class TelemetryConfig:
     enabled: bool
@@ -152,6 +195,14 @@ class TelemetryConfig:
     project_key: str
     instance_id: str
     app_version: str
+    # IANA timezone name the user (or the host OS) has set for
+    # ``settings.app.timezone``. Sent on every event so the maintainer
+    # can answer "where is Tesserae running" without doing IP geolocation
+    # — the value is user-set, far more honest than IP→geo, and works
+    # on Docker installs where IP-based geo collapses to a data-centre
+    # location (see v0.64.2's reverse-proxy gotcha). Empty when no
+    # detection / configuration is available.
+    timezone: str = ""
     # Routes events through the same PostHog project but tags them so the
     # maintainer can filter dev traffic out of the production view.
     # Wired from the ``--dev`` flag in ``app.main._serve``.
@@ -166,14 +217,21 @@ class TelemetryConfig:
         return f"{self.host.rstrip('/')}/i/v0/e/"
 
 
-def _platform_props(app_version: str) -> dict[str, object]:
+def _platform_props(app_version: str, *, timezone: str = "") -> dict[str, object]:
     """Server-side platform context. Picked to mirror what the legacy
     Aptabase ``systemProps`` block carried (locale + appVersion + sdk
     name/version) plus what PostHog's other server SDKs send by
     default. PostHog convention prefixes its own properties with ``$``;
     Tesserae's own properties have no prefix so they sort separately in
-    the event-explorer UI."""
-    return {
+    the event-explorer UI.
+
+    ``timezone`` is the resolved IANA name (``Australia/Melbourne``).
+    Empty strings are omitted from the event payload — the maintainer
+    reads "missing" as "this install didn't have one set" rather than
+    seeing junk like ``UTC`` collapsing every Docker install into a
+    single bucket.
+    """
+    props: dict[str, object] = {
         # PostHog standard property names (the $-prefixed ones get
         # surfaced as first-class columns in the event browser).
         "$lib": "posthog-tesserae",
@@ -184,6 +242,16 @@ def _platform_props(app_version: str) -> dict[str, object]:
         "python_version": _platform.python_version(),
         "platform_name": _platform.platform(),
     }
+    if timezone:
+        # Full IANA name (``Australia/Melbourne``) plus the leading
+        # region segment (``Australia``). The region is just sugar so
+        # the maintainer can group by continent / region in PostHog
+        # dashboards without parsing the timezone string in every
+        # query — same data either way.
+        props["timezone"] = timezone
+        region = timezone.split("/", 1)[0] if "/" in timezone else timezone
+        props["timezone_region"] = region
+    return props
 
 
 def _privacy_props() -> dict[str, object]:
@@ -260,6 +328,12 @@ class Telemetry:
         host = os.environ.get("TESSERAE_TELEMETRY_HOST", "").strip() or POSTHOG_HOST
         key = os.environ.get("TESSERAE_TELEMETRY_PROJECT_KEY", "").strip() or POSTHOG_PROJECT_KEY
         enabled = enabled_setting and bool(host) and bool(key) and not _env_off()
+        # Snapshot timezone at startup. If the user changes it later
+        # the next restart picks up the new value — fine for once-an-
+        # hour heartbeat granularity. v0.64.5's onboarding step will
+        # make sure new installs already have a real IANA name set
+        # here instead of relying on system auto-detect.
+        timezone = _resolve_iana_timezone(str(settings_app.get("timezone", "")))
         return cls(
             TelemetryConfig(
                 enabled=enabled,
@@ -267,6 +341,7 @@ class Telemetry:
                 project_key=key,
                 instance_id=_ensure_instance_id(data_root),
                 app_version=app_version,
+                timezone=timezone,
                 is_debug=is_debug,
             ),
             event_log=event_log,
@@ -411,7 +486,7 @@ class Telemetry:
         # PostHog from using the wall-clock-at-receive time which can
         # be skewed when a heartbeat batches across a network blip.
         all_props: dict[str, object] = {}
-        all_props.update(_platform_props(self._cfg.app_version))
+        all_props.update(_platform_props(self._cfg.app_version, timezone=self._cfg.timezone))
         all_props.update(_privacy_props())
         # Maintainer's debug filter — flagged at the event level so
         # dashboards can filter ``properties.is_debug = false`` to see
