@@ -6,8 +6,8 @@ fresh clone or install never phones home.
 ## What's sent when you opt in
 
 When you opt in (Settings → Server → App), Tesserae posts a small set
-of **anonymous events** to the project's analytics backend (running the
-open-source [aptabase/aptabase][aptabase]) so the maintainer can see how
+of **anonymous events** to the project's analytics backend
+([PostHog Cloud][posthog], US region) so the maintainer can see how
 many people are running Tesserae, what versions they're on, and roughly
 how active a typical install is:
 
@@ -45,12 +45,45 @@ written to `data/core/.instance_id`. Tesserae never sends:
 - broker addresses
 - anything tied to a real-world identity
 
+## PostHog privacy hardening
+
+The events Tesserae sends to PostHog explicitly disable the
+surveillance features that would otherwise apply by default:
+
+- **No IP storage**. Each event carries `$ip = ""` so the request IP
+  is never written to the stored event.
+- **Country and region only**. PostHog enriches each event with the
+  country and region derived from the request IP at ingestion time,
+  then drops the IP itself. No city, no latitude/longitude, no
+  neighbourhood-level data. This lets the maintainer see roughly
+  where Tesserae is running so they can plan hardware support and
+  docs translations.
+- **No person profile**. `$process_person_profile = false` keeps each
+  event from creating or updating a "person" record — the install
+  UUID is the only identity surface and it's never enriched.
+- **No session recording**. Server-side captures don't support it,
+  and the docs site explicitly disables it too.
+- **No autocapture**. On the docs site, only page views are
+  captured — never automatic clicks, scrolls, or form-field
+  inspection.
+- **DNT respected**. Browsers that send Do-Not-Track headers skip
+  docs-site analytics entirely.
+
 ## The endpoint
 
-The endpoint is hard-coded in [`app/telemetry.py`][telemetry-py] -
-it's the maintainer's analytics deployment, not user-configurable. That
+The endpoint is hard-coded in [`app/telemetry.py`][telemetry-py] —
+it's the maintainer's PostHog project, not user-configurable. That
 keeps opted-in counts adding up to a real total instead of being
 scattered across whoever set up their own backend.
+
+The docs site uses the same project, configured via
+[`overrides/main.html`][overrides-main].
+
+Before v0.64.0 the analytics backend was a self-hosted Aptabase
+deployment at `aptabase.dmello.io`; the data shape was the same but
+the dashboards weren't giving the maintainer the cohort + funnel
+views needed to actually answer questions about how Tesserae is
+used. PostHog's free tier gives those views at no extra cost.
 
 ## How to disable
 
@@ -62,5 +95,10 @@ settings):
 export TESSERAE_TELEMETRY=0
 ```
 
-[aptabase]: https://github.com/aptabase/aptabase
+For the docs site, browsers with Do-Not-Track headers skip analytics
+automatically. To force-disable in any browser, block the
+`us.i.posthog.com` domain.
+
+[posthog]: https://posthog.com
 [telemetry-py]: https://github.com/dmellok/tesserae/blob/main/app/telemetry.py
+[overrides-main]: https://github.com/dmellok/tesserae/blob/main/overrides/main.html

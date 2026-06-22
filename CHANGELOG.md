@@ -6,6 +6,52 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.0], 2026-06-21
+
+### Changed
+
+- **Telemetry backend swapped from self-hosted Aptabase to
+  PostHog Cloud (US region)**. Same three events
+  (``app.started``, ``app.heartbeat``, ``update.applied``) plus
+  ``theme.user_created``, same anonymous install UUID, same
+  no-PII data footprint, same opt-in default-off behaviour, same
+  ``TESSERAE_TELEMETRY=0`` kill switch. The wire format changed:
+  POSTs now go to ``https://us.i.posthog.com/i/v0/e/`` with a
+  flat ``{api_key, event, distinct_id, properties, timestamp}``
+  body instead of the Aptabase-shaped ``{sessionId, eventName,
+  systemProps, props}``.
+- **Privacy hardening on every event**. Every POST carries
+  ``$ip: ""`` (request IP not stored on the event) and
+  ``$process_person_profile: false`` (no PostHog "person"
+  profile created or updated for the install UUID). PostHog
+  still uses the request IP at ingestion to derive country +
+  region columns — the maintainer wants those to see roughly
+  where Tesserae is running — then drops the IP. Pinned via
+  ``test_privacy_props_present_on_every_event`` so a future
+  refactor can't drift.
+- **Docs site analytics**: ``overrides/main.html`` swapped from
+  the Umami snippet (``analytics.dmello.io``) to the PostHog JS
+  snippet, configured for ``autocapture: false``,
+  ``disable_session_recording: true``, ``respect_dnt: true``,
+  ``person_profiles: 'identified_only'``. Same project as the
+  in-app telemetry so docs traffic + in-app events can be
+  cross-queried.
+- **Why**: Aptabase's dashboards weren't giving the maintainer
+  the cohort + funnel views needed to actually answer questions
+  about how Tesserae is used. PostHog's free tier covers the
+  expected fleet shape comfortably.
+- **Env var rename**: ``TESSERAE_TELEMETRY_APP_KEY`` →
+  ``TESSERAE_TELEMETRY_PROJECT_KEY``. ``TESSERAE_TELEMETRY_HOST``
+  unchanged. The ``TESSERAE_TELEMETRY=0`` hard kill is unchanged.
+
+### Notes
+
+- Onboarding telemetry-consent copy + ``docs/privacy.md`` +
+  ``README.md`` rewritten to describe the new backend +
+  surveillance-feature kill-switches.
+- The legacy ``aptabase.dmello.io`` endpoint can be sunset after
+  enough installs have updated to v0.64.0+.
+
 ## [0.63.13], 2026-06-21
 
 ### Fixed

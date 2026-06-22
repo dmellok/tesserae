@@ -292,7 +292,7 @@
           <li><code>update.applied</code>, when the in-app updater applies a new revision, with the from/to short SHAs, channel, and whether deps were reinstalled.</li>
         </ul>
         <p><strong>What it doesn't send:</strong> IP addresses, hostnames, paths, settings, secrets, push contents, dashboard layouts, or anything tied to a real-world identity. The only stable identifier is a random UUID generated on this install and stored in <code>data/core/.instance_id</code>.</p>
-        <p class="muted card--wizard-info-footnote">Events go to my self-hosted Aptabase at <code>aptabase.dmello.io</code>.</p>
+        <p class="muted card--wizard-info-footnote">Events go to my PostHog Cloud project, configured to disable IP storage, person profiles, and session recording. Country and region are recorded so I can see roughly where Tesserae's running. <a href="https://github.com/dmellok/tesserae/blob/main/docs/privacy.md" target="_blank" rel="noopener">More detail in the privacy doc</a>.</p>
       </div>
 
       <label class="check-row">

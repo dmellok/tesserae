@@ -338,7 +338,10 @@ for the deep guide (broker config, Chromium overrides, dev workflow).
 
 **Off by default.** When opted in (Settings → Server → App), Tesserae
 posts four anonymous events to the project's
-[aptabase](https://github.com/aptabase/aptabase) backend:
+[PostHog Cloud](https://posthog.com) project (configured to disable
+IP storage, person profiles, and session recording; coarse country /
+region is recorded so the maintainer can see roughly where Tesserae
+is running):
 
 - `app.started`, per process start (version, Python, platform).
 - `app.heartbeat`, hourly. Fleet shape (number of devices / pages /

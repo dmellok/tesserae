@@ -1,10 +1,10 @@
 """Anonymous, opt-in usage telemetry.
 
-When enabled, posts a small set of events to the maintainer's analytics
-backend (running the open-source ``aptabase/aptabase``):
+When enabled, posts a small set of events to the maintainer's PostHog
+Cloud project:
 
 * ``app.started``, once per process start (Tesserae version, Python
-  version, platform are in ``systemProps``; no custom props).
+  version, platform).
 * ``app.heartbeat``, every hour while the process is running. Props
   carry fleet-shape counts (``n_devices``, ``device_kinds``, ``n_pages``,
   ``n_user_themes``) and activity counters since the previous heartbeat
@@ -25,10 +25,32 @@ random UUID generated on first run and persisted to
 ``data/core/.instance_id`` so the same install counts as one across
 restarts.
 
-The endpoint and app key are **baked into this module**, users cannot
-re-aim Tesserae's telemetry at a different server. That's deliberate:
-the whole point is so the maintainer can count installs, which only
-works if every opted-in instance reports to the same place.
+PostHog privacy configuration baked into every event:
+* ``$ip: ""`` — request IP not stored on the event. PostHog still uses
+  it server-side at ingestion to derive the country + region columns
+  the maintainer needs to see roughly where Tesserae is running, then
+  drops it. No IP ever lands on the stored event row.
+* ``$process_person_profile: false`` — no person profile created or
+  updated; the install UUID is the only identity surface and it never
+  gets enriched.
+
+Country/region IS recorded. Earlier privacy posture was "no geo
+enrichment at all" (``$geoip_disable: true``), but the maintainer
+wants the country breakdown to plan hardware support and prioritise
+docs translations. Country + region is a coarser identifier than IP
+or city, and the IP itself is never stored.
+
+Pre-v0.64 the backend was a self-hosted Aptabase deployment at
+``aptabase.dmello.io``. v0.64.0 moved to PostHog Cloud (US region;
+project ``phc_rRc7…``) because the Aptabase dashboards weren't giving
+the maintainer the cohort + funnel views needed to actually answer
+questions about how Tesserae is used. The data footprint is unchanged
+— same three events, same install UUID, no PII.
+
+The endpoint and project key are **baked into this module**; users
+cannot re-aim Tesserae's telemetry at a different server. That's
+deliberate: the whole point is so the maintainer can count installs,
+which only works if every opted-in instance reports to the same place.
 
 Default: **off**. Users opt in via Settings → Server → App, or
 configuration. ``TESSERAE_TELEMETRY=0`` disables hard regardless of
@@ -38,11 +60,11 @@ Failure-silent: a network/endpoint failure logs at DEBUG and drops the
 event. The send happens on a daemon background thread so nothing ever
 blocks startup or a request.
 
-``TESSERAE_TELEMETRY_HOST`` / ``TESSERAE_TELEMETRY_APP_KEY`` env vars
-are honoured **only** as a development convenience (so the maintainer
-can point a dev build at a staging backend without committing the
-production values). Users on a release won't have those set; the baked
-defaults apply.
+``TESSERAE_TELEMETRY_HOST`` / ``TESSERAE_TELEMETRY_PROJECT_KEY`` env
+vars are honoured **only** as a development convenience (so the
+maintainer can point a dev build at a staging project without
+committing throwaway keys). Users on a release won't have those set;
+the baked defaults apply.
 """
 
 from __future__ import annotations
@@ -70,21 +92,22 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # --- Baked-in endpoint ------------------------------------------------
-# The maintainer's self-hosted Aptabase deployment. Users cannot re-aim
-# Tesserae's telemetry; the toggle controls whether to send, not where it
-# goes, that way opted-in installs add up to a real total. The App-Key
-# is a write-only routing identifier intended to ship in clients, not a
-# secret. Empty strings disable telemetry even if the toggle is on.
-APTABASE_HOST: str = "https://aptabase.dmello.io"
-APTABASE_APP_KEY: str = "A-SH-4940410345"
+# PostHog Cloud US, the maintainer's project. Users cannot re-aim
+# Tesserae's telemetry; the setting toggles whether to send, not where
+# it goes, so opted-in installs add up to a real total. The project
+# key is a write-only routing identifier intended to ship in clients
+# (it's not a secret — same model as PostHog's `posthog.init(...)`
+# snippet on a public website). Empty strings disable telemetry even
+# if the user has the toggle on.
+POSTHOG_HOST: str = "https://us.i.posthog.com"
+POSTHOG_PROJECT_KEY: str = "phc_rRc7y27hcc369mcDb6VXEsDYs3wwQvzuzqJKn2DTxm32"
 
 INSTANCE_ID_FILE = "core/.instance_id"
 SEND_TIMEOUT_S = 4.0
 QUEUE_CAPACITY = 64  # Bounded, drop new events when backlogged.
-# Match Aptabase's default session timeout so each heartbeat keeps the
-# current session alive for the full time the user has Tesserae running.
-# Cheap (~24 events/day per install); valuable: lets the maintainer see
-# session duration + DAU instead of just process-start counts.
+# Cheap (~24 events/day per install); valuable: lets the maintainer
+# see returning installs + a live count via PostHog's hourly
+# breakdown without per-action instrumentation.
 HEARTBEAT_INTERVAL_S = 60 * 60
 
 
@@ -118,52 +141,68 @@ def _env_off() -> bool:
 @dataclass(frozen=True)
 class TelemetryConfig:
     enabled: bool
-    host: str  # endpoint base URL, e.g. "https://analytics.example.com"
-    app_key: str
+    host: str  # endpoint base URL, e.g. "https://us.i.posthog.com"
+    project_key: str
     instance_id: str
     app_version: str
-    # When True we mark events with ``isDebug: true`` so the maintainer's
-    # Aptabase dashboard can filter dev traffic out of the prod view.
+    # Routes events through the same PostHog project but tags them so the
+    # maintainer can filter dev traffic out of the production view.
     # Wired from the ``--dev`` flag in ``app.main._serve``.
     is_debug: bool = False
 
     @property
     def post_url(self) -> str:
-        # ``/api/v0/event`` (singular) is the canonical endpoint used by
-        # every published Aptabase SDK *except* the experimental Python
-        # one (which targets ``/events`` with a batched array). The
-        # Aptabase server doesn't accept the plural form, so we follow
-        # the JS / Swift / Flutter / Kotlin / MAUI lineage and POST a
-        # single event object here.
-        return f"{self.host.rstrip('/')}/api/v0/event"
+        # PostHog's server-side capture endpoint. The same path is used
+        # by every official PostHog SDK; the JS one POSTs to the same
+        # URL just with credentials.mode=include and a slightly larger
+        # batch.
+        return f"{self.host.rstrip('/')}/i/v0/e/"
 
 
-def _system_props(app_version: str, *, is_debug: bool) -> dict[str, object]:
-    """Aptabase's required ``systemProps`` block. Field set mirrors the
-    JS SDK's ``sendEvent`` payload exactly, locale, isDebug,
-    appVersion, sdkVersion. The Python SDK adds osName / osVersion /
-    deviceModel but the Aptabase server doesn't actually require them,
-    and extras have historically tripped server-side schema validation.
-    Stay minimal."""
+def _platform_props(app_version: str) -> dict[str, object]:
+    """Server-side platform context. Picked to mirror what the legacy
+    Aptabase ``systemProps`` block carried (locale + appVersion + sdk
+    name/version) plus what PostHog's other server SDKs send by
+    default. PostHog convention prefixes its own properties with ``$``;
+    Tesserae's own properties have no prefix so they sort separately in
+    the event-explorer UI."""
     return {
-        "locale": "en-US",
-        "isDebug": is_debug,
-        "appVersion": app_version,
-        "sdkVersion": f"aptabase-tesserae@{app_version}",
+        # PostHog standard property names (the $-prefixed ones get
+        # surfaced as first-class columns in the event browser).
+        "$lib": "posthog-tesserae",
+        "$lib_version": app_version,
+        "$os": _platform.system() or "Unknown",
+        # Tesserae-specific.
+        "version": app_version,
+        "python_version": _platform.python_version(),
+        "platform_name": _platform.platform(),
     }
 
 
-def _user_agent(app_version: str) -> str:
-    """Aptabase's server requires a Mozilla-like User-Agent for non-
-    browser clients, see the JS SDK's ``getUserAgent``. A plain
-    ``tesserae/<version>`` UA returns 2xx but never indexes."""
-    platform_map = {"Darwin": "Macintosh", "Windows": "Windows", "Linux": "Linux"}
-    name = platform_map.get(_platform.system(), _platform.system() or "Unknown")
-    return f"Mozilla/5.0 ({name}) Not-A-Browser tesserae/{app_version}"
+def _privacy_props() -> dict[str, object]:
+    """PostHog privacy kill-switches sent on EVERY event so a future
+    SDK default-flip can't quietly re-enable IP storage or person-
+    profile creation. ``$geoip_disable`` is deliberately *not* set —
+    the maintainer wants country + region columns to see where
+    Tesserae is running. PostHog still uses the request IP at
+    ingestion to derive those columns, then drops the IP itself
+    (``$ip: ""`` below)."""
+    return {
+        # Empty ``$ip`` blocks PostHog from filling it in from the
+        # request socket — the IP is used server-side for the geo
+        # lookup at ingestion, then NOT written to the stored event.
+        # No IP ever lands on disk.
+        "$ip": "",
+        # Don't create or update a person profile for the install UUID.
+        # Without this PostHog would otherwise track the install as an
+        # anonymous person across events, which is more identity-
+        # adjacent than we want.
+        "$process_person_profile": False,
+    }
 
 
 class Telemetry:
-    """Background-thread Aptabase client.
+    """Background-thread PostHog Cloud client.
 
     Construct via :meth:`from_settings`. Call :meth:`send` to enqueue an
     event; the worker thread drains the queue and posts. :meth:`shutdown`
@@ -197,10 +236,10 @@ class Telemetry:
     ) -> Telemetry:
         """Resolve enable-flag + env-var endpoint overrides into a config.
 
-        Host / app key come from the baked-in :data:`APTABASE_HOST` and
-        :data:`APTABASE_APP_KEY`. ``TESSERAE_TELEMETRY_HOST`` and
-        ``TESSERAE_TELEMETRY_APP_KEY`` override them, these exist only
-        as a dev convenience for the maintainer, not as a public
+        Host / project key come from the baked-in :data:`POSTHOG_HOST`
+        and :data:`POSTHOG_PROJECT_KEY`. ``TESSERAE_TELEMETRY_HOST`` and
+        ``TESSERAE_TELEMETRY_PROJECT_KEY`` override them; these exist
+        only as a dev convenience for the maintainer, not as a public
         re-aiming knob. ``TESSERAE_TELEMETRY=0`` kills it hard.
 
         ``event_log`` (optional): when provided, each send attempt is
@@ -208,17 +247,17 @@ class Telemetry:
         whether the endpoint is actually reachable.
 
         ``is_debug``: marks events as debug traffic so the maintainer's
-        Aptabase dashboard can filter them out of the prod view. Passed
+        PostHog dashboard can filter them out of the prod view. Passed
         as ``args.dev`` from ``app.main._serve``."""
         enabled_setting = bool(settings_app.get("telemetry_enabled", False))
-        host = os.environ.get("TESSERAE_TELEMETRY_HOST", "").strip() or APTABASE_HOST
-        key = os.environ.get("TESSERAE_TELEMETRY_APP_KEY", "").strip() or APTABASE_APP_KEY
+        host = os.environ.get("TESSERAE_TELEMETRY_HOST", "").strip() or POSTHOG_HOST
+        key = os.environ.get("TESSERAE_TELEMETRY_PROJECT_KEY", "").strip() or POSTHOG_PROJECT_KEY
         enabled = enabled_setting and bool(host) and bool(key) and not _env_off()
         return cls(
             TelemetryConfig(
                 enabled=enabled,
                 host=host,
-                app_key=key,
+                project_key=key,
                 instance_id=_ensure_instance_id(data_root),
                 app_version=app_version,
                 is_debug=is_debug,
@@ -234,7 +273,7 @@ class Telemetry:
             TelemetryConfig(
                 enabled=False,
                 host="",
-                app_key="",
+                project_key="",
                 instance_id="00000000-0000-0000-0000-000000000000",
                 app_version="0",
             )
@@ -244,7 +283,7 @@ class Telemetry:
 
     @property
     def enabled(self) -> bool:
-        return self._cfg.enabled and bool(self._cfg.host) and bool(self._cfg.app_key)
+        return self._cfg.enabled and bool(self._cfg.host) and bool(self._cfg.project_key)
 
     @property
     def instance_id(self) -> str:
@@ -279,7 +318,7 @@ class Telemetry:
         be restarted after the user flips the toggle). On→off keeps the
         threads around but ``send`` drops everything, so a future
         re-enable picks up immediately."""
-        can_enable = on and bool(self._cfg.host) and bool(self._cfg.app_key)
+        can_enable = on and bool(self._cfg.host) and bool(self._cfg.project_key)
         self._cfg = dataclasses.replace(self._cfg, enabled=can_enable)
         if can_enable:
             self._stop.clear()
@@ -350,19 +389,37 @@ class Telemetry:
             self._post(name, props)  # return value discarded
 
     def _post(self, event_name: str, props: dict[str, str]) -> str | None:
-        """POST one event. Returns ``None`` on a 2xx response or a short
-        error string on failure (HTTPError gets ``HTTP <code> <reason>``).
+        """POST one event to PostHog's capture endpoint. Returns ``None``
+        on a 2xx response or a short error string on failure (HTTPError
+        gets ``HTTP <code> <reason>``).
 
         Records a ``type="telemetry"`` row in the event log either way so
         the Events tab can show success / failure side-by-side with push
         history."""
-        # Singular ``/api/v0/event`` takes a bare object, see JS SDK.
+        # PostHog's /i/v0/e/ takes a single event object (or a batched
+        # ``{batch: [...]}``). The fields are flat: ``api_key`` for
+        # routing, ``event`` for the name, ``distinct_id`` for the
+        # install identity, ``properties`` for everything else.
+        # ``timestamp`` is optional but pinning it client-side stops
+        # PostHog from using the wall-clock-at-receive time which can
+        # be skewed when a heartbeat batches across a network blip.
+        all_props: dict[str, object] = {}
+        all_props.update(_platform_props(self._cfg.app_version))
+        all_props.update(_privacy_props())
+        # Maintainer's debug filter — flagged at the event level so
+        # dashboards can filter ``properties.is_debug = false`` to see
+        # production traffic only.
+        all_props["is_debug"] = self._cfg.is_debug
+        # Caller props win against the defaults; in practice they don't
+        # collide (caller props are fleet shape / activity counters).
+        for k, v in props.items():
+            all_props[k] = v
         body = {
+            "api_key": self._cfg.project_key,
+            "event": event_name,
+            "distinct_id": self._cfg.instance_id,
+            "properties": all_props,
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "sessionId": self._cfg.instance_id,
-            "eventName": event_name,
-            "systemProps": _system_props(self._cfg.app_version, is_debug=self._cfg.is_debug),
-            "props": props,
         }
         data = json.dumps(body).encode("utf-8")
         req = urllib.request.Request(
@@ -370,8 +427,12 @@ class Telemetry:
             data=data,
             headers={
                 "Content-Type": "application/json",
-                "App-Key": self._cfg.app_key,
-                "User-Agent": _user_agent(self._cfg.app_version),
+                # PostHog accepts the project key either in the body
+                # (api_key field) or in this header. We send it both
+                # ways so a future SDK / proxy that strips one still
+                # routes correctly.
+                "Authorization": f"Bearer {self._cfg.project_key}",
+                "User-Agent": f"tesserae-telemetry/{self._cfg.app_version}",
             },
             method="POST",
         )
@@ -393,12 +454,13 @@ class Telemetry:
             with contextlib.suppress(Exception):
                 # Logging is best-effort, never let an event-log issue
                 # take down the worker thread or the request thread.
-                # We stash the exact JSON body in ``extra`` so the Events
-                # tab can show the user what we shipped (or tried to
-                # ship), handy for diagnosing 400s like the
-                # isDebug/sdkVersion shape one. sessionId is the only
-                # identifier and it's anonymous (instance UUID), so
+                # We stash the exact JSON body (sans the project key,
+                # which is fine to log since it's not a secret but is
+                # noisy in the events table) in ``extra`` so the Events
+                # tab can show the user what we shipped. distinct_id is
+                # the only identifier and it's the install UUID, so
                 # surfacing it is fine.
+                redacted_body = {**body, "api_key": "phc_…"}
                 self._event_log.record(
                     type="telemetry",
                     source=event_name,
@@ -406,6 +468,6 @@ class Telemetry:
                     status="sent" if err_msg is None else "failed",
                     error=err_msg,
                     duration_s=datetime.now(UTC).timestamp() - started,
-                    extra={"payload": body, "endpoint": self._cfg.post_url},
+                    extra={"payload": redacted_body, "endpoint": self._cfg.post_url},
                 )
         return err_msg

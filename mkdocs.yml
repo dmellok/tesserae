@@ -15,10 +15,11 @@ exclude_docs: |
 
 theme:
   name: material
-  # overrides/main.html injects the Umami analytics snippet into the
-  # head of every page. Material doesn't ship a first-party Umami
-  # provider; the override block is the documented hook for custom
-  # script tags that need preserved attributes (data-website-id).
+  # overrides/main.html injects the PostHog analytics snippet into the
+  # head of every page (configured for autocapture-off, no session
+  # recording, no person profiles, DNT respected). v0.64.0 swapped
+  # away from Umami — both surfaces now share one analytics project so
+  # docs traffic + in-app telemetry can be cross-queried.
   custom_dir: overrides
   icon:
     repo: fontawesome/brands/github
