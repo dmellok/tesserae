@@ -66,10 +66,19 @@
     // fires on the initial load AND every subsequent instant nav —
     // so capturing here gives us one event per page with no
     // duplicates and no misses.
-    document$.subscribe(function () {
-      posthog.capture('$pageview', {
-        $current_url: window.location.href,
-        $pathname: window.location.pathname,
+    //
+    // ``document$`` is created by Material's bundle which loads at
+    // the end of ``<body>``; this ``<head>`` script runs *before*
+    // that bundle parses, so we have to defer the subscribe call
+    // until DOMContentLoaded or ``document$`` would be a
+    // ReferenceError and nothing would fire (not even the initial
+    // pageview, since we turned auto-capture off above).
+    window.addEventListener('DOMContentLoaded', function () {
+      document$.subscribe(function () {
+        posthog.capture('$pageview', {
+          $current_url: window.location.href,
+          $pathname: window.location.pathname,
+        });
       });
     });
   </script>

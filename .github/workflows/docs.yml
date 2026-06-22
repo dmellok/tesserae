@@ -15,6 +15,11 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      # MkDocs Material picks up template overrides from ``overrides/``
+      # (configured via ``theme.custom_dir`` in mkdocs.yml). Without
+      # this entry, edits to the PostHog snippet in main.html silently
+      # skipped the docs deploy.
+      - "overrides/**"
       - "mkdocs.yml"
       - "scripts/gen_*.py"
       - "plugins/**/plugin.json"
