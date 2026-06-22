@@ -875,7 +875,7 @@ docker compose up -d</code></pre>
 
   {% if system_dev_mode %}
   <section class="dx-section-card">
-    {{ card_head('Telemetry', icon_name='broadcast', blurb='Two events (app.started, update.applied) go to ' ~ (system_telemetry_host or 'the project backend') ~ '. Every attempt is recorded as a "telemetry" row in the Events tab so you can see exactly what landed.') }}
+    {{ card_head('Telemetry', icon_name='broadcast', blurb='Four anonymous events (app.started, app.heartbeat, update.applied, theme.user_created) go to ' ~ (system_telemetry_host or 'the project backend') ~ '. Every attempt is recorded as a "telemetry" row in the Events tab so you can see exactly what landed.') }}
 
     <p>
       Status: {% if system_telemetry_enabled %}
