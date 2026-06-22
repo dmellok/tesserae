@@ -229,6 +229,9 @@ export function sparkline(canvas, values, colorOrOpts) {
           // Pad below the min so the fill doesn't collapse to a
           // sliver against the bottom edge.
           suggestedMin: Math.min(...values) - (Math.max(...values) - Math.min(...values)) * 0.15,
+          // Headroom above the max so the tension:0.3 spline's overshoot
+          // on a sharp spike isn't sliced off flat against the top edge.
+          grace: "12%",
         },
       },
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
