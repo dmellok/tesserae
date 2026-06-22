@@ -92,14 +92,21 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # --- Baked-in endpoint ------------------------------------------------
-# PostHog Cloud US, the maintainer's project. Users cannot re-aim
-# Tesserae's telemetry; the setting toggles whether to send, not where
-# it goes, so opted-in installs add up to a real total. The project
-# key is a write-only routing identifier intended to ship in clients
-# (it's not a secret — same model as PostHog's `posthog.init(...)`
-# snippet on a public website). Empty strings disable telemetry even
-# if the user has the toggle on.
-POSTHOG_HOST: str = "https://us.i.posthog.com"
+# Maintainer-managed reverse proxy that forwards to PostHog Cloud US.
+# The proxy lives at https://t.dmello.io and forwards both the
+# ``/i/v0/e/`` event ingest path and the ``/static/array.js`` asset
+# bundle to ``us.i.posthog.com`` / ``us-assets.i.posthog.com``. Using
+# a proxy lets the endpoint look like a first-party domain to network-
+# level ad-blockers that silently drop requests to known analytics
+# hosts (uBlock Origin's default lists, Pi-hole, NextDNS); the events
+# arriving at PostHog itself are byte-identical.
+# Users cannot re-aim Tesserae's telemetry; the setting toggles
+# whether to send, not where it goes, so opted-in installs add up to
+# a real total. The project key is a write-only routing identifier
+# intended to ship in clients (not a secret — same model as PostHog's
+# ``posthog.init(...)`` snippet on a public website). Empty strings
+# disable telemetry even if the user has the toggle on.
+POSTHOG_HOST: str = "https://t.dmello.io"
 POSTHOG_PROJECT_KEY: str = "phc_rRc7y27hcc369mcDb6VXEsDYs3wwQvzuzqJKn2DTxm32"
 
 INSTANCE_ID_FILE = "core/.instance_id"
@@ -141,7 +148,7 @@ def _env_off() -> bool:
 @dataclass(frozen=True)
 class TelemetryConfig:
     enabled: bool
-    host: str  # endpoint base URL, e.g. "https://us.i.posthog.com"
+    host: str  # endpoint base URL, e.g. "https://t.dmello.io"
     project_key: str
     instance_id: str
     app_version: str

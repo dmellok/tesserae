@@ -97,7 +97,8 @@ export TESSERAE_TELEMETRY=0
 
 For the docs site, browsers with Do-Not-Track headers skip analytics
 automatically. To force-disable in any browser, block the
-`us.i.posthog.com` domain.
+`t.dmello.io` domain (the maintainer's reverse proxy that forwards
+to PostHog).
 
 [posthog]: https://posthog.com
 [telemetry-py]: https://github.com/dmellok/tesserae/blob/main/app/telemetry.py

@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.2], 2026-06-22
+
+### Changed
+
+- **PostHog endpoint moved behind the maintainer's reverse proxy
+  at ``https://t.dmello.io``** (forwards to PostHog Cloud US).
+  Both the in-app telemetry POST URL and the docs-site JS
+  snippet's ``api_host`` are updated; the proxy forwards both
+  ``/i/v0/e/`` (events) and ``/static/array.js`` (the lazy-loaded
+  SDK bundle). The events PostHog actually receives are byte-
+  identical to before.
+- **Why**: bypasses network-level ad-blockers (uBlock's default
+  lists, Pi-hole, NextDNS) that silently drop requests to known
+  analytics origins — a non-trivial fraction of the privacy-
+  conscious Tesserae audience runs one of these. Going via a
+  first-party-looking domain means opt-in installs that would
+  previously have failed at the DNS layer now actually deliver
+  events.
+- **JS SDK**: docs snippet picks up ``ui_host:
+  'https://us.posthog.com'`` so PostHog's occasional "view in
+  PostHog" deep-links resolve to the real dashboard instead of
+  trying to point back at the proxy.
+- **Privacy doc** updated: the "block this to opt out at the
+  network level" instruction now names ``t.dmello.io``.
+
+### Notes
+
+- Self-host instructions for the reverse proxy aren't in-repo;
+  it's just an nginx/Caddy block that maps ``t.dmello.io/i/* ->
+  us.i.posthog.com/i/*`` and ``t.dmello.io/static/* ->
+  us-assets.i.posthog.com/static/*``.
+
 ## [0.64.1], 2026-06-22
 
 ### Fixed
