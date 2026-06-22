@@ -316,6 +316,16 @@
     const clear = zone.querySelector('[data-dropzone-clear]');
     const filePreview = document.querySelector('[data-file-preview]');
     const filePlaceholder = document.querySelector('[data-file-preview-placeholder]');
+    const form = zone.closest('form');
+
+    // ``arrayBuffer()`` snapshot kept in flight so the form-submit
+    // handler can await it before sending. See ``ingestFile`` for the
+    // why — short version: Android Chrome lazy-reads the file URI at
+    // submit time and aborts with ``ERR_UPLOAD_FILE_CHANGED`` when
+    // Google Photos sync / HEIC conversion / EXIF rewrite touch the
+    // file between selection and submit. Snapshotting at selection
+    // time decouples submit from the URI.
+    let ingesting = null;
 
     function fmt(bytes) {
       if (bytes < 1024) return bytes + ' B';
@@ -340,7 +350,44 @@
       if (filePreview) { filePreview.src = url; filePreview.hidden = false; }
       if (filePlaceholder) filePlaceholder.hidden = true;
     }
-    input.addEventListener('change', () => showFile(input.files[0]));
+    // Read the file's bytes into memory NOW and replace input.files
+    // with a fresh File backed by those bytes. The form's normal
+    // submit then sends the in-memory snapshot rather than re-reading
+    // the original URI — which on Android Chrome routinely fails with
+    // ERR_UPLOAD_FILE_CHANGED when Google Photos sync, HEIC
+    // conversion, or EXIF rewrite touch the file after selection.
+    // We also tag the snapshot with a marker property so we don't
+    // double-snapshot if the change event somehow fires again on the
+    // same bytes (e.g. mobile browsers that fire change on focus).
+    async function ingestFile(rawFile) {
+      if (!rawFile) return;
+      if (rawFile.__tesserae_snapshotted) return;
+      ingesting = (async () => {
+        let snapped = rawFile;
+        try {
+          const buf = await rawFile.arrayBuffer();
+          snapped = new File([buf], rawFile.name, {
+            type: rawFile.type || 'application/octet-stream',
+            lastModified: rawFile.lastModified,
+          });
+          Object.defineProperty(snapped, '__tesserae_snapshotted', { value: true });
+        } catch (err) {
+          // OS denied access mid-read, or out of memory on a huge file.
+          // Fall back to the original File — submit may still work; if
+          // it hits ERR_UPLOAD_FILE_CHANGED the user retries.
+          console.warn('tesserae: file snapshot failed, falling back', err);
+        }
+        const dt = new DataTransfer();
+        dt.items.add(snapped);
+        input.files = dt.files;
+        showFile(snapped);
+      })();
+      try { await ingesting; } finally { ingesting = null; }
+    }
+    input.addEventListener('change', () => {
+      if (input.files[0]) ingestFile(input.files[0]);
+      else showFile(null);
+    });
     clear.addEventListener('click', (e) => {
       e.preventDefault();
       input.value = '';
@@ -355,11 +402,20 @@
     zone.addEventListener('drop', (e) => {
       const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
       if (!file) return;
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      input.files = dt.files;
-      showFile(file);
+      ingestFile(file);
     });
+    // Block the form submit until any in-flight snapshot completes,
+    // otherwise a fast user clicking Push before arrayBuffer resolves
+    // would still submit the original URI-backed file. Snapshots are
+    // sub-second even for 16 MiB so the delay is invisible in the
+    // common case.
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        if (!ingesting) return;
+        e.preventDefault();
+        ingesting.then(() => form.submit());
+      });
+    }
   })();
 
   // Saved-dashboard preview: swap iframe src when the select changes.

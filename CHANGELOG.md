@@ -6,6 +6,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.8], 2026-06-22
+
+### Fixed
+
+- **Send page: photo uploads from Android Chrome no longer fail
+  with ``ERR_UPLOAD_FILE_CHANGED``**. The dropzone now reads the
+  selected file's bytes into memory immediately at selection time
+  (via ``File.arrayBuffer()``) and replaces the
+  ``<input type="file">`` with a fresh in-memory ``File`` backed by
+  those bytes. Form submission therefore no longer depends on the
+  OS file handle that Android lets drift — Google Photos sync,
+  HEIC→JPEG conversion, EXIF rewriting, and similar background
+  modifications between selection and submit are now invisible to
+  Chrome's upload comparison. The form submit handler awaits any
+  in-flight snapshot so a quick tap on **Push file** while
+  ``arrayBuffer()`` is still resolving doesn't sneak the original
+  URI through. Sub-second for the 16 MiB max even on mid-range
+  phones, so the delay is invisible in the common case.
+
+### Why
+
+Multiple Android users reported the file picker showing the
+selected photo and "2.82 MB" file size, then Chrome aborting the
+submit with ``ERR_UPLOAD_FILE_CHANGED`` and dropping them on
+Chrome's "Your file couldn't be accessed" error page. The bytes
+never reached Flask — Chrome compares the file size + mtime it
+cached at selection time with what it sees at submit time and
+refuses to send mismatched data. The fix attacks the underlying
+race: snapshot the bytes once, hold them in JS memory, and submit
+those instead of asking Chrome to re-read.
+
 ## [0.64.7], 2026-06-22
 
 ### Fixed
