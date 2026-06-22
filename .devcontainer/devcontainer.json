@@ -43,6 +43,19 @@
       "onAutoForward": "openPreview"
     }
   },
+  // Block the IDE / terminal until ``postCreateCommand`` finishes.
+  // Without this, the user can open a terminal mid-install and hit
+  // ``tesserae: command not found``, which read as a setup failure
+  // even though pip was still running. The Codespaces UI keeps a
+  // "Setting up dev container" progress card visible until this
+  // resolves, so the install is at least signalled rather than
+  // silent. Boot time on a clean Codespace is ~60–90s; subsequent
+  // attaches skip postCreate entirely and only run postAttach.
+  // For true ~30s cold-start, enable prebuilds in repo Settings →
+  // Codespaces → Set up prebuild (bakes pip install into the image
+  // at GitHub Actions time so the badge launches an
+  // already-provisioned container).
+  "waitFor": "postCreateCommand",
   "postCreateCommand": "sudo apt-get update && sudo apt-get install -y --no-install-recommends fonts-noto-color-emoji && sudo rm -rf /var/lib/apt/lists/* && pip install --upgrade pip && pip install -e '.[dev]'",
   "postAttachCommand": "bash -lc 'pgrep -f \"tesserae\" >/dev/null || nohup tesserae > /tmp/tesserae.log 2>&1 &'",
   "customizations": {
