@@ -1,24 +1,32 @@
-"""Recon HTTP server for a TRMNL-compatible client.
+"""Local test server matching TRMNL's BYOS (Bring Your Own Server)
+protocol. Used during development of ``app/trmnl_api.py`` to verify
+client behaviour: every incoming request is logged to stdout
+(method, path, headers, body) so the maintainer can confirm payload
+shapes before encoding them into the production blueprint. Returns
+minimal valid-shaped responses so a client keeps polling rather
+than backing off after the first 404, which keeps log captures
+useful for more than a single request.
 
-A throwaway server that pretends to be a TRMNL backend so we can watch
-exactly what a TRMNL client (Kindle jailbreak, official device, anything
-that implements the BYOS protocol) sends when it tries to phone home.
-Logs every request to stdout with method, path, headers, and body, then
-returns minimal valid-shaped responses so the client keeps polling
-instead of giving up after the first 404.
+The BYOS protocol is documented and open by design; usetrmnl.com
+publishes it so third-party servers (including this one) can
+interoperate with TRMNL devices, jailbroken Kindles running the
+KOReader trmnl-display plugin, and any other BYOS-compatible
+firmware. See ``docs/credits.md`` for attribution to TRMNL,
+Terminus (their Laravel reference server), the BYOS spec itself,
+and the KOReader plugin. This probe is a local development
+harness against that public spec, not part of the runtime app.
 
-We use it to discover:
+Useful for sanity-checking:
 
-* What headers the client actually sends (``ID``, ``Access-Token``,
+* Which headers the client populates (``ID``, ``Access-Token``,
   ``Width``, ``Height``, battery / RSSI / FW fields).
-* What the request cadence looks like for ``/api/display`` polling.
-* Whether the client honours ``refresh_rate`` we hand back, and how
-  it interprets ``reset_firmware`` / ``update_firmware`` / others.
-* What the ``/api/log/`` POST body looks like in practice, the BYOS
-  docs sketch it but each implementation has its own quirks.
-
-Not part of the runtime app. Stays under ``scripts/`` because it is a
-development-time tool the maintainer runs by hand.
+* The actual cadence of ``/api/display`` polling once
+  ``refresh_rate`` is set.
+* Whether a given client honours ``reset_firmware`` /
+  ``update_firmware`` envelope fields.
+* The shape of ``/api/log/`` POST bodies; the spec describes the
+  envelope but each client implementation has small quirks (line
+  termination, level keys, extra fields).
 
 Usage
 -----
@@ -26,18 +34,19 @@ Usage
 Standard library only, no venv or pip needed. Runs anywhere with
 Python 3.11+::
 
-    python3 scripts/trmnl_recon.py
-    python3 scripts/trmnl_recon.py --port 8765 --host 0.0.0.0
+    python3 scripts/trmnl_byos_probe.py
+    python3 scripts/trmnl_byos_probe.py --port 8765 --host 0.0.0.0
 
-Then point the TRMNL client at ``http://<your-dev-ip>:8765/`` and watch
-the logs. The default 0.0.0.0 bind makes the server reachable from any
-device on the LAN.
+Point a BYOS-compatible client at ``http://<your-dev-ip>:8765/``
+and watch the logs. The default 0.0.0.0 bind makes the server
+reachable from any device on the LAN.
 
-Hello images are generated on demand at any panel dimensions -
+Hello images are generated on demand at any panel dimensions:
 ``/img/hello-<W>x<H>.png`` returns a 1-bit greyscale (or 8-bit if
-``--bit-depth 8`` is set) PNG with a thick border, a corner-to-corner
-diagonal X, centre crosshairs, and L-shaped corner brackets so a
-successful end-to-end fetch is unmistakable on any panel.
+``--bit-depth 8`` is set) PNG with a thick border, a corner-to-
+corner diagonal X, centre crosshairs, and L-shaped corner
+brackets so a successful end-to-end fetch is unmistakable on any
+panel.
 """
 
 from __future__ import annotations
@@ -51,7 +60,7 @@ import zlib
 from datetime import datetime
 
 
-class ReconHandler(http.server.BaseHTTPRequestHandler):
+class ByosProbeHandler(http.server.BaseHTTPRequestHandler):
     # Quiet the default per-request line, we print our own richer log
     # block in ``_log_request`` below.
     def log_message(self, format: str, *args: object) -> None:
@@ -366,7 +375,7 @@ def main() -> None:
     _PNG_CACHE.clear()
 
     addr = (args.host, args.port)
-    httpd = http.server.HTTPServer(addr, ReconHandler)
+    httpd = http.server.HTTPServer(addr, ByosProbeHandler)
     print(f"TRMNL recon listening on http://{args.host}:{args.port}/")
     print("Point your TRMNL client at this address.")
     print("All requests will be logged below. Ctrl+C to stop.\n", flush=True)
