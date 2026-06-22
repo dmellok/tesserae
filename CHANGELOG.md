@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.5], 2026-06-22
+
+### Added
+
+- **Onboarding wizard: new "Timezone" step**. Slots in right
+  after Welcome, before Transport. The picker is pre-selected
+  with the host-detected IANA name (``TZ`` env var or
+  ``/etc/localtime`` symlink target), so a sensible default lands
+  one click away. The user can keep it or pick another. Skip
+  button writes ``system`` (scheduler-time auto-detect, defaults
+  to UTC on bare Docker).
+
+### Why
+
+The scheduler interprets every daily fire time and time-of-day
+window against ``settings.app.timezone``. On Docker images
+without ``TZ=`` set, that resolves to UTC — so a brand-new user
+creates an *8:00 AM* schedule expecting breakfast, gets pushed
+to dinner-time. Surfacing the picker during onboarding instead
+of burying it under Settings → App means new installs land
+already pointing at the right zone.
+
+### Side benefit
+
+v0.64.4's ``timezone`` / ``timezone_region`` telemetry props
+now populate for every event from the first heartbeat onward
+(instead of for installs where the system path happens to find
+a real IANA name). The wizard's save handler also live-updates
+the in-process ``Telemetry._cfg`` so the very next heartbeat
+already carries the new timezone — no restart required.
+
+### Tests
+
+Three new tests in ``test_onboarding.py``: the timezone step
+renders with a populated picker, picking a valid IANA name
+saves it + redirects to broker, and a bogus hand-typed value
+falls through to ``"system"`` instead of slipping into
+settings.
+
 ## [0.64.4], 2026-06-22
 
 ### Added

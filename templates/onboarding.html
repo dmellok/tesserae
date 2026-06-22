@@ -22,16 +22,43 @@
     {# ---------- Welcome ---------- #}
     {% if step == 'welcome' %}
     <h1>Welcome to Tesserae</h1>
-    <p class="lede">Four quick steps to get a dashboard onto your first panel. You can skip any time and configure things later under Settings.</p>
+    <p class="lede">A few quick steps to get a dashboard onto your first panel. You can skip any time and configure things later under Settings.</p>
     <ol class="wizard-overview">
+      <li><strong>Timezone</strong>, so schedules fire at your wall-clock time.</li>
       <li><strong>Transport</strong>, REST API (no broker needed) or MQTT.</li>
       <li><strong>Device</strong>, pair the panel with a 6-digit code (REST) or register it via discovery (MQTT).</li>
       <li><strong>Dashboard</strong>, a starter layout, pushed to the panel.</li>
     </ol>
     <div class="wizard-nav">
       <span></span>
-      <a class="primary" href="{{ url_for('onboarding.step', step='broker') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Get started</span></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='timezone') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Get started</span></a>
     </div>
+
+    {# ---------- Timezone ---------- #}
+    {% elif step == 'timezone' %}
+    <h1>What timezone are you in?</h1>
+    <p class="lede">Used by the scheduler when interpreting daily fire times and time-of-day windows. Pick your timezone so an <em>8:00 AM</em> schedule actually fires at 8 AM local, not 8 AM UTC.</p>
+    <form method="post" action="{{ url_for('onboarding.save_timezone') }}" class="form wizard-timezone-form">
+      <div class="field">
+        <label for="onboard-tz">Timezone</label>
+        <select id="onboard-tz" name="timezone">
+          {% for choice in timezone_choices %}
+          <option value="{{ choice.value }}" {% if choice.value == timezone_selected %}selected{% endif %}>{{ choice.label }}</option>
+          {% endfor %}
+        </select>
+        <p class="field-help">
+          {% if timezone_detected and timezone_detected != 'UTC' %}
+          Detected from your host: <code>{{ timezone_detected }}</code>. Keep it or pick another.
+          {% else %}
+          We couldn't auto-detect; pick yours from the list (defaults to UTC).
+          {% endif %}
+        </p>
+      </div>
+      <div class="wizard-nav">
+        <a class="ghost" href="{{ url_for('onboarding.step', step='broker') }}"><span>Use system default</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+        <button class="primary" type="submit"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Save &amp; continue</span></button>
+      </div>
+    </form>
 
     {# ---------- Broker ---------- #}
     {% elif step == 'broker' %}

@@ -47,12 +47,61 @@ def test_root_lands_on_wizard_until_onboarded(app: Flask) -> None:
 def test_wizard_steps_render(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    for step in ("welcome", "broker", "device", "dashboard", "telemetry"):
+    for step in ("welcome", "timezone", "broker", "device", "dashboard", "telemetry"):
         resp = client.get(f"/onboarding/{step}")
         assert resp.status_code == 200, step
     # Unknown step falls back to welcome.
     resp = client.get("/onboarding/bogus", follow_redirects=False)
     assert "/onboarding/welcome" in resp.location
+
+
+def test_timezone_step_picker_renders_with_choices(app: Flask) -> None:
+    """The wizard's timezone step should render a <select> populated
+    with real IANA names. Picker should land pre-selected with a
+    sensible value rather than blank."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.get("/onboarding/timezone")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # Picker is present + selectable.
+    assert 'name="timezone"' in body
+    # At least one real IANA name appears in the options list.
+    assert "Australia/Melbourne" in body or "Europe/London" in body or "America/New_York" in body
+    # Either the detected timezone is shown or the "couldn't detect"
+    # fallback copy is rendered — both are valid landing states.
+    assert "Detected from your host" in body or "couldn't auto-detect" in body
+
+
+def test_timezone_step_saves_and_advances_to_broker(app: Flask) -> None:
+    """Picking a real IANA name persists ``settings.app.timezone`` and
+    bounces the user into the broker step."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/onboarding/timezone",
+        data={"timezone": "Australia/Melbourne"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert "/onboarding/broker" in resp.location
+    stored = app.config["SETTINGS_STORE"].get_section("app")
+    assert stored.get("timezone") == "Australia/Melbourne"
+
+
+def test_timezone_step_rejects_unknown_value(app: Flask) -> None:
+    """A hand-typed bogus value falls through to ``system`` (the
+    least-surprising default) instead of slipping into settings."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/onboarding/timezone",
+        data={"timezone": "Not/A/Real/Zone"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    stored = app.config["SETTINGS_STORE"].get_section("app")
+    assert stored.get("timezone") == "system"
 
 
 def test_telemetry_step_shows_a_pre_checked_consent_toggle(app: Flask) -> None:

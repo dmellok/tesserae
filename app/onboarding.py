@@ -45,14 +45,24 @@ from app.panel import (
     resolve_settings_panel,
 )
 from app.push import PushManager
+from app.settings.field_defs import _TZ_CHOICES
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
+from app.telemetry import _resolve_iana_timezone
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "broker", "device", "dashboard", "telemetry")
+STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard", "telemetry")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
+    # Timezone slots in right after welcome because it's foundational:
+    # the scheduler interprets every fire time against it. Surfaced
+    # during onboarding so users on Docker / bare metal explicitly
+    # pick instead of inheriting whatever the host happens to be
+    # (often UTC). v0.64.4's telemetry timezone signal also lands
+    # here as a side effect — the maintainer gets an honest "where
+    # are people running this" without IP geolocation.
+    "timezone": "Timezone",
     # The route step id is still "broker" for URL stability (see
     # save_broker), but the user-facing label now reflects the v0.52.2
     # reframe to a transport choice. REST users don't touch a broker
@@ -192,7 +202,27 @@ def step(step: str) -> Response | str:
         "step_index": STEPS.index(step),
         "step_count": len(STEPS),
     }
-    if step == "broker":
+    if step == "timezone":
+        app_section = _settings().get_section("app")
+        stored = str(app_section.get("timezone") or "system")
+        # Auto-detect from the host so the picker lands pre-populated
+        # with a sensible default. The user can keep it (one click) or
+        # change it. ``_resolve_iana_timezone`` returns "" when nothing
+        # resolves — we fall back to "UTC" so the picker still has a
+        # value selected (better than blank).
+        detected = _resolve_iana_timezone("system") or "UTC"
+        ctx["timezone_stored"] = stored
+        ctx["timezone_detected"] = detected
+        ctx["timezone_choices"] = _TZ_CHOICES
+        # ``selected_value`` is what the picker pre-selects. Prefer the
+        # user's existing settings.app.timezone if they're revisiting
+        # the step (e.g. clicked Back) so we don't blow away an
+        # explicit earlier choice.
+        if stored and stored.lower() != "system":
+            ctx["timezone_selected"] = stored
+        else:
+            ctx["timezone_selected"] = detected
+    elif step == "broker":
         broker = _settings().get_section("broker")
         ctx["broker"] = broker
         # v0.52 transport-choice radio. Default to REST for fresh
@@ -268,6 +298,42 @@ def step(step: str) -> Response | str:
     elif step == "dashboard":
         ctx["pages"] = [{"id": p.id, "name": p.name} for p in _pages().list()]
     return render_template("onboarding.html", **ctx)
+
+
+@bp.post("/timezone")
+def save_timezone() -> Response:
+    """Persist the picked timezone to ``settings.app.timezone`` and
+    advance to the broker step.
+
+    Validates against ``zoneinfo.available_timezones()`` so a hand-
+    typed bogus value (or a stale ``_TZ_CHOICES`` cache) can't slip
+    a non-IANA string into settings. Unknown values fall through to
+    ``"system"`` (host auto-detect at scheduler-time) which is the
+    least-surprising default.
+
+    Also: re-snapshots the live Telemetry config's timezone field so
+    the next event picks up the new value without a process restart.
+    Without this the timezone props on the heartbeats Tesserae fires
+    today would still reflect whatever was set at startup.
+    """
+    import dataclasses
+    import zoneinfo
+
+    raw = (request.form.get("timezone") or "").strip()
+    if raw and raw != "system" and raw not in zoneinfo.available_timezones():
+        flash(f"Unknown timezone {raw!r}; falling back to system.", "warn")
+        raw = "system"
+    _settings().patch_section("app", {"timezone": raw or "system"})
+
+    # Live-update the in-process Telemetry config so the timezone shows
+    # up on the very next heartbeat without waiting for a restart.
+    telemetry = current_app.config.get("TELEMETRY")
+    if telemetry is not None:
+        resolved = _resolve_iana_timezone(raw or "system")
+        telemetry._cfg = dataclasses.replace(telemetry._cfg, timezone=resolved)
+
+    flash("Timezone saved.", "ok")
+    return redirect(url_for("onboarding.step", step="broker"))
 
 
 @bp.post("/broker")
