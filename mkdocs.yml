@@ -102,5 +102,7 @@ nav:
       - Widget contract: widgets.md
       - Cross-widget design system: widget-design-system.md
       - Design brief template: widget-design-brief.md
+  - Client development:
+      - Client protocol spec: dev/client-protocol.md
   - Privacy & telemetry: privacy.md
   - Credits: credits.md
