@@ -28,14 +28,7 @@ static/dist/
 # Editor / OS noise
 .DS_Store
 .idea/
-# Ship the workspace tasks (used by the Codespaces auto-start path)
-# while leaving the rest of .vscode/ user-local. launch.json,
-# user-tuned settings.json, etc. stay out of git. Globbing the
-# children rather than the directory itself is required: when the
-# directory is excluded, git won't descend into it to apply the
-# negation, so the ``!`` would be a no-op against ``.vscode/``.
-.vscode/*
-!.vscode/tasks.json
+.vscode/
 *.swp
 
 # Working notes / build prompts for downstream projects
