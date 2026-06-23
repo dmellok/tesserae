@@ -245,9 +245,15 @@
       }
 
       function fireChange() {
-        // ``change`` is what editor.js's autosave listens for, so we
-        // synthesise one when the user picks a result. Bubbles so the
-        // form-level listener catches it.
+        // editor.js wires both ``input`` and ``change`` listeners on the
+        // form; the input listener gates immediate preview updates while
+        // ``change`` is the autosave commit point. Dispatching both
+        // covers either pathway, important because the storage element
+        // is a hidden input (which doesn't have a natural blur event)
+        // so the ``change`` listener path is the only "settled" signal
+        // the editor sees from us. Both events bubble so the form-level
+        // listener catches them.
+        storage.dispatchEvent(new Event("input", { bubbles: true }));
         storage.dispatchEvent(new Event("change", { bubbles: true }));
       }
 

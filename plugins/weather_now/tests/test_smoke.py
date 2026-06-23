@@ -46,11 +46,37 @@ class _FakeResp:
 
 @pytest.mark.parametrize("size", ["xs", "sm", "md", "lg"])
 def test_weather_now_renders(client: FlaskClient, size: str) -> None:
+    # Pass a label via ``?opts=`` since the manifest default for
+    # ``label`` flipped to ``""`` in v0.1.9 (the location_search
+    # migration). Without an explicit label or location, the rendered
+    # widget has no title bar, which is intentional but breaks the
+    # "Melbourne" string-search the test used to do.
+    opts = '{"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
-        resp = client.get(f"/_test/render?plugin=weather_now&size={size}")
+        resp = client.get(f"/_test/render?plugin=weather_now&size={size}&opts={opts}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_now"' in body
     # The fetched payload is threaded through the composer into data-data.
     assert "18.4" in body
     assert "Melbourne" in body
+
+
+@pytest.mark.parametrize("size", ["md", "lg"])
+def test_weather_now_location_search_promotes_to_label(
+    client: FlaskClient, size: str
+) -> None:
+    """When the cell has a ``location`` dict (the new ``location_search``
+    shape) and no explicit ``label`` override, the composer's
+    ``_resolved_options`` promotes ``location.name`` into the ``label``
+    slot, so the widget renders with the city as its place name."""
+    opts = (
+        '{"location":{"name":"Berlin","country":"DE","admin1":"Berlin",'
+        '"latitude":52.52,"longitude":13.405}}'
+    )
+    with patch("urllib.request.urlopen", return_value=_FakeResp()):
+        resp = client.get(f"/_test/render?plugin=weather_now&size={size}&opts={opts}")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Berlin" in body
+    assert "Melbourne" not in body

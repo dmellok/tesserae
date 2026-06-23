@@ -1,20 +1,68 @@
 {
   "tesserae_compat": "1.x",
   "name": "Clock, Sunrise / Sunset",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "kind": "widget",
   "description": "Today's sunrise, sunset, golden hour, and day length for a chosen lat/lon. The hero shows a sun-arc visualisation with the current position marked. Data from Open-Meteo (no key).",
   "icon": "ph-sun-horizon",
-  "supports": { "sizes": ["sm", "md", "lg"] },
+  "supports": {
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
   "cell_options": [
-    { "name": "latitude",  "type": "number", "label": "Latitude",  "default": "" },
-    { "name": "longitude", "type": "number", "label": "Longitude", "default": "" },
-    { "name": "label",     "type": "string", "label": "Place label", "default": "Melbourne" },
-    { "name": "show_arc", "type": "boolean", "label": "Show sun-path arc", "default": true },
-    { "name": "show_golden", "type": "boolean", "label": "Tint golden-hour bands", "default": true },
-    { "name": "show_twilight", "type": "boolean", "label": "Tint twilight bands beyond the horizon (civil / nautical / astronomical)", "default": true }
+    {
+      "name": "location",
+      "type": "location_search",
+      "label": "Location",
+      "default": "",
+      "help": "Search for a city; the editor stores the matched name + coordinates together. Leave blank to fall back to the manual latitude / longitude / label fields below, or to the server-wide default from Settings \u2192 Server \u2192 Location."
+    },
+    {
+      "name": "latitude",
+      "type": "number",
+      "label": "Latitude (override)",
+      "default": "",
+      "help": "Optional. Overrides the coordinate from Location above. Decimal degrees."
+    },
+    {
+      "name": "longitude",
+      "type": "number",
+      "label": "Longitude (override)",
+      "default": ""
+    },
+    {
+      "name": "label",
+      "type": "string",
+      "label": "Label",
+      "default": "",
+      "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
+    },
+    {
+      "name": "show_arc",
+      "type": "boolean",
+      "label": "Show sun-path arc",
+      "default": true
+    },
+    {
+      "name": "show_golden",
+      "type": "boolean",
+      "label": "Tint golden-hour bands",
+      "default": true
+    },
+    {
+      "name": "show_twilight",
+      "type": "boolean",
+      "label": "Tint twilight bands beyond the horizon (civil / nautical / astronomical)",
+      "default": true
+    }
   ],
-  "render": { "dither": "none", "needs_network": true },
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  },
   "requires": [
     "network:api.open-meteo.com"
   ]

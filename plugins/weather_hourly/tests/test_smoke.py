@@ -42,8 +42,12 @@ class _FakeResp:
 
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])
 def test_weather_hourly_renders(client: FlaskClient, size: str) -> None:
+    # Manifest label default flipped to ``""`` in v0.2.3 (location_search
+    # migration). Pass an explicit label so the smoke test's text-match
+    # assertion still has something to find.
+    opts = '{"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
-        resp = client.get(f"/_test/render?plugin=weather_hourly&size={size}")
+        resp = client.get(f"/_test/render?plugin=weather_hourly&size={size}&opts={opts}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_hourly"' in body

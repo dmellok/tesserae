@@ -1,31 +1,44 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Scenic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "widget",
   "description": "Current weather as a pill card with weather-and-time-of-day theming. Uses the extended palette opt-in so soft gradients (sunset, night sky) render on 7-colour e-ink panels via the renderer's dither pass. Data from Open-Meteo (no API key).",
   "icon": "ph-cloud-sun",
   "supports": {
-    "sizes": ["sm", "md", "lg"]
+    "sizes": [
+      "sm",
+      "md",
+      "lg"
+    ]
   },
   "cell_options": [
     {
+      "name": "location",
+      "type": "location_search",
+      "label": "Location",
+      "default": "",
+      "help": "Search for a city; the editor stores the matched name + coordinates together. Leave blank to fall back to the manual latitude / longitude / label fields below, or to the server-wide default from Settings \u2192 Server \u2192 Location."
+    },
+    {
       "name": "latitude",
       "type": "number",
-      "label": "Latitude",
-      "default": ""
+      "label": "Latitude (override)",
+      "default": "",
+      "help": "Optional. Overrides the coordinate from Location above. Decimal degrees."
     },
     {
       "name": "longitude",
       "type": "number",
-      "label": "Longitude",
+      "label": "Longitude (override)",
       "default": ""
     },
     {
       "name": "label",
       "type": "string",
-      "label": "Place label",
-      "default": "Melbourne"
+      "label": "Label",
+      "default": "",
+      "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
     },
     {
       "name": "units",
@@ -33,15 +46,23 @@
       "label": "Units",
       "default": "metric",
       "choices": [
-        { "value": "metric", "label": "Metric (°C)" },
-        { "value": "imperial", "label": "Imperial (°F)" }
+        {
+          "value": "metric",
+          "label": "Metric (\u00b0C)"
+        },
+        {
+          "value": "imperial",
+          "label": "Imperial (\u00b0F)"
+        }
       ]
     }
   ],
   "render": {
     "needs_network": true
   },
-  "requires": ["network:api.open-meteo.com"],
+  "requires": [
+    "network:api.open-meteo.com"
+  ],
   "design": {
     "palette": "extended"
   }

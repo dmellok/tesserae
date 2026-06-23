@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.13], 2026-06-23
+
+### Added
+
+- **`location_search` rolled out across the rest of the
+  location-aware widgets:** ``weather_forecast`` (v0.1.5 →
+  v0.1.6), ``weather_hourly`` (v0.2.2 → v0.2.3),
+  ``weather_now_scenic`` (v0.1.0 → v0.1.1), and
+  ``clock_sunrise_sunset`` (v0.1.4 → v0.1.5) now lead with a
+  city-search dropdown instead of the lat / lon / label triplet.
+  Same Open-Meteo-backed UX as the ``weather_now`` migration in
+  v0.64.12; same backwards-compatibility guarantee (existing
+  cells with the old shape keep rendering exactly as before).
+
+### Changed
+
+- **"Place label" renamed to "Label"** across all migrated
+  widgets. The shorter form reads better in the cell editor's
+  field list and matches how the field's described in the help
+  copy.
+- **JS dispatches both ``input`` and ``change``** when the user
+  picks a result from the location search dropdown. The editor's
+  autosave listens for both depending on field type; the hidden
+  storage element doesn't have a natural blur event so dispatching
+  both events covers either listener path. Belt-and-braces against
+  the editor's defer-to-blur logic, which gates immediate preview
+  updates for some input types.
+
 ## [0.64.12], 2026-06-23
 
 ### Added

@@ -37,7 +37,7 @@
     {
       "name": "label",
       "type": "string",
-      "label": "Place label (override)",
+      "label": "Label",
       "default": "",
       "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
     },

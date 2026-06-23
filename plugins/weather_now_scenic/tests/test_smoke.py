@@ -71,13 +71,19 @@ def test_preset_mapping(icon: str, is_day: bool, expected: str) -> None:
 
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])
 def test_weather_now_scenic_renders(client: FlaskClient, size: str) -> None:
+    # Manifest label default flipped to ``""`` in v0.1.1 (location_search
+    # migration). Pass an explicit label so the smoke test's text-match
+    # assertion still has something to find.
+    opts = '{"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
-        resp = client.get(f"/_test/render?plugin=weather_now_scenic&size={size}")
+        resp = client.get(
+            f"/_test/render?plugin=weather_now_scenic&size={size}&opts={opts}"
+        )
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_now_scenic"' in body
-    # The 22°C fetched temp should land in the body, the manifest's
-    # default Melbourne label too. Both prove the data + cell_options
-    # round-trip through the composer.
+    # The 22°C fetched temp should land in the body, the passed
+    # Melbourne label too. Both prove the data + cell_options round-trip
+    # through the composer.
     assert "21.7" in body or "22" in body
     assert "Melbourne" in body
