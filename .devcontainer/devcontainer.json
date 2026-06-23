@@ -46,7 +46,14 @@
   "portsAttributes": {
     "8765": {
       "label": "Tesserae admin UI",
-      "onAutoForward": "openPreview"
+      // ``openBrowserOnce`` opens a real browser tab the first time
+      // the port is forwarded. The previous ``openPreview`` opened
+      // VS Code's embedded Simple Browser, which is a sandboxed
+      // webview that drops cookies and won't hold a login session,
+      // so the Tesserae admin UI's password gate looks broken
+      // (reported by bablokb in discussion #27). A real browser tab
+      // dodges the sandbox entirely.
+      "onAutoForward": "openBrowserOnce"
     }
   },
   // Block the IDE / terminal until ``postCreateCommand`` finishes.
