@@ -6,6 +6,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.10], 2026-06-23
+
+### Added
+
+- **`GET /mirror/<device_id>` browser-friendly mirror page.** A tiny
+  auto-refreshing HTML wrapper that embeds the existing
+  ``/preview/<id>.png`` so old tablets, jailbroken Kindles in
+  browser mode, kiosk PCs, or any screen with a URL bar can run a
+  Tesserae dashboard without a native client. Defaults to the
+  device's ``sleep_interval_s`` for the refresh cadence; override
+  via ``?refresh=N`` (clamped to ``[5, 86400]`` seconds). Optional
+  ``?rotate=90/180/270`` applies a CSS rotation client-side so a
+  sideways-mounted iPad showing a portrait panel lands the right way
+  up. Equivalent in spirit to TRMNL's ``/mirror`` endpoint. Same
+  LAN-bypass auth as ``/preview/`` and ``/renders/``.
+- **Settings → Devices: Preview + Mirror links** on every device
+  card's footer toolbar. The URLs were always reachable but
+  undocumented; surfacing them as visible buttons (with descriptive
+  tooltips) means an admin can ship a panel-on-a-browser setup in
+  one click without reading the spec.
+
+### Why
+
+Real community ask in [#8](https://github.com/dmellok/tesserae/discussions/8)
+(RealGandy): an old iPad running iOS 12 has no TRMNL or Tesserae
+native client but can run Safari, so a refresh-tagged page pointing
+at the existing per-device preview alias unlocks the device as a
+display target with zero firmware work.
+
 ## [0.64.9], 2026-06-23
 
 ### Added

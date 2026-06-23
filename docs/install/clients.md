@@ -118,6 +118,33 @@ halftone, crosshatch, or none). Dither + contrast live on the device
 card so you can tune for the specific panel (Kindle Paperwhite 2,
 the TRMNL device's panel, etc.).
 
+## Browser-based "client" (no firmware, no native client)
+
+For old tablets, jailbroken Kindles in browser mode, kiosk PCs, or any
+screen with a URL bar but no Tesserae native client, every registered
+device exposes an **auto-refreshing mirror page** at:
+
+```
+http://<your-tesserae-host>:8765/mirror/<device_id>
+```
+
+It's a tiny self-contained HTML page that embeds the device's stable
+preview image (`/preview/<device_id>.png`) with a
+`<meta http-equiv="refresh">` so the panel keeps re-pulling on its
+own. Bookmark it in Safari on an iPad and walk away. Both the
+`/preview/` and `/mirror/` URLs are linked from the device card in
+**Settings → Devices** so you don't need to memorise the pattern.
+
+The default refresh cadence is the device's configured
+`sleep_interval_s` setting (so it matches what an actual firmware
+client would do); override with `?refresh=N` (seconds, clamped to
+`[5, 86400]`). For a sideways-mounted iPad showing a portrait panel,
+`?rotate=90` (or `180` / `270`) applies a CSS rotation client-side so
+the content lands the right way up.
+
+No auth required on LAN (same bypass list as `/preview/` and
+`/renders/`). Equivalent in spirit to TRMNL's `/mirror` endpoint.
+
 ## After flashing / pairing
 
 On first run, a client publishes a heartbeat on `tesserae/<device-id>/status`

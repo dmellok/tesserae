@@ -397,9 +397,30 @@
     {% endif %}
 
     {# FOOTER ACTION ROW (separate forms; cannot live inside the combined form) #}
-    {% if section.calibrate_endpoint or section.regenerate_token_endpoint or section.delete_endpoint %}
+    {% if section.calibrate_endpoint or section.regenerate_token_endpoint or section.delete_endpoint or section.device_id %}
     <footer class="dx-card-footer">
       <div class="dx-footer-left">
+        {# View links: Preview is the raw PNG (good for HA generic_camera,
+           Grafana, screensaver tooling), Mirror is the auto-refreshing
+           HTML wrapper (good for iPads / kiosk browsers / repurposed
+           tablets that can't run an MQTT or REST client). Both open in
+           a new tab so they don't blow away the admin UI. #}
+        {% if section.device_id %}
+        <a class="dx-footer-btn"
+           href="{{ url_for('preview_png', device_id=section.device_id) }}"
+           target="_blank" rel="noopener"
+           title="Latest composition PNG, raw image (good for Home Assistant, Grafana, etc).">
+          <i class="ph ph-image" aria-hidden="true"></i>
+          <span>Preview</span>
+        </a>
+        <a class="dx-footer-btn"
+           href="{{ url_for('mirror', device_id=section.device_id) }}"
+           target="_blank" rel="noopener"
+           title="Auto-refreshing browser page (good for iPad / kiosk dashboards).">
+          <i class="ph ph-monitor-play" aria-hidden="true"></i>
+          <span>Mirror</span>
+        </a>
+        {% endif %}
         {% if section.calibrate_endpoint %}
           {% if calibrating == section.device_id %}
           <div class="calibrate-block calibrate-prompt-block">

@@ -1093,6 +1093,105 @@ def create_app(
         resp.headers["Access-Control-Allow-Origin"] = "*"
         return resp
 
+    @app.get("/mirror/<device_id>")
+    def mirror(device_id: str) -> Response:
+        """Browser-friendly mirror page that embeds ``/preview/<id>.png``
+        with auto-refresh. Useful for old tablets, jailbroken Kindles,
+        or any device that can run a browser but can't speak MQTT or the
+        ``/api/v1/device`` REST surface, point Safari / a kiosk app at
+        ``/mirror/<id>`` and the panel content keeps refreshing on its
+        own.
+
+        Equivalent in spirit to TRMNL's ``/mirror`` endpoint; we
+        delegate the actual frame serving to ``/preview/<id>.png`` so
+        there's one source-of-truth for "latest composition PNG".
+
+        Query params:
+
+        * ``refresh=N`` (seconds) overrides the auto-refresh cadence.
+          Defaults to the device's ``sleep_interval_s`` config when
+          set, then 60s. Clamped to ``[5, 86400]``.
+        * ``rotate=N`` (degrees: 0, 90, 180, 270) applies a CSS
+          rotation client-side, so an iPad mounted sideways shows the
+          panel content the right way up. Defaults to 0.
+
+        Same LAN-bypass auth as ``/preview/``."""
+        if not _DEVICE_ID_RE.match(device_id):
+            abort(404)
+        devices = app.config["DEVICE_REGISTRY"]
+        device = devices.get(device_id)
+        if device is None:
+            abort(404)
+
+        # Default refresh: device's own sleep_interval_s if set, else 60.
+        settings_for_device = device.settings or {}
+        try:
+            default_refresh = int(settings_for_device.get("sleep_interval_s") or 60)
+        except (TypeError, ValueError):
+            default_refresh = 60
+
+        try:
+            refresh = int(request.args.get("refresh") or default_refresh)
+        except ValueError:
+            refresh = default_refresh
+        # Clamp: 5s minimum prevents accidental DoS via ``?refresh=1``,
+        # 24h maximum is a sensible upper bound; if you want longer
+        # you don't really need auto-refresh.
+        refresh = max(5, min(refresh, 86400))
+
+        try:
+            rotate = int(request.args.get("rotate") or 0)
+        except ValueError:
+            rotate = 0
+        if rotate not in (0, 90, 180, 270):
+            rotate = 0
+
+        # Cache-bust the image URL so iOS Safari (which sometimes ignores
+        # Cache-Control: no-store) re-fetches on each page reload. The
+        # timestamp is fresh on every page-load, which is what we want.
+        import time as _time
+
+        ts = int(_time.time())
+        img_src = f"/preview/{device_id}.png?_={ts}"
+
+        # Inline template; no Jinja partial needed for ~25 lines of HTML.
+        # The rotation transforms a square viewport, so the parent has to
+        # account for the dimensions swap (90/270 turn the box on its
+        # side). object-fit:contain handles aspect-ratio preservation.
+        rotate_css = ""
+        if rotate in (90, 270):
+            # Swap width/height so the rotated image fills the viewport.
+            rotate_css = (
+                f"img {{ width:100vh; height:100vw; "
+                f"transform:translate(-50%,-50%) rotate({rotate}deg); "
+                f"position:absolute; top:50%; left:50%; }}"
+            )
+        elif rotate == 180:
+            rotate_css = "img { transform: rotate(180deg); }"
+
+        device_name = device.name or device.id
+        html = (
+            "<!DOCTYPE html>\n"
+            '<html lang="en">\n'
+            "<head>\n"
+            f'<meta http-equiv="refresh" content="{refresh}">\n'
+            '<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+            f"<title>{device_name} · Tesserae mirror</title>\n"
+            "<style>\n"
+            "html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }\n"
+            "img { display:block; width:100vw; height:100vh; object-fit:contain; }\n"
+            f"{rotate_css}\n"
+            "</style>\n"
+            "</head>\n"
+            "<body>\n"
+            f'<img src="{img_src}" alt="{device_name}">\n'
+            "</body>\n"
+            "</html>\n"
+        )
+        resp = Response(html, mimetype="text/html; charset=utf-8")
+        resp.headers["Cache-Control"] = "no-store, max-age=0"
+        return resp
+
     @app.get("/healthz")
     def healthz() -> tuple[str, int]:
         return "ok", 200
