@@ -216,6 +216,8 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
 
         for key in ("latitude", "longitude"):
             val = parsed.get(key)
+            if val is None:
+                continue
             # missing or malformed coord, just omit it; ``_resolved_options``
             # then falls back to the global location or constants.
             with contextlib.suppress(TypeError, ValueError):

@@ -1,0 +1,1239 @@
+# OpenAPI specification for the machine-facing surfaces of a Tesserae
+# instance: the native REST device API, the TRMNL-compatible BYOS
+# endpoints, the webhook push endpoint, and the static-artifact
+# routes a client needs to fetch a rendered frame.
+#
+# Out of scope:
+#   - HTML page-editor / composer / settings routes (served as
+#     Jinja templates, no machine contract)
+#   - Internal admin-only JSON (pairing code admin, battery history,
+#     event SSE stream, condition tester)
+#   - MQTT topics (this file is HTTP only); the canonical transport
+#     for battery-powered devices is documented in client-protocol.md.
+#
+# Generators:
+#   openapi-generator-cli generate -i schema/openapi.yaml -g <lang> -o sdk/<lang>
+#   datamodel-codegen --input schema/openapi.yaml ...
+#   kiota generate -d schema/openapi.yaml -l <lang>
+#
+# OpenAPI 3.0.3 was chosen over 3.1 for the widest generator
+# compatibility; bump when openapi-generator's 3.1 support catches up.
+
+openapi: 3.0.3
+
+info:
+  title: Tesserae REST API
+  version: 0.64.16
+  description: |
+    _Self-hosted e-ink dashboard server, device + automation HTTP API._
+
+
+    Tesserae is a self-hosted hobby project that composes tile-based
+    e-ink dashboards, renders them headless, and pushes the frames to
+    panel devices.
+
+    This spec covers four surfaces an external client touches:
+
+    1. **Native REST device API** under `/api/v1/device/*` for clients
+       that prefer HTTP polling over MQTT. Per-device bearer-token
+       auth bootstrapped through pairing codes or MAC-based discover.
+    2. **TRMNL-compatible BYOS** (`/api/display`, `/api/setup`,
+       `/api/log*`) for the Terminus / TRMNL native firmware family.
+    3. **Webhook push** (`/api/v1/push`) for automations
+       (Home Assistant beyond MQTT, n8n, cron + curl, phone shortcuts)
+       that trigger a render + publish of a saved page.
+    4. **Static render artifacts** (`/renders/*`, `/preview/*.png`,
+       `/mirror/<id>`) that clients fetch after being told their URL
+       through one of the above.
+
+    A health probe (`/healthz`) is included for monitoring.
+  license:
+    name: AGPL-3.0-or-later
+    url: https://www.gnu.org/licenses/agpl-3.0.html
+  contact:
+    name: Tesserae
+    url: https://github.com/dmellok/tesserae
+
+servers:
+  - url: "{scheme}://{host}"
+    description: A self-hosted Tesserae instance.
+    variables:
+      scheme:
+        default: http
+        enum: [http, https]
+      host:
+        default: tesserae.local:8765
+        description: |
+          Hostname (or hostname:port) of the Tesserae instance.
+          Defaults assume the bundled mDNS advertiser is enabled.
+
+tags:
+  - name: device
+    description: |
+      Native REST device API. Per-device bearer-token authenticated
+      endpoints for HTTP-polling panels. Bootstrap via `/discover`
+      (MAC auto-claim) or `/register` (6-digit pairing code).
+  - name: byos
+    description: |
+      TRMNL / Terminus BYOS-compatible polling contract. Lets stock
+      TRMNL firmware point at a Tesserae host and self-provision on
+      first boot.
+  - name: webhook
+    description: |
+      External automation hook. One global token, generated under
+      Settings → Server → App, fires a render + publish for a saved
+      page.
+  - name: frames
+    description: |
+      Static-artifact routes. Devices fetch the binary frame produced
+      by a render; a separate browser-mirror endpoint serves an HTML
+      auto-refresh page for clients that can paint a `<img>` but
+      can't parse JSON envelopes.
+  - name: system
+    description: Health + liveness probes.
+
+security:
+  - DeviceToken: []
+
+paths:
+
+  # ------------------------------------------------------------------
+  # Native REST device API
+  # ------------------------------------------------------------------
+
+  /api/v1/device/{device_id}/frame:
+    get:
+      tags: [device]
+      summary: Latest frame for this device.
+      description: |
+        Returns the URL of the most recent render artifact for the
+        device, plus the metadata its renderer would have published
+        over MQTT (rotate / scale / bg / saturation for `pi_png`,
+        palette signature for the `.bin` renderers, etc.) so REST and
+        MQTT clients receive the same payload shape.
+
+        Content-addressed: the artifact's digest is returned as the
+        ETag. Subsequent polls with `If-None-Match` return 304 when
+        the frame hasn't changed, so quiescent panels do a single
+        cheap round-trip per wake.
+      operationId: getDeviceFrame
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+        - $ref: '#/components/parameters/IfNoneMatchHeader'
+      responses:
+        '200':
+          description: Frame envelope. Body is JSON; `ETag` carries the artifact digest.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+            Cache-Control:
+              schema:
+                type: string
+                example: no-cache
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FrameEnvelope'
+        '204':
+          description: No frame has been rendered yet for this device.
+        '304':
+          description: The supplied `If-None-Match` matches the current frame.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/device/{device_id}/status:
+    post:
+      tags: [device]
+      summary: Heartbeat + status report.
+      description: |
+        Device-side heartbeat. The body is parsed through the device
+        kind's `parse_status` adapter (same hook MQTT uses), then fed
+        through the shared `record_status_heartbeat` so the live
+        status cache, smart-sync telemetry, battery history, event
+        log, and HA discovery all observe the same update.
+
+        Response carries the per-device config block (whatever the
+        admin has set in Settings → Devices, with schema defaults
+        filled in) and the next polling cadence in seconds; combining
+        the config push with the heartbeat means firmware never needs
+        a separate config poll.
+
+        Optional `tz` in the body lets a memory-constrained
+        CircuitPython/MicroPython client tell the server its IANA
+        timezone so the response carries pre-resolved local-time
+        fields (saves the client from carrying the IANA db).
+      operationId: postDeviceStatus
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceStatusRequest'
+      responses:
+        '200':
+          description: Heartbeat accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/device/{device_id}/log:
+    post:
+      tags: [device]
+      summary: Client-side log line.
+      description: |
+        Persist a single log line into the Tesserae Events page.
+        Bounded; the EventLog evicts older entries when its cap is
+        reached. Unknown body shapes are tolerated (stored as `raw`).
+      operationId: postDeviceLog
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceLogRequest'
+      responses:
+        '200':
+          description: Log line accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, bytes]
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  bytes:
+                    type: integer
+                    description: Byte count of the raw body the server saw.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/device/discover:
+    post:
+      tags: [device]
+      summary: Self-announce; auto-claim by MAC or land in the Discovered strip.
+      description: |
+        Unauthenticated. Two outcomes depending on whether a device
+        instance with the announced MAC has already been admin-
+        registered:
+
+        * **MAC matches an existing instance** → returns the existing
+          access token + config. Firmware persists the token and
+          proceeds to its normal wake loop, no pairing code needed.
+        * **No match** → the announce lands in the Discovered strip
+          on Settings → Devices for one-click pairing. Response
+          carries `registered: false` and a `retry_after_s` hint;
+          the next discover poll after admin clicks Register returns
+          the token.
+
+        Rate-limited per source IP (10 failed attempts / 60s,
+        `X-Forwarded-For` honoured behind a reverse proxy).
+      operationId: postDeviceDiscover
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DiscoverRequest'
+      responses:
+        '200':
+          description: Outcome envelope. The `registered` field disambiguates.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/DiscoverClaimed'
+                  - $ref: '#/components/schemas/DiscoverPending'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+
+  /api/v1/device/register:
+    post:
+      tags: [device]
+      summary: First-boot pairing with a 6-digit code.
+      description: |
+        The user generates a 6-digit code from Settings → Devices →
+        Pair. The firmware POSTs the code in `X-Pairing-Code` with a
+        body declaring its chosen device id + kind + panel dims. On
+        success the server creates the instance (or returns an
+        existing one if the id collides), mints a per-device access
+        token, and burns the code.
+
+        Rate-limited per source IP. Successful registrations release
+        the failed-attempt bucket so a recovering user isn't locked
+        out by an earlier typo.
+      operationId: postDeviceRegister
+      security:
+        - PairingCode: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Existing instance; returning its token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '201':
+          description: Newly created instance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: Invalid or expired pairing code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  # ------------------------------------------------------------------
+  # TRMNL-compatible BYOS
+  # ------------------------------------------------------------------
+
+  /api/display:
+    get:
+      tags: [byos]
+      summary: TRMNL BYOS polling endpoint.
+      description: |
+        Steady-state polling endpoint for TRMNL / Terminus-compatible
+        firmware. Returns the official BYOS JSON envelope pointing at
+        the latest render. Auth is MAC-first (`Id` header), token-
+        fallback (`access-token` or `Authorization`); a MAC-bearing
+        client polling an unknown id is auto-provisioned, same UX
+        Terminus offers.
+
+        Unknown tokens land in the Discovered strip so the admin can
+        one-click pair without re-pasting the token onto the device.
+      operationId: getTrmnlDisplay
+      security:
+        - TrmnlAccessToken: []
+        - TrmnlAuthBearer: []
+      parameters:
+        - $ref: '#/components/parameters/TrmnlIdHeader'
+        - $ref: '#/components/parameters/TrmnlWidthHeader'
+        - $ref: '#/components/parameters/TrmnlHeightHeader'
+        - $ref: '#/components/parameters/TrmnlPngWidthHeader'
+        - $ref: '#/components/parameters/TrmnlPngHeightHeader'
+      responses:
+        '200':
+          description: Envelope pointing at the render artifact.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrmnlDisplayResponse'
+        '404':
+          description: Unknown access token; admin pairing required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrmnlErrorResponse'
+
+  /api/setup:
+    get:
+      tags: [byos]
+      summary: TRMNL BYOS first-boot endpoint.
+      description: |
+        First-boot setup endpoint. MAC-bearing clients are
+        auto-provisioned: a fresh Tesserae device instance is
+        created keyed by MAC, a high-entropy `api_key` and
+        `friendly_id` are minted and returned. Clients without a MAC
+        (KOReader/Kindle) fall back to the discovery-cache path,
+        where the admin one-click-pairs from Settings → Devices.
+      operationId: getTrmnlSetup
+      security:
+        - TrmnlAccessToken: []
+        - TrmnlAuthBearer: []
+        - {}
+      parameters:
+        - $ref: '#/components/parameters/TrmnlIdHeader'
+        - $ref: '#/components/parameters/TrmnlWidthHeader'
+        - $ref: '#/components/parameters/TrmnlHeightHeader'
+      responses:
+        '200':
+          description: Setup envelope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrmnlSetupResponse'
+
+  /api/log:
+    post:
+      tags: [byos]
+      summary: TRMNL BYOS client log POST.
+      description: |
+        Persist client-side log lines. Accepts either of the two
+        documented Terminus shapes (`{logs: [...]}` or
+        `{log: {logs_array: [...]}}`); unparseable bodies are still
+        logged as raw text (TRMNL firmware refuses to keep polling
+        if this 404s or 500s).
+      operationId: postTrmnlLog
+      security:
+        - TrmnlAccessToken: []
+        - TrmnlAuthBearer: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrmnlLogRequest'
+      responses:
+        '200':
+          description: Log lines accepted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+
+  /api/log/level:
+    post:
+      tags: [byos]
+      summary: TRMNL BYOS log-level config probe.
+      description: |
+        Some TRMNL firmwares query this on boot to learn the server's
+        preferred log verbosity. Tesserae doesn't drive remote log
+        levels; this endpoint always replies with `info` so firmware
+        keeps polling.
+      operationId: postTrmnlLogLevel
+      security:
+        - TrmnlAccessToken: []
+        - TrmnlAuthBearer: []
+      responses:
+        '200':
+          description: Default log-level response.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: integer
+                    example: 200
+                  log_level:
+                    type: string
+                    example: info
+
+  # ------------------------------------------------------------------
+  # Webhook push
+  # ------------------------------------------------------------------
+
+  /api/v1/push:
+    post:
+      tags: [webhook]
+      summary: Trigger a render + publish for a saved page.
+      description: |
+        External automation hook. Authenticated by the global
+        webhook token from Settings → Server → App (sent as either
+        `Authorization: Bearer …` or `X-Tesserae-Token: …`).
+
+        `device_ids` is optional. When omitted, the push fans out to
+        every device the page is bound to. Per-device quiet hours
+        are respected; a fully-quiet fan-out returns 202 with
+        `status: "quiet"` so the caller can tell that apart from a
+        real failure.
+
+        Status code map:
+
+        | `status`     | HTTP |
+        | ------------ | ---- |
+        | `sent`       | 200  |
+        | `quiet`      | 202  |
+        | `not_found`  | 404  |
+        | `busy`       | 409  |
+        | `failed`     | 500  |
+      operationId: postWebhookPush
+      security:
+        - WebhookBearer: []
+        - WebhookToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPushRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/WebhookPushRequest'
+      responses:
+        '200':
+          description: Page rendered + published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+        '202':
+          description: All bound devices are in quiet hours; nothing was sent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Page id not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+        '409':
+          description: Another push for this page is already in flight.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+        '500':
+          description: Render or publish failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+        '503':
+          description: Webhook token not generated yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookPushResponse'
+
+  # ------------------------------------------------------------------
+  # Frame artifacts
+  # ------------------------------------------------------------------
+
+  /renders/{filename}:
+    get:
+      tags: [frames]
+      summary: Fetch a render artifact by content-addressed filename.
+      description: |
+        Content-addressed binary served straight off disk. The
+        filename includes the artifact's digest so a stable URL
+        always points at the same bytes (good for caches, CDNs, and
+        the `If-None-Match` flow on `/api/v1/device/{id}/frame`).
+
+        `Access-Control-Allow-Origin: *` is set so a browser-based
+        dashboard can render the image cross-origin. Optional
+        `?w=<px>` produces a thumbnail (used by the editor's
+        preview iframes).
+      operationId: getRenderArtifact
+      security: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: |
+            Content-addressed filename, e.g.
+            `pi_png-abc123…-800x480.png` or
+            `pi_bin-def456…-800x480.bin`.
+          schema:
+            type: string
+        - name: w
+          in: query
+          required: false
+          description: Optional thumbnail width in pixels.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Binary render artifact.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                description: Raw `.bin` framebuffer (palette-encoded).
+        '404':
+          description: No such artifact on disk.
+
+  /preview/{device_id}.png:
+    get:
+      tags: [frames]
+      summary: Latest preview PNG for a device.
+      description: |
+        Stable preview URL for a device. Always returns the most
+        recently rendered PNG for that device, regardless of how
+        many renders have happened since. Used by the browser
+        mirror and external dashboards that don't want to track
+        content-addressed digests.
+
+        Cache-Control is `no-store` since the URL is stable but the
+        bytes behind it change.
+      operationId: getDevicePreview
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+      responses:
+        '200':
+          description: Latest preview PNG.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Unknown device id, or device has no rendered frame yet.
+
+  /mirror/{device_id}:
+    get:
+      tags: [frames]
+      summary: Browser-friendly auto-refresh page wrapping the device's preview.
+      description: |
+        HTML page that wraps `/preview/{device_id}.png` in a
+        meta-refresh tag. Suitable for an old iPad or Kindle
+        browser standing in as a panel.
+      operationId: getDeviceMirror
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/DeviceIdPath'
+        - name: refresh
+          in: query
+          required: false
+          description: Auto-refresh interval in seconds.
+          schema:
+            type: integer
+            minimum: 1
+            default: 60
+        - name: rotate
+          in: query
+          required: false
+          description: Display rotation, in 90-degree increments.
+          schema:
+            type: integer
+            enum: [0, 90, 180, 270]
+            default: 0
+      responses:
+        '200':
+          description: HTML page with the embedded preview image.
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: Unknown device id.
+
+  # ------------------------------------------------------------------
+  # System
+  # ------------------------------------------------------------------
+
+  /healthz:
+    get:
+      tags: [system]
+      summary: Liveness probe.
+      description: Returns `ok` if the WSGI process is serving.
+      operationId: getHealthz
+      security: []
+      responses:
+        '200':
+          description: Process is alive.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+# ----------------------------------------------------------------------
+# Components
+# ----------------------------------------------------------------------
+
+components:
+
+  securitySchemes:
+    DeviceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: hex
+      description: |
+        Per-device access token issued by `/api/v1/device/register`
+        or `/api/v1/device/discover`. Sent as
+        `Authorization: Bearer <token>`.
+    PairingCode:
+      type: apiKey
+      in: header
+      name: X-Pairing-Code
+      description: |
+        6-digit code (`[0-9]{6}`) generated by the admin under
+        Settings → Devices → Pair. Single-use, 15-minute TTL.
+    TrmnlAccessToken:
+      type: apiKey
+      in: header
+      name: access-token
+      description: |
+        TRMNL BYOS legacy auth header. Equivalent to the `Authorization`
+        bearer header; either is accepted on the `/api/*` BYOS
+        endpoints.
+    TrmnlAuthBearer:
+      type: http
+      scheme: bearer
+      description: TRMNL BYOS bearer-style auth header.
+    WebhookBearer:
+      type: http
+      scheme: bearer
+      description: |
+        Global webhook token from Settings → Server → App.
+        Single token shared by all webhook callers (HA, n8n, cron, …).
+    WebhookToken:
+      type: apiKey
+      in: header
+      name: X-Tesserae-Token
+      description: |
+        Alternate header for the global webhook token, for callers
+        whose tooling can't customise the `Authorization` header.
+
+  parameters:
+    DeviceIdPath:
+      name: device_id
+      in: path
+      required: true
+      description: Lowercase device-instance id (`^[a-z][a-z0-9_-]*$`).
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_-]*$'
+        example: pi_kitchen
+    IfNoneMatchHeader:
+      name: If-None-Match
+      in: header
+      required: false
+      description: |
+        Content-addressed digest of a previously-fetched frame.
+        Server replies 304 if the current frame matches.
+      schema:
+        type: string
+        example: '"abc123…"'
+    TrmnlIdHeader:
+      name: Id
+      in: header
+      required: false
+      description: |
+        MAC address of the polling device. Auth is MAC-first when
+        present; falls back to access token when absent.
+      schema:
+        type: string
+        example: AA:BB:CC:DD:EE:FF
+    TrmnlWidthHeader:
+      name: Width
+      in: header
+      required: false
+      description: Requested render width in pixels (TRMNL native firmware).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 4096
+    TrmnlHeightHeader:
+      name: Height
+      in: header
+      required: false
+      description: Requested render height in pixels (TRMNL native firmware).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 4096
+    TrmnlPngWidthHeader:
+      name: png-width
+      in: header
+      required: false
+      description: Requested render width in pixels (KOReader / Kindle clients).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 4096
+    TrmnlPngHeightHeader:
+      name: png-height
+      in: header
+      required: false
+      description: Requested render height in pixels (KOReader / Kindle clients).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 4096
+
+  headers:
+    ETag:
+      schema:
+        type: string
+        example: '"abc123…"'
+      description: |
+        Content-addressed digest of the current frame. Use as the
+        `If-None-Match` value on the next request to skip the body
+        when the frame hasn't changed.
+
+  responses:
+    BadRequest:
+      description: The request body failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid credential.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource (device, page, render) not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: |
+        Too many failed attempts from this source IP. The `Retry-After`
+        header carries the wait period.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            description: Seconds to wait before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unavailable:
+      description: A required server-side component is not configured.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    ErrorResponse:
+      type: object
+      required: [status, error]
+      properties:
+        status:
+          type: integer
+          description: HTTP status code echoed in the body for convenience.
+        error:
+          type: string
+          description: Human-readable explanation.
+
+    FrameEnvelope:
+      type: object
+      description: |
+        Latest-frame envelope. The renderer-specific extras (`rotate`,
+        `scale`, `bg`, `saturation`, `palette_signature`, …) are
+        merged in from the renderer's `payload()` so REST clients
+        receive the same shape their MQTT-subscribed cousins do.
+      required: [url, format, panel_w, panel_h, render_id, renderer_id]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: |
+            Absolute URL of the render artifact. Stable per digest;
+            use the digest as the cache key.
+          example: http://tesserae.local:8765/renders/pi_png-abc123-800x480.png
+        format:
+          type: string
+          description: File extension of the artifact (`png`, `bin`, …).
+          example: png
+        panel_w:
+          type: integer
+          description: Panel width in pixels.
+          example: 800
+        panel_h:
+          type: integer
+          description: Panel height in pixels.
+          example: 480
+        render_id:
+          type: string
+          description: Content-addressed digest of the frame bytes (same value as the ETag, minus the quotes).
+          example: abc123def456
+        renderer_id:
+          type: string
+          description: Id of the renderer that produced this frame (`pi_png`, `pi_bin`, `trmnl_bmp`, …).
+          example: pi_png
+        rotate:
+          type: integer
+          enum: [0, 90, 180, 270]
+          description: Renderer-supplied rotation. Present for renderers that publish it (e.g. `pi_png`).
+        scale:
+          type: string
+          description: Renderer-supplied scale mode (e.g. `fit`).
+        bg:
+          type: string
+          description: Renderer-supplied background colour.
+        saturation:
+          type: number
+          description: Renderer-supplied saturation (0.0–1.0). Applies to colour panels.
+        palette_signature:
+          type: string
+          description: |
+            Palette signature for `.bin` renderers; lets the client
+            verify it can decode the payload.
+      additionalProperties: true
+
+    DeviceStatusRequest:
+      type: object
+      description: |
+        Shape is defined by the device kind's `parse_status` adapter;
+        common fields below are typical of `pi_*` and `esp32_*` kinds.
+        Unknown fields are tolerated.
+      properties:
+        battery_pct:
+          type: number
+          minimum: 0
+          maximum: 100
+        rssi_dbm:
+          type: integer
+        uptime_s:
+          type: integer
+        fw_version:
+          type: string
+        tz:
+          type: string
+          description: |
+            Optional IANA timezone. If supplied, the response carries
+            pre-resolved `local_time` / `tz_offset_seconds` / `dst_active`
+            so memory-constrained clients don't need a local IANA db.
+          example: Europe/Berlin
+      additionalProperties: true
+
+    DeviceStatusResponse:
+      type: object
+      required: [status, config, next_poll_s, server_time]
+      properties:
+        status:
+          type: integer
+          example: 200
+        config:
+          type: object
+          description: |
+            Per-device config dictionary. Shape varies by device kind;
+            the keys correspond to the kind's `config_schema`.
+          additionalProperties: true
+        next_poll_s:
+          type: integer
+          description: Suggested seconds until the next status POST.
+          example: 60
+        server_time:
+          type: number
+          format: float
+          description: Server's wall-clock time, as a UNIX epoch float.
+        local_time:
+          type: string
+          description: Server-resolved local time at the requested `tz`. Present when the request body's `tz` is valid.
+          example: '2026-06-23T14:32:11+02:00'
+        tz:
+          type: string
+          description: Echo of the resolved `tz`.
+        tz_offset_seconds:
+          type: integer
+          description: Seconds east of UTC at `server_time`.
+        dst_active:
+          type: boolean
+          description: Whether the resolved zone is currently observing DST.
+
+    DeviceLogRequest:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+          default: info
+        msg:
+          type: string
+          maxLength: 512
+      additionalProperties: true
+
+    DiscoverRequest:
+      type: object
+      required: [device_id]
+      properties:
+        device_id:
+          type: string
+          description: Lowercase id the firmware intends to register as.
+          example: pi_kitchen
+        kind:
+          type: string
+          description: Device kind id (`pi_png`, `esp32_bin`, …).
+        panel_w:
+          type: integer
+        panel_h:
+          type: integer
+        fw_version:
+          type: string
+        mac:
+          type: string
+          description: |
+            MAC address. When supplied, enables the MAC-match
+            auto-claim path: if an existing device instance has the
+            same MAC, its access token is returned immediately.
+
+    DiscoverClaimed:
+      type: object
+      required: [status, registered, device_token, device_id, config, server_time]
+      properties:
+        status:
+          type: integer
+          example: 200
+        registered:
+          type: boolean
+          enum: [true]
+        device_token:
+          type: string
+        device_id:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+        server_time:
+          type: number
+          format: float
+
+    DiscoverPending:
+      type: object
+      required: [status, registered, discovered, retry_after_s, next_step]
+      properties:
+        status:
+          type: integer
+          example: 200
+        registered:
+          type: boolean
+          enum: [false]
+        discovered:
+          type: boolean
+          enum: [true]
+        retry_after_s:
+          type: integer
+          example: 30
+        next_step:
+          type: string
+          description: Human-readable nudge describing the admin action required.
+
+    RegisterRequest:
+      type: object
+      required: [device_id, kind]
+      properties:
+        device_id:
+          type: string
+          pattern: '^[a-z][a-z0-9_-]*$'
+        kind:
+          type: string
+          pattern: '^[a-z][a-z0-9_]*$'
+        panel_w:
+          type: integer
+          minimum: 1
+        panel_h:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        mac:
+          type: string
+        fw_version:
+          type: string
+
+    RegisterResponse:
+      type: object
+      required: [status, device_token, server_time, config]
+      properties:
+        status:
+          type: integer
+        device_token:
+          type: string
+          description: "Per-device bearer token. Send as `Authorization: Bearer <token>` on subsequent calls."
+        server_time:
+          type: number
+          format: float
+        config:
+          type: object
+          additionalProperties: true
+        reused_existing:
+          type: boolean
+          description: True when an existing instance with the same `device_id` was returned instead of a new one being created.
+
+    TrmnlDisplayResponse:
+      type: object
+      required:
+        - status
+        - filename
+        - image_url
+        - refresh_rate
+        - special_function
+        - friendly_id
+      properties:
+        status:
+          type: integer
+          example: 0
+        filename:
+          type: string
+          description: Filename portion of `image_url`. For client-side cache keying.
+        image_url:
+          type: string
+          format: uri
+          description: Absolute URL of the render artifact to paint.
+        image_url_timeout:
+          type: integer
+          description: HTTP timeout in seconds; `0` means firmware default.
+          default: 0
+        refresh_rate:
+          type: integer
+          description: Suggested seconds between polls.
+          example: 60
+        special_function:
+          type: string
+          enum: [sleep]
+          description: TRMNL device action between polls. Tesserae always returns `sleep`.
+        firmware_url:
+          type: string
+          description: OTA URL. Empty until OTA is wired (issue #11).
+        firmware_version:
+          type: string
+        update_firmware:
+          type: boolean
+          default: false
+        reset_firmware:
+          type: boolean
+          default: false
+        maximum_compatibility:
+          type: boolean
+          default: false
+          description: Per-device flag; `false` lets the firmware use modern panel features (partial refresh, etc.).
+        friendly_id:
+          type: string
+
+    TrmnlErrorResponse:
+      type: object
+      required: [status, error]
+      properties:
+        status:
+          type: integer
+          example: 404
+        error:
+          type: string
+
+    TrmnlSetupResponse:
+      type: object
+      required: [status, api_key, friendly_id, image_url, filename, message]
+      properties:
+        status:
+          type: integer
+          example: 200
+        api_key:
+          type: string
+          description: Per-device API key the firmware persists and sends on subsequent polls.
+        friendly_id:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          description: Welcome image to paint right after setup.
+        filename:
+          type: string
+        message:
+          type: string
+
+    TrmnlLogRequest:
+      oneOf:
+        - type: object
+          required: [logs]
+          properties:
+            logs:
+              type: array
+              items:
+                $ref: '#/components/schemas/TrmnlLogEntry'
+        - type: object
+          required: [log]
+          properties:
+            log:
+              type: object
+              required: [logs_array]
+              properties:
+                logs_array:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/TrmnlLogEntry'
+
+    TrmnlLogEntry:
+      type: object
+      properties:
+        creation_timestamp:
+          oneOf:
+            - type: string
+            - type: integer
+        message:
+          type: string
+      additionalProperties: true
+
+    WebhookPushRequest:
+      type: object
+      required: [page_id]
+      properties:
+        page_id:
+          type: string
+          description: Id of the saved page to render + publish.
+          example: hallway
+        device_ids:
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
+              description: Comma-separated form-encoded fallback.
+          description: |
+            Subset of device ids to push to. Omit to fan out to every
+            device the page is bound to.
+          example: [pi_kitchen, pi_bedroom]
+
+    WebhookPushResponse:
+      type: object
+      required: [status, page_id]
+      properties:
+        status:
+          type: string
+          enum: [sent, quiet, busy, not_found, failed, unauthorized, bad_request, disabled]
+        page_id:
+          type: string
+        duration_s:
+          type: number
+          format: float
+          nullable: true
+          description: Wall-clock time for the render + publish.
+        event_id:
+          type: string
+          nullable: true
+          description: Id of the row written to the Events log (when applicable).
+        error:
+          type: string
+          nullable: true
+          description: Failure detail when `status` is `failed` / `bad_request` / `not_found`.

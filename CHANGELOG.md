@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.17], 2026-06-24
+
+### Added
+
+- **OpenAPI 3.0.3 spec at [`schema/openapi.yaml`](schema/openapi.yaml).**
+  Covers the four machine-facing surfaces an external integrator
+  would target: the native REST device API
+  (``/api/v1/device/{frame,status,log,discover,register}``), the
+  TRMNL-compatible BYOS endpoints (``/api/display``, ``/api/setup``,
+  ``/api/log``, ``/api/log/level``), the webhook push hook
+  (``/api/v1/push``), and the render-artifact routes
+  (``/renders/<filename>``, ``/preview/<device_id>.png``,
+  ``/mirror/<device_id>``), plus ``/healthz``. 14 paths, 17 schemas,
+  6 security schemes. Validated by ``openapi-spec-validator``.
+  Editor/settings/composer HTML routes and internal admin JSON are
+  excluded by design; they aren't a stable external contract.
+  Generators like ``openapi-generator-cli`` or ``kiota`` can produce
+  client SDKs in arbitrary languages from this file.
+
+### Fixed
+
+- **Mypy on strict modules.** ``_coerce_cell_option``'s
+  ``location_search`` branch passed ``parsed.get(key)`` straight
+  into ``float()``, which the runtime ``contextlib.suppress`` happily
+  absorbed but mypy flagged as ``Argument 1 to "float" has
+  incompatible type "Any | None"``. Added an explicit ``None`` skip
+  so the static check matches the runtime behaviour.
+
 ## [0.64.16], 2026-06-23
 
 ### Fixed
