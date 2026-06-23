@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.11], 2026-06-23
+
+### Fixed
+
+- **`/mirror/<id>` 500 on a real install.** v0.64.10 read the
+  refresh cadence off ``device.settings``, which doesn't exist on
+  the real ``Device`` class (only ``device.manifest`` and
+  ``device.config_schema`` do; sleep interval lives in the
+  settings store under the ``devices`` section). The test stub
+  was a wild-card ``MagicMock`` that happily provided the missing
+  attribute and the bug shipped. Mirror handler now reads
+  ``sleep_interval_s`` via the same priority chain
+  ``_next_poll_s`` uses in ``rest_api.py`` (settings-store device
+  override → kind's ``config_schema`` default → 60 s fallback).
+- **Tighter test stub.** Replaced the wild-card ``MagicMock``
+  with a real dataclass that mirrors the surface the handler
+  reads from ``Device`` (``id``, ``name``, ``config_schema``).
+  A future drift in field names now fails the test loudly
+  instead of being silently shimmed. Sleep interval is written
+  via ``settings_store.patch_section`` so the read path matches
+  production exactly.
+
 ## [0.64.10], 2026-06-23
 
 ### Added

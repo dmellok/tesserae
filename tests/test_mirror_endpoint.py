@@ -14,9 +14,26 @@ sharing the same LAN-bypass auth path as ``/preview/``.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import Any
 from unittest.mock import MagicMock
 
 from flask import Flask
+
+
+@dataclass
+class _StubDevice:
+    """Minimum-viable shape that matches the real ``Device`` surface
+    the mirror handler reads (``id``, ``name``, ``config_schema``).
+    A bare ``MagicMock`` would happily provide any attribute and
+    paper over real bugs (we previously had a ``device.settings``
+    lookup that never existed on the real class but tests passed
+    against the mock). A real dataclass with declared fields catches
+    that class of drift at test time."""
+
+    id: str
+    name: str
+    config_schema: dict[str, Any]
 
 
 def _stub_device(
@@ -26,16 +43,25 @@ def _stub_device(
     name: str | None = None,
     sleep_interval_s: int | None = None,
 ) -> None:
-    """Inject a fake device into the registry so the mirror endpoint
-    finds something to mirror. Skips the full ``create_instance``
-    pipeline (which would need a real device kind manifest)."""
-    device = MagicMock()
-    device.id = device_id
-    device.name = name or device_id
-    device.settings = {"sleep_interval_s": sleep_interval_s} if sleep_interval_s else {}
+    """Inject a fake device into the registry + sleep_interval into
+    the settings store so the mirror endpoint resolves the same way
+    a real install would. The sleep interval is read via the settings
+    store (devices section), NOT directly off the device object."""
+    device = _StubDevice(
+        id=device_id,
+        name=name or device_id,
+        config_schema={},
+    )
     registry = MagicMock()
     registry.get.side_effect = lambda did: device if did == device_id else None
     app.config["DEVICE_REGISTRY"] = registry
+
+    if sleep_interval_s is not None:
+        settings_store = app.config["SETTINGS_STORE"]
+        settings_store.patch_section(
+            "devices",
+            {device_id: {"sleep_interval_s": sleep_interval_s}},
+        )
 
 
 def test_mirror_returns_html_with_meta_refresh(app: Flask) -> None:

@@ -1123,12 +1123,24 @@ def create_app(
         if device is None:
             abort(404)
 
-        # Default refresh: device's own sleep_interval_s if set, else 60.
-        settings_for_device = device.settings or {}
-        try:
-            default_refresh = int(settings_for_device.get("sleep_interval_s") or 60)
-        except (TypeError, ValueError):
-            default_refresh = 60
+        # Default refresh: the same priority chain ``_next_poll_s`` uses
+        # in ``app/rest_api.py``, settings-store device override →
+        # kind's config_schema default → 60s fallback. We can't import
+        # ``_next_poll_s`` directly because it lives behind a blueprint
+        # ``current_app`` lookup pattern, the inline duplication is
+        # cheap and keeps the mirror endpoint independent.
+        default_refresh = 60
+        settings_store = app.config.get("SETTINGS_STORE")
+        if settings_store is not None:
+            devices_section = settings_store.get_section("devices") or {}
+            stored = devices_section.get(device.id) if isinstance(devices_section, dict) else None
+            if isinstance(stored, dict) and isinstance(stored.get("sleep_interval_s"), int):
+                default_refresh = int(stored["sleep_interval_s"])
+            else:
+                schema = device.config_schema or {}
+                spec = schema.get("sleep_interval_s") if isinstance(schema, dict) else None
+                if isinstance(spec, dict) and isinstance(spec.get("default"), int):
+                    default_refresh = int(spec["default"])
 
         try:
             refresh = int(request.args.get("refresh") or default_refresh)
