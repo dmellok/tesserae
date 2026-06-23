@@ -494,6 +494,32 @@
     schedulePreview();
   };
 
+  // Heavier hammer for custom form components that need to GUARANTEE
+  // an iframe refresh after a programmatic update (no relying on the
+  // patch path's fingerprint cache, which can skip a re-render when
+  // the widget's ``server.py`` returns cached data so the data column
+  // looks unchanged from the iframe's perspective). Posts the
+  // aggregated forms to ``/preview`` synchronously and then triggers
+  // a full iframe reload so the widget re-runs against the latest
+  // cached state. Slower than the patch path; only use it when the
+  // patch path's been observed to NOT re-render in practice.
+  window.tesseraeForcePreview = async function () {
+    if (!pageId || !previewFrames().length) return;
+    setDirty(true);
+    try {
+      const prefix = window.TESSERAE_URL_PREFIX || "";
+      await fetch(`${prefix}/pages/${pageId}/preview`, {
+        method: "POST",
+        body: aggregateForms(),
+        headers: { "X-Requested-With": "fetch" },
+        credentials: "same-origin",
+      });
+    } catch (err) {
+      console.warn("[editor] force-preview POST failed:", err);
+    }
+    reloadPreview();
+  };
+
   // Warn before navigating away with unsaved cell edits. Doesn't fire
   // on programmatic reloads (those go through tesseraeSaveAllForms
   // first) but does catch accidental Cmd+R / browser back / tab close.

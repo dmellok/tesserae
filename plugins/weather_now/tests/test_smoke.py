@@ -63,9 +63,7 @@ def test_weather_now_renders(client: FlaskClient, size: str) -> None:
 
 
 @pytest.mark.parametrize("size", ["md", "lg"])
-def test_weather_now_location_search_promotes_to_label(
-    client: FlaskClient, size: str
-) -> None:
+def test_weather_now_location_search_promotes_to_label(client: FlaskClient, size: str) -> None:
     """When the cell has a ``location`` dict (the new ``location_search``
     shape) and no explicit ``label`` override, the composer's
     ``_resolved_options`` promotes ``location.name`` into the ``label``

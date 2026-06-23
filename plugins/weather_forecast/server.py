@@ -76,6 +76,12 @@ def fetch(
     cache_path = data_dir / f"forecast_{lat:.3f}_{lon:.3f}_{units}.json"
     cached = _cached(cache_path)
     if cached is not None:
+        # ``label`` is a UI string from the cell editor, not part of
+        # the upstream API response. Overlay the current options'
+        # label so a rename on the same ``(lat, lon, units)`` shows
+        # up on the next preview instead of waiting for the cache
+        # TTL.
+        cached["label"] = options.get("label", "")
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"

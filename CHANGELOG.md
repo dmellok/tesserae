@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.16], 2026-06-23
+
+### Fixed
+
+- **Weather + sunrise widget labels stayed stale until the cell's
+  units (or any other cache-key field) changed.** The weather_now
+  / weather_forecast / weather_hourly / weather_now_scenic /
+  clock_sunrise_sunset widgets cache their upstream API response
+  to disk under a key of ``(latitude, longitude[, units[, hours]])``
+  for ``CACHE_TTL_S = 600`` seconds, and the cached blob *included*
+  the ``label`` UI string. That meant editing the label (or picking
+  a new city, which auto-fills the label) on the same coordinates
+  short-circuited the fetch path: ``_resolved_options`` correctly
+  produced ``options.label = "Berlin"``, but ``fetch()`` returned
+  the stale cached dict with whatever label was baked in 10 minutes
+  earlier. Toggling units changed the cache key, dodged the cache,
+  and was the only way to surface the new label, which was the
+  observed "label only updates after switching C/F" behaviour.
+  Fixed by overlaying ``options.get("label", "")`` on every cache
+  hit, before returning; the cached blob is still useful as an
+  upstream-API memo but the UI string is treated as a live field.
+
 ## [0.64.15], 2026-06-23
 
 ### Fixed

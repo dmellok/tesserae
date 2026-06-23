@@ -329,21 +329,19 @@
         renderPill(loc);
         setInputState(true);
         hideResults();
-        // Force-trigger the editor's preview path. We used to rely on
-        // synthesised input + change events bubbling to the form-level
-        // listeners; that path doesn't work for text inputs because
-        // the listener's ``_deferToBlur`` gate early-returns for them,
-        // so the preview wouldn't fire until the user nudged another
-        // (non-text) field. ``tesseraeSchedulePreview`` is the same
-        // helper the editor's own change handler calls, so this is
-        // exactly equivalent to the user editing a select field.
-        if (typeof window.tesseraeSchedulePreview === "function") {
+        // ``tesseraeForcePreview`` bypasses the patch-path fingerprint
+        // cache that was eating the location-pick re-render
+        // (re-fetching weather with the same units produced
+        // byte-identical ``data``, so even though ``options`` changed
+        // the iframe's per-cell fingerprint check decided to skip
+        // the render). Force a full iframe reload instead, which is
+        // exactly what the user observed when they nudged units to
+        // C/F manually.
+        if (typeof window.tesseraeForcePreview === "function") {
+          window.tesseraeForcePreview();
+        } else if (typeof window.tesseraeSchedulePreview === "function") {
           window.tesseraeSchedulePreview();
         } else {
-          // Fallback for environments where editor.js isn't loaded
-          // (e.g. the dev widget-preview page). Dispatch synthetic
-          // events on the storage element, accepting they may be
-          // gated away on text-input fields.
           fireChange();
         }
       }
@@ -355,7 +353,9 @@
         setInputState(false);
         hideResults();
         lastQuery = "";
-        if (typeof window.tesseraeSchedulePreview === "function") {
+        if (typeof window.tesseraeForcePreview === "function") {
+          window.tesseraeForcePreview();
+        } else if (typeof window.tesseraeSchedulePreview === "function") {
           window.tesseraeSchedulePreview();
         } else {
           fireChange();

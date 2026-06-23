@@ -44,7 +44,13 @@ def fetch(
     cache = data_dir / f"sun_{lat:.3f}_{lon:.3f}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
-            return json.loads(cache.read_text(encoding="utf-8"))
+            cached = json.loads(cache.read_text(encoding="utf-8"))
+            # ``label`` is a UI string from the cell editor, not part
+            # of the upstream API response. Overlay current label so
+            # a rename on the same ``(lat, lon)`` shows up on the
+            # next preview instead of waiting for the cache TTL.
+            cached["label"] = options.get("label") or ""
+            return cached
         except (json.JSONDecodeError, OSError):
             pass
 

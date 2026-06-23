@@ -76,9 +76,7 @@ def test_weather_now_scenic_renders(client: FlaskClient, size: str) -> None:
     # assertion still has something to find.
     opts = '{"location":{"name":"Melbourne","latitude":-37.8136,"longitude":144.9631},"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
-        resp = client.get(
-            f"/_test/render?plugin=weather_now_scenic&size={size}&opts={opts}"
-        )
+        resp = client.get(f"/_test/render?plugin=weather_now_scenic&size={size}&opts={opts}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_now_scenic"' in body

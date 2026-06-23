@@ -62,6 +62,14 @@ def fetch(
     cache_path = data_dir / f"now_{lat:.3f}_{lon:.3f}_{units}.json"
     cached = _cached(cache_path)
     if cached is not None:
+        # ``label`` is a UI string set in the cell editor, not part of
+        # the upstream API response. The cache key is keyed only on
+        # ``(lat, lon, units)``, so a label rename on the same
+        # coordinates would otherwise stay stale until the 10-min
+        # TTL expires (or the user toggled units, which was the only
+        # way out before). Overlay the current options' label so
+        # renames take effect on the next preview.
+        cached["label"] = options.get("label", "")
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"
