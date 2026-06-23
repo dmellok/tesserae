@@ -15,10 +15,12 @@ or a new widget is a contained change.
 │                  Panel-sized PNG (composition orientation)          │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Render         Renderers (drop-a-folder)                           │
-│                    ├─ pi_png     (orientation: landscape)           │
-│                    ├─ pi_bin     (orientation: composition)         │
-│                    ├─ esp32_bin  (orientation: composition)         │
-│                    └─ trmnl_png  (orientation: composition, 1-bit)  │
+│                    ├─ pi_png       (orientation: landscape)         │
+│                    ├─ pi_bin       (orientation: composition)       │
+│                    ├─ esp32_bin    (orientation: composition)       │
+│                    ├─ esp32_bw_bin (orientation: composition, 1-bit)│
+│                    ├─ pico_bin     (orientation: composition)       │
+│                    └─ trmnl_png    (orientation: composition, 1-bit)│
 │                            ▼                                        │
 │                  (artifact bytes, payload, mime, topic, retain)     │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -27,11 +29,12 @@ or a new widget is a contained change.
 │                                 Broker        /api/display          │
 ├─────────────────────────────────────────────────────────────────────┤
 │  Devices        Device kinds (drop-a-folder) + user instances       │
-│                    ├─ pi_bin_client   (tesserae/pi_bin/status)      │
-│                    ├─ pi_png_client   (tesserae/pi_png/status)      │
-│                    ├─ esp32_client    (status + pub/sub config)     │
-│                    ├─ pico_bin_client (RP2350, retained, landscape) │
-│                    └─ trmnl_client    (HTTP poll, no broker needed) │
+│                    ├─ pi_bin_client    (tesserae/pi_bin/status)     │
+│                    ├─ pi_png_client    (tesserae/pi_png/status)     │
+│                    ├─ esp32_client     (status + pub/sub config)    │
+│                    ├─ esp32_bw_client  (1-bpp pre-packed, MQTT)     │
+│                    ├─ pico_bin_client  (RP2350, retained, landscape)│
+│                    └─ trmnl_client     (HTTP poll, no broker needed)│
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

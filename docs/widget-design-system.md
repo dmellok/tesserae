@@ -277,7 +277,12 @@ otherwise; the E6 spec forbids motion anyway).
 
 ## 8. Phosphor icons
 
-Bold weight only. Sizes via the `--icon-*` tokens.
+Bold weight for prominent icons (stats, hero glyphs, title-bar lead
+icons) — this is the default and what most widgets use. Regular weight
+for small inline icons that flow alongside text (e.g. a `map-pin`
+next to a place label). Duotone for accent moments (sun-horizon,
+moon-stars). Avoid `ph-fill` — it quantises into solid blobs on
+Spectra 6. Sizes always come from the `--icon-*` tokens.
 
 ```html
 <i class="ph-bold ph-flag-checkered" style="color:var(--accent-1)"></i>

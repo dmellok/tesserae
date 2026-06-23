@@ -50,7 +50,7 @@ and the modern admin UI are all in. Multi-head is built in throughout,
 register multiple panels, bind a dashboard to a specific display,
 auto-discover clients that announce themselves on the broker.
 
-30 widgets bundled across the universally-useful set, weather, clocks,
+33 widgets bundled across the universally-useful set, weather, clocks,
 calendar, news (HN / RSS / Wikipedia OTD), HA, picture gallery, todo,
 webpage, plus the `weather_now_scenic` reference for the
 `design.palette: extended` opt-in. Another 16 entries cover niche /
@@ -75,7 +75,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - **10 layout presets** (1-cell, 2/3 column, 2/3 row, 2×2 grid, hero top/bottom/left/right, hero sandwich), fraction-based so the same layout works at any panel size; "Custom layout" snaps to a grid you set.
 - **Per-cell overrides**: theme, style (typography), font, content zoom. Cells inherit the page's pick by default; the override flag lets a single tile break from the rest.
 - **Reactive layout for mobile editing**, preview stacks above the cell forms on small viewports, with a floating back-to-top button (drag along the bottom to flip side for left-handed grips).
-- **30 widgets bundled** across the universal set (weather, clocks, calendar, news, HA, picture gallery, todo, webpage). The slim-down landed in 0.38–0.42; niche / credential-gated families moved to the [community catalog](https://github.com/dmellok/tesserae-widgets) as installable bundles (F1, Spotify, GitHub, Finance, Sky, Glances, OctoPrint, Unsplash, iCloud Shared Albums, more).
+- **33 widgets bundled** across the universal set (weather, clocks, calendar, news, HA, picture gallery, todo, webpage). The slim-down landed in 0.38–0.42; niche / credential-gated families moved to the [community catalog](https://github.com/dmellok/tesserae-widgets) as installable bundles (F1, Spotify, GitHub, Finance, Sky, Glances, OctoPrint, Unsplash, iCloud Shared Albums, more).
 - **Drop-a-folder widget plugins**, `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The orthogonal `data-theme` × `data-style` Spectra axes let one widget compose with every theme + typography pairing instead of shipping N variants per widget.
 - **`design.palette: extended` opt-in** for decorative widgets that want gradients / layered shapes / soft shadows (the renderer's Floyd-Steinberg dither approximates them on the panel palette); strict tokens stay the default. [Reference impl: weather_now_scenic](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
 - **Capability declarations** (`requires: [network:..., settings:..., filesystem:write:...]` in `plugin.json`) gated at the socket layer for network egress so a widget can't quietly call home outside its declared upstreams; reviewer-visible for the rest. Bundled + catalog widgets ship declarations.
@@ -83,7 +83,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 ### Rendering
 
 - **Headless Playwright** server-side renderer with a persistent browser pool (toggle to fall back to one-shot).
-- **Drop-a-folder renderer plugins**, currently 5: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 + 7.3" PhotoPainter over MQTT), `esp32_bw_bin` (pre-packed 1-bpp buffer for Waveshare 4.2" B/W panels over MQTT), `trmnl_png` (1-bit greyscale PNG over HTTP).
+- **Drop-a-folder renderer plugins**, currently 6: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 + 7.3" PhotoPainter over MQTT), `esp32_bw_bin` (pre-packed 1-bpp buffer for Waveshare 4.2" B/W panels over MQTT), `pico_bin` (pre-packed 4-bpp buffer for Inky-style Spectra 6 driven by Pico Plus 2 firmware), `trmnl_png` (1-bit greyscale PNG over HTTP).
 - **Eight dither modes** for the `.bin` packers: Floyd-Steinberg + none (Pillow paths), plus Atkinson / Jarvis-Judice-Ninke / Stucki / Bayer-8x8 / halftone / crosshatch (NumPy paths).
 - **Opt-in calibrated palette + tone mapping** (per device), dithers against the panel's measured colours instead of nominal sRGB primaries. Palette data ported from [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize); paired with a linear sRGB tone-map pre-pass.
 - **Firmware-native panel orientation** auto-detected from the panel preset, with a startup migration that backfills pre-v0.20 ESP32 instance manifests so legacy installs don't paint at the wrong row stride.
@@ -93,7 +93,7 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Devices & multi-head
 
-- **Drop-a-folder device plugins**, 5 bundled (`pi_png_client`, `pi_bin_client`, `esp32_client`, `esp32_bw_client`, `trmnl_client`).
+- **Drop-a-folder device plugins**, 6 bundled (`pi_png_client`, `pi_bin_client`, `esp32_client`, `esp32_bw_client`, `pico_bin_client`, `trmnl_client`).
 - **Multi-head**: register multiple devices, bind a dashboard to a specific one, each can run its own theme.
 - **MQTT push** (Pi / ESP32) and **HTTP pull** (Kindle / TRMNL BYOS) supported side-by-side.
 - **mDNS auto-discovery** of LAN clients; discovered devices show up in the *Discovered* strip with panel dims pre-filled.
@@ -121,13 +121,13 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 
 ### Themes & typography (Spectra design system)
 
-- **41 bundled themes** across five families: Light (4 + 3 punchier vivid-light / citrus / arctic), Dark (2), Movement (3 palettes for the matching movement styles), Vivid (15 saturated flat-colour surfaces, Tangerine through Forest), and Gradient (14 themes that paint a linear gradient on every widget card via the `--surface-gradient` opt-in). base16 was retired in 0.43.0; the curated dashboards-friendly Spectra families took its place.
+- **14 bundled themes** across three families: Light (9, including the standard `light`, `sepia`, `cool-gray`, `high-contrast`, `paper`, `newsprint`, plus punchier `vivid-light` / `citrus-light` / `arctic-light`), Dark (2, `dark` + `nord`), and Movement (3 palette-only sets — `bauhaus`, `destijl`, `brutalist`). base16 was retired in 0.43.0; the curated dashboards-friendly Spectra families took its place.
 - **Themes page** (top-nav → Themes) with a vertical strip of every theme on the left, a builder pane in the middle, and a sticky preview on the right. Click any theme to load it; bundled themes show a "Duplicate to edit" CTA, user themes are editable + deletable.
 - **Theme builder**: 20 colour tokens (3 surfaces + 4 text + 1 edge + 6 accents × 2 (base + soft) + 1 on-accent) plus mode (light/dark) and optional font-family. Live preview tracks every input. Optional auto-derive switch computes each `accent_*_soft` as `mix(accent, bg, 0.78)` for one less thing to tune.
 - **Image-to-theme**, upload a photo or poster; k-means picks dominant colours and the assignment heuristic spreads them across the Spectra tokens (light/dark mode auto-detected from the modal cluster's luminance). One click fills the form.
 - **User-saved themes** persist at `data/themes/user.json`. The user-CSS endpoint (`/themes/user.css`) emits one `[data-theme="user-<slug>"]` block per saved theme, loaded alongside the bundled Spectra cascade. Themes ride along in the data-export ZIP.
 - **Orthogonal `data-style` axis**, typography / scale / shape, composes with any theme. Bundled styles: Standard / Display / Editorial / Mono / Elegant / Condensed plus Bauhaus / De Stijl / Brutalist forms.
-- **17 bundled typefaces** (SIL OFL / Apache 2.0), Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
+- **20 bundled typefaces** (SIL OFL / Apache 2.0), Inter, IBM Plex (Sans / Mono / Serif), JetBrains Mono, Atkinson Hyperlegible, Archivo (+ Black + Narrow), Space Grotesk, Space Mono, Manrope, Outfit, Anton, Bebas Neue, DM Serif Display, Crimson Pro, Lora, Bodoni Moda, and Jost, all in the `fonts_core` plugin.
 - **Bundled-theme colour parsing**, the builder lifts every bundled theme's actual `bg / surface / accent-*` values straight from the Spectra CSS at import time, so duplicating Nord produces a Nord-coloured copy (not Light's defaults).
 
 ### Administration & ops

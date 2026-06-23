@@ -239,7 +239,7 @@ Headers: `ETag: "<digest>"`, `Cache-Control: no-cache`.
 
 - The `.bin` renderers only ship `{url, format, panel_w, panel_h, render_id, renderer_id}`. All geometry / colour transforms are done server-side before packing, so the client just unpacks nibbles and writes to SPI.
 - The `.png` renderer ships the four extra hints (`rotate`, `scale`, `bg`, `saturation`) because the PNG is in composition orientation; the client decides how to land it on the actual panel.
-- Other renderers may ship their own extras (e.g. the TRMNL renderer adds `dither` and `contrast`). The contract is: anything not listed in the "always present" set above is renderer-specific. **Clients should ignore unknown fields** so future renderers don't break older firmware.
+- Other renderers may ship their own extras in the future. The contract is: anything not listed in the "always present" set above is renderer-specific, and **clients should ignore unknown fields** so new renderers don't break older firmware. Note that things like the TRMNL renderer's `dither` and `contrast` knobs are *device-side settings* (configured per instance in Settings → Devices, applied server-side before encoding) rather than envelope fields, the wire payload stays minimal.
 
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
 just `ETag: "<digest>"`. Re-paint the previously-cached frame.
@@ -398,7 +398,10 @@ fields are hints for client-side fit; if your display library handles
 that natively, ignore them.
 
 The TRMNL variant is dithered to 1-bit B/W (every pixel either 0 or
-255) and ships with `dither` + `contrast` hints in the envelope.
+255) server-side; the dither algorithm + contrast curve are device
+settings (Settings → Devices → trmnl_client) rather than envelope
+fields, so the wire payload is just `{"url": "..."}` like the other
+bin/png variants.
 
 Reference: [`renderers/pi_png/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/pi_png/renderer.py),
 [`renderers/trmnl/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/trmnl/renderer.py).

@@ -32,7 +32,9 @@ and sun times. Data from Open-Meteo (no API key).*
   convention. Use `<family>_<role>` (e.g. `weather_now`, `news_headlines`).
 - **name**: short display name as it'll show in the widget picker.
 - **version**: `0.1.0` for a new widget.
-- **icon**: Phosphor icon name (regular weight) for the editor picker.
+- **icon**: Phosphor icon name (just the name, no weight prefix) for
+  the editor picker, e.g. `ph-cloud-sun`. The picker renders it bold;
+  the schema validates `^ph-[a-z0-9-]+$`.
   Browse [phosphoricons.com](https://phosphoricons.com).
 
 ---

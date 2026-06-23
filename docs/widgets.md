@@ -420,8 +420,9 @@ Worked examples in the bundled tree:
 
 ## `design.palette`, opting out of strict colour tokens
 
-The Spectra colour tokens (`--w-orange`, `--w-blue`, etc.) constrain
-widgets to colours that land cleanly on every supported e-ink panel,
+The Spectra colour tokens (`--accent-1` through `--accent-6`, plus
+their `-soft` companions) constrain widgets to colours that land
+cleanly on every supported e-ink panel,
 no dithering surprises. That's the right default. Some widgets,
 typically decorative or scenic ones, want a richer surface: a sunset
 gradient on a weather card, layered cloud shapes, a deep night-sky

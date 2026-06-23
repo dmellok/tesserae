@@ -118,6 +118,10 @@ work). So:
 
 The full schema with every field's constraints lives at
 [`schema/marketplace.schema.json`](https://github.com/dmellok/tesserae-widgets/blob/main/schema/marketplace.schema.json).
+Worth knowing up front: `description` is capped at **280 characters**
+(catalog CI rejects longer pitches); the widget's own README is the
+place for long-form copy. `tags` are a closed enum, see the schema
+file for the current list.
 
 ## Bundle entries (widget families)
 
