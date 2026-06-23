@@ -257,6 +257,59 @@
         storage.dispatchEvent(new Event("change", { bubbles: true }));
       }
 
+      function renderPill(loc) {
+        // Remove any existing pill so we don't end up with two.
+        const existing = field.querySelector("[data-location-pill]");
+        if (existing) existing.remove();
+        if (!loc) return;
+        const pill = document.createElement("div");
+        pill.className = "location-search-pill";
+        pill.dataset.locationPill = "1";
+        const parts = [loc.name];
+        if (loc.admin1 && loc.admin1 !== loc.name) parts.push(loc.admin1);
+        if (loc.country) parts.push(loc.country);
+        const coords =
+          typeof loc.latitude === "number" && typeof loc.longitude === "number"
+            ? loc.latitude.toFixed(4) + ", " + loc.longitude.toFixed(4)
+            : "";
+        pill.innerHTML =
+          '<i class="ph-bold ph-map-pin location-search-pill-icon" aria-hidden="true"></i>' +
+          '<div class="location-search-pill-body">' +
+          '<span class="location-search-pill-name">' +
+          _escapeHtml(parts.join(", ")) +
+          "</span>" +
+          (coords
+            ? '<span class="location-search-pill-coords">' +
+              _escapeHtml(coords) +
+              "</span>"
+            : "") +
+          "</div>";
+        field.appendChild(pill);
+      }
+
+      function setInputState(isSet) {
+        const inputBox = field.querySelector(".location-search-input");
+        if (!inputBox) return;
+        inputBox.classList.toggle("is-set", isSet);
+        // Show/hide the clear button to match the state. Created on
+        // demand if it doesn't exist yet (fresh cells render without
+        // it since there's nothing to clear).
+        let clr = inputBox.querySelector("[data-location-clear]");
+        if (isSet && !clr) {
+          clr = document.createElement("button");
+          clr.type = "button";
+          clr.className = "location-search-clear";
+          clr.dataset.locationClear = "1";
+          clr.title = "Clear";
+          clr.setAttribute("aria-label", "Clear location");
+          clr.innerHTML = '<i class="ph ph-x" aria-hidden="true"></i>';
+          clr.addEventListener("click", clearLocation);
+          inputBox.appendChild(clr);
+        } else if (!isSet && clr) {
+          clr.remove();
+        }
+      }
+
       function selectResult(loc) {
         storage.value = JSON.stringify(loc);
         display.value = loc.name || "";
@@ -272,13 +325,41 @@
           : null;
         if (labelInput && "value" in labelInput) {
           labelInput.value = loc.name || "";
-          // Fire input+change on the label input too so the editor's
-          // autosave + preview pickup notice the new value.
-          labelInput.dispatchEvent(new Event("input", { bubbles: true }));
-          labelInput.dispatchEvent(new Event("change", { bubbles: true }));
         }
+        renderPill(loc);
+        setInputState(true);
         hideResults();
-        fireChange();
+        // Force-trigger the editor's preview path. We used to rely on
+        // synthesised input + change events bubbling to the form-level
+        // listeners; that path doesn't work for text inputs because
+        // the listener's ``_deferToBlur`` gate early-returns for them,
+        // so the preview wouldn't fire until the user nudged another
+        // (non-text) field. ``tesseraeSchedulePreview`` is the same
+        // helper the editor's own change handler calls, so this is
+        // exactly equivalent to the user editing a select field.
+        if (typeof window.tesseraeSchedulePreview === "function") {
+          window.tesseraeSchedulePreview();
+        } else {
+          // Fallback for environments where editor.js isn't loaded
+          // (e.g. the dev widget-preview page). Dispatch synthetic
+          // events on the storage element, accepting they may be
+          // gated away on text-input fields.
+          fireChange();
+        }
+      }
+
+      function clearLocation() {
+        storage.value = "";
+        display.value = "";
+        renderPill(null);
+        setInputState(false);
+        hideResults();
+        lastQuery = "";
+        if (typeof window.tesseraeSchedulePreview === "function") {
+          window.tesseraeSchedulePreview();
+        } else {
+          fireChange();
+        }
       }
 
       async function search(query) {
@@ -375,13 +456,7 @@
       });
 
       if (clearBtn) {
-        clearBtn.addEventListener("click", () => {
-          storage.value = "";
-          display.value = "";
-          hideResults();
-          lastQuery = "";
-          fireChange();
-        });
+        clearBtn.addEventListener("click", clearLocation);
       }
     });
   }

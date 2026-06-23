@@ -480,6 +480,20 @@
     setDirty(false);
   };
 
+  // Same shape as ``tesseraeSaveAllForms``: a small hook that custom
+  // form-builder components (location_search, future ones) can call
+  // when they've programmatically updated an input value and need the
+  // preview to refresh, without relying on the form-level event
+  // listeners catching synthetic ``input`` / ``change`` events. The
+  // listeners have a ``_deferToBlur`` gate that early-returns for text
+  // inputs, which means a synthesised input event on a sibling
+  // ``<input type="text">`` doesn't trigger the preview. Calling this
+  // helper bypasses the gate.
+  window.tesseraeSchedulePreview = function () {
+    setDirty(true);
+    schedulePreview();
+  };
+
   // Warn before navigating away with unsaved cell edits. Doesn't fire
   // on programmatic reloads (those go through tesseraeSaveAllForms
   // first) but does catch accidental Cmd+R / browser back / tab close.

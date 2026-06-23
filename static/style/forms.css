@@ -1295,11 +1295,17 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .wizard-broker-mqtt-fields[hidden] { display: none; }
 
 /* ----- Location search -------------------------------------------------
-   Used by the ``location_search`` cell option type. Layout mirrors the
-   ``.multiselect`` block above: search input on top, autocomplete list
-   beneath as an absolutely-positioned dropdown so it doesn't reflow the
-   surrounding form. Static/components.js attaches the behaviour. */
-.field--location-search { position: relative; }
+   Used by the ``location_search`` cell option type. Layout: positioned
+   search input with autocomplete dropdown floating beneath, plus a
+   "picked location" pill below the input that shows the resolved name
+   and coordinates when a location is set. The pill is intentionally
+   compact so the cell-options form doesn't gain a tall header just
+   for one option type. Static/components.js attaches the behaviour. */
+.field--location-search {
+  position: relative;
+  display: grid;
+  gap: var(--t-space-2);
+}
 .location-search-input {
   display: flex;
   align-items: center;
@@ -1308,20 +1314,38 @@ input[type="range"].slider:focus::-moz-range-thumb {
   border-radius: var(--t-radius-sm);
   padding: 0 var(--t-space-3);
   background: var(--t-surface, #fff);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .location-search-input:focus-within {
   border-color: var(--t-accent, #1c5cd6);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-accent, #1c5cd6) 18%, transparent);
 }
-.location-search-input .ph { color: var(--t-fg-muted, #6b7280); font-size: 16px; }
+.location-search-input.is-set {
+  /* A subtle tint when a location is set so the user sees at a glance
+     that the search has a value, distinct from "empty + waiting for input". */
+  border-color: color-mix(in srgb, var(--t-accent, #1c5cd6) 40%, var(--t-border, #d0d3da));
+  background: color-mix(in srgb, var(--t-accent, #1c5cd6) 4%, var(--t-surface, #fff));
+}
+.location-search-icon {
+  color: var(--t-fg-muted, #6b7280);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.location-search-input.is-set .location-search-icon {
+  color: var(--t-accent, #1c5cd6);
+}
 .location-search-display {
   flex: 1;
+  min-width: 0;
   border: none;
   outline: none;
-  padding: var(--t-space-2) 0;
+  padding: 10px 0;
   background: transparent;
   font: inherit;
   color: var(--t-fg, #1a1d23);
+}
+.location-search-display::placeholder {
+  color: var(--t-fg-muted, #9aa0aa);
 }
 .location-search-clear {
   border: none;
@@ -1329,42 +1353,65 @@ input[type="range"].slider:focus::-moz-range-thumb {
   cursor: pointer;
   color: var(--t-fg-muted, #6b7280);
   padding: 4px;
-  border-radius: var(--t-radius-sm);
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  transition: background-color 120ms ease, color 120ms ease;
 }
-.location-search-clear:hover { background: var(--t-surface-sunken, #f4f5f7); color: var(--t-fg, #1a1d23); }
+.location-search-clear .ph { font-size: 12px; }
+.location-search-clear:hover {
+  background: color-mix(in srgb, var(--t-fg, #1a1d23) 8%, transparent);
+  color: var(--t-fg, #1a1d23);
+}
 .location-search-results {
   position: absolute;
   z-index: 20;
   left: 0;
   right: 0;
-  top: 100%;
-  margin: 4px 0 0;
+  /* Sit just below the input, accounting for the 22px label that lives
+     above us inside the field wrapper. */
+  top: calc(1em + 4px + var(--t-space-2) + 42px);
+  margin: 0;
   padding: 4px 0;
   list-style: none;
   background: var(--t-surface, #fff);
   border: 1px solid var(--t-border, #d0d3da);
   border-radius: var(--t-radius-sm);
-  box-shadow: 0 8px 24px -8px color-mix(in srgb, black 18%, transparent);
-  max-height: 240px;
+  box-shadow: 0 12px 32px -10px color-mix(in srgb, black 22%, transparent);
+  max-height: 280px;
   overflow-y: auto;
 }
 .location-search-result {
   display: flex;
   align-items: center;
   gap: var(--t-space-2);
-  padding: var(--t-space-2) var(--t-space-3);
+  padding: 10px var(--t-space-3);
   cursor: pointer;
   font-size: 14px;
   color: var(--t-fg, #1a1d23);
+  border-bottom: 1px solid color-mix(in srgb, var(--t-border, #d0d3da) 40%, transparent);
 }
+.location-search-result:last-child { border-bottom: none; }
 .location-search-result:hover,
 .location-search-result:focus {
   background: color-mix(in srgb, var(--t-accent, #1c5cd6) 8%, transparent);
   outline: none;
 }
-.location-search-result .ph { color: var(--t-accent, #1c5cd6); font-size: 14px; }
+.location-search-result .ph {
+  color: var(--t-accent, #1c5cd6);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.location-search-result-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .location-search-empty {
   padding: var(--t-space-3);
   font-size: 13px;
@@ -1372,11 +1419,40 @@ input[type="range"].slider:focus::-moz-range-thumb {
   list-style: none;
   margin: 0;
 }
-.location-search-current {
+/* "Picked location" pill below the search. Compact two-line block:
+   city name + admin + country on top, coordinates underneath in a
+   monospace-y tabular feel. */
+.location-search-pill {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  margin: var(--t-space-2) 0 0;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--t-accent, #1c5cd6) 6%, var(--t-surface-sunken, #f8f9fa));
+  border: 1px solid color-mix(in srgb, var(--t-accent, #1c5cd6) 18%, transparent);
+  border-radius: var(--t-radius-sm);
 }
-.location-search-current .ph { font-size: 12px; }
+.location-search-pill-icon {
+  color: var(--t-accent, #1c5cd6);
+  font-size: 14px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.location-search-pill-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.location-search-pill-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--t-fg, #1a1d23);
+  line-height: 1.3;
+}
+.location-search-pill-coords {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-fg-muted, #6b7280);
+  font-family: var(--t-font-mono, ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace);
+  letter-spacing: 0.01em;
+}

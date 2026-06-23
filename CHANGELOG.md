@@ -6,6 +6,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.15], 2026-06-23
+
+### Fixed
+
+- **Location pick didn't refresh the preview until a sibling
+  field nudged.** The form-level ``input`` listener in
+  ``editor.js`` has a ``_deferToBlur`` gate that early-returns
+  for text-type inputs, so a synthetic ``input`` event dispatched
+  on a text input (the sibling Label field that
+  ``location_search`` auto-fills) didn't trigger
+  ``schedulePreview``. Resulted in the label updating only after
+  the user touched units or another non-text field. Now
+  ``editor.js`` exposes a tiny global hook
+  (``window.tesseraeSchedulePreview()``) that custom form-builder
+  components call directly when they programmatically update an
+  input value, bypassing the defer-to-blur gate. The location-
+  search component uses it on every pick + clear.
+
+### Changed
+
+- **Visual polish on the ``location_search`` field.** The input
+  now tints accent when a location is set (so a glance at the
+  cell editor tells you whether a search has a value),
+  placeholder copy tightened to "Search a city…", and the picked
+  city renders as a small accent-bordered pill below the input
+  with the resolved name + coordinates instead of a muted text
+  line. JS dynamically rebuilds the pill on each pick / clear,
+  so the live preview state stays in lock-step with what the
+  editor shows even before the form has been saved.
+
 ## [0.64.14], 2026-06-23
 
 ### Changed

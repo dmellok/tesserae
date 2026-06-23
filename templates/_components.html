@@ -236,16 +236,16 @@ macro here instead.
   {%- set hidden_json = (value | tojson) if is_dict else '' -%}
 <div class="field field--location-search" data-location-search>
   <label for="{{ field_id }}-display">{{ label }}{{ info_pop(help) }}</label>
-  <div class="location-search-input">
-    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+  <div class="location-search-input{% if is_dict %} is-set{% endif %}">
+    <i class="ph ph-magnifying-glass location-search-icon" aria-hidden="true"></i>
     <input type="text" id="{{ field_id }}-display"
            class="location-search-display" data-location-display
            value="{{ display_str }}"
-           placeholder="Type a city, e.g. Berlin, Melbourne, Tokyo"
+           placeholder="Search a city…"
            autocomplete="off" spellcheck="false">
     {% if is_dict %}
     <button type="button" class="location-search-clear" data-location-clear
-            aria-label="Clear location">
+            aria-label="Clear location" title="Clear">
       <i class="ph ph-x" aria-hidden="true"></i>
     </button>
     {% endif %}
@@ -254,11 +254,17 @@ macro here instead.
          value="{{ hidden_json }}">
   <ul class="location-search-results" data-location-results hidden></ul>
   {%- if is_dict and value.latitude is defined -%}
-  <p class="location-search-current muted">
-    <i class="ph ph-map-pin" aria-hidden="true"></i>
-    {{ value.name }}{% if value.admin1 %}, {{ value.admin1 }}{% endif %}{% if value.country %}, {{ value.country }}{% endif %}
-    · {{ '%.4f'|format(value.latitude) }}, {{ '%.4f'|format(value.longitude) }}
-  </p>
+  <div class="location-search-pill" data-location-pill>
+    <i class="ph-bold ph-map-pin location-search-pill-icon" aria-hidden="true"></i>
+    <div class="location-search-pill-body">
+      <span class="location-search-pill-name">
+        {{ value.name }}{% if value.admin1 and value.admin1 != value.name %}, {{ value.admin1 }}{% endif %}{% if value.country %}, {{ value.country }}{% endif %}
+      </span>
+      <span class="location-search-pill-coords">
+        {{ '%.4f'|format(value.latitude) }}, {{ '%.4f'|format(value.longitude) }}
+      </span>
+    </div>
+  </div>
   {%- endif -%}
 </div>
 {%- endmacro -%}
