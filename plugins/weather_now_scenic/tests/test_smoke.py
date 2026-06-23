@@ -74,7 +74,7 @@ def test_weather_now_scenic_renders(client: FlaskClient, size: str) -> None:
     # Manifest label default flipped to ``""`` in v0.1.1 (location_search
     # migration). Pass an explicit label so the smoke test's text-match
     # assertion still has something to find.
-    opts = '{"label":"Melbourne"}'
+    opts = '{"location":{"name":"Melbourne","latitude":-37.8136,"longitude":144.9631},"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
         resp = client.get(
             f"/_test/render?plugin=weather_now_scenic&size={size}&opts={opts}"

@@ -34,22 +34,47 @@ def test_compose_route_404s_on_unknown_page(client: FlaskClient) -> None:
     assert resp.status_code == 404
 
 
-def test_resolved_options_fills_blank_coords_from_global_location(app: Flask) -> None:
-    """Blank widget lat/long inherit the global location (Settings → Server);
-    an explicit per-cell value wins; with neither set, the built-in fallback
-    keeps the widget rendering."""
+def test_resolved_options_promotes_location_dict_to_coords_and_label(app: Flask) -> None:
+    """The Settings → Server → Location fallback was removed in v0.64.14
+    so weather widgets stop silently rendering "Melbourne weather" when
+    the user hasn't picked anything. ``_resolved_options`` now promotes
+    a ``location`` dict (from the search field) into the widget's
+    ``latitude`` / ``longitude`` / ``label`` slots, and an empty cell
+    returns missing-coords so widget code surfaces a friendly empty
+    state instead of pretending."""
     with app.app_context():
-        store = app.config["SETTINGS_STORE"]
+        # Picked a city → coords + label flow through.
+        out = composer._resolved_options(
+            "weather_now",
+            {
+                "location": {
+                    "name": "Berlin",
+                    "latitude": 52.52,
+                    "longitude": 13.405,
+                },
+            },
+        )
+        assert out["latitude"] == 52.52
+        assert out["longitude"] == 13.405
+        assert out["label"] == "Berlin"
 
-        store.update_section("app", {"latitude": 51.5, "longitude": -0.12})
-        filled = composer._resolved_options("weather_now", {})
-        assert filled["latitude"] == 51.5
-        assert filled["longitude"] == -0.12
+        # Custom label overrides the city name from the location dict.
+        out_custom = composer._resolved_options(
+            "weather_now",
+            {
+                "location": {
+                    "name": "Berlin",
+                    "latitude": 52.52,
+                    "longitude": 13.405,
+                },
+                "label": "Home",
+            },
+        )
+        assert out_custom["label"] == "Home"
+        assert out_custom["latitude"] == 52.52
 
-        explicit = composer._resolved_options("weather_now", {"latitude": 40.7, "longitude": -74.0})
-        assert (explicit["latitude"], explicit["longitude"]) == (40.7, -74.0)
-
-        store.update_section("app", {"latitude": "", "longitude": ""})
-        fallback = composer._resolved_options("weather_now", {})
-        assert fallback["latitude"] == composer._FALLBACK_LAT
-        assert fallback["longitude"] == composer._FALLBACK_LON
+        # Empty cell (no location picked) → no coords; widget code
+        # is expected to return an error / empty state from fetch().
+        empty = composer._resolved_options("weather_now", {})
+        assert empty.get("latitude") in (None, "")
+        assert empty.get("longitude") in (None, "")

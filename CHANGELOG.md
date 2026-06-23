@@ -6,6 +6,66 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.14], 2026-06-23
+
+### Changed
+
+- **Location widgets simplified to two visible fields.** The cell
+  editor for ``weather_now`` (v0.1.10), ``weather_forecast``
+  (v0.1.7), ``weather_hourly`` (v0.2.4), ``weather_now_scenic``
+  (v0.1.2), and ``clock_sunrise_sunset`` (v0.1.6) now shows only
+  **Location** (search) and **Label** (auto-filled from the picked
+  city, editable to "Home" or similar). The visible
+  ``latitude`` / ``longitude`` override fields are gone; the
+  location dict is the single source of truth.
+- **JS auto-fills the Label input** when the user picks a result
+  from the location search. The Label is wired into the editor's
+  autosave + preview pickup so the title shows the picked city
+  immediately. (Replaces the v0.64.12-v0.64.13 contract where the
+  label was set server-side via ``_resolved_options`` promotion;
+  the server-side promotion still fires for cases where a cell
+  arrives via the API or a restored backup without the JS
+  running.)
+
+### Fixed
+
+- **Weather widgets no longer silently render Melbourne weather.**
+  ``_resolved_options`` lost its global-settings fallback (used to
+  reach into Settings → Server → Latitude/Longitude when the cell
+  itself had no coords) and the constant Melbourne coordinates.
+  Cells without a picked location now return a friendly
+  "Pick a location in the cell editor." error from ``fetch()``,
+  surfaced by the widget client's existing error path.
+
+### Why
+
+A user-facing thread (Bernhard's #26, expanded on by Kayden after
+the v0.64.12-13 ships) called out that the Melbourne label kept
+re-appearing because the editor had three coupled location fields
+(``latitude``, ``longitude``, ``label``) PLUS a hidden chain of
+fallbacks reaching into the Settings page. Even when the user
+picked a different city, the leftover override fields and the
+silent Settings fallback could still inject Melbourne data. The
+new shape has one path: pick a city, the label and the
+coordinates come from that. Custom labels are an explicit
+override of the city name on a single visible input.
+
+### Backwards compatibility
+
+Mostly backwards compatible:
+
+- Existing cells that have a ``location`` dict picked are
+  unaffected.
+- Existing cells that used the old ``latitude`` / ``longitude``
+  manual entry lose those values on next edit (the manifest no
+  longer declares the fields, so the form-builder doesn't carry
+  them through). Users with that shape should re-pick their
+  location via the search.
+- Settings → Server → Latitude/Longitude are still present on
+  the Settings page but no longer drive any widget. (Phase 4
+  could remove them entirely; deferred so this release is
+  focused on the user-visible cell editor.)
+
 ## [0.64.13], 2026-06-23
 
 ### Added

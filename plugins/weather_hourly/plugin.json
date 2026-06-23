@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Hourly",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "kind": "widget",
   "description": "Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).",
   "icon": "ph-chart-line",
@@ -19,27 +19,14 @@
       "type": "location_search",
       "label": "Location",
       "default": "",
-      "help": "Search for a city; the editor stores the matched name + coordinates together. Leave blank to fall back to the manual latitude / longitude / label fields below, or to the server-wide default from Settings \u2192 Server \u2192 Location."
-    },
-    {
-      "name": "latitude",
-      "type": "number",
-      "label": "Latitude (override)",
-      "default": "",
-      "help": "Optional. Overrides the coordinate from Location above. Decimal degrees."
-    },
-    {
-      "name": "longitude",
-      "type": "number",
-      "label": "Longitude (override)",
-      "default": ""
+      "help": "Search a city to set the location. The latitude / longitude that drive the weather data come from the picked result; the Label below auto-fills with the city name."
     },
     {
       "name": "label",
       "type": "string",
       "label": "Label",
       "default": "",
-      "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
+      "help": "Auto-filled from the location pick; edit to customise (e.g. 'Home' instead of 'Berlin')."
     },
     {
       "name": "units",

@@ -49,8 +49,26 @@ def fetch(
     options: dict[str, Any], settings: dict[str, Any], *, ctx: dict[str, Any]
 ) -> dict[str, Any]:
     del settings
-    lat = float(options.get("latitude") or ctx.get("home_lat") or 0.0)
-    lon = float(options.get("longitude") or ctx.get("home_lon") or 0.0)
+    # Coordinates come from the cell's Location pick (composer's
+    # ``_resolved_options`` promotes ``location.latitude`` / ``location.longitude``
+    # into the top-level options keys). When the user hasn't picked a
+    # location yet, surface a friendly empty-state instead of fetching
+    # for the equator. The widget's client.js handles the ``error`` key.
+    lat_raw = options.get("latitude")
+    lon_raw = options.get("longitude")
+    if lat_raw in (None, "") or lon_raw in (None, ""):
+        return {
+            "error": "Pick a location in the cell editor.",
+            "label": options.get("label", ""),
+        }
+    try:
+        lat = float(lat_raw)
+        lon = float(lon_raw)
+    except (TypeError, ValueError):
+        return {
+            "error": "Location has invalid coordinates.",
+            "label": options.get("label", ""),
+        }
     units = str(options.get("units", "metric"))
 
     data_dir = Path(ctx["data_dir"])

@@ -41,8 +41,12 @@ class _FakeResp:
 
 @pytest.mark.parametrize("size", ["sm", "md", "lg"])
 def test_weather_forecast_renders(client: FlaskClient, size: str) -> None:
+    # ``location`` must be set in v0.1.7+ or fetch returns an empty-state
+    # error (the no-coords guard added when the global-settings fallback
+    # was removed).
+    opts = '{"location":{"name":"Melbourne","latitude":-37.8136,"longitude":144.9631}}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
-        resp = client.get(f"/_test/render?plugin=weather_forecast&size={size}")
+        resp = client.get(f"/_test/render?plugin=weather_forecast&size={size}&opts={opts}")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert 'data-plugin="weather_forecast"' in body

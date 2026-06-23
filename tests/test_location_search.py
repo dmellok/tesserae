@@ -117,17 +117,18 @@ def test_resolved_options_promotes_location_to_lat_lon_label() -> None:
     assert out["label"] == "Berlin"
 
 
-def test_resolved_options_explicit_lat_overrides_location() -> None:
-    """A power user who set lat/lon manually beats the location dict
-    (e.g. they searched for "Berlin, DE" but want raw coords for a
-    nearby village). The label override behaves the same way."""
+def test_resolved_options_custom_label_overrides_location_name() -> None:
+    """A user who picked Berlin from the search but typed "Home" in the
+    Label field keeps "Home". The location dict's ``name`` only fills
+    the slot if the user hasn't customised it. (Latitude / longitude
+    coordinate overrides went away in v0.64.14 along with the
+    Settings → Server → Location fallback chain; the cell editor no
+    longer surfaces manual lat / lon inputs.)"""
     from app import composer
 
     plugin = MagicMock()
     plugin.cell_option_defaults.return_value = {
         "location": "",
-        "latitude": "",
-        "longitude": "",
         "label": "",
         "units": "metric",
     }
@@ -140,8 +141,6 @@ def test_resolved_options_explicit_lat_overrides_location() -> None:
             "latitude": 52.52,
             "longitude": 13.405,
         },
-        "latitude": 52.6,
-        "longitude": 13.5,
         "label": "Home",
     }
 
@@ -152,24 +151,25 @@ def test_resolved_options_explicit_lat_overrides_location() -> None:
     with patch.object(composer, "current_app", fake_app):
         out = composer._resolved_options("weather_now", raw)
 
-    # Explicit overrides win, location stays in the cell options as a
-    # record of what was searched but doesn't drive rendering.
-    assert out["latitude"] == 52.6
-    assert out["longitude"] == 13.5
+    # User's label wins over location.name; the picked coords still
+    # flow through for the weather data fetch.
+    assert out["latitude"] == 52.52
+    assert out["longitude"] == 13.405
     assert out["label"] == "Home"
 
 
-def test_resolved_options_no_location_falls_back_to_global() -> None:
-    """A cell with neither a ``location`` dict nor explicit coords
-    falls through to the existing global-location fallback path,
-    unchanged from the pre-location_search behaviour."""
+def test_resolved_options_no_location_returns_missing_coords() -> None:
+    """A cell with no ``location`` picked surfaces missing coordinates
+    rather than falling back to a global default. Widget server code
+    is expected to check for the missing values and return a friendly
+    "Pick a location" error, the v0.64.14 design choice was to stop
+    silently rendering Melbourne weather when the user hadn't asked
+    for that."""
     from app import composer
 
     plugin = MagicMock()
     plugin.cell_option_defaults.return_value = {
         "location": "",
-        "latitude": "",
-        "longitude": "",
         "label": "",
         "units": "metric",
     }
@@ -180,13 +180,14 @@ def test_resolved_options_no_location_falls_back_to_global() -> None:
 
     fake_app = MagicMock()
     fake_app.config = {"PLUGIN_REGISTRY": registry, "SETTINGS_STORE": MagicMock()}
-    # No app-level lat/lon set → falls through to the Melbourne
-    # constants in composer.py.
     fake_app.config["SETTINGS_STORE"].get_section.return_value = {}
 
     with patch.object(composer, "current_app", fake_app):
         out = composer._resolved_options("weather_now", raw)
 
-    # Fallback constants, the existing behaviour.
-    assert out["latitude"] == composer._FALLBACK_LAT
-    assert out["longitude"] == composer._FALLBACK_LON
+    # No coords promoted (manifest doesn't declare latitude/longitude
+    # any more, so they're not in the merged dict at all). Label
+    # likewise stays empty.
+    assert "latitude" not in out
+    assert "longitude" not in out
+    assert out.get("label") == ""

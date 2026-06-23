@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Forecast",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "kind": "widget",
   "description": "5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).",
   "icon": "ph-calendar-dots",
@@ -18,27 +18,14 @@
       "type": "location_search",
       "label": "Location",
       "default": "",
-      "help": "Search for a city; the editor stores the matched name + coordinates together. Leave blank to fall back to the manual latitude / longitude / label fields below, or to the server-wide default from Settings \u2192 Server \u2192 Location."
-    },
-    {
-      "name": "latitude",
-      "type": "number",
-      "label": "Latitude (override)",
-      "default": "",
-      "help": "Optional. Overrides the coordinate from Location above. Decimal degrees."
-    },
-    {
-      "name": "longitude",
-      "type": "number",
-      "label": "Longitude (override)",
-      "default": ""
+      "help": "Search a city to set the location. The latitude / longitude that drive the weather data come from the picked result; the Label below auto-fills with the city name."
     },
     {
       "name": "label",
       "type": "string",
       "label": "Label",
       "default": "",
-      "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
+      "help": "Auto-filled from the location pick; edit to customise (e.g. 'Home' instead of 'Berlin')."
     },
     {
       "name": "units",

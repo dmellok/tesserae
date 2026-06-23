@@ -44,77 +44,42 @@ def _registry() -> PluginRegistry:
     return registry
 
 
-# Last-resort coordinates (Melbourne) so a location widget still renders
-# before any global or per-cell location is set.
-_FALLBACK_LAT = -37.8136
-_FALLBACK_LON = 144.9631
-
-
-def _global_location() -> tuple[float, float]:
-    """The global default coordinates from the app settings (Settings →
-    Server), with a built-in fallback so widgets never render blank."""
-    store = current_app.config.get("SETTINGS_STORE")
-    app_cfg = store.get_section("app") if store is not None else {}
-
-    def _f(value: Any, fallback: float) -> float:
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return fallback
-
-    return _f(app_cfg.get("latitude"), _FALLBACK_LAT), _f(app_cfg.get("longitude"), _FALLBACK_LON)
-
-
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
         return dict(raw)
     merged: dict[str, Any] = plugin.cell_option_defaults()
     merged.update(raw)
-    # Promote a ``location_search`` dict into the legacy
-    # ``latitude``/``longitude``/``label`` triplet when the user picked a
-    # city in the editor. This is the resolution path for widgets that
-    # have migrated to the ``location_search`` option type, the legacy
-    # fields (if still declared on the manifest) become last-resort
-    # overrides for power users who want raw coordinates.
+    # Promote a ``location_search`` dict into the top-level options the
+    # widget server.py reads (``latitude``, ``longitude``, ``label``).
+    # The user-facing UX is a single search field + an editable label;
+    # the dict is the source of truth and these promoted fields are
+    # what the existing widget data-fetch code consumes, so no widget
+    # code change is needed for the simpler shape.
+    #
+    # Deliberately no global-settings fallback any more, the global
+    # Settings → Server → Latitude/Longitude fields used to seed
+    # widgets that didn't have their own coordinates, but that meant a
+    # half-configured cell silently showed weather for somewhere other
+    # than where the user thought. Cells without a chosen location
+    # now return missing-coords (``""`` / ``None``) and widget code
+    # surfaces a "pick a location" empty state instead of pretending.
     location = merged.get("location")
     if isinstance(location, dict) and location:
         lat = location.get("latitude")
         lon = location.get("longitude")
         loc_name = location.get("name")
-        if (
-            isinstance(lat, (int, float))
-            and "latitude" in merged
-            and merged["latitude"]
-            in (
-                None,
-                "",
-            )
-        ):
+        if isinstance(lat, (int, float)):
             merged["latitude"] = float(lat)
-        if (
-            isinstance(lon, (int, float))
-            and "longitude" in merged
-            and merged["longitude"]
-            in (
-                None,
-                "",
-            )
-        ):
+        if isinstance(lon, (int, float)):
             merged["longitude"] = float(lon)
-        if isinstance(loc_name, str) and loc_name and "label" in merged and not merged.get("label"):
+        # ``label`` defaults to the city name when the user hasn't typed
+        # anything custom. JS in the cell editor mirrors this by auto-
+        # filling the Label input on location select, the server-side
+        # fallback handles the case where the cell was created via the
+        # API (or restored from a backup) without the editor running.
+        if isinstance(loc_name, str) and loc_name and not merged.get("label"):
             merged["label"] = loc_name
-    # Fill blank latitude/longitude from the global location so the
-    # weather / sky / sunrise widgets don't each re-enter coordinates. An
-    # explicit per-cell value always wins (it's non-blank here).
-    needs_lat = "latitude" in merged and merged["latitude"] in (None, "")
-    needs_lon = "longitude" in merged and merged["longitude"] in (None, "")
-    if needs_lat or needs_lon:
-        glat, glon = _global_location()
-        if needs_lat:
-            merged["latitude"] = glat
-        if needs_lon:
-            merged["longitude"] = glon
     return merged
 
 

@@ -51,7 +51,7 @@ def test_weather_now_renders(client: FlaskClient, size: str) -> None:
     # migration). Without an explicit label or location, the rendered
     # widget has no title bar, which is intentional but breaks the
     # "Melbourne" string-search the test used to do.
-    opts = '{"label":"Melbourne"}'
+    opts = '{"location":{"name":"Melbourne","latitude":-37.8136,"longitude":144.9631},"label":"Melbourne"}'
     with patch("urllib.request.urlopen", return_value=_FakeResp()):
         resp = client.get(f"/_test/render?plugin=weather_now&size={size}&opts={opts}")
     assert resp.status_code == 200

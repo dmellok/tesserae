@@ -260,6 +260,23 @@
       function selectResult(loc) {
         storage.value = JSON.stringify(loc);
         display.value = loc.name || "";
+        // Auto-fill the sibling Label input in the same form with the
+        // picked city's name. The user can then edit it for a custom
+        // display ("Home" instead of "Berlin"); on a subsequent
+        // location pick we'll overwrite again, which is the simpler-
+        // to-explain shape than tracking a per-input "user has
+        // edited" flag.
+        const form = field.closest("form");
+        const labelInput = form
+          ? form.querySelector('[name="opt_label"]')
+          : null;
+        if (labelInput && "value" in labelInput) {
+          labelInput.value = loc.name || "";
+          // Fire input+change on the label input too so the editor's
+          // autosave + preview pickup notice the new value.
+          labelInput.dispatchEvent(new Event("input", { bubbles: true }));
+          labelInput.dispatchEvent(new Event("change", { bubbles: true }));
+        }
         hideResults();
         fireChange();
       }
