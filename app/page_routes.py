@@ -26,6 +26,7 @@ URLs:
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 import uuid
@@ -187,6 +188,39 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
         if raw and raw.startswith("#"):
             return raw
         return field.get("default", "")
+    if ftype == "location_search":
+        # Stored as a JSON-encoded dict in the hidden input. The shape
+        # mirrors Open-Meteo's geocoding response:
+        #   {name, country, admin1, latitude, longitude}
+        # Empty / malformed strings fall back to {}, not the manifest
+        # default (which is "" by convention; we want a real dict so
+        # downstream code can do ``loc.get("latitude")`` without a
+        # type check).
+        if raw is None or raw == "":
+            return {}
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+        if not isinstance(parsed, dict):
+            return {}
+        # Extract just the fields we care about and coerce types, so a
+        # malicious / drifted payload can't slide unexpected keys
+        # through to the renderer.
+        out_loc: dict[str, Any] = {}
+        for key in ("name", "country", "admin1"):
+            val = parsed.get(key)
+            if isinstance(val, str) and val.strip():
+                out_loc[key] = val.strip()
+        import contextlib
+
+        for key in ("latitude", "longitude"):
+            val = parsed.get(key)
+            # missing or malformed coord, just omit it; ``_resolved_options``
+            # then falls back to the global location or constants.
+            with contextlib.suppress(TypeError, ValueError):
+                out_loc[key] = float(val)
+        return out_loc
     return raw if raw is not None else ""
 
 

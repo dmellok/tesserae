@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Now",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "kind": "widget",
   "description": "Current conditions plus feels-like, humidity, wind, UV and sun times. Data from Open-Meteo (no API key required).",
   "icon": "ph-cloud-sun",
@@ -15,22 +15,31 @@
   },
   "cell_options": [
     {
+      "name": "location",
+      "type": "location_search",
+      "label": "Location",
+      "default": "",
+      "help": "Search for a city; the editor stores the matched name + coordinates together. Leave blank to fall back to the manual latitude / longitude / label fields below, or to the server-wide default from Settings → Server → Location."
+    },
+    {
       "name": "latitude",
       "type": "number",
-      "label": "Latitude",
-      "default": ""
+      "label": "Latitude (override)",
+      "default": "",
+      "help": "Optional. Overrides whatever the Location search picked. Decimal degrees."
     },
     {
       "name": "longitude",
       "type": "number",
-      "label": "Longitude",
+      "label": "Longitude (override)",
       "default": ""
     },
     {
       "name": "label",
       "type": "string",
-      "label": "Place label",
-      "default": "Melbourne"
+      "label": "Place label (override)",
+      "default": "",
+      "help": "Optional. Overrides the city name from Location, useful if you want to display 'Home' or similar instead of the city."
     },
     {
       "name": "units",

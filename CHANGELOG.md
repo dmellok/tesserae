@@ -6,6 +6,82 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.12], 2026-06-23
+
+### Added
+
+- **`location_search` cell-option type.** A text input + autocomplete
+  dropdown backed by Open-Meteo's free geocoding endpoint (same
+  provider as Tesserae's weather data, no API key, CC-BY licensed).
+  Users type a city name, see a dropdown of disambiguated matches
+  (city + region + country), and pick one. The chosen result is
+  stored as a dict (``name``, ``country``, ``admin1``, ``latitude``,
+  ``longitude``) in the cell's options.
+- **`weather_now` (v0.1.8 → v0.1.9) migrated to `location_search`.**
+  The primary input is now Location; the legacy ``latitude``,
+  ``longitude``, ``label`` fields remain as **optional overrides**
+  for power users who want raw coordinates or a custom display name
+  (e.g. "Home" instead of "Berlin"). Existing cells with the old
+  three-field shape keep working unchanged: when ``location`` is
+  empty, the resolver falls back to the legacy fields exactly like
+  before.
+- **`_resolved_options` promotion path** in ``app/composer.py``:
+  when a cell has a populated ``location`` dict, the resolver fills
+  in any blank ``latitude`` / ``longitude`` / ``label`` slots from
+  the location's ``latitude`` / ``longitude`` / ``name``. An
+  explicit per-cell value (set in the optional override fields)
+  always beats the location-derived value, so the precedence chain
+  is: per-cell override → location-derived → global app setting →
+  Melbourne fallback constants.
+
+### Fixed (long-standing UX papercut)
+
+- **The "Melbourne" label that wouldn't go away.** The legacy
+  ``label`` cell-option default on the weather widgets used to be
+  the literal string ``"Melbourne"``, so a cell that didn't
+  explicitly set a label rendered "Melbourne" regardless of the
+  actual ``latitude`` / ``longitude``. With the new
+  ``location_search`` shape the default is ``""``, and the
+  location's ``name`` fills the slot if the user hasn't set an
+  explicit override, so picking Berlin from the dropdown actually
+  shows "Berlin" on the card. Filed by Bernhard in
+  [#26](https://github.com/dmellok/tesserae/issues/26).
+
+### Why
+
+The legacy ``latitude`` / ``longitude`` / ``label`` triplet had two
+related papercuts: (a) users had to know decimal degrees and copy
+coords from a separate source, (b) the ``label`` field defaulted to
+the wrong string ("Melbourne") regardless of coords. Combining
+location-name + coords into a single dropdown-driven option removes
+both. Open-Meteo's geocoding is free and licensed compatibly with
+Tesserae's existing usage of their weather API, so no new
+dependency on Mapbox / Google Places / etc.
+
+### Backwards compatibility
+
+Fully backwards compatible:
+
+- Existing cells with the old three-field shape (``latitude``,
+  ``longitude``, ``label``) continue to render exactly as before.
+  No data migration runs.
+- Old plugin manifests that don't declare a ``location`` option
+  load unchanged; the promotion path in ``_resolved_options`` is a
+  no-op when ``location`` is absent.
+- A widget author migrating their plugin to the new option type
+  can declare ``location_search`` alongside the legacy fields; the
+  precedence (per-cell override > location-derived) means a
+  half-migrated install still resolves sensibly.
+
+### Phase 2 (deferred)
+
+The other widgets that share the same lat/lon/label pattern,
+``weather_forecast``, ``weather_hourly``, ``weather_now_scenic``,
+``clock_sunrise_sunset``, plus the community catalog's ``sky_*``
+widgets, still ship the legacy three-field UI. They'll get the
+``location_search`` migration in a follow-up release once Phase 1
+has settled.
+
 ## [0.64.11], 2026-06-23
 
 ### Fixed

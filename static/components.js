@@ -212,6 +212,166 @@
     });
   }
 
+  // ----- Location search ---------------------------------------------
+  //
+  // Wires up the ``location_search`` cell option type: a text input with
+  // debounced autocomplete against Open-Meteo's free geocoding endpoint
+  // (no API key, CC-BY licensed, same provider as Tesserae's weather
+  // data). On select, the chosen result writes JSON into a hidden input
+  // so the form-submit flow demuxes it like any other field.
+  //
+  // The Open-Meteo response shape:
+  //   { results: [
+  //       { id, name, latitude, longitude, country, admin1, admin2, ... }
+  //   ]}
+  // We keep only ``{name, country, admin1, latitude, longitude}`` server
+  // side, see ``_coerce_cell_option`` in app/page_routes.py.
+  function attachLocationSearch(root) {
+    const fields = root.querySelectorAll("[data-location-search]:not([data-location-bound])");
+    fields.forEach((field) => {
+      field.dataset.locationBound = "1";
+      const display = field.querySelector("[data-location-display]");
+      const storage = field.querySelector("[data-location-storage]");
+      const results = field.querySelector("[data-location-results]");
+      const clearBtn = field.querySelector("[data-location-clear]");
+      if (!display || !storage || !results) return;
+
+      let timer = null;
+      let lastQuery = "";
+
+      function hideResults() {
+        results.hidden = true;
+        results.innerHTML = "";
+      }
+
+      function fireChange() {
+        // ``change`` is what editor.js's autosave listens for, so we
+        // synthesise one when the user picks a result. Bubbles so the
+        // form-level listener catches it.
+        storage.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      function selectResult(loc) {
+        storage.value = JSON.stringify(loc);
+        display.value = loc.name || "";
+        hideResults();
+        fireChange();
+      }
+
+      async function search(query) {
+        if (!query || query.length < 2) {
+          hideResults();
+          return;
+        }
+        if (query === lastQuery) return;
+        lastQuery = query;
+        try {
+          const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
+          url.searchParams.set("name", query);
+          url.searchParams.set("count", "5");
+          url.searchParams.set("language", "en");
+          url.searchParams.set("format", "json");
+          const resp = await fetch(url, { credentials: "omit" });
+          if (!resp.ok) {
+            hideResults();
+            return;
+          }
+          const data = await resp.json();
+          const list = (data && data.results) || [];
+          if (!list.length) {
+            results.innerHTML =
+              '<li class="location-search-empty">No matches.</li>';
+            results.hidden = false;
+            return;
+          }
+          results.innerHTML = list
+            .map((r, i) => {
+              // Use index-based id so we can read the chosen result back
+              // out of ``list`` on click without re-parsing.
+              const parts = [r.name];
+              if (r.admin1 && r.admin1 !== r.name) parts.push(r.admin1);
+              if (r.country) parts.push(r.country);
+              const label = parts.join(", ");
+              return (
+                '<li class="location-search-result" tabindex="0" data-idx="' +
+                i +
+                '">' +
+                '<i class="ph ph-map-pin" aria-hidden="true"></i>' +
+                '<span class="location-search-result-label">' +
+                _escapeHtml(label) +
+                "</span>" +
+                "</li>"
+              );
+            })
+            .join("");
+          results.hidden = false;
+          // Pre-bind click handlers, scoped to this batch of results so
+          // a stale list doesn't fire selectResult against the wrong list.
+          results.querySelectorAll("[data-idx]").forEach((row) => {
+            row.addEventListener("click", () => {
+              const i = parseInt(row.dataset.idx || "0", 10);
+              const r = list[i];
+              if (!r) return;
+              selectResult({
+                name: r.name,
+                country: r.country || "",
+                admin1: r.admin1 || "",
+                latitude: r.latitude,
+                longitude: r.longitude,
+              });
+            });
+            row.addEventListener("keydown", (ev) => {
+              if (ev.key === "Enter") {
+                ev.preventDefault();
+                row.click();
+              }
+            });
+          });
+        } catch (err) {
+          // Network-level fail: silently hide rather than show a
+          // confusing error. The user just keeps typing.
+          console.warn("[location_search] geocoding fetch failed:", err);
+          hideResults();
+        }
+      }
+
+      display.addEventListener("input", () => {
+        clearTimeout(timer);
+        const q = display.value.trim();
+        timer = setTimeout(() => search(q), 300);
+      });
+
+      display.addEventListener("blur", () => {
+        // Delay so a click on a result row registers before the dropdown
+        // hides. 200ms matches the typical click latency.
+        setTimeout(hideResults, 200);
+      });
+
+      display.addEventListener("focus", () => {
+        if (results.innerHTML) results.hidden = false;
+      });
+
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          storage.value = "";
+          display.value = "";
+          hideResults();
+          lastQuery = "";
+          fireChange();
+        });
+      }
+    });
+  }
+
+  function _escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
   // Initial attach on DOMContentLoaded; re-attach when the editor reloads
   // its preview iframe (a side-effect of a save).
   function init() {
@@ -219,6 +379,7 @@
     attachPreviewFit(document);
     attachSendFitPreview(document);
     attachPresetNumbers(document);
+    attachLocationSearch(document);
     attachLightbox();
   }
 
@@ -236,6 +397,7 @@
     attachPreviewFit,
     attachSendFitPreview,
     attachPresetNumbers,
+    attachLocationSearch,
     fitPreview,
   };
 })();

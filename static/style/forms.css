@@ -1293,3 +1293,90 @@ input[type="range"].slider:focus::-moz-range-thumb {
 .transport-radio-body strong { font-size: 15px; }
 .transport-radio-body .muted { font-size: 13px; }
 .wizard-broker-mqtt-fields[hidden] { display: none; }
+
+/* ----- Location search -------------------------------------------------
+   Used by the ``location_search`` cell option type. Layout mirrors the
+   ``.multiselect`` block above: search input on top, autocomplete list
+   beneath as an absolutely-positioned dropdown so it doesn't reflow the
+   surrounding form. Static/components.js attaches the behaviour. */
+.field--location-search { position: relative; }
+.location-search-input {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  border: 1px solid var(--t-border, #d0d3da);
+  border-radius: var(--t-radius-sm);
+  padding: 0 var(--t-space-3);
+  background: var(--t-surface, #fff);
+}
+.location-search-input:focus-within {
+  border-color: var(--t-accent, #1c5cd6);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--t-accent, #1c5cd6) 18%, transparent);
+}
+.location-search-input .ph { color: var(--t-fg-muted, #6b7280); font-size: 16px; }
+.location-search-display {
+  flex: 1;
+  border: none;
+  outline: none;
+  padding: var(--t-space-2) 0;
+  background: transparent;
+  font: inherit;
+  color: var(--t-fg, #1a1d23);
+}
+.location-search-clear {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--t-fg-muted, #6b7280);
+  padding: 4px;
+  border-radius: var(--t-radius-sm);
+  display: inline-flex;
+  align-items: center;
+}
+.location-search-clear:hover { background: var(--t-surface-sunken, #f4f5f7); color: var(--t-fg, #1a1d23); }
+.location-search-results {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--t-surface, #fff);
+  border: 1px solid var(--t-border, #d0d3da);
+  border-radius: var(--t-radius-sm);
+  box-shadow: 0 8px 24px -8px color-mix(in srgb, black 18%, transparent);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.location-search-result {
+  display: flex;
+  align-items: center;
+  gap: var(--t-space-2);
+  padding: var(--t-space-2) var(--t-space-3);
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--t-fg, #1a1d23);
+}
+.location-search-result:hover,
+.location-search-result:focus {
+  background: color-mix(in srgb, var(--t-accent, #1c5cd6) 8%, transparent);
+  outline: none;
+}
+.location-search-result .ph { color: var(--t-accent, #1c5cd6); font-size: 14px; }
+.location-search-empty {
+  padding: var(--t-space-3);
+  font-size: 13px;
+  color: var(--t-fg-muted, #6b7280);
+  list-style: none;
+  margin: 0;
+}
+.location-search-current {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: var(--t-space-2) 0 0;
+}
+.location-search-current .ph { font-size: 12px; }

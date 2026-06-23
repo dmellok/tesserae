@@ -71,6 +71,39 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
         return dict(raw)
     merged: dict[str, Any] = plugin.cell_option_defaults()
     merged.update(raw)
+    # Promote a ``location_search`` dict into the legacy
+    # ``latitude``/``longitude``/``label`` triplet when the user picked a
+    # city in the editor. This is the resolution path for widgets that
+    # have migrated to the ``location_search`` option type, the legacy
+    # fields (if still declared on the manifest) become last-resort
+    # overrides for power users who want raw coordinates.
+    location = merged.get("location")
+    if isinstance(location, dict) and location:
+        lat = location.get("latitude")
+        lon = location.get("longitude")
+        loc_name = location.get("name")
+        if (
+            isinstance(lat, (int, float))
+            and "latitude" in merged
+            and merged["latitude"]
+            in (
+                None,
+                "",
+            )
+        ):
+            merged["latitude"] = float(lat)
+        if (
+            isinstance(lon, (int, float))
+            and "longitude" in merged
+            and merged["longitude"]
+            in (
+                None,
+                "",
+            )
+        ):
+            merged["longitude"] = float(lon)
+        if isinstance(loc_name, str) and loc_name and "label" in merged and not merged.get("label"):
+            merged["label"] = loc_name
     # Fill blank latitude/longitude from the global location so the
     # weather / sky / sunrise widgets don't each re-enter coordinates. An
     # explicit per-cell value always wins (it's non-blank here).

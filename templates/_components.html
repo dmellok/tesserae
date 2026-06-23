@@ -215,6 +215,54 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
+{#- Location search: a text input + autocomplete dropdown that calls
+   Open-Meteo's free geocoding endpoint and stores the chosen result
+   as a JSON-encoded dict in a hidden input. The dict shape is what the
+   server reads from ``opt_<name>``, mirroring Open-Meteo's response:
+   ``{name, country, admin1, latitude, longitude}``.
+
+   The display input (visible, not submitted) is what the user types
+   and clicks. The hidden storage input (submitted to the server)
+   carries the selection. JS lives in
+   ``static/components.js#attachLocationSearch``. -#}
+{%- macro location_search_field(field_id, name, label, value=None, help=None) -%}
+  {#- ``value`` arrives as either an empty string (manifest default
+     ``""``), a dict (loaded from cell.options after a save), or
+     the empty dict ``{}``. The hidden input wants JSON either way;
+     normalise via tojson. The display string is the location's
+     ``name`` if we have it, or empty. -#}
+  {%- set is_dict = value is mapping and value -%}
+  {%- set display_str = (value.name if is_dict and value.name else '') -%}
+  {%- set hidden_json = (value | tojson) if is_dict else '' -%}
+<div class="field field--location-search" data-location-search>
+  <label for="{{ field_id }}-display">{{ label }}{{ info_pop(help) }}</label>
+  <div class="location-search-input">
+    <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+    <input type="text" id="{{ field_id }}-display"
+           class="location-search-display" data-location-display
+           value="{{ display_str }}"
+           placeholder="Type a city, e.g. Berlin, Melbourne, Tokyo"
+           autocomplete="off" spellcheck="false">
+    {% if is_dict %}
+    <button type="button" class="location-search-clear" data-location-clear
+            aria-label="Clear location">
+      <i class="ph ph-x" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+  </div>
+  <input type="hidden" name="{{ name }}" data-location-storage
+         value="{{ hidden_json }}">
+  <ul class="location-search-results" data-location-results hidden></ul>
+  {%- if is_dict and value.latitude is defined -%}
+  <p class="location-search-current muted">
+    <i class="ph ph-map-pin" aria-hidden="true"></i>
+    {{ value.name }}{% if value.admin1 %}, {{ value.admin1 }}{% endif %}{% if value.country %}, {{ value.country }}{% endif %}
+    · {{ '%.4f'|format(value.latitude) }}, {{ '%.4f'|format(value.longitude) }}
+  </p>
+  {%- endif -%}
+</div>
+{%- endmacro -%}
+
 {#- Multi-select: a searchable checklist. ``value`` is the selected list
    (tolerates a bare string / None); ``options`` is [{value,label}], as
    produced by a plugin's choices(). An option with an empty value is
@@ -380,6 +428,8 @@ macro here instead.
                                 help=help_text) }}
   {% elif ftype == 'entity_overrides' %}
     {{ entity_overrides_field(field_id, name, label, value=value, help=help_text) }}
+  {% elif ftype == 'location_search' %}
+    {{ location_search_field(field_id, name, label, value=value, help=help_text) }}
   {% elif ftype == 'slider' %}
     {{ slider(field_id, name, label,
               value=value if value is not none else spec.get('default', 0),
