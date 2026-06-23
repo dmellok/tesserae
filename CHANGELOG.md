@@ -6,6 +6,48 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.9], 2026-06-23
+
+### Added
+
+- **`/status` response carries resolved local-time fields.** The
+  heartbeat response (``POST /api/v1/device/<id>/status``) now
+  includes ``local_time`` (ISO 8601 with offset), ``tz`` (IANA
+  name actually used), ``tz_offset_seconds``, and ``dst_active``
+  alongside the existing ``status`` / ``config`` / ``next_poll_s``
+  / ``server_time``. The client's heartbeat body can optionally
+  include ``tz`` to pick the zone; absent / invalid falls through
+  silently to the server's configured ``settings.app.timezone``
+  and then to the host's TZ.
+- **Spec doc: "Client guarantees" section** in
+  ``docs/dev/client-protocol.md`` anchoring the thin-client design
+  principle. Future protocol changes get tested against the list
+  (no RTC required, no IANA db, no NTP, no schedule math, no
+  locale formatting).
+
+### Why
+
+The generic CircuitPython client work (collaborator: bablokb /
+Bernhard in [discussion #24](https://github.com/dmellok/tesserae/discussions/24))
+hit the constraint that memory-constrained embedded clients can't
+carry the IANA timezone database (~200 KB of flash) or a DST rule
+engine. Server-resolved local time is the only sane path. The
+existing ``server_time`` is UTC; clients still needed to do the
+zone + DST math on every wake. The new fields hand them
+everything pre-resolved.
+
+### Backwards compatibility
+
+Fully compatible:
+
+- Existing clients that don't read the new fields silently ignore
+  them (per the "clients ignore unknown fields" rule already in
+  the spec).
+- Existing clients that don't send ``tz`` in the heartbeat get the
+  server's TZ fallback, same as if they'd never asked.
+- The request shape is unchanged for any caller that ignores the
+  new optional field.
+
 ## [0.64.8], 2026-06-22
 
 ### Fixed

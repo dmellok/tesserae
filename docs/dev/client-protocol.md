@@ -38,6 +38,36 @@ ready, the server either:
 The two paths share the same envelope shape, same auth, same frame
 artefacts. Picking one isn't a permanent commitment.
 
+## Client guarantees
+
+The protocol is designed for thin clients. Your firmware
+**does not need**:
+
+- A real-time clock. The server renders the frame with the device's
+  local time baked in; the `/status` response also carries
+  `local_time` for any client-side display or logging needs.
+- An IANA timezone database or DST rule engine. Send your IANA name
+  (e.g. `Europe/Berlin`) in the heartbeat `tz` field; the server
+  resolves and returns local time, offset, and a DST flag.
+- An NTP client. The same `local_time` + `tz_offset_seconds`
+  response fields are sufficient to set or align an external RTC
+  if you have one.
+- A schedule resolver. The server tells you exactly how long to
+  sleep via `next_poll_s`. You don't compute "wake at 8am local" or
+  "quiet hours"; the server returns the resolved seconds.
+- Locale-aware date / time formatting. The server resolves
+  everything time-related and hands you strings.
+
+Future protocol changes get tested against this principle: if a
+new feature would force the client to compute something time-,
+locale-, or schedule-related, the server should do it instead.
+
+What only the client knows (and must report):
+
+- Battery (mV or %), RSSI, IP, MAC, firmware version
+- Last paint timing / errors (`/log`)
+- The device's IANA tz, if it's a different zone from the server
+
 ## Discovery and pairing
 
 Every device gets a per-device bearer token (32+ random bytes,
@@ -265,6 +295,7 @@ always-on).
   "battery_pct": 45,
   "rssi": -72,
   "ip": "192.168.1.100",
+  "tz": "Europe/Berlin",
   "sleep_until": 1687000000.5,
   "next_sleep_s": 3600
 }
@@ -275,7 +306,11 @@ preserve last-known fields. If `battery_mv` is sent but `battery_pct`
 isn't, the server derives `battery_pct` from a linear LiPo curve
 (3300 mV = 0 %, 4200 mV = 100 %). `sleep_until` / `next_sleep_s`
 feed the JIT scheduler (so smart-sync can render *just before*
-wake instead of on a fixed cadence).
+wake instead of on a fixed cadence). `tz` is an IANA timezone name
+(e.g. `Europe/Berlin`); when present, the response carries
+resolved local-time fields so memory-constrained clients don't
+have to ship the IANA tz database. Invalid or unrecognised names
+silently fall through to the server's configured timezone.
 
 **Response** (`200 OK`):
 ```json
@@ -283,7 +318,11 @@ wake instead of on a fixed cadence).
   "status": 200,
   "config": { "sleep_interval_s": 300 },
   "next_poll_s": 300,
-  "server_time": 1687000060.123
+  "server_time": 1687000060.123,
+  "local_time": "2026-06-22T19:00:00+02:00",
+  "tz": "Europe/Berlin",
+  "tz_offset_seconds": 7200,
+  "dst_active": true
 }
 ```
 
@@ -293,8 +332,28 @@ wake instead of on a fixed cadence).
 - `next_poll_s`: how long the firmware should sleep before the next
   status POST. Resolves in priority order: device-instance settings →
   kind-schema default → fallback 60.
-- `server_time`: Unix epoch float. Useful for RTC sync on devices
-  without a battery-backed clock.
+- `server_time`: Unix epoch float (UTC). Useful for RTC sync on
+  devices without a battery-backed clock.
+- `local_time`: ISO 8601 string with offset suffix, resolved for the
+  device's effective timezone (precedence below). Clients without an
+  RTC just use this directly.
+- `tz`: IANA name the server actually used to resolve. Echoes the
+  client's heartbeat `tz` when it's a recognised IANA name; falls
+  back silently to the server's configured `settings.app.timezone`,
+  then the host's TZ, then `UTC` as the last-resort. A client that
+  sent `tz: "Berlin"` (no continent prefix) sees `tz: "UTC"` or the
+  server's own zone come back, which is the signal to widen its
+  guess next time.
+- `tz_offset_seconds`: integer offset from UTC in seconds (positive
+  east of UTC). Lets RTC-equipped clients cache the rule and derive
+  local time on intermediate wakes between heartbeats.
+- `dst_active`: true if daylight saving was in effect at the moment
+  the response was assembled. Informational; combined with the
+  offset it lets a smarter client predict the next DST transition.
+
+The local-time fields are always present in the response regardless
+of whether the heartbeat sent `tz`. A pre-existing client that doesn't
+know about them just ignores the extra keys; pay-for-what-you-use.
 
 ### `POST /api/v1/device/<id>/log` (optional)
 

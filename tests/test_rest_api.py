@@ -337,6 +337,88 @@ def test_status_response_includes_config_and_next_poll(app: Flask) -> None:
     assert record["received_at"] > 0
 
 
+def test_status_response_carries_local_time_fields(app: Flask) -> None:
+    """The ``/status`` response carries resolved local-time fields so
+    memory-constrained clients (CircuitPython, MicroPython) don't have
+    to ship the IANA tz database. ``tz`` in the heartbeat body picks
+    the resolution zone; absent / invalid → server's setting / system.
+
+    Four fields are always present in the response: ``local_time`` (ISO
+    8601 with offset), ``tz`` (echo of what was actually used),
+    ``tz_offset_seconds`` (so RTC-equipped clients can derive without
+    round-trips), and ``dst_active`` (informational)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="tz_pico")
+    token = resp.get_json()["device_token"]
+
+    # Heartbeat-sent IANA tz wins. Berlin in June = AEDT (CEST), UTC+2,
+    # DST active.
+    resp = client.post(
+        "/api/v1/device/tz_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 50, "tz": "Europe/Berlin"}),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["tz"] == "Europe/Berlin"
+    assert body["tz_offset_seconds"] == 7200  # +02:00
+    assert body["dst_active"] is True
+    # ISO 8601 with offset suffix; +02:00 for Berlin in summer.
+    assert "+02:00" in body["local_time"]
+
+
+def test_status_response_falls_back_when_tz_is_invalid(app: Flask) -> None:
+    """A garbled IANA name in the heartbeat doesn't break the response
+    or surface as an error; it silently falls through to the server's
+    settings / system tz, and the response echoes what was used."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="badtz_pico")
+    token = resp.get_json()["device_token"]
+
+    resp = client.post(
+        "/api/v1/device/badtz_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 50, "tz": "Not/A_Real_Zone"}),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    # tz field always present + always a real IANA name (or UTC).
+    assert isinstance(body["tz"], str) and body["tz"]
+    assert isinstance(body["tz_offset_seconds"], int)
+    assert isinstance(body["dst_active"], bool)
+    # local_time is a parseable ISO 8601 string.
+    from datetime import datetime
+
+    datetime.fromisoformat(body["local_time"])  # raises if malformed
+
+
+def test_status_response_local_time_fields_optional_request(app: Flask) -> None:
+    """A heartbeat that doesn't send ``tz`` still gets the four
+    local-time fields back; server falls back to its own setting /
+    system tz. Existing clients that pre-date the addition pay nothing."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="notz_pico")
+    token = resp.get_json()["device_token"]
+
+    resp = client.post(
+        "/api/v1/device/notz_pico/status",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"battery_pct": 50}),
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert "local_time" in body
+    assert "tz" in body and isinstance(body["tz"], str) and body["tz"]
+    assert "tz_offset_seconds" in body
+    assert "dst_active" in body
+
+
 def test_rest_status_updates_received_at_so_last_seen_is_fresh(app: Flask) -> None:
     """v0.53 regression: a REST device heartbeat must write
     ``received_at`` to the status cache so the Devices admin page's

@@ -125,6 +125,58 @@ def _settings() -> SettingsStore:
     return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
 
 
+def _resolve_local_time_fields(request_tz: str) -> dict[str, Any]:
+    """Build the local-time field set that gets added to the /status
+    response so memory-constrained clients (CircuitPython, MicroPython,
+    bare-metal MCU firmware) don't have to carry the IANA tzdata or
+    a DST rule engine.
+
+    Precedence for the effective timezone:
+
+    1. ``request_tz`` if the device sent one in its heartbeat
+    2. ``settings.app.timezone`` set during onboarding
+    3. Server's auto-detected TZ (``TZ`` env var or ``/etc/localtime``)
+    4. ``UTC`` as the last-resort fallback
+
+    Returns four fields:
+
+    * ``local_time`` (ISO 8601 with offset) for clients without an RTC
+      that just want to set / display the moment
+    * ``tz`` echoes which IANA name was actually used (so a client can
+      detect that its sent tz was invalid and fell back)
+    * ``tz_offset_seconds`` + ``dst_active`` for clients WITH an RTC,
+      to derive local time on intermediate wakes without round-trips
+
+    See ``docs/dev/client-protocol.md`` for the client-side contract.
+    """
+    import zoneinfo
+    from datetime import datetime, timedelta
+
+    from app.telemetry import _resolve_iana_timezone
+
+    settings_app = _settings().get_section("app") or {}
+    server_app_tz = str(settings_app.get("timezone", ""))
+
+    resolved = _resolve_iana_timezone(request_tz or server_app_tz or "system") or "UTC"
+    try:
+        zone = zoneinfo.ZoneInfo(resolved)
+    except zoneinfo.ZoneInfoNotFoundError:
+        # Belt and braces. ``_resolve_iana_timezone`` already validates
+        # against ``available_timezones()`` so this should only fire if
+        # tzdata is being live-refreshed under us.
+        resolved = "UTC"
+        zone = zoneinfo.ZoneInfo("UTC")
+
+    now = datetime.now(tz=zone)
+    offset = now.utcoffset() or timedelta(0)
+    return {
+        "local_time": now.isoformat(timespec="seconds"),
+        "tz": resolved,
+        "tz_offset_seconds": int(offset.total_seconds()),
+        "dst_active": bool(now.dst()),
+    }
+
+
 def _events() -> EventLog | None:
     return current_app.config.get("EVENT_LOG")
 
@@ -354,14 +406,29 @@ def post_status(device_id: str) -> Response:
             event_target=f"rest://{device.id}/status",
         )
 
-    return jsonify(
-        {
-            "status": 200,
-            "config": _current_config(device),
-            "next_poll_s": _next_poll_s(device),
-            "server_time": time.time(),
-        }
-    )
+    # Optional ``tz`` field in the heartbeat body lets a client tell
+    # the server its IANA timezone so the response can carry resolved
+    # local-time fields back. Memory-constrained CircuitPython /
+    # MicroPython clients use this in place of carrying the IANA db
+    # locally; the response shape is documented in client-protocol.md.
+    # ``force=True`` accepts any content-type that's still valid JSON
+    # so a client that sends ``text/plain; charset=utf-8`` (some HTTP
+    # libs default to that) still gets parsed.
+    body = request.get_json(silent=True, force=True) or {}
+    request_tz = ""
+    if isinstance(body, dict):
+        raw_tz = body.get("tz", "")
+        if isinstance(raw_tz, str):
+            request_tz = raw_tz.strip()
+
+    response = {
+        "status": 200,
+        "config": _current_config(device),
+        "next_poll_s": _next_poll_s(device),
+        "server_time": time.time(),
+        **_resolve_local_time_fields(request_tz),
+    }
+    return jsonify(response)
 
 
 # -- log -----------------------------------------------------------------
