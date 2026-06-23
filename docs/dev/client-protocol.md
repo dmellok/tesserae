@@ -46,9 +46,13 @@ The protocol is designed for thin clients. Your firmware
 - A real-time clock. The server renders the frame with the device's
   local time baked in; the `/status` response also carries
   `local_time` for any client-side display or logging needs.
-- An IANA timezone database or DST rule engine. Send your IANA name
-  (e.g. `Europe/Berlin`) in the heartbeat `tz` field; the server
-  resolves and returns local time, offset, and a DST flag.
+- An IANA timezone database or DST rule engine. The server already
+  knows its timezone (set during onboarding) and returns local time
+  / offset / DST flag in every `/status` response without you having
+  to tell it anything. A heartbeat `tz` field exists as an *override*
+  for the rare case where the device knows its zone better than the
+  server (mobile / geo-aware firmware, multi-zone install), but the
+  common case doesn't need it.
 - An NTP client. The same `local_time` + `tz_offset_seconds`
   response fields are sufficient to set or align an external RTC
   if you have one.
@@ -66,7 +70,8 @@ What only the client knows (and must report):
 
 - Battery (mV or %), RSSI, IP, MAC, firmware version
 - Last paint timing / errors (`/log`)
-- The device's IANA tz, if it's a different zone from the server
+- (Edge case) The device's IANA tz, *if and only if* the device
+  knows its zone better than the server does. Most installs don't.
 
 ## Discovery and pairing
 
@@ -295,7 +300,6 @@ always-on).
   "battery_pct": 45,
   "rssi": -72,
   "ip": "192.168.1.100",
-  "tz": "Europe/Berlin",
   "sleep_until": 1687000000.5,
   "next_sleep_s": 3600
 }
@@ -306,11 +310,15 @@ preserve last-known fields. If `battery_mv` is sent but `battery_pct`
 isn't, the server derives `battery_pct` from a linear LiPo curve
 (3300 mV = 0 %, 4200 mV = 100 %). `sleep_until` / `next_sleep_s`
 feed the JIT scheduler (so smart-sync can render *just before*
-wake instead of on a fixed cadence). `tz` is an IANA timezone name
-(e.g. `Europe/Berlin`); when present, the response carries
-resolved local-time fields so memory-constrained clients don't
-have to ship the IANA tz database. Invalid or unrecognised names
-silently fall through to the server's configured timezone.
+wake instead of on a fixed cadence).
+
+An optional `tz` field accepts an IANA name (e.g. `Europe/Berlin`)
+when the device knows its zone better than the server (mobile
+firmware, geo-aware setups, multi-zone installs). The common case
+doesn't need to send it: the server already resolves into its
+own configured timezone (set during onboarding) and returns the
+local-time fields described below regardless. Invalid or
+unrecognised names fall through silently.
 
 **Response** (`200 OK`):
 ```json
@@ -337,13 +345,14 @@ silently fall through to the server's configured timezone.
 - `local_time`: ISO 8601 string with offset suffix, resolved for the
   device's effective timezone (precedence below). Clients without an
   RTC just use this directly.
-- `tz`: IANA name the server actually used to resolve. Echoes the
-  client's heartbeat `tz` when it's a recognised IANA name; falls
-  back silently to the server's configured `settings.app.timezone`,
-  then the host's TZ, then `UTC` as the last-resort. A client that
-  sent `tz: "Berlin"` (no continent prefix) sees `tz: "UTC"` or the
-  server's own zone come back, which is the signal to widen its
-  guess next time.
+- `tz`: IANA name the server actually used to resolve. Resolution
+  precedence: server's configured `settings.app.timezone` (set
+  during onboarding, the common case), then the host's auto-detected
+  TZ, then `UTC` as the last-resort. A heartbeat-sent `tz` overrides
+  all of the above when present and valid; if a sent `tz` is
+  garbled (e.g. `"Berlin"` without the continent prefix), the
+  response echoes whichever zone was actually used so the client
+  can detect its guess failed.
 - `tz_offset_seconds`: integer offset from UTC in seconds (positive
   east of UTC). Lets RTC-equipped clients cache the rule and derive
   local time on intermediate wakes between heartbeats.
