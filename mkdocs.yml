@@ -104,5 +104,6 @@ nav:
       - Design brief template: widget-design-brief.md
   - Client development:
       - Client protocol spec: dev/client-protocol.md
+      - OpenAPI spec & SDK generation: dev/openapi.md
   - Privacy & telemetry: privacy.md
   - Credits: credits.md

@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.18], 2026-06-24
+
+### Added
+
+- **Docs page for the OpenAPI spec at [`docs/dev/openapi.md`](dev/openapi.md).**
+  Walks through what the spec covers, what's deliberately not in it,
+  copy-pasteable ``openapi-generator`` / ``kiota`` commands for
+  Python / TS / Go / Rust, the six security schemes side-by-side,
+  the bootstrap flow for a native REST client (MAC auto-claim vs
+  pairing code), a worked cron + curl webhook example, and the
+  versioning policy. Two buttons at the top open the spec live in
+  Swagger Editor or Redoc with the file pre-loaded from
+  raw.githubusercontent.com, so a reader can click through to the
+  interactive reference without installing anything. Linked into
+  the wiki nav under Client development alongside the existing
+  client-protocol spec.
+
 ## [0.64.17], 2026-06-24
 
 ### Added
