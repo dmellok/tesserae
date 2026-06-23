@@ -434,6 +434,38 @@ def post_status(device_id: str) -> Response:
 # -- log -----------------------------------------------------------------
 
 
+# Max stored msg length. Tracebacks easily exceed the pre-v0.64.20
+# 512-byte cap (a typical MicroPython traceback is 1-3 KB); 4 KB
+# covers them without giving a noisy client room to flood the
+# EventLog one entry at a time.
+_LOG_MSG_CAP = 4096
+
+
+def _coerce_log_msg(raw: Any) -> str:
+    """Accept either a string or a list of strings (typically a
+    pre-split traceback from ``traceback.format_exception()``).
+
+    Memory-constrained MicroPython / CircuitPython clients can pass
+    the traceback list directly rather than allocating a single
+    joined string on-device, which is most useful exactly when the
+    device is mid-exception and the heap is tightest. Joined
+    server-side with newlines so the EventLog still holds one string
+    per row.
+
+    Backwards-compatible with the pre-v0.64.20 ``str``-only shape:
+    a string passes through ``str()`` unchanged. The 512-byte cap
+    was raised to 4 KB at the same time, see ``_LOG_MSG_CAP``."""
+    if isinstance(raw, list):
+        # Join in two passes so we never materialise a 100 KB string
+        # before deciding to truncate. ``min(len, cap+1)`` cheaply
+        # detects "would have overflowed" without storing the bytes.
+        joined = "\n".join(str(line) for line in raw if line is not None)
+        return joined[:_LOG_MSG_CAP]
+    if raw is None:
+        return ""
+    return str(raw)[:_LOG_MSG_CAP]
+
+
 @bp.post("/<device_id>/log")
 def post_log(device_id: str) -> Response:
     """Optional client-side log line. Persisted to the EventLog so the
@@ -454,7 +486,7 @@ def post_log(device_id: str) -> Response:
     events = _events()
     if events is not None:
         level = str(body.get("level") or "info")[:32]
-        msg = str(body.get("msg") or "")[:512]
+        msg = _coerce_log_msg(body.get("msg"))
         extra = {k: v for k, v in body.items() if k not in ("level", "msg")}
         events.record(
             type="device",

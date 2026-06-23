@@ -971,8 +971,21 @@ components:
           enum: [debug, info, warn, error]
           default: info
         msg:
-          type: string
-          maxLength: 512
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+              description: |
+                List form, mostly useful for memory-constrained
+                MicroPython / CircuitPython clients that already have
+                the data as a list (e.g. ``traceback.format_exception()``
+                output). Joined server-side with newlines into a
+                single EventLog row.
+          description: |
+            Human-readable log line. Either a single string or a
+            list of strings; the list form is joined with newlines
+            on the server. Capped at 4 KB after joining.
       additionalProperties: true
 
     DiscoverRequest:

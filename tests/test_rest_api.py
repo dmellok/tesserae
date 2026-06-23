@@ -734,6 +734,62 @@ def test_log_endpoint_appends_to_event_log(app: Flask) -> None:
     assert matches[0].extra.get("msg") == "panel busy timeout"
 
 
+def test_log_endpoint_accepts_list_msg_and_joins_with_newlines(app: Flask) -> None:
+    """Memory-constrained MicroPython / CircuitPython clients can
+    POST ``msg`` as a list of strings (typically
+    ``traceback.format_exception()`` output) instead of joining
+    them on-device, which would force an extra heap allocation at
+    exactly the moment they most want to log, mid-exception."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    lines = [
+        "Traceback (most recent call last):",
+        '  File "main.py", line 42, in <module>',
+        "    paint(frame)",
+        "RuntimeError: panel busy",
+    ]
+    resp = client.post(
+        "/api/v1/device/bedroom_pico/log",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"level": "error", "msg": lines}),
+    )
+    assert resp.status_code == 200
+    events = app.config["EVENT_LOG"]
+    rows = events.list(type="device", limit=10)
+    matches = [r for r in rows if r.target == "client_log" and r.source == "bedroom_pico"]
+    assert matches, "no client_log event recorded"
+    assert matches[0].extra.get("msg") == "\n".join(lines)
+    # Error-level entries also flow into the row's ``error`` slot.
+    assert matches[0].error == "\n".join(lines)
+
+
+def test_log_endpoint_caps_oversized_msg_at_4kb(app: Flask) -> None:
+    """A noisy client can't flood the EventLog one entry at a time:
+    msg is capped at 4 KB (post-join for list inputs)."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    huge = "x" * 10_000
+    resp = client.post(
+        "/api/v1/device/bedroom_pico/log",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"level": "info", "msg": huge}),
+    )
+    assert resp.status_code == 200
+    events = app.config["EVENT_LOG"]
+    rows = events.list(type="device", limit=10)
+    matches = [r for r in rows if r.target == "client_log" and r.source == "bedroom_pico"]
+    assert matches
+    assert len(matches[0].extra.get("msg")) == 4096
+
+
 # -- CORS ---------------------------------------------------------------
 
 

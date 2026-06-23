@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.20], 2026-06-24
+
+### Changed
+
+- **``POST /api/v1/device/<id>/log`` now accepts ``msg`` as either
+  a string or a list of strings.** Memory-constrained MicroPython /
+  CircuitPython clients can pass a pre-split traceback (e.g.
+  ``traceback.format_exception()`` output) directly instead of
+  allocating a single joined string on-device, which is most useful
+  exactly when the device is mid-exception and the heap is
+  tightest. Lists are joined server-side with ``\n`` so the
+  EventLog still holds one string per row.
+- **Raised the ``msg`` cap from 512 B to 4 KB.** A typical Python
+  traceback is 1-3 KB and was being silently clipped under the old
+  cap; 4 KB covers them without giving a noisy client room to
+  flood the log one entry at a time.
+
+Both changes are backwards compatible. Existing firmware sending
+``msg`` as a string sees no behavioural change; only the cap moved,
+which is a strict relaxation.
+
+Suggested by Bernhard ([@bablokb](https://github.com/bablokb)) when
+porting his CircuitPython client.
+
 ## [0.64.19], 2026-06-24
 
 ### Changed
