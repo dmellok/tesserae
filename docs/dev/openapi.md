@@ -110,24 +110,27 @@ Each operation tags which ones it accepts.
 
 ### Bootstrap flow for a native REST client
 
-A device needs an `access_token` before it can fetch frames. Two
-paths:
+A device needs an `access_token` before it can fetch frames. **You
+never type one in.** The default flow is:
 
-1. **MAC auto-claim via `/discover`**. The firmware POSTs its MAC in
-   the body; if the admin has already created a device instance with
-   that MAC, the response carries the token straight away. Otherwise
-   the device lands in the **Discovered** strip on Settings ->
-   Devices, the admin one-click-pairs, and the next `/discover`
-   poll returns the token. No human-readable code typed into a
-   firmware config screen.
-2. **6-digit pairing code via `/register`**. The admin generates a
-   code under Settings -> Devices -> Pair, the user types it into
-   the firmware, the firmware POSTs `X-Pairing-Code: <code>` with
-   its declared `device_id` + `kind`, and gets the token back. The
-   code is single-use with a 15-minute TTL.
+1. Firmware boots, has no token, POSTs `/api/v1/device/discover`
+   with its MAC.
+2. Device appears in the **Discovered** strip on Settings →
+   Devices.
+3. Admin clicks **Register** once.
+4. On the firmware's next discover poll (default 30 s later), the
+   server recognises the MAC and returns the token in the response.
+5. Firmware persists the token in flash and sends it as
+   `Authorization: Bearer <token>` on every subsequent call. The
+   user never sees it.
 
-Either way, store the token in flash and send it as
-`Authorization: Bearer <token>` on every subsequent call.
+For environments where the admin can't be at the UI when the
+device boots, sealed appliances, BLE provisioning, kiosk mode,
+there's a fallback: pre-mint a 6-digit pairing code under
+Settings → Devices → Pair, type it into the firmware setup form,
+and the firmware POSTs `/api/v1/device/register` with
+`X-Pairing-Code: <code>` instead of `/discover`. Same end state, no
+admin click required. This path is the exception, not the default.
 
 ## Worked example: trigger a webhook push from cron
 

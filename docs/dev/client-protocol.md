@@ -78,11 +78,20 @@ What only the client knows (and must report):
 Every device gets a per-device bearer token (32+ random bytes,
 constant-time compared). Tokens live in the instance manifest
 server-side; clients store them in persistent flash / NVS / secrets.
-There are three ways to acquire one.
+
+A user never has to type a token by hand. The default flow is the
+zero-touch one below (path A): firmware announces itself, the admin
+clicks **Register** in the UI once, Tesserae returns the token on
+the firmware's next discover poll. The pairing-code path (B) is a
+fallback for environments where the admin can't be at the UI when
+the device boots; the MAC auto-claim path (C) covers a re-flashed
+device that needs to re-acquire its existing token.
 
 ### A. Zero-touch discovery + admin approval
 
-For first-time setup when the device doesn't yet have a token.
+The default first-boot path. Firmware doesn't need a token, a code,
+or any user-supplied credential at flash time, just the Tesserae
+server URL.
 
 1. Firmware boots, has no token. POSTs identity to
    `/api/v1/device/discover` (no auth):
@@ -124,10 +133,13 @@ For first-time setup when the device doesn't yet have a token.
    ```
 5. Firmware saves the token, drops into the steady-state loop.
 
-### B. 6-digit pairing code
+### B. 6-digit pairing code (fallback)
 
-For environments where the admin can read a code into the device
-ahead of time (BLE provisioning, QR pre-print, kiosk mode).
+For environments where the admin can't be at the UI when the device
+boots, sealed appliances, BLE provisioning, QR pre-print, kiosk
+mode. The admin pre-mints a code, types it into the firmware setup
+form, and the firmware self-registers without a follow-up admin
+click.
 
 1. Admin generates a code in Settings → Devices → "Pair new device"
    (server route: `POST /api/v1/device/admin/pairing/issue`,

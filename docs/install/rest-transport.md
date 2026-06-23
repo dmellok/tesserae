@@ -60,43 +60,68 @@ equivalent of every MQTT capability Tesserae uses.
 | **Manual firmware diagnostics** | Firmware can publish to arbitrary topics; admin reads via any MQTT client. | Firmware POSTs `/api/v1/device/<id>/log` → server's EventLog. Visible on Settings → Events. | REST integrates with the EventLog instead of needing an external client. |
 | **TLS** | Mosquitto can do TLS with certificate management. amqtt's TLS story is less battle-tested. | HTTP only in v1. HTTPS via reverse proxy (Caddy / NGINX) works since firmware just sees the URL. | Equivalent in practice if both rely on a reverse-proxy frontend. |
 | **Latency from compose → panel** | Sub-second (publish + subscriber wake). | Bounded by `next_poll_s`. Default 60s for a Pi client, 15min for a battery client. | MQTT wins when "instant" matters (dev preview / manual Send). REST wins everywhere battery is the priority. |
-| **Setup / install cost (new user)** | Install Mosquitto, edit `mosquitto.conf`, open `:1883`, generate creds, paste into Tesserae + every client. ~10 minutes for a first-time installer. | Run Tesserae. Devices REST-pair via 6-digit code. No service to install. < 1 minute. | The headline reason REST is the v0.52+ default. |
+| **Setup / install cost (new user)** | Install Mosquitto, edit `mosquitto.conf`, open `:1883`, generate creds, paste into Tesserae + every client. ~10 minutes for a first-time installer. | Run Tesserae. Plug the device in; it shows up in the Discovered strip; click Register. No service to install, no code typed into firmware. < 1 minute. | The headline reason REST is the v0.52+ default. |
 | **Migration** | N/A. | Per-device flip: Settings → Devices → Switch to REST (or to MQTT). Token persists across flips so flipping back is one click. | A heterogeneous fleet is fine — some devices MQTT, some REST. |
 
 ## How REST works end-to-end
 
 1. **Server hosts the endpoints**. Tesserae's HTTP server (waitress
    in prod) serves `/api/v1/device/<id>/...` routes for frame fetch,
-   status heartbeats, config polls, and first-boot pairing.
+   status heartbeats, config polls, and first-boot registration.
 2. **Firmware polls on its wake cycle**. A battery-powered client
    wakes, fetches the latest frame URL, paints it, posts a heartbeat,
    then deep-sleeps. One round trip per wake.
-3. **Pairing replaces broker creds**. Instead of typing broker host +
-   port + username + password into firmware, the user generates a
-   6-digit pairing code in Tesserae's admin UI and pastes it into the
-   firmware once on first boot. The firmware POSTs the code, gets a
-   permanent device token back, persists the token in flash, and
-   forgets the pairing code.
+3. **No broker credentials to thread.** Instead of typing broker host
+   + port + username + password into firmware, the device announces
+   itself to Tesserae on first boot, you click **Register** in the
+   admin UI, and Tesserae hands the device its per-device access
+   token automatically. The token is stored in flash; the user never
+   sees it.
 
-## Pairing a new REST device (UI flow)
+## Adding a new REST device
 
-1. **Settings → Devices → Pair new device**.
-2. Click **Issue pairing code**. A six-digit code appears (10-minute
-   TTL). Copy it.
-3. Flash your firmware in REST mode (the firmware needs to be built
-   with REST support; the [firmware prompts](#firmware) below describe
-   what's needed in each codebase).
-4. On the firmware's setup form (captive portal, build-time config,
-   serial, depends on the platform), paste:
-     - The Tesserae server URL (e.g. `http://tesserae.local:8765`)
-     - The pairing code
-5. First boot, the firmware POSTs `/api/v1/device/register` with the
-   code. Tesserae creates a device instance with `transport: "rest"`
-   and returns a per-device access token. The firmware persists the
-   token; subsequent wakes use it as a bearer token.
-6. The device shows up in Settings → Devices alongside any MQTT
-   devices. Its meta block shows `Transport: REST` + the first few
-   characters of its token.
+The default path is zero-typed-credentials, you just need to be at
+the admin UI when the device boots.
+
+1. Flash your firmware in REST mode and point it at the Tesserae
+   server URL (e.g. `http://tesserae.local:8765`) via whatever
+   first-boot mechanism the firmware uses (captive portal,
+   build-time config, serial). No code or token needed at this step.
+2. Power the device on. On first boot it POSTs
+   `/api/v1/device/discover` with its MAC address and identity.
+3. **Settings → Devices**. The device shows up under the **Discovered**
+   strip with the announced kind + panel dims.
+4. Click **Register**. Optionally rename / pick a different panel
+   preset. Tesserae creates the instance, mints a per-device access
+   token, and primes its MAC.
+5. The firmware retries `/discover` on its next wake (default 30 s),
+   sees the MAC now matches, and receives the token in the
+   response. From here it polls `/api/v1/device/<id>/frame` like any
+   other device. The token persists in flash; you never see it
+   again.
+
+The same Discovered strip surfaces MQTT-discovered devices, TRMNL
+self-provisioning announces, and REST `/discover` polls; the only
+difference is the transport column.
+
+### Pre-pairing with a 6-digit code (optional)
+
+For environments where you can't be at the admin UI when the device
+first boots, sealed appliances, BLE-provisioned devices, devices
+shipped on a kiosk image, you can pre-mint a token via a one-shot
+pairing code instead.
+
+1. **Settings → Devices → Pair new device**. Click **Issue pairing
+   code**. A six-digit code appears (10-minute TTL).
+2. Type the code into the firmware's setup form alongside the
+   server URL.
+3. First boot, the firmware POSTs `/api/v1/device/register` with
+   `X-Pairing-Code: <code>` instead of `/discover`. Tesserae creates
+   the instance and returns the token in the same response, no
+   admin click required.
+
+Either path yields the same end state: a registered device with a
+per-device bearer token. Pick whichever matches your bring-up flow.
 
 ## REST API reference
 
@@ -152,9 +177,11 @@ cadence:
 One round trip per wake. The firmware doesn't need a separate config
 poll.
 
-### `POST /api/v1/device/register` (first boot)
+### `POST /api/v1/device/register` (first boot, optional)
 
-Pairing flow. Headers + body:
+Used by the pre-pairing flow above. The default first-boot path is
+`/discover` + admin Register click; only reach for this endpoint
+when you need to pre-mint a token. Headers + body:
 
 ```
 X-Pairing-Code: 123456
@@ -185,11 +212,12 @@ Rate-limited per client IP (10 failed attempts / 60s window). Successful
 registrations release the bucket; an attacker can't grind one IP
 without the rate limiter biting.
 
-### `POST /api/v1/device/discover` (optional, first boot before pairing)
+### `POST /api/v1/device/discover` (first boot)
 
-Firmware can announce itself BEFORE getting a pairing code. Useful for
-"flash firmware, see if it appears in admin UI, generate code there,
-flash code back to firmware" workflows.
+The default first-boot endpoint. Firmware announces itself here so
+the device shows up under the Discovered strip in Settings →
+Devices; admin clicks **Register** and Tesserae returns the token
+on the firmware's next poll.
 
 Body:
 

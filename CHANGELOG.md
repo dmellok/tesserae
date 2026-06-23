@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.19], 2026-06-24
+
+### Changed
+
+- **REST-transport docs now lead with discover + admin Register,
+  not the 6-digit pairing code.** In practice every REST device
+  ends up bootstrapped through ``/api/v1/device/discover`` (firmware
+  announces, device appears in the Discovered strip, admin clicks
+  Register, token returns on the next poll), but our docs kept
+  walking readers through the "generate a pairing code, type it
+  into firmware" path as if it were the default. That was a path
+  of resistance that nobody actually walks, and it made the REST
+  transport read as fiddlier than it is. Rewrote
+  [``docs/install/rest-transport.md``](install/rest-transport.md),
+  [``docs/dev/client-protocol.md``](dev/client-protocol.md), and
+  [``docs/dev/openapi.md``](dev/openapi.md) to foreground the
+  zero-typed-credentials flow and demote pairing codes to a
+  fallback callout for sealed appliances / BLE provisioning / kiosk
+  modes where the admin can't be at the UI when the device boots.
+  Both endpoints still exist; the OpenAPI spec is unchanged.
+
 ## [0.64.18], 2026-06-24
 
 ### Added
