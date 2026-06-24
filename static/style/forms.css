@@ -1187,10 +1187,10 @@ input[type="range"].slider:focus::-moz-range-thumb {
 }
 
 /* ----- Wizard info card ----------------------------------------------
-   Used by the onboarding flow's telemetry consent step (and any
-   other wizard that wants an inline explanatory card between the
-   form fields). card--compact pads the block; --wizard-info gives
-   it the vertical breathing room the inline ``margin: var(--t-space-4) 0`` was supplying. */
+   Used by the onboarding flow (and any other wizard that wants an
+   inline explanatory card between the form fields). card--compact
+   pads the block; --wizard-info gives it the vertical breathing
+   room the inline ``margin: var(--t-space-4) 0`` was supplying. */
 .card--wizard-info { margin: var(--t-space-4) 0; }
 .card--wizard-info-footnote { font-size: var(--t-size-sm); }
 

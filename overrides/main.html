@@ -33,15 +33,21 @@
      including the initial load and every instant swap; subscribing
      to it and calling ``posthog.capture('$pageview', …)`` ourselves
      gives us one event per page with no duplicates and no misses.
-   * ``cross_subdomain_cookie: false`` — don't try to span cookies
-     across ``*.tesserae.ink``; each subdomain gets its own (smaller)
-     identity surface.
+   * ``persistence: 'memory'`` — no cookies, no localStorage. The
+     ``distinct_id`` lives only in the page's JS heap, so it resets
+     on every navigation. Unique-visitor counts inflate as a
+     result, but the metrics this snippet actually cares about
+     (pageviews, country, referrer, time-of-day) all still work and
+     no GDPR / ePrivacy consent banner is required because no
+     persistent identifier is written to the browser. Closed over
+     by ``cross_subdomain_cookie: false`` below as belt-and-braces.
+   * ``cross_subdomain_cookie: false`` — defensive; with memory
+     persistence there's no cookie to span subdomains anyway.
 
    Pre-v0.64 this slot held a Umami snippet pointing at
-   ``analytics.dmello.io``. PostHog now serves both the docs site
-   and the in-app telemetry from one place so the maintainer can
-   answer cross-surface questions (e.g. "do docs readers convert to
-   running the addon?"). #}
+   ``analytics.dmello.io``. PostHog is now the docs-site analytics
+   backend. Docs traffic is the only signal collected; the app itself
+   sends no phone-home telemetry. #}
 {% extends "base.html" %}
 
 {% block extrahead %}
@@ -57,6 +63,7 @@
       autocapture: false,
       respect_dnt: true,
       capture_pageview: false,
+      persistence: 'memory',
       cross_subdomain_cookie: false,
     });
     // Material for MkDocs ``navigation.instant`` swaps the DOM in

@@ -1,4 +1,4 @@
-"""Settings → System endpoints: self-update, backup, webhook, telemetry.
+"""Settings → System endpoints: self-update, backup, webhook.
 
 Updates and restore-from-backup both restart the process via os.execv
 (the in-process Playwright renderer + admin UI come back ~1 s later).
@@ -74,17 +74,6 @@ def system_update_apply() -> Response:
     if result.pip_changed:
         note += " (deps reinstalled)"
     flash(note + ". Restarting…", "ok")
-    telemetry = current_app.config.get("TELEMETRY")
-    if telemetry is not None:
-        telemetry.send(
-            "update.applied",
-            {
-                "from": result.from_sha[:7],
-                "to": result.to_sha[:7],
-                "channel": channel,
-                "pip_changed": "yes" if result.pip_changed else "no",
-            },
-        )
     updater().restart(delay_s=1.5)
     return system_redirect()
 
@@ -318,30 +307,4 @@ def system_webhook_set() -> Response:
         return system_redirect()
     settings_store().update_section("app", {"webhook_token_secret": token})
     flash("Webhook token saved.", "ok")
-    return system_redirect()
-
-
-# -- telemetry ----------------------------------------------------------
-
-
-@bp.post("/settings/system/telemetry/test")
-def system_telemetry_test() -> Response:
-    """Fire a synchronous app.started and surface the outcome in a flash
-    + the Events tab. Dev-only, the card is hidden in production
-    builds, so this route is gated to ``current_app.debug`` to avoid
-    leaving an undocumented endpoint exposed."""
-    if not current_app.debug:
-        return system_redirect()
-    telemetry = current_app.config.get("TELEMETRY")
-    if telemetry is None or not telemetry.enabled:
-        flash(
-            "Telemetry is off. Tick the toggle in Settings → Server → App first.",
-            "error",
-        )
-        return system_redirect()
-    err = telemetry.test_send()
-    if err:
-        flash(f"Test event failed: {err}. Check the endpoint config.", "error")
-    else:
-        flash("Test event delivered. Check the Events tab for the row.", "ok")
     return system_redirect()

@@ -248,27 +248,6 @@ APP_FIELDS: list[dict[str, Any]] = [
             "catalog; leave blank to hide the Browse page entirely."
         ),
     },
-    {
-        "name": "telemetry_enabled",
-        "type": "switch",
-        "label": "Send anonymous usage telemetry",
-        "default": False,
-        "group": "privacy",
-        "help": (
-            "Four anonymous events to the project's PostHog Cloud project: "
-            "app.started (version + platform), app.heartbeat hourly (fleet "
-            "shape + activity counters since the last beat, never push "
-            "content), update.applied (from/to short SHA + channel), and "
-            "theme.user_created the first time you save a custom theme. "
-            "Identified only by a random instance UUID; no IP storage, no "
-            "paths, no settings, no secrets, no push contents. Country / "
-            "region is recorded so the maintainer can plan hardware support. "
-            "Suggested on during onboarding so the maintainer can see how "
-            "many people are running Tesserae and what versions they're on; "
-            "flip it off here if you'd rather not. TESSERAE_TELEMETRY=0 "
-            "also disables."
-        ),
-    },
 ]
 
 
@@ -320,13 +299,6 @@ APP_FIELD_GROUPS: list[dict[str, Any]] = [
         "title": "Widget marketplace",
         "description": "Where the Browse page pulls community widget metadata from.",
         "icon": "storefront",
-        "master": None,
-    },
-    {
-        "id": "privacy",
-        "title": "Privacy",
-        "description": "What leaves this server. No image content or device names are ever sent.",
-        "icon": "shield-check",
         "master": None,
     },
 ]

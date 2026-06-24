@@ -6,6 +6,50 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.22], 2026-06-24
+
+### Removed
+
+- **App-side phone-home telemetry, in full.** The PostHog integration
+  that fired ``app.started`` / ``app.heartbeat`` / ``update.applied``
+  / ``theme.user_created`` events through the ``t.dmello.io`` reverse
+  proxy is gone. Deleted ``app/telemetry.py``, the
+  ``app.config["TELEMETRY"]`` lifecycle, the heartbeat-enrichment
+  closure (fleet shape + activity counters), the Settings → Server →
+  App "Send anonymous usage telemetry" toggle, the onboarding wizard
+  "Help out" step, and the ``system_telemetry_test`` admin route.
+  Tesserae now contacts no third party from the running server.
+
+  Rationale: the reverse-proxy approach routed around user-installed
+  ad-blockers (uBlock, Pi-hole, NextDNS lists), which is hard to
+  defend regardless of intent. A self-hosted hobby project that
+  ships zero phone-home is a more coherent privacy position than any
+  opt-out toggle, and the recently-discovered post-startup
+  enrichment bug (provider closure registered only when telemetry
+  was enabled at boot, so users who opted in later sent bare
+  heartbeats forever) confirmed the data was noisy enough to not be
+  worth the maintenance.
+
+  ``app/state/device_telemetry.py`` (per-device battery / RSSI /
+  smart-sync state) is unrelated and **stays untouched**.
+
+### Changed
+
+- **Docs-site analytics are now cookieless.** Added
+  ``persistence: 'memory'`` to the PostHog init in
+  ``overrides/main.html`` so the docs site stops writing the
+  ``ph_...`` cookie / localStorage entry. Page views, country,
+  referrers, and time-of-day continue to work; unique-visitor
+  counts will inflate (every navigation gets a fresh
+  ``distinct_id``) but that's the metric the project cares about
+  least. No GDPR / ePrivacy consent banner is required when no
+  persistent identifier is written.
+- **Privacy doc rewritten.** ``docs/privacy.md`` no longer
+  describes opt-out telemetry defaults; it now states plainly that
+  Tesserae sends no app-side phone-home and describes the
+  cookieless docs analytics separately. ``mkdocs.yml`` nav entry
+  renamed from "Privacy & telemetry" to "Privacy".
+
 ## [0.64.21], 2026-06-24
 
 ### Fixed

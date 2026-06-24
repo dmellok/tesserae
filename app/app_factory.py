@@ -313,8 +313,8 @@ def create_app(
 
     # Resolve the running package version. Prefer pyproject.toml on disk
     # (so a source checkout reflects post-pip-install bumps) and fall
-    # back to importlib.metadata for installed wheels. Used by both
-    # telemetry and the static asset cache-buster below.
+    # back to importlib.metadata for installed wheels. Used by the
+    # static asset cache-buster below.
     def _resolve_pkg_version() -> str:
         pyproject = REPO_ROOT / "pyproject.toml"
         if pyproject.exists():
@@ -604,42 +604,9 @@ def create_app(
 
     app.config["UPDATER"] = _Updater(REPO_ROOT, data_root)
 
-    # Anonymous, opt-in telemetry, disabled by default; configure in
-    # Settings → Server → App. Tests skip it entirely so no test run can
-    # accidentally hit a real endpoint.
-    from app.telemetry import Telemetry as _Telemetry
-
     is_watcher = _is_reloader_watcher(dev) and not testing
     if is_watcher:
-        logger.info(
-            "dev reloader parent: skipping MQTT/scheduler/telemetry init (child process owns those)"
-        )
-    if testing or is_watcher:
-        telemetry = _Telemetry.disabled()
-    else:
-        telemetry = _Telemetry.from_settings(
-            data_root=data_root,
-            app_version=pkg_version,
-            settings_app=settings.get_section("app"),
-            event_log=event_log,
-            is_debug=dev,
-        )
-        # ``is_docker`` lets the maintainer see what proportion of installs
-        # run via the official Docker image vs install.sh / from source.
-        # ``is_homeassistant`` flags the subset of those that run as the
-        # companion HA Add-on (the add-on's run.sh exports
-        # ``TESSERAE_HA_INGRESS=1``). Both are set by the deployment
-        # wrapper; safe-to-trust as long as nobody's spoofing them on a
-        # native install (and if they did, they're just mis-labelling
-        # their own data point).
-        telemetry.send(
-            "app.started",
-            {
-                "is_docker": "true" if os.environ.get("TESSERAE_IN_DOCKER") == "1" else "false",
-                "is_homeassistant": "true" if app.config.get("HA_INGRESS_MODE") else "false",
-            },
-        )
-    app.config["TELEMETRY"] = telemetry
+        logger.info("dev reloader parent: skipping MQTT/scheduler init (child process owns those)")
 
     # Long-running Chromium owned by a dedicated thread. The pool is
     # *created* unconditionally but only *started* when something calls
@@ -822,92 +789,6 @@ def create_app(
 
     if not testing:
         auth.install_gate(app, settings)
-
-    # Heartbeat enrichment, fleet shape + activity counters since the
-    # previous heartbeat. The provider is a closure so app_factory keeps
-    # ownership of the registries; telemetry.py stays free of any direct
-    # dependency on them. Everything here is a count or a kind id; no
-    # device names, page names, theme palettes, or user data.
-    if telemetry.enabled:
-        import time as _time
-
-        # Reset baseline at startup so the first heartbeat counts the
-        # work done in the first hour, not since epoch.
-        _heartbeat_baseline = {"ts": _time.time()}
-
-        # Bucket activity counts to keep cardinality low + still
-        # distinguish "no activity" from "high activity" on Aptabase.
-        def _bucket(n: int) -> str:
-            if n == 0:
-                return "0"
-            if n <= 10:
-                return "1-10"
-            if n <= 50:
-                return "11-50"
-            if n <= 200:
-                return "51-200"
-            return "200+"
-
-        def _heartbeat_props() -> dict[str, str]:
-            now = _time.time()
-            since = _heartbeat_baseline["ts"]
-            # Fleet shape, current state, not deltas.
-            instances = [d for d in devices.all() if d.kind_of is not None]
-            kinds = sorted({str(d.kind_of) for d in instances if d.kind_of})
-            n_pages = len(page_store.list())
-            # Themes shape, number of user-saved themes signals
-            # whether the builder is actually getting used. Telemetry
-            # docstring listed this as a planned prop pre-v0.27; wire
-            # it now that the UserThemeStore is in app.config.
-            n_user_themes = len(user_themes_store.list_all())
-            # Activity counters, events recorded since the previous
-            # heartbeat. event_log.list() returns most-recent-first; we
-            # paginate by 500 and stop once we cross the baseline so
-            # large logs stay cheap.
-            n_pushes = 0
-            n_push_failures = 0
-            n_widget_errors = 0
-            cursor_id: int | None = None
-            scan_limit = 500
-            for _ in range(10):  # cap at 5,000 rows scanned per heartbeat
-                rows = event_log.list(limit=scan_limit)
-                if cursor_id is not None:
-                    rows = [r for r in rows if r.id < cursor_id]
-                if not rows:
-                    break
-                still_in_window = False
-                for r in rows:
-                    if r.timestamp < since:
-                        continue
-                    still_in_window = True
-                    if r.type == "push":
-                        if r.status == "sent":
-                            n_pushes += 1
-                        elif r.status in {"failed", "not_found"}:
-                            n_push_failures += 1
-                    elif r.type == "renderer" and r.status == "error":
-                        n_widget_errors += 1
-                cursor_id = rows[-1].id
-                if not still_in_window or rows[-1].timestamp < since:
-                    break
-            _heartbeat_baseline["ts"] = now
-            return {
-                # Static fleet metadata: deployment kind + current shape.
-                # Static across heartbeats but cheap and lets the maintainer
-                # slice Aptabase views by deployment without joining tables.
-                "is_docker": "true" if os.environ.get("TESSERAE_IN_DOCKER") == "1" else "false",
-                "is_homeassistant": "true" if app.config.get("HA_INGRESS_MODE") else "false",
-                "n_devices": str(len(instances)),
-                "device_kinds": ",".join(kinds),
-                "n_pages": str(n_pages),
-                "n_user_themes": str(n_user_themes),
-                # Bucketed activity counters since the previous heartbeat.
-                "n_pushes_since_last": _bucket(n_pushes),
-                "n_push_failures_since_last": _bucket(n_push_failures),
-                "n_widget_errors_since_last": _bucket(n_widget_errors),
-            }
-
-        telemetry.set_heartbeat_props_provider(_heartbeat_props)
 
     @app.before_request
     def _capture_http_port() -> None:

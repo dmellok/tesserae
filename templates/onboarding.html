@@ -291,10 +291,12 @@
       </li>
       {% endfor %}
     </ul>
-    <div class="wizard-nav">
-      <span></span>
-      <a class="primary" href="{{ url_for('onboarding.step', step='telemetry') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
-    </div>
+    <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
+      <div class="wizard-nav">
+        <span></span>
+        <div class="actions">{{ button('Finish', icon='check', variant='primary') }}</div>
+      </div>
+    </form>
     {% else %}
     <p class="lede">Create a ready-made dashboard, a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
     <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
@@ -304,37 +306,6 @@
       </div>
     </form>
     {% endif %}
-
-    {# ---------- Telemetry consent ---------- #}
-    {% elif step == 'telemetry' %}
-    <h1>Help me build Tesserae</h1>
-    <p class="lede">Tesserae is a solo project. If you opt in to anonymous usage stats, I get a real picture of how many people are running it and what versions they're on, which helps me decide what to prioritise and when it's safe to break old behaviour. It's a small honest signal, not a vanity dashboard.</p>
-
-    <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
-      <div class="card card--compact card--wizard-info">
-        <p><strong>What gets sent (only when ticked):</strong></p>
-        <ul>
-          <li><code>app.started</code>, once per process start, with the Tesserae version, Python version, and platform name.</li>
-          <li><code>app.heartbeat</code>, once an hour while the process is running, so I can tell live installs apart from "started once and crashed". Same fields as above.</li>
-          <li><code>update.applied</code>, when the in-app updater applies a new revision, with the from/to short SHAs, channel, and whether deps were reinstalled.</li>
-        </ul>
-        <p><strong>What it doesn't send:</strong> IP addresses, hostnames, paths, settings, secrets, push contents, dashboard layouts, or anything tied to a real-world identity. The only stable identifier is a random UUID generated on this install and stored in <code>data/core/.instance_id</code>.</p>
-        <p class="muted card--wizard-info-footnote">Events go to my PostHog Cloud project, configured to disable IP storage, person profiles, and session recording. Country and region are recorded so I can see roughly where Tesserae's running. <a href="https://github.com/dmellok/tesserae/blob/main/docs/privacy.md" target="_blank" rel="noopener">More detail in the privacy doc</a>.</p>
-      </div>
-
-      <label class="check-row">
-        <input type="checkbox" name="telemetry_enabled" value="1" checked>
-        <span>
-          <strong>Send anonymous usage stats to the maintainer.</strong>
-          <span class="muted">You can flip this off any time in Settings → Server → App, or set <code>TESSERAE_TELEMETRY=0</code>.</span>
-        </span>
-      </label>
-
-      <div class="wizard-nav">
-        <span></span>
-        <div class="actions">{{ button('Finish', icon='check', variant='primary') }}</div>
-      </div>
-    </form>
     {% endif %}
 
   </div>

@@ -156,10 +156,10 @@ For support, head to [Discussions](https://github.com/dmellok/tesserae/discussio
 - **Windows-specific**: re-exec via Popen + parent-PID handshake (`os.execv` is broken there); UTF-8 default encoding on every file I/O.
 - **32-bit Pi OS** fallback to system Chromium when Playwright's bundled browser can't install.
 
-### Telemetry & privacy
+### Privacy
 
-- **Off by default.** When opted in, four anonymous events: `app.started` (per process start), `app.heartbeat` (hourly fleet shape + activity counters, shape only, never content), `update.applied` (in-app updater applied a new revision), `theme.user_created` (first time a custom theme is saved, no theme content). No IPs, paths, settings, secrets, or push contents.
-- Disable with `TESSERAE_TELEMETRY=0` or the Settings toggle.
+- **No phone-home telemetry.** Tesserae does not contact any third-party analytics service. No install identifier is generated, no `app.started` / `app.heartbeat` events are emitted, and no usage data leaves the box.
+- Per-device diagnostics (battery percentage, RSSI, smart-sync predictions) are tracked locally for the admin UI and stay on the server.
 
 ### Quality
 
@@ -335,31 +335,17 @@ through password setup and the onboarding wizard. See
 [**Install Tesserae**](https://dmellok.github.io/tesserae/install/server/)
 for the deep guide (broker config, Chromium overrides, dev workflow).
 
-## Privacy & telemetry
+## Privacy
 
-**Off by default.** When opted in (Settings → Server → App), Tesserae
-posts four anonymous events to the project's
-[PostHog Cloud](https://posthog.com) project (configured to disable
-IP storage, person profiles, and session recording; coarse country /
-region is recorded so the maintainer can see roughly where Tesserae
-is running):
+**Tesserae sends no phone-home telemetry.** The app does not contact
+any third-party analytics service. No install identifier is generated,
+and no usage events are emitted.
 
-- `app.started`, per process start (version, Python, platform).
-- `app.heartbeat`, hourly. Fleet shape (number of devices / pages /
-  user themes, device kinds, `is_docker`, `is_homeassistant`) +
-  activity counters since the previous heartbeat (pushes, push
-  failures, widget errors). Shape and counts only, never push
-  content, never settings values.
-- `update.applied`, the in-app updater applied a new revision (from /
-  to short SHAs + channel).
-- `theme.user_created`, fired the first time a user persists a custom
-  theme. No theme content is sent, just the fact that the theme
-  builder got reached.
-
-No IPs, paths, settings values, secrets, push contents, or anything
-tied to a real-world identity. Disable with `TESSERAE_TELEMETRY=0` or
-the toggle in Settings. Full details:
-[**Privacy & telemetry**](https://dmellok.github.io/tesserae/privacy/).
+Per-device diagnostics (battery percentage, RSSI, heartbeat cadence,
+smart-sync predictions) are tracked locally for the admin UI and
+stay on the server in `data/core/`; they're never transmitted off
+the box. Full details:
+[**Privacy**](https://dmellok.github.io/tesserae/privacy/).
 
 ## Contributing
 

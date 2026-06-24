@@ -48,20 +48,18 @@ from app.push import PushManager
 from app.settings.field_defs import _TZ_CHOICES
 from app.state.page_store import Cell, Page, PageStore
 from app.state.settings_store import SettingsStore
-from app.telemetry import _resolve_iana_timezone
+from app.tz_resolve import _resolve_iana_timezone
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard", "telemetry")
+STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
     # Timezone slots in right after welcome because it's foundational:
     # the scheduler interprets every fire time against it. Surfaced
     # during onboarding so users on Docker / bare metal explicitly
     # pick instead of inheriting whatever the host happens to be
-    # (often UTC). v0.64.4's telemetry timezone signal also lands
-    # here as a side effect — the maintainer gets an honest "where
-    # are people running this" without IP geolocation.
+    # (often UTC).
     "timezone": "Timezone",
     # The route step id is still "broker" for URL stability (see
     # save_broker), but the user-facing label now reflects the v0.52.2
@@ -70,7 +68,6 @@ STEP_LABELS: dict[str, str] = {
     "broker": "Transport",
     "device": "Device",
     "dashboard": "Dashboard",
-    "telemetry": "Help out",
 }
 # Widget the starter dashboard drops into its single cell, a clock needs
 # no API keys or config, so it paints on the very first push.
@@ -310,13 +307,7 @@ def save_timezone() -> Response:
     a non-IANA string into settings. Unknown values fall through to
     ``"system"`` (host auto-detect at scheduler-time) which is the
     least-surprising default.
-
-    Also: re-snapshots the live Telemetry config's timezone field so
-    the next event picks up the new value without a process restart.
-    Without this the timezone props on the heartbeats Tesserae fires
-    today would still reflect whatever was set at startup.
     """
-    import dataclasses
     import zoneinfo
 
     raw = (request.form.get("timezone") or "").strip()
@@ -324,13 +315,6 @@ def save_timezone() -> Response:
         flash(f"Unknown timezone {raw!r}; falling back to system.", "warn")
         raw = "system"
     _settings().patch_section("app", {"timezone": raw or "system"})
-
-    # Live-update the in-process Telemetry config so the timezone shows
-    # up on the very next heartbeat without waiting for a restart.
-    telemetry = current_app.config.get("TELEMETRY")
-    if telemetry is not None:
-        resolved = _resolve_iana_timezone(raw or "system")
-        telemetry._cfg = dataclasses.replace(telemetry._cfg, timezone=resolved)
 
     flash("Timezone saved.", "ok")
     return redirect(url_for("onboarding.step", step="broker"))
@@ -486,21 +470,7 @@ def skip() -> Response:
 @bp.post("/finish")
 def finish() -> Response:
     settings = _settings()
-    # The telemetry consent comes from the last onboarding step. A
-    # checkbox only POSTs its name when ticked, so absence means the
-    # user explicitly unchecked it. Persist either choice so it survives
-    # restarts and the answer is recorded the moment the user makes it.
-    was_telemetry_on = bool(settings.get_section("app").get("telemetry_enabled", False))
-    now_on = "telemetry_enabled" in request.form
-    settings.patch_section("app", {"telemetry_enabled": now_on})
     mark_onboarded(settings)
-    # Apply the consent live + fire app.started immediately so a fresh
-    # install reports in without waiting for the next process restart.
-    telemetry = current_app.config.get("TELEMETRY")
-    if telemetry is not None and now_on != was_telemetry_on:
-        telemetry.set_enabled(now_on)
-        if now_on:
-            telemetry.test_send()  # silent, onboarding shouldn't get loud
     flash("You're all set.", "ok")
     return redirect(url_for("send.index"))
 

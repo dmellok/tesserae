@@ -56,31 +56,8 @@ def settings_update(section_kind: str) -> Response:
     }
 
     if section_kind in handlers:
-        # Capture telemetry's pre-save state so we can detect an off→on
-        # transition and fire a test event without making the user
-        # restart the process.
-        was_telemetry_on = (
-            bool(store.get_section("app").get("telemetry_enabled", False))
-            if section_kind == "app"
-            else False
-        )
         message = handlers[section_kind]()
         flash(message, "ok")
-        if section_kind == "app":
-            now_on = bool(store.get_section("app").get("telemetry_enabled", False))
-            telemetry = current_app.config.get("TELEMETRY")
-            if telemetry is not None and now_on != was_telemetry_on:
-                telemetry.set_enabled(now_on)
-                if now_on:
-                    err = telemetry.test_send()
-                    if err:
-                        flash(
-                            f"Telemetry enabled, but the test event failed: {err}. "
-                            "Check the endpoint config in app/telemetry.py.",
-                            "warn",
-                        )
-                    else:
-                        flash("Telemetry enabled, test event delivered.", "ok")
         # Broker / App / Panel changes need a transport + HA-discovery
         # refresh to take effect without a restart (base_url, panel dims,
         # ha_discovery_enabled all flow through there).

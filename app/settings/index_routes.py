@@ -119,8 +119,6 @@ def settings_area(area: str) -> str | Response:
     system_last_check = None
     system_history: list[Any] = []
     system_backups: list[Any] = []
-    system_telemetry_enabled = False
-    system_telemetry_host = ""
     system_webhook_token_set = False
     # One-shot reveal after /settings/system/webhook/regenerate, pop
     # so a refresh doesn't re-show the token. Only honoured on the
@@ -165,11 +163,6 @@ def settings_area(area: str) -> str | Response:
             system_last_check = upd.last_check
             system_history = list(reversed(upd.history()))
         system_backups = _backup_mod.list_all(current_app.config["DATA_ROOT"])
-        telemetry = current_app.config.get("TELEMETRY")
-        if telemetry is not None:
-            system_telemetry_enabled = telemetry.enabled
-            # endpoint is empty when disabled; surface host as a hint either way.
-            system_telemetry_host = telemetry._cfg.host
         # Surface only whether a webhook token is set, never the value
         # itself, so a screenshot of Settings → System doesn't leak it.
         # The disk key is ``webhook_token_secret`` (``_secret`` suffix
@@ -238,8 +231,6 @@ def settings_area(area: str) -> str | Response:
         system_in_container=in_container,
         system_git_available=system_git_available,
         system_release_check=system_release_check,
-        system_telemetry_enabled=system_telemetry_enabled,
-        system_telemetry_host=system_telemetry_host,
         system_webhook_token_set=system_webhook_token_set,
         system_webhook_reveal_token=system_webhook_reveal_token,
         system_password_set=system_password_set,

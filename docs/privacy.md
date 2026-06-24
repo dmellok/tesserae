@@ -1,39 +1,14 @@
-# Privacy & telemetry
+# Privacy
 
-**Off by default.** Tesserae ships with no usage telemetry enabled. A
-fresh clone or install never phones home.
-
-## What's sent when you opt in
-
-When you opt in (Settings → Server → App), Tesserae posts a small set
-of **anonymous events** to the project's analytics backend
-([PostHog Cloud][posthog], US region) so the maintainer can see how
-many people are running Tesserae, what versions they're on, and roughly
-how active a typical install is:
-
-- **`app.started`**, once per process start. Carries the Tesserae
-  version, Python version, and platform name.
-- **`app.heartbeat`**, every hour while the process is running. Lets
-  the maintainer see session duration / daily-active counts instead of
-  only process-start counts. Props carry **shape, not content**:
-  - fleet shape: `n_devices`, `device_kinds` (kinds only, e.g.
-    `pi_bin,esp32_bin`), `n_pages`, `n_user_themes`, `is_docker`,
-    `is_homeassistant`
-  - activity counters since the previous heartbeat:
-    `n_pushes_since_last`, `n_push_failures_since_last`,
-    `n_widget_errors_since_last`
-- **`update.applied`**, when the in-app updater applies a new
-  revision. Carries the from/to short SHAs, the channel (edge/stable),
-  and whether deps were reinstalled.
-- **`theme.user_created`**, the first time a user persists a custom
-  theme. Fires once per install, so the maintainer sees how often the
-  theme builder is actually reached. **No theme content** (palette
-  values, name, tokens) is sent.
+**Tesserae sends no phone-home telemetry.** The app does not contact
+any third-party analytics service. A fresh install never reports back
+to the maintainer; no app.started / app.heartbeat / update.applied
+events are emitted, and no instance identifier is generated or
+persisted.
 
 ## What's never sent
 
-The only stable identifier is a random UUID generated on first run and
-written to `data/core/.instance_id`. Tesserae never sends:
+There is no opt-in toggle for usage analytics. The app does not send:
 
 - IP addresses
 - hostnames
@@ -43,65 +18,22 @@ written to `data/core/.instance_id`. Tesserae never sends:
 - push contents
 - dashboard layouts
 - broker addresses
+- a stable install identifier
 - anything tied to a real-world identity
 
-## PostHog privacy hardening
+## Per-device telemetry (stays on the server)
 
-The events Tesserae sends to PostHog have the surveillance features
-that would otherwise apply by default explicitly disabled:
+Tesserae *does* track per-device diagnostics for the displays you
+register (battery percentage, RSSI, heartbeat cadence, smart-sync
+predictions). That data stays on your server in
+`data/core/device_telemetry.json` and `data/core/battery_history.db`,
+and is only surfaced inside the admin UI (Settings → Devices, the
+battery indicator, smart-sync scheduling). It is never transmitted
+off the box.
 
-- **No IP storage**. The maintainer's PostHog project has *Discard
-  client IP data* enabled, so PostHog drops the request IP at
-  ingestion (after running geo enrichment + bot detection against
-  it, before writing the event to storage). No IP ever lands on a
-  stored event row.
-- **Country, region, and city**. PostHog uses the request IP to
-  derive country / region / city columns before discarding the IP
-  itself. No precise latitude or longitude. This lets the maintainer
-  see roughly where Tesserae is running so they can plan hardware
-  support and docs translations.
-- **No person profile**. `$process_person_profile = false` keeps each
-  event from creating or updating a "person" record — the install
-  UUID is the only identity surface and it's never enriched.
-- **No session recording**. Server-side captures don't support it,
-  and the docs site explicitly disables it too.
-- **No autocapture**. On the docs site, only page views are
-  captured — never automatic clicks, scrolls, or form-field
-  inspection.
-- **DNT respected**. Browsers that send Do-Not-Track headers skip
-  docs-site analytics entirely.
+## Docs site analytics
 
-## The endpoint
-
-The endpoint is hard-coded in [`app/telemetry.py`][telemetry-py] —
-it's the maintainer's PostHog project, not user-configurable. That
-keeps opted-in counts adding up to a real total instead of being
-scattered across whoever set up their own backend.
-
-The docs site uses the same project, configured via
-[`overrides/main.html`][overrides-main].
-
-Before v0.64.0 the analytics backend was a self-hosted Aptabase
-deployment at `aptabase.dmello.io`; the data shape was the same but
-the dashboards weren't giving the maintainer the cohort + funnel
-views needed to actually answer questions about how Tesserae is
-used. PostHog's free tier gives those views at no extra cost.
-
-## How to disable
-
-Untick *Send anonymous usage telemetry* in **Settings → Server → App**,
-or set the kill switch environment variable (wins over stored
-settings):
-
-```sh
-export TESSERAE_TELEMETRY=0
-```
-
-For the docs site, browsers with Do-Not-Track headers skip analytics
-automatically. To force-disable in any browser, block the
-`t.dmello.io` domain (the maintainer's reverse proxy that forwards
-to PostHog).
-
-[posthog]: https://posthog.com
-[telemetry-py]: https://github.com/dmellok/tesserae/blob/main/app/telemetry.py
-[overrides-main]: https://github.com/dmellok/tesserae/blob/main/overrides/main.html
+Aggregate analytics on the documentation site
+(`dmellok.github.io/tesserae/`) are kept separately from the app and
+provide a coarse traffic overview only. The docs site honours
+Do-Not-Track headers and skips analytics entirely when DNT is set.

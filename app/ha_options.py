@@ -13,8 +13,8 @@ Override-every-start: HA Configuration is the canonical source for the
 fields it covers. The matching Tesserae UI fields are hidden under HA
 so the user has one place to manage broker connection details.
 
-Anything else (telemetry consent, HA discovery toggle, mDNS, browser
-warmup, theme, …) is intentionally NOT mirrored here, it'd create
+Anything else (HA discovery toggle, mDNS, browser warmup, theme, …)
+is intentionally NOT mirrored here, it'd create
 two sources of truth for fields the user can already edit in
 Tesserae's UI. Add to the allow-list only when there's a strong
 "HA is the right place" argument.

@@ -152,7 +152,7 @@ def _resolve_local_time_fields(request_tz: str) -> dict[str, Any]:
     import zoneinfo
     from datetime import datetime, timedelta
 
-    from app.telemetry import _resolve_iana_timezone
+    from app.tz_resolve import _resolve_iana_timezone
 
     settings_app = _settings().get_section("app") or {}
     server_app_tz = str(settings_app.get("timezone", ""))

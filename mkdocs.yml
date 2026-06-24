@@ -18,8 +18,8 @@ theme:
   # overrides/main.html injects the PostHog analytics snippet into the
   # head of every page (configured for autocapture-off, no session
   # recording, no person profiles, DNT respected). v0.64.0 swapped
-  # away from Umami — both surfaces now share one analytics project so
-  # docs traffic + in-app telemetry can be cross-queried.
+  # away from Umami. Docs traffic is the only signal collected; the
+  # app itself sends no phone-home telemetry.
   custom_dir: overrides
   icon:
     repo: fontawesome/brands/github
@@ -105,5 +105,5 @@ nav:
   - Client development:
       - Client protocol spec: dev/client-protocol.md
       - OpenAPI spec & SDK generation: dev/openapi.md
-  - Privacy & telemetry: privacy.md
+  - Privacy: privacy.md
   - Credits: credits.md
