@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.24], 2026-06-25
+
+### Fixed
+
+- **Editor entity picker now surfaces a re-enter banner when a
+  plugin's stored secret can't be decrypted, instead of silently
+  rendering an empty dropdown.** Reported by RealGandy in
+  [#29](https://github.com/dmellok/tesserae/issues/29) against a
+  Docker compose install where the HA long-lived token had been
+  added under one ``TESSERAE_SECRET_KEY`` (or session-derived key)
+  and was being read under another. ``_materialize_cell_options``
+  in [``app/page_routes.py``](app/page_routes.py) had a
+  catch-all that swallowed every exception from
+  ``plugin.choices(...)`` and rendered ``[]``, which surfaced as
+  "no entities to select" with zero indication of the cause.
+
+  ``SecretBoxError`` is now caught specifically and the picker
+  shows a single sentinel choice with the label
+  ``"Stored secret for <plugin name> can't be decrypted, re-enter
+  it under Settings → Plugins → <plugin name>"``. Other exception
+  types still fall through to the empty-list treatment so a real
+  network timeout or upstream outage doesn't mis-blame
+  decryption.
+
+  Workaround for any user hitting this on their existing data:
+  stop the container, delete the ``plugins.<plugin>.token_secret``
+  (or other ``_secret``-suffixed) key from
+  ``data/core/settings.json``, restart, and re-paste the secret
+  in Settings → Plugins. The re-wrap uses the current key so
+  decryption succeeds on every subsequent run. The root cause
+  (which key resolution diverged across runs) is documented in
+  the comment thread on issue #29.
+
 ## [0.64.23], 2026-06-24
 
 ### Fixed

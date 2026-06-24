@@ -277,18 +277,46 @@ def _materialize_cell_options(plugins: list[Any]) -> dict[str, list[dict[str, An
     calling the plugin's ``choices(name)`` function.
 
     Plugins that don't expose ``choices`` (or that raise) get an empty
-    list, the editor will render an empty dropdown rather than break."""
+    list, the editor will render an empty dropdown rather than break.
+
+    Exception: ``SecretBoxError`` (the plugin's settings include a
+    secret-marked field that can't be decrypted with the current
+    SecretBox key) gets a single sentinel choice with a label
+    explaining the user needs to re-enter the secret. The bare
+    empty-list fallback silently rendered an empty picker which was
+    impossible to diagnose from the UI, see issue #29."""
+    from app.secret_box import SecretBoxError
+
     out: dict[str, list[dict[str, Any]]] = {}
     for plugin in plugins:
         options = list(plugin.manifest.get("cell_options", []))
         resolver = getattr(plugin.server_module, "choices", None) if plugin.server_module else None
         materialized: list[dict[str, Any]] = []
+        plugin_label = str(plugin.manifest.get("name") or plugin.id)
         for opt in options:
             spec = dict(opt)
             source = spec.pop("choices_from", None)
             if source and callable(resolver):
                 try:
                     spec["choices"] = list(resolver(source))
+                except SecretBoxError:
+                    logger.warning(
+                        "plugin %s: choices(%r) hit SecretBoxError, the stored "
+                        "secret can't be decrypted with the current key; "
+                        "surfacing a re-enter sentinel",
+                        plugin.id,
+                        source,
+                    )
+                    spec["choices"] = [
+                        {
+                            "value": "",
+                            "label": (
+                                f"Stored secret for {plugin_label} can't be "
+                                "decrypted, re-enter it under Settings → "
+                                f"Plugins → {plugin_label}"
+                            ),
+                        }
+                    ]
                 except Exception:
                     logger.exception(
                         "plugin %s: choices(%r) raised; rendering as empty", plugin.id, source

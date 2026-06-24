@@ -789,3 +789,74 @@ def test_group_pages_no_device_registry_treats_everything_as_unbound() -> None:
     assert len(groups) == 1
     assert groups[0][0] is None
     assert [p.id for p in groups[0][1]] == ["p1", "p2"]
+
+
+def test_materialize_cell_options_surfaces_re_enter_sentinel_on_secretbox_error() -> None:
+    """v0.64.24 regression target (issue #29).
+
+    When a widget's ``choices()`` function raises ``SecretBoxError``
+    (because the plugin holds a ``_secret``-suffixed setting whose
+    on-disk ciphertext can't be decrypted with the current SecretBox
+    key, typically: ``TESSERAE_SECRET_KEY`` env var was set or
+    changed across container restarts, or the data volume was
+    restored from a backup), the editor used to swallow the
+    exception and render the picker empty. The empty picker was
+    impossible to diagnose from the UI.
+
+    The current behaviour surfaces a single sentinel choice with a
+    label pointing the user at where to re-enter the secret. Other
+    exception types still fall through to the empty-list path so a
+    transient network error in a different plugin doesn't shout
+    ``re-enter the secret`` at the user."""
+    from types import SimpleNamespace
+
+    from app.page_routes import _materialize_cell_options
+    from app.secret_box import SecretBoxError
+
+    def boom_choices(name: str) -> Any:
+        raise SecretBoxError("AES-GCM authentication failed: simulated")
+
+    plugin = SimpleNamespace(
+        id="ha_zones",
+        manifest={
+            "name": "Home Assistant Zones",
+            "cell_options": [{"name": "entity", "type": "select", "choices_from": "entity"}],
+        },
+        server_module=SimpleNamespace(choices=boom_choices),
+    )
+
+    out = _materialize_cell_options([plugin])
+
+    choices = out["ha_zones"][0]["choices"]
+    assert len(choices) == 1, choices
+    assert choices[0]["value"] == ""
+    assert "Home Assistant Zones" in choices[0]["label"]
+    assert "re-enter" in choices[0]["label"].lower()
+    assert "Settings" in choices[0]["label"]
+
+
+def test_materialize_cell_options_keeps_empty_fallback_for_unrelated_errors() -> None:
+    """A network timeout or any non-SecretBoxError still gets the
+    bare empty-list treatment, so the editor doesn't mis-blame
+    decryption when the real issue is upstream (HA is offline, the
+    plugin's HTTP request timed out, etc.). Catches the
+    too-eager-blanket-catch regression."""
+    from types import SimpleNamespace
+
+    from app.page_routes import _materialize_cell_options
+
+    def timeout_choices(name: str) -> Any:
+        raise TimeoutError("HA reachable check timed out")
+
+    plugin = SimpleNamespace(
+        id="ha_zones",
+        manifest={
+            "name": "Home Assistant Zones",
+            "cell_options": [{"name": "entity", "type": "select", "choices_from": "entity"}],
+        },
+        server_module=SimpleNamespace(choices=timeout_choices),
+    )
+
+    out = _materialize_cell_options([plugin])
+
+    assert out["ha_zones"][0]["choices"] == []
