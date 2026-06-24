@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.26], 2026-06-25
+
+### Changed
+
+- **README badges restyled to ``for-the-badge`` with Phosphor
+  icons.** Swapped from ``flat-square`` plain badges to the bolder
+  ``for-the-badge`` style, with each badge's logo loaded inline as
+  a base64-encoded Phosphor regular SVG (``scales`` for license,
+  ``tag`` for the latest release, ``check-circle`` for CI,
+  ``chats-circle`` for Discussions, ``cloud-arrow-up`` for the
+  Codespaces launcher, ``heart`` for Sponsor). Keeps the brand
+  consistent with the rest of the project (Tesserae's UI already
+  uses Phosphor end-to-end via the bundled woff2 fonts under
+  [``static/icons/phosphor/``](static/icons/phosphor/)).
+
 ## [0.64.25], 2026-06-25
 
 ### Fixed
