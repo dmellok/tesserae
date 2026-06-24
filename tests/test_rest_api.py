@@ -767,6 +767,49 @@ def test_log_endpoint_accepts_list_msg_and_joins_with_newlines(app: Flask) -> No
     assert matches[0].error == "\n".join(lines)
 
 
+def test_log_endpoint_strips_per_line_trailing_newlines_before_joining(app: Flask) -> None:
+    """``traceback.format_exception()`` returns lines already
+    terminated with ``\\n``. A naive ``"\\n".join(...)`` would emit
+    double newlines and surface as blank lines between every
+    traceback row on the Events page. ``_coerce_log_msg`` strips
+    one trailing newline per line before joining so both shapes
+    (pre-newlined and hand-crafted) produce clean output."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    # Mirrors ``traceback.format_exception()``: each entry ends in
+    # ``\n``. Expected joined output has SINGLE newlines between
+    # rows and no trailing newline; not the doubled-newline gunk a
+    # naive join would produce.
+    pre_newlined = [
+        "Traceback (most recent call last):\n",
+        '  File "main.py", line 42, in <module>\n',
+        "    paint(frame)\n",
+        "RuntimeError: panel busy\n",
+    ]
+    resp = client.post(
+        "/api/v1/device/bedroom_pico/log",
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        data=json.dumps({"level": "error", "msg": pre_newlined}),
+    )
+    assert resp.status_code == 200
+    events = app.config["EVENT_LOG"]
+    rows = events.list(type="device", limit=10)
+    matches = [r for r in rows if r.target == "client_log" and r.source == "bedroom_pico"]
+    expected = (
+        "Traceback (most recent call last):\n"
+        '  File "main.py", line 42, in <module>\n'
+        "    paint(frame)\n"
+        "RuntimeError: panel busy"
+    )
+    assert matches[0].extra.get("msg") == expected
+    # Defensive: confirm no double-newlines snuck in.
+    assert "\n\n" not in matches[0].extra.get("msg")
+
+
 def test_log_endpoint_caps_oversized_msg_at_4kb(app: Flask) -> None:
     """A noisy client can't flood the EventLog one entry at a time:
     msg is capped at 4 KB (post-join for list inputs)."""

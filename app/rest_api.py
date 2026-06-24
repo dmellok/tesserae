@@ -456,10 +456,16 @@ def _coerce_log_msg(raw: Any) -> str:
     a string passes through ``str()`` unchanged. The 512-byte cap
     was raised to 4 KB at the same time, see ``_LOG_MSG_CAP``."""
     if isinstance(raw, list):
-        # Join in two passes so we never materialise a 100 KB string
-        # before deciding to truncate. ``min(len, cap+1)`` cheaply
-        # detects "would have overflowed" without storing the bytes.
-        joined = "\n".join(str(line) for line in raw if line is not None)
+        # ``rstrip("\n")`` per line covers both shapes the wild
+        # produces. ``traceback.format_exception()`` already
+        # terminates each line with ``\n``, so a naive
+        # ``"\n".join(...)`` would emit double newlines and look
+        # like blank lines between every traceback row in the
+        # Events page (flagged by bablokb in
+        # https://github.com/dmellok/tesserae/issues/26 discussion).
+        # Hand-crafted lists without trailing newlines see no
+        # change (rstrip is a no-op then).
+        joined = "\n".join(str(line).rstrip("\n") for line in raw if line is not None)
         return joined[:_LOG_MSG_CAP]
     if raw is None:
         return ""

@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.21], 2026-06-24
+
+### Fixed
+
+- **``POST /api/v1/device/<id>/log`` no longer doubles newlines
+  between traceback lines.** v0.64.20's list-input handling did a
+  naive ``"\n".join(...)`` over the entries, which works perfectly
+  for hand-crafted lists but not for the most common producer of
+  list-shaped tracebacks, ``traceback.format_exception()``, whose
+  entries already end in ``\n``. The result was a blank line
+  between every traceback row on the Events page. Now strips one
+  trailing ``\n`` per line before joining, so both shapes produce
+  the same clean output. Suggested by Bernhard
+  ([@bablokb](https://github.com/bablokb)) right after v0.64.20
+  shipped.
+
 ## [0.64.20], 2026-06-24
 
 ### Changed
