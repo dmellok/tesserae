@@ -6,6 +6,43 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.25], 2026-06-25
+
+### Fixed
+
+- **One stale encrypted secret no longer cascade-fails the entire
+  ``get_section()`` call.** Follow-up to
+  [#29](https://github.com/dmellok/tesserae/issues/29): RealGandy
+  tried the v0.64.24 workaround (delete the wrapped HA token from
+  ``data/core/settings.json``, restart, re-paste) and still got
+  the same ``AES-GCM authentication failed`` error. The cause was
+  that another plugin's older ``*_secret`` value (likely
+  ``spotify``, ``github``, ``marketplace``, or similar, anything
+  configured before the key changed) was still wrapped under the
+  pre-rotation key. ``_unwrap_tree`` walked the plugins section
+  in dict-iteration order and bailed out the moment it hit the
+  first failing decryption, before it ever reached the
+  freshly-rewrapped HA token. So re-entering one plugin's secret
+  appeared to do nothing.
+
+  ``_unwrap_tree`` is now tolerant of per-value failures: each
+  bad value is logged + replaced with an empty string, the rest
+  of the section walk continues. Plugins downstream observe the
+  empty string the same way they'd observe "never set" and fall
+  through to their own "not configured" sentinels (the
+  v0.64.24 "re-enter the secret" entity-picker banner, the
+  plugin's own ``is_configured()`` short-circuit, etc.). One
+  broken secret can't take out the rest of the section any more.
+  The manifest-aware ``get_for_runtime`` path stays strict so a
+  caller asking for a specific token still gets a loud error
+  rather than an empty string and a downstream 401.
+
+  Net effect for someone in RealGandy's spot: they can delete
+  every ``*_secret`` value in ``plugins.*`` (or just the ones
+  for plugins they care about) in one pass and re-enter them as
+  they need to, without the cascade making each individual
+  re-entry look like it did nothing.
+
 ## [0.64.24], 2026-06-25
 
 ### Fixed

@@ -216,3 +216,54 @@ def test_wrong_key_surfaces_error_rather_than_empty_token(tmp_path: Path) -> Non
     store_b = SettingsStore(p, secret_box=box_b)
     with pytest.raises(SecretBoxError):
         store_b.get_for_runtime("plugins", "weather", WIDGET_FIELDS)
+
+
+def test_get_section_tolerates_per_value_decryption_failures(tmp_path: Path) -> None:
+    """v0.64.25, issue #29.
+
+    A single broken ciphertext in a section used to cascade and fail
+    every other secret in the same ``get_section()`` call: the
+    section walker bailed out on the first decryption failure. That
+    surfaced for RealGandy as "I re-entered the HA token but I still
+    get the same error", because a stale ``spotify`` /
+    ``marketplace`` / etc. ``*_secret`` (wrapped under the old key)
+    was failing before the walker ever reached the fresh ha_core
+    token.
+
+    The walker now logs + replaces the bad value with an empty
+    string and keeps going so every other section reads cleanly.
+    Downstream code (the entity picker's "re-enter" sentinel from
+    v0.64.24, or the plugin's own ``is_configured`` check) handles
+    the empty string the same way it would handle "never set"."""
+    import secrets as _s
+
+    from app.secret_box import SecretBox
+
+    p = tmp_path / "s.json"
+    box_a = SecretBox(_s.token_bytes(32))
+    store_a = SettingsStore(p, secret_box=box_a)
+    # Write two plugin secrets under key_a.
+    store_a.update_for_namespace("plugins", "ha_core", {"api_key": "ha-token"}, WIDGET_FIELDS)
+    store_a.update_for_namespace("plugins", "spotify", {"api_key": "spotify-token"}, WIDGET_FIELDS)
+
+    # Operator rotates ``TESSERAE_SECRET_KEY``; key_b can't decrypt
+    # either, both ciphertexts are now stale.
+    box_b = SecretBox(_s.token_bytes(32))
+    store_b = SettingsStore(p, secret_box=box_b)
+
+    # Now re-write just ha_core (the "I deleted token_secret and
+    # re-pasted" workaround) under key_b. ha_core's ciphertext is
+    # fresh; spotify's is still stale.
+    store_b.update_for_namespace("plugins", "ha_core", {"api_key": "fresh-ha-token"}, WIDGET_FIELDS)
+
+    # get_section must NOT raise. Pre-v0.64.25 it did, because the
+    # walker bailed on the stale spotify value before ever reaching
+    # ha_core's freshly-wrapped value.
+    section = store_b.get_section("plugins")
+
+    # ha_core's freshly-wrapped value reads cleanly.
+    assert section["ha_core"]["api_key_secret"] == "fresh-ha-token"
+    # spotify's stale value surfaces as empty, NOT as the old
+    # ciphertext. Downstream is_configured() / entity-picker
+    # sentinel handle empty as "needs to be re-entered".
+    assert section["spotify"]["api_key_secret"] == ""

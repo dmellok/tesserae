@@ -108,12 +108,39 @@ class SettingsStore:
         nodes pass through unchanged; the wrap/unwrap pair is symmetric
         with the ``_disk_key`` suffix convention so we only touch the
         keys we'd have written ciphertext into.
-        """
+
+        Per-value tolerance for decryption failures (v0.64.25, issue
+        [#29](https://github.com/dmellok/tesserae/issues/29)): a single
+        stale ciphertext anywhere in the section, typical culprit is
+        ``TESSERAE_SECRET_KEY`` changing across container restarts, or
+        a data-volume restore with a mismatched
+        ``session_secret_secret``, used to cascade-fail the whole
+        ``get_section()`` call. RealGandy hit this with the HA token
+        re-entered cleanly but another plugin's older
+        ``*_secret`` still wrapped under the old key, the first
+        broken value blew up the read before any other plugin's
+        fresh value could be seen. Now individual failures log +
+        replace with empty string so each broken value surfaces
+        independently downstream (the entity picker's "re-enter the
+        secret" sentinel from v0.64.24, etc.). The manifest-aware
+        ``get_for_runtime`` path stays strict so a caller that
+        explicitly asked for a specific secret still gets a loud
+        error instead of an empty string the plugin then 401s with."""
         if isinstance(value, dict):
             out: dict[Any, Any] = {}
             for k, v in value.items():
                 if isinstance(k, str) and k.endswith("_secret") and isinstance(v, str):
-                    out[k] = self._maybe_unwrap(v)
+                    try:
+                        out[k] = self._maybe_unwrap(v)
+                    except SecretBoxError:
+                        logger.warning(
+                            "settings: stored secret at key %r can't be decrypted "
+                            "with the current SecretBox key; replacing with empty "
+                            "string so the rest of the section reads. Re-enter the "
+                            "secret through the relevant Settings page to repair.",
+                            k,
+                        )
+                        out[k] = ""
                 else:
                     out[k] = self._unwrap_tree(v)
             return out
