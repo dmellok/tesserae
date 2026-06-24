@@ -191,3 +191,69 @@ def test_resolved_options_no_location_returns_missing_coords() -> None:
     assert "latitude" not in out
     assert "longitude" not in out
     assert out.get("label") == ""
+
+
+def test_location_search_macro_value_attribute_survives_html_parse() -> None:
+    """v0.64.23 regression. The ``location_search_field`` macro
+    rendered the saved location via ``value | tojson``. ``tojson``
+    marks its output safe (intended for ``<script>`` context), so
+    the JSON's literal ``"`` characters used to be written verbatim
+    into the ``value="..."`` HTML attribute and terminated the
+    attribute at the first inner quote. The browser parsed
+    ``value="{"`` and ``.value`` came back as the single character
+    ``{``. The downstream symptom: every save-all loop POSTed
+    ``opt_location={``, ``_coerce_cell_option`` JSON-failed back to
+    ``{}``, and the cell location was wiped on the next reload.
+
+    Renders the macro with a realistic saved-location dict, parses
+    the result with ``html.parser`` (which decodes entities the way
+    a browser does), and asserts the round-tripped value attribute
+    round-trips through ``json.loads`` back to the original dict.
+    Catches any future regression to ``tojson`` directly into an
+    HTML attribute."""
+    from html.parser import HTMLParser
+    from pathlib import Path
+
+    from flask import Flask, render_template_string
+
+    repo_root = Path(__file__).resolve().parent.parent
+    app = Flask(__name__, template_folder=str(repo_root / "templates"))
+
+    saved_loc = {
+        "name": "Tokyo",
+        "country": "Japan",
+        "admin1": "Tōkyō",
+        "latitude": 35.6895,
+        "longitude": 139.6917,
+    }
+
+    with app.app_context():
+        rendered = render_template_string(
+            '{% from "_components.html" import location_search_field %}'
+            '{{ location_search_field("test", "opt_location", "Location", value=loc) }}',
+            loc=saved_loc,
+        )
+
+    found: dict[str, str] = {}
+
+    class Hunter(HTMLParser):
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            attr_dict = dict(attrs)
+            # ``data-location-storage`` is a boolean attribute (no value),
+            # so html.parser returns it with value ``None``. ``in``
+            # rather than ``.get(...) is not None`` since None IS the
+            # value here.
+            if "data-location-storage" in attr_dict:
+                found["value"] = attr_dict.get("value", "") or ""
+
+    Hunter().feed(rendered)
+
+    assert found.get("value"), (
+        "hidden input with data-location-storage not found in rendered macro output"
+    )
+
+    # If the value attribute was terminated at the first inner quote,
+    # ``found["value"]`` would be ``"{"`` and json.loads raises. The
+    # whole point of the test is that this round-trips clean.
+    parsed_back = json.loads(found["value"])
+    assert parsed_back == saved_loc

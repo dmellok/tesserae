@@ -6,6 +6,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.23], 2026-06-24
+
+### Fixed
+
+- **Weather widget location reset on any reload-on-change save.**
+  Changing an unrelated cell's plugin / panel preset / theme on
+  the page editor triggers a save-all loop that POSTs every
+  cell's form before reloading the page. Cells using the
+  ``location_search`` field would come back blank from that
+  reload even though the user hadn't touched them. Root cause was
+  in [``templates/_components.html:228``](templates/_components.html#L228):
+  the ``location_search_field`` macro rendered the saved location
+  via ``value | tojson``. ``tojson`` marks its output safe (it's
+  intended for ``<script>`` context, where ``"`` is fine), so the
+  JSON's literal ``"`` characters were written verbatim into the
+  ``value="..."`` HTML attribute and terminated the attribute at
+  the first inner quote. The browser parsed the attribute as
+  ``value="{"`` and ``.value`` came back as the single character
+  ``{``. The save-all loop POSTed ``opt_location={``,
+  ``_coerce_cell_option`` JSON-failed and fell back to ``{}``,
+  and the cell location was wiped on the next reload.
+  ``|forceescape`` (which re-escapes even Markup-tagged strings,
+  ``|e`` short-circuits on Markup) now sits in the chain so the
+  inner quotes become ``&quot;`` and the attribute survives.
+- **Regression test in [``tests/test_location_search.py``](tests/test_location_search.py)**
+  renders the macro through Flask, parses the result with
+  ``html.parser`` (which decodes entities the way a browser
+  does), and asserts the hidden input's ``value`` attribute
+  round-trips through ``json.loads`` back to the original dict.
+  Catches any future regression that re-introduces an unescaped
+  ``tojson`` directly into an HTML attribute.
+
+  Caught by inspecting the actual POST body that triggered the
+  reset, the ``Form Data`` showed ``opt_location={``, which made
+  the root cause obvious in hindsight.
+
 ## [0.64.22], 2026-06-24
 
 ### Removed
