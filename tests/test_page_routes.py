@@ -285,6 +285,86 @@ def test_delete_page_removes_it(app: Flask, tmp_path: Path) -> None:
     assert _store(tmp_path).get(pid) is None
 
 
+# -- duplicate ------------------------------------------------------
+
+
+def test_duplicate_page_creates_copy_with_suffixed_name(app: Flask, tmp_path: Path) -> None:
+    """First duplicate of ``"Home"`` lands as ``"Home copy"`` with a fresh
+    page id; the source row stays unchanged."""
+    client = app.test_client()
+    _sign_in(client)
+    src_id = _new(client, name="Home")
+    resp = client.post(f"/pages/{src_id}/duplicate", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    new_id = resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+    assert new_id != src_id
+    store = _store(tmp_path)
+    copy = store.get(new_id)
+    assert copy is not None
+    assert copy.name == "Home copy"
+    assert store.get(src_id) is not None and store.get(src_id).name == "Home"
+
+
+def test_duplicate_page_collision_suffixes_with_number(app: Flask, tmp_path: Path) -> None:
+    """A second duplicate of the same source lands as ``"Home copy 2"``,
+    a third as ``"Home copy 3"``, etc."""
+    client = app.test_client()
+    _sign_in(client)
+    src_id = _new(client, name="Home")
+    for expected_name in ("Home copy", "Home copy 2", "Home copy 3"):
+        resp = client.post(f"/pages/{src_id}/duplicate", follow_redirects=False)
+        new_id = resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+        assert _store(tmp_path).get(new_id).name == expected_name
+
+
+def test_duplicate_of_a_duplicate_strips_trailing_copy_suffix(app: Flask, tmp_path: Path) -> None:
+    """Duplicating ``"Home copy"`` lands on ``"Home copy 2"`` (Finder /
+    Google Docs convention), not ``"Home copy copy"``. Same for
+    ``"Home copy 2"`` → ``"Home copy 3"``."""
+    client = app.test_client()
+    _sign_in(client)
+    src_id = _new(client, name="Home")
+    chain = [src_id]
+    for expected_name in ("Home copy", "Home copy 2", "Home copy 3"):
+        resp = client.post(f"/pages/{chain[-1]}/duplicate", follow_redirects=False)
+        new_id = resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+        assert _store(tmp_path).get(new_id).name == expected_name
+        chain.append(new_id)
+
+
+def test_duplicate_page_regenerates_cell_ids_so_edits_dont_bleed(
+    app: Flask, tmp_path: Path
+) -> None:
+    """Every cell in the copy gets a fresh id so a cell-level update on
+    the copy can't write back to the source's cell. Plugin + options on
+    the cells are preserved."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    src_id = _new(client, name="Home", layout="1_cell")
+    src_cell = _store(tmp_path).get(src_id).cells[0]
+    client.post(
+        f"/pages/{src_id}/cells/{src_cell.id}",
+        data={"plugin": "widget_a", "x": "0", "y": "0", "w": "800", "h": "600"},
+    )
+    resp = client.post(f"/pages/{src_id}/duplicate", follow_redirects=False)
+    new_id = resp.headers["Location"].rstrip("/").rsplit("/", 1)[-1]
+    copy = _store(tmp_path).get(new_id)
+    assert len(copy.cells) == 1
+    assert copy.cells[0].plugin == "widget_a"
+    assert copy.cells[0].id != src_cell.id
+
+
+def test_duplicate_missing_page_redirects_with_flash(app: Flask, tmp_path: Path) -> None:
+    """Duplicating an unknown id flashes an error and redirects to the
+    list rather than 500-ing or returning 404."""
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/pages/does-not-exist/duplicate", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert resp.headers["Location"].rstrip("/").endswith("/pages")
+
+
 # -- layout apply ---------------------------------------------------
 
 

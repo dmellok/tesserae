@@ -2696,6 +2696,20 @@
 }
 .dx-btn-icon-only .ph { font-size: 14px; }
 
+/* When an icon-only sibling sits in the same actions row as text
+   buttons (e.g. Edit + Push + Duplicate + Delete on the Dashboards
+   list, or the equivalent on Devices / History), pin the text
+   variants to the same 34px square height as ``.dx-btn-icon-only``
+   so the row reads as a balanced strip rather than a jagged mix.
+   Pre-fix the text variants were content-sized (~30px) so the
+   icon-only squares stood proud of them at narrow widths where the
+   row wraps. */
+.dx-discovered-actions .dx-btn-primary-sm,
+.dx-discovered-actions .dx-btn-ghost-sm {
+  min-height: 34px;
+  box-sizing: border-box;
+}
+
 /* Dashboards list (Tier 1.1). The dashboard row is built on
    .dx-inset-row + .dx-section-icon + a meta strip; class names below
    are dashboard-specific to keep the row layout decoupled from the

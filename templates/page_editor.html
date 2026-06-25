@@ -167,6 +167,11 @@
         <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
       </button>
     </form>
+    <form method="post" action="{{ url_for('pages.duplicate', page_id=page.id) }}" class="inline">
+      <button type="submit" class="ghost" title="Duplicate this dashboard">
+        <i class="ph ph-copy" aria-hidden="true"></i>
+      </button>
+    </form>
     <form method="post" action="{{ url_for('pages.delete', page_id=page.id) }}" class="inline"
           onsubmit="return confirm('Delete this dashboard entirely?');">
       <button type="submit" class="ghost danger" title="Delete dashboard">

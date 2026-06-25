@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.31], 2026-06-26
+
+### Added
+
+- **Duplicate dashboard.** A copy button on the dashboards list and in
+  the page editor header clones the current dashboard (cells, theme,
+  style, font, device bindings, panel override, per-cell options) under
+  ``"<name> copy"``, falling back to ``"<name> copy 2"`` /
+  ``"<name> copy 3"`` on name collision. Page id and every cell id are
+  regenerated so the copy is fully independent of the source, useful
+  for iterating on a layout without risk to a dashboard already bound to
+  a panel. Per [discussions#6](https://github.com/dmellok/tesserae/discussions/6).
+
 ## [0.64.30], 2026-06-26
 
 ### Added

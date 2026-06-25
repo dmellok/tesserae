@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 import uuid
 from typing import Any
@@ -111,6 +112,30 @@ def _random_page_id(taken: set[str]) -> str:
         pid = uuid.uuid4().hex[:12]
         if pid not in taken:
             return pid
+
+
+_COPY_SUFFIX_RE = re.compile(r"\s+copy(?:\s+\d+)?$")
+
+
+def _duplicate_name(original: str, taken: set[str]) -> str:
+    """Compute the name for a duplicated page: ``"<original> copy"`` when
+    the slot's free, else ``"<original> copy 2"``, ``"<original> copy 3"``,
+    etc. on collision.
+
+    A trailing ``" copy"`` or ``" copy N"`` is stripped off the source name
+    first, so duplicating ``"Home copy"`` lands on ``"Home copy 2"`` rather
+    than stacking to ``"Home copy copy"``. Matches the Finder / Google Docs
+    convention. Falls back to a random suffix only after a hundred
+    collisions (effectively never)."""
+    stripped = _COPY_SUFFIX_RE.sub("", original).rstrip()
+    base = f"{stripped} copy"
+    if base not in taken:
+        return base
+    for n in range(2, 100):
+        candidate = f"{base} {n}"
+        if candidate not in taken:
+            return candidate
+    return f"{base} {uuid.uuid4().hex[:6]}"
 
 
 def _coerce_float(
@@ -746,6 +771,32 @@ def delete(page_id: str) -> Response:
     else:
         flash(f"No page with id {page_id!r}.", "error")
     return redirect(url_for("pages.index"))
+
+
+@bp.post("/<page_id>/duplicate")
+def duplicate(page_id: str) -> Response:
+    """Clone an existing dashboard into a new one and drop the user into
+    the editor for the copy. Preserves cells, theme, font, style, device
+    bindings, panel override, and per-cell options; regenerates ids
+    (page + every cell) so the copy is fully independent of the source."""
+    src = _store().get(page_id)
+    if src is None:
+        flash(f"No page with id {page_id!r}.", "error")
+        return redirect(url_for("pages.index"))
+
+    pages = _store().list()
+    taken_ids = {p.id for p in pages}
+    taken_names = {p.name for p in pages}
+    new_id = _random_page_id(taken_ids)
+    new_name = _duplicate_name(src.name, taken_names)
+
+    # Fresh cell ids so the copy is independent: a cell-level update on
+    # the copy must never reach into the source's pages.json entry.
+    new_cells = [c.model_copy(update={"id": uuid.uuid4().hex[:8]}) for c in src.cells]
+    copy = src.model_copy(update={"id": new_id, "name": new_name, "cells": new_cells})
+    _store().save(copy)
+    flash(f"Duplicated as {new_name!r}.", "ok")
+    return redirect(url_for("pages.edit", page_id=new_id))
 
 
 @bp.post("/<page_id>/layout")
