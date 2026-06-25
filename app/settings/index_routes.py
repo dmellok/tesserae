@@ -243,6 +243,15 @@ def settings_area(area: str) -> str | Response:
         # one).
         pairing_codes=_pending_pairings() if area == "devices" else [],
         pairing_reveal=session.pop("_rest_pairing_reveal", None),
+        # About tab: meta + outbound links. URLs are constants for
+        # now; if the survey rotates we'll bump the form id here
+        # rather than rewiring the template. ``APP_VERSION`` is the
+        # version app_factory resolved at boot (from importlib.metadata
+        # or the git tag fallback); reusing it keeps a single source
+        # of truth across the About card and other surfaces.
+        about_app_version=str(current_app.config.get("APP_VERSION") or "unknown"),
+        about_survey_url="https://tally.so/r/QKjGZ1",
+        about_sponsor_url="https://github.com/sponsors/dmellok",
     )
 
 

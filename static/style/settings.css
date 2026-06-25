@@ -2928,3 +2928,59 @@
  *  6f. PAGE — Widgets Browse (/plugins/browse)
  *     EXTRACTED → static/style/dx-marketplace.css (v0.63.7).
  * ============================================================ */
+
+/* ============================================================
+ *  6g. PAGE — Settings → About
+ *     Three flat cards: project meta, survey CTA, sponsor CTA.
+ *     The page reuses .meta from shell.css, but overrides the
+ *     flex-wrap row to a two-column grid because the values here
+ *     are long URLs and a wrap-row reads as untidy. .actions-end
+ *     right-aligns the lone CTA on the survey + sponsor cards
+ *     so the button anchors to the card edge instead of
+ *     floating in the middle.
+ * ============================================================ */
+
+.settings-about .lede {
+  margin: var(--t-space-2) 0 var(--t-space-3);
+  color: var(--t-fg-soft);
+  max-width: 64ch;
+}
+
+.settings-about .about-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--t-space-4);
+  row-gap: var(--t-space-2);
+  margin-top: var(--t-space-3);
+}
+
+.settings-about .about-meta div {
+  display: contents;
+}
+
+.settings-about .about-meta dt {
+  font-size: var(--t-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--t-muted);
+  margin: 0;
+  align-self: center;
+}
+
+.settings-about .about-meta dd {
+  margin: 0;
+  font-size: var(--t-size-sm);
+  color: var(--t-fg);
+  align-self: center;
+}
+
+.settings-about .about-meta dd code {
+  font-size: var(--t-size-sm);
+}
+
+.settings-about .actions-end {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--t-space-3);
+}

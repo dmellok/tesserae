@@ -6,6 +6,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.27], 2026-06-25
+
+### Added
+
+- **Settings → About**, a new tab carrying the install's project
+  meta (version, license, source / docs / discussions links), a
+  prompt to fill out a six-question Tally survey on how people
+  use Tesserae (since v0.64.22 ripped phone-home telemetry,
+  asking is the only signal channel left), and a "Support the
+  project" card linking to GitHub Sponsors. Survey is anonymous,
+  optional per question. Three cards, no forms, no manifest
+  sections; the route passes the version and the two outbound
+  URLs in.
+
+### Removed
+
+- **"Test broker connection" diagnostics card on Settings →
+  Server.** The card was rarely used now that REST is the default
+  transport, and sitting next to the much taller Session card it
+  produced a visible height mismatch at the bottom of the page.
+  The underlying ``auth.diagnostics_test_broker`` route is left
+  intact (no broken bookmarks); the UI surface is gone.
+
 ## [0.64.26], 2026-06-25
 
 ### Changed
