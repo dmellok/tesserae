@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.64.27"
+version = "0.64.28"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -14,6 +14,13 @@ dependencies = [
     "pydantic>=2.6,<3",
     "jsonschema>=4.21,<5",
     "pillow>=10.2,<12",
+    # HEIF / HEIC decoder, registered with Pillow at import time. iPhone
+    # photos arrive HEIC by default; without this the picture_* widget
+    # family falls through to "broken image" tiles whenever a library
+    # holds an unprocessed HEIC asset. Wheel-bundled libheif on every
+    # tier-1 platform (linux x86_64/arm64, macOS arm64), so this stays
+    # pure pip with no system-package step.
+    "pillow-heif>=0.22,<2",
     "numpy>=1.26,<3",
     "paho-mqtt>=2.0,<3",
     # Pinned to a minor: Playwright's Python client and the bundled

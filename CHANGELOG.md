@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.28], 2026-06-25
+
+### Added
+
+- `pillow-heif` added to the host dependencies. Registers a HEIF
+  decoder with Pillow at import time so any picture-family widget
+  can transcode iPhone HEIC originals to JPEG on the proxy path.
+  Wheel-bundled `libheif` on every tier-1 platform, no system
+  package step required.
+
 ## [0.64.27], 2026-06-25
 
 ### Added
