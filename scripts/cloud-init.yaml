@@ -1,0 +1,68 @@
+#cloud-config
+# Tesserae self-hosted dashboard server, automated install via cloud-init.
+#
+# Tested on Debian Trixie under Ubuntu MicroCloud (Raspberry Pi) and
+# Proxmox VE LXC (x86). Pass via your LXC launcher's user-data field, e.g.:
+#
+#   lxc launch images:debian/trixie tesserae \
+#     --config=user.user-data="$(cat scripts/cloud-init.yaml)"
+#
+# Or, on Proxmox: paste into Datacenter > CT > Cloud-Init > User Data.
+#
+# DO NOT run Tesserae open to the internet. The auth model is a single
+# password gate intended for a trusted home LAN. Use a homelab box, a Pi
+# on your LAN, or a private network. If you need remote access, put
+# Tesserae behind a VPN (Tailscale, WireGuard, ZeroTier).
+#
+# What this does:
+#   1. Installs git, python3, python3.13-venv, openssh-server, less, rsync.
+#   2. Creates a non-root `tesserae` user.
+#   3. Clones Tesserae into ~tesserae/tesserae and builds the venv.
+#   4. Installs Playwright's bundled Chromium plus its system runtime deps
+#      so the webpage widget and Send -> Webpage tab work out of the box.
+#   5. Installs the systemd unit so the service starts on boot.
+#
+# What this does NOT do:
+#   - Open ports in any host firewall.
+#   - Provision an MQTT broker. Point Tesserae at one via Settings -> Server
+#     after first boot, or toggle on the built-in broker.
+#
+# Persistent state lives at /home/tesserae/tesserae/data/. Back up that
+# directory (pages, settings, devices, themes, render cache, sqlite logs).
+#
+# Expected first-boot duration: ~3 to 8 minutes on a Pi 4 / CM4, dominated
+# by `pip install`. Check progress with `tail -f /var/log/cloud-init-output.log`
+# inside the container.
+
+package_update: true
+package_upgrade: false
+
+packages:
+  - git
+  - python3
+  - python3.13-venv
+  - openssh-server
+  - less
+  - rsync
+
+users:
+  - name: tesserae
+    gecos: ""
+    shell: /bin/bash
+    lock_passwd: true
+    # Add your SSH public key here to log in as the tesserae user.
+    # ssh_authorized_keys:
+    #   - ssh-ed25519 AAAA...your-key...
+
+runcmd:
+  - su - tesserae -c 'git clone https://github.com/dmellok/tesserae.git /home/tesserae/tesserae'
+  - su - tesserae -c 'cd /home/tesserae/tesserae && python3 -m venv .venv'
+  - su - tesserae -c 'cd /home/tesserae/tesserae && .venv/bin/pip install -e ".[dev]"'
+  - /home/tesserae/tesserae/.venv/bin/playwright install-deps chromium
+  - su - tesserae -c 'cd /home/tesserae/tesserae && .venv/bin/playwright install chromium'
+  - env NONINTERACTIVE=1 TESSERAE_USER=tesserae TESSERAE_DIR=/home/tesserae/tesserae bash /home/tesserae/tesserae/scripts/install-systemd.sh
+
+final_message: |
+  Tesserae installed and running as a systemd service.
+  Open http://<container-ip>:8765/ to finish setup.
+  Logs: journalctl -u tesserae -f

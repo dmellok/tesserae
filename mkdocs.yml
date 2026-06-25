@@ -84,6 +84,7 @@ nav:
   - Gallery: gallery.md
   - Install Tesserae: install/server.md
   - Install via Docker: install/docker.md
+  - Install via LXC: install/lxc.md
   - Home Assistant integration: install/home-assistant.md
   - Spotify widget on Home Assistant: install/spotify-home-assistant.md
   - Install a client: install/clients.md

@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.30], 2026-06-26
+
+### Added
+
+- **[`docs/install/lxc.md`](install/lxc.md)** documents installing
+  Tesserae inside an LXC container, covering Proxmox VE for x86
+  homelab hosts and Ubuntu MicroCloud for arm64 Raspberry Pi. Lists
+  the package set, user setup, and the data directory layout, and
+  notes the LAN-only auth model with a VPN-for-remote-access
+  pointer.
+- **[`scripts/cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/cloud-init.yaml)**
+  automates the same install via cloud-init. Drops in as the
+  `user-data` field for MicroCloud / Proxmox / any cloud-init-aware
+  image. Installs the venv, downloads Playwright's bundled Chromium
+  so webpage widgets work out of the box, and registers the
+  systemd unit.
+
 ## [0.64.29], 2026-06-25
 
 ### Changed
