@@ -46,6 +46,24 @@ format works. Two popular options:
 
 ### openapi-generator (40+ language targets)
 
+Install via pip. The generator itself is a Java program, so you either
+need a system JDK on your PATH, or you can pull a bundled runtime via
+the `jdk4py` extra:
+
+```sh
+# Bundled JDK (works without any system Java setup):
+pip install "openapi-generator-cli[jdk4py]"
+
+# Or, if you already have Java installed:
+pip install openapi-generator-cli
+```
+
+Note that openapi-generator's output is heavyweight by design (it covers
+every spec feature, ships its own runtime helpers). It's a good fit for
+desktop or server consumers; for memory-constrained targets like
+CircuitPython or MicroPython on a microcontroller, you'll probably want
+to hand-write a minimal client against the spec instead.
+
 ```sh
 # Python
 openapi-generator-cli generate \

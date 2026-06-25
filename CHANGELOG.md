@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.29], 2026-06-25
+
+### Changed
+
+- **[``docs/dev/openapi.md``](dev/openapi.md)** gains an install
+  block showing ``pip install "openapi-generator-cli[jdk4py]"`` for
+  users who don't have a system JDK on PATH (the generator itself
+  is a Java program; ``jdk4py`` is a pip extra that bundles a JDK
+  runtime). Also adds a short note flagging that
+  openapi-generator's output is heavyweight by design and a poor
+  fit for memory-constrained MCU targets, where a hand-written
+  minimal client against the spec is the better path.
+
 ## [0.64.28], 2026-06-25
 
 ### Added
