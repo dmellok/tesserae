@@ -26,7 +26,8 @@ account required.
 install guides, [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
 [community catalog](https://dmellok.github.io/tesserae/widgets/community/),
 [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
-[how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/).
+[how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/),
+[how to add hardware support](https://dmellok.github.io/tesserae/dev/adding-hardware/).
 
 ## Quick start
 
@@ -102,14 +103,6 @@ Per-client setup walkthroughs (the firmware repos in the Client column):
 [Install a client](https://dmellok.github.io/tesserae/install/clients/).
 Full renderer / device-kind compatibility matrix:
 [Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/).
-
-### Adding a new SKU
-
-A new e-paper SKU that uses an existing protocol (TRMNL BYOS, MQTT
-binary, MQTT PNG, REST pull) is a single JSON file under
-`hardware/<vendor>/<model>.json`. Schema:
-[schema/hardware.schema.json](schema/hardware.schema.json).
-Worked example: [`hardware/seeed/reterminal_e1003.json`](hardware/seeed/reterminal_e1003.json).
 
 ## Privacy
 

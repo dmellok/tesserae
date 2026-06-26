@@ -6,6 +6,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.35], 2026-06-27
+
+### Changed
+
+- **README's inline "Adding a new SKU" section removed** in favour of
+  the dedicated [docs/dev/adding-hardware.md](dev/adding-hardware.md)
+  page added in 0.64.33. The contribution path stays discoverable via
+  a new link in the Full Documentation callout at the top of the
+  README.
+
 ## [0.64.34], 2026-06-27
 
 ### Fixed
