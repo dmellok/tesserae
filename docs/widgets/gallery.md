@@ -2,7 +2,7 @@
 
 # Widget gallery
 
-The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
+The **33 widgets** that ship with Tesserae. Each is a drop-a-folder widget under `plugins/<id>/`; drop your own in and it shows up in the editor's picker. Want to build one? See [Build a widget with AI](../dev/writing-a-widget.md).
 
 !!! note "Stability tiers"
     **Stable** = backed by an official, documented API. **Best-effort** = undocumented but long-lived endpoint. **Fragile** = scraping or a soft policy, convenience only. **Local** = computed on the host, no upstream to break. See [Screens & compatibility](../compatibility.md) for the hardware side.
@@ -352,5 +352,53 @@ The **30 widgets** that ship with Tesserae. Each is a drop-a-folder widget under
     Embed an external URL in a cell. The composer captures whatever the iframe renders, handy for status pages, public dashboards, or any site that doesn't deny embedding. Same headless-render path as the Send tab is used when the panel renders. Sites that set X-Frame-Options:DENY or strict CSP cannot be embedded.
 
     **Sizes:** `sm` `md` `lg` &middot; **Tier:** -
+
+</div>
+
+## Countdown
+
+<div class="grid cards" markdown>
+
+-   **Countdown, Date** &middot; `countdown_date`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Days remaining until a target date. Glanceable single-number hero with an optional label. Pure client-side, no network.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
+
+</div>
+
+## Device
+
+<div class="grid cards" markdown>
+
+-   **Device Batteries** &middot; `device_battery`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    Battery level for every registered device that reports a battery_pct heartbeat (ESP32-S3, PhotoPainter, etc). Sorted lowest-first so the panel that needs charging surfaces to the top. Predicts days-to-empty from the last seven days of history, when available.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
+
+</div>
+
+## Year
+
+<div class="grid cards" markdown>
+
+-   **Year, Progress** &middot; `year_progress`
+
+    ---
+
+    _Screenshot pending, run `python scripts/capture_widget_shots.py`._
+
+    How far through the year you are. Two modes: the current calendar year as a row of weekly dots, or 'life in weeks' as a long-form grid (give a birth year). Pure client-side, no network.
+
+    **Sizes:** `xs` `sm` `md` `lg` &middot; **Tier:** Local
 
 </div>

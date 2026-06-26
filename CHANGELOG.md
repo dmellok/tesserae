@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.34], 2026-06-27
+
+### Fixed
+
+- **[`docs/widgets/gallery.md`](widgets/gallery.md)** regenerated, was
+  stale at 30 widget cards while the actual bundled set is 33. Re-ran
+  `scripts/gen_widget_gallery.py` to refresh the page from the live
+  plugin manifests.
+- **[`docs/credits.md`](credits.md)** bundled-fonts table missing
+  three OFL entries: Archivo Narrow, Bodoni Moda, and Jost. All three
+  live under `plugins/fonts_core/static/` and ship with the host. Now
+  listed with their designers.
+
 ## [0.64.33], 2026-06-27
 
 ### Changed

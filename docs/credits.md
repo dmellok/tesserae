@@ -21,13 +21,16 @@ live in `plugins/fonts_core/static/`.
 | [Anton](https://fonts.google.com/specimen/Anton) | Vernon Adams | OFL |
 | [Archivo](https://fonts.google.com/specimen/Archivo) | Omnibus-Type | OFL |
 | [Archivo Black](https://fonts.google.com/specimen/Archivo+Black) | Omnibus-Type | OFL |
+| [Archivo Narrow](https://fonts.google.com/specimen/Archivo+Narrow) | Omnibus-Type | OFL |
 | [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont) | Braille Institute | OFL |
 | [Bebas Neue](https://fonts.google.com/specimen/Bebas+Neue) | Ryoichi Tsunekawa | OFL |
+| [Bodoni Moda](https://fonts.google.com/specimen/Bodoni+Moda) | Indestructible Type | OFL |
 | [Crimson Pro](https://fonts.google.com/specimen/Crimson+Pro) | Sebastian Kosch | OFL |
 | [DM Serif Display](https://fonts.google.com/specimen/DM+Serif+Display) | Colophon Foundry | OFL |
 | [IBM Plex Sans / Serif / Mono](https://www.ibm.com/plex/) | IBM | OFL |
 | [Inter](https://rsms.me/inter/) | Rasmus Andersson | OFL |
 | [JetBrains Mono](https://www.jetbrains.com/lp/mono/) | JetBrains | OFL |
+| [Jost](https://fonts.google.com/specimen/Jost) | Indestructible Type | OFL |
 | [Lora](https://fonts.google.com/specimen/Lora) | Cyreal | OFL |
 | [Manrope](https://manropefont.com/) | Mikhail Sharanda | OFL |
 | [Outfit](https://fonts.google.com/specimen/Outfit) | Smith | OFL |
