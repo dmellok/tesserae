@@ -104,6 +104,7 @@ nav:
       - Cross-widget design system: widget-design-system.md
       - Design brief template: widget-design-brief.md
   - Client development:
+      - Add hardware support: dev/adding-hardware.md
       - Client protocol spec: dev/client-protocol.md
       - OpenAPI spec & SDK generation: dev/openapi.md
   - Privacy: privacy.md

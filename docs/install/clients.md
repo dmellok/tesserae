@@ -1,19 +1,20 @@
 # Install a client
 
 The Tesserae server publishes frames; a **client** on the other end paints your
-panel. Six reference clients live in their own repos, pick whichever matches
-your hardware. Five of them subscribe to MQTT (Pi + ESP32); the sixth (TRMNL
-/ KOReader-on-Kindle) polls the server over HTTP. All six use the same
-device-registration flow described in [Set up a device](devices.md).
+panel. Six reference clients live in their own repos, plus an HTTP-pull path
+that uses TRMNL's stock firmware (or KOReader on a Kindle), no Tesserae-built
+client involved. All paths use the same device-registration flow described in
+[Set up a device](devices.md).
 
 | Client | Transport | Default id | Best for |
 |---|---|---|---|
 | `tesserae-device-esp32-bin` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
-| `tesserae-device-photopainter-7.3-bin` | MQTT | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
+| `tesserae-device-photopainter-7.3-bin` | MQTT / REST | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
 | `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
 | `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
-| `tesserae-device-pi-png` | MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
-| `tesserae-trmnl-client` | HTTP-pull | `trmnl` | TRMNL devices + KOReader-on-Kindle |
+| `tesserae-device-pi-png` | REST / MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
+| `tesserae-device-pico-bin` | MQTT | `pico_bin` | Pimoroni Pico-driven Inky Impression (4-bpp Spectra 6) |
+| [TRMNL stock firmware](https://github.com/usetrmnl/trmnl-firmware) or [KOReader plugin](https://github.com/koreader/koreader) | HTTP-pull (BYOS) | `trmnl` | TRMNL devices + KOReader-on-Kindle |
 
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
 client and what's been tested on real hardware.
@@ -95,14 +96,16 @@ wire-compatible with the inky-dash v3/v4 listener protocol.
 
 ## TRMNL / KOReader (HTTP-pull)
 
-[:material-github: dmellok/tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client)
+[:material-github: usetrmnl/trmnl-firmware](https://github.com/usetrmnl/trmnl-firmware)
+or [:material-github: koreader/koreader](https://github.com/koreader/koreader) (`trmnl-display` plugin)
 · pairs with the `trmnl_png` renderer · default id `trmnl`
 
-For TRMNL devices and Kindle e-readers running KOReader's
-`trmnl-display` plugin. Instead of subscribing to MQTT, the device polls
-`GET /api/display` on a schedule (the response carries the next frame
-URL and the next-poll interval). No broker required, handy when you
-want a panel that "just talks to the internet".
+Tesserae doesn't ship its own client here. TRMNL devices already run
+TRMNL's stock firmware (which speaks the BYOS protocol Tesserae implements
+server-side), and Kindles use KOReader's `trmnl-display` plugin. Either
+way, the device polls `GET /api/display` on a schedule, the response
+carries the next frame URL and the next-poll interval. No broker required,
+handy when you want a panel that "just talks to the internet".
 
 Pairing has two paths:
 

@@ -9,288 +9,26 @@
 
 <p align="center">
   <a href="docs/screenshots/hero-rack.jpg">
-    <img src="docs/screenshots/hero-rack.jpg" alt="A wooden tabletop with six different e-ink panels, each painting a different Tesserae dashboard: a framed weather/clock/Spotify panel, a Waveshare Spectra 6 bare board showing F1 schedule, the centre 13.3 inch Spectra 6 panel running a GitHub stats dashboard, a Kindle Paperwhite running an OctoPrint dashboard, a Waveshare 7.3 inch PhotoPainter running a weather/pollen view, and a framed Inky 13.3 inch showing the month calendar plus Hacker News" width="900">
+    <img src="docs/screenshots/hero-rack.jpg" alt="Six different e-ink panels on a wooden tabletop, each painting a different Tesserae dashboard: framed weather + clock + Spotify, a Waveshare Spectra 6 board showing the F1 schedule, a 13.3 inch Spectra 6 panel running a GitHub stats dashboard, a Kindle Paperwhite running an OctoPrint dashboard, a Waveshare 7.3 inch PhotoPainter showing a weather + pollen view, and a framed Inky 13.3 inch with the month calendar plus Hacker News" width="900">
   </a>
   <br>
-  <em>Six panels, one Tesserae server. Framed Inkys, bare Waveshare boards driven by ESP32, and a jailbroken Kindle, all painting different dashboards from the same composer.</em>
+  <em>Six panels, one Tesserae server.</em>
 </p>
 
-For more, see the
-[admin UI gallery](https://dmellok.github.io/tesserae/gallery/)
-and the
-[bundled widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/).
+Self-hosted dashboard companion for e-ink displays. Compose tile-based
+dashboards in a browser, render the frame headless, push it to one or
+more panels over MQTT or HTTP.
 
-E-ink dashboard companion. Compose tile-based dashboards in the browser,
-render headless, push the resulting frame to one or more devices, Pi
-and ESP32 over MQTT, TRMNL / KOReader over HTTP-pull.
+Open source under AGPL-3.0-or-later. No SaaS, no telemetry, no cloud
+account required.
 
-Every layer, widgets, themes, fonts, renderers, and device kinds, is
-a drop-a-folder plugin. Adding new hardware (or a new widget) is a
-contained change.
-
-**📖 [Full documentation](https://dmellok.github.io/tesserae/)** -
-install guides, the [bundled gallery](https://dmellok.github.io/tesserae/widgets/gallery/)
-(30 widgets) and [community catalog](https://dmellok.github.io/tesserae/widgets/community/)
-(16 + bundles), the [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
-and [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/) (with AI).
-
-> **Self-hosted hobby project.** Tesserae installs with `docker compose up`
-> or a `git clone`. The admin UI is polished, but the deployment story
-> still assumes you can read tracebacks if something goes wrong. Aimed at
-> people running a Pi appliance at home.
-
-## Status
-
-A working hobbyist build. Composer → renderers → transport → devices
-pipeline, scheduler (with opt-in smart sync for JIT rendering against
-device sleep telemetry), Home Assistant MQTT auto-discovery, webhook
-push, data export / import, theme builder (with image-to-palette
-extraction), form-driven page editor, the community widget catalog,
-and the modern admin UI are all in. Multi-head is built in throughout,
-register multiple panels, bind a dashboard to a specific display,
-auto-discover clients that announce themselves on the broker.
-
-33 widgets bundled across the universally-useful set, weather, clocks,
-calendar, news (HN / RSS / Wikipedia OTD), HA, picture gallery, todo,
-webpage, plus the `weather_now_scenic` reference for the
-`design.palette: extended` opt-in. Another 16 entries cover niche /
-credential-gated families (F1, Spotify, GitHub, Finance, Sky, Glances,
-OctoPrint, Unsplash, iCloud Shared Albums, and more) via the
+**📖 [Full documentation](https://dmellok.github.io/tesserae/):**
+install guides, [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
 [community catalog](https://dmellok.github.io/tesserae/widgets/community/),
-one-click install from Settings → Widgets → Browse. See
-[widget stability tiers](https://dmellok.github.io/tesserae/widgets/tiers/)
-for an upfront read on which depend on undocumented upstreams.
+[architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
+[how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/).
 
-Tests + ruff + mypy `--strict` (on contract modules) clean. CI runs on
-every push.
-
-For support, head to [Discussions](https://github.com/dmellok/tesserae/discussions).
-
-<details>
-<summary><b>Full feature list</b>, what's actually in the box (click to expand)</summary>
-
-### Composition
-
-- **Browser-based page editor** with form-driven cell options, live preview, and per-cell content-zoom slider.
-- **10 layout presets** (1-cell, 2/3 column, 2/3 row, 2×2 grid, hero top/bottom/left/right, hero sandwich), fraction-based so the same layout works at any panel size; "Custom layout" snaps to a grid you set.
-- **Per-cell overrides**: theme, style (typography), font, content zoom. Cells inherit the page's pick by default; the override flag lets a single tile break from the rest.
-- **Reactive layout for mobile editing**, preview stacks above the cell forms on small viewports, with a floating back-to-top button (drag along the bottom to flip side for left-handed grips).
-- **33 widgets bundled** across the universal set (weather, clocks, calendar, news, HA, picture gallery, todo, webpage). The slim-down landed in 0.38–0.42; niche / credential-gated families moved to the [community catalog](https://github.com/dmellok/tesserae-widgets) as installable bundles (F1, Spotify, GitHub, Finance, Sky, Glances, OctoPrint, Unsplash, iCloud Shared Albums, more).
-- **Drop-a-folder widget plugins**, `plugin.json` + `server.py` + `client.{js,css}`, manifest schema validated at load. The orthogonal `data-theme` × `data-style` Spectra axes let one widget compose with every theme + typography pairing instead of shipping N variants per widget.
-- **`design.palette: extended` opt-in** for decorative widgets that want gradients / layered shapes / soft shadows (the renderer's Floyd-Steinberg dither approximates them on the panel palette); strict tokens stay the default. [Reference impl: weather_now_scenic](https://github.com/dmellok/tesserae/tree/main/plugins/weather_now_scenic).
-- **Capability declarations** (`requires: [network:..., settings:..., filesystem:write:...]` in `plugin.json`) gated at the socket layer for network egress so a widget can't quietly call home outside its declared upstreams; reviewer-visible for the rest. Bundled + catalog widgets ship declarations.
-
-### Rendering
-
-- **Headless Playwright** server-side renderer with a persistent browser pool (toggle to fall back to one-shot).
-- **Drop-a-folder renderer plugins**, currently 6: `pi_png` (universal Pimoroni `inky` path over MQTT), `pi_bin` (pre-packed 4-bpp buffer for Inky Impression), `esp32_bin` (Waveshare 13.3" Spectra 6 + 7.3" PhotoPainter over MQTT), `esp32_bw_bin` (pre-packed 1-bpp buffer for Waveshare 4.2" B/W panels over MQTT), `pico_bin` (pre-packed 4-bpp buffer for Inky-style Spectra 6 driven by Pico Plus 2 firmware), `trmnl_png` (1-bit greyscale PNG over HTTP).
-- **Eight dither modes** for the `.bin` packers: Floyd-Steinberg + none (Pillow paths), plus Atkinson / Jarvis-Judice-Ninke / Stucki / Bayer-8x8 / halftone / crosshatch (NumPy paths).
-- **Opt-in calibrated palette + tone mapping** (per device), dithers against the panel's measured colours instead of nominal sRGB primaries. Palette data ported from [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize); paired with a linear sRGB tone-map pre-pass.
-- **Firmware-native panel orientation** auto-detected from the panel preset, with a startup migration that backfills pre-v0.20 ESP32 instance manifests so legacy installs don't paint at the wrong row stride.
-- **Per-device gamut switching** (ACeP vs Spectra 6) for Impressions sold in both revisions.
-- **Partial-update preview** in the composer, skips full iframe reloads.
-- **Stable per-device preview alias** for Home Assistant generic-camera entities.
-
-### Devices & multi-head
-
-- **Drop-a-folder device plugins**, 6 bundled (`pi_png_client`, `pi_bin_client`, `esp32_client`, `esp32_bw_client`, `pico_bin_client`, `trmnl_client`).
-- **Multi-head**: register multiple devices, bind a dashboard to a specific one, each can run its own theme.
-- **MQTT push** (Pi / ESP32) and **HTTP pull** (Kindle / TRMNL BYOS) supported side-by-side.
-- **mDNS auto-discovery** of LAN clients; discovered devices show up in the *Discovered* strip with panel dims pre-filled.
-- **TRMNL pairing** mints a short 5-char access token (typeable on devices with no real keyboard).
-- Per-device sleep cadence, rotation (CCW quarters), and panel dimensions.
-
-### Scheduling & push
-
-- **Background scheduler** (30s tick), two kinds of schedule:
-  - **interval**, fires every N minutes inside a day-of-week mask + time-of-day window.
-  - **daily**, once per day at a wall-clock time inside a day-of-week mask.
-- **Schedule priority** ordering, **quiet hours** suppression, **stale-schedule detection** (deleted-page schedules don't fire silently).
-- **Smart sync (JIT rendering)**, opt-in per interval schedule. The scheduler tracks each bound device's sleep telemetry (configured `sleep_interval_s` fallback or firmware-published `sleep_until` / `next_sleep_s` on the heartbeat) and fires within a configurable lead window of the next predicted wake. The rendered frame is waiting for the panel when it wakes instead of being rendered after the paint. Falls back to fixed-cadence firing when no bound device is trusted yet. Schedule list shows a green / yellow / red indicator dot per row; the device admin card carries a plain-English diagnostic for the confidence state. Added in v0.42.0; see [#10](https://github.com/dmellok/tesserae/issues/10).
-- **Send page** for one-shot manual pushes.
-- **Retained MQTT frames**, panels that boot mid-cycle get the latest frame on subscribe.
-
-### Home Assistant integration
-
-- **HA MQTT discovery**, every device shows up automatically as an HA device tile.
-- Per-device **display name** that re-publishes discovery on save.
-- **Generic-camera** preview via the per-device alias.
-- **HA sensors** for battery, signal, IP, last-render time per device.
-- **HA widget set**, `ha_battery`, `ha_climate`, `ha_entities`, `ha_lights`, `ha_media`, `ha_sensor` bundled; `ha_camera` / `ha_energy` / `ha_history` / `ha_locks` / `ha_todo` / `ha_zones` opt-in via the catalog.
-- **Stale-discovery sweep on start** so deleted Tesserae devices stop ghosting HA tiles.
-
-### Themes & typography (Spectra design system)
-
-- **14 bundled themes** across three families: Light (9, including the standard `light`, `sepia`, `cool-gray`, `high-contrast`, `paper`, `newsprint`, plus punchier `vivid-light` / `citrus-light` / `arctic-light`), Dark (2, `dark` + `nord`), and Movement (3 palette-only sets — `bauhaus`, `destijl`, `brutalist`). base16 was retired in 0.43.0; the curated dashboards-friendly Spectra families took its place.
-- **Themes page** (top-nav → Themes) with a vertical strip of every theme on the left, a builder pane in the middle, and a sticky preview on the right. Click any theme to load it; bundled themes show a "Duplicate to edit" CTA, user themes are editable + deletable.
-- **Theme builder**: 20 colour tokens (3 surfaces + 4 text + 1 edge + 6 accents × 2 (base + soft) + 1 on-accent) plus mode (light/dark) and optional font-family. Live preview tracks every input. Optional auto-derive switch computes each `accent_*_soft` as `mix(accent, bg, 0.78)` for one less thing to tune.
-- **Image-to-theme**, upload a photo or poster; k-means picks dominant colours and the assignment heuristic spreads them across the Spectra tokens (light/dark mode auto-detected from the modal cluster's luminance). One click fills the form.
-- **User-saved themes** persist at `data/themes/user.json`. The user-CSS endpoint (`/themes/user.css`) emits one `[data-theme="user-<slug>"]` block per saved theme, loaded alongside the bundled Spectra cascade. Themes ride along in the data-export ZIP.
-- **Orthogonal `data-style` axis**, typography / scale / shape, composes with any theme. Bundled styles: Standard / Display / Editorial / Mono / Elegant / Condensed plus Bauhaus / De Stijl / Brutalist forms.
-- **20 bundled typefaces** (SIL OFL / Apache 2.0), Inter, IBM Plex (Sans / Mono / Serif), JetBrains Mono, Atkinson Hyperlegible, Archivo (+ Black + Narrow), Space Grotesk, Space Mono, Manrope, Outfit, Anton, Bebas Neue, DM Serif Display, Crimson Pro, Lora, Bodoni Moda, and Jost, all in the `fonts_core` plugin.
-- **Bundled-theme colour parsing**, the builder lifts every bundled theme's actual `bg / surface / accent-*` values straight from the Spectra CSS at import time, so duplicating Nord produces a Nord-coloured copy (not Light's defaults).
-
-### Administration & ops
-
-- **First-run onboarding wizard**, welcome → broker → device → dashboard. Every step skippable.
-- **Top-nav structure**: Send / Dashboards / Schedules / Themes / Widgets (dropdown) / Settings, plus a Dev dropdown under `--dev` grouping Widget gallery + Theme × style matrix.
-- **Settings UI** tabs: Server, Renderers, Devices, Widgets, System, Events.
-- **Community widget catalog**, audit-only marketplace at [dmellok/tesserae-widgets](https://github.com/dmellok/tesserae-widgets); Settings → Widgets → Browse community widgets lists every entry, one-click install / update / uninstall with a sha256 + schema check on the tarball before it lands. Installed widgets persist under `<data_root>/marketplace/` so Docker / HA image upgrades don't wipe them.
-- **Self-update** from the admin UI (reads GitHub tags, applies in-place, restarts), gated to git-clone installs; Docker shows an upgrade hint instead.
-- **Data export / import**, pack the entire install (pages, themes, devices, plugin settings, secrets) into a single ZIP; restore on a fresh install. Validated against JSON Schemas before writing.
-- **Webhook push**, `POST /api/v1/push` with a bearer token. Re-renders a named page and fans the frame out to every device bound to it. Generate / rotate the token from Settings → System → Webhook. Useful from HA automations, cron, GitHub Actions.
-- **Event log** captures every push, schedule fire, and discovery event for the History view.
-- **Auth**: password setup on first run, persistent session, change / disable / re-enable from Settings → System, and a `tesserae --reset-password` CLI escape hatch when the password is lost. When disabled, the gate still 403s public IPs and only lets LAN traffic through.
-- **Brand assets**, firmware-ready PNG splash images at nine sizes (64 → 1024px square, transparent backdrop) under [`static/brand/firmware/`](static/brand/firmware/) for client builders.
-
-### Networking
-
-- **MQTT** transport (default `tesserae/<device>/frame/...`).
-- **Embedded Mosquitto-compatible broker** as a fallback when no external broker is configured.
-- **mDNS**, opt-in broadcast of `tesserae.local` on port 8765 (Settings → Server → mDNS). ESP32 captive portals use a per-device `tesserae-<id>.local` of their own.
-- **HTTP API** for the TRMNL BYOS protocol (`/api/display`, `/api/setup`, `/api/log`) authed by per-device tokens, plus the webhook push (`POST /api/v1/push`) for external triggers.
-
-### Cross-platform
-
-- **Install methods**: Docker / Docker Compose, shell installer (`install.sh` for macOS / Linux / Pi), PowerShell installer (`install.ps1` for Windows).
-- **Windows-specific**: re-exec via Popen + parent-PID handshake (`os.execv` is broken there); UTF-8 default encoding on every file I/O.
-- **32-bit Pi OS** fallback to system Chromium when Playwright's bundled browser can't install.
-
-### Privacy
-
-- **No phone-home telemetry.** Tesserae does not contact any third-party analytics service. No install identifier is generated, no `app.started` / `app.heartbeat` events are emitted, and no usage data leaves the box.
-- Per-device diagnostics (battery percentage, RSSI, smart-sync predictions) are tracked locally for the admin UI and stay on the server.
-
-### Quality
-
-- **~800 tests** (pytest) green; CI runs every push.
-- **`ruff check` + `ruff format --check`** in CI.
-- **`mypy --strict`** on contract modules (state, push, plugin / renderer / device loaders, renderer, themes routes).
-- **Spectra CSS ↔ theme-registry guard test**, every `[data-theme="..."]` block in the stylesheet has a registry entry and vice versa, so the picker and the cascade can never drift.
-
-</details>
-
-## Clients
-
-The server publishes; something downstream paints the panel. Tesserae
-supports two transport shapes:
-
-* **MQTT push**, server publishes a frame the moment a dashboard
-  changes; the panel boots, subscribes, paints the retained frame.
-  Lowest latency, best for plugged-in Pi / ESP32 panels.
-* **HTTP pull**, TRMNL [BYOS](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
-  protocol. The panel polls `GET /api/display` on a server-set cadence
-  and paints whatever PNG comes back. Best for battery-constrained
-  pollers (jailbroken Kindles, TRMNL devices), they
-  deep-sleep between polls.
-
-| Client | Pairs with | Transport | What it's for |
-|---|---|---|---|
-| [**tesserae-device-pi-png**](https://github.com/dmellok/tesserae-device-pi-png) | `pi_png` renderer | MQTT | Pi-side Python daemon using [`inky`](https://github.com/pimoroni/inky)'s `set_image()`. Works on every panel the inky lib supports. Slower of the two Pi paths (quantises every frame) but wire-compatible with the inky-dash v3/v4 protocol. |
-| [**tesserae-device-pi-bin**](https://github.com/dmellok/tesserae-device-pi-bin) | `pi_bin` renderer | MQTT | Same Pi-side shape but writes the server's already-packed 4-bpp buffer straight into inky's internal `_buf`, no PIL on the paint path. Fastest path on a Pimoroni Inky Impression. |
-| [**tesserae-device-esp32-bin**](https://github.com/dmellok/tesserae-device-esp32-bin) | `esp32_bin` renderer | MQTT | Battery-powered ESP32-S3 firmware for the Waveshare 13.3" Spectra 6 panel. Deep-sleeps between wakes; months of battery life from a single Li-Po. Refresh cadence set via `sleep_interval_s` config. |
-| [**tesserae-device-photopainter-7.3-bin**](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | `esp32_bin` renderer | MQTT | ESP32-S3 firmware for the Waveshare 7.3" PhotoPainter (landscape-native, 800×480 Spectra 6). Same wire contract + deep-sleep pattern as the 13.3" client; just sized for the smaller panel. Pick `waveshare_photopainter_7_3` as the panel preset. |
-| [**tesserae-device-esp32-bw**](https://github.com/dmellok/tesserae-device-esp32-bw) | `esp32_bw_bin` renderer | MQTT | ESP32 firmware for the Waveshare 4.2" B/W e-paper panel (400×300, 1-bpp). Subscribes to `tesserae/<id>/frame/bin`, receives a packed 15000-byte buffer (8 pixels per byte, MSB = leftmost, bit-set = white) and writes it straight to the panel. Heartbeat publishes `panel_w` / `panel_h` so other B/W resolutions (with width a multiple of 8) auto-fill the Discovered card without firmware changes. |
-| Any BYOS-compatible client | `trmnl_png` renderer | HTTP | TRMNL-spec client. Pair via the **Add device → TRMNL** flow in Settings: server mints a short access token, you paste it into the client, the client polls. Tested with the [KOReader trmnl-display plugin](https://github.com/koreader/koreader) on a jailbroken Kindle. |
-
-## Compatible displays
-
-Any panel the [`inky`](https://github.com/pimoroni/inky) library drives
-works via the Pi clients. Three purpose-built ESP32 firmwares cover
-Waveshare e-paper panels: a 13.3" Spectra 6 client, a 7.3" PhotoPainter
-(Spectra 6) client, and a 4.2" B/W client (different sizes + colour
-depths, same MQTT contract shape, distinct renderers per colour gamut).
-
-### Pimoroni Inky lineup
-
-| Panel | Resolution | Colours | Pi `pi_png` | Pi `pi_bin` | Tested |
-|---|---|---|---|---|---|
-| Inky pHAT | 212×104 | 2 / 3 colour | ✓ | | |
-| Inky wHAT | 400×300 | 2 / 3 colour | ✓ | | |
-| Inky Impression 4" (ACeP) | 640×400 | 7 colour (ACeP) | ✓ | ✓ | |
-| Inky Impression 4" (PIM789) | 640×400 | 6 colour (Spectra 6) | ✓ | ✓ | |
-| Inky Impression 5.7" | 600×448 | 7 colour (ACeP) | ✓ | ✓ | ✅ |
-| Inky Impression 7.3" (ACeP) | 800×480 | 7 colour (ACeP) | ✓ | ✓ | |
-| Inky Impression 7.3" (PIM773) | 800×480 | 6 colour (Spectra 6) | ✓ | ✓ | |
-| Inky Impression 13.3" | 1600×1200 | 6 colour (Spectra 6) | ✓ | ✓ | ✅ |
-
-Each device card carries a per-instance "Calibrated palette + tone
-mapping" switch (off by default). Turning it on dithers against the
-panel's measured colours instead of nominal sRGB; A/B with your own
-content since the trade-off is content-dependent.
-
-The `pi_bin` path is faster (the server packs the 4-bpp buffer) but
-needs an Impression, the smaller pHAT / wHAT panels go through the
-slower-but-universal `pi_png` route. The older ACeP and current
-Spectra 6 revisions of the 4" and 7.3" are listed separately because
-their palette and pre-quantise saturation defaults differ (the colour
-gamut picker on each device card switches between them). Untested
-doesn't mean broken, it just means nobody's confirmed it on real
-hardware yet.
-[Open an issue or PR](https://github.com/dmellok/tesserae/issues) if
-you've run a panel that isn't ticked.
-
-### Waveshare panels
-
-| Panel | Resolution | Colours | Client | Tested |
-|---|---|---|---|---|
-| Waveshare 13.3" Spectra 6 (ESP32-S3) | 1200×1600 (portrait native) | 6 colour (Spectra 6) | [tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin) | ✅ |
-| Waveshare 7.3" PhotoPainter (ESP32-S3) | 800×480 (landscape native) | 6 colour (Spectra 6) | [tesserae-device-photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | ✅ |
-| Waveshare 4.2" B/W (ESP32) | 400×300 (landscape native) | 1-bit B/W (2 colour) | [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) | |
-
-### TRMNL-compatible (HTTP pull)
-
-Any client implementing the TRMNL BYOS spec works against the
-`trmnl_png` renderer. The renderer fits / contrast-tweaks / quantises
-to 1-bit greyscale PNG; the client just paints what it polls. Pair via
-**Add device → TRMNL** in Settings, the server mints a short access
-token you paste into the client config.
-
-| Panel | Resolution | Colours | Client | Tested |
-|---|---|---|---|---|
-| Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | greyscale | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
-| [TRMNL device](https://usetrmnl.com/) (Seeed hardware, TRMNL firmware) | 800×480 | 1-bit | TRMNL firmware | |
-
-The token is short on purpose (5 chars from a typeable alphabet)
-because the typical client has an on-screen keyboard. It's
-LAN-safe rather than internet-safe, use a Tailscale-style overlay or
-keep Tesserae bound to your LAN.
-
-### Custom panels
-
-Anything else: pick `custom` in **Settings → Panel** and set the
-dimensions. The renderer only cares about width × height; if your
-chosen client drives it, Tesserae will too.
-
-See [**Screens & compatibility**](https://dmellok.github.io/tesserae/compatibility/)
-for the renderer / device kind matrix and current test status.
-
-## Install
-
-### Home Assistant App (easiest if you already run HA)
-
-Tesserae ships as a Home Assistant App that installs through HA
-Supervisor and shows up as a sidebar Ingress tab. No Docker, no
-shell, no separate password, HA's auth gates the admin UI.
-
-1. **Settings → Apps → app store → ⋮ → Repositories**, paste
-   `https://github.com/dmellok/homeassistant-tesserae-addon`, click
-   **Add**.
-2. The new repository surfaces a **Tesserae** entry (stable) and a
-   **Tesserae (edge)** entry (tracks `main`, rebuilt every release).
-   Click **Install** on whichever you want.
-3. After install, hit **Start**, then **Open Web UI**, the admin
-   UI loads inside HA's Ingress tab.
-
-The App persists `/data` across upgrades, sets
-`TESSERAE_HA_INGRESS=1` so the standalone login is skipped (HA's
-session gates it instead), and wires `SUPERVISOR_TOKEN` through so
-Tesserae can call Supervisor for version + restart niceties. See
-[**Install on Home Assistant**](https://dmellok.github.io/tesserae/install/home-assistant/)
-for the full App guide, MQTT auto-discovery, and the broker-
-sharing story.
-
-### Docker (quickest standalone)
+## Quick start
 
 ```sh
 mkdir tesserae && cd tesserae
@@ -298,81 +36,104 @@ curl -fsSLO https://raw.githubusercontent.com/dmellok/tesserae/main/docker-compo
 docker compose up -d
 ```
 
-Open <http://localhost:8765>. See
-[**Install via Docker**](https://dmellok.github.io/tesserae/install/docker/)
-for the Mosquitto sidecar variant, host-networking for mDNS, and the
-upgrade story.
+Open <http://localhost:8765>. First request walks through password setup
+and the onboarding wizard.
 
-### macOS, Linux, Raspberry Pi
+Other install paths:
+[Home Assistant App](https://dmellok.github.io/tesserae/install/home-assistant/),
+[LXC / Proxmox / MicroCloud](https://dmellok.github.io/tesserae/install/lxc/),
+[macOS / Linux / Pi shell installer](https://dmellok.github.io/tesserae/install/server/),
+[Windows PowerShell](https://dmellok.github.io/tesserae/install/server/),
+[manual venv](https://dmellok.github.io/tesserae/install/server/#manual-install).
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/dmellok/tesserae/main/install.sh | bash
-```
+## Supported hardware
 
-### Windows (PowerShell)
+Tesserae renders to one of several panel families through drop-a-folder
+device plugins. The list below is the verified set; anything marked TBD
+is awaiting a real-hardware confirmation.
 
-```powershell
-iwr https://raw.githubusercontent.com/dmellok/tesserae/main/install.ps1 -UseBasicParsing | iex
-```
+### Seeed Studio (TRMNL BYOS)
 
-The installer sanity-checks git + Python 3.11+, clones the repo, sets up
-a venv, installs Chromium via Playwright (with a system-browser fallback
-for 32-bit Pi OS), and writes a `run.sh` / `run.ps1` shortcut.
+| Model | Panel | Client | Status |
+|---|---|---|---|
+| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono | TRMNL firmware (flash required) | TBD |
+| [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" colour (ACeP) | TRMNL firmware (flash required) | TBD |
+| [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1404×1872 | TRMNL firmware (flash required) | ✅ |
+| [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" colour (Spectra 6), 1200×1600 | TBD | TBD |
+| [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
+| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | TRMNL firmware (flash required) | TBD |
 
-### Manual
+### Pimoroni Inky
 
-```sh
-git clone https://github.com/dmellok/tesserae.git
-cd tesserae
-python3 -m venv .venv
-.venv/bin/pip install -e ".[dev]"
-.venv/bin/python -m app.main         # production: waitress, port 8765
-.venv/bin/python -m app.main --dev   # Flask dev server with reload + debugger
-```
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| [Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) (6-colour Spectra 6) | 640×400 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | TBD |
+| [Inky Impression 5.7"](https://shop.pimoroni.com/products/inky-impression-5-7) (7-colour ACeP) | 600×448 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
+| [Inky Impression 7.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435244411) (6-colour Spectra 6) | 800×480 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
+| [Inky Impression 13.3"](https://shop.pimoroni.com/products/inky-impression?variant=55186435277179) (6-colour Spectra 6) | 1600×1200 | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) or [pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | ✅ |
+| Inky [pHAT](https://shop.pimoroni.com/products/inky-phat) / [wHAT](https://shop.pimoroni.com/products/inky-what) | various | [pi-png](https://github.com/dmellok/tesserae-device-pi-png) | works via `pi_png` |
 
-After it's running, visit <http://localhost:8765>, first request walks
-through password setup and the onboarding wizard. See
-[**Install Tesserae**](https://dmellok.github.io/tesserae/install/server/)
-for the deep guide (broker config, Chromium overrides, dev workflow).
+### Waveshare
+
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| [Waveshare 13.3" Spectra 6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 | [esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin) | ✅ |
+| [Waveshare 7.3" PhotoPainter (ESP32-S3)](https://www.waveshare.com/esp32-s3-photopainter.htm) | 800×480 | [photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | ✅ |
+| [Waveshare 4.2" B/W (ESP32)](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | [esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) | TBD |
+
+### TRMNL-compatible (HTTP pull)
+
+Any client implementing the [TRMNL BYOS spec](https://help.trmnl.com/en/articles/9510536-bring-your-own-server)
+works against the `trmnl_png` renderer.
+
+| Panel | Resolution | Client | Status |
+|---|---|---|---|
+| [TRMNL OG](https://shop.trmnl.com/products/trmnl) | 800×480 | TRMNL firmware | ✅ via BYOS |
+| [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 (10.3") | TRMNL firmware | TBD |
+| Amazon Kindle Paperwhite 2 (jailbroken) | 758×1024 | [KOReader trmnl-display plugin](https://github.com/koreader/koreader) | ✅ |
+
+### Custom panels
+
+Anything else: pick `custom` in **Settings → Panel** and set the
+dimensions. If a client drives your panel, Tesserae can push frames
+to it.
+
+Per-client setup walkthroughs (the firmware repos in the Client column):
+[Install a client](https://dmellok.github.io/tesserae/install/clients/).
+Full renderer / device-kind compatibility matrix:
+[Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/).
+
+### Adding a new SKU
+
+A new e-paper SKU that uses an existing protocol (TRMNL BYOS, MQTT
+binary, MQTT PNG, REST pull) is a single JSON file under
+`hardware/<vendor>/<model>.json`. Schema:
+[schema/hardware.schema.json](schema/hardware.schema.json).
+Worked example: [`hardware/seeed/reterminal_e1003.json`](hardware/seeed/reterminal_e1003.json).
 
 ## Privacy
 
-**Tesserae sends no phone-home telemetry.** The app does not contact
-any third-party analytics service. No install identifier is generated,
-and no usage events are emitted.
+Tesserae sends no phone-home telemetry. No install identifier, no
+usage events, no third-party analytics. Per-device diagnostics
+(battery, RSSI, sleep cadence) stay on the box.
+[Privacy](https://dmellok.github.io/tesserae/privacy/).
 
-Per-device diagnostics (battery percentage, RSSI, heartbeat cadence,
-smart-sync predictions) are tracked locally for the admin UI and
-stay on the server in `data/core/`; they're never transmitted off
-the box. Full details:
-[**Privacy**](https://dmellok.github.io/tesserae/privacy/).
+## Community
 
-## Contributing
+- **[Discussions](https://github.com/dmellok/tesserae/discussions)** for show-your-dashboard, widget pitches, install help, and feedback on what's next.
+- **[Contributing guide](.github/CONTRIBUTING.md)** for dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
+- **[Security policy](.github/SECURITY.md)** for how to report a vulnerability privately.
+- **[Code of conduct](.github/CODE_OF_CONDUCT.md)**.
 
-Issues + the project board live on GitHub:
-[dmellok/tesserae](https://github.com/dmellok/tesserae/issues). Multi-head
-testers on panels other than the Inky 13.3" and the Waveshare 13.3"
-ESP32 panel are especially welcome, the matrix is small and we
-mark verified panels in
-[Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/#whats-been-tested-on-real-hardware).
+## Credits
 
-- **[Discussions](https://github.com/dmellok/tesserae/discussions)**, show your dashboard, pitch a widget, ask "how do I…", or feed back on what's coming next.
-- **[Contributing guide](.github/CONTRIBUTING.md)**, dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
-- **[Security policy](.github/SECURITY.md)**, how to report a vulnerability privately.
-- **[Code of conduct](.github/CODE_OF_CONDUCT.md)**, be kind, assume good faith, don't be a jerk.
-
-## Built with
-
-Tesserae stands on generously-licensed open source:
-
-- **[Phosphor Icons](https://phosphoricons.com/)**, every icon in the admin UI + widgets (6 weights, MIT).
-- **[Chart.js](https://chartjs.org/)** v4.4.0, the line / bar / radar / pie / horizon plots across finance, weather, and stats widgets (MIT).
-- **17 typefaces** under SIL OFL or Apache 2.0, Inter, IBM Plex, JetBrains Mono, Atkinson Hyperlegible, Archivo, Space Mono, and more in the `fonts_core` plugin.
-- **[TRMNL](https://usetrmnl.com/)** + **[Terminus](https://github.com/usetrmnl/byos_laravel)**, the team behind the TRMNL devices, the BYOS protocol Tesserae implements, and the Terminus reference server I aligned the `/api/display`, `/api/setup`, and `/api/log` envelopes against. Tesserae's HTTP-pull path exists because TRMNL's open protocol made it easy to drop in a self-hosted server. The "rotations" feature is also a Tesserae take on TRMNL's playlists.
-- **[KOReader](https://github.com/koreader/koreader)** trmnl-display plugin, the upstream Lua client that turns a jailbroken Kindle into a TRMNL-compatible panel.
-- **[paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)**, calibrated Spectra 6 + ACeP palette measurements (Apache 2.0) that power Tesserae's opt-in calibrated dither path. Measurements made by the team at [paperlesspaper](https://paperlesspaper.de/en) on their eInk picture frames; we ported the numbers into [`app/quantizer.py`](app/quantizer.py) and paired them with our own linear tone-mapping pre-pass. Full attribution in [NOTICES.md](NOTICES.md).
-
-Full list in [docs/credits](https://dmellok.github.io/tesserae/credits/).
+Tesserae stands on generously-licensed open source: Phosphor Icons,
+Chart.js, 20 typefaces under SIL OFL / Apache 2.0, the TRMNL BYOS
+protocol, the KOReader trmnl-display plugin, and
+[paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)'s
+Spectra 6 + ACeP calibrated palette measurements. Full attribution:
+[Credits](https://dmellok.github.io/tesserae/credits/),
+[NOTICES.md](NOTICES.md).
 
 ## License
 

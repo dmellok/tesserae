@@ -3,7 +3,7 @@
   "id": "seeed_reterminal_e1003",
   "name": "Seeed reTerminal E1003",
   "vendor": "Seeed Studio",
-  "url": "https://www.seeedstudio.com/reTerminal-E1003-p-6533.html",
+  "url": "https://www.seeedstudio.com/reTerminal-E1003-p-6731.html",
   "icon": "device-tablet",
   "description": "10.3 inch monochrome ePaper terminal with 16-level greyscale, ESP32-S3, up to six-month battery. Polls Tesserae's TRMNL BYOS endpoints via the device's stock firmware.",
   "protocol": "trmnl_client",

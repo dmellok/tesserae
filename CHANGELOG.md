@@ -6,6 +6,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.33], 2026-06-27
+
+### Changed
+
+- **README cut from 379 to 138 lines.** Hardware lineup tables now
+  carry per-row Client + Status columns with vendor product page
+  links, covering the Seeed reTerminal E Series, TRMNL OG / X, the
+  TRMNL 7.5" OG DIY Kit, the XIAO 7.5" ePaper panel, the Pimoroni
+  Inky Impression lineup, and the Waveshare ESP32 panels.
+  Feature lists, install variants, and detailed compatibility
+  tables moved to the docs site.
+- **[`docs/install/clients.md`](install/clients.md)** adds REST in
+  the Transport column for the clients that support it (`pi-png`,
+  `photopainter-7.3-bin`), drops the dead `tesserae-trmnl-client`
+  reference for direct links to TRMNL's firmware repo and KOReader's
+  `trmnl-display` plugin, and adds the missing
+  `tesserae-device-pico-bin` row.
+
+### Added
+
+- **[`docs/dev/adding-hardware.md`](dev/adding-hardware.md)** walks
+  contributors through the hardware-catalog schema with the bundled
+  reTerminal E1003 entry as a worked example. Covers the two-tier
+  protocol-plus-SKU model, when to use the catalog vs writing a new
+  protocol folder, the schema reference, how catalog kinds register
+  alongside folder kinds, backwards-compat rules (folder wins on
+  conflict, `deprecated_aliases`, orphan handling), and the
+  per-protocol `protocol_config` notes.
+
+### Fixed
+
+- **`hardware/seeed/reterminal_e1003.json`** product URL corrected to
+  the actual Seeed Studio listing (`p-6731`, was `p-6533`).
+
 ## [0.64.32], 2026-06-27
 
 ### Added
