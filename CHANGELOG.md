@@ -6,6 +6,26 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.32], 2026-06-27
+
+### Added
+
+- **Hardware catalog: data-only SKU definitions.** Adding an e-paper
+  SKU that uses one of the existing protocol-level device kinds (TRMNL
+  BYOS, MQTT bin, MQTT PNG, REST pull) no longer requires forking a
+  ``devices/<id>/`` folder. Drop a JSON file under
+  ``hardware/<vendor>/<model>.json`` declaring the panel block, vendor
+  metadata, and any protocol-specific defaults; the loader walks
+  ``hardware/`` after the folder-based discovery and registers each
+  SKU as a kind that borrows the protocol's parse/validate hooks but
+  carries its own manifest. Folder-defined kinds always win on id
+  conflict so existing installs see no behaviour change. Schema lives
+  at ``schema/hardware.schema.json``; the catalog supports a
+  ``protocol_config`` free-form block (each protocol decides what's
+  valid there), a ``config_schema_extends`` additive merge over the
+  protocol's config form, and ``deprecated_aliases`` so a renamed kind
+  can keep resolving for legacy device-instance files.
+
 ## [0.64.31], 2026-06-26
 
 ### Added

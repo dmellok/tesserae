@@ -334,8 +334,18 @@ def discover(
     *,
     schema_path: Path,
     data_root: Path,
+    hardware_dir: Path | None = None,
+    hardware_schema_path: Path | None = None,
 ) -> DeviceRegistry:
-    """Walk ``devices_dir`` and return a registry of validated devices."""
+    """Walk ``devices_dir`` and return a registry of validated devices.
+
+    When ``hardware_dir`` and ``hardware_schema_path`` are supplied, the
+    catalog under ``hardware_dir`` is walked after the folder discovery
+    and each SKU JSON registers as an additional kind derived from its
+    referenced protocol. Folder-defined kinds always win on id conflict
+    (so existing devices/<id>/ entries can't be silently shadowed). See
+    ``app.hardware_catalog`` for the SKU schema and layering rules.
+    """
     registry = DeviceRegistry()
     if not devices_dir.exists():
         return registry
@@ -440,6 +450,20 @@ def discover(
             manifest.get("renderers"),
             manifest.get("status_topic") or "http-polled",
         )
+
+    # ----- hardware catalog ------------------------------------------
+    # SKU JSONs under ``hardware/`` register as additional kinds derived
+    # from their referenced protocol folder. Runs after folder discovery
+    # so existing kinds win on id conflict (back-compat: no folder-defined
+    # kind can be silently shadowed by a catalog entry).
+    if hardware_dir is not None and hardware_schema_path is not None:
+        from app.hardware_catalog import apply_to_registry, discover_hardware
+
+        catalog_entries, catalog_errors = discover_hardware(
+            hardware_dir, schema_path=hardware_schema_path
+        )
+        registry.errors.extend(catalog_errors)
+        apply_to_registry(registry, catalog_entries, data_root=data_root)
 
     # ----- user-defined instances ------------------------------------
     # data_root is already data/devices/ (see main.py), so scan it directly.

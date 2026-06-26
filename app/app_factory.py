@@ -375,9 +375,11 @@ def create_app(
     plugins_dir = plugins_dir or REPO_ROOT / "plugins"
     renderers_dir = renderers_dir or REPO_ROOT / "renderers"
     devices_dir = devices_dir or REPO_ROOT / "devices"
+    hardware_dir = REPO_ROOT / "hardware"
     plugin_schema = REPO_ROOT / "schema" / "plugin.schema.json"
     renderer_schema = REPO_ROOT / "schema" / "renderer.schema.json"
     device_schema = REPO_ROOT / "schema" / "device.schema.json"
+    hardware_schema = REPO_ROOT / "schema" / "hardware.schema.json"
 
     plugin_data_root = data_root / "plugins"
     plugin_data_root.mkdir(parents=True, exist_ok=True)
@@ -458,6 +460,8 @@ def create_app(
         devices_dir,
         schema_path=device_schema,
         data_root=device_data_root,
+        hardware_dir=hardware_dir,
+        hardware_schema_path=hardware_schema,
     )
     for derr in devices.errors:
         logger.warning("device loader: %s, %s", derr.device_id, derr.message)

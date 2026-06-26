@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tesserae.local/schema/hardware.schema.json",
+  "title": "Tesserae hardware catalog entry",
+  "description": "A data-only SKU definition that derives a device kind from an existing protocol-level device folder. The hardware entry brings identity (name, vendor, url), panel specifics (dims, gamut, native stride), and optional protocol-specific defaults; the referenced protocol contributes the wire-format implementation (parse_status, validate_config, status/config topics).",
+  "type": "object",
+  "required": ["tesserae_compat", "id", "name", "vendor", "protocol", "panel"],
+  "properties": {
+    "tesserae_compat": {
+      "type": "string",
+      "pattern": "^\\d+\\.(x|\\d+)(\\..*)?$",
+      "description": "Host major-version compatibility, same convention as device.json."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Unique kind id for this SKU. Used in URLs, device-instance kind_of references, and the compatibility matrix. Cannot collide with an existing devices/<id>/ folder; folder always wins on conflict."
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "vendor": { "type": "string", "minLength": 1 },
+    "url": { "type": "string", "format": "uri" },
+    "icon": {
+      "type": "string",
+      "description": "Phosphor icon slug (no 'ph-' prefix). Falls back to the protocol's icon when absent."
+    },
+    "description": { "type": "string" },
+    "protocol": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Id of the protocol-level device folder under devices/ whose Python module supplies parse_status / validate_config and whose manifest contributes status_topic / config_topic / renderers / config_schema defaults. Validated at load time against the registry."
+    },
+    "panel": {
+      "type": "object",
+      "required": ["w", "h"],
+      "description": "Physical panel for this SKU. Replaces the protocol's default panel block wholesale; native_w/native_h are forwarded to renderers that pack at firmware stride.",
+      "properties": {
+        "w": { "type": "integer", "minimum": 1 },
+        "h": { "type": "integer", "minimum": 1 },
+        "orientation": {
+          "type": "string",
+          "enum": ["landscape", "landscape_flipped", "portrait", "portrait_flipped"]
+        },
+        "name": { "type": "string" },
+        "gamut": { "type": "string", "description": "Panel colour gamut id (e.g. 'waveshare_e6', 'spectra_6', 'inky_7colour', 'mono'). Read by the quantizer when packing the .bin buffer." },
+        "native_w": { "type": "integer", "minimum": 1 },
+        "native_h": { "type": "integer", "minimum": 1 },
+        "underscan": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "protocol_config": {
+      "type": "object",
+      "description": "Free-form protocol-specific defaults. Each protocol decides what's meaningful here (e.g. TRMNL BYOS reads 'model_header' to drive auto-provisioning; MQTT bin pushers read 'image_format'). Validation is the protocol's responsibility, not this schema's.",
+      "additionalProperties": true
+    },
+    "config_schema_extends": {
+      "type": "object",
+      "description": "Optional additions to the protocol's config_schema, merged additively over the protocol's defaults. Same shape as device.json config_schema. Use sparingly; most SKUs should inherit the protocol's form as-is.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": { "enum": ["int", "float", "string", "boolean", "select"] },
+          "label": { "type": "string" },
+          "default": {},
+          "min": { "type": "number" },
+          "max": { "type": "number" },
+          "choices": { "type": "array" },
+          "presets": { "type": "array" },
+          "help": { "type": "string" }
+        }
+      }
+    },
+    "refresh_floor_s": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Lower bound on the device's poll cadence in seconds. Surfaced in the Settings UI so the user can't set a smaller refresh_rate than the panel actually supports."
+    },
+    "image_format": {
+      "type": "string",
+      "enum": ["png", "bin", "webp"],
+      "description": "Wire format this SKU expects. Informational; the protocol's renderers still drive the actual encoding."
+    },
+    "notes_md": {
+      "type": "string",
+      "description": "Free-form maintainer notes in markdown. Surfaced on the docs hardware page."
+    },
+    "deprecated_aliases": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "description": "Older kind ids this SKU also registers under, so device instances created against the old id keep resolving. Only add when actually renaming a previously-shipped kind."
+    }
+  }
+}
