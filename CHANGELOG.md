@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.37], 2026-06-27
+
+### Fixed
+
+- **LXC docs and cloud-init.yaml now use `images:debian/trixie/cloud`**
+  on the cloud-init launch command. The slim `images:debian/trixie`
+  image used in the manual-setup section does not include cloud-init,
+  so the user-data block was silently ignored. The /cloud variant ships
+  with cloud-init pre-installed and is the right pick for any automated
+  provisioning. Manual-setup instructions keep the slim image since
+  cloud-init is not involved there.
+- **Hardware sizing note in `docs/install/lxc.md`** updated to mark 2GB
+  as confirmed (about 1GB headroom after install) rather than testing
+  pending. Confirmed by a community installer on a CM4 2GB.
+- **Added a troubleshooting tip** for MicroCloud setups where
+  `microcloud init` does not auto-detect NVMe / dedicated storage,
+  documenting the `--storage <pool-name>` flag on `lxc launch` plus
+  the `lxc storage list` lookup.
+
 ## [0.64.36], 2026-06-27
 
 ### Fixed

@@ -14,7 +14,7 @@ Both wrap the same underlying LXC / LXD stack. Proxmox ships a nicer web UI; Mic
 
 ## Hardware sizing
 
-Confirmed on a Raspberry Pi CM4 with 8GB RAM: roughly 1.5GB resident with a running Tesserae instance and a small composed dashboard. **4GB is comfortable**, 2GB likely works (testing pending). Webpage-widget rendering is the spikiest component; if you compose heavy dashboards, leave headroom.
+Confirmed on a Raspberry Pi CM4 with 8GB RAM: roughly 1.5GB resident with a running Tesserae instance and a small composed dashboard. **4GB is comfortable**, **2GB also confirmed working** with about 1GB of headroom after install. Webpage-widget rendering is the spikiest component; if you compose heavy dashboards, leave headroom.
 
 For the container's root device, 2GB is sufficient. With thin provisioning, the on-disk footprint matches actual usage anyway.
 
@@ -69,11 +69,21 @@ MicroCloud and Proxmox both support cloud-init, so the package install, user cre
 A ready-to-use config lives at [`scripts/cloud-init.yaml`](https://github.com/dmellok/tesserae/blob/main/scripts/cloud-init.yaml) in the repo. Pass it to MicroCloud via:
 
 ```sh
-lxc launch images:debian/trixie tesserae \
+lxc launch images:debian/trixie/cloud tesserae \
   --config=user.user-data="$(cat scripts/cloud-init.yaml)"
 ```
 
+Note the `/cloud` suffix on the image name. The slim `images:debian/trixie` image used in the manual section above does not include cloud-init, so the user-data block never runs. The `/cloud` variant ships with cloud-init pre-installed and is the right pick for any automated provisioning path.
+
 On Proxmox, paste the same file into **Datacenter → CT → Cloud-Init → User Data**. Edit the `ssh_authorized_keys` block first to add your public key so you can log in once the container's up.
+
+!!! tip "If `microcloud init` didn't auto-detect your storage"
+    Some MicroCloud installs don't pick up NVMe / dedicated storage on their own. If `lxc launch` complains it has no pool to land the container in, list pools with `lxc storage list` and pass the right name through:
+
+    ```sh
+    lxc launch images:debian/trixie/cloud tesserae --storage <pool-name> \
+      --config=user.user-data="$(cat scripts/cloud-init.yaml)"
+    ```
 
 First boot takes 5 to 10 minutes on a Pi (dominated by `pip install` plus the Playwright Chromium download); follow progress with `tail -f /var/log/cloud-init-output.log` inside the container.
 

@@ -4,8 +4,11 @@
 # Tested on Debian Trixie under Ubuntu MicroCloud (Raspberry Pi) and
 # Proxmox VE LXC (x86). Pass via your LXC launcher's user-data field, e.g.:
 #
-#   lxc launch images:debian/trixie tesserae \
+#   lxc launch images:debian/trixie/cloud tesserae \
 #     --config=user.user-data="$(cat scripts/cloud-init.yaml)"
+#
+# Note the /cloud suffix. The slim images:debian/trixie image does not
+# include cloud-init, so the user-data block is silently ignored.
 #
 # Or, on Proxmox: paste into Datacenter > CT > Cloud-Init > User Data.
 #
