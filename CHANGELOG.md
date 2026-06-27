@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.38], 2026-06-28
+
+### Added
+
+- **Six hardware catalog manifests for previously-undeclared SKUs.**
+  Each routes to an existing protocol so no Python changes are required;
+  the Settings UI's kind picker now offers the SKU under its vendor with
+  the correct panel preselected.
+    - `hardware/seeed/reterminal_e1001.json` (7.5" mono, 800x480),
+      protocol `trmnl_client`, model header `reTerminal E1001`.
+    - `hardware/seeed/reterminal_e1002.json` (7.3" ACeP 7-colour,
+      800x480), protocol `trmnl_client`, model header `reTerminal E1002`.
+    - `hardware/seeed/xiao_75.json` (XIAO 7.5" mono, 800x480),
+      protocol `trmnl_client`.
+    - `hardware/pimoroni/inky_impression_4.json` (640x400 Spectra 6),
+      protocol `pi_bin_client`.
+    - `hardware/waveshare/wave42_bw.json` (4.2" B/W, 400x300),
+      protocol `esp32_bw_client`.
+    - `hardware/trmnl/x.json` (10.3" mono, 1872x1404), protocol
+      `trmnl_client`, model header `x`.
+  None are flagged as verified on real hardware yet; each manifest's
+  `notes_md` says so explicitly. The intent is to remove the "drop a
+  JSON" step gating first-touch testing so a tester with the hardware
+  can pair and report status without a code change.
+
 ## [0.64.37], 2026-06-27
 
 ### Fixed

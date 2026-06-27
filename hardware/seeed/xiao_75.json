@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_xiao_75",
+  "name": "Seeed XIAO 7.5\" ePaper Panel",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html",
+  "icon": "device-tablet",
+  "description": "XIAO ESP32-C3 paired with a 7.5 inch monochrome ePaper panel. Speaks Tesserae's TRMNL BYOS endpoints once flashed with the XIAO TRMNL firmware variant.",
+  "protocol": "trmnl_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "refresh_floor_s": 60,
+  "image_format": "png",
+  "notes_md": "Awaiting confirmed test on real hardware. The XIAO TRMNL firmware sends its MAC in the Id header (uppercase, colon-separated); Tesserae's BYOS layer matches case-insensitively, no extra configuration needed."
+}

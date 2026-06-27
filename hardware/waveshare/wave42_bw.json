@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_4_2_bw",
+  "name": "Waveshare 4.2\" B/W e-paper",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/4.2inch-e-paper-module.htm",
+  "icon": "device-tablet",
+  "description": "4.2 inch monochrome ePaper module, 400x300, driven by an ESP32 client. Frames are dithered server-side to 1-bpp and pushed over MQTT as a packed buffer.",
+  "protocol": "esp32_bw_client",
+  "panel": {
+    "w": 400,
+    "h": 300,
+    "orientation": "landscape",
+    "name": "Waveshare 4.2\" B/W",
+    "gamut": "mono",
+    "native_w": 400,
+    "native_h": 300
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Pair with the tesserae-device-esp32-bw firmware."
+}

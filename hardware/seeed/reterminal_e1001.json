@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_reterminal_e1001",
+  "name": "Seeed reTerminal E1001",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/reTerminal-E1001-p-6534.html",
+  "icon": "device-tablet",
+  "description": "7.5 inch monochrome ePaper terminal, ESP32-S3, battery-powered. Speaks Tesserae's TRMNL BYOS endpoints once the device is flashed with TRMNL firmware.",
+  "protocol": "trmnl_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.5 inch monochrome ePaper",
+    "gamut": "mono",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "reTerminal E1001"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "png",
+  "notes_md": "Awaiting confirmed test on real hardware. Flash with TRMNL firmware, point the device's API URL at your Tesserae base URL, and pair via the access token shown in Settings -> Devices."
+}

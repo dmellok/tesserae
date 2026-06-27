@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "pimoroni_inky_4",
+  "name": "Pimoroni Inky Impression 4\"",
+  "vendor": "Pimoroni",
+  "url": "https://shop.pimoroni.com/products/inky-impression",
+  "icon": "monitor",
+  "description": "4 inch 6-colour Spectra 6 e-paper HAT for Raspberry Pi. Driven by the pi_bin client (fast 4-bpp packed buffer path).",
+  "protocol": "pi_bin_client",
+  "panel": {
+    "w": 640,
+    "h": 400,
+    "orientation": "landscape",
+    "name": "Inky Impression 4\" (Spectra 6)",
+    "gamut": "spectra_6",
+    "native_w": 640,
+    "native_h": 400
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. The pi_png client is also compatible if you prefer the on-Pi quantise path; switch by configuring a `pi_png_client` device instance with the same panel preset."
+}
