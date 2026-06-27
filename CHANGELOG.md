@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.36], 2026-06-27
+
+### Fixed
+
+- **weather_forecast / weather_hourly label stayed stale on cache hit.**
+  The v0.64.16 fix overlaid the user-edited ``label`` onto the cached
+  blob before returning, but missed the duplicate ``place`` field that
+  the newer variants paint. A location rename on the same
+  ``(lat, lon, units[, hours])`` cache key updated ``label`` but the
+  variant template still showed the stale ``place``, so the rename
+  appeared not to stick until the user toggled units or picked a new
+  city (which changed the cache key). Now both fields are overlaid
+  together.
+- **news_rss and news_wikipedia_otd cache key was incomplete.**
+  ``max_items`` was used to slice the result but wasn't part of the
+  cache key, so changing it in the editor served the prior fetch's
+  slice for up to the 10-minute TTL. Added ``max_items`` to the cache
+  filename so a size change refetches at the new size.
+
 ## [0.64.35], 2026-06-27
 
 ### Changed

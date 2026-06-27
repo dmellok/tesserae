@@ -76,12 +76,16 @@ def fetch(
     cache_path = data_dir / f"forecast_{lat:.3f}_{lon:.3f}_{units}.json"
     cached = _cached(cache_path)
     if cached is not None:
-        # ``label`` is a UI string from the cell editor, not part of
-        # the upstream API response. Overlay the current options'
-        # label so a rename on the same ``(lat, lon, units)`` shows
-        # up on the next preview instead of waiting for the cache
-        # TTL.
-        cached["label"] = options.get("label", "")
+        # ``label`` and the new-variant duplicate ``place`` are UI
+        # strings from the cell editor, not part of the upstream API
+        # response. Overlay both on cache hit so a rename on the same
+        # ``(lat, lon, units)`` shows up on the next preview instead
+        # of waiting for the cache TTL. Missing the ``place`` overlay
+        # was the v0.64.16 fix's gap; the new variants paint ``place``
+        # while the legacy ones paint ``label``.
+        fresh_label = options.get("label", "")
+        cached["label"] = fresh_label
+        cached["place"] = fresh_label
         return cached
 
     temp_unit = "fahrenheit" if units == "imperial" else "celsius"

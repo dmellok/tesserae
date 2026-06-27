@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Hourly",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "kind": "widget",
   "description": "Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).",
   "icon": "ph-chart-line",
@@ -36,11 +36,11 @@
       "choices": [
         {
           "value": "metric",
-          "label": "Metric (\u00b0C)"
+          "label": "Metric (°C)"
         },
         {
           "value": "imperial",
-          "label": "Imperial (\u00b0F)"
+          "label": "Imperial (°F)"
         }
       ]
     },

@@ -30,7 +30,11 @@ def fetch(
 
     data_dir = Path(ctx["data_dir"])
     data_dir.mkdir(parents=True, exist_ok=True)
-    cache = data_dir / f"otd_{mm}_{dd}_{kind}.json"
+    # ``max_items`` is in the cache key so changing it in the editor
+    # refetches at the new size instead of serving a stale slice from
+    # the prior fetch's larger / smaller payload until the cache TTL
+    # expires.
+    cache = data_dir / f"otd_{mm}_{dd}_{kind}_{max_items}.json"
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL_S:
         try:
             return json.loads(cache.read_text(encoding="utf-8"))
