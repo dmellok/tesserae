@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.39], 2026-06-28
+
+### Fixed
+
+- **`hardware/seeed/reterminal_e1003.json` no longer claims the device
+  ships speaking TRMNL BYOS out of the box.** The reTerminal E1003 ships
+  with Seeed's own ESP32-S3 UI; the BYOS path requires reflashing with
+  TRMNL firmware first, which is what the README has always said but
+  the manifest's `description` and `notes_md` previously contradicted.
+  The worked example in [`docs/dev/adding-hardware.md`](dev/adding-hardware.md)
+  inherits the fix since it inlines the same JSON.
+
 ## [0.64.38], 2026-06-28
 
 ### Added
