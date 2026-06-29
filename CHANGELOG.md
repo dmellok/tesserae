@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.42], 2026-06-29
+
+### Changed
+
+- **Marketplace Browse cards now cap the bundled-folder list at 3
+  with a "+N more" tail** instead of rendering every folder name
+  inline. Bundles with many folders (e.g. AFL Bundle at 5, AI Brief
+  at 4) were pushing their cards visibly taller than single-folder
+  neighbours in the grid, since the chips wrapped onto extra rows
+  while CSS Grid only equalises width, not height. Truncated chips
+  carry a `title=` tooltip listing the hidden folder names so power
+  users can still inspect the full bundle without clicking through
+  to the source repo. Tail rendered as a muted italic chip; the
+  three visible folder names still cover the bundle's identity at a
+  glance.
+
 ## [0.64.41], 2026-06-29
 
 ### Added
