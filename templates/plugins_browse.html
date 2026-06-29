@@ -341,6 +341,14 @@
   .marketplace-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    /* Equal-height rows so a card with a longer description or an
+       extra chip row doesn't make itself visibly taller than its
+       neighbours. The tallest natural card in each row sets the
+       row height; shorter cards stretch to match, and their
+       ``.marketplace-actions`` (which already has ``margin-top:
+       auto``) floats to the bottom of the grown card. Same pattern
+       most modern app-store catalogs use. */
+    grid-auto-rows: 1fr;
     gap: 1rem;
     margin-top: 1rem;
   }

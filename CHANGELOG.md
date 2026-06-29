@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.43], 2026-06-29
+
+### Changed
+
+- **Marketplace Browse grid now uses `grid-auto-rows: 1fr`** so cards
+  in the same row share the tallest card's height. v0.64.42 capped
+  the folder chip list at 3 + "+N more", which fixed the most
+  egregious case (a 5-folder bundle wrapping to 3 rows), but
+  description-length variation and the "+N more" tail still wrapping
+  to a second chip row meant a small height differential remained.
+  Equal-height rows close that gap entirely; the action footer
+  already has `margin-top: auto` so it floats to the bottom of any
+  card grown to match its taller neighbour. Same pattern most app-
+  store catalogs use.
+
 ## [0.64.42], 2026-06-29
 
 ### Changed
