@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.44], 2026-06-30
+
+### Added
+
+- **`renderers/circuitpython_png/`**: new server-side renderer that
+  emits a palette-quantized indexed PNG at the panel's exact dims.
+  Targets CircuitPython clients on memory-constrained
+  microcontrollers (Pico-W, ESP32-S3 / -C3 / -C6, nRF52840) where
+  the nibble-packed `.bin` format isn't viable: there's no
+  general-purpose decoder for it in the CircuitPython ecosystem, and
+  the packed buffer plus a decode scratch buffer would exhaust SRAM
+  on a Pico-W. Output is a true indexed PNG (mode "P") that
+  `adafruit_imageload` mounts directly with minimal RAM. Palette is
+  selected from the bound panel's gamut: `mono` -> 1-bit black/white,
+  `spectra_6` / `waveshare_e6` -> 6-colour Spectra 6, `acep_7colour`
+  / `inky_7colour` -> 7-colour ACeP, anything else falls back to
+  Spectra 6 nominal. Same per-device picture-quality knobs as
+  `trmnl_png` (dither mode + pre-dither contrast). Smoke tests
+  cover the indexed-mode invariant, the per-gamut palette
+  membership, and the flip path. Backlog item closed:
+  [#34](https://github.com/dmellok/tesserae/issues/34).
+
 ## [0.64.43], 2026-06-29
 
 ### Changed
