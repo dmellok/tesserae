@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.40], 2026-06-29
+
+### Added
+
+- **Per-hardware quickstart guides under [`docs/quickstart/`](quickstart/index.md).**
+  Eight family-grouped pages mirroring the
+  [tesserae.ink](https://tesserae.ink) quickstart format (four numbered
+  steps: install / pair / compose / schedule), one per supported
+  hardware family:
+    - Raspberry Pi + Pimoroni Inky Impression.
+    - Pi Pico Plus 2 W + Inky 13.3".
+    - Waveshare 13.3" Spectra 6 (ESP32-S3).
+    - Waveshare 7.3" PhotoPainter (ESP32-S3).
+    - Waveshare 4.2" B/W (ESP32).
+    - TRMNL OG / TRMNL X (stock firmware, no flashing).
+    - Seeed reTerminal E-Series (E1001 / E1002 / E1003 / E1004).
+    - Seeed XIAO 7.5" ePaper Panel.
+    - Kindle Paperwhite + KOReader.
+  Plus a [Quickstart overview](quickstart/index.md) that groups the
+  guides by hardware family. README and `mkdocs.yml` updated to surface
+  the new section. The existing `docs/install/clients.md` reference
+  page stays as the protocol-level depth doc; quickstarts are the
+  consumer-oriented entry point.
+
 ## [0.64.39], 2026-06-28
 
 ### Fixed

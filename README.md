@@ -23,7 +23,8 @@ Open source under AGPL-3.0-or-later. No SaaS, no telemetry, no cloud
 account required.
 
 **📖 [Full documentation](https://dmellok.github.io/tesserae/):**
-install guides, [widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
+install guides, [hardware quickstarts](https://dmellok.github.io/tesserae/quickstart/),
+[widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
 [community catalog](https://dmellok.github.io/tesserae/widgets/community/),
 [architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
 [how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/),
@@ -46,6 +47,8 @@ Other install paths:
 [macOS / Linux / Pi shell installer](https://dmellok.github.io/tesserae/install/server/),
 [Windows PowerShell](https://dmellok.github.io/tesserae/install/server/),
 [manual venv](https://dmellok.github.io/tesserae/install/server/#manual-install).
+
+Server is running? Pick a [hardware quickstart](https://dmellok.github.io/tesserae/quickstart/) to get a panel on the wall.
 
 ## Supported hardware
 

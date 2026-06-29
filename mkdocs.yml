@@ -90,6 +90,17 @@ nav:
   - Install a client: install/clients.md
   - Set up a device: install/devices.md
   - REST transport (no broker): install/rest-transport.md
+  - Hardware quickstarts:
+      - Overview: quickstart/index.md
+      - Pi + Pimoroni Inky: quickstart/pi-inky.md
+      - Pi Pico + Inky 13.3": quickstart/pi-pico-inky.md
+      - Waveshare 13.3" Spectra 6 (ESP32): quickstart/waveshare-spectra-6-13-3.md
+      - Waveshare 7.3" PhotoPainter (ESP32): quickstart/waveshare-photopainter-7-3.md
+      - Waveshare 4.2" B/W (ESP32): quickstart/waveshare-bw-4-2.md
+      - TRMNL OG / TRMNL X: quickstart/trmnl.md
+      - Seeed reTerminal E-Series: quickstart/seeed-reterminal.md
+      - Seeed XIAO 7.5": quickstart/seeed-xiao.md
+      - Kindle Paperwhite + KOReader: quickstart/kindle.md
   - Screens & compatibility: compatibility.md
   - Widgets:
       - Bundled widgets: widgets/gallery.md
