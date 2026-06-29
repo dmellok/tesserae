@@ -34,6 +34,11 @@ The flashed firmware sends a `Model` header that Tesserae maps to the panel dime
 | `reTerminal E1003` | 1404×1872 portrait | 10.3" mono, 16-level grey |
 | `reTerminal E1004` | 1200×1600 | 13.3" Spectra 6, firmware port in progress |
 
+### Per-model references
+
+- **E1002**: the panel uses an ACeP 7-colour gamut, which is more restrictive than the Spectra 6 family. For practical layout patterns on this gamut, see the [colour-for-calendars discussion on r/trmnl](https://www.reddit.com/r/trmnl/comments/1ucr8b2/color_for_calendars_is_here/).
+- **E1004**: TRMNL firmware support is in development upstream. Original bring-up by [@limengdu](https://github.com/limengdu) landed in [usetrmnl/trmnl-firmware#410](https://github.com/usetrmnl/trmnl-firmware/pull/410) (now closed). The active PR is [usetrmnl/trmnl-firmware#445](https://github.com/usetrmnl/trmnl-firmware/pull/445) by [@oetiker](https://github.com/oetiker), which rebases that work onto `main` with build hardening and adds onboard SHT4x temperature / humidity reporting through the existing `SENSORS` header. Verified on real E1004 hardware.
+
 ## 03 — Compose a dashboard
 
 In the editor:

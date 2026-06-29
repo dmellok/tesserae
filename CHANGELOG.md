@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.41], 2026-06-29
+
+### Added
+
+- **[`docs/quickstart/seeed-reterminal.md`](quickstart/seeed-reterminal.md)
+  gains a Per-model references section** under the model header table,
+  with two links:
+    - **E1002**: the [colour-for-calendars discussion on r/trmnl](https://www.reddit.com/r/trmnl/comments/1ucr8b2/color_for_calendars_is_here/),
+      covering practical layout patterns for the ACeP 7-colour gamut.
+    - **E1004**: the upstream firmware PR chain. Original bring-up in
+      [usetrmnl/trmnl-firmware#410](https://github.com/usetrmnl/trmnl-firmware/pull/410)
+      (now closed); active PR is
+      [usetrmnl/trmnl-firmware#445](https://github.com/usetrmnl/trmnl-firmware/pull/445),
+      which rebases that work onto `main` with build hardening and adds
+      onboard SHT4x temperature / humidity reporting through the
+      existing `SENSORS` header.
+
 ## [0.64.40], 2026-06-29
 
 ### Added
