@@ -606,6 +606,19 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
+                # Per-device battery-display offset (mV + %). Manifest
+                # block is ``battery_offset: {mv, pct}``; both default to
+                # 0 and the block drops when both are 0. Like quiet
+                # hours, this is an instances-only knob; kinds don't get
+                # the form.
+                "battery_offset": (
+                    device.manifest.get("battery_offset") or {} if is_instance else {}
+                ),
+                "battery_offset_endpoint": (
+                    url_for("auth.devices_update_battery_offset", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
                 # Per-device rotation view: every Schedule whose target
                 # page binds to this device, sorted by window start.
                 # Pure read view, each row deep-links to the Schedules

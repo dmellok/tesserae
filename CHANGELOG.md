@@ -6,6 +6,45 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.47], 2026-07-01
+
+### Added
+
+- **Per-device battery display offset (Settings → Devices → device
+  card).** Two signed integers, mV and percent, applied at read time
+  to align the displayed battery with a voltmeter measurement.
+  Voltage offset re-derives the percent from a LiPo curve so a
+  calibrated 4.20 V cell that the device reports as 3.85 V now reads
+  as 100% on the dashboard. The percent offset adds on top for the
+  band-aid "UI says 85, voltmeter says 100, add 15" case. Both at
+  zero drops the override entirely. Raw firmware readings stay
+  untouched in the SQLite history store so a recalibration tomorrow
+  doesn't lose the historical record; only the displayed values
+  (dashboard, /devices/battery chart, HA discovery sensors) shift.
+- **Time-to-fully-charged projection on /devices/battery cards.**
+  When the latest samples show sustained charging (positive slope on
+  the trailing monotonic segment, above the existing magnitude
+  threshold), the empty-projection tile flips to "Full in Xh / X
+  days". Gated by the same sustained-segment regression that drives
+  the days-to-empty projection, so transient ADC wobble doesn't
+  toggle the indicator. The `Prediction` dataclass gains a
+  `days_to_full: float | None` field; downstream consumers can opt
+  in to the new value.
+- **"Clear battery history" button per device on /devices/battery.**
+  Wipes every recorded sample for one device only, leaving other
+  devices' histories alone. Gated by a JS confirm so an accidental
+  click can't drop the data. Useful after a recalibration, a
+  battery swap, or a device factory-reset where the historical curve
+  no longer reflects the current cell.
+
+### Changed
+
+- `app.device_loader.load_instance_file` now carries through the
+  optional `battery_offset` block from a device instance manifest
+  (alongside the existing `quiet_hours` carry-through), so the
+  per-device override survives the hot-reload that fires when any
+  device-card subsection is saved.
+
 ## [0.64.46], 2026-07-01
 
 ### Fixed

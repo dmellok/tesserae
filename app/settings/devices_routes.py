@@ -656,6 +656,46 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
 
 
+@bp.post("/settings/devices/<instance_id>/battery-offset")
+def devices_update_battery_offset(instance_id: str) -> Response:
+    """Save a per-device battery-display offset.
+
+    Two values, both signed: ``battery_offset_mv`` adjusts the
+    displayed voltage to match a voltmeter reading; ``battery_offset_pct``
+    adjusts the displayed percent. Both at zero drops the block from
+    the manifest entirely so the device falls back to the raw
+    firmware-reported values."""
+    anchor = f"device-{instance_id}"
+    form = request.form
+    try:
+        mv = int(form.get("battery_offset_mv") or 0)
+        pct = int(form.get("battery_offset_pct") or 0)
+    except ValueError:
+        flash("Battery offsets must be whole numbers.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    result = device_service.update_instance_battery_offset(
+        devices=devices(),
+        renderers=renderers(),
+        data_root=device_data_root(),
+        instance_id=instance_id,
+        mv=mv,
+        pct=pct,
+    )
+    if not result.ok or result.device is None:
+        flash(result.error or "Couldn't save battery offset.", "error")
+        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    block = result.device.manifest.get("battery_offset") or {}
+    if block:
+        flash(
+            f"Saved battery offset for {result.device.name!r}: "
+            f"{block.get('mv', 0):+d} mV, {block.get('pct', 0):+d}%.",
+            "ok",
+        )
+    else:
+        flash(f"Cleared battery offset for {result.device.name!r}.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+
 # -- combined save ------------------------------------------------------
 
 
@@ -825,6 +865,30 @@ def devices_update_combined(instance_id: str) -> Response:
             flash(qh_result.error or "Couldn't save quiet hours.", "error")
         else:
             ok_messages.append("quiet hours saved")
+            any_change = True
+
+    # 5. Battery-display offset. The two inputs always submit on the
+    # combined form (mV + pct). Both at zero drops the block from the
+    # manifest entirely.
+    if "battery_offset_mv" in form or "battery_offset_pct" in form:
+        try:
+            mv = int(form.get("battery_offset_mv") or 0)
+            pct = int(form.get("battery_offset_pct") or 0)
+        except ValueError:
+            flash("Battery offsets must be whole numbers.", "error")
+            return redirect_to
+        bo_result = device_service.update_instance_battery_offset(
+            devices=devices_registry,
+            renderers=renderers(),
+            data_root=device_data_root(),
+            instance_id=instance_id,
+            mv=mv,
+            pct=pct,
+        )
+        if not bo_result.ok:
+            flash(bo_result.error or "Couldn't save battery offset.", "error")
+        else:
+            ok_messages.append("battery offset saved")
             any_change = True
 
     if any_change:

@@ -271,6 +271,37 @@
           </div>
         </div>
         {% endif %}
+
+        {# Per-device battery display offset. Two signed integers (mV
+           and percent) layered on top of the firmware's raw reading at
+           display time. Common case: voltmeter shows the cell at 4.20 V
+           but the device reports 3.85 V → add 350 mV here. Empty / both
+           zero clears the override on save. #}
+        {% if section.battery_offset_endpoint %}
+        <div class="dx-battery-offset">
+          <hr class="dx-divider">
+          <p class="device-subhead">Battery display offset</p>
+          <p class="field-help" style="margin: 0 0 8px;">
+            Adjust the displayed battery to match a voltmeter reading.
+            Raw values stay in the SQLite history store unchanged; only
+            the displayed numbers (here, on /devices/battery, and on
+            Home Assistant discovery sensors) shift. Both zero → no
+            override.
+          </p>
+          <div class="dx-field-grid">
+            {{ number_input(section.id ~ '-bo-mv', 'battery_offset_mv',
+                            'mV offset',
+                            value=section.battery_offset.get('mv', 0),
+                            min=-2000, max=2000, step=10,
+                            help='Added to the device-reported voltage (mV) before display. Positive bumps up, negative bumps down. Range ±2000 mV.') }}
+            {{ number_input(section.id ~ '-bo-pct', 'battery_offset_pct',
+                            '% offset',
+                            value=section.battery_offset.get('pct', 0),
+                            min=-100, max=100, step=1,
+                            help='Added to the displayed percent on top of the mV-derived bump. Range ±100. Use when you want to tune the percent directly without thinking in millivolts.') }}
+          </div>
+        </div>
+        {% endif %}
       </section>
 
       {# RENDERING TAB #}

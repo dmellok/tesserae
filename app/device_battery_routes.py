@@ -17,8 +17,19 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from flask import Blueprint, Flask, current_app, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    Flask,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
+from app.battery_offset import apply_to_mv, apply_to_pct, get_offset
 from app.device_loader import DeviceRegistry
 from app.state.battery_history import BatteryHistory
 
@@ -53,22 +64,46 @@ def _resolve_window() -> int:
 
 def _current_battery_per_device() -> dict[str, dict[str, Any]]:
     """Best-known current battery state per device, pulled from the
-    same in-memory cache the topbar indicator + widget use."""
+    same in-memory cache the topbar indicator + widget use.
+
+    Per-device ``battery_offset`` manifests (see :mod:`app.battery_offset`)
+    apply at this read site so the dashboard, history chart, and the
+    SQLite write path all read the same corrected values. Raw firmware
+    readings stay untouched in ``DEVICE_STATUS`` so a recalibration
+    tomorrow doesn't lose the historical record."""
     status: dict[str, dict[str, Any]] = current_app.config.get("DEVICE_STATUS") or {}
+    registry = _registry()
+    devices = registry.devices if registry is not None else {}
     out: dict[str, dict[str, Any]] = {}
     for device_id, entry in status.items():
         parsed = (entry or {}).get("parsed") or {}
-        raw = parsed.get("battery_pct")
-        if raw is None:
+        raw_pct = parsed.get("battery_pct")
+        raw_mv = parsed.get("battery_mv")
+        if raw_pct is None and raw_mv is None:
             continue
         try:
-            pct = int(raw)
+            raw_pct_int: int | None = int(raw_pct) if raw_pct is not None else None
         except (TypeError, ValueError):
             continue
+        try:
+            raw_mv_int: int | None = int(raw_mv) if raw_mv is not None else None
+        except (TypeError, ValueError):
+            raw_mv_int = None
+        device = devices.get(device_id)
+        mv_off, pct_off = get_offset(device.manifest) if device is not None else (0, 0)
+        adj_pct = apply_to_pct(raw_pct_int, mv_off, pct_off, raw_mv=raw_mv_int)
+        adj_mv = apply_to_mv(raw_mv_int, mv_off)
+        if adj_pct is None:
+            continue
         out[device_id] = {
-            "pct": max(0, min(100, pct)),
+            "pct": adj_pct,
             "received_at": entry.get("received_at"),
-            "battery_mv": parsed.get("battery_mv"),
+            "battery_mv": adj_mv,
+            # Surface the offset block so the dashboard can mark the
+            # card "calibrated" rather than the user guessing whether
+            # the number they're looking at was adjusted.
+            "offset_mv": mv_off,
+            "offset_pct": pct_off,
         }
     return out
 
@@ -80,10 +115,26 @@ def _device_card(
     current: dict[str, Any] | None,
     name: str,
     window_days: int,
+    mv_offset: int = 0,
+    pct_offset: int = 0,
 ) -> dict[str, Any]:
+    """One device's card data, including the chart series and the
+    prediction.
+
+    The chart series carries the **offset-adjusted** percent so the
+    chart matches the dashboard's current-battery readout. Without
+    this, the user would calibrate a device, see "85% → 100%" on
+    the headline, and find the chart still showing the old 85%
+    curve, which reads as a bug. ``BatteryHistory.recent`` returns
+    the raw rows; the offset is layered at this read site only."""
     samples = history.recent(device_id, window_days=window_days)
     prediction = history.predict(device_id, window_days=window_days)
-    series = [{"t_ms": int(row.timestamp * 1000), "pct": row.pct} for row in samples]
+    series: list[dict[str, Any]] = []
+    for row in samples:
+        adj = apply_to_pct(row.pct, mv_offset, pct_offset, raw_mv=row.battery_mv)
+        series.append(
+            {"t_ms": int(row.timestamp * 1000), "pct": adj if adj is not None else row.pct}
+        )
     return {
         "id": device_id,
         "name": name,
@@ -94,6 +145,7 @@ def _device_card(
             "slope_per_day": prediction.slope_per_day,
             "days_to_20pct": prediction.days_to_20pct,
             "days_to_empty": prediction.days_to_empty,
+            "days_to_full": prediction.days_to_full,
             "samples": prediction.samples,
         }
         if prediction is not None
@@ -124,7 +176,9 @@ def index() -> str:
         device_ids = (set(current.keys()) | set(store.device_ids())) & registered_ids
         # Stable display order: name asc, falling back to id.
         names = {d.id: d.display_name for d in (registry.devices.values() if registry else [])}
+        manifests = {d.id: d.manifest for d in (registry.devices.values() if registry else [])}
         for device_id in sorted(device_ids, key=lambda i: (names.get(i) or i).lower()):
+            mv_off, pct_off = get_offset(manifests.get(device_id, {}))
             cards.append(
                 _device_card(
                     device_id,
@@ -132,6 +186,8 @@ def index() -> str:
                     current=current.get(device_id),
                     name=names.get(device_id, device_id),
                     window_days=window_days,
+                    mv_offset=mv_off,
+                    pct_offset=pct_off,
                 )
             )
     return render_template(
@@ -145,19 +201,30 @@ def index() -> str:
 
 @bp.get("/<device_id>/series.json")
 def series_json(device_id: str) -> Any:
-    """JSON dump of the raw points for one device, for charts that want
-    to refresh in place without re-rendering the whole page."""
+    """JSON dump of the offset-adjusted points for one device, for
+    charts that refresh in place without re-rendering the whole page.
+
+    Same offset application as ``index``: raw rows from SQLite, then
+    the per-device ``battery_offset`` manifest layered on top so the
+    JSON consumer sees what the dashboard sees."""
     store = _history()
     window_days = _resolve_window()
     if store is None:
         return jsonify({"error": "battery history store not configured"}), 503
     rows = store.recent(device_id, window_days=window_days)
     prediction = store.predict(device_id, window_days=window_days)
+    registry = _registry()
+    device = registry.get(device_id) if registry is not None else None
+    mv_off, pct_off = get_offset(device.manifest) if device is not None else (0, 0)
+    series: list[dict[str, Any]] = []
+    for r in rows:
+        adj = apply_to_pct(r.pct, mv_off, pct_off, raw_mv=r.battery_mv)
+        series.append({"t_ms": int(r.timestamp * 1000), "pct": adj if adj is not None else r.pct})
     return jsonify(
         {
             "device_id": device_id,
             "window_days": window_days,
-            "series": [{"t_ms": int(r.timestamp * 1000), "pct": r.pct} for r in rows],
+            "series": series,
             "prediction": {
                 "slope_per_day": prediction.slope_per_day,
                 "days_to_20pct": prediction.days_to_20pct,
@@ -168,6 +235,21 @@ def series_json(device_id: str) -> Any:
             else None,
         }
     )
+
+
+@bp.post("/<device_id>/clear")
+def clear_history(device_id: str) -> Any:
+    """Drop every recorded battery sample for ``device_id``. Destructive
+    by design: the user is the only authoritative source for "this
+    history is wrong, start fresh" (e.g. after a calibration change,
+    a battery swap, or a device factory-reset)."""
+    store = _history()
+    if store is None:
+        flash("Battery history store not configured.", "error")
+        return redirect(url_for("device_battery.index"))
+    store.forget(device_id)
+    flash(f"Cleared battery history for {device_id!r}.", "ok")
+    return redirect(url_for("device_battery.index"))
 
 
 def register(app: Flask) -> None:

@@ -150,3 +150,98 @@ def test_topbar_battery_indicator_links_to_admin_page(app: Flask) -> None:
         "topbar battery indicator should link to /devices/battery so the "
         "user has a discoverable entry point"
     )
+
+
+def test_clear_history_drops_every_sample_for_device(app: Flask, tmp_path: Path) -> None:
+    """The Clear battery history button on each device card must wipe
+    every sample for that device only, leaving other devices' history
+    alone. Destructive by design: the user is the only authoritative
+    'this history is wrong, start fresh' source."""
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    client = app.test_client()
+    _sign_in(client)
+    # Two devices with parallel histories so the cross-device isolation
+    # check has something to fail against.
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_attic", "kind": "esp32_client", "name": "Attic"},
+    )
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_lounge", "kind": "esp32_client", "name": "Lounge"},
+    )
+    now = time.time()
+    for i in range(8):
+        store.record("esp32_attic", pct=80 - i * 5, timestamp=now - (8 - i) * 86400 / 2)
+        store.record("esp32_lounge", pct=60 - i * 3, timestamp=now - (8 - i) * 86400 / 2)
+    assert len(store.recent("esp32_attic", window_days=7)) == 8
+    assert len(store.recent("esp32_lounge", window_days=7)) == 8
+
+    resp = client.post("/devices/battery/esp32_attic/clear", follow_redirects=False)
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/devices/battery")
+
+    assert store.recent("esp32_attic", window_days=7) == []
+    assert len(store.recent("esp32_lounge", window_days=7)) == 8, (
+        "clearing one device's history must not touch other devices' history"
+    )
+
+
+def test_series_json_applies_per_device_battery_offset(app: Flask, tmp_path: Path) -> None:
+    """When the device manifest carries a battery_offset block, the
+    /series.json endpoint must return offset-adjusted percents so the
+    chart matches the dashboard's current-battery readout. Without
+    this, the user would calibrate a device and see the headline jump
+    but the chart still drawn from raw readings, which reads as a bug."""
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_attic", "kind": "esp32_client", "name": "Attic"},
+    )
+    # Save a +15% offset on the device.
+    resp = client.post(
+        "/settings/devices/esp32_attic/battery-offset",
+        data={"battery_offset_mv": "0", "battery_offset_pct": "15"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302, f"offset POST failed: {resp.status_code} {resp.data!r}"
+    now = time.time()
+    for i in range(10):
+        store.record(
+            "esp32_attic",
+            pct=50 - i,  # values around 41-50%
+            battery_mv=3700,
+            timestamp=now - (10 - i) * 86400 / 2,
+        )
+
+    payload = client.get("/devices/battery/esp32_attic/series.json?window=7").get_json()
+    series = payload["series"]
+    assert series, "expected non-empty series"
+    # Each point should have the +15% bump applied (raw 41-50 → 56-65,
+    # clamped at 100 if any exceeded that). All raw values were <50
+    # so the bumped values are all well under 100; verify the shift
+    # rather than just the clamp.
+    pcts = [p["pct"] for p in series]
+    assert all(p > 50 for p in pcts), pcts
+
+
+def test_clear_history_button_renders_only_for_devices_with_samples(
+    app: Flask, tmp_path: Path
+) -> None:
+    """An empty-history card has nothing to clear; not showing the
+    button avoids a "press the button → flash 'cleared 0 samples'"
+    UX dead-end."""
+    store: BatteryHistory = app.config["BATTERY_HISTORY"]
+    client = app.test_client()
+    _sign_in(client)
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_attic", "kind": "esp32_client", "name": "Attic"},
+    )
+    now = time.time()
+    for i in range(4):
+        store.record("esp32_attic", pct=80 - i * 5, timestamp=now - (4 - i) * 86400 / 2)
+    body = client.get("/devices/battery?window=7").get_data(as_text=True)
+    assert "Clear battery history" in body

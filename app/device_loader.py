@@ -545,6 +545,10 @@ def load_instance_file(
     # absent or empty means fall back to the app-level setting.
     if isinstance(raw_inst.get("quiet_hours"), dict):
         inst_manifest["quiet_hours"] = dict(raw_inst["quiet_hours"])
+    # Per-device battery-display offset (see app.battery_offset). Optional;
+    # absent means no display correction applied to raw firmware readings.
+    if isinstance(raw_inst.get("battery_offset"), dict):
+        inst_manifest["battery_offset"] = dict(raw_inst["battery_offset"])
     # Per-device access token, currently only TRMNL devices use this
     # (HTTP-polled clients identify themselves by token in lieu of MQTT
     # topics). Carry it through so app.trmnl_api can look up the

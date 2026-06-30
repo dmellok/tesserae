@@ -55,6 +55,16 @@ CHARGE_JUMP_PCT: int = 5
 # 15-min wake cadence produces ~96 samples/day, so 4 samples
 # represents at least an hour of post-charge discharge data.
 MIN_SEGMENT_SAMPLES: int = 4
+# Time-to-full prediction kicks in when the recent slope is
+# meaningfully positive (battery is actively charging). Mirrors
+# ``MIN_DRAIN_PER_DAY`` but on the upward side: a slope of
+# <0.5 %/day reads as "noise", not "charging".
+MIN_CHARGE_PER_DAY: float = 0.5
+# The charging slope is fit to the most recent CHARGING segment
+# (the inverse of ``_last_discharge_segment``), to keep an old
+# discharge episode mid-window from pulling the regression
+# downward and masking an in-progress charge.
+MIN_CHARGE_SEGMENT_SAMPLES: int = 4
 
 
 @dataclass(frozen=True)
@@ -62,9 +72,12 @@ class Prediction:
     """One-shot regression result for a device's last N days.
 
     ``slope_per_day`` is negative on a draining battery (e.g. -3.2
-    means it loses 3.2 % per day). ``days_to_20pct`` / ``days_to_empty``
-    are projections from the current_pct; both ``None`` when the
-    battery's flat or rising.
+    means it loses 3.2 % per day) and positive when charging.
+    ``days_to_20pct`` / ``days_to_empty`` are projections from
+    ``current_pct``; both ``None`` when the battery's flat or rising.
+    ``days_to_full`` is the inverse: present only when the recent
+    samples show sustained charging (positive slope on the latest
+    charging segment); ``None`` when flat or discharging.
     """
 
     device_id: str
@@ -72,6 +85,7 @@ class Prediction:
     slope_per_day: float
     days_to_20pct: float | None
     days_to_empty: float | None
+    days_to_full: float | None
     samples: int
     window_days: int
 
@@ -251,14 +265,21 @@ class BatteryHistory:
         current_pct = max(0.0, min(100.0, float(all_rows[-1].pct)))
 
         if slope >= -MIN_DRAIN_PER_DAY:
-            # Flat or charging. Return the slope so the caller can show
-            # "+0.5%/day" if it wants, but no projection.
+            # Flat or charging. Fit a separate regression to just the
+            # latest charging segment so a half-window-old discharge
+            # doesn't drag the slope below the charging threshold.
+            # When the segment fit shows sustained positive slope we
+            # produce a days_to_full projection; otherwise it's a
+            # genuinely flat battery and only the slope reading goes
+            # back.
+            days_to_full = _maybe_days_to_full(all_rows, current_pct)
             return Prediction(
                 device_id=device_id,
                 current_pct=current_pct,
                 slope_per_day=slope,
                 days_to_20pct=None,
                 days_to_empty=None,
+                days_to_full=days_to_full,
                 samples=n,
                 window_days=window_days,
             )
@@ -271,6 +292,7 @@ class BatteryHistory:
             slope_per_day=slope,
             days_to_20pct=max(0.0, days_to_20pct),
             days_to_empty=max(0.0, days_to_empty),
+            days_to_full=None,
             samples=n,
             window_days=window_days,
         )
@@ -289,3 +311,74 @@ def _last_discharge_segment(rows: list[BatteryRow]) -> list[BatteryRow]:
     if last_charge_idx <= 0:
         return rows
     return rows[last_charge_idx:]
+
+
+def _last_charging_segment(rows: list[BatteryRow]) -> list[BatteryRow]:
+    """Return the trailing slice of ``rows`` where the percent is
+    monotonically non-decreasing across at least
+    ``MIN_CHARGE_SEGMENT_SAMPLES`` consecutive samples ending at the
+    last row.
+
+    Walks back from the tail until the first sample that DROPS, which
+    marks the boundary between "the last discharge" and "the charge
+    currently in progress". Wobble of one percent point is allowed
+    within the segment (firmware ADC noise; a 4.16 V cell can read as
+    99 / 100 / 99 / 100 over four consecutive heartbeats), so we look
+    for drops of more than one percent rather than strict monotonicity.
+    Returns an empty list when the latest segment is too short to fit
+    on; the caller treats that as "not currently charging"."""
+    if not rows:
+        return []
+    end = len(rows) - 1
+    start = end
+    for i in range(end - 1, -1, -1):
+        # A drop of more than one percent breaks the segment; this
+        # cell IS discharging (or at best flat) over this gap.
+        if rows[i + 1].pct - rows[i].pct < -1:
+            break
+        start = i
+    segment = rows[start : end + 1]
+    if len(segment) < MIN_CHARGE_SEGMENT_SAMPLES:
+        return []
+    return segment
+
+
+def _maybe_days_to_full(rows: list[BatteryRow], current_pct: float) -> float | None:
+    """Return the projected days until ``current_pct`` reaches 100%,
+    or ``None`` when the latest samples don't show sustained charging.
+
+    Uses :func:`_last_charging_segment` to isolate the trailing
+    charging slice, then fits the same simple linear regression as
+    ``predict()`` on that subset. Two reasons to gate this beyond the
+    main slope:
+
+    * The main slope is fit to the most recent DISCHARGE segment for
+      the days-to-empty projection; it's the wrong signal for the
+      charge case (it can be slightly negative even while a charge is
+      mid-progress).
+    * A genuinely flat battery shouldn't get a "Full in ∞" indicator;
+      requiring ``MIN_CHARGE_PER_DAY`` of charging slope filters that
+      out cleanly.
+
+    Returns 0 (not None) when the battery is already at or above 100%
+    so the UI can render "Full now" rather than hiding the indicator.
+    """
+    if current_pct >= 100.0:
+        return 0.0
+    segment = _last_charging_segment(rows)
+    if not segment:
+        return None
+    t0 = segment[0].timestamp
+    xs = [(r.timestamp - t0) / 86400.0 for r in segment]
+    ys = [float(r.pct) for r in segment]
+    n = len(xs)
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+    num = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys, strict=True))
+    den = sum((x - mean_x) ** 2 for x in xs)
+    if den == 0:
+        return None
+    slope = num / den
+    if slope < MIN_CHARGE_PER_DAY:
+        return None
+    return max(0.0, (100.0 - current_pct) / slope)

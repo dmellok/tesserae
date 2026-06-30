@@ -94,10 +94,44 @@
           </div>
           <div class="dx-stat-sub">days</div>
         </div>
+        {# When the latest samples show sustained charging, this tile
+           replaces "Reaches 0%" in the user's mental model: an actively
+           charging battery doesn't drain, so the empty-projection is
+           meaningless, and "Full in Xh" is the genuinely useful number. #}
+        {% if c.prediction and c.prediction.days_to_full is not none %}
+        <div class="dx-stat-tile">
+          <div class="dx-stat-label">Full in</div>
+          <div class="dx-stat-value">
+            {% if c.prediction.days_to_full == 0 %}
+              now
+            {% elif c.prediction.days_to_full < 1 %}
+              {{ '%.1f' % (c.prediction.days_to_full * 24) }}
+            {% else %}
+              {{ '%.1f' % c.prediction.days_to_full }}
+            {% endif %}
+          </div>
+          <div class="dx-stat-sub">
+            {% if c.prediction.days_to_full == 0 %}charged
+            {% elif c.prediction.days_to_full < 1 %}hours
+            {% else %}days{% endif %}
+          </div>
+        </div>
+        {% endif %}
       </div>
 
       {% if not c.prediction %}
       <p class="dx-battery-hint">Need at least 8 samples in this window for a prediction.</p>
+      {% endif %}
+
+      {% if c.samples %}
+      <form method="post"
+            action="{{ url_for('device_battery.clear_history', device_id=c.id) }}"
+            class="dx-battery-actions"
+            onsubmit="return confirm('Clear battery history for {{ c.name|e }}? This deletes every recorded sample for this device and cannot be undone.');">
+        <button type="submit" class="dx-link-btn dx-link-btn--danger">
+          Clear battery history
+        </button>
+      </form>
       {% endif %}
     </article>
     {% endfor %}

@@ -507,6 +507,55 @@ def update_instance_quiet_hours(
     return InstanceResult(reloaded)
 
 
+def update_instance_battery_offset(
+    *,
+    devices: DeviceRegistry,
+    renderers: RendererRegistry,
+    data_root: Path,
+    instance_id: str,
+    mv: int,
+    pct: int,
+) -> InstanceResult:
+    """Patch a registered instance's ``battery_offset`` block on disk
+    and hot-reload it in place. Both values are signed (positive bumps
+    the displayed reading up, negative bumps it down). A ``(0, 0)``
+    submission drops the block entirely so the manifest stays clean
+    when the user clears the override.
+
+    Bounds: mV is clamped to ``±2000`` (the realistic ADC drift range
+    for any LiPo / LiFePO4 / LiHV cell tesserae targets); pct is
+    clamped to ``±100`` (the only valid range for a percent
+    adjustment). Out-of-range submissions saturate at the boundary
+    rather than rejecting, so a typoed "350" instead of "35" still
+    produces a sensible result instead of erroring."""
+    device = devices.get(instance_id)
+    if device is None or device.kind_of is None:
+        return InstanceResult(None, f"Unknown device {instance_id!r}.")
+
+    inst_file = device.path
+    try:
+        raw = json.loads(inst_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as err:
+        return InstanceResult(None, f"Couldn't read {inst_file.name}: {err}")
+
+    mv_clamped = max(-2000, min(2000, int(mv)))
+    pct_clamped = max(-100, min(100, int(pct)))
+    if mv_clamped == 0 and pct_clamped == 0:
+        raw.pop("battery_offset", None)
+    else:
+        raw["battery_offset"] = {"mv": mv_clamped, "pct": pct_clamped}
+    inst_file.write_text(json.dumps(raw, indent=2) + "\n", encoding="utf-8")
+
+    devices.devices.pop(instance_id, None)
+    _drop_clones(renderers, instance_id)
+    reloaded = load_instance_file(devices, inst_file=inst_file, data_root=data_root)
+    if reloaded is None:
+        last_err = devices.errors[-1] if devices.errors else None
+        return InstanceResult(None, last_err.message if last_err else "unknown error")
+    clone_for_instances(renderers, devices)
+    return InstanceResult(reloaded)
+
+
 def delete_instance(
     *,
     devices: DeviceRegistry,

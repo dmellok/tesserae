@@ -146,6 +146,83 @@ def test_predict_falls_back_to_full_window_when_segment_too_short(
     assert pred.slope_per_day < 0
 
 
+def test_predict_returns_days_to_full_on_a_sustained_charge(
+    store: BatteryHistory,
+) -> None:
+    """Battery on the charger: percent rises monotonically over the
+    most recent samples. ``days_to_full`` should project the time to
+    100% from the latest charging segment's slope, not from a
+    discharge slope elsewhere in the window."""
+    now = time.time()
+    # 12 samples over 6 days, all monotonically rising from 30 → 90%
+    # (10 %/day). The segment IS the full window in this case.
+    for i in range(12):
+        days_ago = 6.0 * (11 - i) / 11
+        pct = 30 + 10 * (6.0 - days_ago)  # rises from 30 to 90 over 6 days
+        store.record("esp32_charging", pct=round(pct), timestamp=now - days_ago * 86400)
+    pred = store.predict("esp32_charging", window_days=7)
+    assert pred is not None
+    assert pred.slope_per_day > 0
+    assert pred.days_to_full is not None
+    # current 90%, slope 10 %/day → 1 day to 100%
+    assert pred.days_to_full == pytest.approx(1.0, abs=0.3)
+    # Discharge projections must NOT be present when charging.
+    assert pred.days_to_empty is None
+    assert pred.days_to_20pct is None
+
+
+def test_predict_no_days_to_full_when_flat(store: BatteryHistory) -> None:
+    """A perfectly flat battery isn't charging; we don't show a
+    "Full in ∞" indicator. The slope-magnitude gate
+    (``MIN_CHARGE_PER_DAY``) catches this even though
+    ``_last_charging_segment`` would otherwise return the full
+    flat window."""
+    now = time.time()
+    for i in range(20):
+        store.record("esp32_flat", pct=80, timestamp=now - i * 3600)
+    pred = store.predict("esp32_flat", window_days=7)
+    assert pred is not None
+    assert pred.days_to_full is None
+
+
+def test_predict_no_days_to_full_after_a_recent_discharge(
+    store: BatteryHistory,
+) -> None:
+    """A device that drained yesterday and is flat today shouldn't
+    show "Full in" just because the slope is technically near zero.
+    The trailing samples must show sustained charging."""
+    now = time.time()
+    # Drain phase ending 1 day ago, then flat at 60% for the last day.
+    for i in range(10):
+        days_ago = 7.0 - 0.5 * i  # 7.0, 6.5, ..., 2.5
+        pct = 90 - i * 3  # 90, 87, ..., 63
+        store.record("esp32_mixed", pct=pct, timestamp=now - days_ago * 86400)
+    for i in range(8):
+        store.record("esp32_mixed", pct=60, timestamp=now - i * 3600)
+    pred = store.predict("esp32_mixed", window_days=7)
+    assert pred is not None
+    assert pred.days_to_full is None, (
+        f"flat trailing samples shouldn't project to full; got days_to_full={pred.days_to_full}"
+    )
+
+
+def test_predict_days_to_full_zero_when_already_at_or_above_100(
+    store: BatteryHistory,
+) -> None:
+    """A device that's just hit 100% should render "Full now" (i.e.
+    0 days), not be hidden as "not charging anymore"."""
+    now = time.time()
+    # Climbing 50 → 100 over 5 days.
+    for i in range(10):
+        days_ago = 5.0 * (9 - i) / 9
+        pct = 50 + 50 * (5.0 - days_ago) / 5.0
+        store.record("esp32_topup", pct=round(pct), timestamp=now - days_ago * 86400)
+    pred = store.predict("esp32_topup", window_days=7)
+    assert pred is not None
+    assert pred.current_pct >= 100.0
+    assert pred.days_to_full == 0.0
+
+
 def test_device_ids_returns_distinct_devices(store: BatteryHistory) -> None:
     now = time.time()
     store.record("a", pct=80, timestamp=now)
