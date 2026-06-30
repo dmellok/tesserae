@@ -2,6 +2,9 @@
 
 A Raspberry Pi wired to a Pimoroni Inky Impression: 4", 5.7", 7.3", 13.3", or a pHAT / wHAT. About ten minutes from a fresh Pi OS install to a painted panel.
 
+!!! tip "Fresh SD card?"
+    If you're setting up a brand-new Pi specifically for this, the [cloud-init path](pi-inky-cloud-init.md) is zero-touch: flash the SD card with Pi Imager, drop one yaml into the boot partition, edit two values, boot. No SSH required.
+
 !!! tip "Which client?"
     Two clients drive Pimoroni Inky panels: `pi-bin` (fast, panel-native 4-bpp packed buffer) and `pi-png` (PNG path, quantises on the Pi). This guide uses `pi-bin`. Switch to `pi-png` only if your panel uses a colour gamut `pi-bin` doesn't pack (the pHAT and wHAT in particular).
 

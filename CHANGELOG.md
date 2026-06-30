@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.45], 2026-06-30
+
+### Added
+
+- **`scripts/pi-client-cloud-init.yaml`**: zero-touch install for a
+  Raspberry Pi driving a Pimoroni Inky panel. Flash Raspberry Pi OS
+  Lite via Pi Imager, drop the yaml into the boot partition as
+  `user-data`, edit the Tesserae server URL and Inky panel model,
+  insert + power on. cloud-init creates a `tesserae` user with
+  `gpio` + `spi` group membership, pre-writes the client config,
+  clones `tesserae-device-pi-bin`, runs its `install.sh
+  --non-interactive` (apt deps + raspi-config SPI/I2C +
+  dtoverlay=spi0-0cs + venv + pip install + systemd unit), and
+  reboots so SPI / I2C take effect. After the reboot the daemon
+  starts on its own and announces to the Tesserae server's
+  Discovered strip for one-click registration.
+- **[`docs/quickstart/pi-inky-cloud-init.md`](quickstart/pi-inky-cloud-init.md)**:
+  step-by-step walkthrough of the cloud-init path, including the
+  Pi Imager flow, the two values to edit before flashing, the
+  pairing flow on the Tesserae server side, and a troubleshooting
+  table for the usual first-boot failure modes (I2C didn't enable,
+  spi0-0cs overlay missing, server URL unreachable).
+- **[`docs/quickstart/pi-inky.md`](quickstart/pi-inky.md)** gains a
+  callout linking to the cloud-init path for fresh SD cards.
+- **[`mkdocs.yml`](mkdocs.yml)** Hardware quickstart nav extended
+  with the cloud-init sibling between the manual Pi + Inky entry
+  and the Pi Pico variant.
+
 ## [0.64.44], 2026-06-30
 
 ### Added

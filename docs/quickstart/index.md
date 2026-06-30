@@ -8,7 +8,8 @@ If Tesserae is not running yet, start at [Install Tesserae](../install/server.md
 
 The Pi runs a small client that subscribes to your Tesserae server and paints the panel over SPI. No firmware flashing involved.
 
-- [Raspberry Pi + Pimoroni Inky Impression](pi-inky.md): the 4", 5.7", 7.3", 13.3", pHAT, or wHAT.
+- [Raspberry Pi + Pimoroni Inky Impression](pi-inky.md): the 4", 5.7", 7.3", 13.3", pHAT, or wHAT. Manual install path.
+- [Raspberry Pi + Pimoroni Inky, automated via cloud-init](pi-inky-cloud-init.md): zero-touch flash-and-boot setup for a fresh SD card.
 - [Pi Pico Plus 2 W + Pimoroni Inky 13.3"](pi-pico-inky.md): the battery-powered RP2350 path.
 
 ## Waveshare ESP32

@@ -93,6 +93,7 @@ nav:
   - Hardware quickstarts:
       - Overview: quickstart/index.md
       - Pi + Pimoroni Inky: quickstart/pi-inky.md
+      - Pi + Pimoroni Inky (cloud-init): quickstart/pi-inky-cloud-init.md
       - Pi Pico + Inky 13.3": quickstart/pi-pico-inky.md
       - Waveshare 13.3" Spectra 6 (ESP32): quickstart/waveshare-spectra-6-13-3.md
       - Waveshare 7.3" PhotoPainter (ESP32): quickstart/waveshare-photopainter-7-3.md
