@@ -124,10 +124,11 @@ def test_topbar_battery_indicator_links_to_admin_page(app: Flask) -> None:
     # objects with `id`, `display_name`, and `kind_of`.
 
     class _FakeDevice:
-        def __init__(self, id_: str, name: str) -> None:
+        def __init__(self, id_: str, name: str, manifest: dict | None = None) -> None:
             self.id = id_
             self.display_name = name
             self.kind_of = "esp32_client"
+            self.manifest = manifest or {}
 
     class _FakeRegistry:
         def __init__(self) -> None:
@@ -150,6 +151,48 @@ def test_topbar_battery_indicator_links_to_admin_page(app: Flask) -> None:
         "topbar battery indicator should link to /devices/battery so the "
         "user has a discoverable entry point"
     )
+
+
+def test_topbar_battery_indicator_applies_per_device_offset(app: Flask) -> None:
+    """The topbar battery number must show the offset-adjusted value,
+    matching what the /devices/battery dashboard and the HA discovery
+    sensors show. Regression guard: shipping the offset to the
+    dashboard alone left the topbar still reading the raw firmware
+    value, which looked like a half-finished feature."""
+    from app.app_factory import _collect_battery_status
+
+    class _FakeDevice:
+        def __init__(self, id_: str, name: str, manifest: dict) -> None:
+            self.id = id_
+            self.display_name = name
+            self.kind_of = "esp32_client"
+            self.manifest = manifest
+
+    class _FakeRegistry:
+        def __init__(self, devices: dict) -> None:
+            self.devices = devices
+
+    # Two devices: one with no offset (raw 4% surfaces as 4%), one
+    # with +30% offset (raw 4% surfaces as 34%, well above the
+    # "critical" threshold).
+    app.config["DEVICE_REGISTRY"] = _FakeRegistry(
+        {
+            "d_raw": _FakeDevice("d_raw", "Raw", {}),
+            "d_off": _FakeDevice("d_off", "Offset", {"battery_offset": {"mv": 0, "pct": 30}}),
+        }
+    )
+    app.config["DEVICE_STATUS"] = {
+        "d_raw": {"received_at": time.time(), "parsed": {"battery_pct": 4}},
+        "d_off": {"received_at": time.time(), "parsed": {"battery_pct": 4}},
+    }
+
+    with app.app_context():
+        entries = _collect_battery_status(app)
+    by_id = {e["id"]: e for e in entries}
+    assert by_id["d_raw"]["pct"] == 4
+    assert by_id["d_raw"]["tone"] == "critical"
+    assert by_id["d_off"]["pct"] == 34
+    assert by_id["d_off"]["tone"] == "ok"
 
 
 def test_clear_history_drops_every_sample_for_device(app: Flask, tmp_path: Path) -> None:

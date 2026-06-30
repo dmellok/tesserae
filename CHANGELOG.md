@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.48], 2026-07-01
+
+### Fixed
+
+- **Per-device battery offset (v0.64.47) only reached the
+  `/devices/battery` dashboard and the chart; the topbar battery
+  indicator, the popover detail list, the bundled `device_battery`
+  widget, and the Home Assistant discovery sensors kept showing the
+  raw firmware-reported value.** Each of those is its own read site
+  for `parsed.battery_pct` / `parsed.battery_mv` from the
+  `DEVICE_STATUS` cache; the offset only landed on two of them. Now
+  applied consistently across all five so a saved offset reflects
+  everywhere a human (or a Home Assistant automation) sees the
+  battery for that device.
+
 ## [0.64.47], 2026-07-01
 
 ### Added

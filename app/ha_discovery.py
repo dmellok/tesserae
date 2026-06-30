@@ -568,8 +568,36 @@ class HomeAssistantDiscovery:
 
     def _publish_dynamic(self, device_id: str, parsed: dict[str, Any]) -> None:
         device = self._devices.get(device_id) if self._devices is not None else None
+        # Apply the per-device battery-display offset before publishing
+        # so HA's Battery / Battery voltage sensors read the same
+        # calibrated value the dashboard + topbar indicator show. Raw
+        # firmware values still live in ``parsed`` (and on the SQLite
+        # history rows); the offset is a display-layer concern, applied
+        # to every read site that surfaces battery to a human.
+        adjusted = dict(parsed)
+        if device is not None:
+            from app.battery_offset import apply_to_mv, apply_to_pct, get_offset
+
+            mv_off, pct_off = get_offset(device.manifest)
+            if mv_off != 0 or pct_off != 0:
+                raw_pct = parsed.get("battery_pct")
+                raw_mv = parsed.get("battery_mv")
+                try:
+                    raw_pct_int = int(raw_pct) if raw_pct is not None else None
+                except (TypeError, ValueError):
+                    raw_pct_int = None
+                try:
+                    raw_mv_int = int(raw_mv) if raw_mv is not None else None
+                except (TypeError, ValueError):
+                    raw_mv_int = None
+                adj_pct = apply_to_pct(raw_pct_int, mv_off, pct_off, raw_mv=raw_mv_int)
+                adj_mv = apply_to_mv(raw_mv_int, mv_off)
+                if adj_pct is not None:
+                    adjusted["battery_pct"] = adj_pct
+                if adj_mv is not None:
+                    adjusted["battery_mv"] = adj_mv
         for key, spec in _DYN_SENSORS.items():
-            value = parsed.get(key)
+            value = adjusted.get(key)
             if value in (None, ""):
                 continue
             if (device_id, key) not in self._published_dyn and device is not None:

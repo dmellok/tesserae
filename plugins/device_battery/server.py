@@ -17,6 +17,8 @@ from flask import current_app
 
 
 def _devices_with_battery() -> list[dict[str, Any]]:
+    from app.battery_offset import apply_to_mv, apply_to_pct, get_offset
+
     registry = current_app.config.get("DEVICE_REGISTRY")
     status_cache: dict[str, dict[str, Any]] = current_app.config.get("DEVICE_STATUS") or {}
     if registry is None:
@@ -28,14 +30,27 @@ def _devices_with_battery() -> list[dict[str, Any]]:
             continue  # built-in kind, not a real registered instance
         status = status_cache.get(device.id) or {}
         parsed = status.get("parsed") or {}
-        raw = parsed.get("battery_pct")
-        if raw is None:
+        raw_pct = parsed.get("battery_pct")
+        raw_mv = parsed.get("battery_mv")
+        if raw_pct is None and raw_mv is None:
             continue
         try:
-            pct = int(raw)
+            raw_pct_int = int(raw_pct) if raw_pct is not None else None
         except (TypeError, ValueError):
             continue
-        pct = max(0, min(100, pct))
+        try:
+            raw_mv_int = int(raw_mv) if raw_mv is not None else None
+        except (TypeError, ValueError):
+            raw_mv_int = None
+        # Per-device battery offset is applied at every display read
+        # site (topbar, /devices/battery, HA discovery, here) so the
+        # widget on a dashboard matches the dashboard's other battery
+        # readouts after a calibration save.
+        mv_off, pct_off = get_offset(device.manifest)
+        pct = apply_to_pct(raw_pct_int, mv_off, pct_off, raw_mv=raw_mv_int)
+        if pct is None:
+            continue
+        adj_mv = apply_to_mv(raw_mv_int, mv_off)
         received_at = status.get("received_at")
         seconds_ago = max(0.0, now - float(received_at)) if received_at else None
         out.append(
@@ -43,7 +58,7 @@ def _devices_with_battery() -> list[dict[str, Any]]:
                 "device_id": device.id,
                 "name": device.display_name,
                 "pct": pct,
-                "battery_mv": parsed.get("battery_mv"),
+                "battery_mv": adj_mv,
                 "seconds_ago": int(seconds_ago) if seconds_ago is not None else None,
             }
         )

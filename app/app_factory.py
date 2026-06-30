@@ -77,9 +77,18 @@ def _collect_battery_status(app: Flask) -> list[dict[str, Any]]:
     attention. ``tone`` is one of ``"critical"`` / ``"low"`` / ``"ok"``
     so the template can colour-code without re-doing the math.
 
+    Per-device ``battery_offset`` manifests (see
+    :mod:`app.battery_offset`) apply here as well as on the
+    /devices/battery dashboard, so the topbar number, the popover
+    list, and the dashboard all read the same calibrated value.
+    Without this the user could set an offset on the device card and
+    still see the topbar showing the raw firmware reading.
+
     Mains-powered devices (no battery, the Pi paths) are omitted, the
     indicator doesn't render at all when the list is empty so a
     panel-only deployment stays uncluttered."""
+    from app.battery_offset import apply_to_pct, get_offset
+
     registry = app.config.get("DEVICE_REGISTRY")
     status_cache: dict[str, dict[str, Any]] = app.config.get("DEVICE_STATUS") or {}
     if registry is None:
@@ -92,12 +101,21 @@ def _collect_battery_status(app: Flask) -> list[dict[str, Any]]:
             continue
         status = status_cache.get(device.id) or {}
         parsed = status.get("parsed") or {}
-        raw = parsed.get("battery_pct")
-        if raw is None:
+        raw_pct = parsed.get("battery_pct")
+        raw_mv = parsed.get("battery_mv")
+        if raw_pct is None and raw_mv is None:
             continue
         try:
-            pct = int(raw)
+            raw_pct_int: int | None = int(raw_pct) if raw_pct is not None else None
         except (TypeError, ValueError):
+            continue
+        try:
+            raw_mv_int: int | None = int(raw_mv) if raw_mv is not None else None
+        except (TypeError, ValueError):
+            raw_mv_int = None
+        mv_off, pct_off = get_offset(device.manifest)
+        pct = apply_to_pct(raw_pct_int, mv_off, pct_off, raw_mv=raw_mv_int)
+        if pct is None:
             continue
         if pct <= 10:
             tone = "critical"

@@ -61,11 +61,23 @@ class _FakeMqttClient:
 
 
 class _FakeDevice:
-    def __init__(self, id: str, name: str, kind_of: str | None, panel: dict | None) -> None:
+    def __init__(
+        self,
+        id: str,
+        name: str,
+        kind_of: str | None,
+        panel: dict | None,
+        manifest: dict | None = None,
+    ) -> None:
         self.id = id
         self.display_name = name
         self.kind_of = kind_of
         self.panel = panel
+        # battery_offset (v0.64.47) reads from the device manifest;
+        # default empty so the offset helper resolves to (0, 0) and
+        # the published HA sensor values match the raw heartbeat
+        # values these tests assert against.
+        self.manifest = manifest or {}
 
 
 class _FakeRegistry:
