@@ -153,6 +153,22 @@ class Updater:
 
     # -- queries --------------------------------------------------------
 
+    def _github_get_json(self, repo: str, api_path: str, *, user_agent: str) -> object:
+        """Issue a single GitHub-API GET and parse the JSON body. Extracted
+        as a method so tests can override without monkeypatching urllib."""
+        import json
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{repo}{api_path}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": user_agent,
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
     def latest_release_via_api(
         self,
         current_version: str,
@@ -160,10 +176,19 @@ class Updater:
         repo: str = "dmellok/tesserae",
         ttl_s: int = 3600,
     ) -> ReleaseCheck:
-        """Ask GitHub for the most recent release tag. Used by the Docker
+        """Ask GitHub for the most recent pushed tag. Used by the Docker
         case where ``.git`` isn't shipped in the image, so the git-based
         ``check_remote`` can't run. Cached for ``ttl_s`` to stay well
         under the 60/hr unauthenticated rate limit on a multi-tab user.
+
+        Reads ``/tags`` (newest-first) rather than ``/releases/latest``
+        because tag push and Release publication are decoupled: this
+        project tags every change but cuts a Release on a weekly cadence,
+        so ``/releases/latest`` lags behind the actual head by up to a
+        week. The link target is the tag's bare release page, which
+        GitHub auto-redirects to the published Release when one exists
+        and shows the tag view otherwise. One API call, one source of
+        truth.
 
         Network or parse failures populate ``error`` rather than raise,
         so a transient hiccup degrades to "couldn't check" in the UI
@@ -171,52 +196,26 @@ class Updater:
         import json
         import time
         import urllib.error
-        import urllib.request
 
         now = time.time()
         cached = self._latest_release
         if cached is not None and now - cached.fetched_at < ttl_s:
             return cached
 
-        headers = {
-            "Accept": "application/vnd.github+json",
-            "User-Agent": f"tesserae/{current_version}",
-        }
-
-        def _fetch_json(api_path: str) -> object:
-            req = urllib.request.Request(
-                f"https://api.github.com/repos/{repo}{api_path}", headers=headers
-            )
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-
-        check: ReleaseCheck
         tag = ""
         html = f"https://github.com/{repo}/releases"
         err_msg: str | None = None
-        # Prefer ``/releases/latest`` (published Releases with notes).
-        # Fall back to ``/tags`` so a project that's pushed tags but hasn't
-        # published Releases yet still gets a meaningful answer, GitHub
-        # returns the tag list in commit-date order, newest first.
+        user_agent = f"tesserae/{current_version}"
         try:
-            payload = _fetch_json("/releases/latest")
-            assert isinstance(payload, dict)
-            tag = str(payload.get("tag_name") or "").strip()
-            html = str(payload.get("html_url") or html)
+            tags = self._github_get_json(repo, "/tags", user_agent=user_agent)
+            if isinstance(tags, list) and tags:
+                first = tags[0]
+                if isinstance(first, dict):
+                    tag = str(first.get("name") or "").strip()
+                    if tag:
+                        html = f"https://github.com/{repo}/releases/tag/{tag}"
         except urllib.error.HTTPError as err:
-            if err.code == 404:
-                try:
-                    tags = _fetch_json("/tags")
-                    if isinstance(tags, list) and tags:
-                        first = tags[0]
-                        if isinstance(first, dict):
-                            tag = str(first.get("name") or "").strip()
-                            if tag:
-                                html = f"https://github.com/{repo}/releases/tag/{tag}"
-                except (urllib.error.URLError, json.JSONDecodeError, OSError) as err2:
-                    err_msg = str(err2)
-            else:
-                err_msg = f"HTTP {err.code} {err.reason}"
+            err_msg = f"HTTP {err.code} {err.reason}"
         except (urllib.error.URLError, json.JSONDecodeError, OSError) as err:
             err_msg = str(err)
 

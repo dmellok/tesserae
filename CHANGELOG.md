@@ -6,6 +6,48 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.46], 2026-07-01
+
+### Fixed
+
+- **Settings → Devices Dismiss flashed a misleading "broker offline"
+  error in REST-only installs.** The dismiss handler always tried to
+  publish an empty retained payload to clear an MQTT-side heartbeat;
+  in a REST-only setup the transport isn't connected, so the publish
+  raised and surfaced as an error even though the in-memory dismiss
+  had succeeded cleanly. The handler now guards on
+  `transport().connected` and only attempts (and surfaces) the
+  retained-clear step when a broker is actually in play. (#38)
+- **`circuitpython_generic` is now a real device kind.** The client
+  protocol docs cited `kind: "circuitpython_generic"` in the
+  discover / register examples but no matching plugin shipped, so a
+  CircuitPython firmware following the spec literally got rejected
+  at registration. Ships a new `devices/circuitpython_generic/`
+  kind (pairs with the existing `circuitpython_png` renderer; v1
+  REST `parse_status` for the standard battery / rssi / ip / sleep
+  fields with stringy-number coercion; configurable sleep cadence).
+  Docs gained a note that `kind` values are server-side plugin ids
+  and that board-specific kinds can ship alongside the generic
+  catch-all. (#39)
+- **Settings → System Updates card showed a stale version from the
+  latest published GitHub Release.** The card hit `/releases/latest`,
+  which only knows about published Releases; if tags get pushed
+  faster than Releases get cut (the new weekly Release cadence
+  introduces exactly this gap), the card surfaced an older version
+  than the footer. The card now reads `/tags` newest-first as the
+  canonical version source, with the Release page URL constructed
+  from the tag so GitHub auto-redirects to the published Release
+  view when one exists. One API call, single source of truth,
+  matches the footer. (#40)
+
+### Changed
+
+- Releases will now be cut on a weekly cadence (Friday afternoon
+  Melbourne) rather than per-tag. Tags continue to be pushed for
+  every change so the in-app updater and `pip install -e .` users
+  still pull the freshest code; Releases batch the week's changes
+  into a curated notes view.
+
 ## [0.64.45], 2026-06-30
 
 ### Added

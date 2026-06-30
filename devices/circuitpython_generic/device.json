@@ -1,0 +1,29 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "CircuitPython client (generic)",
+  "icon": "device-tablet-speaker",
+  "version": "0.1.0",
+  "description": "Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. Pairs with the circuitpython_png renderer, which emits an indexed PNG that adafruit_imageload can decode directly. Pairing follows the v1 REST discover-and-approve flow (POST /api/v1/device/discover with the board's MAC); steady state polls GET /api/v1/device/<id>/frame and POSTs heartbeats to /status. The kind is deliberately broad: a maintainer's own circuitpython_<board> kind (e.g. circuitpython_pico_w_inky) is welcome and stays compatible, this entry is the catch-all so boards without a tighter manifest still register cleanly.",
+  "renderers": ["circuitpython_png"],
+  "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "Generic 800×480" },
+  "config_schema": {
+    "sleep_interval_s": {
+      "type": "int",
+      "label": "Sleep interval",
+      "default": 300,
+      "min": 30,
+      "max": 604800,
+      "presets": [
+        {"value": 60,    "label": "1 minute"},
+        {"value": 300,   "label": "5 minutes"},
+        {"value": 900,   "label": "15 minutes"},
+        {"value": 1800,  "label": "30 minutes"},
+        {"value": 3600,  "label": "1 hour"},
+        {"value": 21600, "label": "6 hours"},
+        {"value": 43200, "label": "12 hours"},
+        {"value": 86400, "label": "1 day"}
+      ],
+      "help": "How long the client sleeps between /frame polls. Tesserae echoes the value back in the /status response as next_poll_s so the firmware doesn't need its own persistent setting."
+    }
+  }
+}

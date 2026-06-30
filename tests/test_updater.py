@@ -400,3 +400,82 @@ def test_wait_for_parent_exit_consumes_env_var(monkeypatch: pytest.MonkeyPatch) 
     import os as _os
 
     assert PARENT_PID_ENV not in _os.environ
+
+
+# ----- latest_release_via_api ----------------------------------------
+
+
+class _StubReleaseUpdater(Updater):
+    """Updater with the single GitHub-API method stubbed so tests stay
+    offline. ``api_responses`` maps an api_path (e.g. "/tags") to the
+    JSON-decoded payload to return, or to an exception to raise."""
+
+    def __init__(self, *, repo_root: Path, data_root: Path, api_responses: dict) -> None:
+        super().__init__(repo_root=repo_root, data_root=data_root)
+        self._api_responses = api_responses
+        self.api_calls: list[str] = []
+
+    def _github_get_json(self, repo: str, api_path: str, *, user_agent: str) -> object:
+        del repo, user_agent
+        self.api_calls.append(api_path)
+        resp = self._api_responses[api_path]
+        if isinstance(resp, Exception):
+            raise resp
+        return resp
+
+
+def test_latest_release_via_api_reads_tags_not_releases(tmp_path: Path) -> None:
+    """The Updates card source of truth is the newest pushed tag, not
+    the latest published Release. /releases/latest can lag the head by
+    a whole weekly Release cycle, so reading it would surface a stale
+    version on every fresh source checkout."""
+    u = _StubReleaseUpdater(
+        repo_root=tmp_path,
+        data_root=_new_data_root(tmp_path),
+        api_responses={"/tags": [{"name": "v0.64.45"}, {"name": "v0.64.44"}]},
+    )
+    check = u.latest_release_via_api("0.64.45")
+    assert check.latest_tag == "v0.64.45"
+    assert check.latest_url == "https://github.com/dmellok/tesserae/releases/tag/v0.64.45"
+    assert check.behind is False
+    assert check.error is None
+    # Single API call: /tags only, no /releases/latest follow-up.
+    assert u.api_calls == ["/tags"]
+
+
+def test_latest_release_via_api_marks_behind_when_local_is_older(tmp_path: Path) -> None:
+    u = _StubReleaseUpdater(
+        repo_root=tmp_path,
+        data_root=_new_data_root(tmp_path),
+        api_responses={"/tags": [{"name": "v0.64.45"}]},
+    )
+    check = u.latest_release_via_api("0.64.40")
+    assert check.behind is True
+    assert check.latest_tag == "v0.64.45"
+
+
+def test_latest_release_via_api_handles_empty_tags(tmp_path: Path) -> None:
+    """Fresh repo, no tags pushed yet: the card surfaces a clean
+    'no tags found' rather than crashing."""
+    u = _StubReleaseUpdater(
+        repo_root=tmp_path,
+        data_root=_new_data_root(tmp_path),
+        api_responses={"/tags": []},
+    )
+    check = u.latest_release_via_api("0.1.0")
+    assert check.latest_tag == ""
+    assert check.behind is False
+    assert check.error == "no tags found"
+
+
+def test_latest_release_via_api_caches_within_ttl(tmp_path: Path) -> None:
+    """Two reads within the TTL window hit GitHub once: prevents a
+    multi-tab user from blowing the 60/hr anonymous limit."""
+    u = _StubReleaseUpdater(
+        repo_root=tmp_path,
+        data_root=_new_data_root(tmp_path),
+        api_responses={"/tags": [{"name": "v0.64.45"}]},
+    )
+    u.latest_release_via_api("0.64.45")
+    u.latest_release_via_api("0.64.45")
+    assert u.api_calls == ["/tags"]  # second call served from cache

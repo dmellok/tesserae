@@ -768,11 +768,33 @@ def test_dismiss_clears_retained_message(app_with_gate: Flask) -> None:
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     app_with_gate.config["DISCOVERY_CACHE"].record("esp32", b'{"kind":"esp32_client"}')
     transport = MagicMock()
+    transport.connected = True
     app_with_gate.config["MQTT_TRANSPORT"] = transport
     resp = client.post("/settings/devices/discovery/esp32/dismiss", follow_redirects=False)
     assert resp.status_code == 302
     assert app_with_gate.config["DISCOVERY_CACHE"].get("esp32") is None
     transport.publish.assert_called_once_with("tesserae/esp32/status", b"", qos=1, retain=True)
+
+
+def test_dismiss_skips_publish_when_transport_disconnected(app_with_gate: Flask) -> None:
+    """REST-only install: no broker connection, so the dismiss is a
+    pure cache clear. Skipping the publish avoids a misleading "broker
+    offline" error flash on what was actually a clean dismiss
+    (regression guard for #38)."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    app_with_gate.config["DISCOVERY_CACHE"].record("rest_panel", b'{"kind":"trmnl_client"}')
+    transport = MagicMock()
+    transport.connected = False
+    app_with_gate.config["MQTT_TRANSPORT"] = transport
+    resp = client.post("/settings/devices/discovery/rest_panel/dismiss", follow_redirects=False)
+    assert resp.status_code == 302
+    assert app_with_gate.config["DISCOVERY_CACHE"].get("rest_panel") is None
+    transport.publish.assert_not_called()
+    # The flash payload reaches the next request via the session cookie.
+    with client.session_transaction() as sess:
+        flashes = sess.get("_flashes", [])
+    assert any(category == "ok" and "Dismissed" in msg for category, msg in flashes)
 
 
 def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:

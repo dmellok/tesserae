@@ -87,6 +87,20 @@ fallback for environments where the admin can't be at the UI when
 the device boots; the MAC auto-claim path (C) covers a re-flashed
 device that needs to re-acquire its existing token.
 
+!!! note "`kind` is a server-side plugin id"
+    The `kind` field in every discover / register payload must match
+    a folder under `devices/` on the server (or a community device
+    kind installed via the marketplace). The kind plugin tells the
+    server which renderer to compose for, what status fields the
+    device reports, and what config knobs the admin UI exposes.
+
+    Generic CircuitPython firmwares register as
+    `kind: "circuitpython_generic"` (ships in the default install). A
+    board-specific firmware can ship its own kind alongside (e.g.
+    `circuitpython_pico_w_inky_73`); the server tolerates both
+    in parallel. Adding a new kind is documented in
+    [Adding hardware support](adding-hardware.md).
+
 ### A. Zero-touch discovery + admin approval
 
 The default first-boot path. Firmware doesn't need a token, a code,

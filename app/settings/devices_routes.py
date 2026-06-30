@@ -531,20 +531,37 @@ def devices_dismiss_discovered(discovered_id: str) -> Response:
     new id) pop straight back. Publishing an empty retained payload to its
     status topic clears the retention; ``DiscoveryCache.record`` ignores
     that empty tombstone so it doesn't re-add a kind-less ghost. A live
-    device simply re-announces on its next heartbeat."""
+    device simply re-announces on its next heartbeat.
+
+    The retained-message clear only matters when MQTT is in play. A
+    REST-only install has no broker connection at all, so we skip the
+    publish there silently rather than flashing a misleading "broker
+    offline" error on what was actually a clean dismiss."""
     cache_had = discovery_cache().forget(discovered_id)
+    tr = transport()
+    if not tr.connected:
+        # REST-only install or broker not yet connected: nothing to clear
+        # on the broker side, the cache dismiss is the whole operation.
+        if cache_had:
+            flash(f"Dismissed {discovered_id!r}.", "ok")
+        else:
+            flash(f"{discovered_id!r} wasn't in the discovery cache.", "info")
+        return redirect(url_for("auth.settings_area", area="devices"))
     try:
-        transport().publish(f"tesserae/{discovered_id}/status", b"", qos=1, retain=True)
+        tr.publish(f"tesserae/{discovered_id}/status", b"", qos=1, retain=True)
         flash(f"Dismissed {discovered_id!r} and cleared its retained heartbeat.", "ok")
-    except Exception as exc:  # transport offline, cache is still cleared
+    except Exception as exc:
+        # Broker was connected but the publish itself failed: cache is
+        # still cleared, surface the broker fault as a warning, not a
+        # success-or-error binary.
         if cache_had:
             flash(
                 f"Dismissed {discovered_id!r}, but couldn't clear the retained "
-                f"message (broker offline: {exc}); it may reappear on reconnect.",
+                f"message (broker error: {exc}); it may reappear on reconnect.",
                 "error",
             )
         else:
-            flash(f"{discovered_id!r} wasn't in the discovery cache.", "error")
+            flash(f"{discovered_id!r} wasn't in the discovery cache.", "info")
     return redirect(url_for("auth.settings_area", area="devices"))
 
 
