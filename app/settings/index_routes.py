@@ -633,6 +633,12 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else []
                 ),
+                # Read-only diagnostic block: app version, resolved
+                # kind + renderer clone ids, panel details, on-disk
+                # instance file, raw JSON with secrets masked. Renders
+                # under a collapsed <details> at the bottom of the
+                # General tab so it stays out of the way until needed.
+                "debug_info": _device_debug_info(device, is_instance),
             }
         )
 
@@ -654,6 +660,76 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _device_debug_info(device: Device, is_instance: bool) -> dict[str, Any] | None:
+    """Compose the read-only diagnostic block shown under the device
+    card's Debug section. Instances only; kinds don't get one because
+    the raw kind manifest is already visible on the compatibility
+    matrix page.
+
+    Surfaces the exact runtime state so "wrong renderer" / "wrong
+    panel" / "wrong kind" bugs are one glance away: the resolved
+    kind id, the renderer clone ids the push pipeline will use, the
+    panel block (dims + gamut + orientation), transport + topics,
+    the on-disk instance file path, and the raw JSON with secret-
+    suffixed keys masked. The app version is stamped too so a user
+    reporting "colour renderer not working" can eyeball whether the
+    server is actually on the version that ships the fix."""
+    if not is_instance:
+        return None
+
+    import json as _json
+
+    from flask import current_app as _app
+
+    app_version = str(_app.config.get("APP_VERSION") or "unknown")
+    instance_path = str(device.path)
+    raw_manifest: dict[str, Any] = {}
+    try:
+        raw_manifest = _json.loads(device.path.read_text(encoding="utf-8"))
+    except (OSError, _json.JSONDecodeError):
+        raw_manifest = {}
+    if not isinstance(raw_manifest, dict):
+        raw_manifest = {}
+    masked_manifest = _mask_secrets(raw_manifest)
+    try:
+        raw_pretty = _json.dumps(masked_manifest, indent=2, sort_keys=False)
+    except (TypeError, ValueError):
+        raw_pretty = "<unserialisable>"
+
+    return {
+        "app_version": app_version,
+        "kind_of": device.kind_of,
+        "device_id": device.id,
+        "renderer_ids": list(device.renderer_ids),
+        "transport": device.transport,
+        "status_topic": device.status_topic,
+        "config_topic": device.config_topic,
+        "panel": device.panel,
+        "instance_file": instance_path,
+        "raw_manifest_json": raw_pretty,
+    }
+
+
+def _mask_secrets(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy of ``manifest`` with obviously-sensitive
+    values redacted. Applies to the tesserae convention of a
+    ``_secret``-suffixed key (secretbox-encrypted at rest, still
+    shouldn't ship in a debug pane screenshot) and to the well-known
+    ``access_token`` field on TRMNL / REST devices. Nested dicts
+    (e.g. ``protocol_config``) are recursed once so a nested
+    ``access_token`` under ``protocol_config`` is still masked."""
+    out: dict[str, Any] = {}
+    for k, v in manifest.items():
+        if isinstance(k, str) and (k.endswith("_secret") or k == "access_token"):
+            out[k] = "***"
+            continue
+        if isinstance(v, dict):
+            out[k] = _mask_secrets(v)
+            continue
+        out[k] = v
+    return out
 
 
 def _device_meta_block(device: Device, is_instance: bool) -> dict[str, Any]:

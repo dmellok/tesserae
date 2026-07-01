@@ -272,6 +272,64 @@
         </div>
         {% endif %}
 
+        {# Read-only diagnostic block. Collapsed by default; open on
+           demand to check the app version, resolved kind + renderer
+           clone ids, panel block, and on-disk instance file. Answers
+           the recurring "is the panel actually rendering with the
+           renderer I think it is" question in one glance. Secrets
+           (access_token, *_secret keys) are masked server-side. #}
+        {% if section.debug_info %}
+        <details class="dx-debug">
+          <hr class="dx-divider">
+          <summary class="device-subhead">Debug &amp; diagnostics</summary>
+          <div class="dx-debug-body">
+            <dl class="dx-debug-list">
+              <dt>Tesserae version</dt>
+              <dd><code>{{ section.debug_info.app_version }}</code></dd>
+              <dt>Kind</dt>
+              <dd><code>{{ section.debug_info.kind_of or '—' }}</code></dd>
+              <dt>Device id</dt>
+              <dd><code>{{ section.debug_info.device_id }}</code></dd>
+              <dt>Renderer clones</dt>
+              <dd>
+                {% for rid in section.debug_info.renderer_ids %}
+                <code>{{ rid }}</code>{% if not loop.last %}, {% endif %}
+                {% else %}<span class="u-muted">none</span>{% endfor %}
+              </dd>
+              <dt>Transport</dt>
+              <dd><code>{{ section.debug_info.transport }}</code></dd>
+              {# MQTT topics are only surfaced when transport is MQTT.
+                 REST devices carry dormant topic values on the kind
+                 manifest but never actually use them, so listing them
+                 here would confuse the "why is this REST device
+                 subscribed to MQTT?" reader. Matches the main card's
+                 rest-hides-dormant-topics behaviour. #}
+              {% if section.debug_info.transport == 'mqtt' and section.debug_info.status_topic %}
+              <dt>MQTT status topic</dt>
+              <dd><code>{{ section.debug_info.status_topic }}</code></dd>
+              {% endif %}
+              {% if section.debug_info.transport == 'mqtt' and section.debug_info.config_topic %}
+              <dt>MQTT config topic</dt>
+              <dd><code>{{ section.debug_info.config_topic }}</code></dd>
+              {% endif %}
+              {% if section.debug_info.panel %}
+              <dt>Panel</dt>
+              <dd>
+                <code>{{ section.debug_info.panel.w }}×{{ section.debug_info.panel.h }}</code>
+                {% if section.debug_info.panel.orientation %} · <code>{{ section.debug_info.panel.orientation }}</code>{% endif %}
+                {% if section.debug_info.panel.gamut %} · <code>{{ section.debug_info.panel.gamut }}</code>{% endif %}
+                {% if section.debug_info.panel.underscan %} · underscan <code>{{ section.debug_info.panel.underscan }}</code>{% endif %}
+              </dd>
+              {% endif %}
+              <dt>Instance file</dt>
+              <dd><code class="dx-debug-path">{{ section.debug_info.instance_file }}</code></dd>
+            </dl>
+            <p class="field-help" style="margin: 8px 0 4px;">Raw instance manifest (secrets masked):</p>
+            <pre class="code-snippet dx-debug-json"><code>{{ section.debug_info.raw_manifest_json }}</code></pre>
+          </div>
+        </details>
+        {% endif %}
+
         {# Per-device battery display offset. Two signed integers (mV
            and percent) layered on top of the firmware's raw reading at
            display time. Common case: voltmeter shows the cell at 4.20 V

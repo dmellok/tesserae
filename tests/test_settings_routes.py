@@ -797,6 +797,61 @@ def test_dismiss_skips_publish_when_transport_disconnected(app_with_gate: Flask)
     assert any(category == "ok" and "Dismissed" in msg for category, msg in flashes)
 
 
+def test_debug_section_surfaces_resolved_renderer_and_version(app_with_gate: Flask) -> None:
+    """The Debug section on each device card must expose the resolved
+    renderer clone ids + the running Tesserae version, so an operator
+    debugging "wrong renderer" or "prod running the wrong build" gets
+    the answer in one glance instead of having to spelunk logs.
+
+    Regression guard: this feature exists to catch the exact case
+    where a hardware-manifest renderer override didn't propagate (or
+    the prod server isn't on the release that shipped the override)."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    # Register a real instance so its debug block renders.
+    client.post(
+        "/settings/devices/add",
+        data={"id": "esp32_kitchen", "kind": "esp32_client", "name": "Kitchen"},
+    )
+    body = client.get("/settings/devices").get_data(as_text=True)
+    assert "Debug &amp; diagnostics" in body, "expected the Debug summary label on the device card"
+    # Tesserae version shows in the debug block.
+    assert app_with_gate.config["APP_VERSION"] in body
+    # Renderer clone id follows the ``<renderer>__<instance>`` convention
+    # so the operator can see which renderer is bound to this instance.
+    assert "esp32_bin__esp32_kitchen" in body
+
+
+def test_debug_mask_secrets_hides_access_token_and_secret_keys() -> None:
+    """Raw manifest JSON in the Debug pane must NOT leak an
+    access_token or a *_secret-suffixed key. Debug views get
+    screenshotted for support requests and Slack pastes; masking at
+    the server ensures the token stays out of any downstream
+    artefact. Unit-tested directly against the helper so a schema
+    change on the /add path doesn't break the coverage."""
+    from app.settings.index_routes import _mask_secrets
+
+    masked = _mask_secrets(
+        {
+            "id": "trmnl_lounge",
+            "access_token": "eyJ0eXAiOi.super.secret",
+            "webhook_token_secret": "another.secret",
+            "protocol_config": {
+                "access_token": "nested.secret",
+                "model_header": "reTerminal E1002",
+            },
+            "panel": {"w": 800, "h": 480},
+        }
+    )
+    assert masked["access_token"] == "***"
+    assert masked["webhook_token_secret"] == "***"
+    assert masked["protocol_config"]["access_token"] == "***"
+    # Non-secret fields pass through untouched, including nested ones.
+    assert masked["id"] == "trmnl_lounge"
+    assert masked["protocol_config"]["model_header"] == "reTerminal E1002"
+    assert masked["panel"] == {"w": 800, "h": 480}
+
+
 def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})

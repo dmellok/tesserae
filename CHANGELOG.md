@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.50], 2026-07-01
+
+### Added
+
+- **Debug & diagnostics section on every device card
+  (Settings → Devices → device).** Collapsed by default; expand to
+  see the Tesserae version the server is running, the resolved
+  device kind, the renderer clone ids the push pipeline will use,
+  the panel block (dims + gamut + orientation + underscan),
+  transport + MQTT topic bindings (when applicable), the on-disk
+  instance file path, and the raw instance JSON with secrets
+  (access_token, `_secret`-suffixed keys) masked to `***` so the
+  block is safe to screenshot for a support thread. Answers the
+  recurring "is the panel actually rendering with the renderer I
+  think it is" question in one glance, and lets an operator confirm
+  a prod server is on the release that ships a specific fix.
+
 ## [0.64.49], 2026-07-01
 
 ### Added
