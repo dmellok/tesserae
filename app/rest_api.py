@@ -897,7 +897,7 @@ def register(app: Flask) -> None:
             # layer as an unhandled 500; ``err.get_response()`` returns
             # the pre-rendered default HTML body Flask would have sent
             # if we hadn't registered a handler here.
-            return err.get_response()  # type: ignore[return-value]
+            return err.get_response()
         status = err.code or 500
         message = err.description or err.name or "error"
         return _error(status, str(message))

@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.59], 2026-07-01
+
+### Fixed
+
+- Strip an unused `# type: ignore` comment in the v0.64.58 API error
+  handler that mypy strict flagged in CI. Runtime behaviour
+  unchanged; the annotation was over-cautious.
+
 ## [0.64.58], 2026-07-01
 
 ### Fixed
