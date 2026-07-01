@@ -727,3 +727,110 @@ def pack_to_panel_bin_1bpp(
     expected = width * height // 8
     assert len(packed) == expected, f"packed buffer is {len(packed)}, expected {expected}"
     return packed
+
+
+# 16-level linear grayscale palette. Index i -> RGB (i * 17, i * 17, i * 17),
+# so 0 -> (0,0,0) black and 15 -> (255,255,255) white. Used by
+# ``pack_to_panel_bin_4bpp_gray`` (Seeed reTerminal E1003 + any other
+# IT8951-driven grayscale panel). Palette indices are byte-identical to
+# the target nibble values on the wire, so the packer skips the LUT step
+# the colour packer needs.
+_GRAY_16_PALETTE: tuple[tuple[int, int, int], ...] = tuple(
+    (i * 17, i * 17, i * 17) for i in range(16)
+)
+
+
+def pack_to_panel_bin_4bpp_gray(
+    img: Image.Image,
+    *,
+    width: int,
+    height: int,
+    dither: DitherMode = "floyd-steinberg",
+    contrast: float = 1.0,
+) -> bytes:
+    """Quantise to 16-level grayscale and pack to the panel's native 4-bpp
+    grayscale wire format.
+
+    Mirror of :func:`pack_to_panel_bin` for grayscale IT8951 panels (the
+    Seeed reTerminal E1003 in particular, 1872x1404, 10.3 inch). Uses a
+    16-entry linear grayscale palette instead of the Spectra 6 gamut,
+    and skips the palette-index-to-firmware-nibble LUT because index
+    equals nibble here.
+
+    Wire layout:
+
+    * Exactly ``width * height / 2`` bytes (1314144 for the E1003's
+      1872x1404 panel). No header, no padding, no checksum.
+    * Row-major, top-left origin, no mirror. The firmware handles any
+      physical panel-side mirror itself; the renderer keeps a normal
+      orientation so a photo painted on the panel reads the same way it
+      does on a browser preview.
+    * 4-bpp packed, scanline order, no row padding: ``width / 2`` bytes
+      per row.
+    * **HIGH nibble = LEFT pixel** of each byte-pair (even column: 0,
+      2, 4, ...), **LOW nibble = RIGHT pixel** (odd column: 1, 3, ...).
+    * Gray value per nibble: **0x0 = black, 0xF = white**, linear 4-bit
+      gray. Nothing else to translate.
+
+    ``width`` must be even (two pixels per byte). Image must already be
+    at ``(width, height)``, caller sizes / orients first.
+
+    The dither pre-pass uses the same modes as ``pack_to_panel_bin``,
+    against a 16-entry linear grayscale palette. Floyd-Steinberg on
+    grayscale is the smoothest for photos; ordered dither modes are
+    the fastest opt-ins for text-heavy dashboards.
+    """
+    if width % 2:
+        raise ValueError(f"panel width must be even (two pixels per byte), got {width}")
+    if img.size != (width, height):
+        raise ValueError(f"image must be {width}x{height}, got {img.size}")
+
+    palette = _GRAY_16_PALETTE
+    pal_arr = np.array(palette, dtype=np.float32)
+
+    # Grayscale-first, then back to RGB so the dither routines that
+    # expect an RGB source (all of them) see uniform-channel data.
+    # Contrast bump applies after the grayscale conversion so it
+    # deepens gray extremes rather than modifying channel imbalance
+    # that no longer exists.
+    gray = img.convert("L")
+    if contrast != 1.0:
+        gray = ImageEnhance.Contrast(gray).enhance(contrast)
+    rgb = gray.convert("RGB")
+
+    if dither in _PIL_DITHER_MAP:
+        pal_img = _palette_image(palette)
+        indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
+        raw = indexed.tobytes()
+    elif dither == "atkinson":
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+    elif dither == "jarvis":
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+    elif dither == "stucki":
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+    elif dither == "bayer-8x8":
+        raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
+    elif dither == "halftone":
+        raw = _dither_ordered(rgb, pal_arr, _HALFTONE_16, strength=128.0)
+    elif dither == "crosshatch":
+        raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
+    else:
+        raise ValueError(f"unknown dither mode: {dither!r}")
+
+    # Palette indices are 0..15 already; each maps directly to a nibble
+    # value (0 = black, 15 = white). Reshape, split even/odd columns
+    # (columns 0, 2, ... land in the high nibble; 1, 3, ... in the low
+    # nibble), pack, done. All-numpy so it stays fast on 2.6M-pixel
+    # panels.
+    indices = np.frombuffer(raw, dtype=np.uint8).reshape(height, width)
+    # Clamp any stray > 15 down to 15 so a buggy dither output can't
+    # corrupt neighbouring nibbles when we shift it.
+    indices = np.clip(indices, 0, 15).astype(np.uint8)
+    left = indices[:, 0::2]  # even columns -> high nibble
+    right = indices[:, 1::2]  # odd columns  -> low nibble
+    packed = (left << 4) | right
+
+    out = packed.tobytes()
+    expected = width * height // 2
+    assert len(out) == expected, f"packed buffer is {len(out)}, expected {expected}"
+    return out

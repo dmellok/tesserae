@@ -89,8 +89,11 @@ def test_bundled_hardware_loads_against_real_protocols(
     assert "seeed_reterminal_e1003" in registry.devices
     sku = registry.devices["seeed_reterminal_e1003"]
     assert sku.panel is not None
-    assert sku.panel["w"] == 1404
-    assert sku.panel["h"] == 1872
+    # Landscape-native as of v0.64.57 (the unified firmware's IT8951 driver
+    # writes in landscape order); the manifest used to declare portrait dims
+    # while it routed through TRMNL BYOS + trmnl_png.
+    assert sku.panel["w"] == 1872
+    assert sku.panel["h"] == 1404
     assert sku.manifest["vendor"] == "Seeed Studio"
 
 

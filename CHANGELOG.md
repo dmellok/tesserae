@@ -6,6 +6,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.57], 2026-07-01
+
+### Added
+
+- **`renderers/esp32_gray_bin`**: 4-bpp linear grayscale packed
+  buffer for IT8951-driven greyscale panels, primarily the Seeed
+  reTerminal E1003 (10.3", 1872×1404, 16-level grayscale). Composition
+  PNG in, raw packed .bin out (`width * height / 2` bytes; row-major,
+  top-left origin, non-mirrored; high nibble = LEFT pixel, low nibble
+  = RIGHT pixel; nibble value 0x0 = black, 0xF = white). Same
+  8-mode dither list + contrast knob as `esp32_bin`; the dither
+  pipeline runs against a 16-entry linear gray palette so
+  Floyd-Steinberg produces smooth photographic gradients on the
+  panel's genuine 16 grays rather than the 1-bit alternation
+  `esp32_bw_bin` would give.
+- **`app.quantizer.pack_to_panel_bin_4bpp_gray`**: the underlying
+  packer that powers `esp32_gray_bin`. Byte contract asserted in-
+  function (`width % 2 == 0`, image already at target dims, output
+  length exactly `width * height / 2`) and covered by four unit tests
+  in the renderer's smoke suite.
+
+### Changed
+
+- **`hardware/seeed/reterminal_e1003.json` now routes through
+  `esp32_client` + `esp32_gray_bin` (native 4-bpp grayscale path)
+  instead of `trmnl_client` + `trmnl_png` (TRMNL BYOS 1-bit PNG
+  path).** The unified `tesserae-device-firmware` ESP-IDF build
+  supersedes the TRMNL BYOS workaround for this panel, unlocking the
+  full 16 grays the E1003's IT8951 controller can render. Panel dims
+  swapped from 1404×1872 portrait to 1872×1404 landscape to match
+  the firmware's native orientation (which handles any physical
+  mount-side flip itself). Same shape as the E1001/E1002/E1004
+  migrations in v0.64.52 and v0.64.54.
+
 ## [0.64.56], 2026-07-01
 
 ### Changed
