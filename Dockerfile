@@ -42,14 +42,15 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /app
 
 # Copy the whole source tree, Tesserae's loaders resolve plugins/,
-# renderers/, devices/, templates/, and static/ from REPO_ROOT, so
-# the install needs to leave the source tree in place rather than
-# just copying app/ into site-packages.
+# renderers/, devices/, hardware/, templates/, and static/ from
+# REPO_ROOT, so the install needs to leave the source tree in place
+# rather than just copying app/ into site-packages.
 COPY pyproject.toml /app/
 COPY app/        /app/app/
 COPY plugins/    /app/plugins/
 COPY renderers/  /app/renderers/
 COPY devices/    /app/devices/
+COPY hardware/   /app/hardware/
 COPY schema/     /app/schema/
 COPY templates/  /app/templates/
 COPY static/     /app/static/

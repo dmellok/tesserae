@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.53], 2026-07-01
+
+### Fixed
+
+- **Dockerfile was missing `COPY hardware/`**, so Docker + Home
+  Assistant App installs shipped the code that reads the hardware
+  catalog but not the catalog files themselves. Effect: every
+  hardware-catalog-defined kind (all the vendor SKUs under
+  `hardware/<vendor>/<model>.json`) was invisible in the Add Device
+  kind dropdown, and `/api/v1/device/discover` rejected every matching
+  firmware `kind` string with "unknown device kind '...'". Native
+  git-clone installs weren't affected because they inherit the whole
+  source tree. The fix is a one-line addition to the Dockerfile;
+  rebuild the image / bump the HA App to pick it up.
+
 ## [0.64.52], 2026-07-01
 
 ### Added
