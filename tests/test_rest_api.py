@@ -154,8 +154,39 @@ def test_frame_endpoint_with_invalid_token_returns_401(app: Flask) -> None:
 
 
 def test_frame_endpoint_with_token_for_other_device_returns_403(app: Flask) -> None:
-    """Bearer token is valid (resolves to a device) but the URL claims
-    a different device id. Don't leak which device the token belongs to."""
+    """Bearer token is valid AND the URL id resolves to a real registered
+    device, but the token belongs to a DIFFERENT device. That's the only
+    genuine wrong-device auth failure; return 403 with a deliberately
+    vague message so the response doesn't leak which device the token
+    belongs to."""
+    client = app.test_client()
+    _sign_in(client)
+    # Register two devices so both ids resolve. The token from the first
+    # against the URL of the second is the case we're checking.
+    code_a = _issue_pairing(app)
+    resp_a = _register_via_api(client, code=code_a, device_id="bedroom_pico")
+    token_a = resp_a.get_json()["device_token"]
+    code_b = _issue_pairing(app)
+    _register_via_api(client, code=code_b, device_id="kitchen_pico")
+
+    resp = client.get(
+        "/api/v1/device/kitchen_pico/frame",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp.status_code == 403
+    body = resp.get_json()
+    # Vague message on purpose: don't leak which device the token owns.
+    assert "not valid for this device" in body["error"]
+
+
+def test_frame_endpoint_with_nonexistent_device_id_returns_404(app: Flask) -> None:
+    """A URL id that isn't a registered device returns 404, not 403.
+
+    Splitting 404 (id doesn't exist) from 403 (id exists but wrong
+    device) saves the firmware author five minutes of "is it me or
+    the server" when their URL template forgets to substitute the id.
+    Device ids are admin-chosen, not attacker-guessable, so the
+    resource-existence signal isn't a meaningful leak."""
     client = app.test_client()
     _sign_in(client)
     code = _issue_pairing(app)
@@ -163,10 +194,52 @@ def test_frame_endpoint_with_token_for_other_device_returns_403(app: Flask) -> N
     token = resp.get_json()["device_token"]
 
     resp = client.get(
-        "/api/v1/device/different_device/frame",
+        "/api/v1/device/nonexistent_device/frame",
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert resp.status_code == 403
+    assert resp.status_code == 404
+    body = resp.get_json()
+    assert body["status"] == 404
+    assert "no device" in body["error"].lower()
+
+
+def test_blueprint_404_returns_json_not_html(app: Flask) -> None:
+    """A stray /api/v1/device/... URL that doesn't match any registered
+    route must return the same {status, error} JSON envelope the
+    authed 4xx paths use, not Flask's default HTML 404. Firmware
+    clients don't render HTML; this is a real regression Bernhard hit
+    while wiring his CircuitPython client (POST to /status missing
+    the id landed on Flask's 404 page)."""
+    client = app.test_client()
+    resp = client.get("/api/v1/device/")  # no id, no route
+    assert resp.status_code == 404
+    assert resp.mimetype == "application/json", (
+        f"expected JSON 404 body, got mimetype={resp.mimetype!r}"
+    )
+    body = resp.get_json()
+    assert body["status"] == 404
+    assert "error" in body
+
+
+def test_blueprint_405_returns_json(app: Flask) -> None:
+    """Same rationale as the 404 handler: a firmware POSTing to a
+    GET-only route (or vice-versa) should get a JSON body it can
+    decode, not an HTML page."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    # /frame is GET-only; POST returns 405.
+    resp = client.post(
+        "/api/v1/device/bedroom_pico/frame",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 405
+    assert resp.mimetype == "application/json"
+    body = resp.get_json()
+    assert body["status"] == 405
 
 
 def test_status_endpoint_accepts_x_tesserae_token_header(app: Flask) -> None:

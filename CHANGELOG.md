@@ -6,6 +6,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.58], 2026-07-01
+
+### Fixed
+
+- **`/api/v1/device/<id>/frame` and `/status` returned 403 for a URL
+  id that didn't correspond to any registered device.** The
+  ``_auth_device`` helper collapsed two failure modes ("id doesn't
+  exist" and "id exists but the token belongs to a different device")
+  behind one 403, which read as an auth failure on what was actually
+  a client-side URL typo. Split them: a URL id that doesn't resolve
+  to a registered instance now returns **404 `no device with id
+  'foo'`**; the 403 stays for the "valid token, but for a different
+  registered device" case. Device ids are admin-chosen (not
+  attacker-guessable) so the resource-existence signal isn't a
+  meaningful information leak. Reported while wiring a CircuitPython
+  client against the REST API.
+- **404 / 405 / 500 responses under `/api/v1/device/*` returned
+  HTML instead of JSON.** Firmware clients don't render HTML; a
+  stray route (POST to `/status` with a missing id, POST to `/frame`
+  which is GET-only, etc.) landed on Flask's default HTML error
+  page and left the caller staring at a bytes-of-markup blob.
+  Registered app-level error handlers that check the request path,
+  so any 4xx / 5xx under the `/api/v1/device` prefix returns the
+  same `{status, error}` envelope the hand-written auth failures
+  already use. The admin UI's 404s continue to render HTML.
+
 ## [0.64.57], 2026-07-01
 
 ### Added

@@ -237,8 +237,24 @@ def _auth_device(device_id: str) -> tuple[Device | None, Response | None]:
 
     Returns ``(device, None)`` on success, ``(None, response)`` to be
     returned directly when auth fails. Centralises the
-    "token-must-match-the-id-in-the-URL" check, refusing requests
-    whose token resolves to a different instance than the URL claims."""
+    "token-must-match-the-id-in-the-URL" check.
+
+    Three distinct failure shapes:
+
+    * **401**, missing or unrecognised token. Firmware bug or a
+      client that forgot to include the bearer header.
+    * **404**, the URL device id doesn't map to any registered
+      instance. The client probably has a stale / mis-typed id in
+      its config (the bug that landed this branch: a firmware
+      forgot to substitute ``device_id`` into its URL template and
+      sent a literal ``{id}`` at us). Device ids are admin-chosen,
+      not attacker-controlled, so returning a distinct 404 here
+      leaks nothing meaningful and saves the caller five minutes of
+      "is it me or the server" debugging.
+    * **403**, the URL device id DOES exist but the caller's token
+      belongs to a different device. This is the only genuine-auth
+      failure of the three; keep the vague message so a rogue
+      client can't map "which id owns this token"."""
     token = _request_token()
     if not token:
         return None, _error(401, "missing bearer token")
@@ -246,8 +262,14 @@ def _auth_device(device_id: str) -> tuple[Device | None, Response | None]:
     if device is None:
         return None, _error(401, "invalid bearer token")
     if device.id != device_id:
-        # Token is valid but for a different device. Don't leak which
-        # device the token belongs to.
+        # Distinguish "id doesn't exist" (404) from "id exists but
+        # token belongs to a different device" (403). Registry lookup
+        # is O(1) on the dict; keep the constant-time token-compare
+        # dance above so timing side-channels stay closed on the auth
+        # side.
+        target = _devices().get(device_id)
+        if target is None or target.kind_of is None:
+            return None, _error(404, f"no device with id {device_id!r}")
         return None, _error(403, "token not valid for this device")
     return device, None
 
@@ -854,3 +876,31 @@ def admin_pairing_pending() -> Response:
 
 def register(app: Flask) -> None:
     app.register_blueprint(bp)
+
+    # JSON envelope for 4xx / 5xx errors on /api/v1/device paths.
+    # Blueprint-level errorhandlers only fire for errors raised INSIDE a
+    # matched route; a 404 from "no route matched at all" hits Flask's
+    # app-level handler instead. Firmware clients don't render HTML, so
+    # a stray 404 (typo in URL, POST to /status without the id, etc.)
+    # landing on Flask's default HTML 404 leaves them staring at a
+    # bytes-of-markup blob. Register app-level handlers that check the
+    # request path so we only re-shape errors under our own prefix and
+    # don't accidentally JSON-ify the admin UI's 404s.
+    from werkzeug.exceptions import HTTPException
+
+    api_prefix = "/api/v1/device"
+
+    def _json_if_api(err: HTTPException) -> Response:
+        if not request.path.startswith(api_prefix):
+            # Let Werkzeug's default HTML response fall through for the
+            # admin UI. Re-raising the exception would land on the WSGI
+            # layer as an unhandled 500; ``err.get_response()`` returns
+            # the pre-rendered default HTML body Flask would have sent
+            # if we hadn't registered a handler here.
+            return err.get_response()  # type: ignore[return-value]
+        status = err.code or 500
+        message = err.description or err.name or "error"
+        return _error(status, str(message))
+
+    for status_code in (404, 405, 500):
+        app.register_error_handler(status_code, _json_if_api)
