@@ -6,6 +6,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.56], 2026-07-01
+
+### Changed
+
+- **`scripts/pi-client-cloud-init.yaml` no longer shells out to
+  `install.sh`.** The client's `install.sh` was written for
+  interactive use and its internal `sudo` calls need a controlling
+  terminal, which cloud-init's `runcmd` can't provide, so the whole
+  install step silently failed on real first-boot. The yaml now does
+  the equivalent work directly:
+  - Apt-installs the runtime deps (python3, python3-venv,
+    python3-dev, build-essential, libopenjp2-7, libtiff6) via
+    cloud-init's `packages:` list.
+  - Enables SPI + I²C via cloud-init's native `rpi.interfaces`
+    block (no `raspi-config nonint` shell-out).
+  - Appends `dtoverlay=spi0-0cs` to `/boot/firmware/config.txt` via
+    a `write_files` entry.
+  - Clones `tesserae-device-pi-bin`, builds the venv, pip-installs
+    the client + `inky[rpi]` extras as the `tesserae` user via
+    `su -c '...' tesserae`.
+  - Symlinks `/usr/local/bin/tesserae-pi-bin-client` and installs the
+    systemd unit inline (same `[Unit]/[Service]/[Install]` shape
+    the client's `install-service.sh` used to write).
+- **Per-flash settings moved from `user-data` edits to `meta-data`
+  variables** using cloud-init's jinja2 template preprocessor
+  (`## template: jinja` header). Both `server_url` and `panel model`
+  now come out of `meta-data` via `{{ ds.meta_data.server_url }}` and
+  `{{ ds.meta_data.model }}` references. Per-flash workflow becomes:
+  copy the yaml unchanged, edit two lines of meta-data, boot.
+- **`docs/quickstart/pi-inky-cloud-init.md`** updated to reflect the
+  meta-data flow and to add a troubleshooting row for the "literal
+  `{{ ds.meta_data.server_url }}` in config.toml" mode (missing
+  jinja header).
+
 ## [0.64.55], 2026-07-01
 
 ### Fixed

@@ -1,3 +1,4 @@
+## template: jinja
 #cloud-config
 # Tesserae Pi client, automated install via cloud-init.
 #
@@ -8,24 +9,23 @@
 #
 # NOT for the Tesserae server itself, that's scripts/cloud-init.yaml.
 #
-# Usage (Raspberry Pi Imager path):
+# Two-file setup (Pi Imager path):
 #   1. Pi Imager: flash Raspberry Pi OS Lite (64-bit) onto an SD card.
 #      In the Advanced options dialog (Ctrl/Cmd-Shift-X) configure
 #      WiFi + locale, and optionally an SSH public key. DO NOT set a
 #      username here, this file creates one below.
 #   2. After flashing, eject + re-mount the SD card on your computer.
 #      Open the BOOT partition.
-#   3. Copy this file to BOOT/user-data, replacing whatever Pi Imager
-#      wrote there. Leave network-config and meta-data as is so your
-#      WiFi credentials still apply.
-#   4. EDIT THE VALUES MARKED <EDIT> below: the Tesserae server URL
-#      and the Inky panel model. Save.
+#   3. Copy this file to BOOT/user-data as-is. You do NOT edit this
+#      file. All per-install settings live in meta-data next to it.
+#   4. Open BOOT/meta-data and add two lines (server_url + model),
+#      keeping the existing instance-id. Full example at the bottom
+#      of this file.
 #   5. Insert the SD card into the Pi and power it on. First boot is
 #      5 to 10 minutes (apt install + pip install + Inky deps); after
 #      that the daemon starts and announces itself to the server.
 #   6. Open your Tesserae server's web UI -> Settings -> Devices ->
-#      Discovered. Click Register on the new Pi entry. The next poll
-#      cycle, the daemon picks up its token and starts painting.
+#      Discovered. Click Register on the new Pi entry.
 #
 # Persistent state lives in:
 #   /home/tesserae/tesserae-device-pi-bin/         (repo + venv)
@@ -38,11 +38,26 @@
 package_update: true
 package_upgrade: false
 
-# tesserae-device-pi-bin's own install.sh handles apt for build + runtime
-# deps (libopenjp2-7, libtiff6, build-essential, python3-dev, etc.). We
-# only need git here to clone the repo before the install.sh runs.
+# Everything install.sh's apt step used to install, now inline so
+# cloud-init handles it directly (no `sudo` shelling that needs a
+# tty). Runtime deps for pip-installed inky + Pillow + numpy.
 packages:
   - git
+  - python3
+  - python3-venv
+  - python3-pip
+  - python3-dev
+  - build-essential
+  - libopenjp2-7
+  - libtiff6
+
+# cloud-init's native raspi-config equivalents. Handles the same
+# switches install.sh used to shell out for. Avoids `raspi-config
+# nonint do_spi 0` which needs sudo + a controlling terminal.
+rpi:
+  interfaces:
+    spi: true
+    i2c: true
 
 users:
   - name: tesserae
@@ -50,7 +65,8 @@ users:
     shell: /bin/bash
     lock_passwd: true
     # gpio + spi give the user access to the Inky HAT without sudo on
-    # every paint; sudo is needed for apt + raspi-config inside install.sh.
+    # every paint; sudo stays for interactive troubleshooting after
+    # first boot, not for the install itself.
     groups:
       - sudo
       - gpio
@@ -63,11 +79,23 @@ users:
     # ssh_authorized_keys:
     #   - ssh-ed25519 AAAA...your-key...
 
-# Pre-write the client config BEFORE install.sh runs. install.sh's
-# config-prompt path checks for an existing file and skips writing one
-# when found, so this is what ends up at the canonical config path.
-# Same schema render_config_toml() in tesserae_pi_bin_client.config emits.
+# All the config the runcmd steps below need. Written before the
+# users step runs, so ownership is fixed with a top-level chown.
 write_files:
+  # 1. dtoverlay=spi0-0cs, the third thing install.sh's raspi-config
+  #    step did (rpi.interfaces above covered the SPI+I2C toggles).
+  #    Enables single-CS mode on SPI0 which the Inky HAT expects.
+  - path: /boot/firmware/config.txt
+    append: true
+    content: |
+
+      # Added by tesserae pi-client cloud-init: single-CS mode on SPI0
+      # for the Pimoroni Inky HAT.
+      dtoverlay=spi0-0cs
+
+  # 2. Client config, jinja-templated from meta-data. server_url +
+  #    model come out of your meta-data file; everything else is a
+  #    default that works for a REST setup out of the box.
   - path: /home/tesserae/.config/tesserae-pi-bin-client/config.toml
     owner: tesserae:tesserae
     permissions: "0600"
@@ -93,14 +121,14 @@ write_files:
       keepalive = 60
 
       [rest]
-      server_url = "http://tesserae.local:8765"  # <EDIT>: your Tesserae server URL
+      server_url = "{{ ds.meta_data.server_url }}"
       device_token = ""    # auto-populated after Register; do not edit by hand
       pairing_code = ""    # optional: paste a Settings -> Devices pairing code
       last_frame_etag = "" # auto-populated for If-None-Match short-circuit
       poll_interval_s = 60 # fallback wake interval if server omits next_poll_s
 
       [panel]
-      model = "inky_13_3"  # <EDIT>: inky_4 | inky_5_7 | inky_7_3 | inky_13_3
+      model = "{{ ds.meta_data.model }}"
 
       [http]
       download_timeout_s = 30
@@ -109,19 +137,60 @@ write_files:
       [logging]
       level = "INFO"
 
+  # 3. systemd unit for the client. Same shape as the one
+  #    tesserae-device-pi-bin's install-service.sh installs, inlined
+  #    here so we don't have to shell out to it.
+  - path: /etc/systemd/system/tesserae-pi-bin-client.service
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Tesserae Pi .bin client (Inky Impression)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=tesserae
+      Group=tesserae
+      SupplementaryGroups=gpio spi
+      ExecStart=/usr/local/bin/tesserae-pi-bin-client
+      Restart=on-failure
+      RestartSec=5
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
 runcmd:
   # write_files runs BEFORE users when cloud-init creates the home
-  # directory in the same run, so the .config subtree lands owned by
-  # root. A leaf-only chown misses the intermediate directories and
-  # any siblings, so we chown from the top-level home so everything
-  # write_files (and later steps) planted lands owned by tesserae.
+  # directory in the same run, so anything write_files planted under
+  # /home/tesserae lands owned by root. Top-level chown so
+  # everything write_files planted plus anything the subsequent
+  # user-creation step populates lands owned by tesserae.
   - chown -R tesserae:tesserae /home/tesserae
-  - su - tesserae -c 'git clone https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin'
-  # install.sh enables SPI/I2C, adds dtoverlay=spi0-0cs, builds the venv,
-  # pip-installs the client + inky[rpi], symlinks /usr/local/bin/, installs
-  # the systemd unit, and starts it. --non-interactive skips its prompts;
-  # the config we wrote above is the source of truth.
-  - su - tesserae -c 'cd /home/tesserae/tesserae-device-pi-bin && ./scripts/install.sh --non-interactive'
+
+  # Clone the client repo. `su -c ... <user>` runs without a
+  # controlling terminal, unlike `sudo` which install.sh used to
+  # rely on. That's the whole reason we skip install.sh here.
+  - su -c 'git clone https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin' tesserae
+
+  # Build the venv + pip-install the client + inky[rpi] extras, all
+  # as the tesserae user so the venv permissions stay right.
+  - su -c 'python3 -m venv /home/tesserae/tesserae-device-pi-bin/.venv' tesserae
+  - su -c '/home/tesserae/tesserae-device-pi-bin/.venv/bin/pip install --upgrade pip' tesserae
+  - su -c '/home/tesserae/tesserae-device-pi-bin/.venv/bin/pip install -e "/home/tesserae/tesserae-device-pi-bin[rpi]"' tesserae
+
+  # Symlink the client entry-point into /usr/local/bin so the
+  # systemd unit's ExecStart resolves. Run as root (default runcmd
+  # user), no need for sudo.
+  - ln -sf /home/tesserae/tesserae-device-pi-bin/.venv/bin/tesserae-pi-bin-client /usr/local/bin/tesserae-pi-bin-client
+
+  # Enable the systemd unit. systemctl start would fail here because
+  # SPI/I2C don't take effect until the post-cloud-init reboot below;
+  # enable + reboot is how the service starts cleanly on second boot.
+  - systemctl daemon-reload
+  - systemctl enable tesserae-pi-bin-client.service
 
 # SPI + I2C take effect on next boot; reboot here so the systemd unit
 # starts against the enabled bus rather than failing on first launch.
@@ -141,3 +210,22 @@ final_message: |
   Next step: open your Tesserae server's web UI, go to
   Settings -> Devices -> Discovered, and click Register on the new
   Pi entry. The daemon picks up its access token on the next poll.
+
+# --------------------------------------------------------------
+# meta-data companion file
+# --------------------------------------------------------------
+# Alongside this file, edit BOOT/meta-data to look like:
+#
+#   instance-id: pi-inky-01
+#   server_url: http://tesserae.local:8765
+#   model: inky_13_3
+#
+# `server_url` is your Tesserae server's base URL (whatever you'd
+# type in a browser to reach the web UI). `model` is one of:
+#
+#   inky_4 | inky_5_7 | inky_7_3 | inky_13_3
+#
+# Both values are substituted into the config.toml above at
+# first-boot template time via jinja. That's the WHOLE per-flash
+# edit: two lines added to meta-data. This user-data file stays
+# untouched flash-to-flash.
