@@ -110,9 +110,12 @@ write_files:
       level = "INFO"
 
 runcmd:
-  # Ensure the config directory's ownership survives the write_files step
-  # (write_files runs before users sometimes; chown is cheap insurance).
-  - chown -R tesserae:tesserae /home/tesserae/.config
+  # write_files runs BEFORE users when cloud-init creates the home
+  # directory in the same run, so the .config subtree lands owned by
+  # root. A leaf-only chown misses the intermediate directories and
+  # any siblings, so we chown from the top-level home so everything
+  # write_files (and later steps) planted lands owned by tesserae.
+  - chown -R tesserae:tesserae /home/tesserae
   - su - tesserae -c 'git clone https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin'
   # install.sh enables SPI/I2C, adds dtoverlay=spi0-0cs, builds the venv,
   # pip-installs the client + inky[rpi], symlinks /usr/local/bin/, installs

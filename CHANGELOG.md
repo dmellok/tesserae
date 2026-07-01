@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.55], 2026-07-01
+
+### Fixed
+
+- **`scripts/pi-client-cloud-init.yaml` left `/home/tesserae` owned
+  by root.** cloud-init runs `write_files` before `users` when the
+  home directory is created in the same run, so the pre-written
+  `.config/tesserae-pi-bin-client/config.toml` (and its parent
+  directories) landed owned by root. The `chown` in `runcmd` only
+  covered the `.config` leaf, missing the intermediate parent dirs.
+  Chowning `/home/tesserae` from the top level catches everything
+  `write_files` planted plus anything the subsequent user-creation
+  step populates. Reported and traced against a real first-boot on
+  Pi OS Lite.
+
 ## [0.64.54], 2026-07-01
 
 ### Changed
