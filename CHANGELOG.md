@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.54], 2026-07-01
+
+### Changed
+
+- **`hardware/seeed/reterminal_e1001.json` now routes through
+  `esp32_bw_client` + `esp32_bw_bin` (native mono path) instead of
+  `trmnl_client` + `trmnl_png` (TRMNL BYOS path).** Same pattern as
+  the E1002/E1004 migration in v0.64.52. The unified
+  `tesserae-device-firmware` ESP-IDF build streams frame bytes
+  straight to the panel framebuffer without any on-device image
+  decode, so it needs the raw 1-bpp packed buffer (48000 bytes for
+  800×480, MSB=leftmost pixel, bit-set=white) that `esp32_bw_bin`
+  already produces byte-for-byte. Users who intentionally flashed
+  TRMNL BYOS firmware on an E1001 can add a custom hardware manifest
+  that pins the `trmnl_client` protocol.
+
 ## [0.64.53], 2026-07-01
 
 ### Fixed
