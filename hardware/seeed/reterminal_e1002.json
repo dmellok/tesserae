@@ -5,14 +5,15 @@
   "vendor": "Seeed Studio",
   "url": "https://www.seeedstudio.com/reTerminal-E1002-p-6533.html",
   "icon": "device-tablet",
-  "description": "7.3 inch 7-colour ACeP ePaper terminal, ESP32-S3, battery-powered. Speaks Tesserae's TRMNL BYOS endpoints once the device is flashed with TRMNL firmware.",
+  "description": "7.3 inch 6-colour Spectra 6 ePaper terminal, ESP32-S3, battery-powered. Speaks Tesserae's TRMNL BYOS endpoints once the device is flashed with TRMNL firmware. Server-side quantise via the trmnl_png_color renderer produces a Spectra 6 indexed PNG the firmware paints directly.",
   "protocol": "trmnl_client",
+  "renderers": ["trmnl_png_color"],
   "panel": {
     "w": 800,
     "h": 480,
     "orientation": "landscape",
-    "name": "7.3 inch ACeP (7-colour) ePaper",
-    "gamut": "acep_7colour",
+    "name": "7.3 inch Spectra 6 ePaper",
+    "gamut": "spectra_6",
     "native_w": 800,
     "native_h": 480
   },
@@ -21,5 +22,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "png",
-  "notes_md": "Awaiting confirmed test on real hardware. Flash with TRMNL firmware, point the device's API URL at your Tesserae base URL, and pair via the access token shown in Settings -> Devices."
+  "notes_md": "Flashed with TRMNL firmware (E1002_fix branch of usetrmnl/trmnl-firmware), the E1002 speaks the same /api/setup + /api/display BYOS protocol as the mono TRMNL devices. Tesserae routes the E1002 through trmnl_png_color, which outputs an indexed PNG dithered to the panel's 6-colour Spectra 6 palette (black, white, yellow, red, blue, green); the firmware paints it directly via the PNG_PIXEL_INDEXED path. Point the device's API URL at your Tesserae base URL and pair via the access token shown in Settings -> Devices. Awaiting confirmed test on real hardware."
 }

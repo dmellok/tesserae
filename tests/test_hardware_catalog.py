@@ -288,6 +288,71 @@ def test_config_schema_extends_merges_additively(
     assert schema["brightness"]["default"] == 50
 
 
+def test_hardware_renderers_override_replaces_protocol_default(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """When a hardware entry declares its own ``renderers`` array, the
+    derived kind picks up that list instead of inheriting the
+    protocol's default. Used when the same wire protocol serves panels
+    with meaningfully different output formats: TRMNL BYOS drives both
+    mono panels (1-bit trmnl_png) and colour panels (indexed-palette
+    trmnl_png_color) over the exact same /api/display flow, and only
+    the renderer differs per-SKU."""
+    devs = tmp_path / "devices"
+    # Protocol declares one renderer as its default; the hardware entry
+    # will override with something different.
+    _write_protocol(devs, "test_protocol")
+    hw = tmp_path / "hardware"
+    _write_hardware(
+        hw,
+        vendor="vendor",
+        file_name="colour_sku.json",
+        manifest=_hardware_manifest(
+            sku_id="colour_sku",
+            protocol="test_protocol",
+            renderers=["esp32_bin"],  # different from the protocol's ["pi_png"]
+        ),
+    )
+    registry = device_loader.discover(
+        devs,
+        schema_path=device_schema_path,
+        data_root=tmp_path / "data",
+        hardware_dir=hw,
+        hardware_schema_path=hardware_schema_path,
+    )
+    sku = registry.devices["colour_sku"]
+    assert sku.renderer_ids == ["esp32_bin"], (
+        "renderers list on the hardware manifest must replace the "
+        f"protocol's default; got {sku.renderer_ids!r}"
+    )
+
+
+def test_hardware_without_renderers_inherits_from_protocol(
+    tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
+) -> None:
+    """A hardware entry that DOESN'T declare renderers still inherits
+    the protocol's defaults, so the common case (99% of SKUs) doesn't
+    need to duplicate the renderer list."""
+    devs = tmp_path / "devices"
+    _write_protocol(devs, "test_protocol")
+    hw = tmp_path / "hardware"
+    _write_hardware(
+        hw,
+        vendor="vendor",
+        file_name="inherit_sku.json",
+        manifest=_hardware_manifest(sku_id="inherit_sku", protocol="test_protocol"),
+    )
+    registry = device_loader.discover(
+        devs,
+        schema_path=device_schema_path,
+        data_root=tmp_path / "data",
+        hardware_dir=hw,
+        hardware_schema_path=hardware_schema_path,
+    )
+    sku = registry.devices["inherit_sku"]
+    assert sku.renderer_ids == ["pi_png"]  # protocol's default
+
+
 def test_underscore_prefixed_files_ignored(
     tmp_path: Path, device_schema_path: Path, hardware_schema_path: Path
 ) -> None:

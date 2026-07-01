@@ -159,9 +159,13 @@ def _derive_manifest(
     5. ``config_schema_extends`` merged additively into the protocol's
        ``config_schema``.
 
-    Status / config topics, renderers, and the ``tesserae_compat``
-    declaration are inherited verbatim from the protocol so the wire
-    contract is identical.
+    Status / config topics and the ``tesserae_compat`` declaration are
+    inherited verbatim from the protocol so the wire contract is
+    identical. Renderers are inherited too, unless the hardware entry
+    carries its own ``renderers`` override (used when the same wire
+    protocol drives panels with different output formats, e.g. mono
+    TRMNL panels take 1-bit output while colour TRMNL panels take an
+    indexed-palette PNG).
     """
     manifest = copy.deepcopy(protocol_device.manifest)
 
@@ -207,6 +211,14 @@ def _derive_manifest(
             if isinstance(field_spec, dict):
                 merged_schema[str(field_name)] = dict(field_spec)
         manifest["config_schema"] = merged_schema
+
+    # Per-hardware renderer override. Used when the same wire protocol
+    # drives panels with meaningfully different output formats (mono
+    # TRMNL panels take 1-bit; colour TRMNL panels take an indexed
+    # palette PNG). Absent → inherit the protocol's renderers.
+    renderers_override = entry.manifest.get("renderers")
+    if isinstance(renderers_override, list) and renderers_override:
+        manifest["renderers"] = [str(r) for r in renderers_override if isinstance(r, str)]
 
     # Track the catalog origin on the manifest so the Settings UI and
     # compatibility-matrix generator can distinguish folder-defined kinds

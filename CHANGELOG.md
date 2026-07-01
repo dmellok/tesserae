@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.49], 2026-07-01
+
+### Added
+
+- **`renderers/trmnl_png_color`**: colour-panel renderer for TRMNL BYOS
+  devices. Composition PNG in, indexed PNG out with a gamut-selected
+  palette (Waveshare E6 for Spectra 6, Inky 7-colour for ACeP,
+  1-bit for mono, Waveshare E6 fallback for unlabelled colour panels).
+  Ships on the same `tesserae/{device}/frame/trmnl` topic pattern
+  as the mono `trmnl_png` renderer, so devices route through the
+  same /api/display path with only the output format differing per
+  SKU. Server-side Floyd-Steinberg against the panel's palette
+  produces the smoothest gradients the target firmware can render
+  (verified against `usetrmnl/trmnl-firmware` E1002_fix branch's
+  `png_draw_6clr` / `GetSpectraPixel` decoders).
+- **Per-hardware `renderers` override in the hardware catalog
+  schema.** Hardware entries under `hardware/<vendor>/<sku>.json`
+  can now declare `"renderers": ["..."]` to replace the protocol's
+  default renderer list, used when the same wire protocol drives
+  panels with meaningfully different output formats.
+  `_derive_manifest` picks up the override at kind-registration
+  time; the common case (SKU inherits from protocol) is unchanged.
+
+### Changed
+
+- **Seeed reTerminal E1002** (`hardware/seeed/reterminal_e1002.json`)
+  now routes through `trmnl_png_color` instead of the default
+  1-bit `trmnl_png`. Panel gamut relabelled from `acep_7colour` to
+  `spectra_6` to match what the TRMNL firmware for that board
+  actually targets. Colour output is untested on real hardware
+  pending device arrival; the plumbing is verified end-to-end via
+  the renderer + hardware catalog test suites.
+
 ## [0.64.48], 2026-07-01
 
 ### Fixed

@@ -80,6 +80,12 @@
       "enum": ["png", "bin", "webp"],
       "description": "Wire format this SKU expects. Informational; the protocol's renderers still drive the actual encoding."
     },
+    "renderers": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+      "minItems": 1,
+      "description": "Optional override for the protocol's default renderer list. Present when the same wire protocol serves panels with meaningfully different output formats, e.g. a colour Spectra 6 panel wants an indexed-palette PNG while the mono panels on the same protocol take 1-bit output. Absent → inherit the protocol's renderers verbatim (the common case)."
+    },
     "notes_md": {
       "type": "string",
       "description": "Free-form maintainer notes in markdown. Surfaced on the docs hardware page."
