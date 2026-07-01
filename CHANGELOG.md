@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.61], 2026-07-02
+
+### Added
+
+- **`hardware/seeed/ee02.json`**: Seeed XIAO ePaper Driver Board
+  EE02 (ESP32-S3) driving a 13.3" T133A01 6-colour Spectra E6
+  panel (1200×1600). Routes through the `esp32_client` protocol +
+  `esp32_bin` renderer, producing a byte-identical frame to the
+  Seeed reTerminal E1004 and the Waveshare 13.3E6 targets (960000
+  bytes, high nibble = left column, palette nibbles 0x0..0x6 with
+  0x4 / 0x7 reserved). No new renderer needed; the E1004 output
+  can be re-pointed at the EE02 for cross-panel validation.
+  `protocol_config.model_header` set to `Seeed_EE02` for firmware
+  auto-provisioning.
+
 ## [0.64.60], 2026-07-02
 
 ### Added

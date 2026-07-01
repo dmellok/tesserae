@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_ee02",
+  "name": "Seeed XIAO ePaper EE02 (13.3\")",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/reTerminal-E1004-p-6692.html",
+  "icon": "device-tablet",
+  "description": "Seeed XIAO ePaper Driver Board EE02 (ESP32-S3) driving a 13.3\" T133A01 6-colour Spectra E6 panel (1200x1600). Same wire format as the reTerminal E1004 and the Waveshare 13.3E6 target; server-side pack via esp32_bin produces a raw 4-bpp Spectra 6 buffer (960000 bytes) the firmware paints without on-device decode. Battery state is reported as unknown for now, sense pin not yet wired in the reference board.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "13.3 inch Spectra E6 ePaper (1200x1600)",
+    "gamut": "spectra_6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "protocol_config": {
+    "model_header": "Seeed_EE02"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Frame is byte-identical to the seeed_reterminal_e1004 and waveshare_133e6 targets: 960000 bytes exactly (1200*1600/2), two pixels per byte with high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 600 bytes per row, top-left origin. Palette nibbles match the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved). Renderer keeps normal top-left orientation; if hardware testing surfaces a physical flip, the firmware rotates on-device rather than the server pre-rotating."
+}
