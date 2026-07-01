@@ -5,22 +5,18 @@
   "vendor": "Seeed Studio",
   "url": "https://www.seeedstudio.com/reTerminal-E1002-p-6533.html",
   "icon": "device-tablet",
-  "description": "7.3 inch 6-colour Spectra 6 ePaper terminal, ESP32-S3, battery-powered. Speaks Tesserae's TRMNL BYOS endpoints once the device is flashed with TRMNL firmware. Server-side quantise via the trmnl_png_color renderer produces a Spectra 6 indexed PNG the firmware paints directly.",
-  "protocol": "trmnl_client",
-  "renderers": ["trmnl_png_color"],
+  "description": "7.3 inch 6-colour Spectra 6 ePaper terminal, ESP32-S3, battery-powered (800x480). Pairs with the tesserae-device-firmware ESP-IDF build (unified firmware, boards/seeed_reterminal_e1002.h) and speaks Tesserae's v1 REST device API. Server-side pack via esp32_bin produces a 4-bpp Spectra 6 buffer (192000 bytes) that the firmware paints without any on-device quantise.",
+  "protocol": "esp32_client",
   "panel": {
     "w": 800,
     "h": 480,
     "orientation": "landscape",
-    "name": "7.3 inch Spectra 6 ePaper",
+    "name": "7.3 inch Spectra 6 ePaper (800x480)",
     "gamut": "spectra_6",
     "native_w": 800,
     "native_h": 480
   },
-  "protocol_config": {
-    "model_header": "reTerminal E1002"
-  },
   "refresh_floor_s": 60,
-  "image_format": "png",
-  "notes_md": "Flashed with TRMNL firmware (E1002_fix branch of usetrmnl/trmnl-firmware), the E1002 speaks the same /api/setup + /api/display BYOS protocol as the mono TRMNL devices. Tesserae routes the E1002 through trmnl_png_color, which outputs an indexed PNG dithered to the panel's 6-colour Spectra 6 palette (black, white, yellow, red, blue, green); the firmware paints it directly via the PNG_PIXEL_INDEXED path. Point the device's API URL at your Tesserae base URL and pair via the access token shown in Settings -> Devices. Awaiting confirmed test on real hardware."
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Palette nibbles align with the firmware's EPD_COL_* constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), so the frame paints without any on-device translation. If you have an E1002 flashed with TRMNL BYOS firmware instead of the tesserae unified firmware, the trmnl_png_color renderer + trmnl_client protocol path still works; register the device against the trmnl_client kind directly and pick trmnl_png_color as the renderer."
 }

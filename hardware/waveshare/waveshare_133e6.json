@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_133e6",
+  "name": "Waveshare 13.3\" Spectra E6 (ESP32-S3)",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm",
+  "icon": "device-tablet",
+  "description": "13.3 inch 6-colour Spectra E6 ePaper module driven by an ESP32-S3-WROOM-2-N32R16V. 1200x1600 portrait-native panel, dual-SPI controller (left/right halves), single-cell Li-Po battery via onboard ETA6098 charger. Frames are packed server-side to 4-bpp Spectra E6 (960000 bytes) and delivered over Tesserae's v1 REST device API. Pair with the tesserae-device-firmware ESP-IDF build (unified firmware, boards/waveshare_133e6.h).",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "Waveshare 13.3\" Spectra E6 (1200x1600)",
+    "gamut": "waveshare_e6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Pair with `tesserae-device-firmware` (ESP-IDF); the board header at `boards/waveshare_133e6.h` supplies the pin map + palette nibble constants (which match Tesserae's WAVESHARE_E6 nibble mapping byte-for-byte). Default sleep interval is 15 minutes; hash-skip wakes cost roughly 0.13 mAh, render wakes roughly 0.75 mAh."
+}

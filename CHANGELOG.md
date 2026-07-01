@@ -6,6 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.52], 2026-07-01
+
+### Added
+
+- **`hardware/waveshare/waveshare_133e6.json`**: Waveshare 13.3" Spectra
+  E6 (ESP32-S3-WROOM-2-N32R16V), 1200×1600 portrait, dual-SPI panel,
+  routed through `esp32_client` + `esp32_bin`. Pairs with the
+  `tesserae-device-firmware` ESP-IDF unified firmware build's
+  `boards/waveshare_133e6.h` target.
+- **`hardware/seeed/reterminal_e1004.json`**: Seeed reTerminal E1004,
+  13.3" 6-colour Spectra 6 (1200×1600 portrait) on an ESP32-S3.
+  Routes through `esp32_client` + `esp32_bin`. Pairs with the
+  unified firmware's `boards/seeed_reterminal_e1004.h` target.
+
+### Changed
+
+- **`hardware/seeed/reterminal_e1002.json` now routes through
+  `esp32_client` + `esp32_bin` (native path) instead of
+  `trmnl_client` + `trmnl_png_color` (TRMNL BYOS path).** The E1002
+  is now a Tesserae-native-firmware SKU by default; the unified
+  `tesserae-device-firmware` ESP-IDF build supersedes the TRMNL
+  BYOS-flashed workaround for this panel. Anyone who intentionally
+  flashed TRMNL BYOS firmware on an E1002 can add a custom hardware
+  manifest that pins `renderers: ["trmnl_png_color"]` on the
+  `trmnl_client` protocol; the `trmnl_png_color` renderer stays in
+  the tree for that case and for future colour TRMNL BYOS panels.
+
+Palette nibble mapping in `esp32_bin` matches the unified firmware's
+`EPD_COL_*` constants byte-for-byte (black=0x0, white=0x1, yellow=0x2,
+red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), so a frame packed
+by `esp32_bin` paints without any on-device translation.
+
 ## [0.64.51], 2026-07-01
 
 ### Fixed

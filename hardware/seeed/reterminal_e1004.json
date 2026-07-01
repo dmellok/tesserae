@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "seeed_reterminal_e1004",
+  "name": "Seeed reTerminal E1004",
+  "vendor": "Seeed Studio",
+  "url": "https://www.seeedstudio.com/reTerminal-E1004-p-6692.html",
+  "icon": "device-tablet",
+  "description": "13.3 inch 6-colour Spectra 6 ePaper terminal, ESP32-S3, battery-powered (up to 6-month runtime at 1 refresh/day per Seeed). Speaks Tesserae's v1 REST device API when flashed with the tesserae-device-firmware ESP-IDF build (unified firmware, boards/seeed_reterminal_e1004.h). Server-side pack via esp32_bin produces a 4-bpp Spectra 6 buffer (960000 bytes) that the firmware paints without any on-device quantise.",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 1200,
+    "h": 1600,
+    "orientation": "portrait",
+    "name": "13.3 inch Spectra 6 ePaper (1200x1600)",
+    "gamut": "spectra_6",
+    "native_w": 1200,
+    "native_h": 1600
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. If you flashed the reTerminal with TRMNL firmware instead of the tesserae-device-firmware build, use the (planned) `seeed_reterminal_e1004_trmnl` variant which routes through the TRMNL BYOS protocol + colour PNG renderer."
+}
