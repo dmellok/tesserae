@@ -1,0 +1,22 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "pimoroni_inky_4_acep",
+  "name": "Pimoroni Inky Impression 4\" (ACeP, 640x400, legacy)",
+  "vendor": "Pimoroni",
+  "url": "https://shop.pimoroni.com/products/inky-impression",
+  "icon": "monitor",
+  "description": "Legacy 4 inch 7-colour ACeP (E Ink) HAT for Raspberry Pi, 640x400. Pre-dates the Spectra 6 refresh Pimoroni now ships under the same product name; the current shipping SKU is pimoroni_inky_4 (600x400 Spectra 6). Driven by the pi_bin client on a 7-colour palette; the ACeP nibble packing path in pi_bin is less well-exercised than the Spectra 6 path, please open an issue if the paint is off after a fresh flash.",
+  "protocol": "pi_bin_client",
+  "panel": {
+    "w": 640,
+    "h": 400,
+    "orientation": "landscape",
+    "name": "Inky Impression 4\" (7-colour ACeP, 640x400)",
+    "gamut": "acep_7colour",
+    "native_w": 640,
+    "native_h": 400
+  },
+  "refresh_floor_s": 30,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. If you own the current 600x400 Spectra 6 variant, use `pimoroni_inky_4` instead; the two panels share the product name but not the panel dims or the ink chemistry, so picking the wrong kind will paint at the wrong resolution."
+}

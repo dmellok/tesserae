@@ -77,13 +77,19 @@ write_files:
       # below + populate the [mqtt] block if you already run a broker.
       transport_mode = "rest"
 
+      # [mqtt] is used ONLY when transport_mode = "mqtt" above.
+      # For the default transport_mode = "rest" this whole section is
+      # inert: the client never reads host / client_id / device_id /
+      # anything else from here. You do NOT need to change any of
+      # these values for a REST setup. Keep them for the day you
+      # decide to flip to an MQTT broker.
       [mqtt]
-      host = ""
+      host = ""              # broker hostname when using MQTT transport
       port = 1883
       username = ""
       password = ""
-      client_id = "pi-impression-1"
-      device_id = "pi_bin"  # MQTT topic prefix: tesserae/<device_id>/...
+      client_id = "pi-impression-1"  # MQTT client id; only matters if two Pi clients share a broker
+      device_id = "pi_bin"           # MQTT topic prefix: tesserae/<device_id>/...
       keepalive = 60
 
       [rest]

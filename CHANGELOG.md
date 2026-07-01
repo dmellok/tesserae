@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.51], 2026-07-01
+
+### Fixed
+
+- **Pimoroni Inky Impression 4" hardware manifest carried the wrong
+  panel dimensions.** The current shipping SKU (PIM789) is 600×400
+  Spectra 6; the manifest declared 640×400. Corrected in
+  `hardware/pimoroni/inky_impression_4.json`.
+- **Pi-client cloud-init's `[mqtt]` section read as required config
+  even for REST setups.** Rewrote the comments so the block is
+  clearly flagged as "only used when transport_mode = 'mqtt';
+  ignored for the default REST setup" and each field's purpose is
+  spelled out inline. No functional change, the block was already
+  inert for REST users; the yaml just didn't say so plainly.
+
+### Added
+
+- **`hardware/pimoroni/inky_impression_4_acep.json`**: legacy 4"
+  Inky Impression variant at 640×400 with the 7-colour ACeP gamut.
+  Pre-dates the Spectra 6 refresh Pimoroni now ships under the
+  same product name; user-owned examples still exist in the wild.
+  Description explicitly points users at `pimoroni_inky_4` for the
+  current Spectra 6 SKU so the two don't get confused during
+  pairing.
+
 ## [0.64.50], 2026-07-01
 
 ### Added
