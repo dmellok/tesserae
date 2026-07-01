@@ -1,0 +1,25 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "waveshare_photopainter_73",
+  "name": "Waveshare PhotoPainter 7.3\"",
+  "vendor": "Waveshare",
+  "url": "https://www.waveshare.com/photopainter-7.3.htm",
+  "icon": "device-tablet",
+  "description": "7.3 inch 6-colour Spectra E6 ePaper photo frame, ESP32-S3, battery-powered (800x480). Speaks Tesserae's v1 REST device API and paints a raw 4-bpp Spectra 6 buffer (192000 bytes) produced by the esp32_bin renderer. Same wire contract as the Seeed reTerminal E1002; the two panels are byte-compatible on the frame side. The PhotoPainter mounts its panel 180 deg in the case and the firmware rotates on-device, so the server renders in normal top-left orientation (no pre-rotate here).",
+  "protocol": "esp32_client",
+  "panel": {
+    "w": 800,
+    "h": 480,
+    "orientation": "landscape",
+    "name": "7.3 inch Spectra E6 ePaper (800x480)",
+    "gamut": "spectra_6",
+    "native_w": 800,
+    "native_h": 480
+  },
+  "protocol_config": {
+    "model_header": "PhotoPainter_73"
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Awaiting confirmed test on real hardware. Palette nibbles align with the firmware's Spectra 6 constants byte-for-byte (black=0x0, white=0x1, yellow=0x2, red=0x3, blue=0x5, green=0x6; 0x4 and 0x7 reserved), and the buffer is byte-identical to the Seeed reTerminal E1002 output at 800x480: two pixels per byte, high nibble = LEFT (even column), low nibble = RIGHT (odd column), row-major, 400 bytes per row, top-left origin. Do not pre-rotate at render time even though the panel mounts 180 deg physically; the firmware rotates on-device."
+}

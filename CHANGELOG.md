@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.60], 2026-07-02
+
+### Added
+
+- **`hardware/waveshare/photopainter_73.json`**: Waveshare
+  PhotoPainter 7.3" (ESP32-S3, 800×480 6-colour Spectra E6,
+  battery-powered). Routes through the `esp32_client` protocol +
+  `esp32_bin` renderer at 800×480, producing a byte-identical
+  frame to the Seeed reTerminal E1002 (192000 bytes, high nibble =
+  left column, palette nibbles 0x0..0x6 with 0x4 / 0x7 reserved).
+  No new renderer needed; the E1002 output can be re-pointed at the
+  PhotoPainter as a sanity check. `protocol_config.model_header`
+  set to `PhotoPainter_73` for firmware auto-provisioning. Notes
+  flag the physical 180° panel mount inside the case; the firmware
+  rotates on-device so the server keeps rendering in normal
+  top-left orientation.
+
 ## [0.64.59], 2026-07-01
 
 ### Fixed
