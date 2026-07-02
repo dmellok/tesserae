@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.62], 2026-07-02
+
+### Added
+
+- **`hardware/seeed/xiao_epaper_75.json`**: Seeed XIAO ESP32-S3
+  driving a 7.5" 800×480 monochrome ePaper panel (the same panel
+  used in the TRMNL 7.5" OG DIY kit). Routes through the
+  `esp32_bw_client` protocol + `esp32_bw_bin` renderer, producing
+  a byte-identical frame to the Seeed reTerminal E1001 (48000
+  bytes, MSB=leftmost, bit-set=white). No new renderer needed.
+  `protocol_config.model_header` set to `XIAO_ePaper_75` for
+  firmware auto-provisioning. Coexists with the pre-existing
+  `seeed_xiao_75` (which stays for the TRMNL-BYOS-flashed variant
+  of the same panel).
+
 ## [0.64.61], 2026-07-02
 
 ### Added
