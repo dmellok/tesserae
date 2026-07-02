@@ -73,11 +73,11 @@ users:
       - spi
     sudo:
       - "ALL=(ALL) NOPASSWD:ALL"
-    # Uncomment + paste your SSH public key for log-in / diagnostics.
     # The cloud-init has no other password set, so without a key this
     # account is unreachable.
-    # ssh_authorized_keys:
-    #   - ssh-ed25519 AAAA...your-key...
+    {% if ds.meta_data.ssh_key %}ssh_authorized_keys:
+      - {{ ds.meta_data.ssh_key }}
+    {% endif %}
 
 # All the config the runcmd steps below need. Written before the
 # users step runs, so ownership is fixed with a top-level chown.
@@ -97,6 +97,7 @@ write_files:
   #    model come out of your meta-data file; everything else is a
   #    default that works for a REST setup out of the box.
   - path: /home/tesserae/.config/tesserae-pi-bin-client/config.toml
+    defer: true
     owner: tesserae:tesserae
     permissions: "0600"
     content: |
@@ -144,7 +145,7 @@ write_files:
     permissions: "0644"
     content: |
       [Unit]
-      Description=Tesserae Pi .bin client (Inky Impression)
+      Description=Tesserae Pi .bin client (model {{ ds.meta_data.model }})
       After=network-online.target
       Wants=network-online.target
 
@@ -192,14 +193,6 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable tesserae-pi-bin-client.service
 
-# SPI + I2C take effect on next boot; reboot here so the systemd unit
-# starts against the enabled bus rather than failing on first launch.
-power_state:
-  mode: reboot
-  delay: now
-  condition: True
-  message: "Tesserae pi-bin client installed. Rebooting so SPI / I2C take effect."
-
 final_message: |
   Tesserae pi-bin client installed.
 
@@ -219,13 +212,19 @@ final_message: |
 #   instance-id: pi-inky-01
 #   server_url: http://tesserae.local:8765
 #   model: inky_13_3
+#   ssh_key: ssh-ed25519 AAAA...your-key...
+#
+# `server_url` and `model` are mandatory.
 #
 # `server_url` is your Tesserae server's base URL (whatever you'd
 # type in a browser to reach the web UI). `model` is one of:
 #
 #   inky_4 | inky_5_7 | inky_7_3 | inky_13_3
 #
-# Both values are substituted into the config.toml above at
-# first-boot template time via jinja. That's the WHOLE per-flash
-# edit: two lines added to meta-data. This user-data file stays
+# `ssh_key` is optional, but without a key the account is
+# unreachable.
+#
+# All values from `meta-data` are substituted into the `user-data` template
+# above at first-boot time via jinja. That's the WHOLE per-flash
+# edit: add the necessary keys to meta-data. This user-data file stays
 # untouched flash-to-flash.
