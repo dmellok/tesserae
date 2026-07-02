@@ -1,15 +1,18 @@
 # Install a client
 
 The Tesserae server publishes frames; a **client** on the other end paints your
-panel. Six reference clients live in their own repos, plus an HTTP-pull path
-that uses TRMNL's stock firmware (or KOReader on a Kindle), no Tesserae-built
-client involved. All paths use the same device-registration flow described in
-[Set up a device](devices.md).
+panel. The unified [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware)
+is a single ESP32-S3 codebase covering the whole Seeed reTerminal E-Series, the
+XIAO ePaper family, and the Waveshare 13.3" Spectra 6 + PhotoPainter 7.3"
+boards, flashable in the browser at [tesserae.ink/flash](https://tesserae.ink/flash)
+with no toolchain. Panels outside that range use one of the standalone clients
+below. There's also an HTTP-pull path for TRMNL hardware and jailbroken Kindles
+that doesn't need a Tesserae-built client at all. All paths use the same
+device-registration flow described in [Set up a device](devices.md).
 
 | Client | Transport | Default id | Best for |
 |---|---|---|---|
-| `tesserae-device-esp32-bin` | MQTT | `esp32` | Battery-powered Waveshare 13.3" Spectra 6 |
-| `tesserae-device-photopainter-7.3-bin` | MQTT / REST | `esp32` | Battery-powered Waveshare 7.3" PhotoPainter (Spectra 6) |
+| [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware) | REST | `esp32` | Seeed reTerminal E1001-E1004, XIAO EE02, XIAO 7.5", Waveshare 13.3" Spectra 6, PhotoPainter 7.3" (browser flash at [tesserae.ink/flash](https://tesserae.ink/flash)) |
 | `tesserae-device-esp32-bw` | MQTT | `esp32_bw` | Waveshare 4.2" B/W (400×300, 1-bpp) and other small B/W panels |
 | `tesserae-device-pi-bin` | MQTT | `pi_bin` | Plugged-in Pimoroni Inky Impression (fastest path) |
 | `tesserae-device-pi-png` | REST / MQTT | `pi_png` | Any inky-supported panel (2/3/6/7 colour) |
@@ -19,35 +22,29 @@ client involved. All paths use the same device-registration flow described in
 See [Screens & compatibility](../compatibility.md) for which renderer feeds each
 client and what's been tested on real hardware.
 
-## tesserae-device-esp32-bin
+## tesserae-device-firmware
 
-[:material-github: dmellok/tesserae-device-esp32-bin](https://github.com/dmellok/tesserae-device-esp32-bin)
+[:material-github: dmellok/tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware)
 · pairs with the `esp32_bin` renderer · default id `esp32`
 
-Battery-powered **ESP32-S3-WROOM-2** firmware for the Waveshare 13.3" Spectra 6
-panel. It deep-sleeps between wakes, subscribes to the retained
-`tesserae/<device_id>/frame/bin` topic, and skips the download when the frame
-hash hasn't changed. Months of battery life from a single Li-Po; the refresh
-cadence is set by `sleep_interval_s` on `tesserae/<device_id>/config`. Device id
-and Wi-Fi are configured through a captive portal (reachable afterward on the
-LAN at `tesserae-<id>.local`).
+Battery-powered **ESP32-S3** firmware, one codebase across every board Tesserae
+supports natively on ESP32: the whole Seeed reTerminal E-Series (E1001, E1002,
+E1003, E1004), the Seeed XIAO ePaper family (EE02, XIAO 7.5"), and the
+Waveshare 13.3" Spectra 6 + PhotoPainter 7.3". Speaks Tesserae's v1 REST device
+API and streams panel-native `.bin` frames the firmware paints without
+on-device quantise or dither.
+
+The easiest way to install it is the browser-based flasher at
+[tesserae.ink/flash](https://tesserae.ink/flash): pick your board, hit Install,
+no ESP-IDF toolchain required. Wi-Fi is provisioned on first boot via a
+captive portal; device id and Tesserae server URL land in the same setup step.
+Releases are built and published from CI on each Tesserae tag so the flasher
+always serves the latest firmware.
 
 !!! success "This is the maintainer's daily driver"
-    The ESP32 + Waveshare 13.3" path runs in production daily. See
-    [Screens & compatibility](../compatibility.md#whats-been-tested-on-real-hardware)
+    The Waveshare 13.3" and reTerminal E-Series paths run in production daily.
+    See [Screens & compatibility](../compatibility.md#whats-been-tested-on-real-hardware)
     for the full per-client real-hardware status table.
-
-## tesserae-device-photopainter-7.3-bin
-
-[:material-github: dmellok/tesserae-device-photopainter-7.3-bin](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin)
-· pairs with the `esp32_bin` renderer · default id `esp32`
-
-Battery-powered **ESP32-S3** firmware for the **Waveshare 7.3" PhotoPainter**
-(landscape-native 800×480 Spectra 6). Same MQTT wire contract and deep-sleep
-pattern as the 13.3" client; the difference is the panel size and the SPI init
-sequence baked for the PhotoPainter board. Pick `waveshare_photopainter_7_3` as
-the panel preset when registering the device so the server-side renderer uses
-the right row stride. Confirmed on real hardware.
 
 ## tesserae-device-esp32-bw
 
@@ -55,10 +52,9 @@ the right row stride. Confirmed on real hardware.
 · pairs with the `esp32_bw_bin` renderer · default id `esp32_bw`
 
 ESP32 firmware for the **Waveshare 4.2" B/W** e-paper panel (400×300, 1-bpp).
-Same MQTT topic shape as the 13.3" client (subscribes to
-`tesserae/<device_id>/frame/bin`), but consumes the 1-bpp packed buffer the
-`esp32_bw_bin` renderer produces: exactly `width × height / 8` bytes, 8 pixels
-per byte, MSB = leftmost, bit-set = white. Heartbeat publishes `panel_w` /
+Subscribes to `tesserae/<device_id>/frame/bin` and consumes the 1-bpp packed
+buffer the `esp32_bw_bin` renderer produces: exactly `width × height / 8`
+bytes, 8 pixels per byte, MSB = leftmost, bit-set = white. Heartbeat publishes `panel_w` /
 `panel_h` so other B/W resolutions (with width a multiple of 8) auto-fill the
 Discovered card — point the firmware at a different size and Tesserae picks it
 up without changes.

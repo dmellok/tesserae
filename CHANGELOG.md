@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.67], 2026-07-03
+
+### Changed
+
+- **[`docs/install/clients`](install/clients.md)** now leads with the
+  unified [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware)
+  and the browser flasher at [`tesserae.ink/flash`](https://tesserae.ink/flash)
+  as the primary ESP32 client path, and drops the standalone
+  `tesserae-device-esp32-bin` (Waveshare 13.3" Spectra 6) and
+  `tesserae-device-photopainter-7.3-bin` (Waveshare PhotoPainter 7.3")
+  sections since both boards are now covered by the unified firmware.
+  Client table gains a `tesserae-device-firmware` row listing every SKU
+  it covers (reTerminal E1001-E1004, XIAO EE02, XIAO 7.5", Waveshare
+  13.3" Spectra 6, PhotoPainter 7.3"). Fixes an orphaned "the 13.3"
+  client" reference in the `esp32-bw` section that pointed at the now
+  removed heading.
+
 ## [0.64.66], 2026-07-02
 
 ### Changed
