@@ -409,8 +409,8 @@
        column so the user composes the dashboard top-to-bottom, then
        sees "what fires this and when" as the natural next step. On
        desktop the preview stays sticky in the right column; on
-       mobile this card stacks below the cell editors with the
-       preview pinned to the top. #}
+       mobile the preview and this card both scroll with the page
+       (the back-to-top FAB handles jumping back to the preview). #}
     <section class="dx-section-card schedules-card">
       {{ card_head('Schedules', icon_name='alarm',
          blurb='Pushes that fire this dashboard. The Schedules page is the canonical edit surface.') }}
@@ -455,13 +455,12 @@
   </div>
 </div>
 
-{# Floating "back to top" button, appears only on small viewports
-   where the preview stacks above the cell forms (the layout's reactive
-   mode). Tap = smooth scroll to the top of the page. Press-and-drag
-   along the bottom edge moves it to the other side; the side
-   preference persists in localStorage so a left-handed user only has
-   to drag once. Hidden by CSS on desktop (≥1100px) where the preview
-   is already a sticky sidebar.
+{# Floating "back to top" button, appears on small viewports once the
+   preview card scrolls out of view. Tap = smooth scroll to the top of
+   the page. Press-and-drag along the bottom edge moves it to the other
+   side; the side preference persists in localStorage so a left-handed
+   user only has to drag once. Hidden by CSS on desktop (≥1100px)
+   where the preview is already a sticky sidebar.
 
    Visibility is driven by the ``is-visible`` class (not the ``hidden``
    attribute) so the CSS slide-up + fade-in transitions actually run on

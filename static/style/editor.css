@@ -484,11 +484,11 @@
   .editor-grid { gap: var(--t-space-4); }
   /* Mobile: editor header is NOT sticky, scrolls away naturally so
      the save/send/delete row only exists at the top of the page.
-     Preview pins just below the global topbar (which IS sticky at
-     z=500), z=5 keeps it under the topbar but above everything else. */
+     Preview card scrolls with the rest of the content; the
+     back-to-top FAB (see below) reappears once it leaves the
+     viewport. */
   :root {
     --mobile-preview-h: 36vh;
-    --mobile-topbar-h: 56px;
   }
   /* Override the base rule (lines ~334) that makes the editor header
      sticky at top:64px on desktop. Mobile: header is in normal flow
@@ -501,23 +501,10 @@
   }
   .preview-card {
     text-align: center;
-    position: sticky;
-    top: var(--mobile-topbar-h);
-    z-index: 5;
     margin: 0;
     background: var(--t-surface);
-    /* Soft separator from the editor content scrolling beneath. */
-    box-shadow: 0 8px 12px -10px rgba(0, 0, 0, 0.22);
-    /* Tighter padding since the title bar + dims line are hidden;
-       the preview gets nearly the full card. */
     padding: var(--t-space-3);
   }
-  /* Hide the "Live preview" title bar and the "1200 × 1600 · …" dims
-     line on mobile to maximise the preview area in the sticky card.
-     Both labels are obvious in context (the preview IS the preview;
-     the panel dims are in the topbar's deeper UI). */
-  .preview-card > .card-head { display: none; }
-  .preview-card .preview-dims { display: none; }
   /* Centred, aspect-preserved preview frame. --panel-ar is set
      inline (w/h) so width = min(100%, max-height × --panel-ar);
      height comes from the existing aspect-ratio rule. */

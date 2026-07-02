@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.66], 2026-07-02
+
+### Changed
+
+- **Dashboard editor's mobile preview no longer pins to the top of the
+  viewport.** The preview card now scrolls with the rest of the page
+  and the existing floating back-to-top FAB reappears once it leaves
+  the viewport. The FAB's `IntersectionObserver` was already generic,
+  so no JS change was needed. Also un-hides the "Live preview" title
+  and the panel-dims line on mobile, since they were only hidden to
+  maximise the preview area inside the pinned strip. Desktop's
+  sticky-in-right-column behaviour is unchanged.
+
 ## [0.64.65], 2026-07-02
 
 ### Added
