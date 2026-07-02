@@ -1,6 +1,9 @@
-# Quickstart: Seeed XIAO 7.5" ePaper Panel
+# Quickstart: Seeed XIAO 7.5" ePaper Panel (TRMNL BYOS)
 
-The Seeed XIAO ePaper Panel: an XIAO ESP32 board paired with a 7.5 inch monochrome e-paper panel. Ships unflashed; the XIAO variant of the TRMNL firmware turns it into a BYOS client that Tesserae can paint.
+The Seeed XIAO ePaper Panel: an XIAO ESP32 board paired with a 7.5 inch monochrome e-paper panel. Ships unflashed.
+
+!!! tip "There's a native Tesserae firmware path"
+    This page covers the **TRMNL BYOS** flashing path. There's also a native Tesserae firmware for the XIAO 7.5" with a browser-based flasher at [tesserae.ink/flash](https://tesserae.ink/flash); see the [unified Seeed guide](seeed-unified.md) for that flow. Pick whichever fits your setup.
 
 !!! note "Pending real-hardware confirmation"
     This SKU is in the catalog but hasn't been verified end-to-end by the maintainer yet. The protocol path matches the reTerminal flow and should work; please [open an issue](https://github.com/dmellok/tesserae/issues) if you hit anything unexpected.

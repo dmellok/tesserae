@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.63], 2026-07-02
+
+### Added
+
+- **[`docs/quickstart/seeed-unified.md`](quickstart/seeed-unified.md)**:
+  new unified quickstart for every Seeed ePaper device Tesserae
+  supports via the native `tesserae-device-firmware` build. Covers
+  the reTerminal E1001 / E1002 / E1003 / E1004, the XIAO EE02, and
+  the XIAO ePaper 7.5" mono, all via one web-based flasher at
+  [tesserae.ink/flash](https://tesserae.ink/flash). Includes a
+  panel-vs-firmware-kind matrix, per-device notes on refresh
+  behaviour and known battery reporting gaps, and a troubleshooting
+  table for the common first-boot failures. Featured on the
+  quickstart index above the Waveshare + TRMNL guides.
+
+### Changed
+
+- **[`docs/quickstart/seeed-reterminal.md`](quickstart/seeed-reterminal.md)**
+  and **[`docs/quickstart/seeed-xiao.md`](quickstart/seeed-xiao.md)**
+  now open with a "there's a better path now" callout pointing at
+  the unified firmware guide, and are renamed in the nav to `(TRMNL
+  BYOS)` variants. Both pages stay for users who deliberately want
+  to run TRMNL BYOS firmware on Seeed hardware.
+
 ## [0.64.62], 2026-07-02
 
 ### Added

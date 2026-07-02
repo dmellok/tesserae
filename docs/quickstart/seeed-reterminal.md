@@ -1,6 +1,11 @@
-# Quickstart: Seeed reTerminal E-Series
+# Quickstart: Seeed reTerminal E-Series (TRMNL BYOS)
 
-The Seeed reTerminal E Series e-paper terminals: E1001 (7.5" mono), E1002 (7.3" ACeP colour), E1003 (10.3" mono, 16-level grey), and E1004 (13.3" colour Spectra 6). All ship with Seeed's SenseCraft HMI firmware and need a re-flash with TRMNL firmware to talk to Tesserae's BYOS endpoints.
+The Seeed reTerminal E Series e-paper terminals: E1001 (7.5" mono), E1002 (7.3" Spectra 6), E1003 (10.3" mono, 16-level grey), and E1004 (13.3" Spectra 6). All ship with Seeed's SenseCraft HMI firmware and need a re-flash to talk to Tesserae.
+
+!!! tip "There's a native Tesserae firmware path"
+    This page covers the **TRMNL BYOS** flashing path. There's also a native Tesserae firmware for the reTerminal E-series with a browser-based flasher at [tesserae.ink/flash](https://tesserae.ink/flash); see the [unified Seeed guide](seeed-unified.md) for that flow. Pick whichever fits your setup.
+
+    Stay on this page if you want to run TRMNL's firmware and use Tesserae as the BYOS server, or if the unified firmware doesn't yet cover your specific board revision.
 
 !!! note "Verified vs Pending"
     The E1003 has been confirmed end-to-end on real hardware. The E1001, E1002, and E1004 use the same flashing flow; the TRMNL firmware port for E1004 is still in progress upstream.

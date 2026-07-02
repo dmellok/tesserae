@@ -12,6 +12,12 @@ The Pi runs a small client that subscribes to your Tesserae server and paints th
 - [Raspberry Pi + Pimoroni Inky, automated via cloud-init](pi-inky-cloud-init.md): zero-touch flash-and-boot setup for a fresh SD card.
 - [Pi Pico Plus 2 W + Pimoroni Inky 13.3"](pi-pico-inky.md): the battery-powered RP2350 path.
 
+## Seeed ePaper (unified firmware)
+
+The Seeed reTerminal E-series plus the XIAO ePaper family, all covered by one firmware image and one web flasher. Browser-based flashing at [tesserae.ink/flash](https://tesserae.ink/flash); no Wi-Fi cable, no TRMNL account, no BYOS proxy in the middle.
+
+- [Seeed ePaper devices (unified firmware)](seeed-unified.md): the recommended path for E1001 / E1002 / E1003 / E1004 / XIAO EE02 / XIAO 7.5".
+
 ## Waveshare ESP32
 
 ESP32-S3 development boards driving Waveshare e-paper panels. Battery-powered, deep-sleep between renders.
@@ -22,11 +28,11 @@ ESP32-S3 development boards driving Waveshare e-paper panels. Battery-powered, d
 
 ## TRMNL and TRMNL-compatible
 
-Devices that speak the TRMNL BYOS protocol. The TRMNL flagship hardware ships ready to go; Seeed and XIAO panels need a firmware flash first.
+Devices that speak the TRMNL BYOS protocol. The TRMNL flagship hardware ships ready to go; older Seeed paths that still use the TRMNL BYOS firmware also live here.
 
 - [TRMNL OG / TRMNL X](trmnl.md): point the device's BYOS URL at your Tesserae server.
-- [Seeed reTerminal E-Series (E1001 / E1002 / E1003 / E1004)](seeed-reterminal.md): flash TRMNL firmware, then pair.
-- [Seeed XIAO 7.5" ePaper Panel](seeed-xiao.md): flash the XIAO TRMNL variant, then pair.
+- [Seeed reTerminal E-Series (TRMNL BYOS)](seeed-reterminal.md): the older TRMNL-flashed path. Superseded by the [unified firmware guide](seeed-unified.md) above for most users.
+- [Seeed XIAO 7.5" (TRMNL BYOS)](seeed-xiao.md): the older TRMNL-flashed path.
 
 ## Kindle
 

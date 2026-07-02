@@ -99,8 +99,9 @@ nav:
       - Waveshare 7.3" PhotoPainter (ESP32): quickstart/waveshare-photopainter-7-3.md
       - Waveshare 4.2" B/W (ESP32): quickstart/waveshare-bw-4-2.md
       - TRMNL OG / TRMNL X: quickstart/trmnl.md
-      - Seeed reTerminal E-Series: quickstart/seeed-reterminal.md
-      - Seeed XIAO 7.5": quickstart/seeed-xiao.md
+      - Seeed ePaper devices (unified firmware): quickstart/seeed-unified.md
+      - Seeed reTerminal E-Series (TRMNL BYOS): quickstart/seeed-reterminal.md
+      - Seeed XIAO 7.5" (TRMNL BYOS): quickstart/seeed-xiao.md
       - Kindle Paperwhite + KOReader: quickstart/kindle.md
   - Screens & compatibility: compatibility.md
   - Widgets:
