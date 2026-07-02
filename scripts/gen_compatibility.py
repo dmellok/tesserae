@@ -46,6 +46,22 @@ VENDOR_URL: dict[str, str] = {
     "waveshare": "https://www.waveshare.com/",
 }
 
+# Vendor id -> intro paragraph. Rendered between the vendor heading and
+# the SKU table. Optional; a vendor with no intro just gets its heading
+# straight into the table. Used to surface firmware / flasher /
+# ready-to-go framing where a vendor's SKUs share one delivery path.
+VENDOR_INTRO: dict[str, str] = {
+    "seeed": (
+        "The reTerminal E-Series and XIAO ePaper family run the "
+        "[Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); "
+        "flash from the browser in one click at "
+        "[tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, "
+        "Web Serial, no toolchain). Battery-powered, no assembly required. "
+        'The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS '
+        "firmware path if you'd rather stay on stock."
+    ),
+}
+
 # Reference client repos, keyed by renderer id. A renderer can pair
 # with multiple firmware/client repos (e.g. ``esp32_bin`` serves both
 # the 13.3" Waveshare client and the 7.3" PhotoPainter client), each
@@ -202,6 +218,10 @@ def _hardware_sections() -> list[str]:
         heading = f"[{vendor_label}]({vendor_url})" if vendor_url else vendor_label
         out.append(f"### {heading}")
         out.append("")
+        intro = VENDOR_INTRO.get(vendor_id)
+        if intro:
+            out.append(intro)
+            out.append("")
         out.append("| SKU | Panel | Gamut | Protocol / Renderer | Kind id |")
         out.append("|---|---|---|---|---|")
         for entry in entries:

@@ -56,16 +56,19 @@ Tesserae renders to one of several panel families through drop-a-folder
 device plugins. The list below is the verified set; anything marked TBD
 is awaiting a real-hardware confirmation.
 
-### Seeed Studio (TRMNL BYOS)
+### Seeed Studio
+
+The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); flash from the browser in one click at [tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, Web Serial, no toolchain). Battery-powered, no assembly required. The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS firmware path if you'd rather stay on stock.
 
 | Model | Panel | Client | Status |
 |---|---|---|---|
-| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono | TRMNL firmware (flash required) | TBD |
-| [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" colour (ACeP) | TRMNL firmware (flash required) | TBD |
-| [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1404×1872 | TRMNL firmware (flash required) | ✅ |
-| [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" colour (Spectra 6), 1200×1600 | TBD | TBD |
+| [reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 7.3" Spectra 6, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 10.3" mono, 16-level grey, 1872×1404 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [XIAO ePaper EE02](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 13.3" Spectra 6, 1200×1600 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
+| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | [tesserae-device-firmware](https://github.com/dmellok/tesserae-device-firmware) | ✅ |
 | [TRMNL 7.5" OG DIY Kit](https://www.seeedstudio.com/TRMNL-7-5-Inch-OG-DIY-Kit-p-6481.html) | 7.5" mono, 800×480 | TRMNL firmware | ✅ via BYOS |
-| [XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 7.5" mono, 800×480 | TRMNL firmware (flash required) | TBD |
 
 ### Pimoroni Inky
 

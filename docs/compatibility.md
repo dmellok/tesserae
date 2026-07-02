@@ -59,6 +59,8 @@ Per-vendor catalog of specific device / panel SKUs Tesserae ships manifests for.
 
 ### [Seeed Studio](https://www.seeedstudio.com/)
 
+The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); flash from the browser in one click at [tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, Web Serial, no toolchain). Battery-powered, no assembly required. The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS firmware path if you'd rather stay on stock.
+
 | SKU | Panel | Gamut | Protocol / Renderer | Kind id |
 |---|---|---|---|---|
 | [Seeed XIAO ePaper EE02 (13.3")](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_ee02` |

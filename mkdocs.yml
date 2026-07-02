@@ -103,6 +103,8 @@ nav:
       - Seeed reTerminal E-Series (TRMNL BYOS): quickstart/seeed-reterminal.md
       - Seeed XIAO 7.5" (TRMNL BYOS): quickstart/seeed-xiao.md
       - Kindle Paperwhite + KOReader: quickstart/kindle.md
+  - Featured hardware:
+      - Seeed reTerminal E-Series: hardware/seeed.md
   - Screens & compatibility: compatibility.md
   - Widgets:
       - Bundled widgets: widgets/gallery.md

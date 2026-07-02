@@ -6,6 +6,43 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.65], 2026-07-02
+
+### Added
+
+- **[`docs/hardware/seeed`](hardware/seeed.md)**: new dedicated
+  featured-hardware page for the Seeed reTerminal E-Series and the
+  wider XIAO ePaper family. Frames the E-Series as the ready-to-go
+  hardware path (browser flash, battery-powered, no assembly
+  required), lists every supported SKU with panel, colour, and
+  resolution, walks through the getting-started flow, and reserves a
+  slot for the group photo shoot. Reachable from the docs nav under
+  **Featured hardware** and from the landing page's "New here?" tip.
+
+### Changed
+
+- **[`README`](README.md)** Seeed section now leads with the native
+  [`tesserae-device-firmware`](https://github.com/dmellok/tesserae-device-firmware)
+  and the [`tesserae.ink/flash`](https://tesserae.ink/flash) browser
+  flasher rather than the older TRMNL BYOS framing. Every row in the
+  Seeed table links `tesserae-device-firmware` as the client and
+  reflects real-hardware status for the reTerminal E1001, E1002,
+  E1003, and E1004 (all painting). Also adds the previously-missing
+  XIAO ePaper EE02 row and corrects the E1002 panel column to Spectra
+  6 (was ACeP) plus the E1003 dims to 1872×1404 landscape.
+- **[`docs/compatibility`](compatibility.md)** Seeed hardware section
+  now carries an intro paragraph pointing at the firmware repo, the
+  web flasher, and the "battery-powered, no assembly required"
+  framing before the SKU table. Rendered by a new `VENDOR_INTRO` map
+  in `scripts/gen_compatibility.py` so any vendor section can pick up
+  the same treatment without a code change.
+- **[`docs/index`](index.md)** landing page's "New here?" tip now
+  includes the ready-to-go hardware path (linking the new Seeed
+  featured page) as a distinct row alongside "I want it running" and
+  "I have a panel to drive", so a first-time visitor lands on a
+  concrete "buy this and flash it" option without having to read the
+  compatibility matrix.
+
 ## [0.64.64], 2026-07-02
 
 ### Added
