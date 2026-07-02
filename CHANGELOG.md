@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.68], 2026-07-03
+
+### Fixed
+
+- **Docker workflow's GitHub Actions Cache write race on release
+  pushes.** Pushing `main` + a `v*` tag together fires the docker
+  workflow twice in parallel (once per ref), and both runs wrote to the
+  same GHA cache namespace. The second write hit
+  `error writing layer blob: not_found` on layer blobs the first run
+  had just cleaned up, and the workflow reported a failure even though
+  every image manifest had already published to GHCR. Scoping the
+  cache per ref via
+  `cache-from: type=gha,scope=${{ github.ref_name }}` (and the
+  equivalent `cache-to`) gives `main`, each tag, and PR builds their
+  own cache namespace so the two release-time runs stop colliding.
+  Cache reuse within a single ref is unchanged.
+
 ## [0.64.67], 2026-07-03
 
 ### Changed

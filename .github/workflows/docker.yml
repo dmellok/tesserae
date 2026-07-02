@@ -100,5 +100,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Scope the GHA cache per ref so parallel runs (main-branch push
+          # + v* tag push firing together on a release) don't race on layer
+          # blob writes. Without a scope, both runs write to the same cache
+          # namespace and one gets "not_found" on layer blobs the other
+          # just cleaned up. Cache reuse within a ref stays intact.
+          cache-from: type=gha,scope=${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}
