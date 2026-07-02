@@ -3,7 +3,9 @@
 
 # Screens & compatibility
 
-Tesserae renders a dashboard headlessly and pushes the frame over MQTT; a small client on the other end paints your panel. What panel you can drive comes down to which **client** you flash and which **renderer** feeds it.
+Tesserae renders a dashboard headlessly and delivers the frame to a small client that paints your panel. Delivery is either MQTT (retained frame topic, always-on clients wake and receive) or REST (battery-poll clients hit `/api/v1/device/<id>/frame`). What panel you can drive comes down to which **hardware SKU** you have, which **client / protocol** talks to it, and which **renderer** produces the exact byte format the panel needs.
+
+The **Hardware SKUs** section below is the fastest way to find your device. Every SKU listed there ships as a data-only manifest under `hardware/<vendor>/<sku>.json` and shows up automatically in Tesserae's Settings → Devices → Add Device kind picker with the right dims, gamut, and renderer wired up.
 
 ## Panel presets
 
@@ -11,14 +13,14 @@ Built-in sizes (Settings → Panel). Pick `custom` for anything not listed, the 
 
 | Preset | Native resolution | Panel |
 |---|---|---|
-| `inky_13_3` |  | Inky Impression 13.3", 1600x1200 |
-| `inky_7_3` |  | Inky Impression 7.3", 800x480 |
-| `inky_5_7` |  | Inky Impression 5.7", 600x448 |
-| `inky_4` |  | Inky Impression 4", 640x400 |
-| `waveshare_e6_7_5` |  | Waveshare E6 7.5", 800x480 |
-| `waveshare_photopainter_7_3` | S3), 800x480 | Waveshare 7.3" PhotoPainter (ESP32 |
-| `waveshare_e6_13_3` |  | Waveshare 13.3" Spectra 6 (ESP32), 1200x1600 |
-| `waveshare_42_bw` | bpp), 400x300 | Waveshare 4.2" B/W (ESP32, 1 |
+| `inky_13_3` | 1600x1200 | Inky Impression 13.3" |
+| `inky_7_3` | 800x480 | Inky Impression 7.3" |
+| `inky_5_7` | 600x448 | Inky Impression 5.7" |
+| `inky_4` | 640x400 | Inky Impression 4" |
+| `waveshare_e6_7_5` | 800x480 | Waveshare E6 7.5" |
+| `waveshare_photopainter_7_3` | 800x480 | Waveshare 7.3" PhotoPainter (ESP32-S3) |
+| `waveshare_e6_13_3` | 1200x1600 | Waveshare 13.3" Spectra 6 (ESP32) |
+| `waveshare_42_bw` | 400x300 | Waveshare 4.2" B/W (ESP32, 1-bpp) |
 | `custom` | any (set width + height) | anything the inky / Waveshare path drives |
 
 ## Renderers
@@ -27,12 +29,15 @@ A renderer turns the composition PNG into the exact bytes a client wants. Each s
 
 | Renderer | Output | Target client(s) | What it's for |
 |---|---|---|---|
+| `circuitpython_png` | `.png` | - | Composition PNG quantized to the panel's palette and emitted as an indexed PNG sized for adafruit_imageload on CircuitPython microcontrollers. |
 | `esp32_bin` | `.bin` | [tesserae-device-esp32-bin (13.3" Waveshare)](https://github.com/dmellok/tesserae-device-esp32-bin)<br>[tesserae-device-photopainter-7.3-bin (7.3" PhotoPainter)](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin) | Composition PNG packed into the Waveshare E6 4-bpp buffer the ESP32 firmware streams to SPI. |
 | `esp32_bw_bin` | `.bin` | - | Composition PNG dithered to mono B/W and packed into a 1-bpp raw buffer the ESP32 firmware (e.g. |
+| `esp32_gray_bin` | `.bin` | - | Composition PNG dithered to 16-level grayscale and packed into a 4-bpp raw buffer the ESP32 firmware streams straight to the IT8951 controller's image buffer. |
 | `pi_bin` | `.bin` | [tesserae-device-pi-bin](https://github.com/dmellok/tesserae-device-pi-bin) | Composition PNG packed into the panel-native 4-bpp buffer the .bin Pi client consumes. |
 | `pi_png` | `.png` | [tesserae-device-pi-png](https://github.com/dmellok/tesserae-device-pi-png) | Composition PNG, rotated to the Pi client's landscape-native pixel grid. |
 | `pico_bin` | `.bin` | - | Composition PNG packed into the panel-native landscape 4-bpp buffer the battery-powered Pico Plus 2 firmware (tesserae-device-pico-bin) streams onto a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `trmnl_png` | `.png` | [tesserae-trmnl-client](https://github.com/dmellok/tesserae-trmnl-client) | Composition PNG fitted to the device's panel size, then quantised to 1-bit black/white with the selected dither. |
+| `trmnl_png_color` | `.png` | - | Composition PNG quantised to an indexed PNG matched to a Spectra 6 / Waveshare E6 / ACeP colour panel, delivered over the same TRMNL BYOS /api/display path as the 1-bit trmnl_png renderer. |
 
 ## Device kinds
 
@@ -40,6 +45,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 
 | Device kind | Default panel | Renderers | What it is |
 |---|---|---|---|
+| `circuitpython_generic` | 800×480 | `circuitpython_png` | Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. |
 | `esp32_bw_client` | 400×300 | `esp32_bw_bin` | Battery-powered ESP32 firmware for mono B/W e-paper panels (e.g. |
 | `esp32_client` | 800×480 | `esp32_bin` | Battery-powered ESP32 firmware that subscribes to tesserae/esp32/frame/bin (retained), paints the panel via SPI, and goes back to deep sleep. |
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
@@ -47,15 +53,55 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
 | `trmnl_client` | 800×480 | `trmnl_png` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
 
+## Hardware SKUs
+
+Per-vendor catalog of specific device / panel SKUs Tesserae ships manifests for. Each entry maps to a device kind (protocol) + renderer combination that Tesserae picks automatically once the device pairs. Click a product name for the vendor's own page.
+
+### [Seeed Studio](https://www.seeedstudio.com/)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Seeed XIAO ePaper EE02 (13.3")](https://www.seeedstudio.com/XIAO-ePaper-DIY-Kit-EE02-for-13-3-Spectratm-6-E-Ink.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_ee02` |
+| [Seeed reTerminal E1001](https://www.seeedstudio.com/reTerminal-E1001-p-6534.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `seeed_reterminal_e1001` |
+| [Seeed reTerminal E1002](https://www.seeedstudio.com/reTerminal-E1002-p-6533.html) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1002` |
+| [Seeed reTerminal E1003](https://www.seeedstudio.com/reTerminal-E1003-p-6731.html) | 1872×1404 | `mono` | `esp32_client` <br> `esp32_gray_bin` | `seeed_reterminal_e1003` |
+| [Seeed reTerminal E1004](https://www.seeedstudio.com/reTerminal-E1004-p-6692.html) | 1200×1600 portrait | `spectra_6` | `esp32_client` (inherit) | `seeed_reterminal_e1004` |
+| [Seeed XIAO 7.5" ePaper Panel](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `trmnl_client` (inherit) | `seeed_xiao_75` |
+| [Seeed XIAO ePaper 7.5" (mono)](https://www.seeedstudio.com/XIAO-7-5-ePaper-Panel-p-6416.html) | 800×480 | `mono` | `esp32_bw_client` (inherit) | `xiao_epaper_75` |
+
+### [Pimoroni](https://shop.pimoroni.com/)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Pimoroni Inky Impression 4"](https://shop.pimoroni.com/products/inky-impression) | 600×400 | `spectra_6` | `pi_bin_client` (inherit) | `pimoroni_inky_4` |
+| [Pimoroni Inky Impression 4" (ACeP, 640x400, legacy)](https://shop.pimoroni.com/products/inky-impression) | 640×400 | `acep_7colour` | `pi_bin_client` (inherit) | `pimoroni_inky_4_acep` |
+
+### [TRMNL](https://usetrmnl.com/)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [TRMNL X](https://shop.trmnl.com/products/trmnl-x) | 1872×1404 | `mono` | `trmnl_client` (inherit) | `trmnl_x` |
+
+### [Waveshare](https://www.waveshare.com/)
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [Waveshare PhotoPainter 7.3"](https://www.waveshare.com/photopainter-7.3.htm) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `waveshare_photopainter_73` |
+| [Waveshare 4.2" B/W e-paper](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | `mono` | `esp32_bw_client` (inherit) | `waveshare_4_2_bw` |
+| [Waveshare 13.3" Spectra E6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `waveshare_133e6` |
+
 ## What's been tested on real hardware
 
 Honest status from the maintainer's own bench. Untested doesn't mean broken, it means nobody's confirmed it yet. Got one working? [Open a PR or issue](https://github.com/dmellok/tesserae/issues) and we'll mark it.
 
 | Renderer | Hardware | Status | Notes |
 |---|---|---|---|
+| `circuitpython_png` | - | :material-circle-outline: Not yet tested | - |
 | `esp32_bin` | Waveshare 13.3" Spectra 6 (ESP32-S3-WROOM-2) + Waveshare 7.3" PhotoPainter (ESP32-S3) | :material-check-circle: Tested | Primary daily driver, battery-powered, deep-sleep. The 13.3" client lives at tesserae-device-esp32-bin; the 7.3" PhotoPainter client at tesserae-device-photopainter-7.3-bin. Both pair with the same renderer; the panel preset (waveshare_e6_13_3 vs waveshare_photopainter_7_3) selects the firmware-native row stride. |
 | `esp32_bw_bin` | - | :material-circle-outline: Not yet tested | - |
+| `esp32_gray_bin` | - | :material-circle-outline: Not yet tested | - |
 | `pi_bin` | Pimoroni Inky Impression (Spectra 6 / Waveshare E6) | :material-check-circle: Tested | Fastest Pi path, packed buffer written straight to inky's _buf. |
 | `pi_png` | Pimoroni Inky Impression (via inky set_image) | :material-check-circle: Tested | Works on every inky-supported panel; quantises on the Pi each frame. |
 | `pico_bin` | - | :material-circle-outline: Not yet tested | - |
 | `trmnl_png` | Amazon Kindle Paperwhite 2 (jailbroken) via KOReader trmnl-display plugin | :material-check-circle: Tested | 1-bit greyscale PNG fitted to the panel + dithered server-side. TRMNL devices (Seeed hardware running the TRMNL firmware) are supported but not yet confirmed here. |
+| `trmnl_png_color` | - | :material-circle-outline: Not yet tested | - |

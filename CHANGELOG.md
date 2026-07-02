@@ -6,6 +6,40 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.64], 2026-07-02
+
+### Added
+
+- **[`docs/compatibility`](compatibility.md)** now includes a per-vendor
+  **Hardware SKUs** section listing every device manifest in
+  `hardware/<vendor>/*.json`, with panel dims, gamut, protocol,
+  renderer wiring, and a product-page link per row. Vendor sections
+  are ordered Seeed → Pimoroni → TRMNL → Waveshare (Seeed first per
+  the Seeed ecosystem commitment), with any additional vendor
+  directory picked up automatically without a code change. The
+  compatibility page's intro now describes the hardware catalog + the
+  MQTT vs REST split, and points readers at the Hardware SKUs section
+  as the fastest way to find their device.
+- **`scripts/gen_compatibility.py`** grows a `_hardware_by_vendor` +
+  `_hardware_sections` pair that walks `hardware/<vendor>/*.json` and
+  renders per-vendor markdown tables. `VENDOR_ORDER` and `VENDOR_URL`
+  hoist vendor labels / storefronts to the top of the module for a
+  quick edit if a new vendor lands or a URL changes.
+
+### Fixed
+
+- **Panel-preset table's Native resolution column was truncated on
+  labels containing hyphens.** `_panel_table` split on `-`, which
+  ate the resolution when a preset label contained a
+  parenthesised suffix with a hyphen (`(ESP32-S3)` → resolution
+  stranded as `S3), 800x480`). Now splits on the trailing `, ` so
+  `Waveshare 7.3" PhotoPainter (ESP32-S3)` reads cleanly.
+- **Seeed XIAO EE02 hardware manifest's `url` field pointed at the
+  reTerminal E1004 product page.** Copy-paste error from v0.64.61
+  (both are 13.3" Spectra 6). Corrected to the EE02's own page at
+  seeedstudio.com. Also visible on the compatibility page's Seeed
+  section as of the same release.
+
 ## [0.64.63], 2026-07-02
 
 ### Added
