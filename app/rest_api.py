@@ -106,7 +106,7 @@ def _cors_headers(resp: Response) -> Response:
         # the 6-digit code (see ``post_register`` below).
         "Authorization, Content-Type, If-None-Match, X-Tesserae-Token, X-Pairing-Code"
     )
-    resp.headers["Access-Control-Expose-Headers"] = "ETag"
+    resp.headers["Access-Control-Expose-Headers"] = "ETag, Content-Location"
     resp.headers["Access-Control-Max-Age"] = "86400"
     return resp
 
@@ -408,13 +408,22 @@ def get_frame(device_id: str) -> Response:
     # Use the artifact digest as the ETag; identical bytes always
     # produce the same digest (content-addressed renders).
     etag = f'"{latest["digest"]}"'
+    # ``Content-Location`` carries the canonical URL for the current
+    # frame on both 200 and 304 responses. HTTP forbids a body on 304
+    # (RFC 7230 §3.3.3), so a client that boots without a cached URL
+    # (typical on non-e-ink panels that don't retain state through a
+    # power cycle) can still learn where to re-fetch the image
+    # without needing to have persisted the URL alongside its ETag.
+    # RFC 7231 §3.1.4.2 explicitly permits Content-Location here as
+    # "the specific resource location that would be returned". Cost
+    # to existing clients: zero (they ignore unknown headers).
+    image_url = f"{request.url_root.rstrip('/')}/renders/{latest['filename']}"
     if_none_match = request.headers.get("If-None-Match", "")
     if if_none_match and if_none_match == etag:
         resp = Response(status=304)
         resp.headers["ETag"] = etag
+        resp.headers["Content-Location"] = image_url
         return resp
-
-    image_url = f"{request.url_root.rstrip('/')}/renders/{latest['filename']}"
     panel = device.manifest.get("panel") or {}
     payload = {
         "url": image_url,
@@ -456,6 +465,7 @@ def get_frame(device_id: str) -> Response:
 
     resp = jsonify(payload)
     resp.headers["ETag"] = etag
+    resp.headers["Content-Location"] = image_url
     resp.headers["Cache-Control"] = "no-cache"
     return resp
 

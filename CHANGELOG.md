@@ -6,6 +6,142 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.65.0], 2026-07-03
+
+**The reTerminal launch release.** Everything the Seeed reTerminal
+E-Series needs to land as a first-class Tesserae target, plus
+physical button wakes for the whole ESP32 firmware family, a
+community layer, and a stack of reliability + docs work rolled up
+from thirteen 0.64.x patches. Detailed per-patch notes remain
+below.
+
+### Highlights
+
+- **Native firmware for the Seeed reTerminal E-Series and the wider
+  XIAO ePaper family**, browser-flashable at
+  [`tesserae.ink/flash`](https://tesserae.ink/flash). One codebase
+  (`tesserae-device-firmware`) covers E1001 (7.5" mono), E1002 (7.3"
+  Spectra 6), E1003 (10.3" mono, 16-level grey), E1004 (13.3" Spectra
+  6), the XIAO EE02 (13.3" Spectra 6), and the XIAO 7.5" mono. No
+  ESP-IDF toolchain, no TRMNL account, no BYOS proxy.
+- **Physical button wakes** on every ESP32 client. Firmware carries
+  the pressed button in `/frame` (`?button=<name>`) and `/status`
+  (`{button, button_event_id}`), the server resolves it through a
+  per-device `button_map` (default: `left → rotate_prev`, `right →
+  rotate_next`, `refresh → refresh`) with global + hardcoded
+  fallbacks, dedups against the monotonic `button_event_id`,
+  dispatches through an extensible action registry (`rotate_prev`,
+  `rotate_next`, `refresh`, `step:<i>`, `page:<page_id>`,
+  `webhook:<url>`), persists the new rotation position with a
+  sticky-until-next-anchor manual override, and pushes the resulting
+  page synchronously so the returned frame reflects the new state on
+  the same wake. Admin UI + full History integration land at the
+  same time.
+- **`Content-Location` on `/frame`** (200 *and* 304) so a client that
+  boots without a cached URL (non-e-ink panels, factory reset) can
+  re-fetch the image without needing to have persisted the URL
+  alongside its ETag. RFC 7231 §3.1.4.2 explicitly permits
+  `Content-Location` on 304 for exactly this.
+- **Community layer live.** Discord server up, community CTAs
+  (Discussions + Discord + Sponsor) on the onboarding wrap-up step,
+  the app footer, and the Settings → About card. First community
+  sponsor, first external client contribution (Bernhard's
+  CircuitPython client), and first external PR all landed in the
+  0.64.x series ahead of the launch push.
+- **Widget failure isolation.** A dead upstream API (e.g. the
+  Open-Meteo outage on 2026-07-03) no longer sinks the whole
+  dashboard render; each widget shows its own error tile and the
+  rest of the page paints normally. Composer no longer waits on
+  stuck HTTP threads past the overall hydration budget.
+- **New docs surfaces.** Unified Seeed quickstart, Featured hardware
+  page for the reTerminal E-Series, per-vendor Hardware SKUs section
+  on the compatibility page, and a full protocol write-up for
+  button events, rotation state, and the `Content-Location` header.
+
+### Added
+
+- **Server-side handling for physical button wakes on ESP32 devices**
+  (0.64.70): action registry, per-device + global `button_map` with
+  hardcoded defaults, dedup by `button_event_id` (or same-button
+  time-window fallback), sticky manual override, rotation envelope on
+  responses, admin UI for editing the map, per-event History rows
+  with the `button` source label + `hand-tap` icon + filter chip.
+- **`Content-Location` header on `/api/v1/device/<id>/frame`** (this
+  release), on both 200 and 304 responses. Zero-cost to existing
+  e-ink firmwares; unlocks non-e-ink and reset-cycle recovery for
+  new client families. Documented in `client-protocol.md` alongside
+  a note that the URL is also deterministic from the `render_id`
+  (`<server-base>/renders/<render_id>.<format>`) so the most memory-
+  constrained targets can reconstruct without reading the header.
+- **Community CTAs across the app** (0.64.69): Discussions + Discord
+  + Sponsor on the onboarding wrap-up step, the app footer, and the
+  Settings → About card. URLs live in a single app-wide context
+  processor so a link update happens in one place.
+- **Featured Seeed hardware page** on the docs site (0.64.65),
+  reachable from the nav under Featured hardware and from the
+  landing page's "New here?" tip. Frames the reTerminal E-Series as
+  the ready-to-go hardware path (browser flash, battery-powered, no
+  assembly required) with a slot for the group photo.
+- **Six Seeed hardware manifests** (0.64.60–0.64.65): reTerminal
+  E1001–E1004, XIAO ePaper EE02, XIAO ePaper 7.5" mono. Plus the
+  Waveshare PhotoPainter 7.3" (0.64.60) unified under
+  `tesserae-device-firmware`.
+- **Unified Seeed quickstart** covering every SKU via one firmware +
+  one flasher (0.64.63).
+- **Hardware SKUs section on the compatibility page** with a per-
+  vendor intro map so surfacing a new vendor is one config entry
+  (0.64.64).
+- **History page detail line + friendly device names for button
+  rows** (0.64.73): device chip resolved through the registry, and a
+  synthesised `button right → rotate_next pushed Afternoon calendar`
+  line under the main row so the outcome is visible without
+  expanding raw JSON.
+
+### Changed
+
+- **Install-a-client docs** now lead with `tesserae-device-firmware`
+  and the browser flasher; the standalone Waveshare firmware repos
+  covered by the unified build were removed from the client table
+  (0.64.67).
+- **README's Seeed section** reframed from TRMNL BYOS to Tesserae-
+  native, with every reTerminal SKU marked ✅ and every row linking
+  the firmware repo. E1002 corrected from ACeP to Spectra 6, E1003
+  dims corrected to 1872×1404. XIAO EE02 row added. Compatibility
+  page's Seeed section gains a firmware-and-flasher intro paragraph
+  via a new `VENDOR_INTRO` map (0.64.65).
+- **Docs landing page** gets a ready-to-go hardware row in the "New
+  here?" tip alongside "I want it running" and "I have a panel to
+  drive" (0.64.65).
+- **Mobile dashboard editor** drops the sticky preview at the top of
+  the viewport in favour of the existing floating back-to-top FAB
+  (0.64.66). Desktop's sticky-in-right-column behaviour is
+  unchanged.
+- **Docker workflow's GHA cache** scoped per ref
+  (`scope=${{ github.ref_name }}`) so parallel main + tag pushes on
+  a release stop racing on layer blob writes (0.64.68).
+- **Client-protocol spec** now covers the button contract (query
+  param on `/frame`, body fields on `/status`, response envelope
+  shape, `refresh`-drops-ETag convention) and the `Content-Location`
+  header on `/frame` (0.64.70 + this release).
+
+### Fixed
+
+- **Dead upstream weather API no longer sinks the whole dashboard
+  render** (0.64.72). Composer's `ThreadPoolExecutor` now shuts
+  down with `cancel_futures=True` so stuck HTTP threads don't hold
+  the composer past Playwright's `page.goto` budget. The four
+  `weather_*` widgets pass `retries=0` and `timeout=5` to
+  `fetch_json` so a hard Open-Meteo outage returns
+  `{"error": ...}` to the widget in ~5s and the cell paints its
+  error state instead of stalling the whole page.
+- **Mypy strict errors on `app/button_service.py`** that slipped past
+  local pytest (0.64.71).
+- **Docker workflow race on release pushes** where parallel main + tag
+  runs shared one GHA cache namespace and one always failed on
+  `error writing layer blob: not_found` (0.64.68).
+- **Panel-preset table column widths + a stale Seeed manifest URL**
+  (0.64.64).
+
 ## [0.64.73], 2026-07-03
 
 ### Changed

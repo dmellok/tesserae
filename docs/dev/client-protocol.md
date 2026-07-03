@@ -279,7 +279,9 @@ client-side fit):
 }
 ```
 
-Headers: `ETag: "<digest>"`, `Cache-Control: no-cache`.
+Headers: `ETag: "<digest>"`, `Content-Location: <absolute URL of the frame>`, `Cache-Control: no-cache`.
+
+`Content-Location` mirrors the `url` field in the JSON body, and (unlike the body) is also returned on `304 Not Modified` responses. A client that boots without a cached URL (typical on non-e-ink panels that don't retain state through a power cycle) can read the header on `304` and re-fetch the image without having to have persisted the URL alongside its `ETag`. RFC 7231 §3.1.4.2 explicitly permits `Content-Location` on 304 for this purpose. The URL is also deterministic from the `render_id`: `<server-base>/renders/<render_id>.<format>`, so a client that persists `(server_base, render_id, format)` can reconstruct locally and skip reading the header entirely.
 
 **Field-by-field breakdown:**
 
@@ -340,7 +342,9 @@ cached `ETag` before making the request so the server always returns
 `200` with a full frame rather than `304`.
 
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
-just `ETag: "<digest>"`. Re-paint the previously-cached frame.
+just `ETag: "<digest>"` and `Content-Location: <absolute URL>`. Re-paint
+the previously-cached frame, or re-fetch the URL if your device didn't
+retain the image bytes across a power cycle.
 
 `204 No Content` — server has no frame for this device yet (e.g.
 brand-new device, no dashboard bound). Body:

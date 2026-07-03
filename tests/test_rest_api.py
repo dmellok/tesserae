@@ -374,6 +374,40 @@ def test_frame_returns_304_when_if_none_match_matches(app: Flask) -> None:
     )
     assert resp.status_code == 304
     assert resp.headers["ETag"] == '"abc123"'
+    # Content-Location echoes the canonical frame URL on 304 too so a
+    # client that boots without a cached URL (non-e-ink panels, factory
+    # reset, etc.) can still re-fetch the image. RFC 7231 §3.1.4.2
+    # explicitly permits Content-Location on 304.
+    assert resp.headers["Content-Location"].endswith("/renders/abc123.bin")
+
+
+def test_frame_returns_content_location_on_200(app: Flask) -> None:
+    """The Content-Location header ships on 200 too so caching clients
+    that don't parse the JSON body still have the canonical URL."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = _register_via_api(client, code=code, device_id="bedroom_pico")
+    token = resp.get_json()["device_token"]
+
+    push_mgr = app.config["PUSH_MANAGER"]
+    push_mgr._latest_renders["bedroom_pico"] = {
+        "digest": "def456",
+        "ext": "png",
+        "filename": "def456.png",
+        "renderer_id": "circuitpython_png",
+        "timestamp": time.time(),
+        "composition_digest": "comp456",
+    }
+
+    resp = client.get(
+        "/api/v1/device/bedroom_pico/frame",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["Content-Location"].endswith("/renders/def456.png")
+    # And matches the body's ``url`` field.
+    assert resp.get_json()["url"] == resp.headers["Content-Location"]
 
 
 # -- status ------------------------------------------------------------
@@ -921,7 +955,9 @@ def test_cors_headers_present_on_normal_response(app: Flask) -> None:
     assert "GET" in resp.headers.get("Access-Control-Allow-Methods", "")
     assert "POST" in resp.headers.get("Access-Control-Allow-Methods", "")
     assert "Authorization" in resp.headers.get("Access-Control-Allow-Headers", "")
-    assert "ETag" in resp.headers.get("Access-Control-Expose-Headers", "")
+    expose = resp.headers.get("Access-Control-Expose-Headers", "")
+    assert "ETag" in expose
+    assert "Content-Location" in expose
 
 
 def test_cors_preflight_returns_204(app: Flask) -> None:
