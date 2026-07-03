@@ -199,6 +199,45 @@ def test_pack_unknown_dither_raises(red_panel: Image.Image) -> None:
         pack_to_panel_bin(red_panel, width=100, height=80, dither="not-a-mode")  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    "dither",
+    [
+        "floyd-steinberg",
+        "none",
+        "atkinson",
+        "jarvis",
+        "stucki",
+        "bayer-8x8",
+        "halftone",
+        "crosshatch",
+    ],
+)
+def test_quantize_supports_every_dither_mode(dither: str) -> None:
+    """Regression for #47: prior to v0.65.2, ``quantize`` (used by the
+    ``trmnl_png`` / ``trmnl_png_color`` renderers) raised
+    ``ValueError: unsupported Pillow dither mode`` for every mode
+    outside ``_PIL_DITHER_MAP`` (Atkinson, Jarvis, Stucki, Bayer,
+    halftone, crosshatch), even though those are declared in
+    ``DitherMode`` and offered on the device dither dropdown."""
+    from app.quantizer import quantize
+
+    src = Image.new("RGB", (32, 24), (128, 128, 128))  # mid-grey
+    out = quantize(src, dither=dither, palette=((0, 0, 0), (255, 255, 255)))  # type: ignore[arg-type]
+    assert out.size == (32, 24)
+    assert out.mode == "RGB"
+    # Output only contains palette colours (black or white).
+    colours = set(out.getdata())
+    assert colours <= {(0, 0, 0), (255, 255, 255)}
+
+
+def test_quantize_unknown_dither_raises() -> None:
+    from app.quantizer import quantize
+
+    src = Image.new("RGB", (16, 16), (255, 0, 0))
+    with pytest.raises(ValueError, match="unknown dither"):
+        quantize(src, dither="not-a-mode", palette=((0, 0, 0), (255, 255, 255)))  # type: ignore[arg-type]
+
+
 def test_rotate_round_trip() -> None:
     img = Image.new("RGB", (40, 20), (0, 0, 255))
     png = _png_bytes(img)

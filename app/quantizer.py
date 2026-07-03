@@ -326,13 +326,51 @@ def quantize(
     dither: DitherMode = "floyd-steinberg",
     palette: tuple[tuple[int, int, int], ...] = SPECTRA_6_PALETTE,
 ) -> Image.Image:
-    """Project an image to ``palette`` and return mode-RGB Pillow output."""
-    if dither not in _PIL_DITHER_MAP:
-        raise ValueError(f"unsupported Pillow dither mode: {dither!r}")
+    """Project an image to ``palette`` and return mode-RGB Pillow output.
+
+    Fast path (``floyd-steinberg``, ``none``): straight through Pillow's
+    built-in ``rgb.quantize(palette, dither=...)``, since those are the
+    two dither modes Pillow ships. Every other mode declared in
+    ``DitherMode`` (``atkinson``, ``jarvis``, ``stucki``, ``bayer-8x8``,
+    ``halftone``, ``crosshatch``) runs through the same numpy-backed
+    dither pipeline the ``.bin`` packers use, and the resulting palette-
+    index buffer is materialised back into an RGB image via a
+    palette lookup.
+
+    Before v0.65.2 this function only supported the two Pillow modes;
+    picking any of the other five on the ``trmnl_png`` / ``trmnl_png_color``
+    device dither setting crashed the render (see #47).
+    """
     img = src if isinstance(src, Image.Image) else Image.open(io.BytesIO(src))
     rgb = img.convert("RGB")
-    pal_img = _palette_image(palette)
-    return rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither]).convert("RGB")
+    if dither in _PIL_DITHER_MAP:
+        pal_img = _palette_image(palette)
+        return rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither]).convert("RGB")
+    # Numpy-backed dithers return palette indices; project through the
+    # palette to recover an RGB image. Same implementations
+    # ``pack_to_panel_bin`` uses below.
+    pal_arr = np.array(palette, dtype=np.float32)
+    if dither == "atkinson":
+        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+    elif dither == "jarvis":
+        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+    elif dither == "stucki":
+        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+    elif dither == "bayer-8x8":
+        raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
+    elif dither == "halftone":
+        raw = _dither_ordered(rgb, pal_arr, _HALFTONE_16, strength=128.0)
+    elif dither == "crosshatch":
+        raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
+    else:
+        raise ValueError(f"unknown dither mode: {dither!r}")
+    idx_arr = np.frombuffer(raw, dtype=np.uint8)
+    pal_u8 = np.array(palette, dtype=np.uint8)
+    rgb_flat = pal_u8[idx_arr]  # (H*W, 3)
+    width, height = rgb.size
+    # Pillow infers "RGB" from the (H, W, 3) uint8 shape. Passing
+    # ``mode=`` explicitly is deprecated as of Pillow 13.
+    return Image.fromarray(rgb_flat.reshape((height, width, 3)))
 
 
 def quantize_to_png(

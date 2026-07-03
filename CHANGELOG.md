@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.65.2], 2026-07-03
+
+### Fixed
+
+- **Picking Atkinson / Jarvis / Stucki / Bayer 8x8 / halftone /
+  crosshatch as a device's dither mode no longer crashes the push
+  (issue [#47](https://github.com/dmellok/tesserae/issues/47)).**
+  `app.quantizer.quantize()` only accepted the two dither modes
+  Pillow ships built-in (`floyd-steinberg` and `none`) and raised
+  `ValueError: unsupported Pillow dither mode: 'atkinson'` for the
+  other six declared in `DitherMode`, even though the UI offers all
+  eight in the device dither dropdown. `quantize()` now falls
+  through to the same numpy-backed error-diffusion (Atkinson /
+  Jarvis / Stucki) and ordered (Bayer / halftone / crosshatch)
+  implementations `pack_to_panel_bin` already uses; the resulting
+  palette-index buffer is projected back through the palette to
+  recover an RGB image. The `trmnl_png` and `trmnl_png_color`
+  renderers now paint any dither mode the UI lets a user pick.
+
 ## [0.65.1], 2026-07-03
 
 ### Added
