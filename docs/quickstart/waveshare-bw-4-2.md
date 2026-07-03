@@ -9,7 +9,7 @@ A Waveshare 4.2 inch monochrome e-paper module driven by an ESP32 dev board. Bat
 
 Plug the ESP32 dev board into your computer over USB while holding the BOOT button, then release.
 
-Use the web flasher at the [tesserae-device-esp32-bw releases page](https://github.com/dmellok/tesserae-device-esp32-bw/releases) and click **Install** on the latest release.
+There isn't a browser flasher for this SKU yet, and the firmware repo doesn't cut binary releases. Clone [tesserae-device-esp32-bw](https://github.com/dmellok/tesserae-device-esp32-bw) and follow the README to build + flash with ESP-IDF (`idf.py flash`). Track [tesserae.ink/flash](https://tesserae.ink/flash) for browser-flash support if it lands.
 
 On first boot the board opens a Wi-Fi captive portal (SSID `tesserae-esp32-bw-XXXX`). Connect from your phone or laptop, then set:
 

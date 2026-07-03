@@ -6,7 +6,7 @@ The Waveshare 7.3" PhotoPainter, an ESP32-S3 with a 6-colour Spectra 6 panel and
 
 Open the PhotoPainter's case, plug the ESP32-S3 into your computer over USB while holding the BOOT button, then release.
 
-Use the web flasher at the [tesserae-device-photopainter-7.3-bin releases page](https://github.com/dmellok/tesserae-device-photopainter-7.3-bin/releases) and click **Install** on the latest release.
+Open the [Tesserae browser flasher](https://tesserae.ink/flash) in Chrome or Edge, pick **Waveshare 7.3" PhotoPainter** in the device dropdown, then click **Verify & flash**. It installs the firmware over Web Serial with no toolchain.
 
 On first boot the PhotoPainter opens a Wi-Fi captive portal (SSID `tesserae-photopainter-XXXX`). Connect from your phone or laptop, then set:
 
