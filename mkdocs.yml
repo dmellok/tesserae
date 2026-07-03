@@ -89,6 +89,7 @@ nav:
   - Spotify widget on Home Assistant: install/spotify-home-assistant.md
   - Install a client: install/clients.md
   - Set up a device: install/devices.md
+  - Physical buttons: install/buttons.md
   - REST transport (no broker): install/rest-transport.md
   - Hardware quickstarts:
       - Overview: quickstart/index.md

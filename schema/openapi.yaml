@@ -120,12 +120,15 @@ paths:
       parameters:
         - $ref: '#/components/parameters/DeviceIdPath'
         - $ref: '#/components/parameters/IfNoneMatchHeader'
+        - $ref: '#/components/parameters/ButtonQueryParam'
       responses:
         '200':
           description: Frame envelope. Body is JSON; `ETag` carries the artifact digest.
           headers:
             ETag:
               $ref: '#/components/headers/ETag'
+            Content-Location:
+              $ref: '#/components/headers/ContentLocation'
             Cache-Control:
               schema:
                 type: string
@@ -141,6 +144,8 @@ paths:
           headers:
             ETag:
               $ref: '#/components/headers/ETag'
+            Content-Location:
+              $ref: '#/components/headers/ContentLocation'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -737,6 +742,22 @@ components:
       schema:
         type: string
         example: '"abc123…"'
+    ButtonQueryParam:
+      name: button
+      in: query
+      required: false
+      description: |
+        Present on a wake caused by a physical button press. The
+        server resolves it through the device's `button_map` (see
+        [`docs/install/buttons`](https://docs.tesserae.ink/install/buttons/))
+        and dispatches the mapped action synchronously before
+        selecting the frame, so the returned artefact reflects the
+        new state on this same wake. Firmwares that support buttons
+        SHOULD drop their cached `ETag` when the action is `refresh`
+        so the server returns a fresh 200 rather than a 304.
+      schema:
+        type: string
+        example: right
     TrmnlIdHeader:
       name: Id
       in: header
@@ -793,6 +814,21 @@ components:
         Content-addressed digest of the current frame. Use as the
         `If-None-Match` value on the next request to skip the body
         when the frame hasn't changed.
+    ContentLocation:
+      schema:
+        type: string
+        format: uri
+        example: http://tesserae.local:8765/renders/abc123def456.png
+      description: |
+        Canonical URL of the frame artefact. Returned on both `200`
+        and `304` responses (RFC 7231 §3.1.4.2) so a client that
+        boots without a cached URL (typical of non-e-ink panels that
+        don't retain image state through a power cycle) can re-fetch
+        the image without needing to have persisted the URL
+        alongside its ETag. The URL is deterministic:
+        `<server-base>/renders/<render_id>.<format>`, so a client
+        that persists `(server_base, render_id, format)` can also
+        reconstruct locally.
 
   responses:
     BadRequest:
@@ -900,7 +936,54 @@ components:
           description: |
             Palette signature for `.bin` renderers; lets the client
             verify it can decode the payload.
+        rotation:
+          $ref: '#/components/schemas/RotationEnvelope'
       additionalProperties: true
+
+    RotationEnvelope:
+      type: object
+      description: |
+        Present when the device is bound to at least one enabled
+        `Rotation`. Tells the firmware (and any admin UI polling this
+        endpoint) where the device is in its dashboard cycle, and
+        whether a physical button press is currently suppressing the
+        time-based scheduler (`manual_override`). Omitted entirely
+        when no rotation is bound to the device.
+      required: [rotation_id, step_page_id, manual_override]
+      properties:
+        rotation_id:
+          type: string
+          description: Id of the resolved rotation.
+          example: kitchen_rotation
+        step_index:
+          type: integer
+          minimum: 0
+          description: 0-based index of the current step in the rotation.
+          example: 2
+        step_page_id:
+          type: string
+          description: Page id of the current step.
+          example: afternoon_calendar
+        step_count:
+          type: integer
+          minimum: 1
+          description: Total number of steps in the rotation.
+          example: 4
+        manual_override:
+          type: boolean
+          description: |
+            True while a button press is suppressing the time-based
+            scheduler for this device. The override expires at
+            `override_until`; the firmware doesn't need to check this
+            itself.
+        override_until:
+          type: string
+          format: date-time
+          description: |
+            When the manual override lapses and the time-based
+            scheduler resumes. `null` when no override is active.
+          example: '2026-07-04T00:00:00+11:00'
+          nullable: true
 
     DeviceStatusRequest:
       type: object
@@ -926,6 +1009,30 @@ components:
             pre-resolved `local_time` / `tz_offset_seconds` / `dst_active`
             so memory-constrained clients don't need a local IANA db.
           example: Europe/Berlin
+        button:
+          type: string
+          description: |
+            Present on a wake caused by a physical button press. The
+            server resolves it through the device's `button_map` (see
+            [`docs/install/buttons`](https://docs.tesserae.ink/install/buttons/))
+            and dispatches the mapped action; the response carries a
+            `rotation` block reflecting the new state. Deduped against
+            `button_event_id`, so a firmware that carries the button
+            on both `/frame` and `/status` won't fire the action
+            twice.
+          example: right
+        button_event_id:
+          type: integer
+          minimum: 0
+          description: |
+            Monotonically increasing counter the firmware maintains
+            per device (persist across deep sleep, e.g. in NVS).
+            Retries send the same id; the server treats any incoming
+            id `<= last processed` as a duplicate. Optional: firmwares
+            without the counter fall back to a same-button-within-N-
+            seconds dedup window (default 3s, overridable via
+            `settings.app.button_debounce_s`).
+          example: 42
       additionalProperties: true
 
     DeviceStatusResponse:
@@ -962,6 +1069,8 @@ components:
         dst_active:
           type: boolean
           description: Whether the resolved zone is currently observing DST.
+        rotation:
+          $ref: '#/components/schemas/RotationEnvelope'
 
     DeviceLogRequest:
       type: object

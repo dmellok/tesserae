@@ -81,4 +81,5 @@ out only to the displays that share it.
 
 - [Browse the widget gallery](../widgets/gallery.md) and start composing
 - [Screens & compatibility](../compatibility.md), panel presets, renderers, and what's tested
+- [Physical buttons](buttons.md), bind hardware buttons on the device (Seeed reTerminal front buttons, Inky Impression back buttons, etc.) to rotate through dashboards, jump straight to one, refresh, or fire a webhook
 - [Home Assistant integration](home-assistant.md), surface every device as HA entities via MQTT discovery, or run Tesserae as an HA App

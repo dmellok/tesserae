@@ -59,6 +59,17 @@ rest of the XIAO ePaper range is on the roadmap.
 4. Follow the [unified Seeed quickstart](../quickstart/seeed-unified.md)
    for onboarding, Wi-Fi setup, and pairing with your Tesserae server.
 
+## Front buttons
+
+The reTerminal E-Series ships with three front buttons that Tesserae
+can bind to any server-side action: rotate through the dashboards on
+this panel, jump straight to a specific one, force a fresh render,
+fire a webhook. Configure the mapping per device from **Settings →
+Devices → General → Buttons**. Defaults to
+`left → rotate_prev`, `right → rotate_next`, `refresh → refresh`;
+see [Physical buttons](../install/buttons.md) for the full action
+list and common patterns.
+
 ## Firmware source
 
 The firmware is open source and lives at

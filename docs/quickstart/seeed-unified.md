@@ -104,5 +104,6 @@ Some panels have quirks worth knowing about.
 
 - [Set up multiple panels on one server](../install/devices.md#multiple-panels): different dashboards on different Seeed devices, all painted by the same Tesserae install.
 - [Add a rotation](../install/devices.md#next-steps): cycle through several dashboards on the same panel across the day.
+- [Bind the front buttons](../install/buttons.md): rotate through dashboards, jump straight to one, or force a refresh with the reTerminal's three front buttons. Default is `left → previous`, `right → next`, `refresh → re-render`; override per device from **Settings → Devices → General → Buttons**.
 - [Browse community widgets](../widgets/community.md): one-click installs for Spotify, GitHub, OctoPrint, F1, and more.
 - [Firmware source](https://github.com/dmellok/tesserae-device-firmware): read the code, file issues, contribute board support for new panels.

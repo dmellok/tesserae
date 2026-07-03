@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.65.1], 2026-07-03
+
+### Added
+
+- **[`docs/install/buttons`](install/buttons.md)**: new user-facing
+  guide for the button feature. Covers the default map, per-device
+  editor (**Settings → Devices → General → Buttons**), the full
+  action list (`rotate_prev`, `rotate_next`, `refresh`,
+  `step:<i>`, `page:<page_id>`, `webhook:<url>`), manual override
+  behaviour, dedup semantics, and how button events appear on the
+  History page. Wired into the docs nav under **Set up a device**.
+- **`schema/openapi.yaml`** now documents the button contract:
+  `button` query param on `GET /api/v1/device/{device_id}/frame`,
+  `button` + `button_event_id` optional fields on the status body,
+  the `rotation` envelope on both `FrameEnvelope` and
+  `DeviceStatusResponse`, and the `Content-Location` response
+  header on the frame endpoint's `200` + `304` branches. New
+  reusable schemas: `RotationEnvelope` and the `ButtonQueryParam` /
+  `ContentLocation` component definitions.
+- **Cross-links from the surfaces users actually land on:** the
+  [Seeed featured hardware page](hardware/seeed.md), the
+  [unified Seeed quickstart](quickstart/seeed-unified.md), and the
+  ["Set up a device"](install/devices.md) guide all now point at
+  the buttons guide.
+
 ## [0.65.0], 2026-07-03
 
 **The reTerminal launch release.** Everything the Seeed reTerminal
