@@ -22,13 +22,13 @@ more panels over MQTT or HTTP.
 Open source under AGPL-3.0-or-later. No SaaS, no telemetry, no cloud
 account required.
 
-**📖 [Full documentation](https://dmellok.github.io/tesserae/):**
-install guides, [hardware quickstarts](https://dmellok.github.io/tesserae/quickstart/),
-[widget gallery](https://dmellok.github.io/tesserae/widgets/gallery/),
-[community catalog](https://dmellok.github.io/tesserae/widgets/community/),
-[architecture deep dive](https://dmellok.github.io/tesserae/dev/architecture/),
-[how to build a widget](https://dmellok.github.io/tesserae/dev/writing-a-widget/),
-[how to add hardware support](https://dmellok.github.io/tesserae/dev/adding-hardware/).
+**📖 [Full documentation](https://docs.tesserae.ink/):**
+install guides, [hardware quickstarts](https://docs.tesserae.ink/quickstart/),
+[widget gallery](https://docs.tesserae.ink/widgets/gallery/),
+[community catalog](https://docs.tesserae.ink/widgets/community/),
+[architecture deep dive](https://docs.tesserae.ink/dev/architecture/),
+[how to build a widget](https://docs.tesserae.ink/dev/writing-a-widget/),
+[how to add hardware support](https://docs.tesserae.ink/dev/adding-hardware/).
 
 ## Quick start
 
@@ -42,13 +42,75 @@ Open <http://localhost:8765>. First request walks through password setup
 and the onboarding wizard.
 
 Other install paths:
-[Home Assistant App](https://dmellok.github.io/tesserae/install/home-assistant/),
-[LXC / Proxmox / MicroCloud](https://dmellok.github.io/tesserae/install/lxc/),
-[macOS / Linux / Pi shell installer](https://dmellok.github.io/tesserae/install/server/),
-[Windows PowerShell](https://dmellok.github.io/tesserae/install/server/),
-[manual venv](https://dmellok.github.io/tesserae/install/server/#manual-install).
+[Home Assistant App](https://docs.tesserae.ink/install/home-assistant/),
+[LXC / Proxmox / MicroCloud](https://docs.tesserae.ink/install/lxc/),
+[macOS / Linux / Pi shell installer](https://docs.tesserae.ink/install/server/),
+[Windows PowerShell](https://docs.tesserae.ink/install/server/),
+[manual venv](https://docs.tesserae.ink/install/server/#manual-install).
 
-Server is running? Pick a [hardware quickstart](https://dmellok.github.io/tesserae/quickstart/) to get a panel on the wall.
+Server is running? Pick a [hardware quickstart](https://docs.tesserae.ink/quickstart/) to get a panel on the wall.
+
+## How it works
+
+Dashboards are plain HTML. The editor preview and the production render
+load the **same URL**: a headless Chromium (Playwright) screenshots the
+composition at panel resolution, so "looked fine in the editor, broke on
+the panel" is impossible by construction.
+
+The frame then goes through a per-device renderer: Floyd-Steinberg
+dithering against the panel's **measured** color palette (Spectra 6 and
+ACeP panels don't actually produce sRGB primaries; calibrated
+measurements come from [epdoptimize](https://github.com/paperlesspaper/epdoptimize)),
+then packing into the exact byte format the panel wants: packed 4-bit
+Spectra 6, 1-bit mono, or 4-bit grayscale.
+
+Devices are deliberately **thin clients** with no on-device image
+decoding. Always-on clients (a Pi driving an Inky) get frames pushed
+over MQTT the moment a page changes. Battery clients (ESP32) wake, `GET`
+their frame over REST with `If-None-Match` (a 304 skips both the
+download and the slow e-ink refresh), `POST` battery + RSSI telemetry,
+and deep-sleep on a server-driven interval. Wall-clock time comes from
+the HTTP `Date` header, so there's no SNTP on-device.
+
+```
+browser editor          Tesserae server                    panels
+┌──────────┐   HTTP   ┌──────────────────────┐   MQTT   ┌─────────────┐
+│ composer │─────────▶│ headless render      │─────────▶│ Pi + Inky   │
+│ /compose │          │ dither (measured     │          ├─────────────┤
+└──────────┘          │   palettes)          │   REST   │ ESP32,      │
+                      │ pack panel-native    │◀────────▶│ Kindle,     │
+                      │ schedule / rotate    │          │ TRMNL       │
+                      └──────────────────────┘          └─────────────┘
+```
+
+Every layer is a drop-a-folder plugin: widgets, themes, renderers,
+transports, and device kinds. The seams are real directories:
+[`plugins/`](plugins/) · [`renderers/`](renderers/) ·
+[`transports/`](transports/) · [`devices/`](devices/).
+
+## Design decisions
+
+**Server-side rendering, dumb firmware.** The server pre-renders each
+frame into the exact bytes the panel controller wants; the
+[device firmware](https://github.com/dmellok/tesserae-device-firmware)
+streams them straight to the panel. Adding a new panel is a board header
+plus one driver. The network, power, and provisioning stack never
+changes.
+
+**Widgets are sandboxed.** Third-party widgets declare the network hosts
+they need in a `requires:` block in `plugin.json`, and the host enforces
+the allowlist at the socket layer. An undeclared connection raises
+`CapabilityDenied` instead of phoning home. The
+[threat model](https://docs.tesserae.ink/dev/publishing-a-widget/) is
+documented honestly, including what it doesn't catch.
+
+**One server, a fleet of panels.** Tesserae splits rendering from
+transport from hardware, so a single instance drives every panel in the
+house, each with its own dashboards, schedules, and rotations.
+
+**Community widgets install from an audited catalog.** Pinned release
+tarballs, sha256-verified, schema-validated, PR-reviewed:
+[tesserae-widgets](https://github.com/dmellok/tesserae-widgets).
 
 ## Supported hardware
 
@@ -103,26 +165,44 @@ works against the `trmnl_png` renderer.
 
 Anything else: pick `custom` in **Settings → Panel** and set the
 dimensions. If a client drives your panel, Tesserae can push frames
-to it.
+to it. A generic CircuitPython client (400+ boards) is in development;
+follow [discussion #24](https://github.com/dmellok/tesserae/discussions/24).
 
 Per-client setup walkthroughs (the firmware repos in the Client column):
-[Install a client](https://dmellok.github.io/tesserae/install/clients/).
+[Install a client](https://docs.tesserae.ink/install/clients/).
 Full renderer / device-kind compatibility matrix:
-[Screens & compatibility](https://dmellok.github.io/tesserae/compatibility/).
+[Screens & compatibility](https://docs.tesserae.ink/compatibility/).
+
+## Status
+
+Pre-1.0 and moving fast. Every release is documented in the
+[CHANGELOG](CHANGELOG.md). CI runs pytest (1,200+ tests), ruff, and
+mypy --strict on every push.
+
+Built with AI assistance (Claude Code). Architecture decisions, code
+review, hardware testing, and what ships vs. what doesn't are mine.
+The changelogs document the debugging in the open.
 
 ## Privacy
 
 Tesserae sends no phone-home telemetry. No install identifier, no
 usage events, no third-party analytics. Per-device diagnostics
 (battery, RSSI, sleep cadence) stay on the box.
-[Privacy](https://dmellok.github.io/tesserae/privacy/).
+[Privacy](https://docs.tesserae.ink/privacy/).
 
 ## Community
 
-- **[Discussions](https://github.com/dmellok/tesserae/discussions)** for show-your-dashboard, widget pitches, install help, and feedback on what's next.
-- **[Contributing guide](.github/CONTRIBUTING.md)** for dev setup, the three checks (pytest / ruff / mypy), and commit conventions.
-- **[Security policy](.github/SECURITY.md)** for how to report a vulnerability privately.
-- **[Code of conduct](.github/CODE_OF_CONDUCT.md)**.
+- **[Discussions](https://github.com/dmellok/tesserae/discussions)** for show-your-dashboard, widget pitches, and install help.
+- **[Contributing guide](.github/CONTRIBUTING.md)** for dev setup, the three checks (pytest / ruff / mypy), and commit conventions. [Good first issues](https://github.com/dmellok/tesserae/labels/good%20first%20issue).
+- **[Hardware reports](https://github.com/dmellok/tesserae/issues/new?template=hardware_compat.yml)**: running an unlisted panel? A compat report is a real contribution.
+- **[Security policy](.github/SECURITY.md)** · **[Code of conduct](.github/CODE_OF_CONDUCT.md)**
+
+## Why AGPL
+
+The server stays free even when someone runs it as a service:
+improvements have to stay public. And a dashboard for your home
+shouldn't report home. No analytics, no accounts, nothing phones out.
+Don't take the README's word for it; read the source.
 
 ## Credits
 
@@ -131,7 +211,7 @@ Chart.js, 20 typefaces under SIL OFL / Apache 2.0, the TRMNL BYOS
 protocol, the KOReader trmnl-display plugin, and
 [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)'s
 Spectra 6 + ACeP calibrated palette measurements. Full attribution:
-[Credits](https://dmellok.github.io/tesserae/credits/),
+[Credits](https://docs.tesserae.ink/credits/),
 [NOTICES.md](NOTICES.md).
 
 ## License
