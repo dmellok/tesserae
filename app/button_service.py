@@ -139,7 +139,7 @@ class ButtonService:
             resolved = push_manager  # type: ignore[assignment]
             self._push_getter = lambda: resolved
         else:
-            self._push_getter = push_manager  # type: ignore[assignment]
+            self._push_getter = push_manager
         self._event_log = event_log
         self._clock = clock or (lambda: datetime.now(tz=UTC))
 
@@ -372,7 +372,7 @@ class ButtonService:
         except ButtonActionError:
             action_name, action_arg = ("", None)
         if action_name == "webhook" and action_arg:
-            payload = {
+            payload: dict[str, object] = {
                 "device_id": device_id,
                 "button": button,
                 "button_event_id": event_id,

@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.71], 2026-07-03
+
+### Fixed
+
+- **Two mypy errors in `app/button_service.py` that slipped past
+  local pytest.** Line 142 carried an unused
+  `type: ignore[assignment]` now that the push-manager getter type
+  widens correctly, and the webhook payload literal inferred as
+  `dict[str, int | str | None]`, which doesn't satisfy
+  `_fire_webhook_async`'s `dict[str, object]` parameter under mypy's
+  invariant value semantics. An explicit `dict[str, object]`
+  annotation on the payload literal fixes both without changing
+  behaviour. `mypy app/` clean.
+
 ## [0.64.70], 2026-07-03
 
 ### Added
