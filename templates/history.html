@@ -115,6 +115,9 @@
         {{ source_chip(ev.source) }}
         <span class="dx-history-target">{{ ev.target }}</span>
         {% if ev.error %}<span class="dx-history-err">{{ ev.error }}</span>{% endif %}
+        {% if ev.button_detail %}
+        <span class="dx-history-detail u-muted">{{ ev.button_detail }}</span>
+        {% endif %}
       </div>
       <div class="dx-history-end">
         {{ status_chip(ev.status) }}

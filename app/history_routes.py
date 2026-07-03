@@ -102,21 +102,35 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                 }
     out: list[dict[str, Any]] = []
     for ev in rows:
-        # Every type="push" row stores the page_id in ``target``,
-        # regardless of source (manual page send, scheduler tick,
-        # rotation step). Resolve to the page name uniformly; unknown
-        # targets (URL pushes, webpage one-offs) fall through to the
-        # raw value via the dict's default arg.
-        target = page_names.get(ev.target, ev.target)
+        # Button rows target a device (not a page), so resolve the
+        # target through device_meta first. Everything else goes
+        # through page_names as usual, and unknown targets fall
+        # through to the raw value via the dict default. Same treatment
+        # keeps the History view honest about "which device was
+        # this?", not just "which page did we send?".
+        if ev.source == "button" and ev.target in device_meta:
+            target = device_meta[ev.target]["name"]
+        else:
+            target = page_names.get(ev.target, ev.target)
         renderers = [
             {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
             for r in (ev.extra.get("renderers") or [])
         ]
         # Device chips: prefer device_ids carried in extra (set by the
         # push pipeline since v0.5x), fall back to the page's
-        # device_ids when the row is bound to a saved dashboard.
+        # device_ids when the row is bound to a saved dashboard, and
+        # for button rows the row's target IS the device so we chip
+        # that directly.
         device_ids = ev.extra.get("device_ids") or page_devices_map.get(ev.target, [])
+        if ev.source == "button" and not device_ids and ev.target in device_meta:
+            device_ids = [ev.target]
         target_devices = [device_meta[did] for did in device_ids if did in device_meta]
+        # Button rows carry the pressed button, resolved action, and
+        # resulting page in ``extra``. Fold those into a short detail
+        # string the template renders below the main row so the "what
+        # actually happened" is visible without opening the raw event
+        # (which the History page doesn't expose today).
+        button_detail = _button_detail(ev, page_names) if ev.source == "button" else None
         out.append(
             {
                 "id": ev.id,
@@ -130,9 +144,53 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                 "duration_s": ev.duration_s,
                 "error": ev.error,
                 "renderers": renderers,
+                "button_detail": button_detail,
             }
         )
     return out
+
+
+def _button_detail(ev: EventRow, page_names: dict[str, str]) -> str | None:
+    """Render the button-specific extras as a short detail string.
+
+    ``extra`` carries ``button`` (the pressed name), ``action_spec``
+    (the resolved spec, e.g. ``rotate_next`` or ``page:morning``),
+    ``action_description`` (human-readable outcome from the action
+    fn), ``pushed_page_id`` (when the action fired a push), and the
+    resolved rotation position when the device is bound to a rotation.
+    We stitch enough of that into one line so the History row shows
+    what actually happened without a full JSON expand pane.
+
+    Returns ``None`` when there's nothing informative to show; the
+    template drops the detail line entirely in that case.
+    """
+    extra = ev.extra
+    button = extra.get("button")
+    action_spec = extra.get("action_spec")
+    description = extra.get("action_description")
+    pushed_page_id = extra.get("pushed_page_id")
+    step_index = extra.get("step_index")
+    step_page_id = extra.get("step_page_id")
+
+    parts: list[str] = []
+    if isinstance(button, str) and button:
+        parts.append(f"button {button!s}")
+    if isinstance(action_spec, str) and action_spec:
+        parts.append(f"→ {action_spec}")
+    elif isinstance(description, str) and description:
+        parts.append(f"→ {description}")
+
+    # If a page was pushed, prefer its friendly name.
+    if isinstance(pushed_page_id, str) and pushed_page_id:
+        friendly = page_names.get(pushed_page_id, pushed_page_id)
+        parts.append(f"pushed {friendly}")
+    elif isinstance(step_page_id, str) and step_page_id and isinstance(step_index, int):
+        friendly = page_names.get(step_page_id, step_page_id)
+        parts.append(f"step {step_index}: {friendly}")
+
+    if not parts:
+        return None
+    return " ".join(parts)
 
 
 # Statuses we hide from the History view by default. These are the

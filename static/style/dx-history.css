@@ -59,6 +59,20 @@
   color: var(--t-pill-danger-fg);
   font-family: var(--t-font-mono);
 }
+/* Secondary detail line rendered next to the target on rows where
+   the raw target alone doesn't tell the whole story (currently only
+   button events, whose target is a device id and whose interesting
+   fields sit in extra: button name, action spec, pushed page).
+   Same wrap as the rest of dx-history-mid, monospace for the
+   ``→ action`` glyph to sit predictably. */
+.dx-history-detail {
+  font-size: 11.5px;
+  font-family: var(--t-font-mono);
+  white-space: normal;
+  min-width: 0;
+  flex-basis: 100%;
+  order: 10;
+}
 .dx-history-end {
   display: flex;
   align-items: center;

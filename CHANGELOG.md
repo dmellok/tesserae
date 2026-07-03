@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.73], 2026-07-03
+
+### Changed
+
+- **History page shows the friendly device name + a detail line for
+  button events.** Previously button rows showed the raw device id
+  in the target column and buried every interesting field (the
+  pressed button name, the resolved action spec, the pushed page id,
+  the rotation position) inside `extra`, invisible to the row
+  renderer. `history_view` in `app/history_routes.py` now resolves
+  the button-row target through the device registry (so `kitchen`
+  reads as e.g. "Kitchen wall panel"), adds a device chip for the
+  target, and synthesises a short `button_detail` string like
+  `button right → rotate_next pushed Afternoon calendar`. The
+  template renders that as a muted second line under the main row so
+  the full outcome is visible without a JSON expand pane.
+  `_button_detail` gracefully falls back to `action_description` when
+  no spec is present (deduped / unmapped rows still read cleanly)
+  and returns `None` when the extras are empty so the template drops
+  the line entirely.
+
 ## [0.64.72], 2026-07-03
 
 ### Fixed
