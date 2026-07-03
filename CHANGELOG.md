@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.66.1], 2026-07-04
+
+### Changed
+
+- **Calibration tab: two-column layout for colour test patterns.**
+  Pattern picker + colour + submit stack on the left; preview
+  stretches on the right and fills the vertical space so portrait
+  panels (Seeed XIAO EE02, reTerminal E1004) render at a readable
+  size instead of being squeezed to a thumbnail. Stacks under
+  720 px so the picker keeps its full width on narrow viewports.
+
+### Removed
+
+- **Legacy "Calibrate" chip in the device-card footer.** Orientation
+  calibration + colour test patterns are now on the Calibration tab;
+  the footer chip introduced in v0.66.0 as a deep-link is gone since
+  the tab itself is the surface.
+
 ## [0.66.0], 2026-07-03
 
 ### Added

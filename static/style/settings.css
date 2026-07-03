@@ -1180,6 +1180,26 @@
   border: 1px solid var(--dx-border-faint);
 }
 
+/* Two-column layout: controls (picker + colour + submit) on the left,
+   preview stretches on the right and fills the vertical space so
+   portrait panels are readable at a glance. Stacks under 720 px so
+   the picker gets its full width on narrow viewports. */
+.dx-test-pattern-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) minmax(280px, 1.2fr);
+  gap: 18px;
+  align-items: start;
+}
+.dx-test-pattern-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .dx-test-pattern-grid { grid-template-columns: 1fr; }
+}
+
 .dx-pattern-preview {
   position: relative;
   border: 1px solid var(--dx-border-faint);
@@ -1189,25 +1209,32 @@
     #ffffff 0 50%
   ) 0 0 / 20px 20px;
   padding: 4px;
-  margin: 0 0 12px;
+  margin: 0;
   text-align: center;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 340px;
 }
 .dx-pattern-preview img {
   max-width: 100%;
-  max-height: 260px;
-  display: inline-block;
+  max-height: 440px;
+  display: block;
   object-fit: contain;
 }
 .dx-preview-caption {
   display: block;
-  margin-top: 4px;
+  margin: 0;
 }
 
 .dx-pattern-actions {
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: 4px;
 }
 
 /* Per-device button map editor. Small textarea with a monospace

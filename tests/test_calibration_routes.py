@@ -188,5 +188,6 @@ def test_calibration_tab_renders_in_devices_index(app: Flask) -> None:
     assert "Calibration" in body
     assert "Palette swatches" in body
     assert "Send to panel" in body
-    # The old footer Calibrate button is gone; a deep-link chip took its place.
-    assert 'data-tab-link="calibration"' in body
+    # The footer Calibrate button is gone (moved to the tab) so it no
+    # longer competes with the tab-hosted flow for muscle memory.
+    assert 'data-tab-link="calibration"' not in body

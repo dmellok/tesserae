@@ -574,54 +574,61 @@
           </p>
           <form method="post" action="{{ section.test_pattern_endpoint }}"
                 class="form dx-test-pattern-form" data-test-pattern-form>
-            <fieldset class="dx-pattern-picker">
-              <legend class="device-subhead" style="font-size: 0.85em; margin: 0 0 6px;">Pattern</legend>
-              {% for p in section.test_patterns %}
-              <label class="dx-pattern-option">
-                <input type="radio" name="pattern" value="{{ p.id }}"
-                       {% if loop.first %}checked{% endif %}
-                       data-needs-color="{% if p.needs_color %}1{% else %}0{% endif %}">
-                <span class="dx-pattern-body">
-                  <span class="dx-pattern-label">{{ p.label }}</span>
-                  <span class="dx-pattern-desc field-help">{{ p.description }}</span>
+            {# Two-column layout: picker + colour + submit on the left,
+               preview sticks to the right and fills the vertical space
+               so portrait panels aren't crushed. Stacks under 720 px. #}
+            <div class="dx-test-pattern-grid">
+              <div class="dx-test-pattern-controls">
+                <fieldset class="dx-pattern-picker">
+                  <legend class="device-subhead" style="font-size: 0.85em; margin: 0 0 6px;">Pattern</legend>
+                  {% for p in section.test_patterns %}
+                  <label class="dx-pattern-option">
+                    <input type="radio" name="pattern" value="{{ p.id }}"
+                           {% if loop.first %}checked{% endif %}
+                           data-needs-color="{% if p.needs_color %}1{% else %}0{% endif %}">
+                    <span class="dx-pattern-body">
+                      <span class="dx-pattern-label">{{ p.label }}</span>
+                      <span class="dx-pattern-desc field-help">{{ p.description }}</span>
+                    </span>
+                  </label>
+                  {% endfor %}
+                </fieldset>
+
+                {% if section.test_pattern_colors %}
+                <div class="dx-color-picker" data-color-picker hidden>
+                  <label for="{{ section.id }}-color-index">Colour</label>
+                  <select id="{{ section.id }}-color-index" name="color_index"
+                          data-color-select>
+                    {% for c in section.test_pattern_colors %}
+                    <option value="{{ c.index }}" data-hex="{{ c.hex }}">{{ c.label }}</option>
+                    {% endfor %}
+                  </select>
+                  <span class="dx-color-chip" data-color-chip
+                        style="background: {{ section.test_pattern_colors[0].hex }};"
+                        aria-hidden="true"></span>
+                </div>
+                {% endif %}
+
+                <div class="dx-pattern-actions">
+                  <button type="submit" class="button primary">
+                    <i class="ph ph-paint-brush" aria-hidden="true"></i>
+                    <span>Send to panel</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="dx-pattern-preview">
+                <img src="{{ section.test_pattern_preview_url }}?pattern={{ section.test_patterns[0].id }}"
+                     alt="Test pattern preview"
+                     data-preview-img
+                     data-preview-base="{{ section.test_pattern_preview_url }}"
+                     loading="lazy">
+                {% if section.panel %}
+                <span class="dx-preview-caption field-help">
+                  {{ section.panel.w }} × {{ section.panel.h }}
                 </span>
-              </label>
-              {% endfor %}
-            </fieldset>
-
-            {% if section.test_pattern_colors %}
-            <div class="dx-color-picker" data-color-picker hidden>
-              <label for="{{ section.id }}-color-index">Colour</label>
-              <select id="{{ section.id }}-color-index" name="color_index"
-                      data-color-select>
-                {% for c in section.test_pattern_colors %}
-                <option value="{{ c.index }}" data-hex="{{ c.hex }}">{{ c.label }}</option>
-                {% endfor %}
-              </select>
-              <span class="dx-color-chip" data-color-chip
-                    style="background: {{ section.test_pattern_colors[0].hex }};"
-                    aria-hidden="true"></span>
-            </div>
-            {% endif %}
-
-            <div class="dx-pattern-preview">
-              <img src="{{ section.test_pattern_preview_url }}?pattern={{ section.test_patterns[0].id }}"
-                   alt="Test pattern preview"
-                   data-preview-img
-                   data-preview-base="{{ section.test_pattern_preview_url }}"
-                   loading="lazy">
-              {% if section.panel %}
-              <span class="dx-preview-caption field-help">
-                {{ section.panel.w }} × {{ section.panel.h }}
-              </span>
-              {% endif %}
-            </div>
-
-            <div class="dx-pattern-actions">
-              <button type="submit" class="button primary">
-                <i class="ph ph-paint-brush" aria-hidden="true"></i>
-                <span>Send to panel</span>
-              </button>
+                {% endif %}
+              </div>
             </div>
           </form>
         </div>
@@ -680,17 +687,10 @@
           <span>Mirror</span>
         </a>
         {% endif %}
-        {# Orientation calibrate + colour test patterns moved to the
-           Calibration tab in v0.66.0. Deep-link there from the footer
-           so muscle memory still works. #}
-        {% if section.calibrate_endpoint %}
-        <a class="dx-footer-btn"
-           href="?tab=calibration#{{ section.id }}"
-           data-tab-link="calibration">
-          <i class="ph ph-compass" aria-hidden="true"></i>
-          <span>Calibrate</span>
-        </a>
-        {% endif %}
+        {# Calibration (orientation + colour test patterns) lives on
+           its own tab now, so the footer no longer carries a Calibrate
+           button. Left this block empty so future device-wide actions
+           slot in without touching the surrounding footer markup. #}
       </div>
       <div class="dx-footer-right">
         {% if section.regenerate_token_endpoint %}
