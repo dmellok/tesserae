@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.72], 2026-07-03
+
+### Fixed
+
+- **Dead upstream weather API no longer sinks the whole dashboard
+  render.** The failure chain hit during the 2026-07-03 Open-Meteo
+  outage was: `fetch_json`'s default `retries=1` compounded to ~31s
+  of blocking per widget on a hard timeout; the composer's
+  `ThreadPoolExecutor` context manager waited (default `wait=True`)
+  for those stuck HTTP threads to finish before returning; the
+  hydration step therefore held the composer past Playwright's 15s
+  `page.goto` budget; Playwright reported a broken navigation and the
+  screenshot captured an empty page. Two levels of fix:
+  1. **`app/composer.py`** now shuts the pool down with
+     `shutdown(wait=False, cancel_futures=True)` on exit, so stuck
+     HTTP threads no longer hold up the composer once the overall
+     12s cap fires. Also drops the per-widget cap from 10s to 6s so a
+     single 15s HTTP-level timeout can't push a well-behaved widget's
+     wall-time past the overall budget.
+  2. **The four `weather_*` widgets** (`weather_now`,
+     `weather_forecast`, `weather_hourly`, `weather_now_scenic`) now
+     call `fetch_json` with `retries=0` and `timeout=5`, so a hard
+     Open-Meteo outage returns `{"error": ...}` to the widget in ~5s
+     and the cell paints its `data.error` state instead of stalling
+     the whole page render. The 10-minute per-location cache means
+     healthy upstreams still serve fresh data without changes.
+
 ## [0.64.71], 2026-07-03
 
 ### Fixed

@@ -112,7 +112,12 @@ def _font_face_css(fonts: dict[str, Font]) -> str:
 # blows past goto's timeout, Playwright reports a broken navigation and
 # the screenshot captures an empty page. Per-widget cap is the safety
 # net; the overall cap is what actually fires when an upstream is dead.
-_HYDRATE_PER_WIDGET_TIMEOUT_S: float = 10.0
+# Per-widget cap is deliberately smaller than the overall cap so a
+# widget with a 15s HTTP-level timeout can't push the total past the
+# overall budget; the executor's shutdown below uses
+# ``cancel_futures=True`` so stuck HTTP threads don't hold the
+# composer up either.
+_HYDRATE_PER_WIDGET_TIMEOUT_S: float = 6.0
 _HYDRATE_OVERALL_TIMEOUT_S: float = 12.0
 # Max concurrent in-flight widget fetches. Eight is enough for typical
 # dashboards (~6 cells) without spawning a thread per cell on giant
@@ -213,7 +218,16 @@ def _parallel_fetch_plugin_data(
     # result.
     synthesised_errors: set[int] = set()
     max_workers = min(_HYDRATE_MAX_WORKERS, len(indexed))
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+    # Manual pool + try/finally instead of ``with``: the context
+    # manager's ``__exit__`` calls ``shutdown(wait=True)`` which blocks
+    # until every worker returns, so a stuck HTTP call (upstream API
+    # dead, 15s socket timeout) would hold the composer up long past
+    # the overall budget and blow Playwright's page.goto downstream.
+    # ``cancel_futures=True`` (3.9+) drops queued-but-unstarted work
+    # immediately; still-running futures finish in the background but
+    # don't hold us up. See v0.64.72 release notes.
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+    try:
         futures = {
             pool.submit(_worker, plugin_id, options, cw, ch): idx
             for idx, plugin_id, options, cw, ch in indexed
@@ -249,6 +263,10 @@ def _parallel_fetch_plugin_data(
                 _HYDRATE_OVERALL_TIMEOUT_S,
                 sum(1 for f in futures if not f.done()),
             )
+    finally:
+        # Non-blocking shutdown: cancel queued work, let in-flight
+        # threads finish in the background. Composer returns now.
+        pool.shutdown(wait=False, cancel_futures=True)
 
     # Last-good fallback. Walk each cell's result; if it came back from
     # ``fetch()`` cleanly (whatever its shape, including widget-

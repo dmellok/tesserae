@@ -16,7 +16,14 @@ from typing import Any
 from app.plugin_http import fetch_json
 
 CACHE_TTL_S = 600
-HTTP_TIMEOUT_S = 15
+# Deliberately shorter than the composer's per-widget hydration cap
+# (6s in v0.64.72+). ``fetch_json``'s default retry (one) would compound
+# to ~11s on an Open-Meteo outage and blow the composer's budget, so
+# we override to ``retries=0`` at the call site as well; a hard
+# upstream outage returns an error to the widget within ~5s and the
+# cell paints its ``data.error`` state instead of stalling the whole
+# page render.
+HTTP_TIMEOUT_S = 5
 USER_AGENT = "tesserae/0.1 (+weather_now)"
 
 
@@ -87,7 +94,12 @@ def fetch(
         "&forecast_days=1&timezone=auto"
     )
     try:
-        payload = fetch_json(url, headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT_S)
+        payload = fetch_json(
+            url,
+            headers={"User-Agent": USER_AGENT},
+            timeout=HTTP_TIMEOUT_S,
+            retries=0,
+        )
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 

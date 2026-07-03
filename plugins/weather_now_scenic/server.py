@@ -22,7 +22,9 @@ from typing import Any
 from app.plugin_http import fetch_json
 
 CACHE_TTL_S = 600
-HTTP_TIMEOUT_S = 15
+# See weather_now/server.py for the reasoning; short-fail so the
+# composer's hydration cap can't be blown by an Open-Meteo outage.
+HTTP_TIMEOUT_S = 5
 USER_AGENT = "tesserae/0.1 (+weather_now_scenic)"
 
 
@@ -86,7 +88,12 @@ def fetch(
         "&forecast_days=1&timezone=auto"
     )
     try:
-        payload = fetch_json(url, headers={"User-Agent": USER_AGENT}, timeout=HTTP_TIMEOUT_S)
+        payload = fetch_json(
+            url,
+            headers={"User-Agent": USER_AGENT},
+            timeout=HTTP_TIMEOUT_S,
+            retries=0,
+        )
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}"}
 
