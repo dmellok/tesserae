@@ -6,7 +6,38 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
-## [0.64.68], 2026-07-03
+## [0.64.69], 2026-07-03
+
+### Added
+
+- **Community CTA block on the onboarding wrap-up step and mirrored on
+  the Settings → About card.** Three CTAs (GitHub Discussions,
+  Discord, Sponsor) with the same copy, icons, and styling on both
+  surfaces so a first-time user and a long-time user land on the same
+  set of community links. URLs live in a single spot: the app-wide
+  context processor in `app_factory.py` exposes
+  `community_discussions_url`, `community_discord_url`, and
+  `community_sponsor_url`, and the templates read from there. Update
+  in one place if a link changes.
+- **Discord invite link (`https://discord.gg/6qmwkGhGR7`) now shipped
+  in the footer, the onboarding wrap-up, and the About card**, so
+  users can find the server from wherever they are in the app.
+
+### Changed
+
+- **App footer now carries Discussions + Discord + Sponsor links
+  alongside the release tag.** The previous `dmello.io` blog link has
+  been removed in favour of the community set; the release version
+  chip and the Sponsor heart both remain. All links go through
+  `rel="noreferrer noopener"` so the destination never sees a Referer
+  header pointing at the host's LAN address.
+- **Settings → About card layout consolidated.** The standalone
+  "Support the project" section has been folded into a new "Join the
+  community" card that pairs Discussions + Discord + Sponsor as three
+  CTA rows, matching the onboarding wrap-up. The "Discussions" row is
+  removed from the meta list since the same link now lives one card
+  down in a more prominent format. The "Tell us how you use Tesserae"
+  survey card is unchanged.
 
 ### Fixed
 

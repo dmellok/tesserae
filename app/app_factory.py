@@ -894,6 +894,14 @@ def create_app(
             "marketplace_restart_pending": bool(
                 app.config.get("MARKETPLACE_RESTART_PENDING", False)
             ),
+            # Community + support outbound URLs. Injected globally so
+            # the footer, the onboarding "wrap up" step, and the
+            # Settings -> About card can all reference the same links
+            # without each route having to plumb them through its own
+            # context. Update in one place if a URL changes.
+            "community_discussions_url": "https://github.com/dmellok/tesserae/discussions",
+            "community_discord_url": "https://discord.gg/6qmwkGhGR7",
+            "community_sponsor_url": "https://github.com/sponsors/dmellok",
         }
 
     @app.get("/")

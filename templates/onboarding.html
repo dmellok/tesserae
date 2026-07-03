@@ -291,6 +291,38 @@
       </li>
       {% endfor %}
     </ul>
+
+    {# Community CTA. Same three links (Discussions / Discord / Sponsor)
+       as the footer and the Settings -> About card, injected via the
+       app-wide context processor so the URL set stays in sync. #}
+    <section class="wizard-community" aria-label="Community">
+      <h2 class="wizard-subhead">Join the community</h2>
+      <p class="lede">Come say hi, share your dashboards, or help shape what's next.</p>
+      <ul class="community-cta-list">
+        <li>
+          <a href="{{ community_discussions_url }}" target="_blank" rel="noreferrer noopener" class="community-cta">
+            <i class="ph ph-chats-circle" aria-hidden="true"></i>
+            <span class="community-cta-title">GitHub Discussions</span>
+            <span class="community-cta-sub">Show off your dashboards, ask questions, weigh in on what's next.</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ community_discord_url }}" target="_blank" rel="noreferrer noopener" class="community-cta">
+            <i class="ph ph-discord-logo" aria-hidden="true"></i>
+            <span class="community-cta-title">Discord</span>
+            <span class="community-cta-sub">Live chat with other Tesserae users and the maintainer.</span>
+          </a>
+        </li>
+        <li>
+          <a href="{{ community_sponsor_url }}" target="_blank" rel="noreferrer noopener" class="community-cta">
+            <i class="ph ph-heart" aria-hidden="true"></i>
+            <span class="community-cta-title">Sponsor</span>
+            <span class="community-cta-sub">Tesserae is built in spare time; sponsorship is the surest signal to keep it growing.</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
     <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
       <div class="wizard-nav">
         <span></span>

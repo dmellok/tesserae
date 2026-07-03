@@ -1146,6 +1146,63 @@ input[type="range"].slider:focus::-moz-range-thumb {
   margin-bottom: 0.5rem;
 }
 .wizard-page-actions { display: flex; gap: 0.5rem; align-items: center; }
+
+/* Community CTA block on the onboarding wrap-up step and mirrored on
+   the Settings -> About card. Three tappable rows (Discussions,
+   Discord, Sponsor), each an icon + title + short blurb. Same visual
+   treatment on both surfaces so the pattern is recognisable. */
+.wizard-community {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--t-border);
+}
+.wizard-community .wizard-subhead { margin-top: 0; }
+.community-cta-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.community-cta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.9rem;
+  row-gap: 0.2rem;
+  align-items: baseline;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    border-color 120ms ease-out,
+    background 120ms ease-out;
+}
+.community-cta:hover {
+  border-color: var(--t-accent);
+  background: var(--t-surface);
+}
+.community-cta .ph {
+  grid-row: 1 / span 2;
+  grid-column: 1;
+  font-size: 1.3em;
+  align-self: center;
+  color: var(--t-accent);
+}
+.community-cta-title {
+  grid-row: 1;
+  grid-column: 2;
+  font-weight: 600;
+}
+.community-cta-sub {
+  grid-row: 2;
+  grid-column: 2;
+  font-size: 0.9em;
+  color: var(--t-fg-soft, var(--t-fg));
+  opacity: 0.75;
+}
 .wizard-registered ul li { padding: 0.2rem 0; }
 .wizard-manual { margin: 1rem 0; }
 .wizard-manual summary { cursor: pointer; color: var(--t-accent); margin-bottom: 0.5rem; }

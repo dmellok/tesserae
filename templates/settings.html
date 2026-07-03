@@ -998,8 +998,38 @@ docker compose up -d</code></pre>
       <div><dt>License</dt><dd><code>AGPL-3.0-or-later</code></dd></div>
       <div><dt>Source</dt><dd><a href="https://github.com/dmellok/tesserae" rel="noopener" target="_blank">github.com/dmellok/tesserae</a></dd></div>
       <div><dt>Docs</dt><dd><a href="https://docs.tesserae.ink" rel="noopener" target="_blank">docs.tesserae.ink</a></dd></div>
-      <div><dt>Discussions</dt><dd><a href="https://github.com/dmellok/tesserae/discussions" rel="noopener" target="_blank">github.com/dmellok/tesserae/discussions</a></dd></div>
     </dl>
+  </section>
+
+  {# Same three CTAs as the onboarding wrap-up step and the app footer,
+     kept in one place so users can find the community wherever they
+     look. URLs come from the app-wide context processor. #}
+  <section class="dx-section-card">
+    {{ card_head('Join the community', icon_name='users-three') }}
+    <p class="lede">Come say hi, share your dashboards, help shape what's next, or support the project. Tesserae is built in spare time; the community is the reason it keeps growing.</p>
+    <ul class="community-cta-list">
+      <li>
+        <a href="{{ community_discussions_url }}" target="_blank" rel="noopener" class="community-cta">
+          <i class="ph ph-chats-circle" aria-hidden="true"></i>
+          <span class="community-cta-title">GitHub Discussions</span>
+          <span class="community-cta-sub">Show off your dashboards, ask questions, weigh in on what's next.</span>
+        </a>
+      </li>
+      <li>
+        <a href="{{ community_discord_url }}" target="_blank" rel="noopener" class="community-cta">
+          <i class="ph ph-discord-logo" aria-hidden="true"></i>
+          <span class="community-cta-title">Discord</span>
+          <span class="community-cta-sub">Live chat with other Tesserae users and the maintainer.</span>
+        </a>
+      </li>
+      <li>
+        <a href="{{ community_sponsor_url }}" target="_blank" rel="noopener" class="community-cta">
+          <i class="ph ph-heart" aria-hidden="true"></i>
+          <span class="community-cta-title">Sponsor</span>
+          <span class="community-cta-sub">A one-off or recurring sponsorship is the surest signal that Tesserae should keep growing.</span>
+        </a>
+      </li>
+    </ul>
   </section>
 
   <section class="dx-section-card">
@@ -1009,17 +1039,6 @@ docker compose up -d</code></pre>
       <a class="btn btn-primary" href="{{ about_survey_url }}" rel="noopener" target="_blank">
         <i class="ph ph-arrow-square-out" aria-hidden="true"></i>
         <span>Open the survey</span>
-      </a>
-    </div>
-  </section>
-
-  <section class="dx-section-card">
-    {{ card_head('Support the project', icon_name='heart') }}
-    <p class="lede">Tesserae is built in spare time. If you find it useful, a one-off or recurring sponsorship is the surest signal that it should keep growing.</p>
-    <div class="actions actions-end">
-      <a class="btn btn-primary" href="{{ about_sponsor_url }}" rel="noopener" target="_blank">
-        <i class="ph ph-heart" aria-hidden="true"></i>
-        <span>Sponsor on GitHub</span>
       </a>
     </div>
   </section>

@@ -311,19 +311,25 @@
   {# All footer links use ``rel="noreferrer noopener"``: ``noreferrer``
      strips the HTTP Referer header so we never leak the host's IP or
      hostname (loopback, LAN IP, ``tesserae.lan``) to the destination,
-     ``noopener`` blocks ``window.opener`` window-fixation. Attribution
-     for dmello.io still works via the UTM tags carried in the URL. #}
+     ``noopener`` blocks ``window.opener`` window-fixation. Community
+     URLs (Discussions, Discord, Sponsor) come from the app-wide
+     context processor so this list stays in sync with the About card
+     and the onboarding wrap-up step. #}
   <footer class="app-footer" aria-label="Project info">
     <a href="https://github.com/dmellok/tesserae/releases/tag/v{{ config.APP_VERSION }}" target="_blank" rel="noreferrer noopener" title="View v{{ config.APP_VERSION }} on GitHub">
       <i class="ph ph-github-logo" aria-hidden="true"></i> Tesserae v{{ config.APP_VERSION }}
     </a>
     <span class="app-footer-sep" aria-hidden="true">·</span>
-    <a href="https://github.com/sponsors/dmellok" target="_blank" rel="noreferrer noopener" title="Sponsor Tesserae on GitHub">
-      <i class="ph ph-heart" aria-hidden="true"></i> Sponsor
+    <a href="{{ community_discussions_url }}" target="_blank" rel="noreferrer noopener" title="GitHub Discussions">
+      <i class="ph ph-chats-circle" aria-hidden="true"></i> Discussions
     </a>
     <span class="app-footer-sep" aria-hidden="true">·</span>
-    <a href="https://dmello.io?utm_source=tesserae_{{ config.APP_VERSION }}&utm_medium=footer&utm_campaign=tesserae" target="_blank" rel="noreferrer noopener" title="Kayden's blog">
-      <i class="ph ph-arrow-square-out" aria-hidden="true"></i> dmello.io
+    <a href="{{ community_discord_url }}" target="_blank" rel="noreferrer noopener" title="Discord community">
+      <i class="ph ph-discord-logo" aria-hidden="true"></i> Discord
+    </a>
+    <span class="app-footer-sep" aria-hidden="true">·</span>
+    <a href="{{ community_sponsor_url }}" target="_blank" rel="noreferrer noopener" title="Sponsor Tesserae on GitHub">
+      <i class="ph ph-heart" aria-hidden="true"></i> Sponsor
     </a>
   </footer>
   {% include "_restart_modal.html" %}
