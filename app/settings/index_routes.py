@@ -9,6 +9,7 @@ shape regardless of source. Helpers below (``_values_for_core``,
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from typing import Any
@@ -19,6 +20,7 @@ from werkzeug.wrappers import Response
 from app import backup as _backup_mod
 from app import device_timetable
 from app import updater as _updater_mod
+from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
 from app.network import detect_local_ip, docker_bridge_ip_warning, is_docker_bridge_ip
 from app.panel import PANEL_PRESET_CHOICES, PANEL_PRESETS
@@ -620,6 +622,23 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
+                # Per-device button map (physical button wakes). The
+                # textarea shows the stored per-device override (empty
+                # when nothing is set); the "effective map" fold-out
+                # shows the resolved merge of default + global + per-
+                # device so an admin can see what buttons actually
+                # resolve to right now. Registered action names come
+                # from the runtime registry so third-party plugins
+                # that call ``button_actions.register`` at import time
+                # show up in the help text automatically.
+                "button_map_capable": is_instance,
+                "button_map_json": (
+                    _button_map_stored_json(store, device.id) if is_instance else ""
+                ),
+                "button_map_effective": (
+                    _button_map_effective_json(store, device.id) if is_instance else ""
+                ),
+                "button_actions_available": (registered_actions() if is_instance else ()),
                 # Per-device rotation view: every Schedule whose target
                 # page binds to this device, sorted by window start.
                 # Pure read view, each row deep-links to the Schedules
@@ -661,6 +680,48 @@ def _build_sections() -> list[dict[str, Any]]:
         )
 
     return sections
+
+
+def _button_map_stored_json(store: Any, device_id: str) -> str:
+    """Serialise the per-device ``button_map`` (as stored in
+    ``settings.devices.<id>.button_map``) for the textarea. Empty
+    string when nothing is stored so the textarea shows its
+    placeholder default map."""
+    try:
+        section = store.get_section("devices") or {}
+        raw = section.get(device_id, {}).get("button_map")
+    except Exception:
+        raw = None
+    if not isinstance(raw, dict) or not raw:
+        return ""
+    return json.dumps(raw, indent=2, sort_keys=True)
+
+
+def _button_map_effective_json(store: Any, device_id: str) -> str:
+    """Serialise the resolved effective button map: hardcoded default,
+    merged with the global ``settings.app.button_map``, merged with the
+    per-device override. The fold-out under the textarea shows this so
+    an admin can see what each button actually resolves to right now
+    without opening a shell."""
+    try:
+        devices_section = store.get_section("devices") or {}
+        per_device = devices_section.get(device_id, {}).get("button_map")
+    except Exception:
+        per_device = None
+    try:
+        global_map = store.get_section("app").get("button_map")
+    except Exception:
+        global_map = None
+    result: dict[str, str] = dict(DEFAULT_BUTTON_MAP)
+    if isinstance(global_map, dict):
+        for k, v in global_map.items():
+            if isinstance(k, str) and isinstance(v, str) and v:
+                result[k] = v
+    if isinstance(per_device, dict):
+        for k, v in per_device.items():
+            if isinstance(k, str) and isinstance(v, str) and v:
+                result[k] = v
+    return json.dumps(result, indent=2, sort_keys=True)
 
 
 def _device_debug_info(device: Device, is_instance: bool) -> dict[str, Any] | None:

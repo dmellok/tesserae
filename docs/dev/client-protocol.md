@@ -302,6 +302,43 @@ Headers: `ETag: "<digest>"`, `Cache-Control: no-cache`.
 - The `.png` renderer ships the four extra hints (`rotate`, `scale`, `bg`, `saturation`) because the PNG is in composition orientation; the client decides how to land it on the actual panel.
 - Other renderers may ship their own extras in the future. The contract is: anything not listed in the "always present" set above is renderer-specific, and **clients should ignore unknown fields** so new renderers don't break older firmware. Note that things like the TRMNL renderer's `dither` and `contrast` knobs are *device-side settings* (configured per instance in Settings → Devices, applied server-side before encoding) rather than envelope fields, the wire payload stays minimal.
 
+**Physical button wakes** — devices with hardware buttons add
+`?button=<name>` to the frame request on a button-driven wake (the
+name matches the device's `button_map`; conventionally `left`,
+`right`, `refresh`). The server dispatches the mapped action
+synchronously before selecting the frame, so the returned artefact
+already reflects the new state on this same wake:
+
+```
+GET /api/v1/device/kitchen/frame?button=right
+```
+
+When bound to a rotation, the response also carries a `rotation`
+block describing where the device is now:
+
+```json
+{
+  "url": "...",
+  "render_id": "...",
+  "rotation": {
+    "rotation_id": "kitchen_rotation",
+    "step_index": 2,
+    "step_page_id": "afternoon_calendar",
+    "step_count": 4,
+    "manual_override": true,
+    "override_until": "2026-07-04T00:00:00+11:00"
+  }
+}
+```
+
+The `rotation` block is omitted when the device isn't bound to any
+rotation. `manual_override: true` means a button press is currently
+suppressing the time-based scheduler; the scheduler resumes at
+`override_until` (server-side; the firmware doesn't need to check
+this itself). On a `refresh` action the firmware should drop its
+cached `ETag` before making the request so the server always returns
+`200` with a full frame rather than `304`.
+
 `304 Not Modified` — `If-None-Match` matches current digest. No body,
 just `ETag: "<digest>"`. Re-paint the previously-cached frame.
 
@@ -346,6 +383,28 @@ own configured timezone (set during onboarding) and returns the
 local-time fields described below regardless. Invalid or
 unrecognised names fall through silently.
 
+**Button events** also flow through the status body on a button
+wake, so a device that skips `/frame` (or hits it and then hits
+`/status` seconds later) still gets the action dispatched. The
+same event on both endpoints is deduped server-side against
+`button_event_id`:
+
+```json
+{
+  "battery_mv": 3850,
+  "button": "right",
+  "button_event_id": 42
+}
+```
+
+`button` is the button name; `button_event_id` is a monotonically
+increasing uint the firmware maintains per device (persist across
+deep sleep, e.g. in NVS). Retries send the same id, and the server
+treats any incoming id `<= last processed` as a duplicate. A
+firmware without a monotonic counter can omit `button_event_id` and
+fall back to the server's time-window debounce (default 3 seconds,
+overridable via `settings.app.button_debounce_s`).
+
 **Response** (`200 OK`):
 ```json
 {
@@ -356,9 +415,21 @@ unrecognised names fall through silently.
   "local_time": "2026-06-22T19:00:00+02:00",
   "tz": "Europe/Berlin",
   "tz_offset_seconds": 7200,
-  "dst_active": true
+  "dst_active": true,
+  "rotation": {
+    "rotation_id": "kitchen_rotation",
+    "step_index": 2,
+    "step_page_id": "afternoon_calendar",
+    "step_count": 4,
+    "manual_override": true,
+    "override_until": "2026-07-04T00:00:00+11:00"
+  }
 }
 ```
+
+`rotation` is only present when the device is bound to a rotation;
+its shape is identical to the block returned by `/frame` (see
+above).
 
 - `config`: current device config, schema declared in
   `devices/<kind>/device.json`. Apply server-side as the source of

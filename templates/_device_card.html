@@ -272,6 +272,47 @@
         </div>
         {% endif %}
 
+        {# Physical button map (per-device). Present on devices that
+           have hardware buttons and speak the REST protocol; the
+           section context sets ``button_map_capable`` when the device
+           kind advertises button wakes. Textarea rather than one row
+           per button because the firmware may report more than three
+           buttons later, and the JSON edit surface keeps the config
+           flat (settings.devices.<id>.button_map). Empty submission
+           clears the per-device override so the device falls through
+           to settings.app.button_map / the built-in defaults. #}
+        {% if section.button_map_capable %}
+        <div class="dx-button-map">
+          <hr class="dx-divider">
+          <div class="device-subhead-row">
+            <p class="device-subhead">Buttons</p>
+            {{ info_pop("Per-device button map. Overrides the global map (Settings → Server) and the built-in defaults for this device only. Empty saves nothing and the device falls back to the global / default map.") }}
+          </div>
+          <div class="field">
+            <label for="{{ section.id }}-button-map">Button map (JSON)</label>
+            <textarea id="{{ section.id }}-button-map"
+                      name="button_map_json"
+                      class="input dx-button-map-input"
+                      rows="6"
+                      spellcheck="false"
+                      autocomplete="off"
+                      placeholder='{&#10;  "left": "rotate_prev",&#10;  "right": "rotate_next",&#10;  "refresh": "refresh"&#10;}'>{{ section.button_map_json or '' }}</textarea>
+            <p class="field-help">
+              Map each button name to an action. Actions with arguments use the <code>action:arg</code> form.
+              Available actions:
+              {% for name in section.button_actions_available %}<code>{{ name }}</code>{% if not loop.last %}, {% endif %}{% endfor %}.
+              Examples: <code>rotate_next</code>, <code>page:morning_dashboard</code>, <code>step:2</code>, <code>webhook:https://…</code>.
+            </p>
+            {% if section.button_map_effective %}
+            <details class="dx-button-map-effective">
+              <summary class="u-muted">Effective map (this device)</summary>
+              <pre class="dx-button-map-preview"><code>{{ section.button_map_effective }}</code></pre>
+            </details>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
         {# Read-only diagnostic block. Collapsed by default; open on
            demand to check the app version, resolved kind + renderer
            clone ids, panel block, and on-disk instance file. Answers

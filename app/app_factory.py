@@ -498,6 +498,15 @@ def create_app(
     page_store = PageStore(data_root / "core" / "pages.json")
     schedule_store = ScheduleStore(data_root / "core" / "schedules.json")
     rotation_store = RotationStore(data_root / "core" / "rotations.json")
+    # Per-device rotation position + button dedup state. Written by the
+    # button service on every non-dedup'd button wake; read on every
+    # /frame call to decide whether to serve the manual step or the
+    # time-based one.
+    from app.state.device_rotation_state_store import DeviceRotationStateStore
+
+    device_rotation_state_store = DeviceRotationStateStore(
+        data_root / "core" / "device_rotation_state.json"
+    )
     # User themes live alongside core stores at ``data/themes/user.json``.
     # The store creates the directory on first save so a fresh install
     # without any custom themes leaves no empty directory behind.
@@ -557,6 +566,7 @@ def create_app(
     app.config["PAGE_STORE"] = page_store
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
+    app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store
     app.config["USER_THEMES_STORE"] = user_themes_store
     app.config["COMMUNITY_THEMES_STORE"] = community_themes_store
     app.config["EVENT_LOG"] = event_log
@@ -671,6 +681,27 @@ def create_app(
     app.config["REBUILD_TRANSPORT"] = rebuild_transport
     if not is_watcher:
         rebuild_transport()
+
+    # Physical button service. Wired after rebuild_transport() so
+    # PUSH_MANAGER exists and button-driven page changes can push
+    # synchronously; the REST /frame + /status handlers pull it from
+    # app.config on every button-carrying wake. Falls back to a
+    # push-less service in the watcher path so imports work.
+    from app.button_service import ButtonService
+
+    app.config["BUTTON_SERVICE"] = ButtonService(
+        rotation_store=rotation_store,
+        state_store=device_rotation_state_store,
+        settings_store=settings,
+        page_store=page_store,
+        # Getter so a transport rebuild (which swaps PUSH_MANAGER)
+        # doesn't leave the service holding a stale reference.
+        push_manager=lambda: app.config.get("PUSH_MANAGER"),
+        # Feeds the History page: every button press writes a row so
+        # dedup / unmapped / webhook / noop events are visible next to
+        # the push rows PushManager already emits.
+        event_log=event_log,
+    )
 
     # Docker bridge networking gives us an internal IP that LAN
     # clients can't reach. If TESSERAE_HOST_IP isn't set and the

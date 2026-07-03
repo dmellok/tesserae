@@ -6,6 +6,91 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.64.70], 2026-07-03
+
+### Added
+
+- **Server-side handling for physical button wakes on ESP32 devices.**
+  On a button-driven wake the firmware carries the pressed button in
+  the frame query (`GET /api/v1/device/<id>/frame?button=<name>`) and
+  in the status body (`{"button": "<name>", "button_event_id": <uint>,
+  ...}`). The server dispatches the mapped action synchronously before
+  selecting the frame so the returned artefact already reflects the
+  new state on this same wake, and persists the new position so
+  later timer wakes continue from there.
+- **Configurable per-device `button_map` with global fallback.** The
+  hardcoded default is `{"left": "rotate_prev", "right":
+  "rotate_next", "refresh": "refresh"}`. Precedence:
+  `settings.devices.<id>.button_map` beats `settings.app.button_map`
+  beats default. Values are `<action>` or `<action>:<arg>` strings so
+  the config surface stays JSON-flat.
+- **Action registry** at [`app/button_actions.py`](app/button_actions.py):
+  `rotate_prev`, `rotate_next`, `refresh`, `step:<index>` (jump to a
+  specific rotation step), `page:<page_id>` (push a specific dashboard
+  to this device without touching rotation state), and `webhook:<url>`
+  (stub, validates shape). Third-party plugins can add actions via
+  `register(name, fn)`. Adding a new button id or action needs only a
+  config / registry change.
+- **Debounce + idempotency** via `button_event_id`. The firmware
+  sends a monotonically increasing uint; the server treats any
+  incoming id `<= last processed` as a retry and no-ops. Firmwares
+  without the counter fall back to a same-button-within-N-seconds
+  window, default 3s, overridable via `settings.app.button_debounce_s`.
+- **`rotation` envelope on the `/frame` and `/status` responses**
+  (`{rotation_id, step_index, step_page_id, step_count,
+  manual_override, override_until}`). Present when the device is
+  bound to at least one enabled rotation, omitted otherwise. Lets an
+  admin UI show where the device is and pair a per-device
+  `button_map` editor to reality.
+- **New state:** [`app/state/device_rotation_state_model.py`](app/state/device_rotation_state_model.py)
+  + [`app/state/device_rotation_state_store.py`](app/state/device_rotation_state_store.py)
+  persist per-device manual position, override expiry, and button
+  dedup fingerprint. Default is "sticky until the rotation's next
+  daily anchor" so a button press doesn't get yanked back by the
+  scheduler a minute later; overridable via
+  `settings.app.button_hold_seconds`.
+- **Client-protocol docs** at
+  [`docs/dev/client-protocol.md`](docs/dev/client-protocol.md) now
+  cover the button contract: query param on `/frame`, body fields on
+  `/status`, response envelope shape, and the `refresh`-drops-ETag
+  convention firmwares should honour.
+- **Unmapped buttons** log a warning and return the current frame
+  without state change; malformed action args (`step:abc`,
+  `page:unknown`, `webhook:ftp://…`) do the same. Rotations that
+  aren't bound to a device silently no-op on rotation-manipulating
+  actions but still work for `page:<id>` / `webhook:<url>` shortcuts.
+- **Tests** for the action registry, the state store, and the
+  service integration (dedup by event id, dedup by time window,
+  per-device config precedence, `page:` shortcut semantics,
+  push-failure resilience).
+- **Webhook action fires in a daemon thread** with a 3s timeout
+  (overridable via `settings.app.button_webhook_timeout_s`). The
+  POST body carries `{device_id, button, button_event_id,
+  action_spec, timestamp, rotation_id, step_index, step_page_id}`,
+  content-type `application/json`. Failures are logged and swallowed
+  so `/frame` never blocks on an unhealthy external endpoint.
+- **Per-device button map editor on the Settings → Devices card**
+  (General tab). A JSON textarea for the raw `button_map`, plus a
+  fold-out showing the resolved effective map (default merged with
+  the global map merged with the per-device override). The registered
+  actions list is generated from the runtime registry so third-party
+  plugins that call `register(...)` at import time show up in the
+  help text automatically. Save is wired into the existing combined
+  save endpoint; validation rejects malformed JSON, non-string
+  values, unknown actions, and bad action arg shapes before writing.
+- **Every button press writes a History row.** ButtonService emits
+  one event log entry per dispatched press with source `button`, the
+  button name, the resolved action spec, and the resulting state
+  (rotation position, pushed page id, manual-override flag), covering
+  every outcome the admin can care about: `dispatched`, `deduped`,
+  `unmapped`, `error`, `webhook_dispatched`, and `noop`. The row is
+  in addition to the push row `PushManager` already logs, so a
+  state-changing wake produces two correlated rows (one for the
+  button event, one for the resulting page push). `templates/history`
+  and `app/history_routes.py` gain the `button` source label + icon
+  (`hand-tap`) + filter chip so the button feed is a first-class view
+  on the History page.
+
 ## [0.64.69], 2026-07-03
 
 ### Added

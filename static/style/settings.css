@@ -1131,6 +1131,43 @@
 .dx-panel-orientation .device-subhead { margin-bottom: 10px; }
 .dx-device-card input[type="range"] { accent-color: var(--dx-teal); }
 
+/* Per-device button map editor. Small textarea with a monospace
+   input so the JSON reads cleanly, plus a fold-out that shows the
+   resolved effective map (default + global + per-device). */
+.dx-button-map {
+  margin: 18px 0;
+}
+.dx-button-map .device-subhead-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.dx-button-map-input {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.dx-button-map-effective {
+  margin-top: 10px;
+}
+.dx-button-map-effective summary {
+  cursor: pointer;
+  font-size: 12px;
+}
+.dx-button-map-preview {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--band-tint, rgba(0, 0, 0, 0.03));
+  border-radius: var(--t-radius, 6px);
+  overflow-x: auto;
+}
+.dx-button-map-preview code {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 12px;
+  white-space: pre;
+}
+
 /* SCHEDULE TAB --------------------------------------------------- */
 .dx-empty {
   text-align: center;

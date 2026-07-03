@@ -22,6 +22,11 @@ from flask import current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
 from app import calibration, device_service, renderer_loader
+from app.button_actions import (
+    ButtonActionError,
+    parse_action_spec,
+    registered_actions,
+)
 from app.calibration import build_calibration_card, target_orientation
 from app.panel import panel_overrides_from_form
 
@@ -890,6 +895,65 @@ def devices_update_combined(instance_id: str) -> Response:
         else:
             ok_messages.append("battery offset saved")
             any_change = True
+
+    # 6. Per-device button map (physical button wakes). The textarea
+    # ships raw JSON; parse strictly and reject on any bad shape so an
+    # admin doesn't accidentally save a bogus map that silently no-ops
+    # every button press. Empty submission (whitespace or absent
+    # button_map key) clears the per-device override so the device
+    # falls back to the global map / defaults.
+    if "button_map_json" in form:
+        raw = (form.get("button_map_json") or "").strip()
+        bm_error: str | None = None
+        parsed_map: dict[str, str] | None = None
+        if raw:
+            try:
+                candidate = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                bm_error = f"button map must be valid JSON: {exc.msg}"
+                candidate = None
+            if candidate is not None:
+                if not isinstance(candidate, dict) or not all(
+                    isinstance(k, str) and isinstance(v, str) for k, v in candidate.items()
+                ):
+                    bm_error = (
+                        "button map must be a JSON object mapping button names to action specs."
+                    )
+                else:
+                    known_actions = set(registered_actions())
+                    for button_name, spec in candidate.items():
+                        try:
+                            action_name, _arg = parse_action_spec(spec)
+                        except ButtonActionError as exc:
+                            bm_error = f"button {button_name!r}: {exc}"
+                            break
+                        if action_name not in known_actions:
+                            bm_error = (
+                                f"button {button_name!r}: unknown action {action_name!r}. "
+                                f"Available: {', '.join(sorted(known_actions))}."
+                            )
+                            break
+                    else:
+                        parsed_map = {k: v for k, v in candidate.items()}
+        if bm_error is not None:
+            flash(f"{device.name} button map: {bm_error}", "error")
+        else:
+            devices_section = store.get_section("devices") or {}
+            device_section = dict(devices_section.get(instance_id) or {})
+            existing = device_section.get("button_map")
+            if parsed_map is None:
+                # Empty submission -> clear the override.
+                if isinstance(existing, dict) and existing:
+                    device_section.pop("button_map", None)
+                    store.patch_section("devices", {instance_id: device_section})
+                    ok_messages.append("button map cleared")
+                    any_change = True
+            else:
+                if existing != parsed_map:
+                    device_section["button_map"] = parsed_map
+                    store.patch_section("devices", {instance_id: device_section})
+                    ok_messages.append("button map saved")
+                    any_change = True
 
     if any_change:
         rebuild_transport_fn()()

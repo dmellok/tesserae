@@ -37,6 +37,7 @@ FILTERABLE_SOURCES = (
     "manual",
     "resend",
     "onboarding",
+    "button",
 )
 
 

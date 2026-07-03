@@ -46,6 +46,7 @@ from typing import Any
 from flask import Blueprint, Flask, current_app, jsonify, request
 from werkzeug.wrappers import Response
 
+from app.button_service import ButtonService
 from app.device_loader import Device, DeviceRegistry
 from app.device_service import create_instance, generate_access_token
 from app.renderer_loader import RendererRegistry
@@ -287,6 +288,33 @@ def _error(status: int, message: str, **extra: Any) -> Response:
 # -- frame ---------------------------------------------------------------
 
 
+def _button_service() -> ButtonService | None:
+    """Return the app-wide ButtonService or None if buttons aren't
+    wired (early boot, some test paths). Callers no-op on None."""
+    svc = current_app.config.get("BUTTON_SERVICE")
+    if isinstance(svc, ButtonService):
+        return svc
+    return None
+
+
+def _parse_button_event_id(raw: Any) -> int | None:
+    """Firmware sends button_event_id as a uint. Accept ints and
+    numeric strings so a client can't tank the parse by using JSON
+    numbers vs strings; anything unparseable returns None (falls
+    through to the same-button-within-N dedup fallback)."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, int):
+        return raw if raw >= 0 else None
+    if isinstance(raw, str):
+        try:
+            v = int(raw.strip())
+        except ValueError:
+            return None
+        return v if v >= 0 else None
+    return None
+
+
 def _next_poll_s(device: Device) -> int:
     """How many seconds until the firmware should poll again. Reads
     the configured ``sleep_interval_s`` from settings when present
@@ -328,13 +356,49 @@ def _current_config(device: Device) -> dict[str, Any]:
 def get_frame(device_id: str) -> Response:
     """Latest frame URL for this device.
 
-    Returns 200 + JSON ``{url, format, panel_w, panel_h, render_id}``
+    Returns 200 + JSON ``{url, format, panel_w, panel_h, render_id, rotation?}``
     when a frame has been rendered since the last process restart,
     304 when the caller's ``If-None-Match`` already matches the
-    current frame, 204 when no frame has been rendered yet."""
+    current frame, 204 when no frame has been rendered yet.
+
+    Physical button wakes carry ``?button=left|right|refresh|...`` in
+    the query string. The button is dispatched through the button
+    service before the frame lookup so a rotate / page action can push
+    the new page synchronously and the returned frame reflects the
+    new state on this same wake."""
     device, err = _auth_device(device_id)
     if err is not None or device is None:
         return err  # type: ignore[return-value]
+
+    # Button dispatch, if the firmware indicated one. Errors here are
+    # non-fatal: the goal is best-effort action + always-serve-a-frame,
+    # so the wake still returns a valid response even if the button
+    # path blew up.
+    button_result = None
+    button_svc = _button_service()
+    button_raw = request.args.get("button", "").strip()
+    if button_svc is not None:
+        if button_raw:
+            try:
+                button_result = button_svc.handle_button(
+                    device_id=device.id,
+                    button=button_raw,
+                    event_id=_parse_button_event_id(request.args.get("button_event_id")),
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "rest /frame: button dispatch failed for device=%s button=%s",
+                    device.id,
+                    button_raw,
+                )
+                button_result = None
+        else:
+            # No button on this wake, still attach a read-only rotation
+            # snapshot so the firmware always knows where it is.
+            try:
+                button_result = button_svc.snapshot(device.id)
+            except Exception:
+                button_result = None
 
     push_mgr = current_app.config.get("PUSH_MANAGER")
     latest = push_mgr.latest_render_for(device.id) if push_mgr is not None else None
@@ -383,6 +447,13 @@ def get_frame(device_id: str) -> Response:
                 "rest /frame: renderer.payload() failed for renderer %s",
                 renderer.id,
             )
+    # Rotation envelope: current position, page id, and manual-override
+    # state so the firmware (and any admin UI polling this endpoint)
+    # can display where the device is. Omitted when the device isn't
+    # bound to any rotation.
+    if button_result is not None and button_result.rotation_id is not None:
+        payload["rotation"] = button_result.to_envelope()
+
     resp = jsonify(payload)
     resp.headers["ETag"] = etag
     resp.headers["Cache-Control"] = "no-cache"
@@ -443,6 +514,41 @@ def post_status(device_id: str) -> Response:
         if isinstance(raw_tz, str):
             request_tz = raw_tz.strip()
 
+    # Button dispatch, if the firmware included it in the body. Same
+    # non-fatal contract as the /frame path: errors here don't break
+    # the heartbeat response. Dedup against ``last_button_event_id``
+    # means /frame + /status carrying the same event on one wake
+    # doesn't fire the action twice.
+    button_result = None
+    button_svc = _button_service()
+    if button_svc is not None and isinstance(body, dict):
+        raw_button = body.get("button")
+        button_name = raw_button.strip() if isinstance(raw_button, str) else ""
+        if button_name:
+            try:
+                button_result = button_svc.handle_button(
+                    device_id=device.id,
+                    button=button_name,
+                    event_id=_parse_button_event_id(body.get("button_event_id")),
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "rest /status: button dispatch failed for device=%s button=%s",
+                    device.id,
+                    button_name,
+                )
+                button_result = None
+        else:
+            try:
+                button_result = button_svc.snapshot(device.id)
+            except Exception:
+                button_result = None
+    elif button_svc is not None:
+        try:
+            button_result = button_svc.snapshot(device.id)
+        except Exception:
+            button_result = None
+
     response = {
         "status": 200,
         "config": _current_config(device),
@@ -450,6 +556,8 @@ def post_status(device_id: str) -> Response:
         "server_time": time.time(),
         **_resolve_local_time_fields(request_tz),
     }
+    if button_result is not None and button_result.rotation_id is not None:
+        response["rotation"] = button_result.to_envelope()
     return jsonify(response)
 
 
