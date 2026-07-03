@@ -6,6 +6,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.66.0], 2026-07-03
+
+### Added
+
+- **New Calibration tab on every device card** (Settings → Devices).
+  A fifth tab alongside Status / General / Rendering / Schedule that
+  consolidates the existing orientation calibration flow with a new
+  colour-test-pattern picker. Five patterns ship: palette swatches
+  (labelled solid block per palette entry), 16-step grayscale ramp,
+  solid fill (per-colour), text sample (three sizes), and a
+  registration grid (1 px + 2 px lines with corner marks). The
+  legacy footer "Calibrate" button becomes a deep-link chip that
+  jumps straight to the new tab, so muscle memory holds.
+- **Test patterns are palette-locked to the panel's gamut**, so the
+  renderer's dither pass has zero error to diffuse and what the tab's
+  inline preview shows is byte-identical to what the panel paints.
+  Snaps automatically to `waveshare_e6` or `inky_7colour` based on
+  the device's declared gamut and honours the per-clone `calibrated`
+  toggle (measured palette from
+  [epdoptimize](https://github.com/paperlesspaper/epdoptimize) when
+  on, nominal palette when off). Custom / unknown gamuts fall back
+  to E6 rather than crashing.
+- **Two new routes** back the tab:
+  `POST /settings/devices/<id>/test-pattern` hands PNG bytes to
+  `PushManager.push_image` (same path the Send-file / Send-URL flows
+  use, so the device's real renderer + transport paint the panel);
+  `GET /settings/devices/<id>/test-pattern/preview.png` returns the
+  same bytes for the tab's inline preview `<img>`. The palette
+  recalibration slot is scaffolded but disabled until LAB-aware
+  quantisation lands.
+
 ## [0.65.2], 2026-07-03
 
 ### Fixed

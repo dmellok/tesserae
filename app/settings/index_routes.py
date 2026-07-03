@@ -18,7 +18,7 @@ from flask import current_app, flash, redirect, render_template, request, sessio
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
-from app import device_timetable
+from app import device_timetable, test_patterns
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
@@ -369,6 +369,56 @@ def _build_app_field_groups() -> list[dict[str, Any]]:
     return groups
 
 
+_TEST_PATTERN_GAMUT_LABELS: dict[str, tuple[str, ...]] = {
+    "waveshare_e6": ("black", "white", "yellow", "red", "blue", "green"),
+    "inky_7colour": (
+        "black",
+        "white",
+        "green",
+        "blue",
+        "red",
+        "yellow",
+        "orange",
+    ),
+}
+
+_TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
+    "waveshare_e6": (
+        "#000000",
+        "#ffffff",
+        "#ffff00",
+        "#ff0000",
+        "#0000ff",
+        "#00ff00",
+    ),
+    "inky_7colour": (
+        "#000000",
+        "#ffffff",
+        "#00ff00",
+        "#0000ff",
+        "#ff0000",
+        "#ffff00",
+        "#ff8c00",
+    ),
+}
+
+
+def _test_pattern_colors_for(device: Device) -> list[dict[str, Any]]:
+    """Palette entries for the solid-fill colour picker on the
+    Calibration tab. Snap to the device's declared gamut so the labels
+    line up with the panel's actual colours; unknown gamuts fall back
+    to the E6 default palette. Returns a list of ``{index, label, hex}``
+    dicts keyed for the template."""
+    panel = device.panel or {}
+    gamut = str(panel.get("gamut") or "waveshare_e6")
+    labels = _TEST_PATTERN_GAMUT_LABELS.get(gamut, _TEST_PATTERN_GAMUT_LABELS["waveshare_e6"])
+    hexes = _TEST_PATTERN_GAMUT_HEXES.get(gamut, _TEST_PATTERN_GAMUT_HEXES["waveshare_e6"])
+    return [
+        {"index": i, "label": labels[i], "hex": hexes[i]}
+        for i in range(min(len(labels), len(hexes)))
+    ]
+
+
 def _build_sections() -> list[dict[str, Any]]:
     store = settings_store()
     sections: list[dict[str, Any]] = []
@@ -598,6 +648,28 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
+                # Colour test-pattern picker (Calibration tab). The
+                # endpoint POSTs pattern_id + optional color_index and
+                # pushes the resulting PNG through the device's real
+                # renderer; the preview URL returns the same bytes as
+                # an <img> source so the tab can show what will be
+                # sent. Both are None on kinds since the push path is
+                # instance-only. ``test_pattern_colors`` lists palette
+                # entries as (index, label, hex) tuples for the solid-
+                # fill picker; snap to the device's declared gamut so
+                # the labels match the panel.
+                "test_pattern_endpoint": (
+                    url_for("auth.devices_send_test_pattern", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "test_pattern_preview_url": (
+                    url_for("auth.devices_test_pattern_preview", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "test_patterns": test_patterns.list_patterns() if is_instance else [],
+                "test_pattern_colors": (_test_pattern_colors_for(device) if is_instance else []),
                 # Per-device quiet-hours override. Read from the
                 # manifest so the form can preselect the user's
                 # current setting; ``quiet_hours_endpoint`` is None on

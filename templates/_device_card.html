@@ -11,10 +11,15 @@
 
 {# Active tab from the querystring so deep links land on the right
    panel after a save+redirect. Falls back to "status" when the param
-   is missing or unknown. #}
+   is missing or unknown. The orientation-calibrate flow forces the
+   Calibration tab so the numbered-card answer form stays visible when
+   the redirect lands with ?calibrating=<id>. #}
 {% set active_tab = request.args.get('tab', 'status') %}
-{% if active_tab not in ('status', 'general', 'rendering', 'schedule') %}
+{% if active_tab not in ('status', 'general', 'rendering', 'schedule', 'calibration') %}
   {% set active_tab = 'status' %}
+{% endif %}
+{% if calibrating == section.device_id %}
+  {% set active_tab = 'calibration' %}
 {% endif %}
 
 <section class="card dx-device-card"
@@ -97,7 +102,7 @@
 
     {# TAB BAR #}
     <nav class="dx-tabs" role="tablist" aria-label="Device settings">
-      {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('rendering', 'Rendering'), ('schedule', 'Schedule')] %}
+      {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('rendering', 'Rendering'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}
       <button type="button" role="tab"
               data-tab="{{ tab_id }}"
               class="dx-tab{% if tab_id == active_tab %} is-active{% endif %}"
@@ -512,6 +517,130 @@
         {% endif %}
       </section>
 
+      {# CALIBRATION TAB (orientation card + colour test patterns +
+         palette-recalibration placeholder). Lives outside the combined
+         save flow: each subsection posts to its own endpoint since a
+         push is a fire-and-forget action, not a settings edit. #}
+      <section role="tabpanel" data-panel="calibration"
+               class="dx-panel{% if active_tab == 'calibration' %} is-active{% endif %}"
+               aria-hidden="{% if active_tab == 'calibration' %}false{% else %}true{% endif %}">
+
+        {# ORIENTATION #}
+        {% if section.calibrate_endpoint %}
+        <div class="dx-calib-section">
+          <p class="device-subhead">Orientation</p>
+          <p class="field-help" style="margin: 0 0 12px;">
+            Sends a numbered test card so you can tell which way the
+            panel is physically mounted. Do this once when you first
+            hang the display.
+          </p>
+          {% if calibrating == section.device_id %}
+          <div class="calibrate-block calibrate-prompt-block">
+            <p class="field-help calibrate-prompt">
+              A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
+              <strong>which number is in the top-left corner?</strong>
+            </p>
+            <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+              <div class="calibrate-choices">
+                {% for n in [1, 2, 3, 4] %}
+                <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+                {% endfor %}
+              </div>
+            </form>
+            <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+              <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
+            </form>
+          </div>
+          {% else %}
+          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+            <button type="submit" class="button">
+              <i class="ph ph-compass" aria-hidden="true"></i>
+              <span>Send orientation card</span>
+            </button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {# COLOUR TEST PATTERNS #}
+        {% if section.test_pattern_endpoint and section.test_patterns %}
+        {% if section.calibrate_endpoint %}<hr class="dx-divider">{% endif %}
+        <div class="dx-calib-section">
+          <p class="device-subhead">Colour test patterns</p>
+          <p class="field-help" style="margin: 0 0 12px;">
+            Native-palette pattern sent straight to the panel, bypassing
+            compose and dither. What you see below is byte-identical
+            to what the panel will paint.
+          </p>
+          <form method="post" action="{{ section.test_pattern_endpoint }}"
+                class="form dx-test-pattern-form" data-test-pattern-form>
+            <fieldset class="dx-pattern-picker">
+              <legend class="device-subhead" style="font-size: 0.85em; margin: 0 0 6px;">Pattern</legend>
+              {% for p in section.test_patterns %}
+              <label class="dx-pattern-option">
+                <input type="radio" name="pattern" value="{{ p.id }}"
+                       {% if loop.first %}checked{% endif %}
+                       data-needs-color="{% if p.needs_color %}1{% else %}0{% endif %}">
+                <span class="dx-pattern-body">
+                  <span class="dx-pattern-label">{{ p.label }}</span>
+                  <span class="dx-pattern-desc field-help">{{ p.description }}</span>
+                </span>
+              </label>
+              {% endfor %}
+            </fieldset>
+
+            {% if section.test_pattern_colors %}
+            <div class="dx-color-picker" data-color-picker hidden>
+              <label for="{{ section.id }}-color-index">Colour</label>
+              <select id="{{ section.id }}-color-index" name="color_index"
+                      data-color-select>
+                {% for c in section.test_pattern_colors %}
+                <option value="{{ c.index }}" data-hex="{{ c.hex }}">{{ c.label }}</option>
+                {% endfor %}
+              </select>
+              <span class="dx-color-chip" data-color-chip
+                    style="background: {{ section.test_pattern_colors[0].hex }};"
+                    aria-hidden="true"></span>
+            </div>
+            {% endif %}
+
+            <div class="dx-pattern-preview">
+              <img src="{{ section.test_pattern_preview_url }}?pattern={{ section.test_patterns[0].id }}"
+                   alt="Test pattern preview"
+                   data-preview-img
+                   data-preview-base="{{ section.test_pattern_preview_url }}"
+                   loading="lazy">
+              {% if section.panel %}
+              <span class="dx-preview-caption field-help">
+                {{ section.panel.w }} × {{ section.panel.h }}
+              </span>
+              {% endif %}
+            </div>
+
+            <div class="dx-pattern-actions">
+              <button type="submit" class="button primary">
+                <i class="ph ph-paint-brush" aria-hidden="true"></i>
+                <span>Send to panel</span>
+              </button>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
+        {# PALETTE RECALIBRATION (Tier 2 placeholder) #}
+        <hr class="dx-divider">
+        <div class="dx-calib-section dx-calib-placeholder">
+          <p class="device-subhead">Palette recalibration</p>
+          <p class="field-help" style="margin: 0 0 12px;">
+            Coming with LAB-aware quantisation. The swatch pattern above
+            plus a colorimeter will nudge this device's colour targets
+            to what the panel actually reproduces under real viewing
+            light.
+          </p>
+          <button type="button" class="button" disabled>Not available yet</button>
+        </div>
+      </section>
+
       {# STICKY SAVE BAR (revealed by JS when the form is dirty) #}
       <div class="dx-save-bar" data-save-bar hidden>
         <span class="dx-save-bar-msg">You have unsaved changes</span>
@@ -551,32 +680,16 @@
           <span>Mirror</span>
         </a>
         {% endif %}
+        {# Orientation calibrate + colour test patterns moved to the
+           Calibration tab in v0.66.0. Deep-link there from the footer
+           so muscle memory still works. #}
         {% if section.calibrate_endpoint %}
-          {% if calibrating == section.device_id %}
-          <div class="calibrate-block calibrate-prompt-block">
-            <p class="field-help calibrate-prompt">
-              A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
-              <strong>which number is in the top-left corner?</strong>
-            </p>
-            <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
-              <div class="calibrate-choices">
-                {% for n in [1, 2, 3, 4] %}
-                <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
-                {% endfor %}
-              </div>
-            </form>
-            <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-              <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
-            </form>
-          </div>
-          {% else %}
-          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-            <button type="submit" class="dx-footer-btn">
-              <i class="ph ph-compass" aria-hidden="true"></i>
-              <span>Calibrate</span>
-            </button>
-          </form>
-          {% endif %}
+        <a class="dx-footer-btn"
+           href="?tab=calibration#{{ section.id }}"
+           data-tab-link="calibration">
+          <i class="ph ph-compass" aria-hidden="true"></i>
+          <span>Calibrate</span>
+        </a>
         {% endif %}
       </div>
       <div class="dx-footer-right">

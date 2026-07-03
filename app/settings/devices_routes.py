@@ -18,10 +18,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from flask import Response as FlaskResponse
 from flask import current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
-from app import calibration, device_service, renderer_loader
+from app import calibration, device_service, renderer_loader, test_patterns
 from app.button_actions import (
     ButtonActionError,
     parse_action_spec,
@@ -1085,3 +1086,136 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         "ok",
     )
     return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+
+
+# -- colour test patterns ----------------------------------------------
+
+
+def _resolve_pattern_context(instance_id: str) -> tuple[Any, dict[str, Any]] | None:
+    """Common device / panel / gamut / calibrated lookup for the test-
+    pattern routes. Returns ``(device, context)`` on success, ``None``
+    when the device is unknown or lacks a panel block (the caller
+    flashes + redirects in that case). The context is what
+    :func:`test_patterns.build_pattern` needs.
+
+    ``calibrated`` reflects whether *any* renderer clone bound to this
+    device has the calibrated-palette toggle on, so the preview PNG
+    matches what the renderer will actually paint. False when nothing
+    reads calibrated (nominal palette used everywhere)."""
+    device = devices().get(instance_id)
+    if device is None or device.kind_of is None or device.panel is None:
+        return None
+    panel = device.panel
+    gamut = str(panel.get("gamut") or "waveshare_e6")
+    store = settings_store()
+    calibrated = False
+    for clone in renderers().for_device(device.id):
+        clone_state = store.get_for_runtime(
+            "renderers", clone.id, [{"name": "calibrated", "type": "bool", "default": False}]
+        )
+        if bool(clone_state.get("calibrated")):
+            calibrated = True
+            break
+    return device, {
+        "w": int(panel["w"]),
+        "h": int(panel["h"]),
+        "gamut": gamut,
+        "calibrated": calibrated,
+    }
+
+
+@bp.post("/settings/devices/<instance_id>/test-pattern")
+def devices_send_test_pattern(instance_id: str) -> Response:
+    """Push a colour test pattern to the device.
+
+    Payload: ``pattern`` (one of :data:`test_patterns.PATTERN_IDS`) and
+    an optional ``color_index`` for patterns that need one. The bytes
+    go through the same push pipeline as ``push_image`` so the panel's
+    real renderer + transport handle framing; palette-locked pixels
+    make the dither step a no-op so what the user picked is what the
+    panel paints."""
+    anchor = f"device-{instance_id}"
+    ctx = _resolve_pattern_context(instance_id)
+    if ctx is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    _, params = ctx
+    pattern_id = (request.form.get("pattern") or "").strip()
+    if pattern_id not in test_patterns.PATTERN_IDS:
+        flash(f"Unknown test pattern {pattern_id!r}.", "error")
+        return redirect(
+            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+        )
+    color_index: int | None = None
+    raw_color = request.form.get("color_index")
+    if raw_color is not None and raw_color != "":
+        try:
+            color_index = int(raw_color)
+        except ValueError:
+            color_index = 0
+    try:
+        pattern_bytes = test_patterns.build_pattern(
+            pattern_id,
+            params["w"],
+            params["h"],
+            gamut=params["gamut"],
+            calibrated=params["calibrated"],
+            color_index=color_index,
+        )
+    except ValueError as err:
+        flash(str(err), "error")
+        return redirect(
+            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+        )
+    result = push_manager().push_image(
+        pattern_bytes,
+        source_label=f"test-pattern:{pattern_id}:{instance_id}",
+        device_id=instance_id,
+    )
+    if result.status == "sent":
+        flash(f"Sent {pattern_id.replace('_', ' ')} to the panel.", "ok")
+    else:
+        flash(
+            f"Test-pattern push {result.status}: {result.error or '(no detail)'}",
+            "error",
+        )
+    return redirect(
+        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+    )
+
+
+@bp.get("/settings/devices/<instance_id>/test-pattern/preview.png")
+def devices_test_pattern_preview(instance_id: str) -> Response:
+    """Return the raw PNG the send button would push, so the tab can
+    show an inline preview before the user commits. Same generator, no
+    push side-effect. 404s when the device or panel is unknown."""
+    ctx = _resolve_pattern_context(instance_id)
+    if ctx is None:
+        return FlaskResponse("unknown device", status=404, mimetype="text/plain")
+    _, params = ctx
+    pattern_id = (request.args.get("pattern") or "palette_swatches").strip()
+    if pattern_id not in test_patterns.PATTERN_IDS:
+        return FlaskResponse("unknown pattern", status=400, mimetype="text/plain")
+    color_index: int | None = None
+    raw_color = request.args.get("color_index")
+    if raw_color is not None and raw_color != "":
+        try:
+            color_index = int(raw_color)
+        except ValueError:
+            color_index = 0
+    try:
+        png = test_patterns.build_pattern(
+            pattern_id,
+            params["w"],
+            params["h"],
+            gamut=params["gamut"],
+            calibrated=params["calibrated"],
+            color_index=color_index,
+        )
+    except ValueError as err:
+        return FlaskResponse(str(err), status=400, mimetype="text/plain")
+    return FlaskResponse(
+        png,
+        mimetype="image/png",
+        headers={"Cache-Control": "no-store"},
+    )

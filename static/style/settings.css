@@ -1131,6 +1131,85 @@
 .dx-panel-orientation .device-subhead { margin-bottom: 10px; }
 .dx-device-card input[type="range"] { accent-color: var(--dx-teal); }
 
+/* Calibration tab: orientation card + colour test patterns +
+   palette-recalibration placeholder. Each subsection is a plain
+   block separated by dx-divider (matches Rendering + General). */
+.dx-calib-section { margin: 4px 0 12px; }
+.dx-calib-placeholder { opacity: 0.7; }
+.dx-calib-placeholder .button[disabled] { cursor: not-allowed; }
+
+.dx-pattern-picker {
+  border: 0;
+  padding: 0;
+  margin: 0 0 14px;
+  display: grid;
+  gap: 8px;
+}
+.dx-pattern-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--dx-border-faint);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.dx-pattern-option:hover { border-color: var(--dx-teal); }
+.dx-pattern-option:has(input:checked) {
+  border-color: var(--dx-teal);
+  background: color-mix(in srgb, var(--dx-teal) 8%, transparent);
+}
+.dx-pattern-option input[type="radio"] { margin-top: 2px; }
+.dx-pattern-body { display: flex; flex-direction: column; gap: 2px; }
+.dx-pattern-label { font-weight: 600; }
+.dx-pattern-desc { margin: 0; }
+
+.dx-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+}
+.dx-color-picker[hidden] { display: none; }
+.dx-color-chip {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--dx-border-faint);
+}
+
+.dx-pattern-preview {
+  position: relative;
+  border: 1px solid var(--dx-border-faint);
+  border-radius: 8px;
+  background: repeating-conic-gradient(
+    #f4f4f4 0 25%,
+    #ffffff 0 50%
+  ) 0 0 / 20px 20px;
+  padding: 4px;
+  margin: 0 0 12px;
+  text-align: center;
+  overflow: hidden;
+}
+.dx-pattern-preview img {
+  max-width: 100%;
+  max-height: 260px;
+  display: inline-block;
+  object-fit: contain;
+}
+.dx-preview-caption {
+  display: block;
+  margin-top: 4px;
+}
+
+.dx-pattern-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the
    resolved effective map (default + global + per-device). */
@@ -1845,6 +1924,19 @@
 
 /* General + Rendering tab field treatment */
 :root[data-theme="dark"] .dx-divider { background: var(--t-border); }
+:root[data-theme="dark"] .dx-pattern-option { border-color: var(--t-border); }
+:root[data-theme="dark"] .dx-pattern-option:has(input:checked) {
+  border-color: var(--t-accent);
+  background: color-mix(in srgb, var(--t-accent) 12%, transparent);
+}
+:root[data-theme="dark"] .dx-pattern-preview {
+  border-color: var(--t-border);
+  background: repeating-conic-gradient(
+    #22262b 0 25%,
+    #2a2f34 0 50%
+  ) 0 0 / 20px 20px;
+}
+:root[data-theme="dark"] .dx-color-chip { border-color: var(--t-border); }
 :root[data-theme="dark"] .dx-hint { color: var(--t-muted); }
 :root[data-theme="dark"] .dx-hint .ph-info { color: var(--t-muted); }
 

@@ -155,6 +155,49 @@
     });
   }
 
+  // ---- Test-pattern form (Calibration tab) ----------------------------
+  // Live preview: rebuild the preview <img> src whenever the pattern
+  // radio or colour <select> changes, so what the user sees below the
+  // picker is exactly what "Send to panel" will push. Also toggles the
+  // colour picker's visibility based on the current radio's
+  // data-needs-color attribute.
+  function initTestPatternForm(form) {
+    const preview = form.querySelector('[data-preview-img]');
+    if (!preview) return;
+    const base = preview.getAttribute('data-preview-base');
+    if (!base) return;
+    const colorGroup = form.querySelector('[data-color-picker]');
+    const colorSelect = form.querySelector('[data-color-select]');
+    const colorChip = form.querySelector('[data-color-chip]');
+
+    function update() {
+      const checked = form.querySelector('input[name="pattern"]:checked');
+      if (!checked) return;
+      const pattern = checked.value;
+      const needsColor = checked.getAttribute('data-needs-color') === '1';
+      if (colorGroup) colorGroup.hidden = !needsColor;
+      let src = base + '?pattern=' + encodeURIComponent(pattern);
+      if (needsColor && colorSelect) {
+        src += '&color_index=' + encodeURIComponent(colorSelect.value);
+        if (colorChip) {
+          const opt = colorSelect.options[colorSelect.selectedIndex];
+          const hex = opt && opt.getAttribute('data-hex');
+          if (hex) colorChip.style.background = hex;
+        }
+      }
+      // Cache-bust so a subsequent send-with-same-params still refetches
+      // when the user tabs back. no-store on the response also helps.
+      src += '&_t=' + Date.now();
+      preview.src = src;
+    }
+
+    form.querySelectorAll('input[name="pattern"]').forEach(function (radio) {
+      radio.addEventListener('change', update);
+    });
+    if (colorSelect) colorSelect.addEventListener('change', update);
+    update();
+  }
+
   // ---- Kind defaults rows (issue #22) ---------------------------------
   // Whole-row click toggles the inline form. Reset button swaps the
   // actions row for an inline confirm bar; Cancel reverts.
@@ -197,5 +240,6 @@
     document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);
     document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
     document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
+    document.querySelectorAll('[data-test-pattern-form]').forEach(initTestPatternForm);
   });
 })();
