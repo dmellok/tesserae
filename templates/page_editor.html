@@ -199,9 +199,17 @@
            data-panel-w="{{ g.w }}"
            data-panel-h="{{ g.h }}"
            style="aspect-ratio: {{ g.w }} / {{ g.h }}; --panel-ar: calc({{ g.w }} / {{ g.h }});">
+        {# Live-preview throbber (v0.69.8): visible while the composer
+           server-renders the page (waiting on each widget's fetch()),
+           hidden the moment the iframe fires ``load``. Editor JS
+           toggles the ``hidden`` attribute in reloadPreview(). #}
+        <div class="preview-throbber" data-preview-throbber hidden aria-hidden="true">
+          <i class="ph ph-circle-notch"></i>
+        </div>
         <iframe src="{{ url_for('composer.compose', page_id=page.id) }}?preview=1&amp;w={{ g.w }}&amp;h={{ g.h }}"
                 style="width: {{ g.w }}px; height: {{ g.h }}px;"
-                loading="lazy" sandbox="allow-scripts allow-same-origin"></iframe>
+                loading="lazy" sandbox="allow-scripts allow-same-origin"
+                data-preview-iframe></iframe>
       </div>
       <p class="muted preview-dims">
         {{ g.w }} × {{ g.h }}

@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.8], 2026-07-05
+
+### Added
+
+- **Live-preview throbber in the widget editor.** The composer
+  server-renders the preview page on every change, running each
+  widget's ``fetch()`` in parallel; upstreams like Open-Meteo, iCal
+  feeds, or Home Assistant add hundreds of ms to seconds of visible
+  dead time. A ``ph-circle-notch`` spinner now sits over the faded
+  iframe while the reload is in flight, fades in after ~280 ms
+  (so a fast render with cached widget data stays flash-free), and
+  disappears on the iframe's ``load`` event. Applies to
+  ``reloadPreview``, the hourly hard-reset path, and the initial
+  page open (which was previously the longest dead time thanks to
+  ``loading="lazy"``).
+
 ## [0.69.7], 2026-07-05
 
 ### Fixed

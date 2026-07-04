@@ -104,6 +104,24 @@
   // down the whole iframe DOM, see applyPreviewGroups below.
   const lastStateByFrame = new WeakMap();
 
+  // v0.69.8: throbber sibling in ``.preview-frame`` reveals while the
+  // composer server-renders the page (per-widget ``fetch()`` waits)
+  // and hides on the iframe's ``load`` event. Wrapped so both
+  // reloadPreview() and hardResetPreview() can toggle it consistently.
+  function previewThrobberFor(iframe) {
+    return iframe.parentElement
+      ? iframe.parentElement.querySelector("[data-preview-throbber]")
+      : null;
+  }
+  function showPreviewThrobber(iframe) {
+    const t = previewThrobberFor(iframe);
+    if (t) t.hidden = false;
+  }
+  function hidePreviewThrobber(iframe) {
+    const t = previewThrobberFor(iframe);
+    if (t) t.hidden = true;
+  }
+
   // Reload the preview iframe in place. A short opacity fade hides
   // the blank-during-load state without doubling the live iframe.
   //
@@ -116,10 +134,12 @@
       url.searchParams.set("_t", String(Date.now()));
       iframe.style.transition = "opacity 140ms ease";
       iframe.style.opacity = "0.35";
+      showPreviewThrobber(iframe);
       iframe.addEventListener(
         "load",
         () => {
           iframe.style.opacity = "1";
+          hidePreviewThrobber(iframe);
           // The iframe's contents are fresh, drop the cached state so
           // the next preview cycle diffs against what's actually painted.
           lastStateByFrame.delete(iframe);
@@ -155,6 +175,7 @@
       })();
       iframe.style.transition = "opacity 140ms ease";
       iframe.style.opacity = "0.35";
+      showPreviewThrobber(iframe);
       // about:blank first → the browser unmounts the document, dropping
       // every interval/listener/ResizeObserver/embedded-iframe that
       // belonged to it. Then the real URL loads a fresh composition.
@@ -166,6 +187,7 @@
             "load",
             () => {
               iframe.style.opacity = "1";
+              hidePreviewThrobber(iframe);
               lastStateByFrame.delete(iframe);
             },
             { once: true },
@@ -660,6 +682,15 @@
     saveBtn.addEventListener("click", saveAll);
     saveBtn.disabled = true;
   }
+  // v0.69.8: throbber on initial page load. The iframe's ``loading=
+  // "lazy"`` defers navigation until the frame scrolls into view, so
+  // the wait between page open and first paint can be several seconds
+  // of dead space. Reveal the throbber up front and hide on the
+  // iframe's first ``load`` event.
+  previewFrames().forEach((iframe) => {
+    showPreviewThrobber(iframe);
+    iframe.addEventListener("load", () => hidePreviewThrobber(iframe), { once: true });
+  });
   watchForms();
   watchLayoutForms();
   watchMultiSelect();

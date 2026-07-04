@@ -56,6 +56,39 @@
 }
 .preview-placeholder[hidden] { display: none !important; }
 
+/* Live-preview throbber (v0.69.8). Sits on top of the faded iframe
+   while the composer server-renders the page (waiting on each
+   widget's fetch() to return), so the wait doesn't read as a dead
+   pane. Reveals when reloadPreview() sets iframe.src; hidden again
+   on the iframe's ``load`` event. */
+.preview-throbber {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 2;
+  animation: preview-throbber-fade-in 180ms ease 100ms both;
+}
+.preview-throbber[hidden] { display: none; }
+.preview-throbber > i {
+  font-size: 40px;
+  color: var(--t-accent);
+  filter: drop-shadow(0 1px 2px rgba(20, 20, 15, 0.28));
+  animation: preview-throbber-spin 0.9s linear infinite;
+}
+@keyframes preview-throbber-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes preview-throbber-fade-in {
+  /* Small delay + fade so a fast render (cached widget data, no
+     network hit) doesn't flash the throbber. Anything under ~280 ms
+     stays invisible; longer waits get the spinner. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* ----- Dashboards index (mirrors inky-dash) ----------------------- */
 
 /* Inline create card: plus glyph · name input (grows) · primary button. */
