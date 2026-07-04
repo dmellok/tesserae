@@ -427,6 +427,34 @@ def _palette_family_for(device: Device) -> str:
     return "spectra6"
 
 
+def _palette_profile_colors_for(device: Device) -> list[dict[str, str]] | None:
+    """Ordered list of the active profile's palette colours for the
+    colour-picker grid on the Calibration tab. Returns None when no
+    profile is applied (the template hides the picker in that case)."""
+    slug = _palette_profile_slug_for(device)
+    if not slug:
+        return None
+    profile = palette_profiles.bundled_profile(slug)
+    if profile is None:
+        from pathlib import Path
+
+        store = palette_profiles.PaletteProfileStore(Path(current_app.config["DATA_ROOT"]))
+        profile = store.load(slug)
+    if profile is None:
+        return None
+    out = [
+        {"name": "black", "label": "Black", "hex": profile.palette.black},
+        {"name": "white", "label": "White", "hex": profile.palette.white},
+        {"name": "yellow", "label": "Yellow", "hex": profile.palette.yellow},
+        {"name": "red", "label": "Red", "hex": profile.palette.red},
+        {"name": "blue", "label": "Blue", "hex": profile.palette.blue},
+        {"name": "green", "label": "Green", "hex": profile.palette.green},
+    ]
+    if profile.palette.orange:
+        out.append({"name": "orange", "label": "Orange", "hex": profile.palette.orange})
+    return out
+
+
 def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
     """Active profile's tone + dither values, or the neutral defaults
     when no profile is applied. Feeds the tone-editor sliders in the
@@ -808,6 +836,20 @@ def _build_sections() -> list[dict[str, Any]]:
                     url_for("auth.devices_palette_update_tone", instance_id=device.id)
                     if is_instance
                     else None
+                ),
+                # Per-colour palette editor (v0.67.3). Endpoint takes 6-7
+                # hex values keyed by colour name. ``palette_profile_colors``
+                # carries the active profile's current values so the
+                # ``<input type="color">`` fields pre-populate on render;
+                # None when no profile is applied so the template hides
+                # the editor block.
+                "palette_update_palette_endpoint": (
+                    url_for("auth.devices_palette_update_palette", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "palette_profile_colors": (
+                    _palette_profile_colors_for(device) if is_instance else None
                 ),
                 # Contrast + saturation live in the Calibration tab now.
                 # Shape mirrors ``picture_quality`` so the same template

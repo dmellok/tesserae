@@ -6,6 +6,22 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.3], 2026-07-04
+
+### Added
+
+- **Per-colour palette editor on the Calibration tab.** The
+  palette recalibration card grows a grid of six (Spectra 6) or
+  seven (Inky 7-colour) native `<input type="color">` swatches
+  with a live `#rrggbb` readout below each. Users can eyeball-
+  match each palette entry against what their panel actually
+  reproduces, without editing JSON. New endpoint
+  `POST /settings/devices/<id>/palette/update-palette` handles the
+  fork-or-edit-in-place logic: bundled presets fork into a user
+  profile named "<name> (edited)" on first tweak; user profiles
+  are edited in place. Bad hex values fall through to the base
+  preset's value rather than being written as-is.
+
 ## [0.67.2], 2026-07-04
 
 ### Added

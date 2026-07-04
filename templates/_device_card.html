@@ -750,6 +750,38 @@
           </details>
           {% endif %}
 
+          {# Per-colour palette editor (v0.67.3). Six <input type="color">
+             fields keyed by colour name. Bundled profiles fork on first
+             tweak; user profiles are edited in place. #}
+          {% if section.palette_update_palette_endpoint and section.palette_profile_colors %}
+          <hr class="dx-divider">
+          <p class="device-subhead">Palette colours</p>
+          {% if section.palette_profile_tone.bundled %}
+          <p class="field-help" style="margin: 0 0 12px;">
+            Editing bundled colours forks the preset into an editable
+            copy under "Your profiles".
+          </p>
+          {% endif %}
+          <form method="post" action="{{ section.palette_update_palette_endpoint }}"
+                class="form dx-palette-colors-form">
+            <div class="dx-palette-colors-grid">
+              {% for c in section.palette_profile_colors %}
+              <label class="dx-palette-color-cell">
+                <span class="dx-palette-color-name">{{ c.label }}</span>
+                <input type="color" name="{{ c.name }}" value="{{ c.hex }}"
+                       class="dx-palette-color-input"
+                       data-palette-color-input>
+                <output class="dx-palette-color-hex" data-palette-color-hex>{{ c.hex }}</output>
+              </label>
+              {% endfor %}
+            </div>
+            <button type="submit" class="button">
+              <i class="ph ph-eyedropper" aria-hidden="true"></i>
+              <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save colours{% else %}Save colours{% endif %}</span>
+            </button>
+          </form>
+          {% endif %}
+
           {# Tone editor (v0.67.1). Sliders write to the active
              profile via a dedicated POST. Bundled profiles fork on
              first edit; user profiles are edited in place. Only

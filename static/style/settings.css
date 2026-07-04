@@ -1350,6 +1350,42 @@
 }
 :root[data-theme="dark"] .dx-palette-experimental { border-color: var(--t-border); }
 
+/* Per-colour palette editor (v0.67.3). Grid of colour swatches so
+   users can eyeball-match each palette entry to what their panel
+   actually reproduces. */
+.dx-palette-colors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.dx-palette-color-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--dx-border-faint);
+  border-radius: 8px;
+  padding: 8px 10px;
+  align-items: center;
+}
+.dx-palette-color-name { font-weight: 600; font-size: 13px; }
+.dx-palette-color-input {
+  width: 100%;
+  height: 40px;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  background: transparent;
+}
+.dx-palette-color-hex {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--dx-faint);
+  font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] .dx-palette-color-cell { border-color: var(--t-border); }
+
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the
    resolved effective map (default + global + per-device). */

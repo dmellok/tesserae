@@ -229,6 +229,104 @@ def devices_palette_update_tone(instance_id: str) -> Response:
     return _redirect_to_calibration(instance_id)
 
 
+@bp.post("/settings/devices/<instance_id>/palette/update-palette")
+def devices_palette_update_palette(instance_id: str) -> Response:
+    """Update the RGB values on the device's active profile.
+
+    Accepts six (Spectra 6) or seven (Inky 7-colour) ``#rrggbb`` hex
+    values keyed ``black`` / ``white`` / ``yellow`` / ``red`` / ``blue``
+    / ``green`` (+ optional ``orange`` for Inky). Bundled profiles fork
+    on first edit, mirroring the tone-editor flow; user profiles are
+    edited in place. The renderer picks up the new palette on the next
+    push."""
+    from app.palette_profiles.schema import PaletteColors
+
+    device = devices().get(instance_id)
+    if device is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
+    raw = settings_store().get_for_runtime("devices", instance_id, slug_field)
+    slug = str(raw.get("palette_profile_slug") or "").strip()
+    if not slug:
+        flash("Pick a palette profile before editing colours.", "error")
+        return _redirect_to_calibration(instance_id)
+    base = bundled_profile(slug) or _profile_store().load(slug)
+    if base is None:
+        flash(f"Unknown palette profile {slug!r}.", "error")
+        return _redirect_to_calibration(instance_id)
+
+    def _hex(key: str, default: str) -> str:
+        val = (request.form.get(key) or "").strip()
+        # ``<input type="color">`` always submits ``#rrggbb``. Reject
+        # anything that doesn't match the shape so a broken submit
+        # can't put garbage in the profile.
+        if len(val) == 7 and val.startswith("#"):
+            try:
+                int(val[1:], 16)
+                return val
+            except ValueError:
+                return default
+        return default
+
+    new_palette = PaletteColors(
+        black=_hex("black", base.palette.black),
+        white=_hex("white", base.palette.white),
+        yellow=_hex("yellow", base.palette.yellow),
+        red=_hex("red", base.palette.red),
+        blue=_hex("blue", base.palette.blue),
+        green=_hex("green", base.palette.green),
+        orange=(
+            _hex("orange", base.palette.orange or "#ff8c00")
+            if base.palette.orange is not None
+            else None
+        ),
+    )
+    store = _profile_store()
+    if base.bundled:
+        forked_slug = f"{base.slug}-edited"
+        suffix = 2
+        original = forked_slug
+        while not store.slug_available(forked_slug):
+            forked_slug = f"{original}-{suffix}"
+            suffix += 1
+        forked = PaletteProfile(
+            slug=forked_slug,
+            name=f"{base.name} (edited)",
+            family=base.family,
+            palette=new_palette,
+            tone=base.tone,
+            dither=base.dither,
+            edges=base.edges,
+            bundled=False,
+            based_on=base.based_on or base.slug,
+            attribution=base.attribution,
+            notes=base.notes,
+            saved_at=_now_iso(),
+        )
+        store.save(forked)
+        _write_device_slug(instance_id, forked_slug)
+        flash(f"Forked {base.name!r} into an editable copy with your palette.", "ok")
+        return _redirect_to_calibration(instance_id)
+    updated = PaletteProfile(
+        slug=base.slug,
+        name=base.name,
+        family=base.family,
+        palette=new_palette,
+        tone=base.tone,
+        dither=base.dither,
+        edges=base.edges,
+        bundled=False,
+        based_on=base.based_on,
+        attribution=base.attribution,
+        notes=base.notes,
+        saved_at=_now_iso(),
+    )
+    store.save(updated)
+    flash(f"Updated palette for profile {base.name!r}.", "ok")
+    return _redirect_to_calibration(instance_id)
+
+
 @bp.post("/settings/devices/<instance_id>/palette/reset")
 def devices_palette_reset(instance_id: str) -> Response:
     """Clear the device's palette profile override so the built-in

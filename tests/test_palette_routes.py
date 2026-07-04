@@ -257,6 +257,96 @@ def test_update_tone_on_user_profile_edits_in_place(app: Flask, tmp_path: Path) 
     assert body["tone"]["exposure"] == 15
 
 
+def test_update_palette_on_bundled_forks_with_new_colours(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "paperlesspaper-spectra6"},
+    )
+    resp = client.post(
+        f"/settings/devices/{dev}/palette/update-palette",
+        data={
+            "black": "#101010",
+            "white": "#f0f0f0",
+            "yellow": "#c0c000",
+            "red": "#a01010",
+            "blue": "#1010a0",
+            "green": "#108010",
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    forks = list((tmp_path / "palette_profiles").glob("*.json"))
+    assert len(forks) == 1
+    fork = json.loads(forks[0].read_text(encoding="utf-8"))
+    assert fork["palette"]["black"] == "#101010"
+    assert fork["palette"]["red"] == "#a01010"
+    # Bundled preset stays clean.
+    original = json.loads(
+        client.get("/settings/palette-profiles/paperlesspaper-spectra6/export.json").data.decode(
+            "utf-8"
+        )
+    )
+    assert original["palette"]["black"] == "#1F2226"
+
+
+def test_update_palette_on_user_profile_edits_in_place(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/save",
+        data={"name": "MyRoom", "base_slug": "paperlesspaper-spectra6"},
+    )
+    (before,) = list((tmp_path / "palette_profiles").glob("*.json"))
+    client.post(
+        f"/settings/devices/{dev}/palette/update-palette",
+        data={
+            "black": "#222222",
+            "white": "#eeeeee",
+            "yellow": "#dddd00",
+            "red": "#bb2222",
+            "blue": "#2222bb",
+            "green": "#22bb22",
+        },
+    )
+    after = list((tmp_path / "palette_profiles").glob("*.json"))
+    assert [f.name for f in after] == [before.name]
+    body = json.loads(after[0].read_text(encoding="utf-8"))
+    assert body["palette"]["black"] == "#222222"
+    assert body["palette"]["red"] == "#bb2222"
+
+
+def test_update_palette_ignores_bad_hex(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "paperlesspaper-spectra6"},
+    )
+    resp = client.post(
+        f"/settings/devices/{dev}/palette/update-palette",
+        data={
+            "black": "not-a-hex",
+            "white": "#f0f0f0",
+            "yellow": "#c0c000",
+            "red": "#a01010",
+            "blue": "#1010a0",
+            "green": "#108010",
+        },
+    )
+    assert resp.status_code == 302
+    forks = list((tmp_path / "palette_profiles").glob("*.json"))
+    fork = json.loads(forks[0].read_text(encoding="utf-8"))
+    # Bad ``black`` fell back to the base preset value; other colours
+    # took the submitted values.
+    assert fork["palette"]["black"] == "#1F2226"
+    assert fork["palette"]["white"] == "#f0f0f0"
+
+
 def test_update_tone_refused_when_no_profile_applied(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

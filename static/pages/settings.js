@@ -287,5 +287,16 @@
         label.textContent = input.value;
       });
     });
+    // Palette editor: live hex readout below each colour input so the
+    // user sees the exact ``#rrggbb`` they're picking. Native colour
+    // pickers already show hex in their popovers but the readout stays
+    // visible on-card without requiring the popover to be open.
+    document.querySelectorAll('[data-palette-color-input]').forEach(function (input) {
+      const readout = input.parentElement.querySelector('[data-palette-color-hex]');
+      if (!readout) return;
+      input.addEventListener('input', function () {
+        readout.textContent = input.value;
+      });
+    });
   });
 })();
