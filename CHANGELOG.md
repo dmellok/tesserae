@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.5], 2026-07-04
+
+### Fixed
+
+- **`mypy` strict CI failure on `_error_diffusion`'s LAB scratch
+  buffers.** The v0.67.4 introduction of the LAB colour-match path
+  initialised the scratch buffers as `None` in the RGB-only branch,
+  which type-checked locally against the strict-modules list but
+  tripped the CI-wide `mypy app` run (91 files) on the buffer
+  indexing. Declare the buffers up-front with concrete types and
+  leave them empty in the RGB path so the indexed reads inside
+  `if use_lab:` type-check consistently. No runtime behaviour
+  change.
+
 ## [0.67.4], 2026-07-04
 
 ### Added

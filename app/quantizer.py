@@ -624,6 +624,15 @@ def _error_diffusion(
 
     use_lab = color_match in ("lab", "chroma-aware")
     chroma_weight = 2.0 if color_match == "chroma-aware" else 1.0
+    # Declare LAB buffers up-front so mypy sees one type per name;
+    # the LAB branch guards indexing behind ``use_lab`` so the empty
+    # placeholders are never touched at runtime.
+    buf_l = _array.array("f")
+    buf_a = _array.array("f")
+    buf_b_lab = _array.array("f")
+    pal_L: list[float] = []
+    pal_a: list[float] = []
+    pal_b_lab: list[float] = []
     if use_lab:
         pal_lab = _srgb_to_lab(np.asarray(palette, dtype=np.uint8))
         src_lab = _srgb_to_lab(arr.astype(np.uint8))
@@ -633,9 +642,6 @@ def _error_diffusion(
         pal_L = [float(pal_lab[i, 0]) for i in range(pal_lab.shape[0])]
         pal_a = [float(pal_lab[i, 1]) for i in range(pal_lab.shape[0])]
         pal_b_lab = [float(pal_lab[i, 2]) for i in range(pal_lab.shape[0])]
-    else:
-        buf_l = buf_a = buf_b_lab = None
-        pal_L = pal_a = pal_b_lab = None
     # Flipped weights list is precomputed for serpentine rows so the hot
     # loop doesn't re-mirror per pixel.
     w_dy_lr = [w[0] for w in weights]
