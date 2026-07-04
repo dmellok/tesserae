@@ -70,6 +70,7 @@ users:
     groups:
       - sudo
       - gpio
+      - i2c
       - spi
     sudo:
       - "ALL=(ALL) NOPASSWD:ALL"
