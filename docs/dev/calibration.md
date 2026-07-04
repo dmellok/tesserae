@@ -56,7 +56,7 @@ forward-compatible with schema additions. Out-of-range tone values
 are clamped rather than rejected. Bad hex codes fall through to
 `#000000` so a corrupt profile can't crash a render.
 
-## What phase 1 (v0.67.0) actually wires
+## What v0.67.0 (phase 1) wires
 
 - **Palette override** flows through the app-side push manager into
   each `.bin` renderer (`esp32_bin`, `pi_bin`, `pico_bin`) as an
@@ -70,10 +70,42 @@ are clamped rather than rejected. Bad hex codes fall through to
   under Rendering → Picture quality). Storage is unchanged; both
   fields still write to `settings.renderers.<clone_id>.contrast` and
   `.saturation`.
-- **Tone / dither / edge knobs** in the profile (S-curve, LAB
-  compress, serpentine scan, colour-match mode, diffusion strength,
-  edge handling) are saved on the profile but not yet applied by the
-  quantizer. They land in phase 2 (v0.67.1).
+
+## What v0.67.1 (phase 2) adds
+
+- **`exposure` (-100..+100)** — linear brightness shift, applied
+  before palette quantisation. `_apply_exposure` in
+  `app/quantizer.py` short-circuits on the neutral value so
+  no-profile devices pay no cost.
+- **`s_curve` (-100..+100)** — sigmoid mid-tone punch. Positive
+  values push mid-tones away from grey (more contrast), negative
+  values flatten them.
+- **`serpentine` (bool)** — reverses every other row's scan
+  direction on error-diffusion dithers so diagonal "worming"
+  artefacts disappear from gradient regions.
+- **`diffusion_strength` (0..200)** — scales propagated error
+  amount on error-diffusion dithers. 100 = default, <100 = softer
+  / flatter, 0 = nearest-neighbour quantise, >100 = exaggerated
+  (rarely useful).
+- **UI**: sliders + toggle on the Calibration tab card writing to
+  the active profile via
+  `POST /settings/devices/<id>/palette/update-tone`. Editing a
+  bundled preset forks it into an editable copy on first tweak;
+  user profiles are edited in place.
+
+## What still isn't wired (later phases)
+
+- **LAB dynamic-range compression** (`lab_compress_min` /
+  `lab_compress_max` on the profile) — stored but ignored; the
+  existing linear `_compress_to_calibrated_range` still runs when
+  `calibrated=True`.
+- **Colour-match modes** (RGB / LAB / chroma-aware) — stored but
+  ignored; RGB nearest is the only path.
+- **Edge handling** (`preserve_line_art`, `smoothing_radius`) —
+  stored but ignored, targeted for a future v0.67.x.
+- **`pi_png`** — palette override would need a firmware-side
+  change on `tesserae-device-pi-png`.
+- **`trmnl_png`** — mono; palette calibration doesn't apply.
 
 ## What phase 1 doesn't cover
 

@@ -209,6 +209,69 @@ def test_delete_user_profile(app: Flask, tmp_path: Path) -> None:
     assert not list((tmp_path / "palette_profiles").glob("*.json"))
 
 
+def test_update_tone_on_bundled_profile_forks_to_user_copy(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "paperlesspaper-spectra6"},
+    )
+    resp = client.post(
+        f"/settings/devices/{dev}/palette/update-tone",
+        data={"exposure": "20", "s_curve": "-10", "diffusion_strength": "80"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    forks = list((tmp_path / "palette_profiles").glob("*.json"))
+    assert len(forks) == 1
+    fork_body = json.loads(forks[0].read_text(encoding="utf-8"))
+    assert fork_body["name"].endswith("(edited)")
+    assert fork_body["tone"]["exposure"] == 20
+    assert fork_body["tone"]["s_curve"] == -10
+    assert fork_body["dither"]["diffusion_strength"] == 80
+    # Bundled preset itself is untouched.
+    body = client.get("/settings/palette-profiles/paperlesspaper-spectra6/export.json")
+    original = json.loads(body.data.decode("utf-8"))
+    assert original["tone"]["exposure"] == 0
+
+
+def test_update_tone_on_user_profile_edits_in_place(app: Flask, tmp_path: Path) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    # Save-as-new → applies the user profile → edit-tone stays on it.
+    client.post(
+        f"/settings/devices/{dev}/palette/save",
+        data={"name": "MyDeck", "base_slug": "paperlesspaper-spectra6"},
+    )
+    (files_before,) = list((tmp_path / "palette_profiles").glob("*.json"))
+    client.post(
+        f"/settings/devices/{dev}/palette/update-tone",
+        data={"exposure": "15", "s_curve": "0", "diffusion_strength": "100"},
+    )
+    files_after = list((tmp_path / "palette_profiles").glob("*.json"))
+    # Same file (no fork).
+    assert [f.name for f in files_after] == [files_before.name]
+    body = json.loads(files_after[0].read_text(encoding="utf-8"))
+    assert body["tone"]["exposure"] == 15
+
+
+def test_update_tone_refused_when_no_profile_applied(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    resp = client.post(
+        f"/settings/devices/{dev}/palette/update-tone",
+        data={"exposure": "10"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    # No profile file written.
+    prof_dir = Path(app.config["DATA_ROOT"]) / "palette_profiles"
+    assert not prof_dir.exists() or not list(prof_dir.glob("*.json"))
+
+
 def test_delete_bundled_profile_refused(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

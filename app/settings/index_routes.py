@@ -18,7 +18,7 @@ from flask import current_app, flash, redirect, render_template, request, sessio
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
-from app import device_timetable, test_patterns
+from app import device_timetable, palette_profiles, test_patterns
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
@@ -427,6 +427,45 @@ def _palette_family_for(device: Device) -> str:
     return "spectra6"
 
 
+def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
+    """Active profile's tone + dither values, or the neutral defaults
+    when no profile is applied. Feeds the tone-editor sliders in the
+    Calibration tab so they pre-populate on render."""
+    slug = _palette_profile_slug_for(device)
+    if not slug:
+        return {
+            "exposure": 0,
+            "s_curve": 0,
+            "serpentine": False,
+            "diffusion_strength": 100,
+            "bundled": False,
+            "editable": False,
+        }
+    profile = palette_profiles.bundled_profile(slug)
+    if profile is None:
+        from pathlib import Path
+
+        store = palette_profiles.PaletteProfileStore(Path(current_app.config["DATA_ROOT"]))
+        profile = store.load(slug)
+    if profile is None:
+        return {
+            "exposure": 0,
+            "s_curve": 0,
+            "serpentine": False,
+            "diffusion_strength": 100,
+            "bundled": False,
+            "editable": False,
+        }
+    return {
+        "exposure": profile.tone.exposure,
+        "s_curve": profile.tone.s_curve,
+        "serpentine": profile.dither.serpentine,
+        "diffusion_strength": profile.dither.diffusion_strength,
+        "bundled": profile.bundled,
+        "editable": True,
+    }
+
+
 def _palette_profile_choices_for(device: Device) -> list[dict[str, Any]]:
     """Bundled + user profiles offered to this device, scoped to the
     matching palette family."""
@@ -757,6 +796,16 @@ def _build_sections() -> list[dict[str, Any]]:
                 ),
                 "palette_import_endpoint": (
                     url_for("auth.palette_profile_import") if is_instance else None
+                ),
+                # Tone / dither editor (v0.67.1). ``palette_profile_tone``
+                # carries the active profile's current values so the
+                # sliders pre-populate; ``palette_update_tone_endpoint``
+                # is the POST target for the editor.
+                "palette_profile_tone": (_palette_profile_tone_for(device) if is_instance else {}),
+                "palette_update_tone_endpoint": (
+                    url_for("auth.devices_palette_update_tone", instance_id=device.id)
+                    if is_instance
+                    else None
                 ),
                 # Contrast + saturation live in the Calibration tab now.
                 # Shape mirrors ``picture_quality`` so the same template

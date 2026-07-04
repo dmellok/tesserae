@@ -750,13 +750,65 @@
           </details>
           {% endif %}
 
+          {# Tone editor (v0.67.1). Sliders write to the active
+             profile via a dedicated POST. Bundled profiles fork on
+             first edit; user profiles are edited in place. Only
+             renders when a profile is applied (nothing to edit
+             otherwise). #}
+          {% if section.palette_update_tone_endpoint and section.palette_profile_tone.editable %}
+          <hr class="dx-divider">
+          <p class="device-subhead">Tone &amp; dither</p>
+          {% if section.palette_profile_tone.bundled %}
+          <p class="field-help" style="margin: 0 0 12px;">
+            Editing a bundled preset forks it into an editable copy so
+            the original stays intact. You'll see the copy show up under
+            "Your profiles" in the picker above.
+          </p>
+          {% endif %}
+          <form method="post" action="{{ section.palette_update_tone_endpoint }}"
+                class="form dx-palette-tone-form">
+            <div class="dx-tone-grid">
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">Exposure</span>
+                <input type="range" name="exposure" min="-100" max="100" step="1"
+                       value="{{ section.palette_profile_tone.exposure }}"
+                       data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.exposure }}</output>
+              </label>
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">S-curve (mid-tone punch)</span>
+                <input type="range" name="s_curve" min="-100" max="100" step="1"
+                       value="{{ section.palette_profile_tone.s_curve }}"
+                       data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.s_curve }}</output>
+              </label>
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">Diffusion strength</span>
+                <input type="range" name="diffusion_strength" min="0" max="200" step="5"
+                       value="{{ section.palette_profile_tone.diffusion_strength }}"
+                       data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.diffusion_strength }}</output>
+              </label>
+              <label class="dx-tone-toggle">
+                <input type="checkbox" name="serpentine" value="1"
+                       {% if section.palette_profile_tone.serpentine %}checked{% endif %}>
+                <span>Serpentine scan (error-diffusion only)</span>
+              </label>
+            </div>
+            <button type="submit" class="button">
+              <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+              <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
+            </button>
+          </form>
+          {% endif %}
+
           {# Contrast + Saturation moved here in v0.67; storage is the
              same per-clone renderer-settings path they were on before,
              so the combined save form still routes correctly. #}
           {% if section.calibration_picture_quality %}
           <hr class="dx-divider">
           {% for pq in section.calibration_picture_quality %}
-          <p class="device-subhead">{{ pq.base_name }} — tone</p>
+          <p class="device-subhead">{{ pq.base_name }} — contrast &amp; saturation</p>
           {% for field in pq.fields %}
             {% set value = pq.state.get(field.name, field.get('default', '')) %}
             {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}

@@ -92,6 +92,12 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
+    # Profile tone / dither knobs (v0.67.1). Populated by app.push
+    # only when the device has a Calibration-tab profile applied;
+    # missing keys keep the pre-v0.67 defaults so no-profile devices
+    # render byte-identical to before.
+    tone = settings.get("_profile_tone") or {}
+    dither_extras = settings.get("_profile_dither") or {}
     return pack_to_panel_bin(
         img,
         width=native_w,
@@ -105,6 +111,10 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # applied), the quantizer falls back to the built-in calibrated
         # palette for the gamut, same as pre-v0.67 behaviour.
         palette_override=settings.get("_palette_override"),
+        exposure=int(tone.get("exposure", 0)),
+        s_curve=int(tone.get("s_curve", 0)),
+        serpentine=bool(dither_extras.get("serpentine", False)),
+        diffusion_strength=int(dither_extras.get("diffusion_strength", 100)),
     )
 
 

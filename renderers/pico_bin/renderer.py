@@ -100,6 +100,12 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # Calibration-tab palette profile (populated by app.push from
         # the device's active profile). None keeps pre-v0.67 behaviour.
         palette_override=settings.get("_palette_override"),
+        exposure=int((settings.get("_profile_tone") or {}).get("exposure", 0)),
+        s_curve=int((settings.get("_profile_tone") or {}).get("s_curve", 0)),
+        serpentine=bool((settings.get("_profile_dither") or {}).get("serpentine", False)),
+        diffusion_strength=int(
+            (settings.get("_profile_dither") or {}).get("diffusion_strength", 100)
+        ),
     )
 
 

@@ -187,6 +187,45 @@ _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]
 }
 
 
+def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
+    """Linear brightness shift. ``exposure`` in -100..+100 maps to a
+    multiplier ``1 + exposure/200``, so +100 is +50% brighter and -100
+    is 50% darker. Clips at 0..255. Skips the numpy round-trip on the
+    no-op fast path so profiles with ``exposure=0`` cost nothing."""
+    if exposure == 0:
+        return img
+    factor = 1.0 + max(-100, min(100, int(exposure))) / 200.0
+    arr = np.asarray(img.convert("RGB"), dtype=np.float32) * factor
+    return Image.fromarray(np.clip(arr, 0.0, 255.0).astype(np.uint8))
+
+
+def _apply_s_curve(img: Image.Image, amount: int) -> Image.Image:
+    """Mid-tone contrast shift via a sigmoid S-curve. ``amount`` in
+    -100..+100; positive values steepen the S (more mid-tone punch)
+    and negative values flatten it (softer, milkier). Applies to R,
+    G, B independently rather than luminance so the palette-space
+    dither still sees per-channel error. Skips no-op fast path."""
+    amount = max(-100, min(100, int(amount)))
+    if amount == 0:
+        return img
+    # k controls the sigmoid steepness. amount=100 -> k=6 (strong S);
+    # amount=-100 -> k=-6 (inverted / flattened).
+    k = amount / 100.0 * 6.0
+    arr = np.asarray(img.convert("RGB"), dtype=np.float32) / 255.0
+    centred = arr - 0.5
+    # sigmoid(k*x); rescale so 0 and 1 stay pinned regardless of k.
+    if k > 0:
+        raw = 1.0 / (1.0 + np.exp(-k * centred * 2.0))
+        lo = 1.0 / (1.0 + np.exp(k))
+        hi = 1.0 / (1.0 + np.exp(-k))
+        out = (raw - lo) / (hi - lo)
+    else:
+        # Inverse sigmoid: flatten mid-tones. Blend towards linear.
+        blend = 1.0 + k / 6.0 * 0.6  # -100 -> 0.4
+        out = 0.5 + centred * blend
+    return Image.fromarray(np.clip(out * 255.0, 0.0, 255.0).astype(np.uint8))
+
+
 _PIL_DITHER_MAP: dict[str, Image.Dither] = {
     "floyd-steinberg": Image.Dither.FLOYDSTEINBERG,
     "none": Image.Dither.NONE,
@@ -399,7 +438,12 @@ def _nearest_palette_indices(pixels: np.ndarray, palette: np.ndarray) -> np.ndar
 
 
 def _error_diffusion(
-    rgb: Image.Image, palette: np.ndarray, weights: list[tuple[int, int, float]]
+    rgb: Image.Image,
+    palette: np.ndarray,
+    weights: list[tuple[int, int, float]],
+    *,
+    serpentine: bool = False,
+    strength: float = 1.0,
 ) -> bytes:
     """Generic error-diffusion dither.
 
@@ -407,9 +451,21 @@ def _error_diffusion(
     fundamental sequential dependency. We feed numpy arrays into typed
     ``array.array`` flat buffers, ~3x faster than indexing numpy in the
     hot loop. Still slow at panel size (several seconds) but opt-in;
-    FS / bayer remain the fast paths."""
+    FS / bayer remain the fast paths.
+
+    ``serpentine`` reverses every other row's scan direction, which
+    hides the diagonal "worming" banding pattern that plain left-to-
+    right scans can produce on gradient regions. Slightly slower
+    (branch overhead) but reads noticeably cleaner on photos.
+
+    ``strength`` scales the propagated error (1.0 = normal, 0.5 =
+    softer / flatter dither). Values under 1.0 discard error rather
+    than spread it, so the output stays palette-locked with less
+    speckle at the cost of tone accuracy. Values above 1.0 amplify
+    the dither for exaggerated texture and are almost never useful."""
     import array as _array
 
+    strength = max(0.0, float(strength))
     arr = np.asarray(rgb, dtype=np.float32)
     H, W, _ = arr.shape
     buf_r = _array.array("f", arr[:, :, 0].ravel().tolist())
@@ -421,14 +477,24 @@ def _error_diffusion(
     pg = [float(palette[i, 1]) for i in range(palette.shape[0])]
     pb = [float(palette[i, 2]) for i in range(palette.shape[0])]
     n_pal = len(pr)
-    w_dy = [w[0] for w in weights]
-    w_dx = [w[1] for w in weights]
+    # Flipped weights list is precomputed for serpentine rows so the hot
+    # loop doesn't re-mirror per pixel.
+    w_dy_lr = [w[0] for w in weights]
+    w_dx_lr = [w[1] for w in weights]
     w_frac = [w[2] for w in weights]
+    w_dx_rl = [-dx for dx in w_dx_lr]
     n_weights = len(weights)
 
     for y in range(H):
         row_base = y * W
-        for x in range(W):
+        reverse = serpentine and (y & 1)
+        if reverse:
+            x_range = range(W - 1, -1, -1)
+            w_dx_row = w_dx_rl
+        else:
+            x_range = range(W)
+            w_dx_row = w_dx_lr
+        for x in x_range:
             idx = row_base + x
             r = buf_r[idx]
             g = buf_g[idx]
@@ -447,12 +513,12 @@ def _error_diffusion(
                     best_d = d
                     best_i = i
             out[idx] = best_i
-            er = r - pr[best_i]
-            eg = g - pg[best_i]
-            eb = b - pb[best_i]
+            er = (r - pr[best_i]) * strength
+            eg = (g - pg[best_i]) * strength
+            eb = (b - pb[best_i]) * strength
             for k in range(n_weights):
-                ny = y + w_dy[k]
-                nx = x + w_dx[k]
+                ny = y + w_dy_lr[k]
+                nx = x + w_dx_row[k]
                 if 0 <= ny < H and 0 <= nx < W:
                     frac = w_frac[k]
                     nidx = ny * W + nx
@@ -568,6 +634,10 @@ def pack_to_panel_bin(
     gamut: str = "waveshare_e6",
     calibrated: bool = False,
     palette_override: tuple[tuple[int, int, int], ...] | None = None,
+    exposure: int = 0,
+    s_curve: int = 0,
+    serpentine: bool = False,
+    diffusion_strength: int = 100,
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
@@ -640,22 +710,38 @@ def pack_to_panel_bin(
     rgb = img.convert("RGB")
     if calibrated_active:
         rgb = _compress_to_calibrated_range(rgb, palette)
+    # Tone pipeline order: exposure (linear brightness) -> S-curve
+    # (mid-tone contrast) -> saturation / contrast (existing per-clone
+    # multipliers). Each helper short-circuits on the no-op value so
+    # profiles that leave the knobs at defaults stay free of numpy
+    # round-trips.
+    if exposure:
+        rgb = _apply_exposure(rgb, exposure)
+    if s_curve:
+        rgb = _apply_s_curve(rgb, s_curve)
     # ImageEnhance is C-speed and idempotent at factor=1.0 (no-op fast path).
     if saturation != 1.0:
         rgb = ImageEnhance.Color(rgb).enhance(saturation)
     if contrast != 1.0:
         rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
 
+    strength_scale = max(0.0, min(200, int(diffusion_strength))) / 100.0
     if dither in _PIL_DITHER_MAP:
         pal_img = _palette_image(palette)
         indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
         raw = indexed.tobytes()
     elif dither == "atkinson":
-        raw = _error_diffusion(rgb, pal_arr, _ATKINSON_WEIGHTS)
+        raw = _error_diffusion(
+            rgb, pal_arr, _ATKINSON_WEIGHTS, serpentine=serpentine, strength=strength_scale
+        )
     elif dither == "jarvis":
-        raw = _error_diffusion(rgb, pal_arr, _JJN_WEIGHTS)
+        raw = _error_diffusion(
+            rgb, pal_arr, _JJN_WEIGHTS, serpentine=serpentine, strength=strength_scale
+        )
     elif dither == "stucki":
-        raw = _error_diffusion(rgb, pal_arr, _STUCKI_WEIGHTS)
+        raw = _error_diffusion(
+            rgb, pal_arr, _STUCKI_WEIGHTS, serpentine=serpentine, strength=strength_scale
+        )
     elif dither == "bayer-8x8":
         raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)
     elif dither == "halftone":

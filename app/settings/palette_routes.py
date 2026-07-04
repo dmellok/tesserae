@@ -131,6 +131,100 @@ def devices_palette_save(instance_id: str) -> Response:
     return _redirect_to_calibration(instance_id)
 
 
+@bp.post("/settings/devices/<instance_id>/palette/update-tone")
+def devices_palette_update_tone(instance_id: str) -> Response:
+    """Update the tone / dither knobs on the device's active profile.
+
+    Bundled profiles fork into a user profile named "<Base name> (edited)"
+    on first tweak; subsequent tweaks update the fork in place. User
+    profiles are edited directly. The renderer picks up the new values
+    on the next push (no restart needed)."""
+    from app.palette_profiles.schema import DitherSettings, ToneSettings
+
+    device = devices().get(instance_id)
+    if device is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
+    raw = settings_store().get_for_runtime("devices", instance_id, slug_field)
+    slug = str(raw.get("palette_profile_slug") or "").strip()
+    if not slug:
+        flash("Pick a palette profile before editing tone.", "error")
+        return _redirect_to_calibration(instance_id)
+    base = bundled_profile(slug) or _profile_store().load(slug)
+    if base is None:
+        flash(f"Unknown palette profile {slug!r}.", "error")
+        return _redirect_to_calibration(instance_id)
+
+    def _as_int(key: str, default: int) -> int:
+        try:
+            return int(request.form.get(key, default) or default)
+        except (TypeError, ValueError):
+            return default
+
+    new_tone = ToneSettings(
+        exposure=max(-100, min(100, _as_int("exposure", base.tone.exposure))),
+        contrast=base.tone.contrast,
+        saturation=base.tone.saturation,
+        s_curve=max(-100, min(100, _as_int("s_curve", base.tone.s_curve))),
+        lab_compress_min=base.tone.lab_compress_min,
+        lab_compress_max=base.tone.lab_compress_max,
+    )
+    new_dither = DitherSettings(
+        algorithm=base.dither.algorithm,
+        serpentine=bool(request.form.get("serpentine")),
+        color_match=base.dither.color_match,
+        diffusion_strength=max(0, min(200, _as_int("diffusion_strength", 100))),
+    )
+    store = _profile_store()
+    if base.bundled:
+        # Fork the bundled preset. Naming skips a suffix on the first
+        # fork; subsequent forks tack on ``-2``, ``-3``... same suffix
+        # loop the Save-as-new flow uses.
+        forked_slug = f"{base.slug}-edited"
+        suffix = 2
+        original = forked_slug
+        while not store.slug_available(forked_slug):
+            forked_slug = f"{original}-{suffix}"
+            suffix += 1
+        forked = PaletteProfile(
+            slug=forked_slug,
+            name=f"{base.name} (edited)",
+            family=base.family,
+            palette=base.palette,
+            tone=new_tone,
+            dither=new_dither,
+            edges=base.edges,
+            bundled=False,
+            based_on=base.based_on or base.slug,
+            attribution=base.attribution,
+            notes=base.notes,
+            saved_at=_now_iso(),
+        )
+        store.save(forked)
+        _write_device_slug(instance_id, forked_slug)
+        flash(f"Forked {base.name!r} into an editable copy and applied it.", "ok")
+        return _redirect_to_calibration(instance_id)
+    # Non-bundled: edit in place.
+    updated = PaletteProfile(
+        slug=base.slug,
+        name=base.name,
+        family=base.family,
+        palette=base.palette,
+        tone=new_tone,
+        dither=new_dither,
+        edges=base.edges,
+        bundled=False,
+        based_on=base.based_on,
+        attribution=base.attribution,
+        notes=base.notes,
+        saved_at=_now_iso(),
+    )
+    store.save(updated)
+    flash(f"Updated tone for profile {base.name!r}.", "ok")
+    return _redirect_to_calibration(instance_id)
+
+
 @bp.post("/settings/devices/<instance_id>/palette/reset")
 def devices_palette_reset(instance_id: str) -> Response:
     """Clear the device's palette profile override so the built-in

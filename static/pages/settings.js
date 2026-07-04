@@ -277,5 +277,15 @@
     document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
     document.querySelectorAll('[data-test-pattern-form]').forEach(initTestPatternForm);
     document.querySelectorAll('[data-palette-apply-form]').forEach(initPaletteApplyForm);
+    // Live label for each tone slider so the user sees the exact
+    // numeric value they're dragging to. Cheap DOM: one <output> per
+    // slider, updated on input.
+    document.querySelectorAll('[data-tone-input]').forEach(function (input) {
+      const label = input.parentElement.querySelector('[data-tone-value]');
+      if (!label) return;
+      input.addEventListener('input', function () {
+        label.textContent = input.value;
+      });
+    });
   });
 })();

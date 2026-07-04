@@ -1296,6 +1296,34 @@
 :root[data-theme="dark"] .dx-palette-save,
 :root[data-theme="dark"] .dx-palette-import { border-color: var(--t-border); }
 
+.dx-tone-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+.dx-tone-slider {
+  display: grid;
+  grid-template-columns: minmax(160px, auto) 1fr 44px;
+  gap: 10px;
+  align-items: center;
+}
+.dx-tone-label { font-weight: 600; }
+.dx-tone-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 40px;
+}
+.dx-tone-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (max-width: 540px) {
+  .dx-tone-slider { grid-template-columns: 1fr; }
+  .dx-tone-value { text-align: left; }
+}
+
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the
    resolved effective map (default + global + per-device). */

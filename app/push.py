@@ -44,8 +44,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
 from app.palette_profiles import (
+    PaletteProfile,
     PaletteProfileStore,
-    resolve_device_palette,
+    bundled_profile,
 )
 from app.panel import (
     device_panel,
@@ -59,6 +60,27 @@ from app.state.event_log import EventLog
 from app.state.page_store import PageStore, Panel
 from app.state.settings_store import SettingsStore
 from app.transport import MqttTransport
+
+
+def _resolve_full_profile(
+    *,
+    device_id: str,
+    settings_store: SettingsStore,
+    profile_store: PaletteProfileStore,
+) -> PaletteProfile | None:
+    """Resolve the full :class:`PaletteProfile` for a device, or None
+    when the device has no profile applied. Bundled profiles win over
+    user profiles when slugs collide (bundled are read-only + version-
+    controlled, so they win the race)."""
+    slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
+    raw = settings_store.get_for_runtime("devices", device_id, slug_field)
+    slug = str(raw.get("palette_profile_slug") or "").strip()
+    if not slug:
+        return None
+    bundled = bundled_profile(slug)
+    if bundled is not None:
+        return bundled
+    return profile_store.load(slug)
 
 
 def resolve_render_timezone_id(settings: SettingsStore) -> str | None:
@@ -1011,14 +1033,30 @@ class PushManager:
         # :func:`app.quantizer.pack_to_panel_bin` as ``palette_override``,
         # which wins over the module-level ``_CALIBRATED_PALETTES`` lookup
         # when the clone's ``calibrated`` toggle is also on.
+        #
+        # Phase 2 (v0.67.1) adds ``_profile_tone`` (exposure, s_curve)
+        # and ``_profile_dither`` (serpentine, diffusion_strength) side
+        # channels for the renderer to pick up. Contrast + saturation
+        # stay on the per-clone renderer settings so existing configs
+        # keep working; the profile's contrast/saturation get merged in
+        # only when they're actively different from their defaults.
         if self._palette_profile_store is not None and renderer.device is not None:
-            override = resolve_device_palette(
+            profile = _resolve_full_profile(
                 device_id=renderer.device,
                 settings_store=self._settings,
                 profile_store=self._palette_profile_store,
             )
-            if override is not None:
-                settings = {**settings, "_palette_override": override}
+            if profile is not None:
+                extras: dict[str, Any] = {"_palette_override": profile.palette.as_tuples()}
+                extras["_profile_tone"] = {
+                    "exposure": profile.tone.exposure,
+                    "s_curve": profile.tone.s_curve,
+                }
+                extras["_profile_dither"] = {
+                    "serpentine": profile.dither.serpentine,
+                    "diffusion_strength": profile.dither.diffusion_strength,
+                }
+                settings = {**settings, **extras}
         # Device-aware low-battery chip: per-renderer so each device's
         # last-known battery decides whether its push wears the warning.
         # A composition fanned out to a Pi + a TRMNL only paints the

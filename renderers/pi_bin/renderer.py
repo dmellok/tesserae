@@ -66,6 +66,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
+    tone = settings.get("_profile_tone") or {}
+    dither_extras = settings.get("_profile_dither") or {}
     return pack_to_panel_bin(
         img,
         width=native_w,
@@ -81,6 +83,10 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # Calibration-tab palette profile (populated by app.push from
         # the device's active profile). None keeps pre-v0.67 behaviour.
         palette_override=settings.get("_palette_override"),
+        exposure=int(tone.get("exposure", 0)),
+        s_curve=int(tone.get("s_curve", 0)),
+        serpentine=bool(dither_extras.get("serpentine", False)),
+        diffusion_strength=int(dither_extras.get("diffusion_strength", 100)),
     )
 
 

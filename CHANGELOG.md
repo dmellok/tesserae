@@ -6,6 +6,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.1], 2026-07-04
+
+### Added
+
+- **Tone + dither editor on the Calibration tab.** The palette
+  card now grows four sliders / toggles that write to the active
+  profile: **Exposure** (-100..+100 linear brightness shift),
+  **S-curve** (-100..+100 mid-tone punch via a sigmoid), **Diffusion
+  strength** (0..200 for error-diffusion dithers; 100 = normal),
+  and **Serpentine scan** (flips scan direction each row, hides
+  the diagonal worming pattern on gradients). Editing a bundled
+  preset forks it into an editable user profile named "<name>
+  (edited)" on first tweak; subsequent edits update the fork in
+  place. User profiles are edited directly.
+- **Palette-profile tone + dither now take effect at render
+  time.** `app.push` injects `_profile_tone` and `_profile_dither`
+  into settings alongside `_palette_override`; `esp32_bin`,
+  `pi_bin`, `pico_bin`, and `trmnl_png_color` pass them through
+  to `app.quantizer.pack_to_panel_bin`. Devices with no profile
+  applied render byte-identical to pre-v0.67.1 (verified in
+  `test_pack_neutral_knobs_match_pre_v67_defaults`).
+- **New route** `POST /settings/devices/<id>/palette/update-tone`
+  handles the fork-or-edit-in-place logic behind the tone editor.
+
 ## [0.67.0], 2026-07-04
 
 ### Added
