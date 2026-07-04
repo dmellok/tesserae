@@ -8,7 +8,7 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import calendar_timezone
+from app.calendar_time import all_day_event_overlaps_date, calendar_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -45,6 +45,10 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "events": []}
 
+    target_date = now_local.date()
+    visible_events = [
+        e for e in events if not e.get("all_day") or all_day_event_overlaps_date(e, target_date)
+    ]
     slim = [
         {
             "summary": e["summary"],
@@ -55,7 +59,7 @@ def fetch(
             "colour": e.get("feed_colour"),
             "feed": e.get("feed_name"),
         }
-        for e in events
+        for e in visible_events
     ]
     if max_events > 0:
         slim = slim[:max_events]

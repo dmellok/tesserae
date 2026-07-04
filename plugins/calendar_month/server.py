@@ -9,7 +9,12 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import calendar_timezone, event_local_date_key, local_midnight_utc
+from app.calendar_time import (
+    all_day_event_date_keys,
+    calendar_timezone,
+    event_local_date_key,
+    local_midnight_utc,
+)
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -54,11 +59,16 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
 
-    # Bucket events by local date (event start date)
+    # Bucket timed events by their local start date. All-day event DTEND values
+    # are exclusive, so expand them across each covered visible date.
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
-        day_key = event_local_date_key(ev, zone)
-        buckets.setdefault(day_key, []).append(ev)
+        if ev.get("all_day"):
+            day_keys = all_day_event_date_keys(ev, grid_start, grid_end)
+        else:
+            day_keys = [event_local_date_key(ev, zone)]
+        for day_key in day_keys:
+            buckets.setdefault(day_key, []).append(ev)
 
     days = []
     cur = grid_start

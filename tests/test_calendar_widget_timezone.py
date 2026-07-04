@@ -64,6 +64,56 @@ def test_calendar_day_uses_app_timezone_for_display_date(
     assert captured["end"] == datetime(2026, 7, 5, 18, 30, tzinfo=UTC)
 
 
+def test_calendar_day_filters_all_day_events_to_the_local_date(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    day = _plugin(app, "calendar_day")
+    core = _core_plugin(app)
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+    frozen = datetime(2026, 7, 4, 19, 10, tzinfo=UTC)
+
+    def load_events(
+        _feeds_filter: list[str] | None,
+        _start: datetime,
+        _end: datetime,
+        *,
+        data_dir: Any,
+    ) -> list[dict[str, Any]]:
+        del data_dir
+        return [
+            {
+                "summary": "Yesterday",
+                "start": "2026-07-04",
+                "end": "2026-07-05",
+                "all_day": True,
+                "feed_colour": "#0d8c7e",
+            },
+            {
+                "summary": "Today",
+                "start": "2026-07-05",
+                "end": "2026-07-06",
+                "all_day": True,
+                "feed_colour": "#0d8c7e",
+            },
+            {
+                "summary": "Spanning",
+                "start": "2026-07-04",
+                "end": "2026-07-06",
+                "all_day": True,
+                "feed_colour": "#0d8c7e",
+            },
+        ]
+
+    monkeypatch.setattr(day, "datetime", _freeze_datetime(frozen))
+    monkeypatch.setattr(core.server_module, "load_events", load_events)
+
+    with app.app_context():
+        out = day.fetch({"hours_ahead": 24}, {}, ctx={})
+
+    assert out["date"] == "2026-07-05"
+    assert [event["summary"] for event in out["events"]] == ["Today", "Spanning"]
+
+
 def test_calendar_week_uses_local_week_and_buckets_timed_events_by_local_date(
     app: Flask, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -138,3 +188,44 @@ def test_calendar_month_uses_local_month(app: Flask, monkeypatch: pytest.MonkeyP
     assert out["month_name"] == "July"
     assert captured["start"] == datetime(2026, 6, 28, 16, 0, tzinfo=UTC)
     assert captured["end"] == datetime(2026, 8, 9, 16, 0, tzinfo=UTC)
+
+
+def test_calendar_month_expands_all_day_events_across_visible_dates(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    month = _plugin(app, "calendar_month")
+    core = _core_plugin(app)
+    app.config["SETTINGS_STORE"].update_section("app", {"timezone": "Asia/Hong_Kong"})
+    frozen = datetime(2026, 7, 5, 10, 0, tzinfo=UTC)
+
+    def load_events(
+        _feeds_filter: list[str] | None,
+        _start: datetime,
+        _end: datetime,
+        *,
+        data_dir: Any,
+    ) -> list[dict[str, Any]]:
+        del data_dir
+        return [
+            {
+                "summary": "Long weekend",
+                "start": "2026-07-04",
+                "end": "2026-07-07",
+                "all_day": True,
+                "feed_colour": "#0d8c7e",
+            }
+        ]
+
+    monkeypatch.setattr(month, "datetime", _freeze_datetime(frozen))
+    monkeypatch.setattr(core.server_module, "load_events", load_events)
+
+    with app.app_context():
+        out = month.fetch({}, {}, ctx={})
+
+    events_by_date = {
+        day["date"]: [event["summary"] for event in day["events"]] for day in out["days"]
+    }
+    assert events_by_date["2026-07-04"] == ["Long weekend"]
+    assert events_by_date["2026-07-05"] == ["Long weekend"]
+    assert events_by_date["2026-07-06"] == ["Long weekend"]
+    assert events_by_date["2026-07-07"] == []
