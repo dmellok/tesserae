@@ -99,6 +99,33 @@ INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
 _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
 
 
+# 4-colour BWRY palette (v0.69.3, issue #NNN follow-up for PicPak
+# support). Physical panels of this class (400 x 300 PicPak, Waveshare
+# 4.2" DEPG0420BR variants, other B/W/Red/Yellow SKUs) reproduce these
+# four colours only; no green, no blue, no grey. Server dithers to
+# this palette when the panel declares ``gamut = "bwry_4"``.
+#
+# Naming is chemistry-only (not ``waveshare_bwry`` etc.) because we
+# define the on-wire nibble layout ourselves for this gamut: no
+# manufacturer-specific packing convention exists yet in the fleet, so
+# there's nothing to alias. If a manufacturer-specific packing shows
+# up later (a firmware that reserves specific nibble values the way
+# Waveshare's E6 firmware reserves 0x4 and 0x7), we'd add
+# ``waveshare_bwry`` / etc. alongside and canonicalise into it.
+BWRY_4_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),  # 0 -> 0x0 black
+    (255, 255, 255),  # 1 -> 0x1 white
+    (255, 0, 0),  # 2 -> 0x2 red
+    (255, 255, 0),  # 3 -> 0x3 yellow
+)
+
+# Dense 0-3 nibble mapping. Unused nibbles (0x4 - 0xf) never appear in
+# the output, so a firmware decoder only needs to switch over the four
+# values. Documented in docs/dev/client-protocol.md as the wire
+# convention.
+_BWRY_4_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3)
+
+
 # Calibrated targets, what the panels actually reproduce under normal
 # viewing light. Used **only** when the per-device ``calibrated`` toggle
 # is on, and always paired with the ``_compress_to_calibrated_range``
@@ -153,8 +180,8 @@ INKY_7COLOUR_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
 # require migrating every existing on-disk config, so the awkward
 # names stay for backward compat and the aliases carry the semantic
 # intent.
-PanelGamut = Literal["waveshare_e6", "inky_7colour"]
-PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour")
+PanelGamut = Literal["waveshare_e6", "inky_7colour", "bwry_4"]
+PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour", "bwry_4")
 
 # Wider allow-list for values a client can *declare* over
 # /api/v1/device/{discover, register} (added v0.69.1 for issue #41
@@ -175,6 +202,7 @@ ACCEPTED_GAMUTS: frozenset[str] = frozenset(
         "mono",
         "rgb24",
         "rgb16",
+        "bwry_4",
     }
 )
 
@@ -251,6 +279,7 @@ def _compress_to_calibrated_range(
 _GAMUT_TABLE: dict[str, tuple[tuple[tuple[int, int, int], ...], tuple[int, ...]]] = {
     "waveshare_e6": (WAVESHARE_E6_PALETTE, _E6_NIBBLE_BY_PALETTE_INDEX),
     "inky_7colour": (INKY_7COLOUR_PALETTE, _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX),
+    "bwry_4": (BWRY_4_PALETTE, _BWRY_4_NIBBLE_BY_PALETTE_INDEX),
 }
 
 

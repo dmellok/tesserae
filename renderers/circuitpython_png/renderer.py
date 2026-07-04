@@ -41,6 +41,7 @@ from typing import Any
 from PIL import Image, ImageEnhance
 
 from app.quantizer import (
+    BWRY_4_PALETTE,
     INKY_7COLOUR_PALETTE,
     SPECTRA_6_PALETTE,
     fit_to_panel,
@@ -82,12 +83,15 @@ def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...] | None:
       * ``mono`` -> black + white
       * ``spectra_6`` / ``waveshare_e6`` / ``e6`` -> Spectra 6
       * ``acep_7colour`` / ``acep_7color`` / ``inky_7colour`` -> 7-colour
+      * ``bwry_4`` -> 4-colour BWRY (v0.69.3 for PicPak-class panels)
       * ``rgb24`` / ``rgb16`` -> None (24-bit RGB PNG passthrough,
         v0.69.1 per issue #41)
     """
     g = (gamut or "").lower()
     if g == "mono":
         return _MONO_PALETTE
+    if g == "bwry_4":
+        return BWRY_4_PALETTE
     if g in ("acep_7colour", "acep_7color", "inky_7colour"):
         return INKY_7COLOUR_PALETTE
     if g in ("rgb24", "rgb16"):

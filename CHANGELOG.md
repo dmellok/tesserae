@@ -6,6 +6,34 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.3], 2026-07-04
+
+### Added
+
+- **`bwry_4` gamut for 4-colour B/W/Red/Yellow e-paper panels.**
+  New `BWRY_4_PALETTE` constant in
+  [`app/quantizer.py`](app/quantizer.py) (black / white / red /
+  yellow), plus a nibble LUT and a `bwry_4` entry in
+  `_GAMUT_TABLE` so `pack_to_panel_bin` picks it up whenever a
+  device declares `panel.gamut = "bwry_4"`. Dense 0-3 nibble
+  mapping (`0x0=black`, `0x1=white`, `0x2=red`, `0x3=yellow`); no
+  reserved values, so firmware decoders only need to switch over
+  the four nibbles. `circuitpython_png` also gains a BWRY branch
+  for the indexed-PNG path.
+- **`bwry_4` in `ACCEPTED_GAMUTS`** so clients can declare it via
+  `POST /api/v1/device/{discover, register}` and the value
+  persists onto the auto-provisioned instance's panel block. No
+  new endpoints; the API surface stays put, only the allow-list
+  widens.
+
+### Changed
+
+- **`docs/dev/client-protocol.md`** documents the new gamut value
+  in the accepted-value table and adds a `bwry_4` entry to the
+  `.bin` frame-format section with the exact nibble convention
+  firmware needs to decode. Targets PicPak-class 400 × 300 4.2"
+  BWRY panels (60 000 bytes per frame at 4 bpp).
+
 ## [0.69.2], 2026-07-04
 
 ### Added

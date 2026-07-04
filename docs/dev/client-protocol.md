@@ -133,6 +133,7 @@ server URL.
    | `inky_7colour` | Pimoroni Inky ACeP, `.bin` packer target | `inky_7colour` |
    | `acep_7colour` | ACeP, semantic alias | `inky_7colour` |
    | `mono` | 1-bit B/W | `mono` |
+   | `bwry_4` | 4-colour B/W/Red/Yellow (PicPak-class 4.2" panels) | `bwry_4` |
    | `rgb24` | Full 24-bit colour (LCD-hybrid) | `rgb24` |
    | `rgb16` | 16-bit colour (RGB565) | `rgb16` |
 
@@ -589,11 +590,19 @@ Used by `pi_bin`, `esp32_bin`, `pico_bin` renderers. Exactly
 - Scanline order: row 0 first, left-to-right within each row.
 - High nibble = even column index (0, 2, 4, …), low nibble = odd.
 - 1200 × 1600 panel → 960 000 bytes.
-- Nibble values 0–15 are palette indices. Two standard palettes:
-  - **waveshare_e6**: 6-color Spectra 6 (default; Waveshare + ESP32).
-  - **inky_7colour**: Pimoroni Inky 7-color (matches the `inky`
+- Nibble values 0–15 are palette indices. Three standard palettes:
+  - **waveshare_e6**: 6-colour Spectra 6 (default; Waveshare + ESP32).
+    Firmware reserves nibbles `0x4` and `0x7` (blue remaps to `0x5`,
+    green to `0x6`); output never uses those reserved values.
+  - **inky_7colour**: Pimoroni Inky 7-colour (matches the `inky`
     library's `pal` array, so you can `display.set_pixel(x, y,
     nibble)` directly).
+  - **bwry_4** (v0.69.3, PicPak-class 4.2" panels): 4-colour
+    black / white / red / yellow. Dense 0-3 nibble mapping:
+    `0x0=black`, `0x1=white`, `0x2=red`, `0x3=yellow`. Nibble values
+    `0x4`–`0xf` never appear in the output, so a firmware decoder
+    only needs to switch over the four values. 400 × 300 panel →
+    60 000 bytes.
 
 The renderer applies rotation, letterboxing, underscan, and dithering
 server-side, so the firmware just unpacks nibbles and pushes to the
