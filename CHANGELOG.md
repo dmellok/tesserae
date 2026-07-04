@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.7], 2026-07-05
+
+### Fixed
+
+- **mypy: narrow legacy lat/lon type in ``_app_location_dict``.**
+  v0.69.6 added a legacy-lat/lon migration in
+  [`app/composer.py`](app/composer.py) whose ``in (None, "")`` guard
+  didn't survive mypy's base type check (the read value is
+  ``Any | None``, and mypy sees ``float(None)`` as a type error).
+  Explicit ``isinstance`` narrowing against ``int | float | str``
+  before the conversion. Behaviour is identical; CI mypy job now
+  green.
+
 ## [0.69.6], 2026-07-05
 
 Batch fix for issue #52 items 1, 2, 3, 4, 5, 6, 7. Items 8-10 (Devices

@@ -73,15 +73,21 @@ def _app_location_dict() -> dict[str, Any] | None:
                 "name": str(picked.get("name") or ""),
             }
 
-    # Legacy flat fields.
+    # Legacy flat fields. Explicit isinstance narrowing (``int | float |
+    # str`` is what ``float()`` accepts) so mypy can see the type is
+    # safe. The subsequent try/except still catches malformed strings
+    # (e.g. someone hand-edited ``settings.json`` with junk in the lat
+    # field).
     lat_raw = app_section.get("latitude")
     lon_raw = app_section.get("longitude")
-    try:
-        lat_f = float(lat_raw) if lat_raw not in (None, "") else None
-        lon_f = float(lon_raw) if lon_raw not in (None, "") else None
-    except (TypeError, ValueError):
+    if not isinstance(lat_raw, (int, float, str)) or not isinstance(lon_raw, (int, float, str)):
         return None
-    if lat_f is None or lon_f is None:
+    if lat_raw == "" or lon_raw == "":
+        return None
+    try:
+        lat_f = float(lat_raw)
+        lon_f = float(lon_raw)
+    except (TypeError, ValueError):
         return None
     return {"latitude": lat_f, "longitude": lon_f, "name": ""}
 
