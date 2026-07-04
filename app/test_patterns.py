@@ -109,6 +109,12 @@ def build_pattern(
     gamut: str = "waveshare_e6",
     calibrated: bool = False,
     color_index: int | None = None,
+    palette_override: tuple[tuple[int, int, int], ...] | None = None,
+    exposure: int = 0,
+    s_curve: int = 0,
+    lab_compress_min: int = 0,
+    lab_compress_max: int = 100,
+    smoothing_radius: int = 0,
 ) -> bytes:
     """Return PNG bytes for ``pattern_id`` at ``w × h``.
 
@@ -118,6 +124,17 @@ def build_pattern(
     palette entry to use for the ``solid_fill`` pattern and is ignored
     for every other id.
 
+    ``palette_override`` (v0.67.5) shows the currently-applied profile
+    palette in the Calibration-tab preview so users see the actual
+    hues their profile picks rather than the built-in default gamut.
+    Snaps to the same shape (6-7 RGB tuples) as the built-in tables.
+
+    ``exposure`` / ``s_curve`` / ``lab_compress_*`` / ``smoothing_radius``
+    apply the same tone / edge pipeline the renderer uses so slider
+    movement in the Calibration tab produces a byte-for-byte match of
+    what the panel would paint (skipping dither, which is a per-pixel
+    lookup that this preview surface doesn't recreate).
+
     Unknown ``pattern_id`` values raise :class:`ValueError` rather than
     silently producing white bytes; the route handler validates against
     :data:`PATTERN_IDS` first."""
@@ -126,6 +143,8 @@ def build_pattern(
     w = max(2, int(w))
     h = max(2, int(h))
     palette, labels = _palette_for(gamut, calibrated)
+    if palette_override is not None and len(palette_override) >= len(palette):
+        palette = tuple(palette_override[: len(palette)])
 
     if pattern_id == "palette_swatches":
         img = _swatches(w, h, palette, labels)
@@ -138,6 +157,28 @@ def build_pattern(
         img = _text_sample(w, h)
     else:  # registration_grid
         img = _registration_grid(w, h)
+
+    # v0.67.5: apply the profile's tone / edge pipeline on top of the
+    # generated pattern so slider movement in the Calibration tab
+    # shows what the panel would paint (short of the dither step,
+    # which is a per-pixel lookup this preview surface doesn't
+    # replay). Skip work when the caller left every knob neutral.
+    if exposure or s_curve or lab_compress_min > 0 or lab_compress_max < 100 or smoothing_radius:
+        from app.quantizer import (
+            _apply_exposure,
+            _apply_s_curve,
+            _apply_smoothing,
+            _compress_lab_range,
+        )
+
+        if smoothing_radius:
+            img = _apply_smoothing(img, smoothing_radius)
+        if lab_compress_min > 0 or lab_compress_max < 100:
+            img = _compress_lab_range(img, lab_compress_min, lab_compress_max)
+        if exposure:
+            img = _apply_exposure(img, exposure)
+        if s_curve:
+            img = _apply_s_curve(img, s_curve)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")

@@ -826,6 +826,28 @@
                        {% if section.palette_profile_tone.serpentine %}checked{% endif %}>
                 <span>Serpentine scan (error-diffusion only)</span>
               </label>
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">LAB compress: min</span>
+                <input type="range" name="lab_compress_min" min="0" max="100" step="1"
+                       value="{{ section.palette_profile_tone.lab_compress_min }}"
+                       data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.lab_compress_min }}</output>
+              </label>
+              <label class="dx-tone-slider">
+                <span class="dx-tone-label">LAB compress: max</span>
+                <input type="range" name="lab_compress_max" min="0" max="100" step="1"
+                       value="{{ section.palette_profile_tone.lab_compress_max }}"
+                       data-tone-input>
+                <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.lab_compress_max }}</output>
+              </label>
+              <label class="dx-tone-slider dx-tone-select-row">
+                <span class="dx-tone-label">Colour match</span>
+                <select name="color_match" class="input">
+                  {% for opt in [('rgb', 'RGB nearest (fastest)'), ('lab', 'LAB perceptual'), ('chroma-aware', 'LAB, chroma-weighted (best hue fidelity)')] %}
+                  <option value="{{ opt[0] }}" {% if section.palette_profile_tone.color_match == opt[0] %}selected{% endif %}>{{ opt[1] }}</option>
+                  {% endfor %}
+                </select>
+              </label>
             </div>
 
             {# Experimental edge-handling block (v0.67.2). Collapsed by

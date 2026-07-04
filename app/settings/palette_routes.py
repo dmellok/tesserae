@@ -167,13 +167,16 @@ def devices_palette_update_tone(instance_id: str) -> Response:
         contrast=base.tone.contrast,
         saturation=base.tone.saturation,
         s_curve=max(-100, min(100, _as_int("s_curve", base.tone.s_curve))),
-        lab_compress_min=base.tone.lab_compress_min,
-        lab_compress_max=base.tone.lab_compress_max,
+        lab_compress_min=max(0, min(100, _as_int("lab_compress_min", base.tone.lab_compress_min))),
+        lab_compress_max=max(0, min(100, _as_int("lab_compress_max", base.tone.lab_compress_max))),
     )
+    color_match_raw = (request.form.get("color_match") or base.dither.color_match).strip()
+    if color_match_raw not in ("rgb", "lab", "chroma-aware"):
+        color_match_raw = base.dither.color_match
     new_dither = DitherSettings(
         algorithm=base.dither.algorithm,
         serpentine=bool(request.form.get("serpentine")),
-        color_match=base.dither.color_match,
+        color_match=color_match_raw,
         diffusion_strength=max(0, min(200, _as_int("diffusion_strength", 100))),
     )
     new_edges = EdgeSettings(

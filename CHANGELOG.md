@@ -6,6 +6,42 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.4], 2026-07-04
+
+### Added
+
+- **LAB dynamic-range compression on palette profiles.** New
+  `_compress_lab_range` helper in `app.quantizer` rescales a
+  source's L* channel into `[lab_compress_min, lab_compress_max]`
+  while leaving a* and b* untouched, preserving hue while
+  squeezing brightness into whatever the target panel can
+  reproduce. Two matching sliders (min / max, 0-100) join the tone
+  editor on the Calibration tab. Overrides the linear
+  `_compress_to_calibrated_range` when set; default `(0, 100)` is
+  a no-op fast path so profiles without the knob set render
+  byte-identical.
+- **Colour-match modes (`rgb` / `lab` / `chroma-aware`)** on the
+  error-diffusion dithers (`floyd-steinberg`, `atkinson`,
+  `jarvis`, `stucki`). `lab` picks each pixel's nearest palette
+  entry in CIE L*a*b* space instead of sRGB; `chroma-aware`
+  weights a*/b* differences 2x to preserve hue over lightness.
+  Pillow's built-in FS is RGB-only, so when a profile picks
+  `lab` / `chroma-aware` and the algorithm is `floyd-steinberg`,
+  the packer detours through the numpy error-diffusion path with
+  FS weights.
+- **New sRGB<->LAB conversion helpers** (`_srgb_to_lab`,
+  `_lab_to_srgb`) in `app.quantizer`. Standard D65 sRGB gamma +
+  CIELAB nonlinearity; vectorised numpy, round-trips within a 4-
+  per-channel delta (documented in
+  `test_srgb_lab_round_trip_is_lossless_within_a_delta`).
+- **Tone-aware test-pattern preview.** The Calibration-tab preview
+  now reflects the applied profile's palette, exposure, S-curve,
+  LAB compression, and smoothing radius; sliders update the
+  preview `<img>` live via a query-string handshake before the
+  user hits Save. Dither / colour-match / preserve-line-art stay
+  render-time only (they're per-pixel and would need the full
+  `pack_to_panel_bin` round-trip to replay in the preview).
+
 ## [0.67.3], 2026-07-04
 
 ### Added

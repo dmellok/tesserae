@@ -178,6 +178,42 @@ def test_send_404s_for_unknown_device(app: Flask) -> None:
     assert "/settings/devices" in resp.location
 
 
+def test_preview_reflects_applied_profile_palette(app: Flask) -> None:
+    # v0.67.5: when a profile is applied, the palette-swatch preview
+    # should paint that profile's palette rather than the built-in
+    # gamut default.
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "boeber-spectra6"},
+    )
+    resp = client.get(f"/settings/devices/{dev}/test-pattern/preview.png?pattern=palette_swatches")
+    assert resp.status_code == 200
+    from io import BytesIO
+
+    img = Image.open(BytesIO(resp.data)).convert("RGB")
+    # Boeber's red = #EA4843. Sample near the top of the red swatch
+    # (fourth swatch on a 6-colour E6 layout).
+    swatch_w = img.width // 6
+    r = img.getpixel((3 * swatch_w + swatch_w // 4, 2))
+    assert r == (0xEA, 0x48, 0x43)
+
+
+def test_preview_exposure_query_shifts_grayscale(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    baseline = client.get(
+        f"/settings/devices/{dev}/test-pattern/preview.png?pattern=grayscale_ramp"
+    ).data
+    bumped = client.get(
+        f"/settings/devices/{dev}/test-pattern/preview.png?pattern=grayscale_ramp&exposure=60"
+    ).data
+    assert baseline != bumped
+
+
 def test_calibration_tab_renders_in_devices_index(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

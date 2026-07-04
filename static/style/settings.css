@@ -1319,6 +1319,8 @@
   align-items: center;
   gap: 8px;
 }
+.dx-tone-select-row select { flex: 1 1 auto; }
+.dx-tone-select-row .dx-tone-value { display: none; }
 @media (max-width: 540px) {
   .dx-tone-slider { grid-template-columns: 1fr; }
   .dx-tone-value { text-align: left; }

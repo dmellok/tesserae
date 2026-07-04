@@ -279,12 +279,48 @@
     document.querySelectorAll('[data-palette-apply-form]').forEach(initPaletteApplyForm);
     // Live label for each tone slider so the user sees the exact
     // numeric value they're dragging to. Cheap DOM: one <output> per
-    // slider, updated on input.
-    document.querySelectorAll('[data-tone-input]').forEach(function (input) {
-      const label = input.parentElement.querySelector('[data-tone-value]');
-      if (!label) return;
-      input.addEventListener('input', function () {
-        label.textContent = input.value;
+    // slider, updated on input. Also rebuilds the test-pattern
+    // preview URL with the current slider values so the preview
+    // reflects tone changes before the user hits Save. Query params
+    // override the applied profile's stored defaults on the server
+    // side (see devices_test_pattern_preview).
+    function refreshTonePreview(card) {
+      const preview = card.querySelector('[data-preview-img]');
+      if (!preview) return;
+      const base = preview.getAttribute('data-preview-base');
+      if (!base) return;
+      const checked = card.querySelector('input[name="pattern"]:checked');
+      const pattern = checked ? checked.value : 'palette_swatches';
+      const params = new URLSearchParams();
+      params.set('pattern', pattern);
+      if (checked && checked.getAttribute('data-needs-color') === '1') {
+        const cs = card.querySelector('[data-color-select]');
+        if (cs) params.set('color_index', cs.value);
+      }
+      const toneForm = card.querySelector('.dx-palette-tone-form');
+      if (toneForm) {
+        ['exposure', 's_curve', 'lab_compress_min', 'lab_compress_max',
+         'smoothing_radius'].forEach(function (name) {
+          const el = toneForm.querySelector('[name="' + name + '"]');
+          if (el && el.value !== '') params.set(name, el.value);
+        });
+      }
+      params.set('_t', Date.now());
+      preview.src = base + '?' + params.toString();
+    }
+
+    document.querySelectorAll('[data-device-card]').forEach(function (card) {
+      const inputs = card.querySelectorAll('[data-tone-input]');
+      inputs.forEach(function (input) {
+        const label = input.parentElement.querySelector('[data-tone-value]');
+        if (label) {
+          input.addEventListener('input', function () {
+            label.textContent = input.value;
+          });
+        }
+        input.addEventListener('input', function () {
+          refreshTonePreview(card);
+        });
       });
     });
     // Palette editor: live hex readout below each colour input so the

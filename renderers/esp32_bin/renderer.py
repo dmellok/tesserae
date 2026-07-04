@@ -118,6 +118,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         diffusion_strength=int(dither_extras.get("diffusion_strength", 100)),
         smoothing_radius=int(edges.get("smoothing_radius", 0)),
         preserve_line_art=bool(edges.get("preserve_line_art", False)),
+        lab_compress_min=int(tone.get("lab_compress_min", 0)),
+        lab_compress_max=int(tone.get("lab_compress_max", 100)),
+        color_match=str(dither_extras.get("color_match", "rgb")),
     )
 
 

@@ -199,6 +199,95 @@ def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
     return Image.fromarray(np.clip(arr, 0.0, 255.0).astype(np.uint8))
 
 
+def _srgb_to_lab(rgb_arr: np.ndarray) -> np.ndarray:
+    """Vectorised sRGB (0-255 uint8) -> CIE L*a*b* (float32). Uses the
+    standard D65 illuminant, sRGB gamma (piecewise 2.4-with-linear-toe),
+    then the CIELAB nonlinearity. Cost is a couple of small numpy ops
+    per pixel; only called when the caller opts into a LAB-based mode.
+
+    Returns an array shaped ``(N, 3)`` for an ``(N, 3)`` input and
+    ``(H, W, 3)`` for ``(H, W, 3)``."""
+    x = rgb_arr.astype(np.float32) / 255.0
+    # sRGB -> linear RGB.
+    lin = np.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+    # Linear RGB -> XYZ (D65). Column matrix from the sRGB reference.
+    m = np.array(
+        [
+            [0.4124564, 0.3575761, 0.1804375],
+            [0.2126729, 0.7151522, 0.0721750],
+            [0.0193339, 0.1191920, 0.9503041],
+        ],
+        dtype=np.float32,
+    )
+    xyz = lin @ m.T
+    # D65 reference white in the same scale.
+    ref = np.array([0.95047, 1.00000, 1.08883], dtype=np.float32)
+    xn = xyz / ref
+    delta = 6.0 / 29.0
+    f = np.where(xn > delta**3, np.cbrt(np.clip(xn, 1e-8, None)), xn / (3 * delta**2) + 4.0 / 29.0)
+    ls = 116.0 * f[..., 1] - 16.0
+    a = 500.0 * (f[..., 0] - f[..., 1])
+    b = 200.0 * (f[..., 1] - f[..., 2])
+    return np.stack([ls, a, b], axis=-1)
+
+
+def _lab_to_srgb(lab_arr: np.ndarray) -> np.ndarray:
+    """LAB -> sRGB (0-255 uint8), inverse of :func:`_srgb_to_lab`. Clips
+    out-of-gamut values so the output is displayable even for LAB tuples
+    the sRGB primaries can't represent."""
+    ls = lab_arr[..., 0]
+    a = lab_arr[..., 1]
+    b = lab_arr[..., 2]
+    fy = (ls + 16.0) / 116.0
+    fx = a / 500.0 + fy
+    fz = fy - b / 200.0
+    delta = 6.0 / 29.0
+
+    def _finv(t: np.ndarray) -> np.ndarray:
+        return np.where(t > delta, t**3, 3 * delta**2 * (t - 4.0 / 29.0))
+
+    ref = np.array([0.95047, 1.00000, 1.08883], dtype=np.float32)
+    xyz = np.stack([_finv(fx) * ref[0], _finv(fy) * ref[1], _finv(fz) * ref[2]], axis=-1)
+    m_inv = np.array(
+        [
+            [3.2404542, -1.5371385, -0.4985314],
+            [-0.9692660, 1.8760108, 0.0415560],
+            [0.0556434, -0.2040259, 1.0572252],
+        ],
+        dtype=np.float32,
+    )
+    lin = xyz @ m_inv.T
+    # Linear RGB -> sRGB gamma.
+    srgb = np.where(
+        lin <= 0.0031308, lin * 12.92, 1.055 * np.clip(lin, 1e-8, None) ** (1.0 / 2.4) - 0.055
+    )
+    return np.clip(srgb * 255.0, 0.0, 255.0).astype(np.uint8)
+
+
+def _compress_lab_range(img: Image.Image, min_pct: int, max_pct: int) -> Image.Image:
+    """LAB lightness dynamic-range compression. Rescales the L*
+    channel so the source's [0, 100] range lands in
+    ``[min_pct, max_pct]``; a + b stay untouched so hue is preserved.
+    ``min_pct=0`` and ``max_pct=100`` is the identity (no-op fast path).
+
+    This replaces the linear per-channel `_compress_to_calibrated_range`
+    when the profile opts into LAB compression; the two are alternatives
+    (only one runs per render)."""
+    if min_pct <= 0 and max_pct >= 100:
+        return img
+    lo = max(0, min(100, int(min_pct)))
+    hi = max(0, min(100, int(max_pct)))
+    if hi <= lo:
+        return img
+    arr = np.asarray(img.convert("RGB"))
+    lab = _srgb_to_lab(arr)
+    ls = lab[..., 0]
+    ls = ls / 100.0 * (hi - lo) + lo
+    lab[..., 0] = np.clip(ls, 0.0, 100.0)
+    rgb = _lab_to_srgb(lab)
+    return Image.fromarray(rgb)
+
+
 def _apply_smoothing(img: Image.Image, radius: int) -> Image.Image:
     """Pre-dither Gaussian blur. ``radius`` in 0..3 px; 0 is the
     no-op fast path (returns the input untouched). Applied before
@@ -485,6 +574,7 @@ def _error_diffusion(
     *,
     serpentine: bool = False,
     strength: float = 1.0,
+    color_match: str = "rgb",
 ) -> bytes:
     """Generic error-diffusion dither.
 
@@ -503,7 +593,16 @@ def _error_diffusion(
     softer / flatter dither). Values under 1.0 discard error rather
     than spread it, so the output stays palette-locked with less
     speckle at the cost of tone accuracy. Values above 1.0 amplify
-    the dither for exaggerated texture and are almost never useful."""
+    the dither for exaggerated texture and are almost never useful.
+
+    ``color_match`` picks the distance metric used to find each pixel's
+    nearest palette entry. ``rgb`` (default) is the historical simple
+    Euclidean-in-sRGB match. ``lab`` computes distance in CIE L*a*b*
+    (perceptual) and ``chroma-aware`` biases towards preserving hue
+    over lightness by weighting the a*/b* difference 2x. The source
+    LAB values are pre-computed once (source-with-accumulated-error is
+    approximated by the initial LAB coordinates; small errors don't
+    shift LAB space enough to matter for practical dashboards)."""
     import array as _array
 
     strength = max(0.0, float(strength))
@@ -514,10 +613,29 @@ def _error_diffusion(
     buf_b = _array.array("f", arr[:, :, 2].ravel().tolist())
     out = bytearray(H * W)
 
+    # RGB targets are always used for error computation (the error
+    # is the un-quantised residual in the same space the neighbours'
+    # buffer lives in). LAB targets, when active, only steer the
+    # nearest-palette lookup.
     pr = [float(palette[i, 0]) for i in range(palette.shape[0])]
     pg = [float(palette[i, 1]) for i in range(palette.shape[0])]
     pb = [float(palette[i, 2]) for i in range(palette.shape[0])]
     n_pal = len(pr)
+
+    use_lab = color_match in ("lab", "chroma-aware")
+    chroma_weight = 2.0 if color_match == "chroma-aware" else 1.0
+    if use_lab:
+        pal_lab = _srgb_to_lab(np.asarray(palette, dtype=np.uint8))
+        src_lab = _srgb_to_lab(arr.astype(np.uint8))
+        buf_l = _array.array("f", src_lab[:, :, 0].ravel().tolist())
+        buf_a = _array.array("f", src_lab[:, :, 1].ravel().tolist())
+        buf_b_lab = _array.array("f", src_lab[:, :, 2].ravel().tolist())
+        pal_L = [float(pal_lab[i, 0]) for i in range(pal_lab.shape[0])]
+        pal_a = [float(pal_lab[i, 1]) for i in range(pal_lab.shape[0])]
+        pal_b_lab = [float(pal_lab[i, 2]) for i in range(pal_lab.shape[0])]
+    else:
+        buf_l = buf_a = buf_b_lab = None
+        pal_L = pal_a = pal_b_lab = None
     # Flipped weights list is precomputed for serpentine rows so the hot
     # loop doesn't re-mirror per pixel.
     w_dy_lr = [w[0] for w in weights]
@@ -540,19 +658,41 @@ def _error_diffusion(
             r = buf_r[idx]
             g = buf_g[idx]
             b = buf_b[idx]
-            best_i = 0
-            dr = r - pr[0]
-            dg = g - pg[0]
-            db = b - pb[0]
-            best_d = dr * dr + dg * dg + db * db
-            for i in range(1, n_pal):
-                dr = r - pr[i]
-                dg = g - pg[i]
-                db = b - pb[i]
-                d = dr * dr + dg * dg + db * db
-                if d < best_d:
-                    best_d = d
-                    best_i = i
+            if use_lab:
+                # LAB nearest-palette. chroma_weight (2.0 for chroma-
+                # aware, 1.0 for plain LAB) biases towards preserving
+                # hue over lightness, so blues stay blue even at the
+                # cost of a lightness match.
+                L0 = buf_l[idx]
+                A0 = buf_a[idx]
+                B0 = buf_b_lab[idx]
+                best_i = 0
+                dL = L0 - pal_L[0]
+                dA = A0 - pal_a[0]
+                dB = B0 - pal_b_lab[0]
+                best_d = dL * dL + chroma_weight * (dA * dA + dB * dB)
+                for i in range(1, n_pal):
+                    dL = L0 - pal_L[i]
+                    dA = A0 - pal_a[i]
+                    dB = B0 - pal_b_lab[i]
+                    d = dL * dL + chroma_weight * (dA * dA + dB * dB)
+                    if d < best_d:
+                        best_d = d
+                        best_i = i
+            else:
+                best_i = 0
+                dr = r - pr[0]
+                dg = g - pg[0]
+                db = b - pb[0]
+                best_d = dr * dr + dg * dg + db * db
+                for i in range(1, n_pal):
+                    dr = r - pr[i]
+                    dg = g - pg[i]
+                    db = b - pb[i]
+                    d = dr * dr + dg * dg + db * db
+                    if d < best_d:
+                        best_d = d
+                        best_i = i
             out[idx] = best_i
             er = (r - pr[best_i]) * strength
             eg = (g - pg[best_i]) * strength
@@ -567,6 +707,17 @@ def _error_diffusion(
                     buf_g[nidx] += eg * frac
                     buf_b[nidx] += eb * frac
     return bytes(out)
+
+
+# Floyd-Steinberg: the canonical four-neighbour error-diffusion. Used
+# when the profile asks for a LAB colour match on FS, since Pillow's
+# built-in FS is RGB-only.
+_FS_WEIGHTS: list[tuple[int, int, float]] = [
+    (0, 1, 7 / 16),
+    (1, -1, 3 / 16),
+    (1, 0, 5 / 16),
+    (1, 1, 1 / 16),
+]
 
 
 # Atkinson: 6 neighbours each at 1/8, only 6/8 of the error propagates,
@@ -681,6 +832,9 @@ def pack_to_panel_bin(
     diffusion_strength: int = 100,
     smoothing_radius: int = 0,
     preserve_line_art: bool = False,
+    lab_compress_min: int = 0,
+    lab_compress_max: int = 100,
+    color_match: str = "rgb",
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
@@ -753,6 +907,12 @@ def pack_to_panel_bin(
     rgb = img.convert("RGB")
     if calibrated_active:
         rgb = _compress_to_calibrated_range(rgb, palette)
+    # LAB dynamic-range compression (v0.67.4). Overrides the linear
+    # calibrated range squeeze above when active; the two compressors
+    # are alternatives (only one squeezes the source per render).
+    # No-op fast path at min=0, max=100.
+    if lab_compress_min > 0 or lab_compress_max < 100:
+        rgb = _compress_lab_range(rgb, lab_compress_min, lab_compress_max)
     # Pre-dither smoothing (v0.67.2 experimental). Softens the source
     # a hair before tone-mapping runs; useful on antialiased text where
     # error-diffusion would otherwise build a noisy tail along each
@@ -775,21 +935,51 @@ def pack_to_panel_bin(
         rgb = ImageEnhance.Contrast(rgb).enhance(contrast)
 
     strength_scale = max(0.0, min(200, int(diffusion_strength))) / 100.0
-    if dither in _PIL_DITHER_MAP:
+    # Pillow's built-in Floyd-Steinberg only knows RGB nearest. When
+    # the profile asks for LAB / chroma-aware match on FS, we detour
+    # through the numpy error-diffusion path with the FS weights so
+    # the LAB metric is honoured. Slower than Pillow but keeps the
+    # colour-match semantics consistent across dithers.
+    use_numpy_fs = dither == "floyd-steinberg" and color_match in ("lab", "chroma-aware")
+    if dither in _PIL_DITHER_MAP and not use_numpy_fs:
         pal_img = _palette_image(palette)
         indexed = rgb.quantize(palette=pal_img, dither=_PIL_DITHER_MAP[dither])
         raw = indexed.tobytes()
     elif dither == "atkinson":
         raw = _error_diffusion(
-            rgb, pal_arr, _ATKINSON_WEIGHTS, serpentine=serpentine, strength=strength_scale
+            rgb,
+            pal_arr,
+            _ATKINSON_WEIGHTS,
+            serpentine=serpentine,
+            strength=strength_scale,
+            color_match=color_match,
         )
     elif dither == "jarvis":
         raw = _error_diffusion(
-            rgb, pal_arr, _JJN_WEIGHTS, serpentine=serpentine, strength=strength_scale
+            rgb,
+            pal_arr,
+            _JJN_WEIGHTS,
+            serpentine=serpentine,
+            strength=strength_scale,
+            color_match=color_match,
         )
     elif dither == "stucki":
         raw = _error_diffusion(
-            rgb, pal_arr, _STUCKI_WEIGHTS, serpentine=serpentine, strength=strength_scale
+            rgb,
+            pal_arr,
+            _STUCKI_WEIGHTS,
+            serpentine=serpentine,
+            strength=strength_scale,
+            color_match=color_match,
+        )
+    elif dither == "floyd-steinberg":  # numpy-FS LAB detour
+        raw = _error_diffusion(
+            rgb,
+            pal_arr,
+            _FS_WEIGHTS,
+            serpentine=serpentine,
+            strength=strength_scale,
+            color_match=color_match,
         )
     elif dither == "bayer-8x8":
         raw = _dither_ordered(rgb, pal_arr, _BAYER_8X8)

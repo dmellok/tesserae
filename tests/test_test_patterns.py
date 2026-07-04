@@ -135,3 +135,58 @@ def test_tiny_size_clamped_to_two() -> None:
     png = test_patterns.build_pattern("palette_swatches", 0, 0)
     img = _open(png)
     assert img.size == (2, 2)
+
+
+def test_palette_override_paints_custom_colours() -> None:
+    # v0.67.5: preview surface can show a profile's applied palette.
+    custom = (
+        (10, 10, 10),
+        (200, 200, 200),
+        (150, 130, 20),
+        (170, 30, 30),
+        (30, 60, 170),
+        (40, 130, 60),
+    )
+    png = test_patterns.build_pattern(
+        "palette_swatches", 60 * len(custom), 60, palette_override=custom
+    )
+    img = _open(png).convert("RGB")
+    # Sample the top of each swatch (well clear of the label).
+    swatch_w = 60
+    for i, expected in enumerate(custom):
+        assert img.getpixel((i * swatch_w + swatch_w // 4, 2)) == expected
+
+
+def test_tone_pipeline_neutral_leaves_pattern_untouched() -> None:
+    baseline = test_patterns.build_pattern("grayscale_ramp", 96, 16)
+    same = test_patterns.build_pattern(
+        "grayscale_ramp",
+        96,
+        16,
+        exposure=0,
+        s_curve=0,
+        lab_compress_min=0,
+        lab_compress_max=100,
+        smoothing_radius=0,
+    )
+    assert baseline == same
+
+
+def test_exposure_changes_grayscale_ramp_preview() -> None:
+    baseline = test_patterns.build_pattern("grayscale_ramp", 96, 16)
+    bumped = test_patterns.build_pattern("grayscale_ramp", 96, 16, exposure=60)
+    assert baseline != bumped
+
+
+def test_lab_compress_changes_grayscale_ramp_preview() -> None:
+    baseline = test_patterns.build_pattern("grayscale_ramp", 96, 16)
+    squeezed = test_patterns.build_pattern(
+        "grayscale_ramp", 96, 16, lab_compress_min=15, lab_compress_max=60
+    )
+    assert baseline != squeezed
+
+
+def test_smoothing_changes_registration_grid_preview() -> None:
+    baseline = test_patterns.build_pattern("registration_grid", 96, 96)
+    blurred = test_patterns.build_pattern("registration_grid", 96, 96, smoothing_radius=2)
+    assert baseline != blurred

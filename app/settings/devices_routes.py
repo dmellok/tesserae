@@ -1203,6 +1203,50 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
             color_index = int(raw_color)
         except ValueError:
             color_index = 0
+    # v0.67.5: resolve the device's active palette profile so the
+    # preview shows the applied palette + tone / edge pipeline
+    # rather than the built-in gamut default. Query-string overrides
+    # (populated by the tone sliders via inline JS) let users see
+    # slider effects live before hitting Save.
+    from pathlib import Path
+
+    from app.palette_profiles import (
+        PaletteProfileStore,
+        bundled_profile,
+    )
+
+    def _q_int(name: str, default: int) -> int:
+        raw = request.args.get(name)
+        if raw is None or raw == "":
+            return default
+        try:
+            return int(raw)
+        except ValueError:
+            return default
+
+    palette_override = None
+    tone_defaults: dict[str, int] = {
+        "exposure": 0,
+        "s_curve": 0,
+        "lab_compress_min": 0,
+        "lab_compress_max": 100,
+        "smoothing_radius": 0,
+    }
+    slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
+    slug_raw = settings_store().get_for_runtime("devices", instance_id, slug_field)
+    slug = str(slug_raw.get("palette_profile_slug") or "").strip()
+    if slug:
+        profile = bundled_profile(slug) or PaletteProfileStore(
+            Path(current_app.config["DATA_ROOT"])
+        ).load(slug)
+        if profile is not None:
+            palette_override = profile.palette.as_tuples()
+            tone_defaults["exposure"] = profile.tone.exposure
+            tone_defaults["s_curve"] = profile.tone.s_curve
+            tone_defaults["lab_compress_min"] = profile.tone.lab_compress_min
+            tone_defaults["lab_compress_max"] = profile.tone.lab_compress_max
+            tone_defaults["smoothing_radius"] = profile.edges.smoothing_radius
+
     try:
         png = test_patterns.build_pattern(
             pattern_id,
@@ -1211,6 +1255,12 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
             gamut=params["gamut"],
             calibrated=params["calibrated"],
             color_index=color_index,
+            palette_override=palette_override,
+            exposure=_q_int("exposure", tone_defaults["exposure"]),
+            s_curve=_q_int("s_curve", tone_defaults["s_curve"]),
+            lab_compress_min=_q_int("lab_compress_min", tone_defaults["lab_compress_min"]),
+            lab_compress_max=_q_int("lab_compress_max", tone_defaults["lab_compress_max"]),
+            smoothing_radius=_q_int("smoothing_radius", tone_defaults["smoothing_radius"]),
         )
     except ValueError as err:
         return FlaskResponse(str(err), status=400, mimetype="text/plain")

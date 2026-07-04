@@ -1051,10 +1051,13 @@ class PushManager:
                 extras["_profile_tone"] = {
                     "exposure": profile.tone.exposure,
                     "s_curve": profile.tone.s_curve,
+                    "lab_compress_min": profile.tone.lab_compress_min,
+                    "lab_compress_max": profile.tone.lab_compress_max,
                 }
                 extras["_profile_dither"] = {
                     "serpentine": profile.dither.serpentine,
                     "diffusion_strength": profile.dither.diffusion_strength,
+                    "color_match": profile.dither.color_match,
                 }
                 # Phase 3 edge knobs (v0.67.2). Ignored by renderers
                 # that don't opt in; wired through esp32_bin / pi_bin /
