@@ -567,6 +567,7 @@ def pack_to_panel_bin(
     contrast: float = 1.0,
     gamut: str = "waveshare_e6",
     calibrated: bool = False,
+    palette_override: tuple[tuple[int, int, int], ...] | None = None,
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
@@ -620,9 +621,20 @@ def pack_to_panel_bin(
     # source range into the calibrated [black, white] band so the dither
     # has somewhere to spread error to. Nibble LUT stays the rendered
     # gamut's, on-wire bytes are unchanged.
-    calibrated_active = calibrated and gamut in _CALIBRATED_PALETTES
+    #
+    # ``palette_override`` (populated by the app-side palette-profile
+    # resolver in :mod:`app.push`) trumps the built-in ``_CALIBRATED_PALETTES``
+    # lookup when the device has a Calibration-tab profile applied. The
+    # nibble LUT and gamut selection are unchanged; only the RGB target
+    # values dither snaps to shift.
+    calibrated_active = calibrated and (
+        palette_override is not None or gamut in _CALIBRATED_PALETTES
+    )
     if calibrated_active:
-        palette = _CALIBRATED_PALETTES[gamut]
+        if palette_override is not None and len(palette_override) >= len(palette):
+            palette = palette_override[: len(palette)]
+        else:
+            palette = _CALIBRATED_PALETTES[gamut]
     pal_arr = np.array(palette, dtype=np.float32)
 
     rgb = img.convert("RGB")

@@ -1237,6 +1237,65 @@
   margin-top: 4px;
 }
 
+/* Palette recalibration card. Preset dropdown + attribution chip +
+   save/export/import/delete actions live in this block. Save/import
+   fold-outs use <details> so the primary picker stays uncluttered. */
+.dx-palette-picker-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin: 0 0 10px;
+}
+.dx-palette-picker-label {
+  font-weight: 600;
+  margin: 0;
+}
+.dx-palette-select { min-width: 240px; }
+.dx-palette-attribution {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+.dx-palette-notes {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--dx-faint);
+}
+.dx-palette-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+.dx-palette-save,
+.dx-palette-import {
+  border: 1px dashed var(--dx-border-faint);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 0 0 10px;
+}
+.dx-palette-save summary,
+.dx-palette-import summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.dx-palette-save[open] summary,
+.dx-palette-import[open] summary { margin-bottom: 8px; }
+.dx-palette-save-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 4px;
+}
+.dx-palette-save-row .input { flex: 1 1 auto; min-width: 180px; }
+@media (max-width: 540px) {
+  .dx-palette-picker-row { grid-template-columns: 1fr; }
+  .dx-palette-save-row { flex-direction: column; align-items: stretch; }
+}
+:root[data-theme="dark"] .dx-palette-save,
+:root[data-theme="dark"] .dx-palette-import { border-color: var(--t-border); }
+
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the
    resolved effective map (default + global + per-device). */

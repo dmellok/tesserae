@@ -634,18 +634,138 @@
         </div>
         {% endif %}
 
-        {# PALETTE RECALIBRATION (Tier 2 placeholder) #}
+        {# PALETTE RECALIBRATION (v0.67 Phase 1). Preset picker sourced
+           from bundled epdoptimize presets + user-saved profiles;
+           attribution chip renders when the active preset has one.
+           Contrast + saturation moved here from the Rendering tab in
+           v0.67.0; they save through the same combined-form endpoint
+           so the overall Save button still works. #}
+        {% if section.palette_apply_endpoint %}
         <hr class="dx-divider">
-        <div class="dx-calib-section dx-calib-placeholder">
+        <div class="dx-calib-section">
           <p class="device-subhead">Palette recalibration</p>
           <p class="field-help" style="margin: 0 0 12px;">
-            Coming with LAB-aware quantisation. The swatch pattern above
-            plus a colorimeter will nudge this device's colour targets
-            to what the panel actually reproduces under real viewing
-            light.
+            Pick a community-measured profile, then fine-tune below if the
+            panel looks off. Bundled palettes come from
+            <a href="https://github.com/paperlesspaper/epdoptimize" target="_blank" rel="noopener">paperlesspaper/epdoptimize</a>.
           </p>
-          <button type="button" class="button" disabled>Not available yet</button>
+
+          {# Track the currently-applied profile so the "attribution",
+             "export", and "delete" affordances key off the right slug. #}
+          {% set active_slug = section.palette_profile_slug or '' %}
+          {% set active_choice = namespace(entry=none) %}
+          {% for c in section.palette_profile_choices %}
+            {% if c.slug == active_slug %}{% set active_choice.entry = c %}{% endif %}
+          {% endfor %}
+
+          <form method="post" action="{{ section.palette_apply_endpoint }}"
+                class="form dx-palette-apply-form" data-palette-apply-form>
+            <div class="dx-palette-picker-row">
+              <label for="{{ section.id }}-palette-slug" class="dx-palette-picker-label">Profile</label>
+              <select id="{{ section.id }}-palette-slug" name="slug"
+                      class="input dx-palette-select" data-palette-slug>
+                <option value="">Built-in default (no profile)</option>
+                {% for c in section.palette_profile_choices %}
+                <optgroup label="{% if c.bundled %}Bundled presets{% else %}Your profiles{% endif %}"
+                          {% if not loop.first and section.palette_profile_choices[loop.index0 - 1].bundled == c.bundled %}style="display:none;"{% endif %}>
+                  <option value="{{ c.slug }}"
+                          data-attribution="{{ c.attribution or '' }}"
+                          data-notes="{{ c.notes or '' }}"
+                          data-bundled="{% if c.bundled %}1{% else %}0{% endif %}"
+                          {% if c.slug == active_slug %}selected{% endif %}>
+                    {{ c.name }}{% if not c.bundled %} (custom){% endif %}
+                  </option>
+                </optgroup>
+                {% endfor %}
+              </select>
+              <button type="submit" class="button primary">Apply</button>
+            </div>
+          </form>
+
+          {% if active_choice.entry %}
+          {% set entry = active_choice.entry %}
+          <p class="dx-palette-attribution field-help" data-palette-attribution>
+            {% if entry.based_on %}Based on <code>{{ entry.based_on }}</code>{% if entry.attribution %} — {% endif %}{% endif %}
+            {% if entry.attribution %}<a href="{{ entry.attribution }}" target="_blank" rel="noopener">{{ entry.attribution }}</a>{% endif %}
+          </p>
+          {% if entry.notes %}
+          <p class="dx-palette-notes field-help" data-palette-notes>{{ entry.notes }}</p>
+          {% endif %}
+          {% endif %}
+
+          <div class="dx-palette-actions">
+            {% if section.palette_reset_endpoint %}
+            <form method="post" action="{{ section.palette_reset_endpoint }}" class="form form--inline">
+              <button type="submit" class="button ghost">Reset to built-in</button>
+            </form>
+            {% endif %}
+            {% if active_slug %}
+            <a class="button ghost"
+               href="{{ url_for('auth.palette_profile_export', slug=active_slug) }}"
+               download>Export JSON</a>
+            {% if active_choice.entry and not active_choice.entry.bundled %}
+            <form method="post"
+                  action="{{ url_for('auth.palette_profile_delete', slug=active_slug) }}"
+                  class="form form--inline"
+                  onsubmit="return confirm('Delete this custom profile? Devices using it fall back to the built-in palette.');">
+              <button type="submit" class="button ghost dx-danger">Delete profile</button>
+            </form>
+            {% endif %}
+            {% endif %}
+          </div>
+
+          {# Save-as-new: fork the currently-selected profile into a new
+             user-owned one, then apply the new one to this device. Empty
+             name refuses. #}
+          {% if section.palette_save_endpoint %}
+          <details class="dx-palette-save">
+            <summary>Save as new profile</summary>
+            <form method="post" action="{{ section.palette_save_endpoint }}" class="form">
+              <input type="hidden" name="base_slug" value="{{ active_slug }}">
+              <div class="dx-palette-save-row">
+                <input type="text" name="name" class="input"
+                       placeholder="e.g. Living room, evening"
+                       required maxlength="80">
+                <button type="submit" class="button">Save + apply</button>
+              </div>
+              <p class="field-help">Clones the currently-selected profile so you can edit and share.</p>
+            </form>
+          </details>
+          {% endif %}
+
+          {# Import: JSON upload. Instance id piggybacks the form so the
+             import route knows which device to route the redirect at. #}
+          {% if section.palette_import_endpoint %}
+          <details class="dx-palette-import">
+            <summary>Import profile from JSON</summary>
+            <form method="post" action="{{ section.palette_import_endpoint }}"
+                  enctype="multipart/form-data" class="form">
+              <input type="hidden" name="instance_id" value="{{ section.device_id }}">
+              <div class="dx-palette-save-row">
+                <input type="file" name="profile" accept="application/json,.json" required class="input">
+                <button type="submit" class="button">Import + apply</button>
+              </div>
+              <p class="field-help">Uploaded JSON must match the profile schema (see docs/dev/calibration).</p>
+            </form>
+          </details>
+          {% endif %}
+
+          {# Contrast + Saturation moved here in v0.67; storage is the
+             same per-clone renderer-settings path they were on before,
+             so the combined save form still routes correctly. #}
+          {% if section.calibration_picture_quality %}
+          <hr class="dx-divider">
+          {% for pq in section.calibration_picture_quality %}
+          <p class="device-subhead">{{ pq.base_name }} — tone</p>
+          {% for field in pq.fields %}
+            {% set value = pq.state.get(field.name, field.get('default', '')) %}
+            {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}
+            {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+          {% endfor %}
+          {% endfor %}
+          {% endif %}
         </div>
+        {% endif %}
       </section>
 
       {# STICKY SAVE BAR (revealed by JS when the form is dirty) #}

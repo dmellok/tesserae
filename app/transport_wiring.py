@@ -31,6 +31,7 @@ from app.embedded_broker import EmbeddedBroker
 from app.ha_discovery import HomeAssistantDiscovery
 from app.mdns import MdnsAdvertiser
 from app.network import detect_base_url
+from app.palette_profiles import PaletteProfileStore
 from app.push import PushManager
 from app.renderer import BrowserPool
 from app.state.event_log import EventLog
@@ -620,6 +621,11 @@ def _rebuild_transport(
         # (mutated on every device status message) rather than a
         # snapshot captured at PushManager construction.
         device_status_fn=lambda: app.config.get("DEVICE_STATUS") or {},
+        # Calibration-tab palette-profile store (v0.67+). The push
+        # manager consults it per-render to inject a device's active
+        # profile as ``_palette_override`` in settings; .bin renderers
+        # pass the override through to :func:`pack_to_panel_bin`.
+        palette_profile_store=PaletteProfileStore(app.config["DATA_ROOT"]),
     )
     # Sweep render artifacts orphaned by event-log eviction (or a manual
     # history clear) at boot. Idempotent + never fatal.

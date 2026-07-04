@@ -97,6 +97,9 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # the Panel so one shared renderer serves both.
         gamut=panel.gamut,
         calibrated=bool(_setting(settings, "calibrated")),
+        # Calibration-tab palette profile (populated by app.push from
+        # the device's active profile). None keeps pre-v0.67 behaviour.
+        palette_override=settings.get("_palette_override"),
     )
 
 

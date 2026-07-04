@@ -100,6 +100,11 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         saturation=float(_setting(settings, "saturation")),
         contrast=float(_setting(settings, "contrast")),
         calibrated=bool(_setting(settings, "calibrated")),
+        # Populated by :mod:`app.push` from the device's active
+        # Calibration-tab palette profile. When ``None`` (no profile
+        # applied), the quantizer falls back to the built-in calibrated
+        # palette for the gamut, same as pre-v0.67 behaviour.
+        palette_override=settings.get("_palette_override"),
     )
 
 

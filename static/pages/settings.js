@@ -198,6 +198,41 @@
     update();
   }
 
+  // ---- Palette apply form (Calibration tab) ---------------------------
+  // The picker's attribution + notes lines are baked into the initial
+  // render for the currently-active slug. When the user picks a different
+  // profile in the dropdown, refresh the attribution / notes so the
+  // labels update before they've clicked Apply.
+  function initPaletteApplyForm(form) {
+    const select = form.querySelector('[data-palette-slug]');
+    if (!select) return;
+    const card = form.closest('.dx-calib-section');
+    if (!card) return;
+    const attrEl = card.querySelector('[data-palette-attribution]');
+    const notesEl = card.querySelector('[data-palette-notes]');
+    function apply() {
+      const opt = select.options[select.selectedIndex];
+      if (!opt) return;
+      const attribution = opt.getAttribute('data-attribution') || '';
+      const notes = opt.getAttribute('data-notes') || '';
+      if (attrEl) {
+        if (attribution) {
+          attrEl.innerHTML =
+            'via <a href="' + attribution + '" target="_blank" rel="noopener">' +
+            attribution + '</a>';
+          attrEl.hidden = false;
+        } else {
+          attrEl.hidden = true;
+        }
+      }
+      if (notesEl) {
+        notesEl.textContent = notes;
+        notesEl.hidden = !notes;
+      }
+    }
+    select.addEventListener('change', apply);
+  }
+
   // ---- Kind defaults rows (issue #22) ---------------------------------
   // Whole-row click toggles the inline form. Reset button swaps the
   // actions row for an inline confirm bar; Cancel reverts.
@@ -241,5 +276,6 @@
     document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
     document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
     document.querySelectorAll('[data-test-pattern-form]').forEach(initTestPatternForm);
+    document.querySelectorAll('[data-palette-apply-form]').forEach(initPaletteApplyForm);
   });
 })();

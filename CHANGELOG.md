@@ -6,6 +6,58 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.0], 2026-07-04
+
+### Added
+
+- **Palette recalibration on the Calibration tab.** Every device
+  card grows a "Palette recalibration" section that lets the user
+  pick from six pre-measured palette profiles per gamut (Spectra 6
+  + Inky 7-colour) sourced from
+  [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)
+  (`spectra6`, `spectra6legacy`, `spectra6-boeber`,
+  `aitjcize-spectra6`, `acep`), plus a "Nominal (uncalibrated)"
+  identity fallback. Bundled presets carry `based_on` +
+  `attribution` fields that surface as a "via paperlesspaper /
+  epdoptimize" line on the picker. Applied profile is stored per
+  device at `settings.devices.<id>.palette_profile_slug`.
+- **Save-as-new, import, export, delete for palette profiles.**
+  Users can fork any bundled preset into a named custom profile
+  (saved at `data/palette_profiles/<slug>.json`), import a JSON
+  profile shared by someone else, download a profile via
+  `GET /settings/palette-profiles/<slug>/export.json`, and delete
+  their own custom profiles. Bundled profiles refuse deletion.
+- **Palette override wired through the `.bin` renderers**
+  (`esp32_bin`, `pi_bin`, `pico_bin`, plus `trmnl_png_color` on
+  the PNG side). When a device has a profile applied AND the
+  renderer clone's `calibrated` toggle is on, the profile's
+  palette wins over the built-in `_CALIBRATED_PALETTES` lookup in
+  `app.quantizer`. `pi_png` and `trmnl_png` don't gain server-side
+  palette override in this release (their quantisation lives on
+  the client or is mono).
+- **Palette-profile schema, store, and bundled table** in the new
+  [`app.palette_profiles`](app/palette_profiles/) package.
+  Forward-compatible: unknown JSON fields are ignored on load,
+  out-of-range tone values are clamped, bad hex codes fall through
+  to `#000000` so a corrupt profile can't crash a render.
+- **Developer docs** at
+  [`docs/dev/calibration.md`](docs/dev/calibration.md) explaining
+  the schema, storage layout, and how to add a new bundled preset.
+
+### Changed
+
+- **Contrast + saturation moved from Rendering → Calibration.** The
+  two tone-mapping fields that were surfaced in each device card's
+  Picture-quality subsection (Rendering tab) now render on the
+  Calibration tab alongside the palette picker. Storage is
+  unchanged (still per-clone
+  `settings.renderers.<clone_id>.contrast` / `.saturation`) so
+  existing configs read forward without migration.
+- **`NOTICES.md`** carries a new sub-section documenting the
+  paperlesspaper/epdoptimize palette data reused as bundled
+  presets, alongside the existing entry for the calibrated palette
+  values in `app.quantizer`.
+
 ## [0.66.1], 2026-07-04
 
 ### Changed

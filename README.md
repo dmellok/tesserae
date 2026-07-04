@@ -210,7 +210,9 @@ Tesserae stands on generously-licensed open source: Phosphor Icons,
 Chart.js, 20 typefaces under SIL OFL / Apache 2.0, the TRMNL BYOS
 protocol, the KOReader trmnl-display plugin, and
 [paperlesspaper/epdoptimize](https://github.com/paperlesspaper/epdoptimize)'s
-Spectra 6 + ACeP calibrated palette measurements. Full attribution:
+Spectra 6 + ACeP calibrated palette measurements (also shipped as
+selectable presets in the Calibration tab under Apache 2.0). Full
+attribution:
 [Credits](https://docs.tesserae.ink/credits/),
 [NOTICES.md](NOTICES.md).
 

@@ -43,6 +43,10 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
+from app.palette_profiles import (
+    PaletteProfileStore,
+    resolve_device_palette,
+)
 from app.panel import (
     device_panel,
     panel_groups_for_push,
@@ -250,6 +254,7 @@ class PushManager:
         devices: DeviceRegistry | None = None,
         browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
         device_status_fn: Callable[[], dict[str, dict[str, Any]]] | None = None,
+        palette_profile_store: PaletteProfileStore | None = None,
     ) -> None:
         self._registry = registry
         self._page_store = page_store
@@ -273,6 +278,10 @@ class PushManager:
         # device_id, the panel comes from that device's manifest and
         # only its renderers fire in _fan_out.
         self._devices = devices
+        # Optional, enables Calibration-tab palette overrides. When None,
+        # renderers fall back to the module-level ``_CALIBRATED_PALETTES``
+        # or the nominal palette (behaviour before v0.67).
+        self._palette_profile_store = palette_profile_store
         self._lock = threading.Lock()
         # Renders accumulate in renders_dir as events age out (the event-log
         # cap evicts rows but not their artifacts). Sweep orphans on a
@@ -996,6 +1005,20 @@ class PushManager:
             # read ``image_fit`` (server-side fit_to_panel); pi_png passes it
             # to the client via its ``scale`` payload field.
             settings = {**settings, "image_fit": image_fit, "scale": image_fit}
+        # Calibration-tab palette override: when the device has a profile
+        # applied, inject the resolved RGB tuples into settings under the
+        # ``_palette_override`` key. .bin renderers read it and pass to
+        # :func:`app.quantizer.pack_to_panel_bin` as ``palette_override``,
+        # which wins over the module-level ``_CALIBRATED_PALETTES`` lookup
+        # when the clone's ``calibrated`` toggle is also on.
+        if self._palette_profile_store is not None and renderer.device is not None:
+            override = resolve_device_palette(
+                device_id=renderer.device,
+                settings_store=self._settings,
+                profile_store=self._palette_profile_store,
+            )
+            if override is not None:
+                settings = {**settings, "_palette_override": override}
         # Device-aware low-battery chip: per-renderer so each device's
         # last-known battery decides whether its push wears the warning.
         # A composition fanned out to a Pi + a TRMNL only paints the

@@ -403,6 +403,38 @@ _TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _palette_profile_slug_for(device: Device) -> str:
+    """Read the device's active palette profile slug from the settings
+    store, defaulting to an empty string when no override is set."""
+    raw = settings_store().get_for_runtime(
+        "devices",
+        device.id,
+        [{"name": "palette_profile_slug", "type": "string", "default": ""}],
+    )
+    return str(raw.get("palette_profile_slug") or "").strip()
+
+
+def _palette_family_for(device: Device) -> str:
+    """Which palette-profile family a device's picker filters against.
+
+    Uses the panel gamut when set (``waveshare_e6`` → ``spectra6``,
+    ``inky_7colour`` → ``inky_7colour``) and falls back to the Spectra 6
+    default so custom / unknown gamuts still get a picker."""
+    panel = device.panel or {}
+    gamut = str(panel.get("gamut") or "waveshare_e6")
+    if gamut == "inky_7colour":
+        return "inky_7colour"
+    return "spectra6"
+
+
+def _palette_profile_choices_for(device: Device) -> list[dict[str, Any]]:
+    """Bundled + user profiles offered to this device, scoped to the
+    matching palette family."""
+    from app.settings.palette_routes import profile_choices_for
+
+    return profile_choices_for(_palette_family_for(device))
+
+
 def _test_pattern_colors_for(device: Device) -> list[dict[str, Any]]:
     """Palette entries for the solid-fill colour picker on the
     Calibration tab. Snap to the device's declared gamut so the labels
@@ -538,24 +570,51 @@ def _build_sections() -> list[dict[str, Any]]:
         # the template renders them inside the combined form with the
         # name pattern ``<clone_id>:<field_name>`` so the save handler
         # can route each value back to the right clone's namespace.
+        # Contrast + saturation moved to the Calibration tab in v0.67
+        # (they're tone knobs, not rendering knobs); hide them from the
+        # Rendering-tab picture-quality subsection so users aren't
+        # editing the same value in two places. Storage is unchanged
+        # (still ``settings.renderers.<clone_id>.contrast``); the
+        # Calibration tab surfaces the same fields on the same clone.
+        _CALIBRATION_TAB_FIELDS = {"contrast", "saturation"}
         picture_quality: list[dict[str, Any]] = []
+        calibration_picture_quality: list[dict[str, Any]] = []
         if is_instance:
             for clone in renderers().for_device(device.id):
-                dev_fields = [
+                all_dev_fields = [
                     f for f in clone.manifest.get("settings", []) if f.get("device_setting")
                 ]
-                if not dev_fields:
+                if not all_dev_fields:
                     continue
+                rendering_fields = [
+                    f for f in all_dev_fields if f["name"] not in _CALIBRATION_TAB_FIELDS
+                ]
+                calibration_fields = [
+                    f for f in all_dev_fields if f["name"] in _CALIBRATION_TAB_FIELDS
+                ]
                 base_id = clone.id.split("__", 1)[0]
-                picture_quality.append(
-                    {
-                        "clone_id": clone.id,
-                        "base_id": base_id,
-                        "base_name": clone.name.split(" (", 1)[0],
-                        "fields": dev_fields,
-                        "state": store.get_for_runtime("renderers", clone.id, dev_fields),
-                    }
-                )
+                base_name = clone.name.split(" (", 1)[0]
+                state = store.get_for_runtime("renderers", clone.id, all_dev_fields)
+                if rendering_fields:
+                    picture_quality.append(
+                        {
+                            "clone_id": clone.id,
+                            "base_id": base_id,
+                            "base_name": base_name,
+                            "fields": rendering_fields,
+                            "state": state,
+                        }
+                    )
+                if calibration_fields:
+                    calibration_picture_quality.append(
+                        {
+                            "clone_id": clone.id,
+                            "base_id": base_id,
+                            "base_name": base_name,
+                            "fields": calibration_fields,
+                            "state": state,
+                        }
+                    )
         sections.append(
             {
                 "id": sid,
@@ -670,6 +729,41 @@ def _build_sections() -> list[dict[str, Any]]:
                 ),
                 "test_patterns": test_patterns.list_patterns() if is_instance else [],
                 "test_pattern_colors": (_test_pattern_colors_for(device) if is_instance else []),
+                # Palette profile picker (Calibration tab, Phase 1 of the
+                # v0.67 palette-profile work). ``palette_profile_slug`` is
+                # the currently-applied slug (empty when none);
+                # ``palette_profile_choices`` is the ordered dropdown
+                # scoped to this device's gamut so a Spectra 6 panel doesn't
+                # see the Inky 7-colour presets and vice versa. Endpoints
+                # are None on kinds (the picker is instance-only).
+                "palette_profile_slug": (_palette_profile_slug_for(device) if is_instance else ""),
+                "palette_profile_choices": (
+                    _palette_profile_choices_for(device) if is_instance else []
+                ),
+                "palette_apply_endpoint": (
+                    url_for("auth.devices_palette_apply", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "palette_save_endpoint": (
+                    url_for("auth.devices_palette_save", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "palette_reset_endpoint": (
+                    url_for("auth.devices_palette_reset", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "palette_import_endpoint": (
+                    url_for("auth.palette_profile_import") if is_instance else None
+                ),
+                # Contrast + saturation live in the Calibration tab now.
+                # Shape mirrors ``picture_quality`` so the same template
+                # macros render them; storage is the same per-clone
+                # ``renderers.<clone_id>.<field>`` path (the fields are
+                # just hidden from the Rendering tab in v0.67+).
+                "calibration_picture_quality": calibration_picture_quality,
                 # Per-device quiet-hours override. Read from the
                 # manifest so the form can preselect the user's
                 # current setting; ``quiet_hours_endpoint`` is None on

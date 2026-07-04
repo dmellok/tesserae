@@ -132,7 +132,14 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         # which reads better on text-heavy dashboards.
         img = ImageEnhance.Contrast(img.convert("L")).enhance(contrast).convert("RGB")
 
-    palette = _palette_for(panel.gamut)
+    # Calibration-tab palette profile: when the app.push layer resolves
+    # a device profile it injects RGB tuples under ``_palette_override``.
+    # Snap to that palette instead of the built-in gamut default so
+    # server-side dither aims at the panel's measured colours; on-wire
+    # PNG-palette entries just shift RGB values, the firmware's Spectra
+    # anchor mapping still recognises them by nearest primary.
+    override = settings.get("_palette_override")
+    palette = override or _palette_for(panel.gamut)
     pal_img = _make_palette_image(palette)
     dither_mode = _PIL_DITHER_MAP.get(
         str(_setting(settings, "dither")), Image.Dither.FLOYDSTEINBERG
