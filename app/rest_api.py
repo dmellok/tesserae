@@ -833,6 +833,13 @@ def post_register() -> Response:
     # Build panel overrides from the body if the firmware reported
     # dims (used for kinds whose default panel doesn't match the
     # connected hardware, e.g. swapping a 7.3" for a 13.3" Inky).
+    #
+    # v0.69.1 (issue #41) extends this with an optional ``gamut``
+    # field so a generic CircuitPython kind can serve every panel
+    # shape from one manifest; the value is canonicalised via
+    # :func:`app.quantizer.canonicalise_gamut` so aliases
+    # (``spectra_6`` → ``waveshare_e6``, ``acep_7colour`` →
+    # ``inky_7colour``) collapse cleanly.
     panel_overrides: dict[str, Any] | None = None
     try:
         w = int(body.get("panel_w") or 0)
@@ -841,6 +848,12 @@ def post_register() -> Response:
         w = h = 0
     if w > 0 and h > 0:
         panel_overrides = {"w": w, "h": h}
+    declared_gamut = body.get("gamut")
+    if isinstance(declared_gamut, str) and declared_gamut.strip():
+        from app.quantizer import canonicalise_gamut
+
+        panel_overrides = panel_overrides or {}
+        panel_overrides["gamut"] = canonicalise_gamut(declared_gamut.strip())
 
     # Existing device id? Re-register without overwriting (idempotent
     # for the firmware retry case). Return the existing token so the

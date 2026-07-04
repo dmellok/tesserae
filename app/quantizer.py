@@ -136,8 +136,75 @@ INKY_7COLOUR_CALIBRATED_PALETTE: tuple[tuple[int, int, int], ...] = (
 # stored on a device's panel block. Each maps to (palette, nibble LUT).
 # ``waveshare_e6`` is the default everywhere so existing devices and the
 # always-E6 ESP32 path are unchanged.
+#
+# On the manufacturer names: same ink chemistry, different on-wire
+# byte layouts. Waveshare's firmware reserves nibbles 0x4 and 0x7 for
+# the Spectra 6 palette (blue remaps to 0x5, green to 0x6);
+# Pimoroni's inky library targets the UC8159's native palette order
+# verbatim for ACeP. "Spectra 6" alone doesn't tell the packer which
+# byte layout to produce, so the canonical gamut string has to say
+# "Spectra 6 done Waveshare-style" (``waveshare_e6``) or "ACeP done
+# Inky-style" (``inky_7colour``). Chemistry-only aliases
+# (``spectra_6``, ``acep_7colour``) exist in :data:`ACCEPTED_GAMUTS`
+# so a client can declare "I'm a Spectra 6 panel" without knowing
+# which packing scheme its driver expects; the alias resolves to the
+# canonical form via :func:`canonicalise_gamut` at persistence time.
+# Renaming the canonical values to something chemistry-neutral would
+# require migrating every existing on-disk config, so the awkward
+# names stay for backward compat and the aliases carry the semantic
+# intent.
 PanelGamut = Literal["waveshare_e6", "inky_7colour"]
 PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour")
+
+# Wider allow-list for values a client can *declare* over
+# /api/v1/device/{discover, register} (added v0.69.1 for issue #41
+# and the follow-up comment asking for rgb24/rgb16 coverage).
+# Semantic labels (``spectra_6``,
+# ``acep_7colour``) alias into the canonical PANEL_GAMUTS values at
+# persistence time so the .bin packer's lookup keeps working; the
+# rest (``mono``, ``rgb24``, ``rgb16``) sit as metadata for
+# renderers / clients that key off panel type (CircuitPython generic
+# driver, TRMNL mono path, future full-colour LCD hybrids) without
+# going through the .bin packer.
+ACCEPTED_GAMUTS: frozenset[str] = frozenset(
+    {
+        "waveshare_e6",
+        "inky_7colour",
+        "spectra_6",
+        "acep_7colour",
+        "mono",
+        "rgb24",
+        "rgb16",
+    }
+)
+
+# Aliases from declared-name to canonical PANEL_GAMUTS entry. Applied at
+# persistence time so the on-disk panel block always carries a value
+# the .bin packer understands (or a passthrough label for renderers
+# that don't care).
+_GAMUT_ALIASES: dict[str, str] = {
+    "spectra_6": "waveshare_e6",
+    "acep_7colour": "inky_7colour",
+}
+
+
+def canonicalise_gamut(declared: str) -> str:
+    """Map a declared gamut label to its canonical panel-block value.
+
+    Preserves ``waveshare_e6`` and ``inky_7colour`` verbatim (the .bin
+    packer's targets); collapses semantic labels (``spectra_6``,
+    ``acep_7colour``) onto their canonical equivalents; passes through
+    ``mono``, ``rgb24``, ``rgb16`` for renderers that key off panel
+    type without going through the packer. Unknown values fall back
+    to ``waveshare_e6`` so a corrupt payload can't strand the device
+    with a nonsense panel."""
+    if declared in _GAMUT_ALIASES:
+        return _GAMUT_ALIASES[declared]
+    if declared in ACCEPTED_GAMUTS:
+        return declared
+    return "waveshare_e6"
+
+
 # Look up the calibrated palette for a gamut, or None when no calibration
 # profile exists (custom panels, future gamuts). Both calibrated palettes
 # use the same nibble LUT as their nominal counterparts so the on-wire

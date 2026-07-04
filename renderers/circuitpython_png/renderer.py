@@ -14,6 +14,14 @@ Output palette selected from the bound panel's gamut:
 * ``mono``                             -> 1-bit black + white
 * ``spectra_6`` / ``waveshare_e6``     -> 6-colour Spectra 6
 * ``acep_7colour`` / ``inky_7colour``  -> 7-colour ACeP
+* ``rgb24`` / ``rgb16``                -> plain 24-bit RGB PNG,
+                                          no quantisation (v0.69.1
+                                          per issue #41). rgb16
+                                          panels pack the 24-bit
+                                          RGB to RGB565 on-device;
+                                          a raw RGB565 wire format
+                                          is a bandwidth-only
+                                          follow-up.
 
 Unknown or custom gamuts fall back to Spectra 6 nominal so a panel
 that just hasn't declared its gamut yet still produces a sensible
@@ -64,8 +72,9 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
     return settings.get(key, DEFAULTS[key])
 
 
-def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...]:
-    """Map a panel's declared gamut to an RGB palette tuple. Unknown
+def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...] | None:
+    """Map a panel's declared gamut to an RGB palette tuple, or ``None``
+    when the gamut wants a full-colour (unquantised) output. Unknown
     or empty gamuts fall through to Spectra 6 nominal so the renderer
     is forgiving of custom panels that haven't named their gamut.
 
@@ -73,12 +82,16 @@ def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...]:
       * ``mono`` -> black + white
       * ``spectra_6`` / ``waveshare_e6`` / ``e6`` -> Spectra 6
       * ``acep_7colour`` / ``acep_7color`` / ``inky_7colour`` -> 7-colour
+      * ``rgb24`` / ``rgb16`` -> None (24-bit RGB PNG passthrough,
+        v0.69.1 per issue #41)
     """
     g = (gamut or "").lower()
     if g == "mono":
         return _MONO_PALETTE
     if g in ("acep_7colour", "acep_7color", "inky_7colour"):
         return INKY_7COLOUR_PALETTE
+    if g in ("rgb24", "rgb16"):
+        return None
     # Spectra 6, Waveshare E6, e6, or anything else: 6-colour nominal.
     return SPECTRA_6_PALETTE
 
@@ -135,6 +148,17 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img = ImageEnhance.Contrast(img.convert("L")).enhance(contrast).convert("RGB")
 
     palette = _palette_for(panel.gamut)
+    buf = io.BytesIO()
+    if palette is None:
+        # rgb24 / rgb16 (v0.69.1): emit a plain 24-bit RGB PNG. Skips
+        # both palette-quantise and dither, so the client gets the
+        # composition's full colour range on the wire. rgb16 panels
+        # pack down to RGB565 in firmware (a Python one-liner:
+        # ``((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)`` per
+        # pixel); a raw RGB565 wire format is a bandwidth-only
+        # follow-up.
+        img.convert("RGB").save(buf, format="PNG", optimize=True)
+        return buf.getvalue()
     pal_img = _make_palette_image(palette)
     dither_mode = _PIL_DITHER_MAP.get(
         str(_setting(settings, "dither")), Image.Dither.FLOYDSTEINBERG
@@ -146,7 +170,6 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # in app/quantizer.py does, for the bin-packer feed path).
     indexed = img.convert("RGB").quantize(palette=pal_img, dither=dither_mode)
 
-    buf = io.BytesIO()
     indexed.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
 

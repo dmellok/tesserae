@@ -63,6 +63,121 @@ def _issue_pairing(app) -> str:
 # -- register ----------------------------------------------------------
 
 
+def test_register_with_dims_and_gamut_persists_panel_override(app: Flask) -> None:
+    """v0.69.1 (issue #41): a generic CircuitPython register with
+    ``panel_w`` + ``panel_h`` + ``gamut`` in the body overrides the
+    kind's default panel block so the same generic kind can serve
+    different-shape panels without a per-SKU manifest add."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "cp_lab",
+                "kind": "circuitpython_generic",
+                "panel_w": 400,
+                "panel_h": 300,
+                "gamut": "mono",
+                "fw_version": "0.1.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    devices = app.config["DEVICE_REGISTRY"]
+    instance = devices.get("cp_lab")
+    assert instance is not None
+    panel = instance.panel or {}
+    assert panel.get("w") == 400
+    assert panel.get("h") == 300
+    assert panel.get("gamut") == "mono"
+
+
+def test_register_aliases_semantic_gamut_to_canonical(app: Flask) -> None:
+    """``spectra_6`` aliases to ``waveshare_e6`` so the .bin packer's
+    lookup still finds a palette; ``acep_7colour`` aliases to
+    ``inky_7colour`` the same way."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "cp_spectra",
+                "kind": "circuitpython_generic",
+                "panel_w": 800,
+                "panel_h": 480,
+                "gamut": "spectra_6",
+                "fw_version": "0.1.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    devices = app.config["DEVICE_REGISTRY"]
+    panel = (devices.get("cp_spectra").panel or {}) if devices.get("cp_spectra") else {}
+    assert panel.get("gamut") == "waveshare_e6"
+
+
+def test_register_rejects_bogus_gamut_and_falls_back_to_waveshare_e6(app: Flask) -> None:
+    """Corrupt payloads (a gamut string that isn't in the allow-list)
+    persist as ``waveshare_e6`` rather than stranding the device with a
+    nonsense panel the .bin packer can't quantise against."""
+    client = app.test_client()
+    _sign_in(client)
+    code = _issue_pairing(app)
+    resp = client.post(
+        "/api/v1/device/register",
+        headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+        data=json.dumps(
+            {
+                "device_id": "cp_bogus",
+                "kind": "circuitpython_generic",
+                "panel_w": 800,
+                "panel_h": 480,
+                "gamut": "not-a-real-gamut",
+                "fw_version": "0.1.0",
+            }
+        ),
+    )
+    assert resp.status_code == 201, resp.get_data(as_text=True)
+    devices = app.config["DEVICE_REGISTRY"]
+    panel = (devices.get("cp_bogus").panel or {}) if devices.get("cp_bogus") else {}
+    assert panel.get("gamut") == "waveshare_e6"
+
+
+def test_register_accepts_rgb24_and_rgb16_as_declared(app: Flask) -> None:
+    """Bernhard's suggestion from issue #41 (comment 4872979793):
+    accept ``rgb24`` and ``rgb16`` for full-colour displays. Values
+    persist verbatim (no alias to a .bin packer target since these
+    aren't served by that path)."""
+    client = app.test_client()
+    _sign_in(client)
+    for tag, gamut in (("rgb24", "rgb24"), ("rgb16", "rgb16")):
+        code = _issue_pairing(app)
+        resp = client.post(
+            "/api/v1/device/register",
+            headers={"X-Pairing-Code": code, "Content-Type": "application/json"},
+            data=json.dumps(
+                {
+                    "device_id": f"cp_{tag}",
+                    "kind": "circuitpython_generic",
+                    "panel_w": 320,
+                    "panel_h": 240,
+                    "gamut": gamut,
+                    "fw_version": "0.1.0",
+                }
+            ),
+        )
+        assert resp.status_code == 201, resp.get_data(as_text=True)
+    devices = app.config["DEVICE_REGISTRY"]
+    assert (devices.get("cp_rgb24").panel or {}).get("gamut") == "rgb24"
+    assert (devices.get("cp_rgb16").panel or {}).get("gamut") == "rgb16"
+
+
 def test_register_with_valid_pairing_code_creates_device_and_returns_token(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

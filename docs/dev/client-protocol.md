@@ -115,10 +115,50 @@ server URL.
      "kind": "circuitpython_generic",
      "panel_w": 800,
      "panel_h": 480,
+     "gamut": "mono",
      "fw_version": "0.1.0",
      "mac": "AA:BB:CC:DD:EE:FF"
    }
    ```
+
+   `gamut` is optional; when supplied, it's persisted onto the
+   auto-provisioned instance's panel block so the generic
+   `circuitpython_generic` kind can serve every panel shape without a
+   per-SKU manifest add (issue #41). Accepted values:
+
+   | Value | Meaning | Persisted as |
+   | --- | --- | --- |
+   | `waveshare_e6` | Spectra 6, `.bin` packer target | `waveshare_e6` |
+   | `spectra_6` | Spectra 6, semantic alias | `waveshare_e6` |
+   | `inky_7colour` | Pimoroni Inky ACeP, `.bin` packer target | `inky_7colour` |
+   | `acep_7colour` | ACeP, semantic alias | `inky_7colour` |
+   | `mono` | 1-bit B/W | `mono` |
+   | `rgb24` | Full 24-bit colour (LCD-hybrid) | `rgb24` |
+   | `rgb16` | 16-bit colour (RGB565) | `rgb16` |
+
+   Anything else falls back to `waveshare_e6` at persistence time so a
+   corrupt payload can't strand the device with a nonsense panel.
+
+   ??? note "Why do `waveshare_e6` and `inky_7colour` carry manufacturer
+       names?"
+
+       Same ink chemistry, different byte layouts on the wire.
+       Waveshare's firmware and Pimoroni's `inky` library both target
+       Spectra 6 / ACeP panels, but they pack the palette nibbles
+       differently, Waveshare reserves nibbles 0x4 and 0x7 (so blue
+       remaps to 0x5 and green to 0x6), Pimoroni uses the UC8159's
+       native palette order verbatim. "Spectra 6" alone doesn't tell
+       Tesserae's `.bin` packer which byte format to emit, so the
+       canonical gamut value has to say "Spectra 6 done Waveshare-
+       style" (`waveshare_e6`) or "ACeP done Inky-style"
+       (`inky_7colour`). The chemistry-only aliases (`spectra_6`,
+       `acep_7colour`) exist so a client can declare "I'm a Spectra 6
+       panel" without knowing which packing scheme its driver expects;
+       the alias resolves to the canonical form at persistence time.
+       Renaming the canonical values to something chemistry-neutral
+       (e.g. `spectra_6_pack_waveshare`) would need a migration for
+       every existing config, so the awkward names stay for backwards
+       compat and the aliases carry the semantic intent.
 2. Server caches the announcement. Returns:
    ```json
    {
@@ -170,10 +210,15 @@ click.
      "kind": "circuitpython_generic",
      "panel_w": 800,
      "panel_h": 480,
+     "gamut": "mono",
      "name": "Kitchen Display",
      "fw_version": "0.1.0",
      "mac": "AA:BB:CC:DD:EE:FF"
    }
+
+   `gamut` follows the same rules as on `/discover` (v0.69.1). Both
+   paths write the canonicalised value onto the auto-provisioned
+   instance's panel block.
    ```
 3. Server validates, creates the instance, returns a token:
    ```json

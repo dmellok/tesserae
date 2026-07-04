@@ -115,6 +115,58 @@ def test_circuitpython_png_unknown_gamut_falls_back_to_spectra_6(
     assert colors <= set(SPECTRA_6_PALETTE)
 
 
+def test_circuitpython_png_rgb24_output_is_full_colour(circuitpython_png, composition_png) -> None:
+    # v0.69.1 (issue #41): rgb24 panels get a plain 24-bit RGB PNG
+    # rather than an indexed palette output, so a full-colour LCD
+    # hybrid can paint the composition at its native depth.
+    panel = Panel(w=200, h=100, gamut="rgb24")
+    artifact = circuitpython_png.transform(
+        composition_png, panel=panel, settings=circuitpython_png.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.mode == "RGB", f"expected RGB mode, got {out.mode!r}"
+    # No palette, so ``getpalette()`` returns None.
+    assert out.getpalette() is None
+
+
+def test_circuitpython_png_rgb16_output_is_full_colour(circuitpython_png, composition_png) -> None:
+    # rgb16 shares the rgb24 wire format (24-bit RGB PNG); the
+    # firmware packs to RGB565 on-device. Same shape assertion as
+    # the rgb24 test.
+    panel = Panel(w=200, h=100, gamut="rgb16")
+    artifact = circuitpython_png.transform(
+        composition_png, panel=panel, settings=circuitpython_png.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.mode == "RGB"
+    assert out.getpalette() is None
+
+
+def test_circuitpython_png_rgb24_preserves_source_colours(
+    circuitpython_png,
+) -> None:
+    # A colourful gradient survives the rgb24 path with more distinct
+    # colours than the 6-entry Spectra 6 palette would allow. Uses a
+    # 128-shade horizontal ramp so the assertion is unambiguous.
+    from PIL import Image as PILImage
+
+    ramp = PILImage.new("RGB", (128, 32))
+    for x in range(128):
+        for y in range(32):
+            ramp.putpixel((x, y), (x * 2, 128, 255 - x * 2))
+    buf = io.BytesIO()
+    ramp.save(buf, format="PNG")
+    artifact = circuitpython_png.transform(
+        buf.getvalue(),
+        panel=Panel(w=128, h=32, gamut="rgb24"),
+        settings=circuitpython_png.settings_defaults(),
+    )
+    out = PILImage.open(io.BytesIO(artifact)).convert("RGB")
+    # Distinct colour count comfortably exceeds the 6-colour Spectra 6
+    # palette that would apply on any of the other gamut paths.
+    assert len({out.getpixel((x, 0)) for x in range(128)}) > 20
+
+
 def test_circuitpython_png_flip_changes_bytes(circuitpython_png) -> None:
     # flip=True applies a 180° rotation before quantise, so the
     # resulting indexed PNG bytes differ from the un-flipped version.

@@ -58,6 +58,15 @@ class DiscoveredDevice:
         return _maybe_int(self.parsed.get("panel_h"))
 
     @property
+    def gamut(self) -> str | None:
+        """Declared colour gamut from the /discover payload (v0.69.1,
+        issue #41). Values are canonicalised at persistence time via
+        :func:`app.quantizer.canonicalise_gamut`; here we just surface
+        whatever the client sent."""
+        value = self.parsed.get("gamut")
+        return str(value) if isinstance(value, str) and value else None
+
+    @property
     def fw_version(self) -> str | None:
         value = self.parsed.get("fw_version")
         return str(value) if isinstance(value, (str, int, float)) else None

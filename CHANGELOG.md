@@ -6,6 +6,43 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.1], 2026-07-04
+
+### Added
+
+- **Optional `gamut` field on `/api/v1/device/discover` +
+  `/api/v1/device/register`** (issue
+  [#41](https://github.com/dmellok/tesserae/issues/41)). A generic
+  CircuitPython client (or any REST-registering firmware) can now
+  declare its colour target in the same payload that carries
+  `panel_w` / `panel_h`; the value gets canonicalised through the
+  new `app.quantizer.canonicalise_gamut` and persisted onto the
+  auto-provisioned instance's panel block. Result: the
+  `circuitpython_generic` kind serves every panel shape from one
+  manifest with no per-SKU release cycle.
+- **Wider `ACCEPTED_GAMUTS`** list: `waveshare_e6`, `inky_7colour`,
+  `spectra_6` (aliases to `waveshare_e6`), `acep_7colour` (aliases
+  to `inky_7colour`), `mono`, and (per
+  [the follow-up comment on issue #41](https://github.com/dmellok/tesserae/issues/41#issuecomment-4872979793))
+  `rgb24` + `rgb16` for full-colour display hybrids. Unknown values
+  fall back to `waveshare_e6` at persistence time so a corrupt
+  payload can't strand the device with a nonsense panel.
+
+### Changed
+
+- **`Settings → Devices → Discovered` register flow** reads
+  `gamut` from the cached discover payload alongside `panel_w` /
+  `panel_h` when the admin clicks Register on a discovered device.
+- **`circuitpython_png` renderer honours `rgb24` and `rgb16`
+  panels** by emitting a plain 24-bit RGB PNG (no palette
+  quantise, no dither). `mono` was already wired to the 2-colour
+  palette path; this release makes it reachable end-to-end from a
+  generic `/register` call. `rgb16` panels pack the 24-bit RGB to
+  RGB565 on-device; a raw RGB565 wire format is a bandwidth-only
+  follow-up.
+- **`docs/dev/client-protocol.md`** documents the new payload
+  field + the accepted-value table.
+
 ## [0.69.0], 2026-07-04
 
 ### Changed

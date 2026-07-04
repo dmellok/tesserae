@@ -453,6 +453,16 @@ def devices_register_discovered(discovered_id: str) -> Response:
         panel_overrides["w"] = entry.panel_w
     if entry.panel_h is not None and entry.panel_h > 0:
         panel_overrides["h"] = entry.panel_h
+    # Gamut carried in the discover payload (v0.69.1, issue #41) lets a
+    # generic CircuitPython client tell Tesserae which colour target it
+    # paints against so the same generic kind can drive different-shape
+    # panels without a per-SKU manifest add. Canonicalise here so the
+    # on-disk value always matches the .bin packer's lookup keys or an
+    # accepted metadata label (mono / rgb24 / rgb16).
+    if entry.gamut:
+        from app.quantizer import canonicalise_gamut
+
+        panel_overrides["gamut"] = canonicalise_gamut(entry.gamut)
 
     # TRMNL discoveries carry the original access_token in the cache
     # entry's parsed payload so create_instance can preserve it, the
