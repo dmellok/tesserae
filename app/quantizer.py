@@ -4,15 +4,18 @@ Two responsibility groups:
 
 * **Pure transforms**, ``rotate_png``, ``apply_underscan``, ``fit_to_panel``.
   Composable, no panel/palette assumptions, used by any renderer.
-* **Spectra 6 / Waveshare E6 packing**, ``pack_to_panel_bin`` produces the
-  4-bpp panel-native buffer that ESP32 firmware streams to SPI and Pi-side
-  binary listeners consume. Dither dispatch (Pillow's Floyd-Steinberg /
-  none + our own numpy-backed atkinson / jarvis / stucki / bayer-8x8 /
-  halftone / crosshatch) lives here.
+* **Colour / mono packing**, ``pack_to_panel_bin`` produces the panel-
+  native buffer that ESP32 firmware streams to SPI and Pi-side binary
+  listeners consume. Bit width depends on the gamut:
+  4-bpp nibble-packed for 6/7-colour panels
+  (``waveshare_e6``, ``inky_7colour``), and 2-bpp native for 4-colour
+  BWRY panels (``bwry_4``, PicPak class). Dither dispatch (Pillow's
+  Floyd-Steinberg / none + our own numpy-backed atkinson / jarvis /
+  stucki / bayer-8x8 / halftone / crosshatch) lives here.
 
-Lifted largely from inky-dash's ``app.quantizer``. The packing layout
-(``width * height // 2`` bytes, high nibble = even column, palette →
-firmware-nibble LUT) is byte-compatible with the existing
+Lifted largely from inky-dash's ``app.quantizer``. The 4-bpp packing
+layout (``width * height // 2`` bytes, high nibble = even column,
+palette to firmware-nibble LUT) is byte-compatible with the existing
 ``dmellok/esp32-inky-dash-client`` firmware.
 """
 
@@ -99,30 +102,40 @@ INKY_7COLOUR_PALETTE: tuple[tuple[int, int, int], ...] = (
 _INKY_7COLOUR_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
 
 
-# 4-colour BWRY palette (v0.69.3, issue #NNN follow-up for PicPak
-# support). Physical panels of this class (400 x 300 PicPak, Waveshare
-# 4.2" DEPG0420BR variants, other B/W/Red/Yellow SKUs) reproduce these
-# four colours only; no green, no blue, no grey. Server dithers to
-# this palette when the panel declares ``gamut = "bwry_4"``.
+# 4-colour BWRY palette (v0.69.3 for PicPak support; v0.69.4 flipped
+# the wire format from 4-bpp nibble-packed to native 2-bpp and swapped
+# the Y/R indices to match the PicPak controller's palette order).
+# Physical panels of this class (400 x 300 PicPak, Waveshare 4.2"
+# DEPG0420BR variants, other B/W/Red/Yellow SKUs) reproduce these four
+# colours only; no green, no blue, no grey. Server dithers to this
+# palette when the panel declares ``gamut = "bwry_4"``.
+#
+# Palette index equals the wire value. Order is (black, white, yellow,
+# red) so index 0 -> 0x0, 1 -> 0x1, 2 -> 0x2, 3 -> 0x3, and the packer
+# skips the palette-index-to-nibble translation entirely. Matches the
+# PicPak's on-panel palette register (0x0 black, 0x1 white, 0x2 yellow,
+# 0x3 red).
 #
 # Naming is chemistry-only (not ``waveshare_bwry`` etc.) because we
-# define the on-wire nibble layout ourselves for this gamut: no
-# manufacturer-specific packing convention exists yet in the fleet, so
-# there's nothing to alias. If a manufacturer-specific packing shows
-# up later (a firmware that reserves specific nibble values the way
-# Waveshare's E6 firmware reserves 0x4 and 0x7), we'd add
+# define the on-wire layout ourselves for this gamut: no manufacturer-
+# specific packing convention exists yet in the fleet, so there's
+# nothing to alias. If a manufacturer-specific packing shows up later
+# (a firmware that reserves specific values the way Waveshare's E6
+# firmware reserves 0x4 and 0x7 in the 4-bpp layout), we'd add
 # ``waveshare_bwry`` / etc. alongside and canonicalise into it.
 BWRY_4_PALETTE: tuple[tuple[int, int, int], ...] = (
     (0, 0, 0),  # 0 -> 0x0 black
     (255, 255, 255),  # 1 -> 0x1 white
-    (255, 0, 0),  # 2 -> 0x2 red
-    (255, 255, 0),  # 3 -> 0x3 yellow
+    (255, 255, 0),  # 2 -> 0x2 yellow
+    (255, 0, 0),  # 3 -> 0x3 red
 )
 
-# Dense 0-3 nibble mapping. Unused nibbles (0x4 - 0xf) never appear in
-# the output, so a firmware decoder only needs to switch over the four
-# values. Documented in docs/dev/client-protocol.md as the wire
-# convention.
+# Identity LUT. Kept as a constant so ``_GAMUT_TABLE``'s shape is
+# uniform across gamuts (every entry is a ``(palette, nibble_lut)``
+# pair). ``pack_to_panel_bin`` still runs the ``bytes.translate`` step
+# for BWRY, but the identity mapping means it's a no-op on the payload;
+# the 2-bpp packer that runs afterwards reads the palette indices out
+# of the untranslated buffer directly.
 _BWRY_4_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3)
 
 
@@ -939,15 +952,23 @@ def pack_to_panel_bin(
     color_match: str = "rgb",
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
-    panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
-    each, scanline order, high nibble = even column (col 0, 2, …), low nibble
-    = odd column. Matches the firmware's ``epd_display`` SPI stream.
+    panel's native buffer.
 
-    ``gamut`` selects the target palette + nibble LUT (see ``PANEL_GAMUTS``):
-    ``waveshare_e6`` (6 colours, the default, ESP32 firmware + Waveshare E6
-    Pi clients) or ``inky_7colour`` (7 colours incl. orange, indices matching
-    the Pimoroni inky library so a Pi client writes them straight to the
-    UC8159 buffer). An unknown value falls back to ``waveshare_e6``.
+    Wire format depends on the gamut:
+
+    * ``waveshare_e6`` / ``inky_7colour`` (6 and 7 colour panels): 4-bpp
+      nibble-packed. Layout: ``height`` rows x ``width/2`` bytes each,
+      scanline order, high nibble = even column (col 0, 2, …), low
+      nibble = odd column. Matches the firmware's ``epd_display`` SPI
+      stream.
+    * ``bwry_4`` (native 2-bpp panels, PicPak class): 2-bpp packed.
+      Layout: ``height`` rows x ``width/4`` bytes each, scanline order,
+      MSB = leftmost pixel (bits 7:6 = col 0, 5:4 = col 1, 3:2 = col 2,
+      1:0 = col 3). Values are the four palette indices directly (0x0
+      black, 0x1 white, 0x2 yellow, 0x3 red), goes straight to the SPI
+      stream on the C3-class controllers these panels ship with.
+
+    Unknown gamuts fall back to ``waveshare_e6`` (6 colour, 4-bpp).
 
     ``calibrated`` swaps the dither target from nominal sRGB primaries to
     measured panel colours and runs a tone-mapping pre-pass that squeezes
@@ -979,7 +1000,12 @@ def pack_to_panel_bin(
       when near-black / near-white regions are dithering noisily into
       grey equivalents on the panel.
     """
-    if width % 2:
+    if gamut == "bwry_4":
+        if width % 4:
+            raise ValueError(
+                f"BWRY panel width must be a multiple of 4 (four pixels per byte), got {width}"
+            )
+    elif width % 2:
         raise ValueError(f"panel width must be even (two pixels per byte), got {width}")
     if img.size != (width, height):
         raise ValueError(f"image must be {width}x{height}, got {img.size}")
@@ -1120,13 +1146,30 @@ def pack_to_panel_bin(
 
     # palette index -> firmware/library nibble via bytes.translate (C-speed).
     # 256-byte LUT; anything past the gamut's entries falls through to 0x0
-    # (safe black).
+    # (safe black). For ``bwry_4`` the LUT is identity (palette index IS
+    # the wire value), so translate is a no-op here and the 2-bpp packer
+    # below reads the palette indices straight from ``nibbles``.
     lut = bytearray(256)
     for i, nibble in enumerate(nibble_by_index):
         lut[i] = nibble
     nibbles = raw.translate(bytes(lut))
 
-    # Pack two-per-byte. The firmware refuses any other layout.
+    if gamut == "bwry_4":
+        # 2-bpp native pack, 4 pixels per byte. MSB = leftmost pixel:
+        # bits 7:6 = col 0, 5:4 = col 1, 3:2 = col 2, 1:0 = col 3.
+        # Goes straight to the SPI stream on PicPak-class controllers,
+        # no decode / repack on the C3.
+        idx = np.frombuffer(nibbles, dtype=np.uint8).reshape(height, width)
+        packed_arr = (
+            (idx[:, 0::4] << 6) | (idx[:, 1::4] << 4) | (idx[:, 2::4] << 2) | idx[:, 3::4]
+        ).astype(np.uint8)
+        packed = packed_arr.tobytes()
+        expected = width * height // 4
+        assert len(packed) == expected, f"packed buffer is {len(packed)}, expected {expected}"
+        return packed
+
+    # 4-bpp nibble pack (the 6 and 7 colour panels). Two per byte, the
+    # firmware refuses any other layout.
     evens = nibbles[0::2]
     odds = nibbles[1::2]
     packed = bytes((e << 4) | o for e, o in zip(evens, odds, strict=True))

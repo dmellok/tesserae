@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.4], 2026-07-04
+
+### Changed
+
+- **`bwry_4` wire format switched to native 2-bpp packing.** v0.69.3
+  shipped BWRY as a 4-bpp nibble-packed buffer (matching Spectra 6 /
+  ACeP conventions), which doubled the buffer size a PicPak-class C3
+  actually needs and forced a repack step on the client. `bwry_4`
+  now packs 4 pixels per byte, MSB = leftmost pixel: a 400 × 300
+  PicPak frame is 30 000 bytes, not 60 000, and goes straight to the
+  SPI stream without a decode step. Full wire spec in
+  [`docs/dev/client-protocol.md`](docs/dev/client-protocol.md).
+- **`bwry_4` palette indices swapped to match the controller's
+  register.** Palette order is now `(black, white, yellow, red)` so
+  index equals wire value: `0x0=black`, `0x1=white`, `0x2=yellow`,
+  `0x3=red`. v0.69.3 had yellow and red the other way round, which
+  paints a red field on a yellow buffer (and vice versa) on PicPak.
+
 ## [0.69.3], 2026-07-04
 
 ### Added

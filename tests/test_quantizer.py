@@ -88,19 +88,17 @@ def test_pack_inky_7colour_orange_maps_to_nibble_six() -> None:
     assert all(b == 0x66 for b in packed)
 
 
-def test_pack_bwry_4_dense_nibble_mapping() -> None:
-    """v0.69.3: BWRY 4-colour gamut packs 0x0=black, 0x1=white,
-    0x2=red, 0x3=yellow into the 4-bpp buffer (two pixels per byte).
-    Each fill produces a byte where both nibbles are the same value
-    (top nibble = even column, bottom nibble = odd column), so a
-    solid black panel packs to all-zeros, solid red to 0x22, and so
-    on. Dense 0-3 mapping is the wire convention firmware decoders
-    need to switch over."""
+def test_pack_bwry_4_native_2bpp_packing() -> None:
+    """v0.69.4: BWRY 4-colour gamut packs to the panel's native 2-bpp
+    layout (4 pixels per byte, MSB = leftmost pixel), palette values
+    0x0=black, 0x1=white, 0x2=yellow, 0x3=red. A solid fill produces a
+    byte where all four 2-bit slots hold the same value: black -> 0x00,
+    white -> 0x55, yellow -> 0xAA, red -> 0xFF."""
     solid = [
         ((0, 0, 0), 0x00),
-        ((255, 255, 255), 0x11),
-        ((255, 0, 0), 0x22),
-        ((255, 255, 0), 0x33),
+        ((255, 255, 255), 0x55),
+        ((255, 255, 0), 0xAA),
+        ((255, 0, 0), 0xFF),
     ]
     for rgb, expected_byte in solid:
         img = Image.new("RGB", (100, 80), rgb)
@@ -108,30 +106,45 @@ def test_pack_bwry_4_dense_nibble_mapping() -> None:
         assert all(b == expected_byte for b in packed), (
             f"colour {rgb} did not pack to 0x{expected_byte:02x} everywhere"
         )
-    # Palette constant matches the RGB tuples we packed against.
+    # Palette order is (black, white, yellow, red) so palette index
+    # equals the wire value directly, no LUT translation on the pack
+    # path.
     assert BWRY_4_PALETTE == (
         (0, 0, 0),
         (255, 255, 255),
-        (255, 0, 0),
         (255, 255, 0),
+        (255, 0, 0),
     )
 
 
 def test_pack_bwry_4_output_length_matches_panel_dims() -> None:
+    """400x300 PicPak frame = 30_000 bytes at 2-bpp native (four pixels
+    per byte), not 60_000 as the v0.69.3 4-bpp variant produced."""
     img = Image.new("RGB", (400, 300), (255, 0, 0))
     packed = pack_to_panel_bin(img, width=400, height=300, dither="none", gamut="bwry_4")
-    assert len(packed) == 400 * 300 // 2  # 60_000 bytes for a PicPak frame
+    assert len(packed) == 400 * 300 // 4  # 30_000 bytes for a PicPak frame
 
 
 def test_pack_bwry_4_dither_stays_in_palette() -> None:
     """Given a mid-grey source, the dithered BWRY output only uses
-    the four palette nibbles (0x0-0x3). No stray high nibbles from
-    an accidental fallback to the E6 palette."""
+    the four palette values (0x0-0x3) in every 2-bit slot. No stray
+    values from an accidental fallback to another palette."""
     img = Image.new("RGB", (100, 80), (128, 128, 128))
     packed = pack_to_panel_bin(img, width=100, height=80, dither="floyd-steinberg", gamut="bwry_4")
     for byte in packed:
-        assert (byte >> 4) <= 0x3
-        assert (byte & 0xF) <= 0x3
+        for shift in (6, 4, 2, 0):
+            assert (byte >> shift) & 0x3 <= 0x3
+
+
+def test_pack_bwry_4_rejects_width_not_multiple_of_4() -> None:
+    """BWRY packs four pixels per byte, so width % 4 must be 0.
+    A width of 402 would leave two pixels dangling at the end of each
+    scanline that the 2-bpp packer has nowhere to put."""
+    import pytest
+
+    img = Image.new("RGB", (402, 80), (0, 0, 0))
+    with pytest.raises(ValueError, match="multiple of 4"):
+        pack_to_panel_bin(img, width=402, height=80, dither="none", gamut="bwry_4")
 
 
 def test_canonicalise_gamut_passes_bwry_through() -> None:

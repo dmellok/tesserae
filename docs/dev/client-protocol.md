@@ -582,30 +582,44 @@ most recent heartbeat without waiting for the next one.
 
 ## Frame formats
 
-### `.bin` — 4-bpp packed binary
+### `.bin` — packed binary
 
-Used by `pi_bin`, `esp32_bin`, `pico_bin` renderers. Exactly
+Used by `pi_bin`, `esp32_bin`, `pico_bin` renderers. Bit width and
+byte layout depend on the panel's gamut, so a client should key its
+unpack path off the `gamut` field it receives in `/api/v1/device/config`
+(or its `discover` payload).
+
+#### 4-bpp layout (6 and 7 colour panels)
+
+Applies to `waveshare_e6` and `inky_7colour`. Exactly
 `(width × height) / 2` bytes, no header, no padding.
 
 - Scanline order: row 0 first, left-to-right within each row.
 - High nibble = even column index (0, 2, 4, …), low nibble = odd.
 - 1200 × 1600 panel → 960 000 bytes.
-- Nibble values 0–15 are palette indices. Three standard palettes:
+- Nibble values 0–15 are palette indices. Two standard palettes:
   - **waveshare_e6**: 6-colour Spectra 6 (default; Waveshare + ESP32).
     Firmware reserves nibbles `0x4` and `0x7` (blue remaps to `0x5`,
     green to `0x6`); output never uses those reserved values.
   - **inky_7colour**: Pimoroni Inky 7-colour (matches the `inky`
     library's `pal` array, so you can `display.set_pixel(x, y,
     nibble)` directly).
-  - **bwry_4** (v0.69.3, PicPak-class 4.2" panels): 4-colour
-    black / white / red / yellow. Dense 0-3 nibble mapping:
-    `0x0=black`, `0x1=white`, `0x2=red`, `0x3=yellow`. Nibble values
-    `0x4`–`0xf` never appear in the output, so a firmware decoder
-    only needs to switch over the four values. 400 × 300 panel →
-    60 000 bytes.
+
+#### 2-bpp layout (4 colour BWRY panels)
+
+Applies to `bwry_4` (PicPak-class 4.2" panels, v0.69.4). Exactly
+`(width × height) / 4` bytes, no header, no padding. Goes straight
+to the SPI stream on the C3-class controllers these panels ship with.
+
+- Scanline order: row 0 first, left-to-right within each row.
+- Four pixels per byte, MSB = leftmost pixel: bits 7:6 = col 0,
+  5:4 = col 1, 3:2 = col 2, 1:0 = col 3.
+- Palette (values match the PicPak's on-panel palette register):
+  `0x0=black`, `0x1=white`, `0x2=yellow`, `0x3=red`.
+- 400 × 300 panel → 30 000 bytes.
 
 The renderer applies rotation, letterboxing, underscan, and dithering
-server-side, so the firmware just unpacks nibbles and pushes to the
+server-side, so the firmware just unpacks and pushes to the
 controller.
 
 Reference: [`renderers/esp32_bin/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/esp32_bin/renderer.py),
