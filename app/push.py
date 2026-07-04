@@ -11,9 +11,16 @@ Four entry points share the same single-flight + log-the-event tail:
 * ``republish(event_id)``, re-publish a past push from history using the
   stored composition PNG, no re-render.
 
-Concurrency: one push at a time. Concurrent attempts return
-``status="busy"`` instead of queueing, simple model, the UI shows what's
-actually happening.
+Concurrency: one push at a time, with latest-wins coalescing per
+device (v0.69+). Callers wait on a shared ``_lock``; before waiting
+they bump a per-device generation counter, and on lock acquire a
+stale caller (its generation is no longer the latest for that
+device) returns ``status="superseded"`` without firing so an already-
+queued newer push wins. User-initiated pushes (Send-page,
+test patterns, Push-now, republish) pass ``bypass_coalesce=True`` so
+they always fire; scheduler / auto-refresh flows leave the flag
+False so back-to-back schedule ticks don't paint twice. The old
+``status="busy"`` drop path is retired.
 
 The composition PNG is always written to ``data/core/renders/<comp_digest>.png``
 as the canonical thumbnail. Per-renderer artifacts go to
@@ -128,7 +135,7 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
 
 logger = logging.getLogger(__name__)
 
-PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet", "held"]
+PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet", "held", "superseded"]
 
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
 # Larger downloads are rejected before going through Pillow.
@@ -305,6 +312,18 @@ class PushManager:
         # or the nominal palette (behaviour before v0.67).
         self._palette_profile_store = palette_profile_store
         self._lock = threading.Lock()
+        # Per-device latest-wins coalescing (v0.69). Each call to
+        # ``_acquire_or_supersede`` bumps this map before waiting on
+        # ``_lock``; on acquire, if the caller's generation is stale
+        # relative to the current entry, its render is skipped as
+        # "superseded" and the newer push wins. The map is keyed by
+        # device_id, with ``None`` bucketing pushes that aren't
+        # scoped to a device (they never supersede each other and
+        # always process FIFO). Callers can opt out with
+        # ``bypass_coalesce=True`` (user-initiated pushes so a
+        # panic-click Send never gets silently dropped).
+        self._gen_lock = threading.Lock()
+        self._device_gens: dict[str | None, int] = {}
         # Renders accumulate in renders_dir as events age out (the event-log
         # cap evicts rows but not their artifacts). Sweep orphans on a
         # rolling basis so the dir stays bounded without a restart.
@@ -418,6 +437,7 @@ class PushManager:
         device_ids: set[str] | None = None,
         respect_quiet_hours: bool = False,
         source: str = "page",
+        bypass_coalesce: bool = False,
     ) -> PushResult:
         """Render a saved Page through the composer and publish.
 
@@ -438,8 +458,28 @@ class PushManager:
         ``source`` (default ``"page"``): the trigger label written to the
         event log so History can chip what kicked it off. Callers pass
         ``"scheduler"``, ``"webhook"``, ``"home_assistant"``, etc."""
-        if not self._lock.acquire(blocking=False):
-            result = self._log_busy(source=source, target=page_id)
+        # v0.69 coalescing: page pushes with a single-device target
+        # coalesce against that device_id (later pushes for the same
+        # device supersede earlier ones). Multi-device or unbound
+        # pushes coalesce against the ``None`` bucket, so a schedule
+        # firing twice in a row for the same page doesn't paint
+        # twice. Manual / user-initiated pushes should pass
+        # ``bypass_coalesce=True`` so they always fire.
+        coalesce_key: str | None = None
+        if device_ids and len(device_ids) == 1:
+            coalesce_key = next(iter(device_ids))
+        supersede = self._acquire_or_supersede(
+            device_id=coalesce_key,
+            source=source,
+            target=page_id,
+            bypass_coalesce=bypass_coalesce,
+        )
+        if supersede is not None:
+            result = PushResult(
+                status="superseded",
+                page_id=page_id,
+                error="newer push for the same device took priority",
+            )
         else:
             try:
                 result = self._push_page_locked(
@@ -460,6 +500,7 @@ class PushManager:
         source_label: str,
         device_id: str | None = None,
         fit: str | None = None,
+        bypass_coalesce: bool = True,
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -471,8 +512,18 @@ class PushManager:
         fire and its panel dims are used, same routing as a page bound
         to the device. ``fit`` (optional): the fit mode for non-panel-sized
         input (``fit``/``fill``/``stretch``/``center``/``blur``)."""
-        if not self._lock.acquire(blocking=False):
-            result = self._log_busy(source="file", target=source_label)
+        supersede = self._acquire_or_supersede(
+            device_id=device_id,
+            source="file",
+            target=source_label,
+            bypass_coalesce=bypass_coalesce,
+        )
+        if supersede is not None:
+            result = PushResult(
+                status="superseded",
+                page_id=source_label,
+                error="newer push for the same device took priority",
+            )
         else:
             try:
                 result = self._push_bytes_locked(
@@ -484,12 +535,27 @@ class PushManager:
         return result
 
     def push_url_image(
-        self, url: str, *, device_id: str | None = None, fit: str | None = None
+        self,
+        url: str,
+        *,
+        device_id: str | None = None,
+        fit: str | None = None,
+        bypass_coalesce: bool = True,
     ) -> PushResult:
         """Download an image URL, then ``push_image``. Networking errors
         surface as failed events with the URL as the target."""
-        if not self._lock.acquire(blocking=False):
-            result = self._log_busy(source="url", target=url)
+        supersede = self._acquire_or_supersede(
+            device_id=device_id,
+            source="url",
+            target=url,
+            bypass_coalesce=bypass_coalesce,
+        )
+        if supersede is not None:
+            result = PushResult(
+                status="superseded",
+                page_id=url,
+                error="newer push for the same device took priority",
+            )
         else:
             try:
                 try:
@@ -513,10 +579,21 @@ class PushManager:
         viewport_h: int = 1200,
         device_id: str | None = None,
         fit: str | None = None,
+        bypass_coalesce: bool = True,
     ) -> PushResult:
         """Screenshot an arbitrary URL with Playwright, then publish."""
-        if not self._lock.acquire(blocking=False):
-            result = self._log_busy(source="webpage", target=url)
+        supersede = self._acquire_or_supersede(
+            device_id=device_id,
+            source="webpage",
+            target=url,
+            bypass_coalesce=bypass_coalesce,
+        )
+        if supersede is not None:
+            result = PushResult(
+                status="superseded",
+                page_id=url,
+                error="newer push for the same device took priority",
+            )
         else:
             try:
                 started = time.monotonic()
@@ -576,9 +653,11 @@ class PushManager:
                     composition_digest=record.digest,
                     error="composition PNG evicted from disk",
                 )
-            elif not self._lock.acquire(blocking=False):
-                result = self._log_busy(source="resend", target=record.target)
             else:
+                # Republish is a user-initiated resend from the History
+                # page; treat it as user intent (bypass coalescing) so
+                # the user's re-send never gets silently superseded.
+                self._lock.acquire()
                 try:
                     result = self._push_bytes_locked(
                         comp_path.read_bytes(),
@@ -1212,6 +1291,65 @@ class PushManager:
             error="another push in flight",
             event_id=event_id,
         )
+
+    def _log_superseded(self, *, source: str, target: str) -> PushResult:
+        """Record a "superseded" event when this push was coalesced by
+        a newer arrival for the same device. Semantically distinct from
+        "busy" (which meant "we couldn't queue it at all") and "sent"
+        (which means "the panel painted our frame"); History and HA
+        callers key off the string, so keep it stable."""
+        event_id = self._event_log.record(
+            type="push",
+            source=source,
+            target=target,
+            status="superseded",
+            error="newer push for the same device took priority",
+        )
+        return PushResult(
+            status="superseded",
+            page_id=target,
+            error="newer push for the same device took priority",
+            event_id=event_id,
+        )
+
+    def _acquire_or_supersede(
+        self,
+        *,
+        device_id: str | None,
+        source: str,
+        target: str,
+        bypass_coalesce: bool,
+    ) -> str | None:
+        """Coalesce + acquire pattern shared across the push entry
+        points. Returns ``None`` when the caller can proceed (lock is
+        held; caller must ``self._lock.release()`` on the way out).
+        Returns ``"superseded"`` when a newer push for the same
+        device stole this caller's slot; the event is already logged,
+        no lock is held, and the caller should return immediately.
+
+        ``bypass_coalesce=True`` skips the generation check entirely so
+        user-initiated pushes (Send-file, test patterns, buttons) always
+        fire; they still serialise on ``_lock`` so we never paint two
+        frames simultaneously.
+
+        The old non-blocking ``self._lock.acquire(blocking=False)``
+        pattern that returned ``"busy"`` on contention is retired
+        here: a coalescing wait is more forgiving for the "user hits
+        Send while a schedule fires" race."""
+        if bypass_coalesce:
+            self._lock.acquire()
+            return None
+        with self._gen_lock:
+            my_gen = self._device_gens.get(device_id, 0) + 1
+            self._device_gens[device_id] = my_gen
+        self._lock.acquire()
+        with self._gen_lock:
+            latest = self._device_gens.get(device_id, 0)
+        if my_gen < latest:
+            self._lock.release()
+            self._log_superseded(source=source, target=target)
+            return "superseded"
+        return None
 
     def _log_failure(
         self,

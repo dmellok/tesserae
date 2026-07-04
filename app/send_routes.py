@@ -333,7 +333,12 @@ def send_page() -> Response:
         flash("Pick a saved dashboard first.", "error")
         return _redirect_after_page_push(page_id, on_error=True)
     page_name = next((p.name for p in _pages().list() if p.id == page_id), page_id)
-    _run_in_background(lambda: _push().push(page_id), label=f"page:{page_id}")
+    # User-initiated click; skip coalescing so the panel never silently
+    # gets superseded by a schedule firing on the same device.
+    _run_in_background(
+        lambda: _push().push(page_id, bypass_coalesce=True),
+        label=f"page:{page_id}",
+    )
     return_to = (request.form.get("return_to") or "").strip()
     # Tailor the flash message to where the user is about to land.
     # "History tab" was helpful from the Send page; from the dashboards

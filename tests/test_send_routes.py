@@ -104,7 +104,10 @@ def test_saved_dashboard_invokes_push(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     client.post("/send/page", data={"page_id": "home"}, follow_redirects=False)
-    pm.push.assert_called_once_with("home")
+    # v0.69: user-initiated Send-page click passes bypass_coalesce=True
+    # so a schedule tick for the same device can't silently supersede
+    # the manual click.
+    pm.push.assert_called_once_with("home", bypass_coalesce=True)
 
 
 def test_url_invokes_push_url_image(app: Flask) -> None:

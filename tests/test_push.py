@@ -166,16 +166,105 @@ def test_push_not_found_when_page_missing(tmp_path: Path, composition_png: bytes
     assert result.status == "not_found"
 
 
-def test_push_busy_when_already_in_flight(tmp_path: Path, composition_png: bytes) -> None:
-    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+def test_push_image_supersedes_older_pending_for_same_device(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """v0.69 coalescing: two rapid-fire pushes for the same device
+    (with bypass_coalesce=False) mean the earlier one gets
+    ``status="superseded"`` while the later one fires. The Send-file
+    entry points default to ``bypass_coalesce=True`` (user intent), so
+    the test flips that flag to exercise the coalescing path."""
+    import threading
+    import time
+
+    renderers = [_make_renderer(tmp_path, "esp32_bin", "bin", retain=False)]
     manager, _, _ = _wired(tmp_path, composition_png, renderers)
-    # Take the internal lock so the next call sees busy.
+    # Hold the processing lock so both pushes queue. Both threads will
+    # bump the device generation and then block on _lock.acquire().
     manager._lock.acquire()
-    try:
-        result = manager.push("home")
-    finally:
-        manager._lock.release()
-    assert result.status == "busy"
+    results: dict[str, object] = {}
+
+    def fire(label: str) -> None:
+        results[label] = manager.push_image(
+            composition_png,
+            source_label=label,
+            device_id="esp32",
+            bypass_coalesce=False,
+        )
+
+    t1 = threading.Thread(target=fire, args=("earlier",))
+    t2 = threading.Thread(target=fire, args=("later",))
+    t1.start()
+    time.sleep(0.1)  # let t1 bump gen to 1 and block on lock
+    t2.start()
+    time.sleep(0.1)  # let t2 bump gen to 2 and block on lock
+    manager._lock.release()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+    # Earlier push (gen 1) is superseded by the later push (gen 2).
+    assert results["earlier"].status == "superseded"  # type: ignore[union-attr]
+    assert results["later"].status == "sent"  # type: ignore[union-attr]
+
+
+def test_push_image_bypass_coalesce_always_fires(tmp_path: Path, composition_png: bytes) -> None:
+    """User-initiated pushes pass ``bypass_coalesce=True`` (the default)
+    so they never get superseded, even when a competing push is already
+    queued for the same device."""
+    renderers = [_make_renderer(tmp_path, "esp32_bin", "bin", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    r1 = manager.push_image(
+        composition_png,
+        source_label="first",
+        device_id="esp32",
+        bypass_coalesce=True,
+    )
+    r2 = manager.push_image(
+        composition_png,
+        source_label="second",
+        device_id="esp32",
+        bypass_coalesce=True,
+    )
+    # Sequential (both serialise on _lock) but both fire.
+    assert r1.status == "sent"
+    assert r2.status == "sent"
+
+
+def test_supersede_records_event_log_row(tmp_path: Path, composition_png: bytes) -> None:
+    """Superseded pushes still write an event row so History can chip
+    them, mirroring the old ``busy`` semantics on the observability
+    side."""
+    import threading
+    import time
+
+    renderers = [_make_renderer(tmp_path, "esp32_bin", "bin", retain=False)]
+    manager, _, _ = _wired(tmp_path, composition_png, renderers)
+    manager._lock.acquire()
+
+    def fire(label: str, results: list[object]) -> None:
+        results.append(
+            manager.push_image(
+                composition_png,
+                source_label=label,
+                device_id="esp32",
+                bypass_coalesce=False,
+            )
+        )
+
+    results: list[object] = []
+    t1 = threading.Thread(target=fire, args=("earlier", results))
+    t2 = threading.Thread(target=fire, args=("later", results))
+    t1.start()
+    time.sleep(0.1)
+    t2.start()
+    time.sleep(0.1)
+    manager._lock.release()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+    superseded_rows = [
+        row for row in manager._event_log.list(limit=20) if row.status == "superseded"
+    ]
+    assert len(superseded_rows) == 1
+    assert superseded_rows[0].source == "file"
 
 
 def test_failing_renderer_marks_push_failed_but_others_still_publish(

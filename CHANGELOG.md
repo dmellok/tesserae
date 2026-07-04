@@ -6,6 +6,35 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.0], 2026-07-04
+
+### Changed
+
+- **PushManager: latest-wins coalescing per device, replacing the
+  old `status="busy"` drop path.** Two pushes for the same device
+  no longer stomp each other; the earlier one gets
+  `status="superseded"` (with a matching History event) and the
+  later one paints. User-initiated pushes (Send-file / Send-URL /
+  Send-webpage / Send-page / test patterns / republish) pass
+  `bypass_coalesce=True` so they always fire. Scheduler and
+  auto-refresh flows leave the flag `False`, so back-to-back
+  schedule ticks for the same page paint once instead of twice.
+- New `PushResult` status: `"superseded"`. Same shape as `"busy"`
+  was (event row + error message), so History / HA discovery /
+  events log all keep working; downstream consumers only need to
+  handle the new string. `"busy"` remains in the `PushStatus`
+  literal for backward compat but is no longer emitted.
+
+### Added
+
+- **`bypass_coalesce` kwarg** on `PushManager.push`,
+  `.push_image`, `.push_url_image`, `.push_webpage`. Defaults are
+  set so the common HTTP-facing surfaces (`push_image` etc.)
+  bypass by default (user intent), while `push(page_id)` defaults
+  to coalescing (scheduler intent). Send-page's "Send this
+  dashboard" button explicitly passes `bypass_coalesce=True` so a
+  panic-click never gets silently superseded.
+
 ## [0.68.0], 2026-07-04
 
 ### Changed
