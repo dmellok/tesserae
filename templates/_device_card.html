@@ -944,8 +944,10 @@
         {% endif %}
       </section>
 
-      {# STICKY SAVE BAR (revealed by JS when the form is dirty) #}
-      <div class="dx-save-bar" data-save-bar hidden>
+      {# STICKY SAVE BAR (always visible; JS toggles the muted class
+         between clean + dirty states so the Save affordance is
+         discoverable, v0.69.6 for issue #52 item 3). #}
+      <div class="dx-save-bar dx-save-bar--muted" data-save-bar>
         <span class="dx-save-bar-msg">You have unsaved changes</span>
         <div class="dx-save-bar-actions">
           <button type="reset" class="dx-save-bar-discard">Discard</button>

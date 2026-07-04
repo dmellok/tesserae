@@ -50,23 +50,41 @@
   }
 
   // ---- Dirty tracking + sticky save bar ----------------------------------
-  // The bar is hidden until the user touches any input in the form. Save
-  // submits normally (server returns 302 + flash + re-render). Discard
-  // resets every field to its initial value and re-hides the bar.
+  // v0.69.6 (issue #52 item 3): the sticky "You have unsaved changes"
+  // bar is now always visible when its host section is open, rather
+  // than hiding until the first input event, so users can see the
+  // Save affordance the moment they land in a settings tab. When
+  // clean it renders muted (dimmed background, disabled Save button,
+  // Discard hidden via CSS); on the first change it swaps to the
+  // "unsaved changes" state (full contrast, both buttons live). Save
+  // submits normally; Discard resets fields + re-mutes.
   function initDirtyForm(form) {
     const bar = form.querySelector('[data-save-bar]');
     if (!bar) return;
+    const msg = bar.querySelector('.dx-save-bar-msg');
+    const dirtyText = (msg && msg.textContent) || 'You have unsaved changes';
+    // ``data-msg-clean`` on the message span overrides the default
+    // (per-template copy, if a page wants something more specific).
+    const cleanText = (msg && msg.dataset && msg.dataset.msgClean) || 'No unsaved changes';
     let dirty = false;
 
+    function setMsg(text) {
+      if (msg) msg.textContent = text;
+    }
     function markDirty() {
       if (dirty) return;
       dirty = true;
-      bar.hidden = false;
+      bar.classList.remove('dx-save-bar--muted');
+      setMsg(dirtyText);
     }
     function clearDirty() {
       dirty = false;
-      bar.hidden = true;
+      bar.classList.add('dx-save-bar--muted');
+      setMsg(cleanText);
     }
+    // Initial state: start muted so the bar is visible but doesn't
+    // demand attention until the user makes an edit.
+    clearDirty();
 
     form.addEventListener('input', markDirty);
     form.addEventListener('change', markDirty);
@@ -76,10 +94,13 @@
       // ``input`` event from the reset doesn't re-mark us dirty.
       setTimeout(clearDirty, 0);
     });
-    // Once Save fires, we'll be redirected by the server. Hide
-    // optimistically so the bar doesn't linger after the click.
+    // Once Save fires we'll be redirected by the server. Optimistically
+    // re-mute so the bar doesn't sit in the "changes" state after the
+    // click (matters if the redirect is slow, or if a validation error
+    // brings the same page back and we want to start "clean" from the
+    // server's re-rendered field values).
     form.addEventListener('submit', function () {
-      bar.hidden = true;
+      clearDirty();
     });
   }
 

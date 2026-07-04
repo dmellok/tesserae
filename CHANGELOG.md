@@ -8,11 +8,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [0.69.6], 2026-07-05
 
-Batch fix for issue #52 items 1, 2, 4, 5, 6, 7. Every confirmed bug in
-that report lands here except item 3, which is a UX polish (the sticky
-"You have unsaved changes" bar on device tabs) tracked separately, and
-items 8-10 which are UX threads (Devices to top-level nav, split
-registration, admin dashboard) that need their own design pass.
+Batch fix for issue #52 items 1, 2, 3, 4, 5, 6, 7. Items 8-10 (Devices
+to top-level nav, split registration, admin dashboard) are UX threads
+that need their own design pass.
 
 ### Fixed
 
@@ -53,6 +51,15 @@ registration, admin dashboard) that need their own design pass.
   settings from before v0.69.6 get promoted into the new
   ``{latitude, longitude, name}`` shape on read so upgrades don't
   silently blank the fallback.
+- **Sticky "Save changes" bar is always visible on Settings tabs (item 3).**
+  Previously hidden until the first ``input`` event, which meant users
+  who wanted to save via a persistent button couldn't see one existed.
+  The bar now renders in a muted state while the form is clean (dimmed
+  background, disabled Save, hidden Discard) and lights up to the
+  current styling on the first edit. Applies to the device card, the
+  device-kind defaults, and the Settings > Server section. Same JS + CSS
+  variant; templates only drop the ``hidden`` attribute and add the
+  ``dx-save-bar--muted`` class.
 - **beforeunload popup fires only on real edits (item 7).**
   [`static/pages/editor.js`](static/pages/editor.js) used to gate the
   "Leave site?" prompt on ``saveBtn.disabled``, which flipped enabled
