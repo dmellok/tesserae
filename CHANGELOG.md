@@ -6,6 +6,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.2], 2026-07-04
+
+### Added
+
+- **Delete-with-cascade prompt on the device card** (issue
+  [#48](https://github.com/dmellok/tesserae/issues/48)). The delete
+  button no longer fires a browser `confirm()`; it expands an inline
+  form with a checkbox showing exactly what would be wiped
+  ("Also wipe N bound dashboards, M history rows, per-device
+  settings, uploaded calibration image"). Off by default so muscle
+  memory doesn't destroy data; on for a clean-slate delete.
+- **MAC-differs auto-wipe on re-register.** When a device is deleted
+  without ticking the wipe checkbox, Tesserae stashes the device's
+  last-known MAC in `data/deleted_device_markers.json`. On
+  `POST /api/v1/device/register` or a one-click register from the
+  Discovered strip, if the incoming MAC differs from the stored MAC
+  (or the client dropped its MAC), the leftover pages / events /
+  settings / calibration image are wiped before the new instance is
+  created. Same MAC keeps the state; the marker is cleared on either
+  path so subsequent registers behave normally.
+- **`app.device_cleanup`** package: `list_orphan_state()` and
+  `wipe_orphan_state()` are the shared helpers used by both flows.
+  `app.state.deleted_device_markers.DeletedDeviceMarkers` is the tiny
+  MAC-tracking store.
+
 ## [0.69.1], 2026-07-04
 
 ### Added

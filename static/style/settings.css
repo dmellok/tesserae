@@ -1403,6 +1403,44 @@
 }
 :root[data-theme="dark"] .dx-palette-color-cell { border-color: var(--t-border); }
 
+/* Delete-with-cascade prompt (v0.69.2, issue #48). ``<details>`` in
+   the footer expands into an inline confirm with the wipe checkbox,
+   so users can see what would be preserved vs wiped before pulling
+   the trigger. */
+.dx-delete-details { position: relative; }
+.dx-delete-details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.dx-delete-details > summary::-webkit-details-marker { display: none; }
+.dx-delete-form {
+  position: absolute;
+  right: 0;
+  bottom: 40px;
+  z-index: 5;
+  width: min(340px, 90vw);
+  padding: 12px 14px;
+  border: 1px solid var(--dx-border);
+  border-radius: 8px;
+  background: var(--dx-surface, #ffffff);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+.dx-delete-wipe {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 0;
+}
+.dx-delete-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+:root[data-theme="dark"] .dx-delete-form {
+  background: var(--t-surface);
+  border-color: var(--t-border);
+}
+
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the
    resolved effective map (default + global + per-device). */

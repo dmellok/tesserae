@@ -23,7 +23,7 @@ from flask import Response as FlaskResponse
 from flask import current_app, flash, redirect, request, session, url_for
 from werkzeug.wrappers import Response
 
-from app import calibration, device_service, renderer_loader, test_patterns
+from app import calibration, device_cleanup, device_service, renderer_loader, test_patterns
 from app.button_actions import (
     ButtonActionError,
     parse_action_spec,
@@ -31,6 +31,7 @@ from app.button_actions import (
 )
 from app.calibration import build_calibration_card, target_orientation
 from app.panel import panel_overrides_from_form
+from app.state.deleted_device_markers import DeletedDeviceMarkers
 
 from ._shared import (
     bp,
@@ -499,6 +500,22 @@ def devices_register_discovered(discovered_id: str) -> Response:
     is_rest_discovery = entry.parsed.get("transport") == "rest"
     transport_arg = "rest" if is_rest_discovery else None
     mac_arg = str(entry.parsed.get("mac") or "").strip() or None if is_rest_discovery else None
+    # v0.69.2 (issue #48): if the id has orphan state from a previous
+    # deletion AND the incoming MAC differs from what was stored, wipe
+    # the leftovers so the new device starts pristine. Matching MACs
+    # keep state. Marker gets cleared either way so future registers
+    # don't keep triggering.
+    target_id = form.get("id") or default_id
+    markers = DeletedDeviceMarkers(Path(current_app.config["DATA_ROOT"]))
+    if markers.mac_differs(target_id, mac_arg):
+        device_cleanup.wipe_orphan_state(
+            device_id=target_id,
+            page_store=current_app.config["PAGE_STORE"],
+            event_log=current_app.config["EVENT_LOG"],
+            settings_store=settings_store(),
+            data_root=Path(current_app.config["DATA_ROOT"]),
+        )
+    markers.clear(target_id)
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers(),
@@ -986,7 +1003,23 @@ def devices_update_combined(instance_id: str) -> Response:
 @bp.post("/settings/devices/<instance_id>/delete")
 def devices_delete(instance_id: str) -> Response:
     """Remove a user-created device instance. Built-in kinds are
-    refused, they ship with the app."""
+    refused, they ship with the app.
+
+    v0.69.2 (issue #48): when the form carries ``wipe_orphan=1``, the
+    per-device state that would otherwise stay (pages exclusively
+    bound to the id, event log rows for those pages + test-pattern
+    events, per-device settings, calibration image) gets wiped after
+    the manifest / registry entry come down. Without the flag, the
+    state stays and the device's last-known MAC gets stashed as a
+    marker so a later re-register can decide whether to auto-wipe
+    based on Bernhard's MAC-differs check."""
+    device_to_delete = devices().get(instance_id)
+    last_mac = (
+        str(device_to_delete.manifest.get("mac") or "").strip()
+        if device_to_delete is not None
+        else ""
+    )
+    wipe_orphan = bool(request.form.get("wipe_orphan"))
     result = device_service.delete_instance(
         devices=devices(),
         renderers=renderers(),
@@ -995,6 +1028,28 @@ def devices_delete(instance_id: str) -> Response:
     if not result.ok or result.device is None:
         flash(result.error or "Delete failed.", "error")
         return redirect(url_for("auth.settings_area", area="devices"))
+    if wipe_orphan:
+        wiped = device_cleanup.wipe_orphan_state(
+            device_id=instance_id,
+            page_store=current_app.config["PAGE_STORE"],
+            event_log=current_app.config["EVENT_LOG"],
+            settings_store=settings_store(),
+            data_root=Path(current_app.config["DATA_ROOT"]),
+        )
+        # Also clear any pending marker for this id; the state is
+        # already gone, so a later re-register has nothing to compare
+        # against and treats the id as pristine.
+        DeletedDeviceMarkers(Path(current_app.config["DATA_ROOT"])).clear(instance_id)
+        if wiped.total:
+            flash(
+                f"Wiped {len(wiped.page_ids)} dashboards, "
+                f"{wiped.event_count} history rows, and per-device settings.",
+                "ok",
+            )
+    else:
+        DeletedDeviceMarkers(Path(current_app.config["DATA_ROOT"])).record(
+            instance_id, last_mac or None
+        )
     # Drop the device's smart-sync telemetry too (issue #10) so a
     # future device that happens to reuse the id starts with a clean
     # confidence counter instead of inheriting stale state.

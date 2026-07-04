@@ -126,6 +126,15 @@ def _settings() -> SettingsStore:
     return current_app.config["SETTINGS_STORE"]  # type: ignore[no-any-return]
 
 
+def _deleted_device_markers() -> Any:
+    """Lazily-built marker store for v0.69.2 (issue #48) MAC-differs
+    auto-wipe. One instance per request is cheap; the store itself is
+    just a wrapper around a small JSON file."""
+    from app.state.deleted_device_markers import DeletedDeviceMarkers
+
+    return DeletedDeviceMarkers(_data_root())
+
+
 def _resolve_local_time_fields(request_tz: str) -> dict[str, Any]:
     """Build the local-time field set that gets added to the /status
     response so memory-constrained clients (CircuitPython, MicroPython,
@@ -878,6 +887,27 @@ def post_register() -> Response:
             }
         )
 
+    # v0.69.2 (issue #48): a previous device with this id may have been
+    # deleted without ticking the "also wipe" checkbox. If we recorded
+    # the previous MAC and the incoming MAC differs (or is missing),
+    # treat this as a different physical device that happens to reuse
+    # the id and auto-wipe the leftovers before create_instance runs
+    # so the new device starts pristine. Matching MACs keep state
+    # (same physical device came back).
+    incoming_mac = str(body.get("mac") or "").strip() or None
+    markers = _deleted_device_markers()
+    if markers.mac_differs(device_id, incoming_mac):
+        from app import device_cleanup as _cleanup
+
+        _cleanup.wipe_orphan_state(
+            device_id=device_id,
+            page_store=current_app.config["PAGE_STORE"],
+            event_log=current_app.config["EVENT_LOG"],
+            settings_store=_settings(),
+            data_root=_data_root(),
+        )
+    markers.clear(device_id)
+
     result = create_instance(
         devices=devices_registry,
         renderers=_renderers(),
@@ -887,7 +917,7 @@ def post_register() -> Response:
         name=str(body.get("name") or "").strip(),
         panel_overrides=panel_overrides,
         access_token=None,  # let create_instance mint one
-        mac=str(body.get("mac") or "").strip() or None,
+        mac=incoming_mac,
         api_key_strength="typeable",  # ignored for REST devices, see below
         # Mark the instance REST-mode so the push pipeline skips
         # broker publishes and the admin UI shows the right transport

@@ -277,6 +277,16 @@
     document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
     document.querySelectorAll('[data-test-pattern-form]').forEach(initTestPatternForm);
     document.querySelectorAll('[data-palette-apply-form]').forEach(initPaletteApplyForm);
+    // Delete-details cancel (v0.69.2): the Cancel button inside the
+    // expanded delete confirmation closes the <details> without
+    // reloading the page. Purely UX; the submit button posts as normal.
+    document.querySelectorAll('[data-delete-cancel]').forEach(function (btn) {
+      const details = btn.closest('[data-delete-details]');
+      if (!details) return;
+      btn.addEventListener('click', function () {
+        details.removeAttribute('open');
+      });
+    });
     // Live label for each tone slider so the user sees the exact
     // numeric value they're dragging to. Cheap DOM: one <output> per
     // slider, updated on input. Also rebuilds the test-pattern

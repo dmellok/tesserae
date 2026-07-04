@@ -998,14 +998,52 @@
           </button>
         </form>
         {% endif %}
+        {# Delete flow (v0.69.2, issue #48): expands into an inline
+           confirm with the orphan-state checkbox instead of a bare
+           browser confirm(), so users can see what would be kept vs
+           wiped. The checkbox is only shown when there's actual
+           state to wipe. #}
         {% if section.delete_endpoint %}
-        <form method="post" action="{{ section.delete_endpoint }}" class="form form--inline"
-              onsubmit="return confirm('Delete this device? Its renderers stop publishing.');">
-          <button type="submit" class="dx-footer-btn dx-danger">
+        <details class="dx-delete-details" data-delete-details>
+          <summary class="dx-footer-btn dx-danger">
             <i class="ph ph-trash" aria-hidden="true"></i>
             <span>Delete</span>
-          </button>
-        </form>
+          </summary>
+          <form method="post" action="{{ section.delete_endpoint }}" class="form dx-delete-form">
+            <p class="field-help">
+              Delete this device? Its renderers stop publishing and its
+              registry entry is removed.
+            </p>
+            {% if section.orphan_state and section.orphan_state.total > 0 %}
+            <label class="dx-delete-wipe">
+              <input type="checkbox" name="wipe_orphan" value="1">
+              <span>
+                Also wipe
+                {% set parts = [] %}
+                {% if section.orphan_state.page_count %}{% set _ = parts.append(section.orphan_state.page_count ~ ' bound dashboard' ~ ('s' if section.orphan_state.page_count != 1 else '')) %}{% endif %}
+                {% if section.orphan_state.event_count %}{% set _ = parts.append(section.orphan_state.event_count ~ ' history row' ~ ('s' if section.orphan_state.event_count != 1 else '')) %}{% endif %}
+                {% if section.orphan_state.settings_count %}{% set _ = parts.append('per-device settings') %}{% endif %}
+                {% if section.orphan_state.has_calibration_image %}{% set _ = parts.append('uploaded calibration image') %}{% endif %}
+                {{ parts | join(', ') }}.
+              </span>
+            </label>
+            <p class="field-help" style="margin-top: 6px;">
+              Leave unticked to keep the state around in case you re-register
+              the same physical device (matched by MAC). A future register
+              with a different MAC will wipe it automatically.
+            </p>
+            {% else %}
+            <p class="field-help">Nothing else to wipe; the delete is already clean.</p>
+            {% endif %}
+            <div class="dx-delete-actions">
+              <button type="submit" class="button dx-danger">
+                <i class="ph ph-trash" aria-hidden="true"></i>
+                <span>Delete device</span>
+              </button>
+              <button type="button" class="button ghost" data-delete-cancel>Cancel</button>
+            </div>
+          </form>
+        </details>
         {% endif %}
       </div>
     </footer>

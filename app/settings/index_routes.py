@@ -403,6 +403,31 @@ _TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _orphan_state_counts_for(device: Device) -> dict[str, Any]:
+    """Peek at how much per-device state a delete-with-wipe would touch.
+    Returns counts for the modal's checkbox row; the template hides
+    the row when ``total`` is 0. Cheap to compute; the page store +
+    event log queries are indexed."""
+    from pathlib import Path
+
+    from app import device_cleanup as _cleanup
+
+    summary = _cleanup.list_orphan_state(
+        device_id=device.id,
+        page_store=current_app.config["PAGE_STORE"],
+        event_log=current_app.config["EVENT_LOG"],
+        settings_store=settings_store(),
+        data_root=Path(current_app.config["DATA_ROOT"]),
+    )
+    return {
+        "page_count": len(summary.page_ids),
+        "event_count": summary.event_count,
+        "settings_count": summary.setting_keys_devices + summary.setting_keys_renderers,
+        "has_calibration_image": summary.has_calibration_image,
+        "total": summary.total,
+    }
+
+
 def _has_custom_image(instance_id: str) -> bool:
     """True when the device has a user-uploaded calibration image on
     disk. Used to conditionally surface the "Your uploaded image"
@@ -738,6 +763,11 @@ def _build_sections() -> list[dict[str, Any]]:
                 "delete_endpoint": (
                     url_for("auth.devices_delete", instance_id=device.id) if is_instance else None
                 ),
+                # Counts for the delete-confirm modal (v0.69.2, issue
+                # #48): what a checked "Also wipe" tickbox would drop.
+                # Zero everywhere means the delete is already clean and
+                # the UI can skip the checkbox row.
+                "orphan_state": _orphan_state_counts_for(device) if is_instance else None,
                 # Regenerate token, only present on devices that use
                 # access tokens (TRMNL). The template gates the button
                 # on this being non-None so a Pi/ESP32 card doesn't
