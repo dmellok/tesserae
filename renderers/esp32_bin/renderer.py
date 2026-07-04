@@ -103,6 +103,12 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img,
         width=native_w,
         height=native_h,
+        # v0.69.5: route ``panel.gamut`` through so non-Spectra-6 ESP32
+        # panels get the right wire format (native 2-bpp for BWRY,
+        # etc.). Pre-v0.69.5 this defaulted to ``waveshare_e6`` because
+        # every fleet ESP32 was Spectra 6; adding BWRY support in
+        # v0.69.4 exposed the missing hookup.
+        gamut=panel.gamut,
         dither=_setting(settings, "dither"),
         saturation=float(_setting(settings, "saturation")),
         contrast=float(_setting(settings, "contrast")),

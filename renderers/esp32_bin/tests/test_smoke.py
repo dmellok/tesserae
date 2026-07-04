@@ -214,6 +214,27 @@ def test_portrait_calibration_on_landscape_native_panel(registry) -> None:
     assert _decode_pixel(out, 600, 240, 800) == red_nibble
 
 
+def test_bwry_panel_gets_native_2bpp_pack(registry) -> None:
+    """v0.69.5: ``panel.gamut`` routes into ``pack_to_panel_bin`` so a
+    BWRY-declared panel gets the native 2-bpp buffer (four pixels per
+    byte), not the 4-bpp Spectra 6 default. Pre-v0.69.5 this test
+    would fail because ``esp32_bin`` never passed ``gamut=``.
+    Solid red on a BWRY panel packs to 0xFF everywhere (palette index
+    3 in all four 2-bit slots)."""
+    img = Image.new("RGB", (400, 300), (255, 0, 0))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    out = esp.transform(
+        _png_bytes(img),
+        panel=Panel(w=400, h=300, gamut="bwry_4"),
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    # 2-bpp buffer, not 4-bpp: 30_000 bytes for a 400x300 PicPak frame.
+    assert len(out) == 400 * 300 // 4
+    assert all(b == 0xFF for b in out), "solid red on BWRY should be 0xFF everywhere"
+
+
 def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     """Symmetric case: a 13.3" Waveshare Spectra 6 is portrait native
     (1200×1600). If the user calibrates landscape, panel arrives as

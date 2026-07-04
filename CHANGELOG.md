@@ -6,6 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.5], 2026-07-05
+
+### Fixed
+
+- **`esp32_bin` now routes `panel.gamut` through to the packer.** The
+  renderer was hardcoding the packer's default (Spectra 6), so a
+  device that declared a non-E6 gamut (BWRY, or any future ESP32-side
+  gamut) got a Spectra-6 packed frame regardless. `pi_bin` already
+  did this correctly, so BWRY on Pi worked but BWRY on ESP32 didn't
+  end-to-end until now. See
+  [`renderers/esp32_bin/renderer.py`](renderers/esp32_bin/renderer.py).
+
 ## [0.69.4], 2026-07-04
 
 ### Changed
