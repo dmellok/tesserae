@@ -37,7 +37,13 @@ def test_every_pattern_renders_at_requested_size(pattern_id: str) -> None:
 
 
 def test_list_patterns_matches_pattern_ids() -> None:
-    assert set(test_patterns.PATTERN_IDS) == {p["id"] for p in test_patterns.list_patterns()}
+    # PATTERN_IDS is derived from list_patterns(has_custom_image=True)
+    # because the route always validates against the full universe of
+    # pattern ids; visible entries depend on whether a device has a
+    # custom image on disk.
+    assert set(test_patterns.PATTERN_IDS) == {
+        p["id"] for p in test_patterns.list_patterns(has_custom_image=True)
+    }
 
 
 def test_unknown_pattern_raises() -> None:

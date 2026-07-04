@@ -16,6 +16,7 @@ the transport once at the end.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from flask import Response as FlaskResponse
@@ -719,7 +720,13 @@ def devices_update_combined(instance_id: str) -> Response:
     runs independently, an error in one is flashed but doesn't block
     the others. Transport rebuild happens once at the end."""
     anchor = f"device-{instance_id}"
-    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    # v0.68: threading ``opened=<id>`` back through the redirect keeps
+    # the device card expanded after Save. Without this the card
+    # collapses on every save + reload, which meant the user's next
+    # tweak needed another click on "Show settings" first.
+    redirect_to = redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
     devices_registry = devices()
     device = devices_registry.get(instance_id)
@@ -1124,6 +1131,75 @@ def _resolve_pattern_context(instance_id: str) -> tuple[Any, dict[str, Any]] | N
     }
 
 
+def _custom_image_path_for(instance_id: str) -> Path:
+    """Where an uploaded calibration reference lives on disk. One file
+    per device; overwritten on subsequent uploads. Format is always PNG
+    so the pattern generator can open it without sniffing content type."""
+    root = Path(current_app.config["DATA_ROOT"]) / "calibration_images"
+    root.mkdir(parents=True, exist_ok=True)
+    return root / f"{instance_id}.png"
+
+
+@bp.post("/settings/devices/<instance_id>/test-pattern/custom-image/upload")
+def devices_custom_image_upload(instance_id: str) -> Response:
+    """Save a user-picked JPG / PNG as this device's custom test
+    pattern. Content is re-encoded to PNG on write so downstream
+    readers don't have to sniff the format. Panel-side fitting
+    happens at render time in :func:`app.test_patterns._custom_image`
+    to keep the storage step cheap."""
+    from io import BytesIO
+
+    from PIL import Image, UnidentifiedImageError
+
+    anchor = f"device-{instance_id}"
+    ctx = _resolve_pattern_context(instance_id)
+    if ctx is None:
+        flash(f"Unknown device {instance_id!r}.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+    upload = request.files.get("image")
+    if upload is None or not upload.filename:
+        flash("Pick an image file to upload.", "error")
+        return redirect(
+            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+        )
+    try:
+        img = Image.open(BytesIO(upload.read())).convert("RGB")
+    except (OSError, UnidentifiedImageError) as err:
+        flash(f"Couldn't read {upload.filename!r}: {err}", "error")
+        return redirect(
+            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+        )
+    _custom_image_path_for(instance_id).write_bytes(_png_bytes(img))
+    flash(f"Uploaded {upload.filename!r} as this device's custom pattern.", "ok")
+    return redirect(
+        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+    )
+
+
+@bp.post("/settings/devices/<instance_id>/test-pattern/custom-image/delete")
+def devices_custom_image_delete(instance_id: str) -> Response:
+    """Remove the uploaded custom pattern. Idempotent (missing file is
+    a no-op)."""
+    anchor = f"device-{instance_id}"
+    path = _custom_image_path_for(instance_id)
+    if path.exists():
+        path.unlink()
+        flash("Removed custom calibration image.", "ok")
+    return redirect(
+        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
+    )
+
+
+def _png_bytes(img: Any) -> bytes:
+    """Encode a PIL image as PNG bytes. Small helper so the upload
+    route stays readable."""
+    from io import BytesIO
+
+    buf = BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 @bp.post("/settings/devices/<instance_id>/test-pattern")
 def devices_send_test_pattern(instance_id: str) -> Response:
     """Push a colour test pattern to the device.
@@ -1153,6 +1229,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
             color_index = int(raw_color)
         except ValueError:
             color_index = 0
+    custom_path = _custom_image_path_for(instance_id)
     try:
         pattern_bytes = test_patterns.build_pattern(
             pattern_id,
@@ -1161,6 +1238,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
             gamut=params["gamut"],
             calibrated=params["calibrated"],
             color_index=color_index,
+            custom_image_path=str(custom_path) if custom_path.exists() else None,
         )
     except ValueError as err:
         flash(str(err), "error")
@@ -1224,7 +1302,7 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
         except ValueError:
             return default
 
-    palette_override = None
+    palette_override: tuple[tuple[int, int, int], ...] | None = None
     tone_defaults: dict[str, int] = {
         "exposure": 0,
         "s_curve": 0,
@@ -1247,6 +1325,28 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
             tone_defaults["lab_compress_max"] = profile.tone.lab_compress_max
             tone_defaults["smoothing_radius"] = profile.edges.smoothing_radius
 
+    # v0.68: live palette preview. When the palette editor swatches
+    # change, the JS attaches ``black`` / ``white`` / ``yellow`` /
+    # ``red`` / ``blue`` / ``green`` (+ optional ``orange``) as
+    # ``#rrggbb`` query params. Any that arrive override the profile
+    # palette on a per-slot basis so users see their colour choices
+    # painted into the preview before hitting Save.
+    import contextlib
+
+    palette_names = ("black", "white", "yellow", "red", "blue", "green", "orange")
+    swatches: list[tuple[int, int, int]] = []
+    for name in palette_names:
+        raw = request.args.get(name)
+        if raw is None or raw == "":
+            continue
+        raw = raw.strip()
+        if len(raw) == 7 and raw.startswith("#"):
+            with contextlib.suppress(ValueError):
+                swatches.append((int(raw[1:3], 16), int(raw[3:5], 16), int(raw[5:7], 16)))
+    if len(swatches) >= 6:
+        palette_override = tuple(swatches)
+
+    custom_path = _custom_image_path_for(instance_id)
     try:
         png = test_patterns.build_pattern(
             pattern_id,
@@ -1261,6 +1361,7 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
             lab_compress_min=_q_int("lab_compress_min", tone_defaults["lab_compress_min"]),
             lab_compress_max=_q_int("lab_compress_max", tone_defaults["lab_compress_max"]),
             smoothing_radius=_q_int("smoothing_radius", tone_defaults["smoothing_radius"]),
+            custom_image_path=str(custom_path) if custom_path.exists() else None,
         )
     except ValueError as err:
         return FlaskResponse(str(err), status=400, mimetype="text/plain")

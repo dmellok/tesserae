@@ -576,7 +576,10 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
     settings subsection (titled after the renderer) on its card with
     the dither/saturation/contrast fields namespaced as
     ``<clone_id>:<field>`` so the combined-save handler can route them
-    to the right clone's settings."""
+    to the right clone's settings.
+
+    v0.68 moved these three fields onto the Calibration tab under a
+    "— tone & dither" subhead; storage + name pattern are unchanged."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post(
@@ -585,7 +588,7 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
     )
     body = client.get("/settings/devices").get_data(as_text=True)
     # Subsection titled after the renderer's base name.
-    assert "Pi BIN client settings" in body
+    assert "Pi BIN client — tone" in body
     # Namespaced field names. Clone id is ``pi_bin__pi_lab``.
     assert 'name="pi_bin__pi_lab:dither"' in body
     assert 'name="pi_bin__pi_lab:saturation"' in body
@@ -594,7 +597,12 @@ def test_device_card_exposes_picture_quality(app_with_gate: Flask) -> None:
 
 def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
     """Pi PNG client devices get rotate / scale / bg / saturation on
-    the device card, none of those are renderer-wide any more."""
+    the device card, none of those are renderer-wide any more.
+
+    v0.68 split the picture-quality subsection: fields NOT in the
+    Calibration-tab set (rotate / scale / bg) stay on General under
+    a "— rendering" heading; saturation moved onto the Calibration
+    tab under "— tone & dither" alongside dither + contrast."""
     client = app_with_gate.test_client()
     client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
     client.post(
@@ -602,7 +610,8 @@ def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
         data={"id": "png_lab", "kind": "pi_png_client", "panel_preset": "inky_7_3"},
     )
     body = client.get("/settings/devices").get_data(as_text=True)
-    assert "Pi PNG client settings" in body
+    assert "Pi PNG client — rendering" in body
+    assert "Pi PNG client — tone" in body
     assert 'name="pi_png__png_lab:rotate"' in body
     assert 'name="pi_png__png_lab:scale"' in body
     assert 'name="pi_png__png_lab:bg"' in body

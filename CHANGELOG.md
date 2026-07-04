@@ -6,6 +6,57 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.68.0], 2026-07-04
+
+### Changed
+
+- **Device-card tabs reorganised around hardware setup vs colour
+  tuning.** The Rendering tab is retired; Panel & orientation, the
+  orientation calibration card (Send + 1/2/3/4 answer), and dither
+  algorithm all move onto the appropriate tabs. Panel + orientation
+  + orientation calibration land on General (physical-mount
+  concerns). Dither algorithm joins contrast, saturation, palette,
+  tone and edges on Calibration (colour-rendering concerns). The
+  four remaining tabs are Status / General / Schedule /
+  Calibration. Legacy `?tab=rendering` URLs redirect to General.
+- **Retired the per-clone `calibrated` toggle.** The Calibration-tab
+  palette-profile picker is now the single source of truth for
+  which palette a device paints. The palette-override plumbing in
+  `pack_to_panel_bin` no longer requires `calibrated=True` on the
+  clone; a profile-with-palette wins unconditionally. The field
+  stays in renderer manifests + storage so pre-v0.68 configs keep
+  parsing, but it no longer surfaces in the UI.
+- **Consistent UI primitives on the Calibration tab.** Bare
+  checkboxes for serpentine scan + preserve-line-art now use the
+  shared `switch()` macro; the colour-index dropdown wears the
+  standard `.input` class. Tone-editor sliders align to a fixed
+  200 px label column so every slider starts and ends at the same
+  x.
+- **Device-card tab bar scrolls horizontally on narrow viewports.**
+  Adds `overflow-x: auto` + `scroll-snap-type: x proximity` on
+  `.dx-tabs` so the four tabs stay accessible on mobile without
+  wrapping.
+
+### Added
+
+- **Custom calibration image.** Every device grows a small
+  "Upload custom calibration image" affordance under the Colour
+  test patterns block. Uploaded images (PNG / JPEG / WebP) live at
+  `data/calibration_images/<device_id>.png`, get fit-to-panel with
+  white padding at render time, and surface as a new
+  `Your uploaded image` entry in the pattern picker. Delete button
+  removes the file idempotently.
+- **Live palette preview.** Nudging any of the six/seven palette
+  colour swatches on the Calibration tab now repaints the inline
+  preview `<img>` on the same tick, matching the tone-slider live
+  behaviour that shipped in v0.67.4. Works for both Waveshare E6
+  (6 colours) and ACeP / Inky 7-colour (adds orange).
+- **Device card stays open after Save.** The combined-form redirect
+  threads `?opened=<device_id>` back to the settings index, and the
+  device card checks that flag alongside the existing
+  `?calibrating=<id>` flow to render `data-collapsed="false"`. No
+  more re-opening the card after every save.
+
 ## [0.67.5], 2026-07-04
 
 ### Fixed

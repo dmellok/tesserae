@@ -62,13 +62,18 @@ def _palette_for(gamut: str, calibrated: bool) -> tuple[tuple[RGB, ...], tuple[s
     return pal, _COLOUR_LABELS_E6
 
 
-def list_patterns() -> list[dict[str, Any]]:
+def list_patterns(has_custom_image: bool = False) -> list[dict[str, Any]]:
     """The pattern picker. Kept in sync with the template.
 
     ``needs_color`` marks patterns that take a colour argument (right
     now just the solid fill); the UI reveals a colour picker when set.
+
+    ``has_custom_image`` (v0.68) surfaces the "Your uploaded image"
+    entry only when a file is on disk for the device the picker's
+    scoped to; the route reads it from
+    ``data/calibration_images/<device_id>.png``.
     """
-    return [
+    patterns: list[dict[str, Any]] = [
         {
             "id": "palette_swatches",
             "label": "Palette swatches",
@@ -96,9 +101,20 @@ def list_patterns() -> list[dict[str, Any]]:
             "description": "1 px and 2 px lines plus corner marks.",
         },
     ]
+    if has_custom_image:
+        patterns.append(
+            {
+                "id": "custom_image",
+                "label": "Your uploaded image",
+                "description": (
+                    "The image you uploaded for this device, fit to the panel with white padding."
+                ),
+            }
+        )
+    return patterns
 
 
-PATTERN_IDS: tuple[str, ...] = tuple(p["id"] for p in list_patterns())
+PATTERN_IDS: tuple[str, ...] = tuple(p["id"] for p in list_patterns(has_custom_image=True))
 
 
 def build_pattern(
@@ -115,6 +131,7 @@ def build_pattern(
     lab_compress_min: int = 0,
     lab_compress_max: int = 100,
     smoothing_radius: int = 0,
+    custom_image_path: str | None = None,
 ) -> bytes:
     """Return PNG bytes for ``pattern_id`` at ``w × h``.
 
@@ -155,6 +172,8 @@ def build_pattern(
         img = Image.new("RGB", (w, h), palette[idx])
     elif pattern_id == "text_sample":
         img = _text_sample(w, h)
+    elif pattern_id == "custom_image":
+        img = _custom_image(w, h, custom_image_path)
     else:  # registration_grid
         img = _registration_grid(w, h)
 
@@ -183,6 +202,22 @@ def build_pattern(
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return buf.getvalue()
+
+
+def _custom_image(w: int, h: int, path: str | None) -> Image.Image:
+    """User-uploaded reference image, fit to panel dims with white
+    padding (matches the Send-file pipeline). Returns a plain white
+    canvas when the path is missing / unreadable so the picker doesn't
+    error out with a confusing 500."""
+    if not path:
+        return Image.new("RGB", (w, h), (255, 255, 255))
+    try:
+        src = Image.open(path).convert("RGB")
+    except (OSError, FileNotFoundError):
+        return Image.new("RGB", (w, h), (255, 255, 255))
+    from app.quantizer import fit_to_panel
+
+    return fit_to_panel(src, target_w=w, target_h=h, scale="fit", bg="white")
 
 
 def _swatches(w: int, h: int, palette: tuple[RGB, ...], labels: tuple[str, ...]) -> Image.Image:

@@ -15,17 +15,27 @@
    Calibration tab so the numbered-card answer form stays visible when
    the redirect lands with ?calibrating=<id>. #}
 {% set active_tab = request.args.get('tab', 'status') %}
-{% if active_tab not in ('status', 'general', 'rendering', 'schedule', 'calibration') %}
+{# Legacy ``?tab=rendering`` URLs (pre-v0.68) fall back to General
+   since Rendering was folded into it. #}
+{% if active_tab == 'rendering' %}
+  {% set active_tab = 'general' %}
+{% endif %}
+{% if active_tab not in ('status', 'general', 'schedule', 'calibration') %}
   {% set active_tab = 'status' %}
 {% endif %}
 {% if calibrating == section.device_id %}
-  {% set active_tab = 'calibration' %}
+  {% set active_tab = 'general' %}
 {% endif %}
 
+{# Expanded state is remembered across the combined save redirect via
+   ``?opened=<device_id>`` (v0.68), and while the orientation-calibrate
+   flow is in-progress via ``?calibrating=<device_id>``. Either match
+   keeps the card open on the next render. #}
+{% set _opened = request.args.get('opened') %}
 <section class="card dx-device-card"
          id="{{ section.id }}"
          data-device-card
-         data-collapsed="{% if calibrating == section.device_id %}false{% else %}true{% endif %}">
+         data-collapsed="{% if calibrating == section.device_id or _opened == section.device_id %}false{% else %}true{% endif %}">
 
   {# HEADER STRIP #}
   <header class="dx-card-header">
@@ -48,7 +58,7 @@
       </div>
     </div>
     <button type="button" class="dx-collapse-btn" data-device-toggle
-            aria-expanded="{% if calibrating == section.device_id %}true{% else %}false{% endif %}">
+            aria-expanded="{% if calibrating == section.device_id or _opened == section.device_id %}true{% else %}false{% endif %}">
       <span class="when-open">Hide settings</span>
       <span class="when-closed">Show settings</span>
       <i class="ph ph-caret-down" aria-hidden="true"></i>
@@ -102,7 +112,7 @@
 
     {# TAB BAR #}
     <nav class="dx-tabs" role="tablist" aria-label="Device settings">
-      {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('rendering', 'Rendering'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}
+      {% for tab_id, tab_label in [('status', 'Status'), ('general', 'General'), ('schedule', 'Schedule'), ('calibration', 'Calibration')] %}
       <button type="button" role="tab"
               data-tab="{{ tab_id }}"
               class="dx-tab{% if tab_id == active_tab %} is-active{% endif %}"
@@ -406,28 +416,9 @@
           </div>
         </div>
         {% endif %}
-      </section>
 
-      {# RENDERING TAB #}
-      <section role="tabpanel" data-panel="rendering"
-               class="dx-panel{% if active_tab == 'rendering' %} is-active{% endif %}"
-               aria-hidden="{% if active_tab == 'rendering' %}false{% else %}true{% endif %}">
-
-        {% for pq in section.picture_quality %}
-        {# Per-clone picture-quality fields (dither, saturation, contrast,
-           calibrated palette). Field names are namespaced
-           ``<clone_id>:<field>`` so the combined-save handler can route
-           them back to the right clone's settings. Heading is always
-           rendered so tests + a11y readers can find the subsection
-           regardless of clone count. #}
-        <p class="device-subhead">{{ pq.base_name }} settings</p>
-        {% for field in pq.fields %}
-          {% set value = pq.state.get(field.name, field.get('default', '')) %}
-          {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
-          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
-        {% endfor %}
-        {% endfor %}
-
+        {# Panel + orientation moved from the (retired) Rendering tab in
+           v0.68 so hardware-shape settings all live in one place. #}
         {% if section.panel %}
         <div class="dx-panel-orientation">
           <hr class="dx-divider">
@@ -459,6 +450,61 @@
                        {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}]) }}
           {% endif %}
         </div>
+        {% endif %}
+
+        {# Orientation calibration card, moved from the Calibration tab
+           in v0.68 because it's a physical-mount concern (which way is
+           up?), not a colour-tuning concern. Nested forms are fine here;
+           they post to their own endpoint independent of the combined
+           Save. #}
+        {% if section.calibrate_endpoint %}
+        <hr class="dx-divider">
+        <p class="device-subhead">Orientation calibration</p>
+        <p class="field-help" style="margin: 0 0 12px;">
+          Sends a numbered test card so you can tell which way the panel
+          is physically mounted. Do this once when you first hang the
+          display.
+        </p>
+        {% if calibrating == section.device_id %}
+        <div class="calibrate-block calibrate-prompt-block">
+          <p class="field-help calibrate-prompt">
+            A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
+            <strong>which number is in the top-left corner?</strong>
+          </p>
+          <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
+            <div class="calibrate-choices">
+              {% for n in [1, 2, 3, 4] %}
+              <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
+              {% endfor %}
+            </div>
+          </form>
+          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+            <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
+          </form>
+        </div>
+        {% else %}
+        <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
+          <button type="submit" class="button">
+            <i class="ph ph-compass" aria-hidden="true"></i>
+            <span>Send orientation card</span>
+          </button>
+        </form>
+        {% endif %}
+        {% endif %}
+
+        {# Dither mode + any other per-clone rendering fields that
+           weren't folded into the Calibration tab. Same combined-form
+           save path they had in the retired Rendering tab. #}
+        {% if section.picture_quality %}
+        <hr class="dx-divider">
+        {% for pq in section.picture_quality %}
+        <p class="device-subhead">{{ pq.base_name }} — rendering</p>
+        {% for field in pq.fields %}
+          {% set value = pq.state.get(field.name, field.get('default', '')) %}
+          {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
+          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+        {% endfor %}
+        {% endfor %}
         {% endif %}
       </section>
 
@@ -525,46 +571,11 @@
                class="dx-panel{% if active_tab == 'calibration' %} is-active{% endif %}"
                aria-hidden="{% if active_tab == 'calibration' %}false{% else %}true{% endif %}">
 
-        {# ORIENTATION #}
-        {% if section.calibrate_endpoint %}
-        <div class="dx-calib-section">
-          <p class="device-subhead">Orientation</p>
-          <p class="field-help" style="margin: 0 0 12px;">
-            Sends a numbered test card so you can tell which way the
-            panel is physically mounted. Do this once when you first
-            hang the display.
-          </p>
-          {% if calibrating == section.device_id %}
-          <div class="calibrate-block calibrate-prompt-block">
-            <p class="field-help calibrate-prompt">
-              A test card was sent to <code>{{ section.device_id }}</code>. Look at the panel:
-              <strong>which number is in the top-left corner?</strong>
-            </p>
-            <form method="post" action="{{ section.calibrate_apply_endpoint }}" class="form calibrate-answer">
-              <div class="calibrate-choices">
-                {% for n in [1, 2, 3, 4] %}
-                <button type="submit" name="top_left" value="{{ n }}" class="ghost calibrate-num">{{ n }}</button>
-                {% endfor %}
-              </div>
-            </form>
-            <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-              <div class="actions">{{ button('Re-send card', icon='arrow-clockwise', variant='ghost') }}</div>
-            </form>
-          </div>
-          {% else %}
-          <form method="post" action="{{ section.calibrate_endpoint }}" class="form form--inline">
-            <button type="submit" class="button">
-              <i class="ph ph-compass" aria-hidden="true"></i>
-              <span>Send orientation card</span>
-            </button>
-          </form>
-          {% endif %}
-        </div>
-        {% endif %}
+        {# Orientation calibration moved to the General tab in v0.68.
+           Calibration tab is now colour-tuning only. #}
 
         {# COLOUR TEST PATTERNS #}
         {% if section.test_pattern_endpoint and section.test_patterns %}
-        {% if section.calibrate_endpoint %}<hr class="dx-divider">{% endif %}
         <div class="dx-calib-section">
           <p class="device-subhead">Colour test patterns</p>
           <p class="field-help" style="margin: 0 0 12px;">
@@ -598,7 +609,7 @@
                 <div class="dx-color-picker" data-color-picker hidden>
                   <label for="{{ section.id }}-color-index">Colour</label>
                   <select id="{{ section.id }}-color-index" name="color_index"
-                          data-color-select>
+                          class="input" data-color-select>
                     {% for c in section.test_pattern_colors %}
                     <option value="{{ c.index }}" data-hex="{{ c.hex }}">{{ c.label }}</option>
                     {% endfor %}
@@ -631,6 +642,40 @@
               </div>
             </div>
           </form>
+
+          {# Custom-image upload (v0.68). Lives inside the Colour test
+             patterns block so users find it next to the picker. Once
+             uploaded, the "Your uploaded image" pattern appears in
+             the radio list automatically. #}
+          {% if section.custom_image_upload_endpoint %}
+          <details class="dx-palette-import" style="margin-top: 12px;">
+            <summary>
+              {% if section.custom_image_uploaded %}Replace or remove custom image{% else %}Upload custom calibration image{% endif %}
+            </summary>
+            <form method="post" action="{{ section.custom_image_upload_endpoint }}"
+                  enctype="multipart/form-data" class="form">
+              <div class="dx-palette-save-row">
+                <input type="file" name="image" accept="image/png,image/jpeg,image/webp"
+                       required class="input">
+                <button type="submit" class="button">Upload</button>
+              </div>
+              <p class="field-help">
+                PNG, JPEG, or WebP. Fit-to-panel with white padding on
+                render (same as the Send-file flow).
+              </p>
+            </form>
+            {% if section.custom_image_uploaded and section.custom_image_delete_endpoint %}
+            <form method="post" action="{{ section.custom_image_delete_endpoint }}"
+                  class="form form--inline"
+                  onsubmit="return confirm('Remove the uploaded calibration image?');"
+                  style="margin-top: 8px;">
+              <button type="submit" class="button ghost dx-danger">
+                Delete uploaded image
+              </button>
+            </form>
+            {% endif %}
+          </details>
+          {% endif %}
         </div>
         {% endif %}
 
@@ -821,11 +866,11 @@
                        data-tone-input>
                 <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.diffusion_strength }}</output>
               </label>
-              <label class="dx-tone-toggle">
-                <input type="checkbox" name="serpentine" value="1"
-                       {% if section.palette_profile_tone.serpentine %}checked{% endif %}>
-                <span>Serpentine scan (error-diffusion only)</span>
-              </label>
+              {# Consistent Tesserae switch rather than a bare checkbox
+                 so this row matches the rest of the settings UI. #}
+              {{ switch(section.id ~ '-serpentine', 'serpentine',
+                        'Serpentine scan (error-diffusion only)',
+                        checked=section.palette_profile_tone.serpentine) }}
               <label class="dx-tone-slider">
                 <span class="dx-tone-label">LAB compress: min</span>
                 <input type="range" name="lab_compress_min" min="0" max="100" step="1"
@@ -868,11 +913,9 @@
                          data-tone-input>
                   <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.smoothing_radius }}</output>
                 </label>
-                <label class="dx-tone-toggle">
-                  <input type="checkbox" name="preserve_line_art" value="1"
-                         {% if section.palette_profile_tone.preserve_line_art %}checked{% endif %}>
-                  <span>Preserve line-art edges (nearest-neighbour on detected text / rules)</span>
-                </label>
+                {{ switch(section.id ~ '-preserve-line-art', 'preserve_line_art',
+                          'Preserve line-art edges (nearest-neighbour on detected text / rules)',
+                          checked=section.palette_profile_tone.preserve_line_art) }}
               </div>
             </details>
 
@@ -889,7 +932,7 @@
           {% if section.calibration_picture_quality %}
           <hr class="dx-divider">
           {% for pq in section.calibration_picture_quality %}
-          <p class="device-subhead">{{ pq.base_name }} — contrast &amp; saturation</p>
+          <p class="device-subhead">{{ pq.base_name }} — tone &amp; dither</p>
           {% for field in pq.fields %}
             {% set value = pq.state.get(field.name, field.get('default', '')) %}
             {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}

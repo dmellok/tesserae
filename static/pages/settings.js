@@ -305,6 +305,18 @@
           if (el && el.value !== '') params.set(name, el.value);
         });
       }
+      // Live palette preview (v0.68): read the six / seven colour
+      // swatches and pipe them through as ``#rrggbb`` query params so
+      // the preview repaints with the currently-picked colours. Orange
+      // is optional (only ACeP / 7-colour Inky profiles render it).
+      const paletteForm = card.querySelector('.dx-palette-colors-form');
+      if (paletteForm) {
+        ['black', 'white', 'yellow', 'red', 'blue', 'green', 'orange']
+          .forEach(function (name) {
+            const el = paletteForm.querySelector('[name="' + name + '"]');
+            if (el && el.value) params.set(name, el.value);
+          });
+      }
       params.set('_t', Date.now());
       preview.src = base + '?' + params.toString();
     }
@@ -327,12 +339,21 @@
     // user sees the exact ``#rrggbb`` they're picking. Native colour
     // pickers already show hex in their popovers but the readout stays
     // visible on-card without requiring the popover to be open.
+    // Also refreshes the tone preview so the swatch change paints
+    // into the preview on the same tick.
     document.querySelectorAll('[data-palette-color-input]').forEach(function (input) {
       const readout = input.parentElement.querySelector('[data-palette-color-hex]');
-      if (!readout) return;
-      input.addEventListener('input', function () {
-        readout.textContent = input.value;
-      });
+      if (readout) {
+        input.addEventListener('input', function () {
+          readout.textContent = input.value;
+        });
+      }
+      const card = input.closest('[data-device-card]');
+      if (card) {
+        input.addEventListener('input', function () {
+          refreshTonePreview(card);
+        });
+      }
     });
   });
 })();

@@ -403,6 +403,16 @@ _TEST_PATTERN_GAMUT_HEXES: dict[str, tuple[str, ...]] = {
 }
 
 
+def _has_custom_image(instance_id: str) -> bool:
+    """True when the device has a user-uploaded calibration image on
+    disk. Used to conditionally surface the "Your uploaded image"
+    pattern in the picker + the delete button."""
+    from pathlib import Path
+
+    path = Path(current_app.config["DATA_ROOT"]) / "calibration_images" / f"{instance_id}.png"
+    return path.exists()
+
+
 def _palette_profile_slug_for(device: Device) -> str:
     """Read the device's active palette profile slug from the settings
     store, defaulting to an empty string when no override is set."""
@@ -642,13 +652,15 @@ def _build_sections() -> list[dict[str, Any]]:
         # the template renders them inside the combined form with the
         # name pattern ``<clone_id>:<field_name>`` so the save handler
         # can route each value back to the right clone's namespace.
-        # Contrast + saturation moved to the Calibration tab in v0.67
-        # (they're tone knobs, not rendering knobs); hide them from the
-        # Rendering-tab picture-quality subsection so users aren't
-        # editing the same value in two places. Storage is unchanged
-        # (still ``settings.renderers.<clone_id>.contrast``); the
-        # Calibration tab surfaces the same fields on the same clone.
-        _CALIBRATION_TAB_FIELDS = {"contrast", "saturation"}
+        # Contrast + saturation moved to the Calibration tab in v0.67,
+        # dither joined them in v0.68 (all three are colour-tuning
+        # concerns, not hardware setup). ``calibrated`` was retired in
+        # v0.68 too: the palette-profile picker now owns "which palette
+        # does this device paint"; storage is preserved for backward
+        # compat with older configs but the toggle no longer surfaces
+        # in either tab.
+        _CALIBRATION_TAB_FIELDS = {"contrast", "saturation", "dither"}
+        _HIDDEN_TAB_FIELDS = {"calibrated"}
         picture_quality: list[dict[str, Any]] = []
         calibration_picture_quality: list[dict[str, Any]] = []
         if is_instance:
@@ -659,7 +671,10 @@ def _build_sections() -> list[dict[str, Any]]:
                 if not all_dev_fields:
                     continue
                 rendering_fields = [
-                    f for f in all_dev_fields if f["name"] not in _CALIBRATION_TAB_FIELDS
+                    f
+                    for f in all_dev_fields
+                    if f["name"] not in _CALIBRATION_TAB_FIELDS
+                    and f["name"] not in _HIDDEN_TAB_FIELDS
                 ]
                 calibration_fields = [
                     f for f in all_dev_fields if f["name"] in _CALIBRATION_TAB_FIELDS
@@ -799,7 +814,22 @@ def _build_sections() -> list[dict[str, Any]]:
                     if is_instance
                     else None
                 ),
-                "test_patterns": test_patterns.list_patterns() if is_instance else [],
+                "test_patterns": (
+                    test_patterns.list_patterns(has_custom_image=_has_custom_image(device.id))
+                    if is_instance
+                    else []
+                ),
+                "custom_image_uploaded": _has_custom_image(device.id) if is_instance else False,
+                "custom_image_upload_endpoint": (
+                    url_for("auth.devices_custom_image_upload", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
+                "custom_image_delete_endpoint": (
+                    url_for("auth.devices_custom_image_delete", instance_id=device.id)
+                    if is_instance
+                    else None
+                ),
                 "test_pattern_colors": (_test_pattern_colors_for(device) if is_instance else []),
                 # Palette profile picker (Calibration tab, Phase 1 of the
                 # v0.67 palette-profile work). ``palette_profile_slug`` is

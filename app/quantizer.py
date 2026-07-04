@@ -900,8 +900,16 @@ def pack_to_panel_bin(
     # lookup when the device has a Calibration-tab profile applied. The
     # nibble LUT and gamut selection are unchanged; only the RGB target
     # values dither snaps to shift.
-    calibrated_active = calibrated and (
-        palette_override is not None or gamut in _CALIBRATED_PALETTES
+    # v0.68 removed the ``calibrated`` toggle from the device-card UI;
+    # the Calibration-tab palette profile is now the single source of
+    # truth. When a profile is applied, ``palette_override`` carries
+    # its palette in and wins unconditionally. Legacy configs that
+    # still have ``calibrated=true`` set but no profile applied
+    # continue to hit the built-in ``_CALIBRATED_PALETTES`` map for
+    # their gamut (backward-compat path); everything else falls
+    # through to the nominal palette.
+    calibrated_active = palette_override is not None or (
+        calibrated and gamut in _CALIBRATED_PALETTES
     )
     if calibrated_active:
         if palette_override is not None and len(palette_override) >= len(palette):

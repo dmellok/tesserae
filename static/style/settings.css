@@ -893,7 +893,15 @@
   gap: 0;
   padding: 0 14px;
   border-bottom: 1px solid var(--dx-border);
+  /* Mobile: the four tabs overflow a narrow viewport, so let them
+     scroll horizontally rather than wrap or clip. Snap so each tap
+     lands cleanly. -webkit-overflow-scrolling for older iOS Safari. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
 }
+.dx-tabs::-webkit-scrollbar { display: none; }
 .dx-tab {
   background: transparent;
   border: 0;
@@ -905,6 +913,9 @@
   color: #8f8f88;
   cursor: pointer;
   transition: color 120ms ease;
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  white-space: nowrap;
 }
 .dx-tab:hover,
 .dx-tab:focus,
@@ -1304,7 +1315,11 @@
 }
 .dx-tone-slider {
   display: grid;
-  grid-template-columns: minmax(160px, auto) 1fr 44px;
+  /* Fixed-width label column so every slider aligns to the same start
+     x. Previously ``minmax(160px, auto)`` grew with label text, so a
+     long label like "LAB compress: max" pushed its slider right of
+     the shorter ones. */
+  grid-template-columns: 200px 1fr 44px;
   gap: 10px;
   align-items: center;
 }
