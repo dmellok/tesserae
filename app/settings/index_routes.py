@@ -461,6 +461,8 @@ def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
         "s_curve": profile.tone.s_curve,
         "serpentine": profile.dither.serpentine,
         "diffusion_strength": profile.dither.diffusion_strength,
+        "smoothing_radius": profile.edges.smoothing_radius,
+        "preserve_line_art": profile.edges.preserve_line_art,
         "bundled": profile.bundled,
         "editable": True,
     }

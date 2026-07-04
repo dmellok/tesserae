@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.67.2], 2026-07-04
+
+### Added
+
+- **Experimental edge handling on the Calibration tab.** The tone
+  editor grows an "Experimental: edge handling" fold-out with two
+  new knobs: **Smoothing radius** (0-3 px, Gaussian blur applied
+  before tone mapping to soften antialiased edges before dither
+  can build a noisy tail along them) and **Preserve line-art
+  edges** (post-dither pass that detects sharp edges in the tone-
+  mapped source and swaps those pixels for nearest-neighbour
+  quantise so text and hairline rules stay crisp).
+- **`smoothing_radius` + `preserve_line_art` on
+  `pack_to_panel_bin`.** Both default to their pre-v0.67.2 neutral
+  values (0 and False), so devices with no profile applied render
+  byte-identical to v0.67.1
+  (`test_pack_edge_defaults_match_pre_v672`). `esp32_bin` /
+  `pi_bin` / `pico_bin` pass the profile's edges block through.
+  `preserve_line_art` costs zero on all-photo sources (edge mask
+  is empty).
+
 ## [0.67.1], 2026-07-04
 
 ### Added

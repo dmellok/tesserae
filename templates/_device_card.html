@@ -795,6 +795,33 @@
                 <span>Serpentine scan (error-diffusion only)</span>
               </label>
             </div>
+
+            {# Experimental edge-handling block (v0.67.2). Collapsed by
+               default so the tone editor stays uncluttered; the sliders
+               inside still submit with the outer form. #}
+            <details class="dx-palette-experimental">
+              <summary>Experimental: edge handling</summary>
+              <p class="field-help" style="margin: 8px 0 12px;">
+                Post-processes text and hairline edges. Great on
+                dashboards with mixed photo + text content; can look
+                busy on pure photos.
+              </p>
+              <div class="dx-tone-grid">
+                <label class="dx-tone-slider">
+                  <span class="dx-tone-label">Smoothing radius (px)</span>
+                  <input type="range" name="smoothing_radius" min="0" max="3" step="1"
+                         value="{{ section.palette_profile_tone.smoothing_radius }}"
+                         data-tone-input>
+                  <output class="dx-tone-value" data-tone-value>{{ section.palette_profile_tone.smoothing_radius }}</output>
+                </label>
+                <label class="dx-tone-toggle">
+                  <input type="checkbox" name="preserve_line_art" value="1"
+                         {% if section.palette_profile_tone.preserve_line_art %}checked{% endif %}>
+                  <span>Preserve line-art edges (nearest-neighbour on detected text / rules)</span>
+                </label>
+              </div>
+            </details>
+
             <button type="submit" class="button">
               <i class="ph ph-floppy-disk" aria-hidden="true"></i>
               <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>

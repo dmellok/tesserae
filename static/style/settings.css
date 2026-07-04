@@ -1323,6 +1323,32 @@
   .dx-tone-slider { grid-template-columns: 1fr; }
   .dx-tone-value { text-align: left; }
 }
+.dx-palette-experimental {
+  border: 1px dashed var(--dx-border-faint);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 12px 0;
+}
+.dx-palette-experimental summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+}
+.dx-palette-experimental::before {
+  content: "experimental";
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--dx-teal) 10%, transparent);
+  color: var(--dx-teal);
+  margin: 0 8px 0 0;
+  float: right;
+  position: relative;
+  top: 4px;
+}
+:root[data-theme="dark"] .dx-palette-experimental { border-color: var(--t-border); }
 
 /* Per-device button map editor. Small textarea with a monospace
    input so the JSON reads cleanly, plus a fold-out that shows the

@@ -106,6 +106,10 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         diffusion_strength=int(
             (settings.get("_profile_dither") or {}).get("diffusion_strength", 100)
         ),
+        smoothing_radius=int((settings.get("_profile_edges") or {}).get("smoothing_radius", 0)),
+        preserve_line_art=bool(
+            (settings.get("_profile_edges") or {}).get("preserve_line_art", False)
+        ),
     )
 
 

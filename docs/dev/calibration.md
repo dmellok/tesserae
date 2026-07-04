@@ -93,6 +93,24 @@ are clamped rather than rejected. Bad hex codes fall through to
   bundled preset forks it into an editable copy on first tweak;
   user profiles are edited in place.
 
+## What v0.67.2 (phase 3) adds
+
+Experimental edge handling, wired for `esp32_bin` / `pi_bin` /
+`pico_bin`:
+
+- **`smoothing_radius` (0-3 px)** — Gaussian blur applied to the
+  source before tone mapping. Softens antialiased edges before
+  error-diffusion has a chance to build a noisy tail along them.
+  Zero-cost fast path at `radius=0`.
+- **`preserve_line_art` (bool)** — post-dither pass. Detects sharp
+  edges in the tone-mapped source via `ImageFilter.FIND_EDGES` on
+  the luminance channel, thresholds at 40/255 and dilates 3x3.
+  Detected pixels get replaced with plain nearest-neighbour
+  quantise output; the surrounding photographic regions keep their
+  full error-diffusion dither. Cost is one extra
+  `Image.quantize(dither=NONE)` pass plus a mask copy; near-zero on
+  all-photo sources.
+
 ## What still isn't wired (later phases)
 
 - **LAB dynamic-range compression** (`lab_compress_min` /
@@ -101,8 +119,6 @@ are clamped rather than rejected. Bad hex codes fall through to
   `calibrated=True`.
 - **Colour-match modes** (RGB / LAB / chroma-aware) — stored but
   ignored; RGB nearest is the only path.
-- **Edge handling** (`preserve_line_art`, `smoothing_radius`) —
-  stored but ignored, targeted for a future v0.67.x.
 - **`pi_png`** — palette override would need a firmware-side
   change on `tesserae-device-pi-png`.
 - **`trmnl_png`** — mono; palette calibration doesn't apply.

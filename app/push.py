@@ -1056,6 +1056,14 @@ class PushManager:
                     "serpentine": profile.dither.serpentine,
                     "diffusion_strength": profile.dither.diffusion_strength,
                 }
+                # Phase 3 edge knobs (v0.67.2). Ignored by renderers
+                # that don't opt in; wired through esp32_bin / pi_bin /
+                # pico_bin. ``preserve_line_art`` costs zero on all-
+                # photo dashboards (edge mask is empty).
+                extras["_profile_edges"] = {
+                    "smoothing_radius": profile.edges.smoothing_radius,
+                    "preserve_line_art": profile.edges.preserve_line_art,
+                }
                 settings = {**settings, **extras}
         # Device-aware low-battery chip: per-renderer so each device's
         # last-known battery decides whether its push wears the warning.

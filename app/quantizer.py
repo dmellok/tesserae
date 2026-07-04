@@ -199,6 +199,47 @@ def _apply_exposure(img: Image.Image, exposure: int) -> Image.Image:
     return Image.fromarray(np.clip(arr, 0.0, 255.0).astype(np.uint8))
 
 
+def _apply_smoothing(img: Image.Image, radius: int) -> Image.Image:
+    """Pre-dither Gaussian blur. ``radius`` in 0..3 px; 0 is the
+    no-op fast path (returns the input untouched). Applied before
+    tone / dither so hard antialiased edges soften a hair before
+    error-diffusion has a chance to build a noisy tail along them."""
+    if radius <= 0:
+        return img
+    return img.filter(ImageFilter.GaussianBlur(radius=max(0, min(3, int(radius)))))
+
+
+def _line_art_mask(img: Image.Image, threshold: int = 40) -> np.ndarray:
+    """1D boolean mask (length H*W) marking pixels that fall inside a
+    line-art region. Detected via Pillow's FIND_EDGES on the luminance
+    channel, thresholded, then 3x3 dilated so the edge halo is covered
+    (dither error otherwise leaks across the fresh nearest-neighbour
+    strip we're going to paint on top of these pixels).
+
+    ``threshold`` is empirical: 40/255 catches typical dashboard text
+    and rules without lighting up photographic mid-tones.
+
+    Pillow's FIND_EDGES lights up the image border because the kernel
+    reads pixels outside the frame as black. That's a spurious edge
+    that would surface as a stray nearest-neighbour ring on every
+    preserve-line-art render, so we zero the outer 2 px of the mask."""
+    gray = img.convert("L")
+    edges = gray.filter(ImageFilter.FIND_EDGES)
+    edge_arr = np.asarray(edges, dtype=np.uint8)
+    mask = edge_arr > threshold
+    if mask.shape[0] > 4 and mask.shape[1] > 4:
+        mask[:2, :] = False
+        mask[-2:, :] = False
+        mask[:, :2] = False
+        mask[:, -2:] = False
+    if not mask.any():
+        return mask.ravel()
+    # 3x3 max-filter dilation via Pillow (avoids a scipy dependency).
+    mask_img = Image.fromarray(mask.astype(np.uint8) * 255).filter(ImageFilter.MaxFilter(3))
+    dilated = np.asarray(mask_img, dtype=np.uint8) > 0
+    return dilated.ravel()
+
+
 def _apply_s_curve(img: Image.Image, amount: int) -> Image.Image:
     """Mid-tone contrast shift via a sigmoid S-curve. ``amount`` in
     -100..+100; positive values steepen the S (more mid-tone punch)
@@ -638,6 +679,8 @@ def pack_to_panel_bin(
     s_curve: int = 0,
     serpentine: bool = False,
     diffusion_strength: int = 100,
+    smoothing_radius: int = 0,
+    preserve_line_art: bool = False,
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native 4-bpp buffer. Layout: ``height`` rows x ``width/2`` bytes
@@ -710,6 +753,12 @@ def pack_to_panel_bin(
     rgb = img.convert("RGB")
     if calibrated_active:
         rgb = _compress_to_calibrated_range(rgb, palette)
+    # Pre-dither smoothing (v0.67.2 experimental). Softens the source
+    # a hair before tone-mapping runs; useful on antialiased text where
+    # error-diffusion would otherwise build a noisy tail along each
+    # letterform edge.
+    if smoothing_radius:
+        rgb = _apply_smoothing(rgb, smoothing_radius)
     # Tone pipeline order: exposure (linear brightness) -> S-curve
     # (mid-tone contrast) -> saturation / contrast (existing per-clone
     # multipliers). Each helper short-circuits on the no-op value so
@@ -750,6 +799,24 @@ def pack_to_panel_bin(
         raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
     else:
         raise ValueError(f"unknown dither mode: {dither!r}")
+
+    # Preserve-line-art post-processing (v0.67.2 experimental). Detect
+    # sharp edges in the tone-mapped source and replace the dither
+    # output at those pixels with plain nearest-neighbour quantise;
+    # keeps text and hairline rules crisp without ditching the
+    # error-diffusion win on the surrounding photographic regions. No-
+    # op when the source has no edges above the threshold, so
+    # dashboards with no text pay next to nothing.
+    if preserve_line_art:
+        mask = _line_art_mask(rgb)
+        if mask.any():
+            pal_img = _palette_image(palette)
+            nearest = rgb.quantize(palette=pal_img, dither=Image.Dither.NONE).tobytes()
+            merged = bytearray(raw)
+            nearest_arr = np.frombuffer(nearest, dtype=np.uint8)
+            merged_arr = np.frombuffer(merged, dtype=np.uint8).copy()
+            merged_arr[mask] = nearest_arr[mask]
+            raw = merged_arr.tobytes()
 
     # palette index -> firmware/library nibble via bytes.translate (C-speed).
     # 256-byte LUT; anything past the gamut's entries falls through to 0x0

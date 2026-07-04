@@ -68,6 +68,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img = underscan_image(img, underscan=panel.underscan)
     tone = settings.get("_profile_tone") or {}
     dither_extras = settings.get("_profile_dither") or {}
+    edges = settings.get("_profile_edges") or {}
     return pack_to_panel_bin(
         img,
         width=native_w,
@@ -87,6 +88,8 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         s_curve=int(tone.get("s_curve", 0)),
         serpentine=bool(dither_extras.get("serpentine", False)),
         diffusion_strength=int(dither_extras.get("diffusion_strength", 100)),
+        smoothing_radius=int(edges.get("smoothing_radius", 0)),
+        preserve_line_art=bool(edges.get("preserve_line_art", False)),
     )
 
 
