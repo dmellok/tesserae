@@ -8,6 +8,8 @@ from typing import Any
 
 from flask import current_app
 
+from app.calendar_time import calendar_timezone
+
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
     s = (s or "").strip()
@@ -29,7 +31,9 @@ def fetch(
     max_events = int(options.get("max_events") or 0)
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
 
-    now = datetime.now(UTC)
+    zone = calendar_timezone()
+    now_local = datetime.now(zone)
+    now = now_local.astimezone(UTC)
     end = now + timedelta(hours=hours_ahead)
     try:
         events = core.server_module.load_events(
@@ -56,8 +60,8 @@ def fetch(
     if max_events > 0:
         slim = slim[:max_events]
     return {
-        "now": now.isoformat(),
-        "date": now.date().isoformat(),
+        "now": now_local.isoformat(),
+        "date": now_local.date().isoformat(),
         "events": slim,
         "count": len(slim),
     }
