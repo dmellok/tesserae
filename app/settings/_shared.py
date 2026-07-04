@@ -214,6 +214,34 @@ def coerce_form_value(field: dict[str, Any], raw: str | None) -> Any:
             if str(choice.get("value")) == raw:
                 return choice["value"]
         return raw
+    if ftype == "location_search":
+        # v0.69.6 (issue #52 items 5 + 6): the location picker submits a
+        # JSON-encoded dict in a hidden input. Parse it into a real dict
+        # here so the SettingsStore round-trips a proper structure, not
+        # a stringified blob. Blank / malformed input clears the picker.
+        if raw is None or raw == "":
+            return {}
+        import contextlib
+        import json
+
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            return {}
+        if not isinstance(parsed, dict):
+            return {}
+        out_loc: dict[str, Any] = {}
+        for key in ("name", "country", "admin1"):
+            val = parsed.get(key)
+            if isinstance(val, str) and val.strip():
+                out_loc[key] = val.strip()
+        for key in ("latitude", "longitude"):
+            val = parsed.get(key)
+            if val is None:
+                continue
+            with contextlib.suppress(TypeError, ValueError):
+                out_loc[key] = float(val)
+        return out_loc
     return raw if raw is not None else ""
 
 

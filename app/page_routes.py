@@ -534,36 +534,44 @@ def _preview_scale(panel_w: int, panel_h: int = 0) -> float:
 
 
 def _group_pages_for_index(pages: list[Page], devices: Any) -> list[tuple[Any, list[Page]]]:
-    """Bucket pages by primary (first still-existing) device for the
-    Dashboards list. Returns ordered ``(device_or_None, pages)`` tuples:
-    bound device groups sorted by ``display_name`` (case-insensitive),
-    then an "Unbound" group at the end when there are unbound pages.
-    Pages within each group are alphabetical by name (case-insensitive,
-    tie-break on id for stability). Empty groups are dropped, so a
-    device with zero bound pages never renders a section head.
+    """Bucket pages under every bound (still-existing) device for the
+    Dashboards list. A page bound to N live devices appears in N groups,
+    once under each device's section head. Returns ordered ``(device_or_None,
+    pages)`` tuples: bound device groups sorted by ``display_name``
+    (case-insensitive), then an "Unbound" group at the end when there
+    are unbound pages. Pages within each group are alphabetical by name
+    (case-insensitive, tie-break on id for stability). Empty groups are
+    dropped, so a device with zero bound pages never renders a section
+    head.
 
-    Primary-device resolution skips ids that no longer resolve through
-    the registry, so a half-deleted binding (`device_ids=["gone",
-    "kitchen"]`) falls through to the next live device rather than
-    landing in Unbound; a page with no live bindings goes to Unbound.
+    Pre-v0.69.6 (issue #52 item 1): a page went to its FIRST live device
+    only, so a dashboard bound to "living-room" + "kitchen" appeared
+    once under whichever sorted first and never surfaced from the other
+    device's section. The current shape mirrors the behaviour the user
+    expects: each device's section head owns every dashboard pushed to
+    it, with no hidden "primary" concept.
+
+    Half-deleted bindings (``device_ids=["gone", "kitchen"]``) still
+    resolve down to the live subset; a page with no live bindings at
+    all goes to Unbound.
 
     Pulled out of ``index()`` so unit tests can hit the grouping logic
     without standing up a full Flask app + Page store."""
     bound: dict[str, tuple[Any, list[Page]]] = {}
     unbound: list[Page] = []
     for page in pages:
-        primary = None
+        matched: list[Any] = []
         if devices is not None:
             for did in page.device_ids:
                 candidate = devices.devices.get(did)
                 if candidate is not None:
-                    primary = candidate
-                    break
-        if primary is None:
+                    matched.append(candidate)
+        if not matched:
             unbound.append(page)
             continue
-        slot = bound.setdefault(primary.id, (primary, []))
-        slot[1].append(page)
+        for device in matched:
+            slot = bound.setdefault(device.id, (device, []))
+            slot[1].append(page)
 
     def page_sort_key(p: Page) -> tuple[str, str]:
         return (p.name.casefold(), p.id)

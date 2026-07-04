@@ -831,6 +831,25 @@ def test_group_pages_unbound_sorts_last() -> None:
     assert [p.id for p in groups[1][1]] == ["u1"]
 
 
+def test_group_pages_multi_device_binding_appears_under_every_device() -> None:
+    """v0.69.6 (issue #52 item 1): a page bound to N live devices renders
+    under each of their section heads, not just the first. Previously
+    (pre-v0.69.6) the helper picked the first live device as a "primary"
+    and hid the page from the others' groups, so a dashboard bound to
+    "living-room" + "kitchen" only surfaced from one of them."""
+    from app.page_routes import _group_pages_for_index
+
+    kitchen = _StubDevice("kitchen", display_name="Kitchen Panel")
+    studio = _StubDevice("studio", display_name="Studio Display")
+    registry = _StubRegistry([kitchen, studio])
+    pages = [_page("shared", "Family agenda", ["kitchen", "studio"])]
+    groups = _group_pages_for_index(pages, registry)
+    assert [d.id for d, _ in groups] == ["kitchen", "studio"]
+    # Same page appears under both device groups.
+    assert [p.id for p in groups[0][1]] == ["shared"]
+    assert [p.id for p in groups[1][1]] == ["shared"]
+
+
 def test_group_pages_primary_device_deletion_falls_through() -> None:
     """When a page's first device id no longer resolves, the helper
     walks to the next device in the list. The page lands in the group

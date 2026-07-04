@@ -3,6 +3,50 @@
 from __future__ import annotations
 
 import os
+from datetime import UTC, datetime, tzinfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+
+def app_timezone() -> tzinfo:
+    """Return the tzinfo the app should render user-facing timestamps in.
+
+    Reads ``settings.app.timezone`` via ``current_app.config["SETTINGS_STORE"]``
+    (a Flask app context is expected, callers are all inside a request or
+    a rendered template). Falls back to system-local when unset, "system",
+    or unresolvable; ultimate fallback is UTC so callers always get a
+    tz-aware datetime.
+
+    Used by history-row rendering (issue #52 item 2) and any other
+    server-side clock display that used to hit a naive
+    ``datetime.fromtimestamp`` and inherit the container TZ (UTC on
+    Docker / MicroCloud defaults).
+    """
+    from flask import current_app
+
+    raw = "system"
+    try:
+        store = current_app.config.get("SETTINGS_STORE")
+        if store is not None:
+            raw = str((store.get_section("app") or {}).get("timezone") or "system").strip()
+    except Exception:
+        # Called outside app context (or a corrupt settings store):
+        # fall through to system-local resolution.
+        raw = "system"
+
+    if raw and raw.lower() != "system":
+        try:
+            return ZoneInfo(raw)
+        except ZoneInfoNotFoundError:
+            pass
+
+    resolved = _resolve_iana_timezone("system")
+    if resolved:
+        try:
+            return ZoneInfo(resolved)
+        except ZoneInfoNotFoundError:
+            pass
+
+    return datetime.now().astimezone().tzinfo or UTC
 
 
 def _resolve_iana_timezone(stored: str) -> str:

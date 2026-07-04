@@ -130,8 +130,24 @@ class RendererRegistry:
         return list(self.renderers.values())
 
     def for_device(self, device_id: str) -> list[Renderer]:
-        """All renderers whose ``device`` matches the given device id."""
-        return [r for r in self.renderers.values() if r.device == device_id]
+        """All renderers whose ``device`` matches the given device id.
+
+        Prefers instance clones over the base renderer when both match:
+        clones have ids of the form ``<base>__<instance>`` (created by
+        :func:`clone_for_instances`), while a base renderer's ``device``
+        is a topic prefix like ``"pi_bin"``. If a user creates a device
+        instance whose id equals a base renderer's topic prefix (say,
+        instance id ``"pi_bin"``), naively matching on ``r.device ==
+        device_id`` returns BOTH the base and the ``pi_bin__pi_bin``
+        clone, and callers (the settings-page loop over
+        ``for_device(device.id)``) would render the picture-quality
+        block twice. Filtering to clones-only when any clone matches
+        keeps the naïve caller correct without asking each one to
+        remember to dedupe (v0.69.6, issue #52 item 4)."""
+        matches = [r for r in self.renderers.values() if r.device == device_id]
+        if any("__" in r.id for r in matches):
+            return [r for r in matches if "__" in r.id]
+        return matches
 
 
 def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:

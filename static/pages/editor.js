@@ -24,6 +24,33 @@
   const pageId = grid ? grid.dataset.pageId : null;
   const forms = () => document.querySelectorAll("form[data-editor-form]");
 
+  // v0.69.6 (issue #52 item 7): snapshot every form's current values
+  // whenever we go clean (initial load + after each successful save),
+  // then diff at ``beforeunload`` to catch only real edits. FormData
+  // iteration order is insertion order (matches the DOM), stable
+  // enough for a raw-string comparison, and cheap enough to run on
+  // both save + unload.
+  function _snapshotForms() {
+    const snap = new Map();
+    forms().forEach((form) => {
+      const rows = [];
+      new FormData(form).forEach((value, key) => {
+        rows.push(key + "=" + String(value));
+      });
+      snap.set(form, rows.join("\n"));
+    });
+    return snap;
+  }
+  let cleanSnapshot = new Map();
+  function _hasRealFormDiff() {
+    const current = _snapshotForms();
+    if (current.size !== cleanSnapshot.size) return true;
+    for (const [form, snap] of cleanSnapshot) {
+      if (current.get(form) !== snap) return true;
+    }
+    return false;
+  }
+
   function setStatus(state) {
     if (!status) return;
     status.dataset.state = state;
@@ -44,6 +71,15 @@
   function setDirty(dirty) {
     setStatus(dirty ? "dirty" : "saved");
     if (saveBtn) saveBtn.disabled = !dirty;
+    // v0.69.6 (issue #52 item 7): re-snapshot the clean form state
+    // whenever we transition to "not dirty" (initial load + after
+    // every successful save). The beforeunload guard compares live
+    // FormData against this snapshot so spurious ``input`` events
+    // (autofill, focus, browser extensions) don't trigger the
+    // "Leave site?" popup for a page the user hasn't actually edited.
+    if (!dirty) {
+      cleanSnapshot = _snapshotForms();
+    }
   }
 
   // Text-like inputs (<input type="text|search|email|url|password|tel">
@@ -520,14 +556,17 @@
     reloadPreview();
   };
 
-  // Warn before navigating away with unsaved cell edits. Doesn't fire
-  // on programmatic reloads (those go through tesseraeSaveAllForms
-  // first) but does catch accidental Cmd+R / browser back / tab close.
   window.addEventListener("beforeunload", (ev) => {
-    if (saveBtn && !saveBtn.disabled) {
-      ev.preventDefault();
-      ev.returnValue = "";
-    }
+    // v0.69.6 (issue #52 item 7): saveBtn state is only a hint,
+    // it re-enables on any ``input`` event (autofill, focus,
+    // extensions) even when the underlying values are unchanged. Real
+    // gate is a raw-string comparison of the current form values
+    // against the last known-clean snapshot; only warn when something
+    // actually differs.
+    if (!(saveBtn && !saveBtn.disabled)) return;
+    if (!_hasRealFormDiff()) return;
+    ev.preventDefault();
+    ev.returnValue = "";
   });
 
   // Icon picker lives in static/icon-picker.js as a reusable shared
@@ -624,5 +663,10 @@
   watchForms();
   watchLayoutForms();
   watchMultiSelect();
-  setStatus("saved");
+  // ``setDirty(false)`` here (not just ``setStatus("saved")``) so the
+  // beforeunload snapshot is populated once forms are watched. Without
+  // this the snapshot stays empty and every navigation triggers the
+  // "Leave site?" prompt because ``current.size !== 0``. (v0.69.6,
+  // issue #52 item 7.)
+  setDirty(false);
 })();

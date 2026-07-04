@@ -44,6 +44,48 @@ def _registry() -> PluginRegistry:
     return registry
 
 
+def _app_location_dict() -> dict[str, Any] | None:
+    """Return the app-level ``{latitude, longitude, name}`` dict from
+    ``settings.app.location`` (v0.69.6, issue #52 items 5 + 6), or a
+    migrated dict built from the legacy flat ``latitude`` / ``longitude``
+    pair when the picker hasn't been touched yet. Returns ``None`` when
+    neither is set.
+
+    The migration lets a pre-v0.69.6 install upgrade cleanly: users with
+    a flat lat/lon still get their weather widgets served, without
+    forcing them to re-pick their location on first launch after the
+    upgrade. Once the user opens Settings and re-saves via the picker,
+    the ``location`` key wins and the flat fields become inert.
+    """
+    store = current_app.config.get("SETTINGS_STORE")
+    if store is None:
+        return None
+    app_section = store.get_section("app") or {}
+
+    picked = app_section.get("location")
+    if isinstance(picked, dict) and picked:
+        lat = picked.get("latitude")
+        lon = picked.get("longitude")
+        if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
+            return {
+                "latitude": float(lat),
+                "longitude": float(lon),
+                "name": str(picked.get("name") or ""),
+            }
+
+    # Legacy flat fields.
+    lat_raw = app_section.get("latitude")
+    lon_raw = app_section.get("longitude")
+    try:
+        lat_f = float(lat_raw) if lat_raw not in (None, "") else None
+        lon_f = float(lon_raw) if lon_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+    if lat_f is None or lon_f is None:
+        return None
+    return {"latitude": lat_f, "longitude": lon_f, "name": ""}
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -57,14 +99,18 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     # what the existing widget data-fetch code consumes, so no widget
     # code change is needed for the simpler shape.
     #
-    # Deliberately no global-settings fallback any more, the global
-    # Settings → Server → Latitude/Longitude fields used to seed
-    # widgets that didn't have their own coordinates, but that meant a
-    # half-configured cell silently showed weather for somewhere other
-    # than where the user thought. Cells without a chosen location
-    # now return missing-coords (``""`` / ``None``) and widget code
-    # surfaces a "pick a location" empty state instead of pretending.
+    # v0.69.6 (issue #52 items 5 + 6): the app-level Settings → Location
+    # picker is the fallback for a cell that hasn't picked its own
+    # location. The old objection (a half-configured cell silently
+    # showing weather for somewhere else) doesn't apply when the app-
+    # level location is itself an explicit ``location_search`` pick,
+    # not two separate number fields someone could half-fill. If the
+    # cell has no ``location`` dict of its own, we splice the app-level
+    # one in here so the promote-to-flat step below still fills
+    # ``latitude`` / ``longitude`` on the widget's options.
     location = merged.get("location")
+    if not (isinstance(location, dict) and location):
+        location = _app_location_dict()
     if isinstance(location, dict) and location:
         lat = location.get("latitude")
         lon = location.get("longitude")

@@ -18,6 +18,7 @@ from app.device_loader import DeviceRegistry
 from app.renderer_loader import RendererRegistry
 from app.state.event_log import EventLog, EventRow
 from app.state.page_store import PageStore
+from app.tz_resolve import app_timezone
 
 bp = Blueprint("history", __name__, url_prefix="/history")
 
@@ -140,7 +141,14 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
                 "target": target,
                 "target_devices": target_devices,
                 "rel": _relative(ev.timestamp),
-                "abs": datetime.fromtimestamp(ev.timestamp).strftime("%Y-%m-%d %H:%M:%S"),
+                # v0.69.6 (issue #52 item 2): render in the user's configured
+                # timezone rather than the container's local (UTC on Docker /
+                # MicroCloud defaults). Falls back to system-local when the
+                # setting is empty or "system"; see ``app_timezone`` for the
+                # resolution ladder.
+                "abs": datetime.fromtimestamp(ev.timestamp, tz=app_timezone()).strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                ),
                 "duration_s": ev.duration_s,
                 "error": ev.error,
                 "renderers": renderers,

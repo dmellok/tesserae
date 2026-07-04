@@ -346,7 +346,15 @@ def _build_app_field_groups() -> list[dict[str, Any]]:
         )
         # Dependent + plain fields render under the section body. The
         # master keeps its place in the header so it isn't duplicated.
-        body_fields = [f for f in group_fields if f.get("group_role") != "master"]
+        # ``hidden: True`` marks legacy fields that still load off disk
+        # but no longer render in the UI (v0.69.6 retired the flat
+        # ``latitude`` / ``longitude`` pair on the location group in
+        # favour of the ``location_search`` picker; keeping them in
+        # ``APP_FIELDS`` avoids "unknown key" grumbles from a pre-v0.69.6
+        # settings.json).
+        body_fields = [
+            f for f in group_fields if f.get("group_role") != "master" and not f.get("hidden")
+        ]
         master_state = state.get(master_field["name"]) if master_field else None
         meta_value = None
         if spec.get("meta_label") == "NETWORK IP":

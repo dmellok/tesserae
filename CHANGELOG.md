@@ -6,6 +6,62 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.6], 2026-07-05
+
+Batch fix for issue #52 items 1, 2, 4, 5, 6, 7. Every confirmed bug in
+that report lands here except item 3, which is a UX polish (the sticky
+"You have unsaved changes" bar on device tabs) tracked separately, and
+items 8-10 which are UX threads (Devices to top-level nav, split
+registration, admin dashboard) that need their own design pass.
+
+### Fixed
+
+- **Multi-device dashboards now render under every bound device (item 1).**
+  The Dashboards list used to pick a "primary" device (the first live
+  entry in ``page.device_ids``) and only render the page under that
+  section head; a dashboard bound to two devices only surfaced from
+  one of them. ``_group_pages_for_index`` in
+  [`app/page_routes.py`](app/page_routes.py) now appends the page
+  under every live device it's bound to, so each device section head
+  owns every dashboard pushed to it. Unbound-device fallback and
+  half-deleted-binding tolerance stay intact.
+- **History timestamps render in the configured timezone (item 2).**
+  [`app/history_routes.py`](app/history_routes.py) was using naive
+  ``datetime.fromtimestamp`` which follows the container's TZ (UTC on
+  Docker / MicroCloud defaults). Now routes through a new
+  ``app_timezone()`` helper in [`app/tz_resolve.py`](app/tz_resolve.py)
+  that reads ``settings.app.timezone``, so history rows honour the
+  user's zone regardless of what the container thinks it is. Same
+  helper is safe to consume from other views that render server-side
+  clock times.
+- **``for_device`` no longer double-renders on instance-id collisions
+  (item 4).** When a user's device instance id equalled a base
+  renderer's topic prefix (say, an instance called ``pi_bin`` on a
+  ``pi_bin`` base renderer), the settings loop rendered the
+  picture-quality block twice with identical ``base_name`` because
+  both the base and the clone matched. The registry now filters to
+  clones-only when a clone is in the match set, so a single renderer's
+  settings appear once regardless of the instance id.
+- **Weather widgets fall back to the app-level location (items 5 + 6).**
+  New ``Settings → Location & time → Default location`` picker (a
+  ``location_search`` field on the same shape the cell-level picker
+  uses); ``_resolved_options`` in [`app/composer.py`](app/composer.py)
+  splices it into any cell whose own ``location`` dict is empty, so
+  weather widgets Just Work after the user picks a global location and
+  swapping between weather_now / weather_forecast on a cell no longer
+  triggers a re-search. Legacy flat ``latitude`` / ``longitude``
+  settings from before v0.69.6 get promoted into the new
+  ``{latitude, longitude, name}`` shape on read so upgrades don't
+  silently blank the fallback.
+- **beforeunload popup fires only on real edits (item 7).**
+  [`static/pages/editor.js`](static/pages/editor.js) used to gate the
+  "Leave site?" prompt on ``saveBtn.disabled``, which flipped enabled
+  on any ``input`` event including autofill / focus / browser
+  extensions, so users saw the prompt while navigating between pages
+  they hadn't touched. Now snapshots every form's ``FormData`` on
+  load and after each save, and only prompts when the current values
+  actually differ from the snapshot.
+
 ## [0.69.5], 2026-07-05
 
 ### Fixed

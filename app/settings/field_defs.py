@@ -90,17 +90,46 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        # v0.69.6 (issue #52 item 5): app-level location picker replaces
+        # the flat lat/lon pair below. Stores the same
+        # ``{latitude, longitude, name}`` dict that per-cell widget
+        # locations use, so the composer's ``_resolved_options`` can
+        # fall back to it when a cell has no location of its own.
+        # The flat ``latitude`` / ``longitude`` fields below are kept
+        # so an on-disk value from before v0.69.6 still round-trips
+        # through the settings page and can be re-entered here in the
+        # new picker; a small on-read seed in the composer promotes the
+        # legacy pair into a ``{latitude, longitude, name}`` dict if
+        # ``location`` isn't set, so upgrades don't silently blank
+        # anyone's weather.
+        "name": "location",
+        "type": "location_search",
+        "label": "Default location",
+        "default": "",
+        "group": "location",
+        "help": (
+            "Search a city or pick your coordinates. Weather, sky, and any "
+            "other location-aware widget will use this when its own cell "
+            "hasn't picked a location of its own, so you can set your city "
+            "once and reuse it across the whole dashboard."
+        ),
+    },
+    {
+        # Legacy flat-lat/lon fields, kept so a pre-v0.69.6 settings.json
+        # still parses. Not surfaced on the settings page any more (the
+        # picker above owns the UX); a data migration in
+        # ``_resolved_options`` promotes them into ``location`` on read
+        # so weather widgets keep working through an upgrade. Once the
+        # migration has run for every install we can drop them; leaving
+        # them declared for now so ``settings.json`` doesn't grow an
+        # unknown-key warning on load.
         "name": "latitude",
         "type": "number",
         "label": "Latitude",
         "default": "",
         "group": "location",
-        "step": "any",  # decimal degrees, a default step of 1 rejects e.g. -37.8136
-        "help": (
-            "Default location for weather / sky / sunrise widgets, so you don't "
-            "re-enter coordinates per widget. A widget can still override it with "
-            "its own latitude/longitude. Decimal degrees, e.g. -37.8136."
-        ),
+        "hidden": True,
+        "step": "any",
     },
     {
         "name": "longitude",
@@ -108,8 +137,8 @@ APP_FIELDS: list[dict[str, Any]] = [
         "label": "Longitude",
         "default": "",
         "group": "location",
+        "hidden": True,
         "step": "any",
-        "help": "Decimal degrees, e.g. 144.9631. Paired with Latitude above.",
     },
     {
         "name": "ha_discovery_enabled",

@@ -148,6 +148,48 @@ def test_for_device_filters(tmp_path: Path, schema_path: Path) -> None:
     assert pi_ids == ["pi_a", "pi_b"]
 
 
+def test_for_device_prefers_clone_over_base_on_id_collision(
+    tmp_path: Path, schema_path: Path
+) -> None:
+    """v0.69.6 (issue #52 item 4): when a user creates a device instance
+    whose id equals a base renderer's topic prefix (e.g. ``pi_bin`` as
+    both the base renderer's ``device`` and the instance id), the
+    registry ends up with the base renderer AND a ``pi_bin__pi_bin``
+    clone that both match ``for_device("pi_bin")``. Callers loop over
+    the returned list to render per-clone settings, so returning both
+    used to duplicate the picture-quality block on that device's
+    Calibration tab. The registry now filters to clones-only when any
+    clone is in the match set, so a single renderer's settings appear
+    once regardless of the instance id."""
+    from app.renderer_loader import Renderer
+
+    plugins_dir = tmp_path / "renderers"
+    plugins_dir.mkdir()
+    _write_renderer(plugins_dir, "pi_bin", {"device": "pi_bin"}, _VALID_BODY)
+    registry = renderer_loader.discover(
+        plugins_dir, schema_path=schema_path, data_root=tmp_path / "data"
+    )
+    base = registry.get("pi_bin")
+    assert base is not None
+    # Manually inject a clone the way ``clone_for_instances`` would when
+    # a user creates a device instance whose id happens to equal the
+    # base renderer's topic prefix.
+    cloned_manifest = dict(base.manifest)
+    cloned_manifest["device"] = "pi_bin"
+    cloned_manifest["name"] = "Pi BIN (pi_bin)"
+    registry.renderers["pi_bin__pi_bin"] = Renderer(
+        id="pi_bin__pi_bin",
+        path=base.path,
+        manifest=cloned_manifest,
+        module=base.module,
+        data_dir=base.data_dir,
+    )
+    # Base + clone both have ``device == "pi_bin"``; ``for_device`` must
+    # collapse to the clone only.
+    ids = sorted(r.id for r in registry.for_device("pi_bin"))
+    assert ids == ["pi_bin__pi_bin"]
+
+
 def test_compat_mismatch_is_rejected(tmp_path: Path, schema_path: Path) -> None:
     plugins_dir = tmp_path / "renderers"
     plugins_dir.mkdir()
