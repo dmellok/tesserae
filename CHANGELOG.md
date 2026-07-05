@@ -6,6 +6,39 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.11], 2026-07-05
+
+### Changed
+
+- **Palette profile picker hides on panels without a matching family.**
+  Pre-v0.69.11, the picker fell through to the Spectra 6 default
+  family for any unrecognised gamut, so a mono panel, a BWRY panel,
+  or an RGB LCD saw Spectra 6 profiles they couldn't apply.
+  ``_palette_family_for`` now returns empty for those gamuts and the
+  section builder null-gates every palette endpoint (apply, save,
+  reset, import, tone editor, per-colour palette editor), so the
+  whole Calibration-tab palette section hides for panels that don't
+  have bundled profiles. Spectra 6 and Inky 7-colour behaviour is
+  unchanged.
+- **Sticky save bar sits in-card until it would scroll off.**
+  ``position: sticky`` with both ``top`` and ``bottom`` insets so
+  the bar sits at its natural in-card position when the natural
+  position is in the viewport, and only sticks to the corresponding
+  viewport edge when scroll would otherwise carry it off-screen.
+  Replaces the v0.69.10 always-fixed variant, which was obscuring
+  page content unnecessarily when the natural position was already
+  in view. Message now reads "Unsaved changes for &lt;device name&gt;"
+  instead of the generic "You have unsaved changes" so users know
+  exactly which card is dirty.
+- **Palette-tone form gets its own sticky save bar.**
+  The v0.69.10 attempt (a sticky footer inside the form with a
+  primary teal button and a dirty flag) didn't render right and the
+  sticky positioning didn't stick because the form itself is short.
+  Replaced with the same ``.dx-save-bar`` shape the outer combined
+  form uses, associated to the tone form via ``form=""`` attributes
+  on Save + Discard. Reveals when a tone slider is touched, message
+  reads "Unsaved tone changes for &lt;device name&gt;".
+
 ## [0.69.10], 2026-07-05
 
 ### Changed

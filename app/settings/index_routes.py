@@ -460,14 +460,28 @@ def _palette_profile_slug_for(device: Device) -> str:
 def _palette_family_for(device: Device) -> str:
     """Which palette-profile family a device's picker filters against.
 
-    Uses the panel gamut when set (``waveshare_e6`` → ``spectra6``,
-    ``inky_7colour`` → ``inky_7colour``) and falls back to the Spectra 6
-    default so custom / unknown gamuts still get a picker."""
+    Maps panel gamut to the bundled profile family: ``waveshare_e6`` /
+    ``spectra_6`` → ``spectra6``, ``inky_7colour`` / ``acep_7colour``
+    → ``inky_7colour``. Panels without a matching profile family
+    (mono, ``bwry_4``, ``rgb24``, ``rgb16``, unknown gamut) return
+    empty so the section builder can null out every palette endpoint
+    for them; the whole Calibration-tab palette + tone editor then
+    hides on the template side.
+
+    Empty gamut is treated as ``spectra6`` (legacy default for the
+    fleet majority) so devices that haven't declared a gamut yet
+    still see the picker.
+    """
     panel = device.panel or {}
-    gamut = str(panel.get("gamut") or "waveshare_e6")
-    if gamut == "inky_7colour":
+    gamut = str(panel.get("gamut") or "").strip()
+    if gamut in ("inky_7colour", "acep_7colour"):
         return "inky_7colour"
-    return "spectra6"
+    if gamut in ("waveshare_e6", "spectra_6", ""):
+        return "spectra6"
+    # mono, bwry_4, rgb24, rgb16, unknown: no bundled profile family
+    # applies, hide the picker rather than showing incompatible
+    # Spectra 6 profiles as the pre-v0.69.11 default did.
+    return ""
 
 
 def _palette_profile_colors_for(device: Device) -> list[dict[str, str]] | None:
@@ -544,10 +558,16 @@ def _palette_profile_tone_for(device: Device) -> dict[str, Any]:
 
 def _palette_profile_choices_for(device: Device) -> list[dict[str, Any]]:
     """Bundled + user profiles offered to this device, scoped to the
-    matching palette family."""
+    matching palette family. Empty for panels whose gamut has no
+    bundled profile family (mono, ``bwry_4``, ``rgb24``, ``rgb16``);
+    the section builder null-gates the palette endpoints in that case
+    so the picker hides entirely (v0.69.11)."""
     from app.settings.palette_routes import profile_choices_for
 
-    return profile_choices_for(_palette_family_for(device))
+    family = _palette_family_for(device)
+    if not family:
+        return []
+    return profile_choices_for(family)
 
 
 def _test_pattern_colors_for(device: Device) -> list[dict[str, Any]]:
@@ -875,28 +895,34 @@ def _build_sections() -> list[dict[str, Any]]:
                 # ``palette_profile_choices`` is the ordered dropdown
                 # scoped to this device's gamut so a Spectra 6 panel doesn't
                 # see the Inky 7-colour presets and vice versa. Endpoints
-                # are None on kinds (the picker is instance-only).
+                # are None on kinds (the picker is instance-only), and
+                # v0.69.11 also null-gates the whole palette section when
+                # the device's gamut has no matching profile family
+                # (mono, bwry_4, rgb24, rgb16) so the picker doesn't
+                # falsely offer Spectra 6 profiles to a mono panel.
                 "palette_profile_slug": (_palette_profile_slug_for(device) if is_instance else ""),
                 "palette_profile_choices": (
                     _palette_profile_choices_for(device) if is_instance else []
                 ),
                 "palette_apply_endpoint": (
                     url_for("auth.devices_palette_apply", instance_id=device.id)
-                    if is_instance
+                    if is_instance and _palette_family_for(device)
                     else None
                 ),
                 "palette_save_endpoint": (
                     url_for("auth.devices_palette_save", instance_id=device.id)
-                    if is_instance
+                    if is_instance and _palette_family_for(device)
                     else None
                 ),
                 "palette_reset_endpoint": (
                     url_for("auth.devices_palette_reset", instance_id=device.id)
-                    if is_instance
+                    if is_instance and _palette_family_for(device)
                     else None
                 ),
                 "palette_import_endpoint": (
-                    url_for("auth.palette_profile_import") if is_instance else None
+                    url_for("auth.palette_profile_import")
+                    if is_instance and _palette_family_for(device)
+                    else None
                 ),
                 # Tone / dither editor (v0.67.1). ``palette_profile_tone``
                 # carries the active profile's current values so the
@@ -905,7 +931,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 "palette_profile_tone": (_palette_profile_tone_for(device) if is_instance else {}),
                 "palette_update_tone_endpoint": (
                     url_for("auth.devices_palette_update_tone", instance_id=device.id)
-                    if is_instance
+                    if is_instance and _palette_family_for(device)
                     else None
                 ),
                 # Per-colour palette editor (v0.67.3). Endpoint takes 6-7
@@ -916,7 +942,7 @@ def _build_sections() -> list[dict[str, Any]]:
                 # the editor block.
                 "palette_update_palette_endpoint": (
                     url_for("auth.devices_palette_update_palette", instance_id=device.id)
-                    if is_instance
+                    if is_instance and _palette_family_for(device)
                     else None
                 ),
                 "palette_profile_colors": (

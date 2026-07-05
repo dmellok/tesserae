@@ -949,25 +949,34 @@
               </div>
             </details>
 
-            {# Save row (v0.69.10). Wrapped in a sticky footer inside
-               the tone form so the button stays visible at the bottom
-               of the viewport while the user is editing sliders in the
-               grid above. The row also carries a small "Unsaved
-               changes" label that appears when the form has been
-               touched (via ``data-dirty`` set by ``initDirtyForm``),
-               so the user doesn't have to guess whether their slider
-               drag registered. #}
-            <div class="dx-tone-save-row">
-              <span class="dx-tone-dirty-flag" data-dirty-flag>
-                <i class="ph ph-circle-dashed" aria-hidden="true"></i>
-                <span>Unsaved tone changes</span>
-              </span>
-              <button type="submit" class="button primary dx-tone-save-btn">
+            {# Inline Save button, always visible in the form flow.
+               The sticky save bar below sits outside the form and
+               reveals when a slider is touched (associated via
+               ``form="..."``). Two clear affordances: scroll-and-click
+               inline, or use the sticky bar without scrolling. #}
+            <button type="submit" class="button primary">
+              <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+              <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
+            </button>
+          </form>
+
+          {# Sticky save bar for the tone form (v0.69.11). Uses the
+             same ``.dx-save-bar`` shape as the outer combined form so
+             the pattern is consistent, associated to the tone form
+             via ``data-save-bar-for`` + ``form=""`` attributes on the
+             Save / Discard buttons. Hides until a slider or the
+             colour-match select is touched. #}
+          <div class="dx-save-bar" data-save-bar
+               data-save-bar-for="{{ section.id }}-tone-form" hidden>
+            <span class="dx-save-bar-msg">Unsaved tone changes for {{ section.device_name or section.title.replace('Device: ', '') }}</span>
+            <div class="dx-save-bar-actions">
+              <button type="reset" form="{{ section.id }}-tone-form" class="dx-save-bar-discard">Discard</button>
+              <button type="submit" form="{{ section.id }}-tone-form" class="dx-save-bar-save">
                 <i class="ph ph-floppy-disk" aria-hidden="true"></i>
                 <span>{% if section.palette_profile_tone.bundled %}Fork &amp; save{% else %}Save tone{% endif %}</span>
               </button>
             </div>
-          </form>
+          </div>
           {% endif %}
 
           {# Contrast + Saturation moved here in v0.67; storage is the
@@ -997,7 +1006,7 @@
          the outer form even though the bar sits outside it in the
          DOM after the nested-form parse quirk. #}
       <div class="dx-save-bar" data-save-bar data-save-bar-for="{{ _combined_form_id }}" hidden>
-        <span class="dx-save-bar-msg">You have unsaved changes</span>
+        <span class="dx-save-bar-msg">Unsaved changes for {{ section.device_name or section.title.replace('Device: ', '') }}</span>
         <div class="dx-save-bar-actions">
           <button type="reset" form="{{ _combined_form_id }}" class="dx-save-bar-discard">Discard</button>
           <button type="submit" form="{{ _combined_form_id }}" class="dx-save-bar-save">
