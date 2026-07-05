@@ -46,6 +46,38 @@ def test_list_patterns_matches_pattern_ids() -> None:
     }
 
 
+def test_mono_gamut_filters_out_colour_patterns() -> None:
+    """v0.69.14: mono panels shouldn't see palette_swatches or
+    solid_fill in the picker (both are degenerate at 2 colours). The
+    grayscale ramp, text sample, and registration grid still show
+    since they exercise dither / rendering axes."""
+    ids = {p["id"] for p in test_patterns.list_patterns(gamut="mono")}
+    assert "palette_swatches" not in ids
+    assert "solid_fill" not in ids
+    assert "grayscale_ramp" in ids
+    assert "text_sample" in ids
+    assert "registration_grid" in ids
+
+
+def test_colour_gamuts_offer_all_patterns() -> None:
+    """The E6 / Inky 7 / BWRY panels see the full pattern list. Empty
+    gamut (kinds, unknown declarations) is treated as colour so the
+    picker doesn't spuriously hide entries."""
+    for gamut in ("waveshare_e6", "inky_7colour", "bwry_4", ""):
+        ids = {p["id"] for p in test_patterns.list_patterns(gamut=gamut)}
+        assert "palette_swatches" in ids, gamut
+        assert "solid_fill" in ids, gamut
+
+
+def test_mono_pattern_ids_still_accepted_by_build() -> None:
+    """PATTERN_IDS stays the full universe: any pattern id remains a
+    legal POST value even when the picker filters that id out. This
+    prevents an in-flight submit from 400'ing if the gamut changes
+    between page render and form POST."""
+    assert "palette_swatches" in test_patterns.PATTERN_IDS
+    assert "solid_fill" in test_patterns.PATTERN_IDS
+
+
 def test_unknown_pattern_raises() -> None:
     with pytest.raises(ValueError):
         test_patterns.build_pattern("does-not-exist", 100, 100)

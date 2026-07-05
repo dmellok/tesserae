@@ -28,9 +28,14 @@
           p.setAttribute('aria-hidden', on ? 'false' : 'true');
         });
         // Replace the query string so a reload (or a redirect-after-save
-        // from the form below) returns to the same tab.
+        // from the form below) returns to the same tab. Set ``?opened=``
+        // to this card's device id so the tab param is scoped to it;
+        // without that, other cards on the page inherit the same tab on
+        // the next render (they read the same shared ``?tab=``).
         const url = new URL(window.location.href);
         url.searchParams.set('tab', target);
+        const deviceId = card.getAttribute('data-device-id');
+        if (deviceId) url.searchParams.set('opened', deviceId);
         // Anchor lets multiple device cards co-exist on one page; we
         // bias to the focused card so #device-<id> stays accurate.
         history.replaceState(null, '', url.pathname + url.search + '#' + card.id);
@@ -244,6 +249,13 @@
           if (hex) colorChip.style.background = hex;
         }
       }
+      // v0.69.14: carry the palette-profile picker's currently-selected
+      // slug so switching patterns doesn't drop the candidate-profile
+      // preview back to the saved slug. Empty is meaningful (built-in
+      // default), so we always attach the slug when the picker exists.
+      const card = form.closest('[data-device-card]');
+      const slugSelect = card && card.querySelector('[data-palette-slug]');
+      if (slugSelect) src += '&slug=' + encodeURIComponent(slugSelect.value);
       // Cache-bust so a subsequent send-with-same-params still refetches
       // when the user tabs back. no-store on the response also helps.
       src += '&_t=' + Date.now();
@@ -367,6 +379,14 @@
         const cs = card.querySelector('[data-color-select]');
         if (cs) params.set('color_index', cs.value);
       }
+      // Profile slug (v0.69.14): the palette-profile picker is a
+      // preview-before-apply dropdown. Piping the currently-selected
+      // slug through as ``?slug=`` lets the user see a candidate
+      // profile's palette + tone before hitting Apply. Empty string
+      // is meaningful (built-in default); missing param would fall
+      // back to the saved slug on the server.
+      const slugSelect = card.querySelector('[data-palette-slug]');
+      if (slugSelect) params.set('slug', slugSelect.value);
       const toneForm = card.querySelector('.dx-palette-tone-form');
       if (toneForm) {
         ['exposure', 's_curve', 'lab_compress_min', 'lab_compress_max',
@@ -424,6 +444,19 @@
           refreshTonePreview(card);
         });
       }
+    });
+    // Palette profile picker (v0.69.14): refresh the preview when the
+    // user picks a different profile in the dropdown. The change
+    // handler on initPaletteApplyForm above already updates the
+    // attribution + notes strings; this second listener repaints the
+    // preview so the palette + tone of the candidate profile shows up
+    // before the user hits Apply.
+    document.querySelectorAll('[data-palette-slug]').forEach(function (select) {
+      const card = select.closest('[data-device-card]');
+      if (!card) return;
+      select.addEventListener('change', function () {
+        refreshTonePreview(card);
+      });
     });
   });
 })();

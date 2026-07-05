@@ -1243,6 +1243,22 @@ def _custom_image_path_for(instance_id: str) -> Path:
     return root / f"{instance_id}.png"
 
 
+def _redirect_to_calibration_tab(instance_id: str) -> Response:
+    """Redirect back to the Calibration tab of the given device card,
+    keeping the card expanded (``?opened=``) and the tab selected
+    (``?tab=calibration``). v0.69.14: without ``?opened=`` the card
+    collapsed on every POST + 302 (e.g. custom-image upload)."""
+    return redirect(
+        url_for(
+            "auth.settings_area",
+            area="devices",
+            tab="calibration",
+            opened=instance_id,
+            _anchor=f"device-{instance_id}",
+        )
+    )
+
+
 @bp.post("/settings/devices/<instance_id>/test-pattern/custom-image/upload")
 def devices_custom_image_upload(instance_id: str) -> Response:
     """Save a user-picked JPG / PNG as this device's custom test
@@ -1254,7 +1270,6 @@ def devices_custom_image_upload(instance_id: str) -> Response:
 
     from PIL import Image, UnidentifiedImageError
 
-    anchor = f"device-{instance_id}"
     ctx = _resolve_pattern_context(instance_id)
     if ctx is None:
         flash(f"Unknown device {instance_id!r}.", "error")
@@ -1262,35 +1277,26 @@ def devices_custom_image_upload(instance_id: str) -> Response:
     upload = request.files.get("image")
     if upload is None or not upload.filename:
         flash("Pick an image file to upload.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-        )
+        return _redirect_to_calibration_tab(instance_id)
     try:
         img = Image.open(BytesIO(upload.read())).convert("RGB")
     except (OSError, UnidentifiedImageError) as err:
         flash(f"Couldn't read {upload.filename!r}: {err}", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-        )
+        return _redirect_to_calibration_tab(instance_id)
     _custom_image_path_for(instance_id).write_bytes(_png_bytes(img))
     flash(f"Uploaded {upload.filename!r} as this device's custom pattern.", "ok")
-    return redirect(
-        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-    )
+    return _redirect_to_calibration_tab(instance_id)
 
 
 @bp.post("/settings/devices/<instance_id>/test-pattern/custom-image/delete")
 def devices_custom_image_delete(instance_id: str) -> Response:
     """Remove the uploaded custom pattern. Idempotent (missing file is
     a no-op)."""
-    anchor = f"device-{instance_id}"
     path = _custom_image_path_for(instance_id)
     if path.exists():
         path.unlink()
         flash("Removed custom calibration image.", "ok")
-    return redirect(
-        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-    )
+    return _redirect_to_calibration_tab(instance_id)
 
 
 def _png_bytes(img: Any) -> bytes:
@@ -1313,7 +1319,6 @@ def devices_send_test_pattern(instance_id: str) -> Response:
     real renderer + transport handle framing; palette-locked pixels
     make the dither step a no-op so what the user picked is what the
     panel paints."""
-    anchor = f"device-{instance_id}"
     ctx = _resolve_pattern_context(instance_id)
     if ctx is None:
         flash(f"Unknown device {instance_id!r}.", "error")
@@ -1322,9 +1327,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
     pattern_id = (request.form.get("pattern") or "").strip()
     if pattern_id not in test_patterns.PATTERN_IDS:
         flash(f"Unknown test pattern {pattern_id!r}.", "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-        )
+        return _redirect_to_calibration_tab(instance_id)
     color_index: int | None = None
     raw_color = request.form.get("color_index")
     if raw_color is not None and raw_color != "":
@@ -1345,9 +1348,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
         )
     except ValueError as err:
         flash(str(err), "error")
-        return redirect(
-            url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-        )
+        return _redirect_to_calibration_tab(instance_id)
     result = push_manager().push_image(
         pattern_bytes,
         source_label=f"test-pattern:{pattern_id}:{instance_id}",
@@ -1360,9 +1361,7 @@ def devices_send_test_pattern(instance_id: str) -> Response:
             f"Test-pattern push {result.status}: {result.error or '(no detail)'}",
             "error",
         )
-    return redirect(
-        url_for("auth.settings_area", area="devices", tab="calibration", _anchor=anchor)
-    )
+    return _redirect_to_calibration_tab(instance_id)
 
 
 @bp.get("/settings/devices/<instance_id>/test-pattern/preview.png")
@@ -1413,9 +1412,17 @@ def devices_test_pattern_preview(instance_id: str) -> Response:
         "lab_compress_max": 100,
         "smoothing_radius": 0,
     }
-    slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
-    slug_raw = settings_store().get_for_runtime("devices", instance_id, slug_field)
-    slug = str(slug_raw.get("palette_profile_slug") or "").strip()
+    # v0.69.14: the palette-profile picker previews a candidate profile
+    # before the user hits Apply via ``?slug=<slug>``. Empty ``slug=""``
+    # explicitly means "no profile" (built-in default). Missing param
+    # falls back to the saved slug the device is currently using.
+    slug_raw_override = request.args.get("slug")
+    if slug_raw_override is not None:
+        slug = slug_raw_override.strip()
+    else:
+        slug_field = [{"name": "palette_profile_slug", "type": "string", "default": ""}]
+        slug_raw = settings_store().get_for_runtime("devices", instance_id, slug_field)
+        slug = str(slug_raw.get("palette_profile_slug") or "").strip()
     if slug:
         profile = bundled_profile(slug) or PaletteProfileStore(
             Path(current_app.config["DATA_ROOT"])

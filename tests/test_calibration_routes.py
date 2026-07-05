@@ -227,3 +227,156 @@ def test_calibration_tab_renders_in_devices_index(app: Flask) -> None:
     # The footer Calibrate button is gone (moved to the tab) so it no
     # longer competes with the tab-hosted flow for muscle memory.
     assert 'data-tab-link="calibration"' not in body
+
+
+# ---- v0.69.14 fixes -------------------------------------------------
+
+
+def _upload_png(client, device_id: str, name: str = "test.png"):
+    """Post a tiny PNG to the custom-image upload endpoint."""
+    from io import BytesIO
+
+    buf = BytesIO()
+    Image.new("RGB", (10, 10), (255, 0, 0)).save(buf, format="PNG")
+    buf.seek(0)
+    return client.post(
+        f"/settings/devices/{device_id}/test-pattern/custom-image/upload",
+        data={"image": (buf, name)},
+        content_type="multipart/form-data",
+        follow_redirects=False,
+    )
+
+
+def test_custom_image_upload_redirect_keeps_card_expanded(app: Flask) -> None:
+    """Bug A: after uploading, the redirect must carry ``opened=<id>``
+    so the device card stays expanded. Previously only ``tab=calibration``
+    was set and the card collapsed on every upload."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    resp = _upload_png(client, dev)
+    assert resp.status_code == 302
+    assert f"opened={dev}" in resp.location
+    assert "tab=calibration" in resp.location
+    assert f"#device-{dev}" in resp.location
+
+
+def test_custom_image_delete_redirect_keeps_card_expanded(app: Flask) -> None:
+    """Same fix applied to the delete endpoint: the card should stay
+    open after removing a custom image."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    _upload_png(client, dev)
+    resp = client.post(
+        f"/settings/devices/{dev}/test-pattern/custom-image/delete",
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert f"opened={dev}" in resp.location
+    assert "tab=calibration" in resp.location
+
+
+def test_send_test_pattern_redirect_keeps_card_expanded(app: Flask) -> None:
+    """Same fix on the Send-to-panel POST: sending a pattern shouldn't
+    collapse the calibration tab on the redirect."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    pm = MagicMock()
+    pm.push_image.return_value = PushResult(
+        status="sent", page_id="test-pattern:palette_swatches:esp32_demo", error=None
+    )
+    app.config["PUSH_MANAGER"] = pm
+    resp = client.post(
+        f"/settings/devices/{dev}/test-pattern",
+        data={"pattern": "palette_swatches"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    assert f"opened={dev}" in resp.location
+    assert "tab=calibration" in resp.location
+
+
+def test_tab_state_is_scoped_to_opened_device(app: Flask) -> None:
+    """Bug B: ``?tab=calibration`` only applies to the card whose
+    device id matches ``?opened=``. Other cards on the page still
+    render on their default (status) tab. Before this fix, ``?tab=``
+    was shared so all cards followed one card's tab click."""
+    import re
+
+    client = app.test_client()
+    _sign_in(client)
+    _register_device(client, "dev_alpha")
+    _register_device(client, "dev_beta")
+    body = client.get("/settings/devices?tab=calibration&opened=dev_alpha").get_data(as_text=True)
+    alpha_idx = body.index('id="device-dev_alpha"')
+    beta_idx = body.index('id="device-dev_beta"')
+    alpha_html = body[alpha_idx:beta_idx]
+    beta_html = body[beta_idx:]
+
+    def _panels(html: str) -> dict[str, bool]:
+        # Map each ``data-panel="<name>"`` to whether it is the active
+        # tab (``class=... is-active``). Uses regex to tolerate the
+        # template's whitespace + attribute order.
+        out: dict[str, bool] = {}
+        for m in re.finditer(r'data-panel="([^"]+)"[^>]*class="([^"]*)"', html, flags=re.DOTALL):
+            out[m.group(1)] = "is-active" in m.group(2)
+        return out
+
+    alpha_panels = _panels(alpha_html)
+    beta_panels = _panels(beta_html)
+    assert alpha_panels.get("calibration") is True
+    assert beta_panels.get("calibration") is False
+    assert beta_panels.get("status") is True
+
+
+def test_preview_slug_query_previews_candidate_profile(app: Flask) -> None:
+    """Bug C: the preview endpoint accepts ``?slug=<slug>`` to preview
+    a profile before the user hits Apply. The saved slug on the device
+    is irrelevant when the query overrides."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    # No profile applied on this device. Request a preview with an
+    # explicit slug override; the palette-swatch preview should paint
+    # the overridden profile's palette rather than the built-in gamut.
+    resp = client.get(
+        f"/settings/devices/{dev}/test-pattern/preview.png"
+        "?pattern=palette_swatches&slug=boeber-spectra6"
+    )
+    assert resp.status_code == 200
+    from io import BytesIO
+
+    img = Image.open(BytesIO(resp.data)).convert("RGB")
+    # Boeber's red = #EA4843. Same shape as the applied-profile test.
+    swatch_w = img.width // 6
+    r = img.getpixel((3 * swatch_w + swatch_w // 4, 2))
+    assert r == (0xEA, 0x48, 0x43)
+
+
+def test_preview_empty_slug_query_hides_applied_profile(app: Flask) -> None:
+    """``?slug=`` (empty) explicitly asks for the built-in default so
+    the user can preview 'no profile' without unapplying first."""
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    client.post(
+        f"/settings/devices/{dev}/palette/apply",
+        data={"slug": "boeber-spectra6"},
+    )
+    # Applied Boeber; now preview with slug="" (explicit no-profile).
+    resp = client.get(
+        f"/settings/devices/{dev}/test-pattern/preview.png?pattern=palette_swatches&slug="
+    )
+    assert resp.status_code == 200
+    from io import BytesIO
+
+    from app.quantizer import WAVESHARE_E6_PALETTE
+
+    img = Image.open(BytesIO(resp.data)).convert("RGB")
+    # Should be the built-in E6 red (WAVESHARE_E6_PALETTE[3]), not
+    # Boeber's #EA4843, because ?slug= explicitly overrode.
+    swatch_w = img.width // 6
+    r = img.getpixel((3 * swatch_w + swatch_w // 4, 2))
+    assert r == WAVESHARE_E6_PALETTE[3]

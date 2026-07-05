@@ -575,9 +575,13 @@ def _test_pattern_colors_for(device: Device) -> list[dict[str, Any]]:
     Calibration tab. Snap to the device's declared gamut so the labels
     line up with the panel's actual colours; unknown gamuts fall back
     to the E6 default palette. Returns a list of ``{index, label, hex}``
-    dicts keyed for the template."""
+    dicts keyed for the template. Empty list on mono panels: the
+    solid-fill pattern isn't offered there, so the picker has nothing
+    to gate."""
     panel = device.panel or {}
     gamut = str(panel.get("gamut") or "waveshare_e6")
+    if gamut == "mono":
+        return []
     labels = _TEST_PATTERN_GAMUT_LABELS.get(gamut, _TEST_PATTERN_GAMUT_LABELS["waveshare_e6"])
     hexes = _TEST_PATTERN_GAMUT_HEXES.get(gamut, _TEST_PATTERN_GAMUT_HEXES["waveshare_e6"])
     return [
@@ -873,7 +877,10 @@ def _build_sections() -> list[dict[str, Any]]:
                     else None
                 ),
                 "test_patterns": (
-                    test_patterns.list_patterns(has_custom_image=_has_custom_image(device.id))
+                    test_patterns.list_patterns(
+                        has_custom_image=_has_custom_image(device.id),
+                        gamut=str((device.panel or {}).get("gamut") or ""),
+                    )
                     if is_instance
                     else []
                 ),

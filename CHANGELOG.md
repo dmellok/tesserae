@@ -6,6 +6,33 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.14], 2026-07-05
+
+### Fixed
+
+- **Device tabs no longer bleed across cards.** Clicking the Calibration
+  tab on one device wrote `?tab=calibration` to the shared URL, so every
+  other device card on the page re-rendered with Calibration active on
+  the next reload. The template now scopes `?tab=` to the card whose id
+  matches `?opened=`; other cards fall back to their default (Status).
+- **Custom-image upload keeps the device card expanded.** The upload,
+  delete, and Send-to-panel POSTs on the Calibration tab all now thread
+  `?opened=<device_id>` through their redirects so the card doesn't
+  collapse and lose scroll position on every action. Matches the shape
+  the palette / tone routes have used since v0.69.9.
+- **Palette-profile picker previews before Apply.** Selecting a
+  different profile in the Calibration-tab dropdown now repaints the
+  test-pattern preview with that profile's palette and tone straight
+  away, instead of waiting for the user to hit Apply. Backed by a new
+  `?slug=` query on the preview endpoint (empty string means built-in
+  default).
+- **BW / grayscale panels no longer show colour-only test patterns.**
+  Mono-gamut panels used to see the palette-swatch and solid-fill
+  entries in the picker even though both render as two blocks / one
+  flat fill. The picker now filters those out for `gamut = "mono"`;
+  grayscale ramp, text sample, registration grid, and custom image
+  still show. Colour panels are unaffected.
+
 ## [0.69.13], 2026-07-05
 
 ### Fixed

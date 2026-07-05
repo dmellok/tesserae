@@ -62,7 +62,16 @@ def _palette_for(gamut: str, calibrated: bool) -> tuple[tuple[RGB, ...], tuple[s
     return pal, _COLOUR_LABELS_E6
 
 
-def list_patterns(has_custom_image: bool = False) -> list[dict[str, Any]]:
+def _is_mono_gamut(gamut: str) -> bool:
+    """True for panels whose gamut is black + white only. The
+    palette-swatch and solid-fill patterns are noise on such panels
+    (both would render as two blocks / one flat fill), so the picker
+    hides them. Grayscale ramp still shows: it exercises dither which
+    is the interesting axis on a mono panel."""
+    return gamut == "mono"
+
+
+def list_patterns(has_custom_image: bool = False, gamut: str = "") -> list[dict[str, Any]]:
     """The pattern picker. Kept in sync with the template.
 
     ``needs_color`` marks patterns that take a colour argument (right
@@ -72,35 +81,51 @@ def list_patterns(has_custom_image: bool = False) -> list[dict[str, Any]]:
     entry only when a file is on disk for the device the picker's
     scoped to; the route reads it from
     ``data/calibration_images/<device_id>.png``.
+
+    ``gamut`` (v0.69.14) filters out patterns that don't make sense on
+    the panel. Mono panels only see grayscale / text / grid / custom;
+    the palette-swatch and solid-fill patterns are colour-only.
     """
-    patterns: list[dict[str, Any]] = [
-        {
-            "id": "palette_swatches",
-            "label": "Palette swatches",
-            "description": "Every colour in the panel's palette as a labelled block.",
-        },
+    is_mono = _is_mono_gamut(gamut)
+    patterns: list[dict[str, Any]] = []
+    if not is_mono:
+        patterns.append(
+            {
+                "id": "palette_swatches",
+                "label": "Palette swatches",
+                "description": "Every colour in the panel's palette as a labelled block.",
+            }
+        )
+    patterns.append(
         {
             "id": "grayscale_ramp",
             "label": "Grayscale ramp",
             "description": "Black to white in 16 steps, the panel dithers between them.",
-        },
-        {
-            "id": "solid_fill",
-            "label": "Solid fill",
-            "description": "One palette colour across the whole panel.",
-            "needs_color": True,
-        },
-        {
-            "id": "text_sample",
-            "label": "Text sample",
-            "description": "Headline, body, and caption sizes on white.",
-        },
-        {
-            "id": "registration_grid",
-            "label": "Registration grid",
-            "description": "1 px and 2 px lines plus corner marks.",
-        },
-    ]
+        }
+    )
+    if not is_mono:
+        patterns.append(
+            {
+                "id": "solid_fill",
+                "label": "Solid fill",
+                "description": "One palette colour across the whole panel.",
+                "needs_color": True,
+            }
+        )
+    patterns.extend(
+        [
+            {
+                "id": "text_sample",
+                "label": "Text sample",
+                "description": "Headline, body, and caption sizes on white.",
+            },
+            {
+                "id": "registration_grid",
+                "label": "Registration grid",
+                "description": "1 px and 2 px lines plus corner marks.",
+            },
+        ]
+    )
     if has_custom_image:
         patterns.append(
             {
@@ -114,6 +139,10 @@ def list_patterns(has_custom_image: bool = False) -> list[dict[str, Any]]:
     return patterns
 
 
+# ``PATTERN_IDS`` is the full unfiltered id set the route validates
+# against. Filtering by gamut only affects what the picker offers;
+# any id in this tuple remains a legal POST value (so a pre-selected
+# gamut change doesn't 400 an in-flight submit).
 PATTERN_IDS: tuple[str, ...] = tuple(p["id"] for p in list_patterns(has_custom_image=True))
 
 

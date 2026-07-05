@@ -9,12 +9,27 @@
 {% from "_components.html" import auto_field, button, info_pop, number_input,
     select_field, slider, switch, text_input with context %}
 
+{# Expanded state is remembered across the combined save redirect via
+   ``?opened=<device_id>`` (v0.68), and while the orientation-calibrate
+   flow is in-progress via ``?calibrating=<device_id>``. Either match
+   keeps the card open on the next render. #}
+{% set _opened = request.args.get('opened') %}
+
 {# Active tab from the querystring so deep links land on the right
    panel after a save+redirect. Falls back to "status" when the param
    is missing or unknown. The orientation-calibrate flow forces the
    Calibration tab so the numbered-card answer form stays visible when
-   the redirect lands with ?calibrating=<id>. #}
-{% set active_tab = request.args.get('tab', 'status') %}
+   the redirect lands with ?calibrating=<id>.
+
+   v0.69.14: ``?tab=`` is only respected on the card whose device id
+   matches ``?opened=``. Without this scoping, clicking Calibration on
+   one card wrote ``?tab=calibration`` into the shared URL and every
+   other card on the page then re-rendered with Calibration active. #}
+{% if _opened == section.device_id or calibrating == section.device_id %}
+  {% set active_tab = request.args.get('tab', 'status') %}
+{% else %}
+  {% set active_tab = 'status' %}
+{% endif %}
 {# Legacy ``?tab=rendering`` URLs (pre-v0.68) fall back to General
    since Rendering was folded into it. #}
 {% if active_tab == 'rendering' %}
@@ -26,12 +41,6 @@
 {% if calibrating == section.device_id %}
   {% set active_tab = 'general' %}
 {% endif %}
-
-{# Expanded state is remembered across the combined save redirect via
-   ``?opened=<device_id>`` (v0.68), and while the orientation-calibrate
-   flow is in-progress via ``?calibrating=<device_id>``. Either match
-   keeps the card open on the next render. #}
-{% set _opened = request.args.get('opened') %}
 
 {# v0.69.9: the outer combined-save form's id, used via HTML5
    ``form="..."`` attribute on every input in the tab panels that
@@ -45,6 +54,7 @@
 <section class="card dx-device-card"
          id="{{ section.id }}"
          data-device-card
+         data-device-id="{{ section.device_id }}"
          data-collapsed="{% if calibrating == section.device_id or _opened == section.device_id %}false{% else %}true{% endif %}">
 
   {# HEADER STRIP #}
