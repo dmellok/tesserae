@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.10], 2026-07-05
+
+### Changed
+
+- **Sticky "Save changes" bar now floats at the viewport bottom.**
+  Previously it was ``position: sticky`` inside the device card, so a
+  long calibration tab could scroll the bar off-screen. Now
+  ``position: fixed`` centred at the viewport bottom, with
+  ``env(safe-area-inset-bottom)`` inset so the iOS home-indicator
+  doesn't sit on top of it. Matches the shape the ``--server``
+  variant already used on the Settings > Server section.
+- **Palette-tone form's Save button is much more discoverable.**
+  The tone form was tall enough that the Save affordance sat below
+  the fold when the user was editing sliders at the top; the button
+  is now wrapped in a sticky footer inside the form so it stays
+  pinned at the bottom of the visible tone-form region, and a small
+  "Unsaved tone changes" flag fades in the moment the form goes
+  dirty (via a ``data-dirty`` attribute now set by
+  ``initDirtyForm``, useful for any future in-form-button dirty
+  affordance too). Save button also promoted to the primary teal
+  fill so it reads as the action to take.
+
 ## [0.69.9], 2026-07-05
 
 ### Fixed

@@ -70,17 +70,22 @@
     if (!bar && form.id) {
       bar = document.querySelector('[data-save-bar-for="' + form.id + '"]');
     }
-    if (!bar) return;
+    // Bar is optional (v0.69.10): the ``data-dirty`` attribute on
+    // the form is enough for CSS-based dirty-state styling on any
+    // in-form button (e.g. the palette-tone Save row's "Unsaved tone
+    // changes" flag). Forms without a bar still track dirty state.
     let dirty = false;
 
     function markDirty() {
       if (dirty) return;
       dirty = true;
-      bar.hidden = false;
+      form.setAttribute('data-dirty', '1');
+      if (bar) bar.hidden = false;
     }
     function clearDirty() {
       dirty = false;
-      bar.hidden = true;
+      form.removeAttribute('data-dirty');
+      if (bar) bar.hidden = true;
     }
 
     document.addEventListener('input', function (ev) {
@@ -97,9 +102,7 @@
     });
     // Once Save fires we'll be redirected by the server. Hide
     // optimistically so the bar doesn't linger after the click.
-    form.addEventListener('submit', function () {
-      bar.hidden = true;
-    });
+    form.addEventListener('submit', clearDirty);
   }
 
   // ---- Dependent dim -----------------------------------------------------

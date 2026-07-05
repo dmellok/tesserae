@@ -1367,6 +1367,56 @@
 }
 :root[data-theme="dark"] .dx-palette-experimental { border-color: var(--t-border); }
 
+/* Tone-form Save row (v0.69.10). The palette-update-tone form was
+   tall enough that the Save button sat well below the last slider,
+   so users editing sliders at the top of the form couldn't see the
+   save affordance. Sticky footer keeps the button pinned at the
+   bottom of the visible tone-form region, and a small "Unsaved tone
+   changes" flag fades in once the form is dirty so the user has
+   feedback that their drag registered. */
+.dx-tone-save-row {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 4px;
+  margin-top: 8px;
+  background: linear-gradient(to top,
+    var(--t-surface-soft) 60%,
+    color-mix(in srgb, var(--t-surface-soft) 90%, transparent) 100%);
+  z-index: 3;
+}
+.dx-tone-save-btn {
+  background: var(--dx-teal);
+  color: #fff;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dx-tone-save-btn:hover { background: var(--dx-teal-hover); }
+.dx-tone-dirty-flag {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--dx-teal);
+  font-weight: 500;
+}
+[data-dirty-form][data-dirty] .dx-tone-dirty-flag {
+  display: inline-flex;
+  animation: dx-tone-dirty-in 220ms ease;
+}
+[data-dirty-form][data-dirty] .dx-tone-save-btn {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dx-teal) 30%, transparent);
+}
+@keyframes dx-tone-dirty-in {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
 /* Per-colour palette editor (v0.67.3). Grid of colour swatches so
    users can eyeball-match each palette entry to what their panel
    actually reproduces. */
@@ -1518,11 +1568,21 @@
 }
 .dx-empty .button.primary:hover { background: var(--dx-teal-hover); }
 
-/* STICKY SAVE BAR ------------------------------------------------ */
+/* STICKY SAVE BAR ------------------------------------------------
+   v0.69.10: pinned to the viewport bottom (position: fixed) rather
+   than the containing block (position: sticky), so the Save
+   affordance never scrolls off-screen on a long device card. Uses
+   ``env(safe-area-inset-bottom)`` so iOS's home-indicator area
+   doesn't sit on top of the bar. Only one device-card bar is
+   typically visible at a time (the one the user is currently
+   editing), so bar collision isn't a concern in practice. */
 .dx-save-bar {
-  position: sticky;
-  bottom: 20px;
-  margin: 14px 22px 18px;
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100% - 32px));
+  margin: 0;
   background: var(--dx-save-bar);
   color: #fff;
   border-radius: 10px;
@@ -1533,7 +1593,7 @@
   justify-content: space-between;
   gap: 12px;
   animation: dx-slide-up 0.22s ease;
-  z-index: 5;
+  z-index: 50;
 }
 .dx-save-bar[hidden] { display: none; }
 .dx-save-bar-msg { font-size: 13px; }
