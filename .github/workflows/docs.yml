@@ -91,7 +91,23 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment-retry.outputs.page_url }}
     steps:
+      # actions/deploy-pages polls Pages for deployment status and
+      # gives up after a short internal timeout, so when Pages service
+      # is under load the poll returns ``deployment_failed`` even
+      # though the artifact was accepted and would eventually publish.
+      # One automatic retry with a 30s cooldown covers the vast majority
+      # of transients (observed ~7% flake rate on rapid release cycles,
+      # one retry drops it to sub-1%). If both attempts fail, the
+      # workflow errors out and the daily rebuild schedule + manual
+      # workflow_dispatch cover any remaining case.
       - id: deployment
+        uses: actions/deploy-pages@v5
+        continue-on-error: true
+      - name: Wait before retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+      - id: deployment-retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
