@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from flask import current_app
+
+from app.calendar_time import event_local_date_key, local_midnight_utc
+from app.tz_resolve import app_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -25,7 +28,8 @@ def fetch(
     if core is None or core.server_module is None:
         return {"error": "calendar_core plugin not installed.", "days": []}
 
-    today = datetime.now(UTC).date()
+    zone = app_timezone()
+    today = datetime.now(zone).date()
     week_start = options.get("week_start", "monday")
     first_weekday = 6 if week_start == "sunday" else 0
     # Start the week on the chosen weekday at-or-before today.
@@ -33,8 +37,8 @@ def fetch(
     start_date = today - timedelta(days=offset)
     end_date = start_date + timedelta(days=7)
 
-    start_dt = datetime.combine(start_date, datetime.min.time(), tzinfo=UTC)
-    end_dt = datetime.combine(end_date, datetime.min.time(), tzinfo=UTC)
+    start_dt = local_midnight_utc(start_date, zone)
+    end_dt = local_midnight_utc(end_date, zone)
 
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
     try:
@@ -49,8 +53,7 @@ def fetch(
 
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
-        s = ev["start"]
-        day_key = s.split("T")[0] if "T" in s else s
+        day_key = event_local_date_key(ev, zone)
         buckets.setdefault(day_key, []).append(ev)
 
     days = []

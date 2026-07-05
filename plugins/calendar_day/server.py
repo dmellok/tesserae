@@ -8,6 +8,9 @@ from typing import Any
 
 from flask import current_app
 
+from app.calendar_time import all_day_event_overlaps_date
+from app.tz_resolve import app_timezone
+
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
     s = (s or "").strip()
@@ -29,7 +32,9 @@ def fetch(
     max_events = int(options.get("max_events") or 0)
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
 
-    now = datetime.now(UTC)
+    zone = app_timezone()
+    now_local = datetime.now(zone)
+    now = now_local.astimezone(UTC)
     end = now + timedelta(hours=hours_ahead)
     try:
         events = core.server_module.load_events(
@@ -41,6 +46,10 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "events": []}
 
+    target_date = now_local.date()
+    visible_events = [
+        e for e in events if not e.get("all_day") or all_day_event_overlaps_date(e, target_date)
+    ]
     slim = [
         {
             "summary": e["summary"],
@@ -51,13 +60,13 @@ def fetch(
             "colour": e.get("feed_colour"),
             "feed": e.get("feed_name"),
         }
-        for e in events
+        for e in visible_events
     ]
     if max_events > 0:
         slim = slim[:max_events]
     return {
-        "now": now.isoformat(),
-        "date": now.date().isoformat(),
+        "now": now_local.isoformat(),
+        "date": now_local.date().isoformat(),
         "events": slim,
         "count": len(slim),
     }

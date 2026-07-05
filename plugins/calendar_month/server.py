@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import calendar as cal_mod
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from flask import current_app
+
+from app.calendar_time import (
+    all_day_event_date_keys,
+    event_local_date_key,
+    local_midnight_utc,
+)
+from app.tz_resolve import app_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -26,7 +33,8 @@ def fetch(
     if core is None or core.server_module is None:
         return {"error": "calendar_core plugin not installed.", "days": []}
 
-    today = datetime.now(UTC).date()
+    zone = app_timezone()
+    today = datetime.now(zone).date()
     week_start = options.get("week_start", "monday")
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
     max_per_day = int(options.get("max_events_per_day") or 3)
@@ -39,8 +47,8 @@ def fetch(
     grid_start = first_of_month - timedelta(days=offset)
     grid_end = grid_start + timedelta(days=42)
 
-    start_dt = datetime.combine(grid_start, datetime.min.time(), tzinfo=UTC)
-    end_dt = datetime.combine(grid_end, datetime.min.time(), tzinfo=UTC)
+    start_dt = local_midnight_utc(grid_start, zone)
+    end_dt = local_midnight_utc(grid_end, zone)
     try:
         events = core.server_module.load_events(
             feeds_filter,
@@ -51,16 +59,16 @@ def fetch(
     except Exception as err:
         return {"error": f"{type(err).__name__}: {err}", "days": []}
 
-    # Bucket events by local date (event start date)
+    # Bucket timed events by their local start date. All-day event DTEND values
+    # are exclusive, so expand them across each covered visible date.
     buckets: dict[str, list[dict[str, Any]]] = {}
     for ev in events:
-        # Derive a date key from the start ISO. All-day events have a
-        # plain YYYY-MM-DD; timed events have a UTC ISO, we'll let
-        # the client localise the time; for date-bucketing we use the
-        # UTC date as a stable key.
-        s = ev["start"]
-        day_key = s.split("T")[0] if "T" in s else s
-        buckets.setdefault(day_key, []).append(ev)
+        if ev.get("all_day"):
+            day_keys = all_day_event_date_keys(ev, grid_start, grid_end)
+        else:
+            day_keys = [event_local_date_key(ev, zone)]
+        for day_key in day_keys:
+            buckets.setdefault(day_key, []).append(ev)
 
     days = []
     cur = grid_start
