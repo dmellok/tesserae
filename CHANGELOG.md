@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.15], 2026-07-05
+
+### Fixed
+
+- **Test-pattern picker keeps its selection across saves.** Every
+  calibration-side save (tone, palette colours, custom-image upload)
+  returns a 302 to the Calibration tab, and the template's default
+  first-radio would win on re-render, dropping whatever pattern the
+  user was tuning. The picker's current pattern and colour are now
+  persisted in localStorage keyed by device id and restored on load.
+
 ## [0.69.14], 2026-07-05
 
 ### Fixed

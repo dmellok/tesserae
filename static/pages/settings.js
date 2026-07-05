@@ -225,6 +225,25 @@
   // picker is exactly what "Send to panel" will push. Also toggles the
   // colour picker's visibility based on the current radio's
   // data-needs-color attribute.
+  //
+  // v0.69.15: the picker's current selection persists in localStorage,
+  // keyed by device id. Every calibration-side save (tone, palette
+  // colours, custom-image upload, ...) hits the server and comes back
+  // as a 302; without persistence the template re-checks the first
+  // radio option and the user loses whatever pattern they were tuning.
+  function _readLocal(key) {
+    if (!key) return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch (e) { return null; }
+  }
+  function _writeLocal(key, value) {
+    if (!key) return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) { /* private mode / disabled storage: no-op */ }
+  }
+
   function initTestPatternForm(form) {
     const preview = form.querySelector('[data-preview-img]');
     if (!preview) return;
@@ -233,6 +252,28 @@
     const colorGroup = form.querySelector('[data-color-picker]');
     const colorSelect = form.querySelector('[data-color-select]');
     const colorChip = form.querySelector('[data-color-chip]');
+    const card = form.closest('[data-device-card]');
+    const deviceId = card && card.getAttribute('data-device-id');
+    const patternKey = deviceId ? 'tesserae:cal:pattern:' + deviceId : null;
+    const colorKey = deviceId ? 'tesserae:cal:color:' + deviceId : null;
+
+    // Restore the last-selected pattern + colour before wiring change
+    // handlers so ``update()`` below paints the preview against the
+    // restored state, not the template's default first-radio.
+    const savedPattern = _readLocal(patternKey);
+    if (savedPattern) {
+      const target = form.querySelector(
+        'input[name="pattern"][value="' + savedPattern.replace(/"/g, '\\"') + '"]'
+      );
+      if (target) target.checked = true;
+    }
+    const savedColor = _readLocal(colorKey);
+    if (savedColor && colorSelect) {
+      const opt = colorSelect.querySelector(
+        'option[value="' + savedColor.replace(/"/g, '\\"') + '"]'
+      );
+      if (opt) colorSelect.value = savedColor;
+    }
 
     function update() {
       const checked = form.querySelector('input[name="pattern"]:checked');
@@ -253,7 +294,6 @@
       // slug so switching patterns doesn't drop the candidate-profile
       // preview back to the saved slug. Empty is meaningful (built-in
       // default), so we always attach the slug when the picker exists.
-      const card = form.closest('[data-device-card]');
       const slugSelect = card && card.querySelector('[data-palette-slug]');
       if (slugSelect) src += '&slug=' + encodeURIComponent(slugSelect.value);
       // Cache-bust so a subsequent send-with-same-params still refetches
@@ -263,9 +303,17 @@
     }
 
     form.querySelectorAll('input[name="pattern"]').forEach(function (radio) {
-      radio.addEventListener('change', update);
+      radio.addEventListener('change', function () {
+        _writeLocal(patternKey, radio.value);
+        update();
+      });
     });
-    if (colorSelect) colorSelect.addEventListener('change', update);
+    if (colorSelect) {
+      colorSelect.addEventListener('change', function () {
+        _writeLocal(colorKey, colorSelect.value);
+        update();
+      });
+    }
     update();
   }
 
