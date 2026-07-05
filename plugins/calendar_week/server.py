@@ -8,7 +8,8 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import calendar_timezone, event_local_date_key, local_midnight_utc
+from app.calendar_time import event_local_date_key, local_midnight_utc
+from app.tz_resolve import app_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -27,7 +28,7 @@ def fetch(
     if core is None or core.server_module is None:
         return {"error": "calendar_core plugin not installed.", "days": []}
 
-    zone = calendar_timezone()
+    zone = app_timezone()
     today = datetime.now(zone).date()
     week_start = options.get("week_start", "monday")
     first_weekday = 6 if week_start == "sunday" else 0

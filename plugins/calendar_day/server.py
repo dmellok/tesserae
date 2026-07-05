@@ -8,7 +8,8 @@ from typing import Any
 
 from flask import current_app
 
-from app.calendar_time import all_day_event_overlaps_date, calendar_timezone
+from app.calendar_time import all_day_event_overlaps_date
+from app.tz_resolve import app_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -31,7 +32,7 @@ def fetch(
     max_events = int(options.get("max_events") or 0)
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
 
-    zone = calendar_timezone()
+    zone = app_timezone()
     now_local = datetime.now(zone)
     now = now_local.astimezone(UTC)
     end = now + timedelta(hours=hours_ahead)

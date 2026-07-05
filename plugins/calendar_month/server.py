@@ -11,10 +11,10 @@ from flask import current_app
 
 from app.calendar_time import (
     all_day_event_date_keys,
-    calendar_timezone,
     event_local_date_key,
     local_midnight_utc,
 )
+from app.tz_resolve import app_timezone
 
 
 def _parse_feeds_filter(s: str) -> list[str] | None:
@@ -33,7 +33,7 @@ def fetch(
     if core is None or core.server_module is None:
         return {"error": "calendar_core plugin not installed.", "days": []}
 
-    zone = calendar_timezone()
+    zone = app_timezone()
     today = datetime.now(zone).date()
     week_start = options.get("week_start", "monday")
     feeds_filter = _parse_feeds_filter(options.get("feeds_filter") or "")
