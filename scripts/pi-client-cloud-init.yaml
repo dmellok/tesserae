@@ -175,7 +175,14 @@ runcmd:
   # Clone the client repo. `su -c ... <user>` runs without a
   # controlling terminal, unlike `sudo` which install.sh used to
   # rely on. That's the whole reason we skip install.sh here.
-  - su -c 'git clone https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin' tesserae
+  #
+  # v0.69.13 (issue #35): the client repo doesn't publish releases
+  # yet so this stays on ``main`` for now. Once
+  # ``tesserae-device-pi-bin`` cuts its first tag, change this to
+  # ``git clone --branch v<X.Y.Z> --depth 1 ...`` to match the
+  # server yaml above. ``--depth 1`` still shrinks the clone size
+  # meaningfully in the meantime.
+  - su -c 'git clone --depth 1 https://github.com/dmellok/tesserae-device-pi-bin.git /home/tesserae/tesserae-device-pi-bin' tesserae
 
   # Build the venv + pip-install the client + inky[rpi] extras, all
   # as the tesserae user so the venv permissions stay right.

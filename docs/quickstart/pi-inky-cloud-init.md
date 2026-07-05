@@ -112,7 +112,7 @@ For battery-powered Pi setups (rare but possible), **smart sync** keeps the pane
 - **Doesn't open any ports** on a host firewall.
 - **Doesn't configure WiFi**: that's in `network-config`, written by Pi Imager.
 - **Doesn't tune `quiet_hours`, smart sync, or other server-side schedule behaviour**: that lives in the Tesserae server's UI on a per-device basis.
-- **Doesn't pin the client to a specific version**: the install pulls `main` from `tesserae-device-pi-bin`. To pin, edit the `runcmd` `git clone` line to add `--branch <tag>`.
+- **Doesn't pin the client to a specific version yet**: the client repo (`tesserae-device-pi-bin`) doesn't publish tags yet, so this cloud-init stays on `main` with a shallow (`--depth 1`) clone. The server yaml already pins to a specific Tesserae release; the client will follow the same shape once it cuts its first tag. To pin manually today, edit the `runcmd` `git clone` line to add `--branch <sha>` or `--branch <tag>` once tags exist.
 
 ## Next steps
 

@@ -6,6 +6,32 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.13], 2026-07-05
+
+### Fixed
+
+- **Calendar widgets render dates in the configured app timezone
+  (community contribution, #54 by @charmmmz).** The day / week /
+  month calendar widgets were computing visible-date boundaries in
+  UTC, so users in non-UTC timezones saw the wrong day for events
+  near midnight. Now routes through the ``app_timezone()`` helper
+  shared with the v0.69.6 history-timestamp fix, and also fixes an
+  adjacent bug where multi-day all-day events only bucketed under
+  their start date (iCalendar exclusive DTEND semantics are now
+  honoured, so a Fri-to-Sun event correctly appears on all three
+  days).
+- **Cloud-init yamls no longer time-bomb SD cards flashed months later
+  (issue #35).** The server cloud-init at
+  [`scripts/cloud-init.yaml`](scripts/cloud-init.yaml) used to clone
+  ``main`` from ``dmellok/tesserae``, so a user who flashed an SD card
+  three months after downloading the yaml got whatever main was on that
+  day, not the tested release. Now pins to ``--branch v0.69.13
+  --depth 1``. The pi-client cloud-init at
+  [`scripts/pi-client-cloud-init.yaml`](scripts/pi-client-cloud-init.yaml)
+  gets a shallow clone (``--depth 1``) while the client repo doesn't
+  publish tags yet; a comment flags the follow-up to pin properly once
+  ``tesserae-device-pi-bin`` cuts its first release.
+
 ## [0.69.12], 2026-07-05
 
 ### Fixed
