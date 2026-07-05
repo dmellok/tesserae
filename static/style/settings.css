@@ -1536,32 +1536,6 @@
   z-index: 5;
 }
 .dx-save-bar[hidden] { display: none; }
-/* v0.69.6 (issue #52 item 3): muted variant. Bar is always visible
-   when its host section is open; clean state renders it muted so
-   users see the Save affordance without it demanding attention until
-   they've made an actual change. Skips the slide-up animation
-   because the bar isn't reappearing, it's just changing state.
-   Doubled selector (``.dx-save-bar.dx-save-bar--muted``) so the
-   ``--server`` variant declared later in this file (page-level bar)
-   inherits the muted treatment too without needing its own copy. */
-.dx-save-bar.dx-save-bar--muted {
-  background: color-mix(in srgb, var(--dx-save-bar) 55%, #f5f5ef 45%);
-  color: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 2px 6px rgba(20, 20, 15, 0.08);
-  animation: none;
-}
-.dx-save-bar.dx-save-bar--muted .dx-save-bar-save {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.55);
-  cursor: default;
-  pointer-events: none;
-}
-.dx-save-bar.dx-save-bar--muted .dx-save-bar-save:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-.dx-save-bar.dx-save-bar--muted .dx-save-bar-discard {
-  visibility: hidden;
-}
 .dx-save-bar-msg { font-size: 13px; }
 .dx-save-bar-actions {
   display: flex;

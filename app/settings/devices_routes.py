@@ -91,7 +91,12 @@ def devices_add() -> Response:
     rebuild_transport_fn()()
     flash(f"Added device {result.device.name!r}.", "ok")
     return redirect(
-        url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")
+        url_for(
+            "auth.settings_area",
+            area="devices",
+            opened=result.device.id,
+            _anchor=f"device-{result.device.id}",
+        )
     )
 
 
@@ -172,7 +177,9 @@ def devices_set_transport(instance_id: str) -> Response:
         - The status/config topics derived at instance creation stay
           on the manifest, so MQTT mode works without re-deriving."""
     anchor = f"device-{instance_id}"
-    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    redirect_to = redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
     devs = devices()
     device = devs.get(instance_id)
@@ -231,7 +238,9 @@ def devices_regenerate_token(instance_id: str) -> Response:
     the add-device flow. The old token stops working immediately -
     the client will fail its next poll and need its config updated."""
     anchor = f"device-{instance_id}"
-    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    redirect_to = redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
     devs = devices()
     device = devs.get(instance_id)
@@ -278,7 +287,9 @@ def devices_reveal_token(instance_id: str) -> Response:
     The reveal is logged to the EventLog so an admin can audit who
     surfaced the token and when."""
     anchor = f"device-{instance_id}"
-    redirect_to = redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    redirect_to = redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
     devs = devices()
     device = devs.get(instance_id)
@@ -550,7 +561,12 @@ def devices_register_discovered(discovered_id: str) -> Response:
         }
     flash(f"Registered discovered device {result.device.name!r}.", "ok")
     return redirect(
-        url_for("auth.settings_area", area="devices", _anchor=f"device-{result.device.id}")
+        url_for(
+            "auth.settings_area",
+            area="devices",
+            opened=result.device.id,
+            _anchor=f"device-{result.device.id}",
+        )
     )
 
 
@@ -617,7 +633,9 @@ def devices_update_panel(instance_id: str) -> Response:
         new_h = int(form.get("panel_h") or 0)
     except ValueError:
         flash("Panel width and height must be whole numbers.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
 
     underscan_raw = form.get("panel_underscan")
     underscan: int | None = None
@@ -641,7 +659,9 @@ def devices_update_panel(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Panel update failed.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
     rebuild_transport_fn()()
     panel = result.device.panel or {}
     flash(
@@ -649,7 +669,9 @@ def devices_update_panel(instance_id: str) -> Response:
         f"{panel.get('w')}×{panel.get('h')} at {orientation_label(panel.get('orientation', 'landscape'))}.",
         "ok",
     )
-    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    return redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
 
 @bp.post("/settings/devices/<instance_id>/quiet-hours")
@@ -674,7 +696,9 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Couldn't save quiet hours.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
     qh = (result.device.manifest.get("quiet_hours") or {}) if result.device else {}
     if qh.get("enabled") and qh.get("start") and qh.get("end"):
         flash(
@@ -687,7 +711,9 @@ def devices_update_quiet_hours(instance_id: str) -> Response:
             f"(falls back to app setting).",
             "ok",
         )
-    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    return redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
 
 @bp.post("/settings/devices/<instance_id>/battery-offset")
@@ -706,7 +732,9 @@ def devices_update_battery_offset(instance_id: str) -> Response:
         pct = int(form.get("battery_offset_pct") or 0)
     except ValueError:
         flash("Battery offsets must be whole numbers.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
     result = device_service.update_instance_battery_offset(
         devices=devices(),
         renderers=renderers(),
@@ -717,7 +745,9 @@ def devices_update_battery_offset(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Couldn't save battery offset.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
     block = result.device.manifest.get("battery_offset") or {}
     if block:
         flash(
@@ -727,7 +757,9 @@ def devices_update_battery_offset(instance_id: str) -> Response:
         )
     else:
         flash(f"Cleared battery offset for {result.device.name!r}.", "ok")
-    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    return redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
 
 # -- combined save ------------------------------------------------------
@@ -1122,7 +1154,9 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         top_left = 0
     if top_left not in (1, 2, 3, 4):
         flash("Pick which number is in the panel's top-left corner.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
 
     panel = device.panel
     pushed = str(panel.get("orientation") or "landscape")
@@ -1144,7 +1178,9 @@ def devices_calibrate_apply(instance_id: str) -> Response:
     )
     if not result.ok or result.device is None:
         flash(result.error or "Calibration failed.", "error")
-        return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+        return redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
     rebuild_transport_fn()()
     # Confirm re-push at the new orientation.
     if result.device.panel is not None:
@@ -1157,7 +1193,9 @@ def devices_calibrate_apply(instance_id: str) -> Response:
         "upright in that orientation. Re-sent the card to confirm; adjust Rotation below if needed.",
         "ok",
     )
-    return redirect(url_for("auth.settings_area", area="devices", _anchor=anchor))
+    return redirect(
+        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+    )
 
 
 # -- colour test patterns ----------------------------------------------

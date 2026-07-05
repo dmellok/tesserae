@@ -40,11 +40,22 @@ macro here instead.
 {%- endif -%}
 {%- endmacro -%}
 
-{%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text') -%}
+{#- All input-rendering macros take an optional ``form`` parameter
+    (v0.69.9): when set, renders as the HTML5 ``form="<id>"`` attribute
+    on the input element so the input submits to a form it isn't a
+    descendant of. Used by ``_device_card.html`` to work around the
+    HTML5 nested-forms restriction: the device card's outer combined
+    form and the per-endpoint calibrate / palette / tone forms would
+    otherwise nest inside each other, and the first inner </form>
+    would close the outer form early. Explicit ``form`` attribute
+    keeps every input in the right form regardless of DOM nesting. -#}
+
+{%- macro text_input(field_id, name, label, value='', placeholder='', required=False, help=None, autofocus=False, autocomplete=None, type='text', form=None) -%}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="{{ type }}" id="{{ field_id }}" name="{{ name }}"
          value="{{ value|default('', true) }}"
+         {% if form %}form="{{ form }}"{% endif %}
          {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
          {% if autocomplete %}autocomplete="{{ autocomplete }}"{% endif %}
          {% if required %}required{% endif %}
@@ -52,17 +63,18 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
-{%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None) -%}
+{%- macro number_input(field_id, name, label, value=0, min=None, max=None, step=1, help=None, form=None) -%}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
   <input type="number" id="{{ field_id }}" name="{{ name }}" value="{{ value }}"
+         {% if form %}form="{{ form }}"{% endif %}
          {% if min is not none %}min="{{ min }}"{% endif %}
          {% if max is not none %}max="{{ max }}"{% endif %}
          step="{{ step }}">
 </div>
 {%- endmacro -%}
 
-{%- macro preset_or_number(field_id, name, label, value=0, presets=[], min=None, max=None, step=1, help=None) -%}
+{%- macro preset_or_number(field_id, name, label, value=0, presets=[], min=None, max=None, step=1, help=None, form=None) -%}
 {#- Numeric field with a preset dropdown. If the current value matches
    one of the presets, that preset is selected and the number input
    stays hidden. Otherwise the dropdown sits on "Custom…" and the
@@ -80,6 +92,7 @@ macro here instead.
   <input type="number" id="{{ field_id }}" name="{{ name }}"
          class="preset-custom-input" data-preset-custom
          value="{{ value }}"
+         {% if form %}form="{{ form }}"{% endif %}
          {% if min is not none %}min="{{ min }}"{% endif %}
          {% if max is not none %}max="{{ max }}"{% endif %}
          step="{{ step }}"
@@ -87,7 +100,7 @@ macro here instead.
 </div>
 {%- endmacro -%}
 
-{%- macro slider(field_id, name, label, value=0, min=0, max=100, step=1, unit='', help=None) -%}
+{%- macro slider(field_id, name, label, value=0, min=0, max=100, step=1, unit='', help=None, form=None) -%}
 <div class="field field--slider">
   <div class="slider-header">
     <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
@@ -95,21 +108,24 @@ macro here instead.
   </div>
   <input type="range" class="slider" id="{{ field_id }}" name="{{ name }}"
          value="{{ value }}" min="{{ min }}" max="{{ max }}" step="{{ step }}"
+         {% if form %}form="{{ form }}"{% endif %}
          data-output-suffix="{{ unit }}">
 </div>
 {%- endmacro -%}
 
-{%- macro switch(field_id, name, label, checked=False, help=None) -%}
+{%- macro switch(field_id, name, label, checked=False, help=None, form=None) -%}
 <div class="field field--switch">
   <label class="switch" for="{{ field_id }}">
-    <input type="checkbox" id="{{ field_id }}" name="{{ name }}" {% if checked %}checked{% endif %}>
+    <input type="checkbox" id="{{ field_id }}" name="{{ name }}"
+           {% if form %}form="{{ form }}"{% endif %}
+           {% if checked %}checked{% endif %}>
     <span class="switch-track"><span class="switch-thumb"></span></span>
     <span class="switch-label">{{ label }}</span>
   </label>{{ info_pop(help) }}
 </div>
 {%- endmacro -%}
 
-{%- macro select_field(field_id, name, label, value='', options=[], help=None, blank_label=None) -%}
+{%- macro select_field(field_id, name, label, value='', options=[], help=None, blank_label=None, form=None) -%}
 {#- options: list of {value, label} dicts (optionally with {group}) OR
     (value, label) tuples. Consecutive options sharing the same non-empty
     ``group`` are wrapped in a single <optgroup> labelled with the group
@@ -117,7 +133,8 @@ macro here instead.
     related themes / fonts / etc. clustered. -#}
 <div class="field">
   <label for="{{ field_id }}">{{ label }}{{ info_pop(help) }}</label>
-  <select id="{{ field_id }}" name="{{ name }}">
+  <select id="{{ field_id }}" name="{{ name }}"
+          {% if form %}form="{{ form }}"{% endif %}>
     {% if blank_label is not none %}
     <option value="" {% if not value %}selected{% endif %}>{{ blank_label }}</option>
     {% endif %}
@@ -426,14 +443,14 @@ macro here instead.
    (the {name, type, label, default, choices, min, max, step, unit, help}
    shape used by plugin / renderer / device manifests). Used by the
    settings page so we don't have to keep a parallel rendering table. -#}
-{%- macro auto_field(field_id, name, spec, value, help=None) -%}
+{%- macro auto_field(field_id, name, spec, value, help=None, form=None) -%}
   {% set ftype = spec.get('type', 'string') %}
   {% set label = spec.get('label', name) %}
   {% set help_text = help if help is not none else spec.get('help') %}
   {% if ftype in ('boolean', 'switch') %}
-    {{ switch(field_id, name, label, checked=value, help=help_text) }}
+    {{ switch(field_id, name, label, checked=value, help=help_text, form=form) }}
   {% elif ftype == 'select' %}
-    {{ select_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
+    {{ select_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text, form=form) }}
   {% elif ftype == 'multiselect' %}
     {{ multiselect_field(field_id, name, label, value=value, options=spec.get('choices', []), help=help_text) }}
   {% elif ftype == 'textarea' %}
@@ -455,30 +472,30 @@ macro here instead.
     {{ slider(field_id, name, label,
               value=value if value is not none else spec.get('default', 0),
               min=spec.get('min', 0), max=spec.get('max', 100),
-              step=spec.get('step', 1), unit=spec.get('unit', ''), help=help_text) }}
+              step=spec.get('step', 1), unit=spec.get('unit', ''), help=help_text, form=form) }}
   {% elif ftype == 'number' %}
     {% if spec.get('presets') %}
       {{ preset_or_number(field_id, name, label,
                           value=value if value is not none else spec.get('default', 0),
                           presets=spec.get('presets'),
                           min=spec.get('min'), max=spec.get('max'),
-                          step=spec.get('step', 1), help=help_text) }}
+                          step=spec.get('step', 1), help=help_text, form=form) }}
     {% else %}
       {{ number_input(field_id, name, label, value=value if value is not none else spec.get('default', 0),
-                      min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text) }}
+                      min=spec.get('min'), max=spec.get('max'), step=spec.get('step', 1), help=help_text, form=form) }}
     {% endif %}
   {% elif ftype == 'color' %}
     {{ color_input(field_id, name, label, value=value or spec.get('default', '#000000'), help=help_text) }}
   {% elif ftype == 'time' %}
     {{ text_input(field_id, name, label, value=value or spec.get('default', ''),
                   placeholder=spec.get('placeholder', 'HH:MM'),
-                  type='time', help=help_text) }}
+                  type='time', help=help_text, form=form) }}
   {% else %}
     {{ text_input(field_id, name, label, value=value or '',
                   placeholder=spec.get('placeholder', ''),
                   type='password' if spec.get('secret') else 'text',
                   autocomplete='new-password' if spec.get('secret') else None,
-                  help=help_text) }}
+                  help=help_text, form=form) }}
   {% endif %}
 {%- endmacro -%}
 

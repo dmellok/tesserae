@@ -6,6 +6,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.9], 2026-07-05
+
+### Fixed
+
+- **Device card save affordance + collapse regressions from v0.68.0.**
+  The v0.68.0 device-card reorg placed several per-endpoint forms
+  (calibrate, palette, tone, custom-image) inside the outer combined
+  form. HTML5 forbids nested forms: the first inner ``</form>`` close
+  tag closes the outer form early, orphaning the picture-quality
+  fields, the sticky save bar itself, and the Save button. Result:
+  ``initDirtyForm`` never wired up (bar wasn't a descendant of the
+  form it looked at), the sticky bar stayed hidden, the Save button
+  submitted nothing, and changes to Calibration fields quietly did
+  not persist. Every per-endpoint palette / tone / calibrate
+  redirect also missed ``opened=<id>``, so any Apply on those forms
+  collapsed the device card.
+
+  Rewired via the HTML5 ``form="..."`` attribute on every input in
+  the tab panels that should submit to the combined endpoint (macros
+  in [`_components.html`](templates/_components.html) take a new
+  ``form`` parameter); the outer form's id ties the associations
+  together regardless of DOM position. Per-endpoint redirects thread
+  ``opened=<id>`` via a shared sweep in
+  [`palette_routes.py`](app/settings/palette_routes.py) and
+  [`devices_routes.py`](app/settings/devices_routes.py) so the card
+  stays open across every Save + Apply. Reverts the always-visible
+  muted save-bar variant introduced in v0.69.6 (that was a
+  workaround for a symptom of this bug; with the form actually wired
+  up, hide-until-dirty is the right shape again).
+
 ## [0.69.8], 2026-07-05
 
 ### Added

@@ -32,6 +32,16 @@
    flow is in-progress via ``?calibrating=<device_id>``. Either match
    keeps the card open on the next render. #}
 {% set _opened = request.args.get('opened') %}
+
+{# v0.69.9: the outer combined-save form's id, used via HTML5
+   ``form="..."`` attribute on every input in the tab panels that
+   should submit to the combined endpoint. Bypasses the nested-forms
+   HTML5 restriction: the calibrate / palette / tone forms are legally
+   nested by DOM but their inputs belong to their own <form>, while
+   the combined-endpoint inputs (device name, panel dims, sleep
+   interval, quiet hours, picture quality) associate back to the
+   outer form via this id regardless of DOM position. #}
+{% set _combined_form_id = section.id ~ '-combined' %}
 <section class="card dx-device-card"
          id="{{ section.id }}"
          data-device-card
@@ -122,9 +132,21 @@
       {% endfor %}
     </nav>
 
-    {# COMBINED FORM (wraps all 4 tab panels; Status + Schedule have read-only content) #}
+    {# COMBINED FORM. v0.69.9: DOM-wrapping the tab panels used to
+       break the sticky save bar and the calibration fields because
+       the calibrate / palette / tone <form> tags inside are illegal
+       nested-form structures per HTML5 (the first inner </form>
+       closes the OUTER form early, orphaning the picture-quality
+       fields and the save bar itself). Every input that submits to
+       the combined endpoint now uses ``form="{{ _combined_form_id }}"``
+       via the shared macros, so DOM nesting doesn't matter. The
+       outer <form> stays for the DOM-descendant inputs (nothing
+       broken by wrapping), and its id ties the ``form=""``
+       associations together. #}
     {% if section.combined_endpoint %}
-    <form method="post" action="{{ section.combined_endpoint }}" class="form dx-device-form" data-dirty-form>
+    <form method="post" action="{{ section.combined_endpoint }}"
+          id="{{ _combined_form_id }}"
+          class="form dx-device-form" data-dirty-form>
 
       {# STATUS TAB (read-only) #}
       <section role="tabpanel" data-panel="status"
@@ -232,12 +254,13 @@
         {% if section.device_name is not none %}
         <div class="dx-field-grid">
           {{ text_input(section.id ~ '-device-name', 'device_name', 'Display name',
-              value=section.device_name, required=True) }}
+              value=section.device_name, required=True, form=_combined_form_id) }}
 
           {# Existing icon picker; kept here as the General-tab Icon control. #}
           {% set current_icon = section.icon or 'device-mobile' %}
           {% set picker_id = section.id ~ '-icon' %}
           <input type="hidden" name="device_icon" value="{{ current_icon }}"
+                 form="{{ _combined_form_id }}"
                  data-icon-value data-icon-picker-id="{{ picker_id }}">
           <div class="field">
             <label for="{{ picker_id }}-btn">Icon</label>
@@ -265,7 +288,7 @@
         {% for field in section.fields %}
           {% set value = section.state.get(field.name, field.get('default', '')) %}
           {% set field_id = section.id ~ '-' ~ field.name %}
-          {{ auto_field(field_id, field.name, field, value) }}
+          {{ auto_field(field_id, field.name, field, value, form=_combined_form_id) }}
         {% endfor %}
         {% endif %}
 
@@ -275,14 +298,15 @@
           <hr class="dx-divider">
           {{ switch(section.id ~ '-qh-enabled', 'quiet_hours_enabled', 'Override quiet hours',
                     checked=section.quiet_hours.get('enabled', False),
-                    help='Use a different no-refresh window for this device. When off, this device follows the global quiet-hours window in Settings → Server.') }}
+                    help='Use a different no-refresh window for this device. When off, this device follows the global quiet-hours window in Settings → Server.',
+                    form=_combined_form_id) }}
           <div class="dx-field-grid" data-dep-target>
             {{ text_input(section.id ~ '-qh-start', 'quiet_hours_start', 'Start',
                           value=section.quiet_hours.get('start', ''),
-                          placeholder='HH:MM', type='time') }}
+                          placeholder='HH:MM', type='time', form=_combined_form_id) }}
             {{ text_input(section.id ~ '-qh-end', 'quiet_hours_end', 'End',
                           value=section.quiet_hours.get('end', ''),
-                          placeholder='HH:MM', type='time') }}
+                          placeholder='HH:MM', type='time', form=_combined_form_id) }}
           </div>
         </div>
         {% endif %}
@@ -407,12 +431,14 @@
                             'mV offset',
                             value=section.battery_offset.get('mv', 0),
                             min=-2000, max=2000, step=10,
-                            help='Added to the device-reported voltage (mV) before display. Positive bumps up, negative bumps down. Range ±2000 mV.') }}
+                            help='Added to the device-reported voltage (mV) before display. Positive bumps up, negative bumps down. Range ±2000 mV.',
+                            form=_combined_form_id) }}
             {{ number_input(section.id ~ '-bo-pct', 'battery_offset_pct',
                             '% offset',
                             value=section.battery_offset.get('pct', 0),
                             min=-100, max=100, step=1,
-                            help='Added to the displayed percent on top of the mV-derived bump. Range ±100. Use when you want to tune the percent directly without thinking in millivolts.') }}
+                            help='Added to the displayed percent on top of the mV-derived bump. Range ±100. Use when you want to tune the percent directly without thinking in millivolts.',
+                            form=_combined_form_id) }}
           </div>
         </div>
         {% endif %}
@@ -429,10 +455,11 @@
                        {'value':'portrait','label':'90°'},
                        {'value':'landscape_flipped','label':'180°'},
                        {'value':'portrait_flipped','label':'270°'}],
-              help='Clockwise turn to match the mount.') }}
+              help='Clockwise turn to match the mount.',
+              form=_combined_form_id) }}
           <div class="dx-field-grid">
-            {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1) }}
-            {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1) }}
+            {{ number_input(section.id ~ '-panel-w', 'panel_w', 'Panel width (px)', value=section.panel.w, min=1, step=1, form=_combined_form_id) }}
+            {{ number_input(section.id ~ '-panel-h', 'panel_h', 'Panel height (px)', value=section.panel.h, min=1, step=1, form=_combined_form_id) }}
           </div>
           {% if section.status.reported_panel_hint %}
           <p class="dx-hint">
@@ -442,12 +469,14 @@
           {% endif %}
           {% set us_max = [section.panel.w, section.panel.h]|min // 4 %}
           {{ slider(section.id ~ '-panel-underscan', 'panel_underscan', 'Underscan', value=section.panel.get('underscan', 0), min=0, max=us_max, step=1, unit='px',
-              help='Inset content by this many pixels on every edge so it clears a mat or bezel.') }}
+              help='Inset content by this many pixels on every edge so it clears a mat or bezel.',
+              form=_combined_form_id) }}
           {% if section.gamut_capable %}
           {{ select_field(section.id ~ '-gamut', 'panel_gamut', 'Colour gamut',
               value=section.panel.get('gamut', 'waveshare_e6'),
               options=[{'value':'waveshare_e6','label':'Waveshare E6 / Spectra 6 (6-colour)'},
-                       {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}]) }}
+                       {'value':'inky_7colour','label':'Inky Impression 7-colour (adds orange)'}],
+              form=_combined_form_id) }}
           {% endif %}
         </div>
         {% endif %}
@@ -502,7 +531,7 @@
         {% for field in pq.fields %}
           {% set value = pq.state.get(field.name, field.get('default', '')) %}
           {% set field_id = section.id ~ '-pq-' ~ pq.base_id ~ '-' ~ field.name %}
-          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
         {% endfor %}
         {% endfor %}
         {% endif %}
@@ -936,7 +965,7 @@
           {% for field in pq.fields %}
             {% set value = pq.state.get(field.name, field.get('default', '')) %}
             {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}
-            {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value) }}
+            {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
           {% endfor %}
           {% endfor %}
           {% endif %}
@@ -944,14 +973,19 @@
         {% endif %}
       </section>
 
-      {# STICKY SAVE BAR (always visible; JS toggles the muted class
-         between clean + dirty states so the Save affordance is
-         discoverable, v0.69.6 for issue #52 item 3). #}
-      <div class="dx-save-bar dx-save-bar--muted" data-save-bar>
+      {# STICKY SAVE BAR (hidden until the form goes dirty; JS clears
+         the ``hidden`` attribute on the first input event). v0.69.9
+         reverts the v0.69.6 always-visible-muted variant: with the
+         nested-form bug fixed, dirty tracking works and hide-until-
+         dirty is the right shape again. The Save + Discard buttons
+         use ``form="{{ _combined_form_id }}"`` so they submit / reset
+         the outer form even though the bar sits outside it in the
+         DOM after the nested-form parse quirk. #}
+      <div class="dx-save-bar" data-save-bar data-save-bar-for="{{ _combined_form_id }}" hidden>
         <span class="dx-save-bar-msg">You have unsaved changes</span>
         <div class="dx-save-bar-actions">
-          <button type="reset" class="dx-save-bar-discard">Discard</button>
-          <button type="submit" class="dx-save-bar-save">
+          <button type="reset" form="{{ _combined_form_id }}" class="dx-save-bar-discard">Discard</button>
+          <button type="submit" form="{{ _combined_form_id }}" class="dx-save-bar-save">
             <i class="ph ph-floppy-disk" aria-hidden="true"></i>
             <span>Save changes</span>
           </button>
