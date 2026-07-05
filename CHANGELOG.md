@@ -6,6 +6,28 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.12], 2026-07-05
+
+### Fixed
+
+- **Multiple sticky save bars now stack instead of overlapping.**
+  When both the outer combined-form bar and the tone-form bar are
+  dirty on the same device card, they both stick to the viewport
+  bottom and previously drew on top of each other. ``settings.js``
+  now tracks visible bars via ``MutationObserver`` on the ``hidden``
+  attribute and sets a cumulative ``--dx-save-bar-offset`` CSS
+  custom property on each, so they stack vertically upwards from
+  the viewport bottom (or downwards from the top).
+- **``.dx-device-card`` uses ``overflow: clip`` instead of ``hidden``.**
+  The ``hidden`` value created a new scrollport scoped to the card,
+  which blocked descendant ``position: sticky`` elements (the save
+  bars) from sticking to the viewport. ``overflow: clip`` still
+  hides overflow past the card's rounded corners but doesn't
+  establish a scrollport. Sticky positioning on the bars now uses
+  the viewport as intended: the bar sits at its natural position
+  when in view, sticks to viewport bottom when scrolled below,
+  sticks to viewport top when scrolled above.
+
 ## [0.69.11], 2026-07-05
 
 ### Changed

@@ -710,7 +710,15 @@
   border: 1px solid var(--t-border);
   border-radius: var(--t-radius-md);
   box-shadow: var(--t-shadow-sm), var(--t-shadow-inset);
-  overflow: hidden;
+  /* v0.69.12: ``overflow: clip`` instead of ``hidden`` so descendant
+     sticky elements (the save bars) can use the viewport as their
+     scroll container. ``hidden`` created a new scroll container
+     scoped to the card, which meant ``position: sticky; bottom: 20px``
+     stuck the bar inside the card rather than to the viewport
+     bottom. ``clip`` still hides overflow past the card's rounded
+     corners, just without turning the card into a scrollport.
+     Supported in Chromium 90+, Firefox 81+, Safari 15.4+. */
+  overflow: clip;
   margin: 0 0 var(--t-space-4);
   transition:
     border-color var(--t-trans-fast),
@@ -1530,8 +1538,12 @@
    when the natural position was already in view. */
 .dx-save-bar {
   position: sticky;
-  top: calc(20px + env(safe-area-inset-top, 0px));
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  /* v0.69.12: ``--dx-save-bar-offset`` is set by settings.js when
+     multiple bars are visible so they stack cumulatively upwards
+     from the viewport bottom / downwards from the viewport top,
+     instead of overlapping at the same sticky offset. */
+  top: calc(20px + env(safe-area-inset-top, 0px) + var(--dx-save-bar-offset, 0px));
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px) + var(--dx-save-bar-offset, 0px));
   margin: 14px 22px 18px;
   background: var(--dx-save-bar);
   color: #fff;

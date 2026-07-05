@@ -105,6 +105,43 @@
     form.addEventListener('submit', clearDirty);
   }
 
+  // ---- Save bar stacking (v0.69.12) ---------------------------------
+  // Multiple sticky save bars can be visible at once: the outer
+  // combined-form bar + the tone-form bar on a single device card,
+  // or the combined bars of multiple device cards on the Devices tab.
+  // Without offset, they overlap at the same sticky ``bottom: 20px``.
+  // Assign each visible bar a cumulative offset (via CSS custom
+  // property) so they stack above one another instead. Recomputes
+  // whenever a bar's ``hidden`` attribute changes.
+  const SAVE_BAR_GAP = 8;
+  function recomputeSaveBarStack() {
+    const visibleBars = Array.from(
+      document.querySelectorAll('[data-save-bar]:not([hidden])')
+    );
+    let cumulative = 0;
+    visibleBars.forEach(function (bar) {
+      bar.style.setProperty('--dx-save-bar-offset', cumulative + 'px');
+      // Force reflow so offsetHeight reads the current layout.
+      cumulative += bar.offsetHeight + SAVE_BAR_GAP;
+    });
+  }
+
+  function initSaveBarStackObserver() {
+    const bars = document.querySelectorAll('[data-save-bar]');
+    if (!bars.length) return;
+    // MutationObserver on hidden attribute is cheap and only fires
+    // when initDirtyForm toggles a bar's visibility.
+    const obs = new MutationObserver(recomputeSaveBarStack);
+    bars.forEach(function (bar) {
+      obs.observe(bar, { attributes: true, attributeFilter: ['hidden'] });
+    });
+    // Also recompute on window resize since bar height can change if
+    // the layout reflows (viewport width change wrapping the message
+    // to two lines).
+    window.addEventListener('resize', recomputeSaveBarStack);
+    recomputeSaveBarStack();
+  }
+
   // ---- Dependent dim -----------------------------------------------------
   // Groups marked ``data-dep-group`` carry a master switch (the first
   // checkbox or [role=switch] inside) and one or more ``data-dep-target``
@@ -294,6 +331,7 @@
       initCollapse(card);
     });
     document.querySelectorAll('[data-dirty-form]').forEach(initDirtyForm);
+    initSaveBarStackObserver();
     document.querySelectorAll('[data-dep-group]').forEach(initDepGroup);
     document.querySelectorAll('[data-segmented-group]').forEach(initSegmented);
     document.querySelectorAll('[data-kind-row]').forEach(initKindRow);
