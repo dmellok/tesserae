@@ -235,6 +235,59 @@ def test_bwry_panel_gets_native_2bpp_pack(registry) -> None:
     assert all(b == 0xFF for b in out), "solid red on BWRY should be 0xFF everywhere"
 
 
+def test_vflip_reverses_row_order_before_pack(registry) -> None:
+    """v0.69.16: ``panel.vflip`` reverses row order before pack so panels
+    whose hardware scans bottom-to-top (PicPak 4-colour BWRY) paint the
+    right way up. Split-image with white on top / red on the bottom of
+    the composition; with vflip set, the FIRST packed byte carries the
+    RED palette index (0x03 in each 2-bit slot = 0xFF), because the
+    bottom of the composition lands at the top of the wire buffer."""
+    img = Image.new("RGB", (400, 300), "white")
+    # Bottom half red (palette index 3), top half white (palette index 1)
+    img.paste((255, 0, 0), (0, 150, 400, 300))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    panel = Panel(w=400, h=300, gamut="bwry_4", vflip=True)
+    out = esp.transform(
+        _png_bytes(img),
+        panel=panel,
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    # 2-bpp buffer: 30_000 bytes for a 400x300 PicPak frame.
+    assert len(out) == 400 * 300 // 4
+    # The top-of-wire row is what the panel scans first. With vflip on,
+    # that should be the RED half (bottom of the composition). Red is
+    # palette index 3 = 0b11; four reds per byte = 0xFF.
+    row_bytes = 400 // 4
+    assert out[:row_bytes] == b"\xff" * row_bytes
+    # And the bottom-of-wire row is the WHITE half (top of the
+    # composition). White is palette index 1 = 0b01; four whites per
+    # byte = 0b01010101 = 0x55.
+    assert out[-row_bytes:] == b"\x55" * row_bytes
+
+
+def test_vflip_off_preserves_row_order(registry) -> None:
+    """The vflip default (False) leaves rows alone; existing panels
+    (Spectra 6, and BWRY panels that don't need the flip) stay
+    byte-identical to pre-v0.69.16."""
+    img = Image.new("RGB", (400, 300), "white")
+    img.paste((255, 0, 0), (0, 150, 400, 300))
+
+    esp = registry.get("esp32_bin")
+    assert esp is not None
+    out = esp.transform(
+        _png_bytes(img),
+        panel=Panel(w=400, h=300, gamut="bwry_4"),  # vflip defaults False
+        settings={"dither": "none", "saturation": 1.0, "contrast": 1.0},
+    )
+    row_bytes = 400 // 4
+    # Top-of-wire = top-of-composition = WHITE (0x55 for four whites/byte).
+    assert out[:row_bytes] == b"\x55" * row_bytes
+    # Bottom-of-wire = bottom-of-composition = RED (0xFF).
+    assert out[-row_bytes:] == b"\xff" * row_bytes
+
+
 def test_landscape_calibration_on_portrait_native_panel(registry) -> None:
     """Symmetric case: a 13.3" Waveshare Spectra 6 is portrait native
     (1200×1600). If the user calibrates landscape, panel arrives as

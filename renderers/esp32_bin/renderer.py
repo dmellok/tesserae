@@ -32,7 +32,9 @@ Pipeline:
 3. Apply ``panel.flip`` (180° for upside-down mounts).
 4. Letterbox (white) to fit the firmware-native dims exactly.
 5. Apply per-device underscan.
-6. Pack at the firmware-native dims.
+6. Apply ``panel.vflip`` (row reverse for panels whose hardware scans
+   bottom-to-top, e.g. the PicPak 4-colour BWRY).
+7. Pack at the firmware-native dims.
 """
 
 from __future__ import annotations
@@ -92,6 +94,14 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
+    # v0.69.16: panels whose hardware scans bottom-to-top (PicPak
+    # 4-colour BWRY, and any successor with the same UC81xx-class
+    # driver quirk) need the row order reversed before pack so the
+    # top-of-image lands at the last-scanned byte. Applied after
+    # underscan so the mat inset ends up on the correct edge. Cheap
+    # (PIL's FLIP_TOP_BOTTOM is a strided copy).
+    if panel.vflip:
+        img = img.transpose(Image.FLIP_TOP_BOTTOM)
     # Profile tone / dither knobs (v0.67.1). Populated by app.push
     # only when the device has a Calibration-tab profile applied;
     # missing keys keep the pre-v0.67 defaults so no-profile devices

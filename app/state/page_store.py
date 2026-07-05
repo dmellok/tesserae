@@ -43,6 +43,14 @@ class Panel(BaseModel):
     w: int = Field(..., gt=0)
     h: int = Field(..., gt=0)
     flip: bool = False
+    # v0.69.16: some panels (PicPak 4-colour BWRY, notably) scan their
+    # rows bottom-to-top at the hardware level. The firmware streams
+    # bytes straight to SPI, so the renderer has to flip rows vertically
+    # before packing or the image lands upside down. Distinct from
+    # ``flip`` (a full 180° rotation for upside-down mounts): ``vflip``
+    # only reverses rows, columns stay put. Set via the device manifest;
+    # ``False`` for every panel Tesserae shipped support for pre-v0.69.16.
+    vflip: bool = False
     gamut: str = "waveshare_e6"
     underscan: int = Field(default=0, ge=0)
     # Firmware-native row stride. The panel hardware fixes its (w, h)

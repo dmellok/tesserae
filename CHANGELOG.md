@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.16], 2026-07-06
+
+### Added
+
+- **PicPak 4.2" 4-colour BWRY panel supported out of the box (issue
+  #61, firmware and hardware validation by @varanu5).** Ships a bundled
+  `picpak_client` device kind that binds to the stock `esp32_bin`
+  renderer with `gamut: "bwry_4"` (native 2 bpp packer, already present
+  since v0.69.3) and a new `panel.vflip` option for the PicPak's
+  bottom-to-top hardware scan direction. PicPak owners can now pair one
+  to a stock Tesserae install; no server-plugin needed. Firmware lives
+  at [varanu5/picpak-tesserae-client](https://github.com/varanu5/picpak-tesserae-client).
+
 ## [0.69.15], 2026-07-05
 
 ### Fixed
