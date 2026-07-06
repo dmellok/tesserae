@@ -155,6 +155,14 @@ class Device:
             out["name"] = block["name"]
         if isinstance(block.get("gamut"), str):
             out["gamut"] = block["gamut"]
+        # v0.69.18 (regression from v0.69.16): the manifest ``vflip`` opt-in
+        # (PicPak BWRY 4.2\" and any successor with the same hardware
+        # bottom-to-top scan quirk) has to survive this manifest -> device
+        # allow-list too, otherwise it drops out silently on the way to
+        # ``device_panel()`` / ``Panel(...)`` and the renderer's
+        # ``if panel.vflip`` branch never fires (issue #65, credit @varanu5).
+        if bool(block.get("vflip")):
+            out["vflip"] = True
         try:
             underscan = int(block.get("underscan", 0))
         except (TypeError, ValueError):

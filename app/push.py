@@ -1243,6 +1243,13 @@ class PushManager:
                         "w": resolved.w,
                         "h": resolved.h,
                         "flip": resolved.flip,
+                        # v0.69.18: the push pipeline rebuilds a Panel
+                        # dict from the resolved model, then reconstructs
+                        # ``Panel(**dict)`` for the renderer. Without
+                        # ``vflip`` here the flag round-trips through
+                        # ``device_panel()`` correctly but gets dropped
+                        # again on the send-side rebuild (issue #65).
+                        "vflip": resolved.vflip,
                         "gamut": resolved.gamut,
                         "underscan": resolved.underscan,
                     }

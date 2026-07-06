@@ -6,6 +6,25 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.18], 2026-07-06
+
+### Fixed
+
+- **PicPak 4.2" BWRY panels no longer paint upside-down and mirrored
+  (issue #65, hardware validation and diagnosis by @varanu5).** The
+  ``panel.vflip`` opt-in that shipped in v0.69.16 was declared on the
+  ``picpak_client`` manifest and honoured by the ``esp32_bin`` renderer,
+  but silently dropped by three separate panel-key allow-lists on the
+  way from the manifest to the renderer (``device_loader``'s panel
+  property, ``panel.device_panel()``, and ``push._panel_dims_for_send``).
+  Each layer copied ``w``, ``h``, ``flip``, ``gamut`` etc. but not
+  ``vflip``, so ``panel.vflip`` was always ``False`` when the renderer
+  checked it and the row-reverse never fired. Three one-line additions
+  carry the flag through end to end; a regression test now pins the
+  flow so it can't drop again. Existing PicPak installs need to re-add
+  the device once so the fixed manifest allow-list writes ``vflip:
+  true`` into the instance file.
+
 ## [0.69.17], 2026-07-06
 
 ### Fixed

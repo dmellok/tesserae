@@ -222,6 +222,10 @@ def device_panel(device: Device) -> Panel | None:
         w=w,
         h=h,
         flip=is_flipped_orientation(block.get("orientation")),
+        # v0.69.18: carry ``vflip`` through so the renderer's row-reverse
+        # step actually fires on panels that declare the bottom-to-top
+        # scan quirk (issue #65).
+        vflip=bool(block.get("vflip")),
         gamut=str(block.get("gamut") or "waveshare_e6"),
         underscan=max(0, int(block.get("underscan") or 0)),
         native_w=native_w,

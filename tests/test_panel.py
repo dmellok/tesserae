@@ -226,6 +226,33 @@ def test_panel_underscan_surfaces(env) -> None:
     assert panel.underscan == 15
 
 
+def test_panel_vflip_surfaces_end_to_end(env) -> None:
+    """v0.69.18 (issue #65, regression from v0.69.16): the ``vflip`` opt-in
+    declared on the PicPak kind's manifest must reach the resolved Panel
+    the renderer sees, so the row-reverse step in ``esp32_bin`` actually
+    fires. Broken end to end pre-v0.69.18 because three separate panel-key
+    allow-lists (``device_loader``, ``panel``, ``push``) each dropped the
+    flag silently.
+
+    Locks the flow: create a picpak instance, resolve the page's Panel,
+    assert ``vflip`` is True. Any of the three allow-lists dropping the
+    flag again would flip this test red."""
+    devices, settings, make = env
+    make("picpak_a", kind_id="picpak_client")
+    picpak = resolve_panel_for_page(
+        Page(id="a", name="A", device_ids=["picpak_a"], cells=[]), devices, settings
+    )
+    assert picpak.vflip is True
+
+    # Non-vflip panels stay False so unrelated devices aren't dragged
+    # into a row-reverse they don't need.
+    make("esp32_plain")
+    plain = resolve_panel_for_page(
+        Page(id="b", name="B", device_ids=["esp32_plain"], cells=[]), devices, settings
+    )
+    assert plain.vflip is False
+
+
 def test_unknown_device_ids_are_skipped(env) -> None:
     """A page bound to an id that no longer exists falls back to the
     virtual panel rather than erroring."""
