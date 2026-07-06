@@ -158,6 +158,15 @@
           id="{{ _combined_form_id }}"
           class="form dx-device-form" data-dirty-form>
 
+      {# v0.69.17: carry the currently-active tab through the save
+         redirect so saving from General / Calibration doesn't jump
+         back to Status. The v0.69.14 tab-scoping fix reads ``?tab=``
+         only when ``?opened=`` matches, so any redirect that forgets
+         ``tab=`` lands on the default (Status). JS updates this field
+         when the user switches tabs via the tab bar. #}
+      <input type="hidden" name="_active_tab" value="{{ active_tab }}"
+             data-active-tab-field>
+
       {# STATUS TAB (read-only) #}
       <section role="tabpanel" data-panel="status"
                class="dx-panel{% if active_tab == 'status' %} is-active{% endif %}"

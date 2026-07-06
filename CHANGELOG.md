@@ -6,6 +6,67 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.69.17], 2026-07-06
+
+### Fixed
+
+- **Sticky save bar no longer paints as a full-height black column on
+  the Settings page (issue #52).** The server-tab save-bar variant is
+  ``position: fixed`` and specifies ``bottom`` only, but was inheriting
+  the sticky device-card variant's ``top`` too. ``top`` + ``bottom`` on
+  a fixed element stretches it to fill the viewport height between the
+  two insets; content sat at the bottom edge and the empty container
+  above it read as one big black rectangle. Added ``top: auto`` on the
+  server variant so only ``bottom`` positions it.
+- **Saving from the General or Calibration tab no longer jumps back to
+  Status (issue #52).** The v0.69.14 tab-scoping fix only threaded
+  ``?tab=`` through the calibration-side redirects; the combined-form
+  save (General tab, panel dims, quiet hours, etc.) dropped it, so the
+  redirect landed with just ``?opened=`` and the template's tab picker
+  fell through to the default. Now carries an ``_active_tab`` hidden
+  field on the combined form and echoes it back through the redirect.
+- **Push history rows no longer contaminate old entries with
+  currently-linked devices (issue #52).** The device-chip renderer
+  used to fall back to the page's live ``device_ids`` list when the
+  event's snapshot was missing, so a device added yesterday would
+  appear on entries pushed a week ago (before the device even
+  existed). Snapshot-only now; pre-v0.5x rows without a snapshot show
+  no chip rather than a wrong one.
+- **Per-cell widget options survive a widget-type change (issue #52
+  follow-up).** Switching a cell from Weather Now to Weather Forecast
+  used to wipe every override, including the location the user had
+  set on the previous variant. Now preserves any option whose name is
+  also declared on the new plugin's ``cell_options`` schema, so shared
+  knobs like ``location`` on weather_* variants (and ``feeds_filter``
+  on calendar_* variants) carry through.
+
+### Changed
+
+- **Device cards on Settings → Devices sort alphabetically by name.**
+  ``devices().all()`` returned entries in registry insertion order, so
+  cards jumped around across renders when devices were added, renamed,
+  or re-registered. Now stable, case-insensitive by display name with
+  device id as tiebreaker.
+- **"Push" button on the Dashboards list names the fan-out.** Was
+  labelled "Push" with the tooltip "Push this dashboard to its panel",
+  which read as if the button targeted a single device. Now shows
+  ``Push to N`` for multi-device dashboards, and the tooltip counts
+  the linked devices explicitly.
+
+### Added
+
+- **Push history has a "By dashboard" sort option (issue #52
+  follow-up).** ``?sort=dashboard`` groups rows sharing a target so a
+  per-dashboard read is one scroll rather than a scan. Default is
+  chronological, newest first.
+- **``--dev`` mode gains a "Seed dummy devices" affordance.** New
+  yellow-bordered card under Add device on Settings → Devices creates
+  a set of test instances (``dev_esp32``, ``dev_pi_bin``, ``dev_pi_png``,
+  ``dev_picpak``, ``dev_trmnl``) so the device-card UI can be
+  reproduced without real hardware attached. Guarded server-side by
+  the ``DEV_MODE`` config flag; the button hides and the endpoint
+  rejects outside of ``--dev`` mode.
+
 ## [0.69.16], 2026-07-06
 
 ### Added

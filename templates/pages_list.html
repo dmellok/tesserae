@@ -70,8 +70,18 @@
           <form method="post" action="{{ url_for('send.send_page') }}" class="form form--inline">
             <input type="hidden" name="page_id" value="{{ page.id }}">
             <input type="hidden" name="return_to" value="dashboards">
-            <button type="submit" class="dx-btn-ghost-sm" title="Push this dashboard to its panel">
-              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i><span>Push</span>
+            {# v0.69.17 (issue #52 follow-up): the button title used to
+               read "Push this dashboard to its panel" (singular), which
+               misled users into thinking a Push targeted only the
+               device whose group they were clicking under. It actually
+               pushes to every device the dashboard is linked to. Count
+               the linked devices in the title so the fan-out is
+               visible before the click. #}
+            {% set _link_count = page.device_ids|length %}
+            <button type="submit" class="dx-btn-ghost-sm"
+                    title="Push this dashboard to {% if _link_count == 0 %}no linked devices (attach a device on the dashboard first){% elif _link_count == 1 %}its 1 linked device{% else %}all {{ _link_count }} linked devices{% endif %}">
+              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+              <span>Push{% if _link_count > 1 %} to {{ _link_count }}{% endif %}</span>
             </button>
           </form>
           <form method="post" action="{{ url_for('pages.duplicate', page_id=page.id) }}" class="form form--inline">

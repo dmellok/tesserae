@@ -61,16 +61,30 @@
   {% endfor %}
   {# Skipped-pushes toggle preserves the existing behaviour, restyled. #}
   {% if include_skipped %}
-  <a href="{{ url_for('history.index', source=active_source) }}"
+  <a href="{{ url_for('history.index', source=active_source, sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip is-active" title="Hide skipped pushes (quiet hours, condition holds)">
     <i class="ph ph-eye" aria-hidden="true"></i><span>Skipped shown</span>
   </a>
   {% else %}
-  <a href="{{ url_for('history.index', source=active_source, include_skipped=1) }}"
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=1, sort=(sort_mode if sort_mode != 'time' else None)) }}"
      class="dx-filter-chip" title="Show pushes skipped by quiet hours or condition holds">
     <i class="ph ph-eye-closed" aria-hidden="true"></i><span>Show skipped</span>
   </a>
   {% endif %}
+  {# v0.69.17: sort toggle. Default "Newest first" is chronological
+     (rows already come back that way from the event log); "By
+     dashboard" groups rows sharing a target so a per-dashboard read
+     is one scroll rather than a needle-in-haystack scan. #}
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None)) }}"
+     class="dx-filter-chip{% if sort_mode == 'time' %} is-active{% endif %}"
+     title="Sort chronologically (newest first)">
+    <i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>Newest first</span>
+  </a>
+  <a href="{{ url_for('history.index', source=active_source, include_skipped=(1 if include_skipped else None), sort='dashboard') }}"
+     class="dx-filter-chip{% if sort_mode == 'dashboard' %} is-active{% endif %}"
+     title="Group rows sharing a dashboard (or device, for button rows)">
+    <i class="ph ph-squares-four" aria-hidden="true"></i><span>By dashboard</span>
+  </a>
 </nav>
 {% endif %}
 

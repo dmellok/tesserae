@@ -848,7 +848,25 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
     plugin_changed = new_plugin_id != cell.plugin
     plugin = _plugins().get(new_plugin_id) if new_plugin_id else None
     if plugin_changed:
-        options: dict[str, Any] = plugin.cell_option_defaults() if plugin else {}
+        if plugin is None:
+            options: dict[str, Any] = {}
+        else:
+            # v0.69.17 (issue #52 follow-up): a widget-type change used
+            # to wipe every per-cell option override. Preserve any
+            # override whose option name also exists on the new
+            # plugin's ``cell_options`` schema so shared knobs like
+            # ``location`` on weather_* variants, or a ``feeds_filter``
+            # shared across calendar_* widgets, survive the swap.
+            # Anything the new plugin doesn't declare drops off (it
+            # would have no effect there anyway, but keeping it would
+            # leave stale keys in the persisted options).
+            new_option_names = {
+                str(opt["name"]) for opt in plugin.manifest.get("cell_options", []) if "name" in opt
+            }
+            preserved = {
+                name: value for name, value in cell.options.items() if name in new_option_names
+            }
+            options = {**plugin.cell_option_defaults(), **preserved}
     elif plugin is not None:
         options = _cell_options_from_form(plugin, form)
     else:

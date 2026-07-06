@@ -36,6 +36,12 @@
         url.searchParams.set('tab', target);
         const deviceId = card.getAttribute('data-device-id');
         if (deviceId) url.searchParams.set('opened', deviceId);
+        // v0.69.17: sync the hidden ``_active_tab`` field on the
+        // combined form so a save-after-tab-switch redirects back to
+        // the tab the user is looking at, not the tab that was active
+        // when the page first rendered.
+        const activeTabField = card.querySelector('[data-active-tab-field]');
+        if (activeTabField) activeTabField.value = target;
         // Anchor lets multiple device cards co-exist on one page; we
         // bias to the focused card so #device-<id> stays accurate.
         history.replaceState(null, '', url.pathname + url.search + '#' + card.id);

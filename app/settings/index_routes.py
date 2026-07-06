@@ -692,7 +692,16 @@ def _build_sections() -> list[dict[str, Any]]:
             }
         )
 
-    for device in devices().all():
+    # v0.69.17: sort device cards by display name (case-insensitive,
+    # falling back to id for stability) so the list order stays
+    # predictable across renders. ``devices().all()`` returns entries
+    # in registry insertion order, which shifts as devices are added,
+    # renamed, or re-registered from the Discovered strip; a user
+    # scrolling Settings → Devices would otherwise see cards jump
+    # around between saves.
+    _instances = [d for d in devices().all() if d.kind_of is not None]
+    _instances.sort(key=lambda d: ((d.name or d.id).casefold(), d.id))
+    for device in _instances:
         # Built-in kinds are templates, not bindable devices, they
         # never appear on the Devices tab. Every physical display is
         # represented by an instance (added manually or auto-registered

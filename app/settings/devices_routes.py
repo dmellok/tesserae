@@ -50,6 +50,81 @@ from ._shared import (
     values_from_form,
 )
 
+
+def _dev_seed_kinds() -> list[tuple[str, str, str]]:
+    """Dev-mode seed set: (kind_id, instance_id_prefix, human name).
+
+    Covers the main client kinds so the tone/dither, calibration, and
+    picture-quality UI paths all have something to render against
+    without needing real hardware. Kept as a plain list rather than a
+    scan of every available kind so seed output stays predictable.
+    """
+    return [
+        ("esp32_client", "dev_esp32", "Dev ESP32"),
+        ("pi_bin_client", "dev_pi_bin", "Dev Pi (bin)"),
+        ("pi_png_client", "dev_pi_png", "Dev Pi (png)"),
+        ("picpak_client", "dev_picpak", "Dev PicPak"),
+        ("trmnl_client", "dev_trmnl", "Dev TRMNL"),
+    ]
+
+
+@bp.post("/settings/devices/dev-seed")
+def devices_dev_seed() -> Response:
+    """Seed a set of dummy devices for local UI testing.
+
+    Guarded by ``DEV_MODE`` so the affordance doesn't ship to
+    production installs. Idempotent: instance ids that already exist
+    are skipped without error, so hitting the button repeatedly is
+    safe. Useful when reproducing device-card bugs without real
+    hardware attached.
+    """
+    if not current_app.config.get("DEV_MODE"):
+        flash("Dev seeding is disabled outside of --dev mode.", "error")
+        return redirect(url_for("auth.settings_area", area="devices"))
+
+    devices_registry = devices()
+    renderers_registry = renderers()
+    created: list[str] = []
+    skipped: list[str] = []
+    failed: list[str] = []
+    for kind_id, instance_id, name in _dev_seed_kinds():
+        if devices_registry.get(kind_id) is None:
+            skipped.append(f"{instance_id} (kind {kind_id!r} not installed)")
+            continue
+        if instance_id in devices_registry.devices:
+            skipped.append(instance_id)
+            continue
+        result = device_service.create_instance(
+            devices=devices_registry,
+            renderers=renderers_registry,
+            data_root=device_data_root(),
+            instance_id=instance_id,
+            kind_id=kind_id,
+            name=name,
+        )
+        if result.ok and result.device is not None:
+            created.append(result.device.id)
+        else:
+            failed.append(f"{instance_id} ({result.error or 'unknown error'})")
+
+    if created:
+        renderer_loader.seed_device_settings_from_base(renderers_registry, settings_store())
+        rebuild_transport_fn()()
+
+    parts: list[str] = []
+    if created:
+        parts.append(f"added {len(created)} ({', '.join(created)})")
+    if skipped:
+        parts.append(f"skipped {len(skipped)}")
+    if failed:
+        parts.append(f"failed {len(failed)}: {', '.join(failed)}")
+    if parts:
+        flash("Dev-seed: " + "; ".join(parts) + ".", "ok" if not failed else "error")
+    else:
+        flash("Dev-seed: nothing to do.", "ok")
+    return redirect(url_for("auth.settings_area", area="devices"))
+
+
 # -- add / discover / dismiss ------------------------------------------
 
 
@@ -783,9 +858,27 @@ def devices_update_combined(instance_id: str) -> Response:
     # the device card expanded after Save. Without this the card
     # collapses on every save + reload, which meant the user's next
     # tweak needed another click on "Show settings" first.
-    redirect_to = redirect(
-        url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
-    )
+    # v0.69.17: also thread ``tab=`` so save from General / Calibration
+    # doesn't jump back to Status. The v0.69.14 tab-scoping fix reads
+    # ``?tab=`` only when ``?opened=`` matches, so any redirect that
+    # forgets ``tab=`` lands on the default (Status). The combined form
+    # posts an ``_active_tab`` hidden field carrying whichever tab
+    # rendered the card; we echo it back on redirect.
+    _redirect_tab = (request.form.get("_active_tab") or "").strip()
+    if _redirect_tab in ("status", "general", "schedule", "calibration"):
+        redirect_to = redirect(
+            url_for(
+                "auth.settings_area",
+                area="devices",
+                opened=instance_id,
+                tab=_redirect_tab,
+                _anchor=anchor,
+            )
+        )
+    else:
+        redirect_to = redirect(
+            url_for("auth.settings_area", area="devices", opened=instance_id, _anchor=anchor)
+        )
 
     devices_registry = devices()
     device = devices_registry.get(instance_id)

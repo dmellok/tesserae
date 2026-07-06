@@ -88,7 +88,6 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
     humanised time, friendly device labels."""
     pages = _pages().list()
     page_names = {p.id: p.name for p in pages}
-    page_devices_map = {p.id: list(p.device_ids) for p in pages}
     devices = _devices()
     # Cache device id → {name, icon} for the per-row device chip on the
     # v0.56 history view. Devices removed from the registry mid-stream
@@ -117,12 +116,17 @@ def history_view(rows: list[EventRow]) -> list[dict[str, Any]]:
             {"label": _renderer_label(str(r.get("renderer_id", ""))), "error": r.get("error")}
             for r in (ev.extra.get("renderers") or [])
         ]
-        # Device chips: prefer device_ids carried in extra (set by the
-        # push pipeline since v0.5x), fall back to the page's
-        # device_ids when the row is bound to a saved dashboard, and
-        # for button rows the row's target IS the device so we chip
-        # that directly.
-        device_ids = ev.extra.get("device_ids") or page_devices_map.get(ev.target, [])
+        # Device chips: use only the ``device_ids`` snapshot the push
+        # pipeline wrote to ``extra`` at push time. v0.69.17 (issue #52
+        # follow-up): previously the code fell back to the page's
+        # current ``device_ids`` when the snapshot was missing, which
+        # contaminated old rows with devices that hadn't been added yet
+        # when the push originally fired. For rows without a snapshot
+        # (pre-v0.5x events, or bare-URL pushes with no device targets)
+        # we show no chip: "we don't know" is honest, showing "today's
+        # devices" isn't. Button rows always target a device directly,
+        # so pull the target chip from ``ev.target`` in that case.
+        device_ids = list(ev.extra.get("device_ids") or [])
         if ev.source == "button" and not device_ids and ev.target in device_meta:
             device_ids = [ev.target]
         target_devices = [device_meta[did] for did in device_ids if did in device_meta]
@@ -221,6 +225,13 @@ def index() -> str:
         "yes",
         "on",
     )
+    # v0.69.17 (issue #52 follow-up): opt-in sort by dashboard name so
+    # a user drilling into "how did dashboard X fare over the last week"
+    # can read consecutive rows without scanning back and forth. Default
+    # (missing / anything else) is chronological, newest first.
+    sort_mode = (request.args.get("sort") or "").strip().lower()
+    if sort_mode not in ("dashboard",):
+        sort_mode = "time"
     events = _events()
     exclude_statuses = None if include_skipped else _DEFAULT_HIDDEN_STATUSES
     history = history_view(
@@ -231,6 +242,12 @@ def index() -> str:
             limit=100,
         )
     )
+    if sort_mode == "dashboard":
+        # Stable-sort by the resolved target label (page name or
+        # device name for button rows) so entries of the same
+        # dashboard clump. The base list is already newest-first, so
+        # within each dashboard clump the recency order is preserved.
+        history.sort(key=lambda row: (row.get("target") or "").casefold())
     # Per-source counts power the filter-chip badges. We include zero-
     # count chips for the canonical sources so the filter row is stable
     # across page loads (chips don't appear/disappear as the log churns).
@@ -253,6 +270,7 @@ def index() -> str:
         chips=chips,
         active_source=source,
         include_skipped=include_skipped,
+        sort_mode=sort_mode,
     )
 
 

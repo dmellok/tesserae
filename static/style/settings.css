@@ -1993,6 +1993,12 @@
   --dx-teal: #15846a;
   --dx-teal-hover-2: #179476;
   position: fixed;
+  /* v0.69.17: the base ``.dx-save-bar`` sets ``top`` (for its
+     sticky-positioned device-card variant). Without ``top: auto`` here
+     the server variant inherits it, and ``position: fixed`` with both
+     ``top`` and ``bottom`` set stretches the element to fill the
+     viewport-height minus both insets, painting as a big black column. */
+  top: auto;
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%);

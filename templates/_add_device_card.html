@@ -158,6 +158,25 @@
       </form>
       <script type="application/json" id="add-device-kinds">{{ device_kinds|tojson }}</script>
       <script type="application/json" id="add-device-presets">{{ panel_presets|tojson }}</script>
+
+      {# v0.69.17: dev-only quick-seed for UI testing without real
+         hardware. Hidden outside of --dev mode so this never ships
+         to production installs. Guarded server-side too by the
+         DEV_MODE check on the endpoint. #}
+      {% if config.DEV_MODE %}
+      <div class="dx-hint-band" style="margin-top: 16px; border-color: #F3B03E;">
+        <i class="ph ph-flask" aria-hidden="true"></i>
+        <div style="flex: 1;">
+          <p style="margin: 0 0 8px;"><strong>Dev-only:</strong> seed a set of dummy devices (esp32, pi_bin, pi_png, picpak, trmnl) for testing the device card without real hardware. Idempotent, safe to click repeatedly.</p>
+          <form method="post" action="{{ url_for('auth.devices_dev_seed') }}" class="form form--inline" style="margin: 0;">
+            <button type="submit" class="dx-btn-primary" style="background: #F3B03E; color: #1B1A16;">
+              <i class="ph ph-flask" aria-hidden="true"></i>
+              <span>Seed dummy devices</span>
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
   </div>
