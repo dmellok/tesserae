@@ -397,21 +397,38 @@ def _fetch_plugin_data(
             home_lon = float(app_section.get("longitude") or 0.0)
         except (TypeError, ValueError):
             home_lon = 0.0
+    # v0.70.0: install identifier propagation. Plugins opt in via their
+    # manifest with either ``needs_install_id`` (the raw UUID, for
+    # shared-world features like the planned tamagotchi pet or dashboard
+    # traveler that need cross-widget correlation) or ``needs_scoped_id``
+    # (a per-plugin SHA-256 hash of the install id, so the widget's
+    # identity can't be correlated with any other widget's). Plugins
+    # that declare neither never see either value.
+    manifest = plugin.manifest or {}
+    ctx: dict[str, Any] = {
+        "panel_w": panel_w,
+        "panel_h": panel_h,
+        "cell_w": cell_w,
+        "cell_h": cell_h,
+        "preview": preview,
+        "data_dir": str(plugin.data_dir),
+        "home_lat": home_lat,
+        "home_lon": home_lon,
+    }
+    install_uuid = current_app.config.get("INSTALL_ID")
+    if isinstance(install_uuid, str) and install_uuid:
+        if manifest.get("needs_install_id"):
+            ctx["install_id"] = install_uuid
+        if manifest.get("needs_scoped_id"):
+            from app import install_id as _install_id_module
+
+            ctx["widget_scoped_id"] = _install_id_module.scoped_id(install_uuid, plugin_id)
     try:
         with capability_scope(plugin.capabilities):
             return fetch_fn(
                 options,
                 settings,
-                ctx={
-                    "panel_w": panel_w,
-                    "panel_h": panel_h,
-                    "cell_w": cell_w,
-                    "cell_h": cell_h,
-                    "preview": preview,
-                    "data_dir": str(plugin.data_dir),
-                    "home_lat": home_lat,
-                    "home_lon": home_lon,
-                },
+                ctx=ctx,
             )
     except CapabilityDenied as err:
         # Capability violations get a tailored message so the cell

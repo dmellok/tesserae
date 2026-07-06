@@ -1,0 +1,185 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Tesserae, Status Bar",
+  "version": "0.2.0",
+  "kind": "widget",
+  "description": "Dashboard status strip: identity on the left, ambient info chips on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
+  "icon": "ph-squares-four",
+  "supports": { "sizes": ["xs", "sm", "md", "lg"] },
+  "needs_scoped_id": true,
+  "cell_options": [
+    {
+      "name": "mode",
+      "type": "select",
+      "label": "Placement mode",
+      "default": "bar",
+      "help": "Bar: full-width, 48 px tall. Block: resizable cell; chips wrap.",
+      "choices": [
+        { "value": "bar", "label": "Bar (thin horizontal strip)" },
+        { "value": "block", "label": "Block (chips wrap)" }
+      ]
+    },
+    {
+      "name": "chipMode",
+      "type": "select",
+      "label": "Chip style",
+      "default": "icon-text",
+      "help": "Icon+text is the default. Icon-only hides labels (updates surface as a badge dot). Text-only hides icons (updates surface as accent text).",
+      "choices": [
+        { "value": "icon-text", "label": "Icon + text" },
+        { "value": "icon-only", "label": "Icon only" },
+        { "value": "text-only", "label": "Text only" }
+      ]
+    },
+    {
+      "name": "dashboardName",
+      "type": "string",
+      "label": "Dashboard name (blank = use page name)",
+      "default": ""
+    },
+    {
+      "name": "leadingIcon",
+      "type": "boolean",
+      "label": "Show leading icon",
+      "default": true,
+      "help": "The dashboard-name identifier icon (default ph-squares-four). Force-hidden in text-only mode."
+    },
+    {
+      "name": "panelBg",
+      "type": "string",
+      "label": "Background colour (hex, e.g. #1B1A16)",
+      "default": "#1B1A16",
+      "help": "Freeform hex. Text, icons, and rules auto-flip between ink (#1B1A16) and paper (#FCFBF7) based on background luminance; the update accent flips between two reds for legibility on light vs dark."
+    },
+    {
+      "name": "show_time",
+      "type": "boolean",
+      "label": "Time chip",
+      "default": true
+    },
+    {
+      "name": "time_format",
+      "type": "select",
+      "label": "Time format",
+      "default": "24h",
+      "choices": [
+        { "value": "24h", "label": "24 hour" },
+        { "value": "12h", "label": "12 hour" }
+      ]
+    },
+    {
+      "name": "show_weather",
+      "type": "boolean",
+      "label": "Weather chip",
+      "default": false,
+      "help": "Static custom value (Tesserae's status widget doesn't fetch weather itself). Set the icon and value fields below to a live-looking summary or leave off."
+    },
+    {
+      "name": "weather_icon",
+      "type": "select",
+      "label": "Weather icon",
+      "default": "ph-sun",
+      "choices": [
+        { "value": "ph-sun", "label": "Sun" },
+        { "value": "ph-cloud", "label": "Cloud" },
+        { "value": "ph-cloud-rain", "label": "Rain" },
+        { "value": "ph-cloud-snow", "label": "Snow" },
+        { "value": "ph-cloud-lightning", "label": "Storm" },
+        { "value": "ph-moon", "label": "Night" }
+      ]
+    },
+    {
+      "name": "weather_value",
+      "type": "string",
+      "label": "Weather value (e.g. \"12°\")",
+      "default": ""
+    },
+    {
+      "name": "show_battery",
+      "type": "boolean",
+      "label": "Battery chip",
+      "default": true,
+      "help": "Panel battery percentage (min across bound devices). Auto-hides for mains-powered panels."
+    },
+    {
+      "name": "show_wifi",
+      "type": "boolean",
+      "label": "Wi-Fi chip",
+      "default": true,
+      "help": "Signal strength label derived from the panel's RSSI heartbeat."
+    },
+    {
+      "name": "show_broker",
+      "type": "boolean",
+      "label": "Broker chip",
+      "default": true,
+      "help": "Short broker label (e.g. \"HA\") when MQTT is configured."
+    },
+    {
+      "name": "broker_label",
+      "type": "string",
+      "label": "Broker label",
+      "default": "HA"
+    },
+    {
+      "name": "check_for_updates",
+      "type": "boolean",
+      "label": "Show app version + update indicator",
+      "default": false,
+      "help": "When on, the widget fetches api.tesserae.ink/version/latest. If the running version matches the latest, nothing renders; when an update is pending, a version chip appears with a badge dot or accent \"-> .18\" text. Aggregate install count only, no PII."
+    },
+    {
+      "name": "show_firmware_updates",
+      "type": "boolean",
+      "label": "Show firmware update indicator",
+      "default": true,
+      "help": "Appears only when at least one bound device kind has a newer firmware known to Tesserae. Renders as \"FW\" with badge / accent sub. Nothing renders when everything is up to date."
+    },
+    {
+      "name": "custom_slot_1_icon",
+      "type": "select",
+      "label": "Custom slot 1 icon",
+      "default": "ph-thermometer-simple",
+      "choices": [
+        { "value": "ph-thermometer-simple", "label": "Thermometer" },
+        { "value": "ph-trash", "label": "Bin" },
+        { "value": "ph-moon-stars", "label": "Moon" },
+        { "value": "ph-calendar-dots", "label": "Calendar" },
+        { "value": "ph-house", "label": "Home" },
+        { "value": "ph-drop", "label": "Drop" },
+        { "value": "ph-wind", "label": "Wind" }
+      ]
+    },
+    {
+      "name": "custom_slot_1_value",
+      "type": "string",
+      "label": "Custom slot 1 value (blank = hide)",
+      "default": ""
+    },
+    {
+      "name": "custom_slot_2_icon",
+      "type": "select",
+      "label": "Custom slot 2 icon",
+      "default": "ph-calendar-dots",
+      "choices": [
+        { "value": "ph-thermometer-simple", "label": "Thermometer" },
+        { "value": "ph-trash", "label": "Bin" },
+        { "value": "ph-moon-stars", "label": "Moon" },
+        { "value": "ph-calendar-dots", "label": "Calendar" },
+        { "value": "ph-house", "label": "Home" },
+        { "value": "ph-drop", "label": "Drop" },
+        { "value": "ph-wind", "label": "Wind" }
+      ]
+    },
+    {
+      "name": "custom_slot_2_value",
+      "type": "string",
+      "label": "Custom slot 2 value (blank = hide)",
+      "default": ""
+    }
+  ],
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  }
+}

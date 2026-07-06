@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 from flask import current_app, flash, redirect, render_template, request, session, url_for
@@ -19,6 +20,8 @@ from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
 from app import device_timetable, palette_profiles, test_patterns
+from app import firmware_check as firmware_check_module
+from app import install_id as install_id_module
 from app import updater as _updater_mod
 from app.button_actions import DEFAULT_BUTTON_MAP, registered_actions
 from app.device_loader import Device
@@ -237,6 +240,13 @@ def settings_area(area: str) -> str | Response:
         system_webhook_reveal_token=system_webhook_reveal_token,
         system_password_set=system_password_set,
         system_password_required=system_password_required,
+        # v0.70.0: install-identifier metadata for the Settings -> System
+        # "Install identifier" section (regeneration button + display).
+        install_id_meta=(
+            install_id_module.read_metadata(Path(current_app.config["DATA_ROOT"]))
+            if area == "system"
+            else None
+        ),
         trmnl_token_reveal=trmnl_token_reveal,
         # Pending REST pairing codes for the Devices area's Pair card.
         # Only computed on the devices tab; the template doesn't reference
@@ -1390,6 +1400,7 @@ def _status_view(device: Device) -> dict[str, Any]:
         "smart_sync": smart_sync,
         "smart_sync_header": _smart_sync_header(smart_sync),
         "reported_panel_hint": None,
+        "firmware": _firmware_view(device, {}),
     }
     if cache is None:
         return base
@@ -1408,9 +1419,40 @@ def _status_view(device: Device) -> dict[str, Any]:
             "parsed": parsed,
             "tiles": _status_tiles(parsed),
             "reported_panel_hint": _reported_panel_hint(device, parsed),
+            "firmware": _firmware_view(device, parsed),
         }
     )
     return base
+
+
+def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
+    """Compose the firmware-version chip data for the Devices card.
+
+    Combines the ``fw_version`` value the client reported in its most
+    recent heartbeat with the latest known version for its kind from the
+    v0.70.0 firmware-check module (which polls api.tesserae.ink lazily
+    with a 60-minute cache).
+
+    Returns a dict with:
+      * ``current``: the reported fw_version, or None.
+      * ``latest``: the latest known version, or None.
+      * ``state``: one of "current", "outdated", "unknown", "no_data",
+        matching :func:`app.firmware_check.compare_versions`.
+      * ``release_url``: URL to the release notes for ``latest``.
+      * ``notes_headline``: short release summary for ``latest``.
+    """
+    kind_id = device.kind_of or device.id
+    current = parsed.get("fw_version")
+    current_str = str(current) if isinstance(current, (str, int, float)) else None
+    latest = firmware_check_module.latest_for_kind(kind_id)
+    state = firmware_check_module.compare_versions(current_str, latest)
+    return {
+        "current": current_str,
+        "latest": latest.version if latest else None,
+        "state": state,
+        "release_url": latest.url if latest else None,
+        "notes_headline": latest.notes_headline if latest else None,
+    }
 
 
 def _format_duration(seconds: float) -> str:

@@ -1,5 +1,5 @@
 {% extends "_base.html" %}
-{% from "_components.html" import auto_field, button, card_head, info_pop, number_input, select_field, settings_tabs, slider, switch, text_input %}
+{% from "_components.html" import auto_field, button, card_head, info_pop, number_input, section_card, select_field, settings_tabs, slider, switch, text_input %}
 {% set AREA_TITLES = {'server':'Server','renderers':'Renderers','devices':'Devices','plugins':'Widgets','system':'System','about':'About'} %}
 {% set AREA_ICONS = {'server':'desktop-tower','renderers':'image-square','devices':'devices','plugins':'puzzle-piece','system':'wrench','about':'info'} %}
 {% set AREA_BLURBS = {
@@ -977,6 +977,37 @@ docker compose up -d</code></pre>
   })();
 </script>
 {% endif %}
+
+{# v0.70.0: Install identifier. Random UUID minted on first startup and
+   persisted at ``data/core/install_id.json``. Widgets that declare
+   ``needs_install_id`` (shared-world features: the planned tamagotchi
+   pet, dashboard traveler, guestbook) receive the raw value in their
+   render context, so identity is stable across restarts. Widgets that
+   declare ``needs_scoped_id`` receive a per-plugin SHA-256 derivation
+   instead, so their identity can't be correlated with any other
+   widget's. Widgets that declare neither never see either value.
+   Regenerating rotates the UUID; per-install widget state (a pet's
+   history, a traveler's home waypoint) resets. #}
+{% if install_id_meta %}
+{% call section_card(icon='fingerprint', title='Install identifier',
+                     description="A random UUID minted on first start, stored locally. Some widgets need a stable identifier so they can remember state across sessions (a pet's history, a shared-world traveler's home waypoint). Not tied to your identity, hardware, or Tesserae account. Regenerate any time.") %}
+  <div class="section-body">
+    <p><strong>Current:</strong> <code>{{ install_id_meta.id }}</code></p>
+    {% if install_id_meta.created_at %}
+    <p class="field-help">Minted <code>{{ install_id_meta.created_at }}</code>. Stored at <code>data/core/install_id.json</code>.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('auth.settings_install_id_regenerate') }}"
+          class="form form--inline"
+          onsubmit="return confirm('Regenerate the install identifier? Widgets that use it (e.g. shared-world features like the pet or the traveler) will treat this install as brand new and any accumulated per-install state on their side will reset.');">
+      <button type="submit" class="button ghost">
+        <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+        <span>Regenerate</span>
+      </button>
+    </form>
+  </div>
+{% endcall %}
+{% endif %}
+
 {% endif %}
 
 {# About: project meta, survey, and sponsor. Three flat cards; no

@@ -51,6 +51,9 @@ from app import (
     trmnl_api,
     webhook_routes,
 )
+from app import (
+    install_id as install_id_module,
+)
 from app.discovery import DiscoveryCache
 from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
@@ -416,6 +419,13 @@ def create_app(
 
     settings = SettingsStore(data_root / "core" / "settings.json")
     app.config["SETTINGS_STORE"] = settings
+
+    # Install identifier: a random UUID generated on first startup and
+    # persisted at ``data/core/install_id.json``. Widgets that declare
+    # ``needs_install_id`` or ``needs_scoped_id`` in their manifest read
+    # this off the app config through the composer's render context.
+    # v0.70.0.
+    app.config["INSTALL_ID"] = install_id_module.load_or_create(data_root)
     # When running as an HA Add-on, Supervisor's options.json is the
     # canonical place for MQTT connection + log level. Apply it before
     # auth.secret_key / the transport wiring read the broker section,

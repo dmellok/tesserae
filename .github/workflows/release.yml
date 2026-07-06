@@ -1,0 +1,75 @@
+# Create a GitHub Release whenever a v* tag is pushed. Extracts the
+# matching section from CHANGELOG.md so the Release body mirrors the
+# curated release notes rather than the raw commit list.
+#
+# Never overwrites an existing Release: if one already exists for the
+# tag (e.g. the maintainer hand-created it), the workflow logs and
+# exits cleanly. Marks the Release as ``--latest`` so
+# ``api.tesserae.ink/version/latest`` reflects it on the next poll.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version + notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          # Extract the section for this version from CHANGELOG.md.
+          # Matches "## [<version>]," picks everything until the next
+          # "## [" or end of file. Falls back to a short auto-generated
+          # body when the CHANGELOG has no entry for this version.
+          awk -v ver="[$version]" '
+            BEGIN { capture=0 }
+            /^## \[/{
+              if (capture) exit
+              if (index($0, ver) > 0) { capture=1; next }
+            }
+            capture { print }
+          ' CHANGELOG.md > release_body.md
+          if [ ! -s release_body.md ]; then
+            printf "%s\n" "Release $tag." > release_body.md
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Skip if Release already exists
+        id: exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "${{ steps.notes.outputs.tag }}" >/dev/null 2>&1; then
+            echo "already-exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already-exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.exists.outputs.already-exists == 'false'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create "${{ steps.notes.outputs.tag }}" \
+            --title "${{ steps.notes.outputs.tag }}" \
+            --notes-file release_body.md \
+            --latest

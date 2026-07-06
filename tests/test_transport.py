@@ -97,6 +97,18 @@ def test_publish_before_connect_raises(fakes) -> None:
         t.publish("x", b"y")
 
 
+def test_publish_with_no_broker_configured_is_silent(fakes) -> None:
+    """When ``host`` was empty at construction, the fan-out ends up
+    calling ``publish()`` on base kind renderers whose device is
+    MQTT-native. There's no broker to publish to and the user never
+    asked for one, so raising marks their REST-only push as failed in
+    history (issue #67). No-op silently instead."""
+    _, factory = fakes
+    t = MqttTransport(BrokerConfig(host=""), client_factory=factory)
+    # Must not raise:
+    t.publish("tesserae/esp32/frame/bin", b"payload", qos=1)
+
+
 def test_publish_propagates_paho_rc(fakes) -> None:
     """Non-recoverable rc values (anything other than NO_CONN) still raise."""
     holder, factory = fakes

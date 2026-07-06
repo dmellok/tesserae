@@ -6,6 +6,72 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.70.0], 2026-07-07
+
+### Added
+
+- **`install_id` foundation for shared-world widgets.** Tesserae now
+  generates a random UUID on first startup and persists it at
+  ``data/core/install_id.json``. Widgets that declare
+  ``needs_install_id`` in their manifest receive the raw value on
+  ``ctx``, which is what upcoming shared-world features (dashboard pet,
+  traveler) will key against so state survives restarts. Widgets that
+  declare ``needs_scoped_id`` receive
+  ``SHA-256(install_id + plugin_id)`` instead, so their outbound
+  calls can't be correlated with other widgets on the same install.
+  The identifier is regenerable from **Settings → System → Install
+  identifier**; regeneration resets any per-install state that
+  external widget services have accumulated.
+- **Device firmware chip on the Devices card.** Each registered device
+  kind is looked up against ``api.tesserae.ink/firmware/<kind>/latest``
+  the first time the Devices page renders (and on demand every 60 min
+  after). When the device's running firmware is behind, an amber
+  "update available" pill appears next to the version. Lookups are
+  cached, silent-fail on network error, and the only outbound data is
+  the kind name.
+- **`tesserae_status` bundled widget (fixes #66).** Dashboard status
+  strip. Left identity (dashboard name + optional leading icon) paired
+  with a right-hand row of ambient chips: time, weather, panel
+  battery, Wi-Fi, broker, plus conditional app-version and firmware
+  update indicators, plus two custom text slots. Two placements (bar,
+  48 px tall; block, resizable, wrapping chips) and three chip modes
+  (icon+text, icon-only, text-only). Auto-contrasts against a
+  freeform ``panelBg`` hex: text, icons, and rules flip between ink
+  (#1B1A16) and paper (#FCFBF7) based on background luminance, and
+  the update accent flips between two reds. Update chips render only
+  when an update is pending; the signal is a positional badge dot on
+  the icon or an accent-red text sub, never colour alone, so a 1-bit
+  render still reads the update. The app-version update check is
+  off by default; when enabled it fetches
+  ``api.tesserae.ink/version/latest`` with a widget-scoped install id
+  (see above).
+- **Auto-release workflow.** Pushing a ``v*`` tag now creates the
+  matching GitHub Release from ``CHANGELOG.md`` automatically. Every
+  release is marked ``--latest`` so ``api.tesserae.ink/version/latest``
+  picks it up on the next poll. Existing Releases are never overwritten.
+
+### Fixed
+
+- **Broker-less installs no longer log push failures for renderers
+  that never had a broker to publish to (issue #67).** ``_fan_out``
+  walks every registered renderer, so on a
+  REST-only fleet with no MQTT configured, base kind renderers
+  (esp32_bin, esp32_bw_bin, pi_png, etc.) still called
+  ``transport.publish`` and got back
+  ``RuntimeError("transport not connected")``. The exception marked
+  the whole render as failed in the history view even though the
+  actually-bound REST device published fine. ``MqttTransport.publish``
+  now silently no-ops when the host was empty at construction; when a
+  host was configured but the connection dropped, it still raises so
+  a genuine outage still surfaces.
+
+### Changed
+
+- **Privacy docs updated.** ``docs/privacy.md`` documents the new
+  install identifier, both places widgets can fetch from
+  ``api.tesserae.ink``, and the exact query parameters those calls
+  carry. The app itself still sends no phone-home telemetry.
+
 ## [0.69.18], 2026-07-06
 
 ### Fixed

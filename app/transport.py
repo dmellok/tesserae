@@ -156,6 +156,22 @@ class MqttTransport:
 
     def publish(self, topic: str, payload: bytes, *, qos: int = 1, retain: bool = False) -> None:
         if not self._connected:
+            # Broker-less installs (all-REST fleets, HTTP-polled devices,
+            # bare-metal Pi with pi_bin over REST): the transport was
+            # constructed but never connected because no host was ever
+            # configured. Silently no-op so a fan-out over base kind
+            # renderers doesn't mark itself failed for a broker the
+            # user never asked for. When the user IS trying to use MQTT
+            # (host set, but connect failed / dropped), raising is
+            # still the right signal, keep that path unchanged.
+            # (issue #67)
+            if not self._config.host:
+                logger.debug(
+                    "MQTT publish %s skipped, no broker configured (%d bytes)",
+                    topic,
+                    len(payload),
+                )
+                return
             raise RuntimeError(f"transport not connected; can't publish to {topic!r}")
         result = self._client.publish(topic, payload, qos=qos, retain=retain)
         rc = getattr(result, "rc", 0)

@@ -75,6 +75,26 @@
         </span>
         {% endif %}
         <span class="dx-status-muted">last seen {{ section.status.relative }}</span>
+        {# v0.70.0: firmware version chip. Shows the fw_version the client
+           reports in its heartbeat, plus an amber "update available" pill
+           when api.tesserae.ink knows about a newer release for this
+           device kind. Hidden when the client doesn't report fw_version
+           OR when the firmware-source aggregator has no data (upstream
+           has no GitHub releases yet, network unreachable, etc.). #}
+        {% set _fw = section.status.firmware %}
+        {% if _fw and _fw.current %}
+        <span class="dx-status-muted">·</span>
+        <span class="dx-status-muted">firmware
+          <code>{{ _fw.current if _fw.current.startswith('v') else 'v' ~ _fw.current }}</code>
+        </span>
+        {% if _fw.state == 'outdated' and _fw.release_url %}
+        <a class="pill is-warn"
+           href="{{ _fw.release_url }}" target="_blank" rel="noopener"
+           title="{{ _fw.notes_headline or ('Latest available: v' ~ _fw.latest) }}">
+          v{{ _fw.latest }} available
+        </a>
+        {% endif %}
+        {% endif %}
       </div>
     </div>
     <button type="button" class="dx-collapse-btn" data-device-toggle

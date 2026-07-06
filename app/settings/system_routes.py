@@ -15,6 +15,7 @@ from flask import current_app, flash, request, send_file, session
 from werkzeug.wrappers import Response
 
 from app import backup as _backup_mod
+from app import install_id as install_id_module
 from app import updater as _updater_mod
 
 from ._shared import (
@@ -307,4 +308,27 @@ def system_webhook_set() -> Response:
         return system_redirect()
     settings_store().update_section("app", {"webhook_token_secret": token})
     flash("Webhook token saved.", "ok")
+    return system_redirect()
+
+
+# -- install identifier ------------------------------------------------
+
+
+@bp.post("/settings/system/install-id/regenerate", endpoint="settings_install_id_regenerate")
+def system_install_id_regenerate() -> Response:
+    """Rotate the install identifier (v0.70.0).
+
+    The install id is a random UUID stored at ``data/core/install_id.json``,
+    passed to widgets that declare ``needs_install_id`` (shared-world
+    features) or ``needs_scoped_id`` (privacy-scoped derivation). Rotating
+    it makes any per-install state on the widget side (a pet's history,
+    a traveler's home waypoint) effectively reset from the outside
+    world's point of view. The value on disk is replaced with a fresh
+    UUID and the running app picks it up on the next widget render.
+    """
+    from flask import current_app as _current_app
+
+    new_id = install_id_module.regenerate(data_root())
+    _current_app.config["INSTALL_ID"] = new_id
+    flash("Install identifier regenerated. Widgets that used it will see a new install.", "ok")
     return system_redirect()
