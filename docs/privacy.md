@@ -77,13 +77,17 @@ the update signal on your dashboard.
 
 ### Device firmware check
 
-Tesserae looks up the latest known firmware version for each of your
-registered device kinds against
+Tesserae can look up the latest known firmware version for each of
+your registered device kinds against
 `https://api.tesserae.ink/firmware/<kind>/latest`, so the Devices card
-can show "v1.1.0 (v1.2.0 available)" when a device is behind. The
-lookup happens lazily (on the first Devices page render, and on demand
-every 60 min after). The only outbound data is the device kind name;
-no identifiers, no device-specific fields.
+shows "v1.1.0 (v1.2.0 available)" when a device is behind. **Off by
+default** as of v0.70.1: turn it on from **Settings → System → Check
+for device firmware updates**. When enabled, the lookup happens
+lazily (on the first Devices page render, and on demand every 60 min
+after). The only outbound data is the device kind name; no install
+identifier, no device-specific fields. When disabled, the Devices
+card still shows the current firmware version reported by each
+device's heartbeat; the "update available" pill just never fires.
 
 ### Home Assistant App auto-update
 

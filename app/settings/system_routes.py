@@ -332,3 +332,22 @@ def system_install_id_regenerate() -> Response:
     _current_app.config["INSTALL_ID"] = new_id
     flash("Install identifier regenerated. Widgets that used it will see a new install.", "ok")
     return system_redirect()
+
+
+@bp.post("/settings/system/firmware-check/toggle", endpoint="settings_firmware_check_toggle")
+def system_firmware_check_toggle() -> Response:
+    """Flip ``settings.app.check_firmware_updates`` (v0.70.1).
+
+    The firmware-update lookup is off by default so a fresh install
+    never phones home to api.tesserae.ink. Users opt in from
+    Settings -> System; toggling here writes the new value and the
+    Devices card + tesserae_status widget pick it up on the next
+    render. Checkbox absent from the form body means unchecked.
+    """
+    enabled = request.form.get("check_firmware_updates") in ("1", "true", "on")
+    settings_store().patch_section("app", {"check_firmware_updates": enabled})
+    flash(
+        ("Firmware update lookups enabled." if enabled else "Firmware update lookups disabled."),
+        "ok",
+    )
+    return system_redirect()

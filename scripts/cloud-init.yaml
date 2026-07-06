@@ -64,7 +64,7 @@ runcmd:
   # ``v<X.Y.Z>`` value below to match the just-released tag. Users
   # who want to track ``main`` can drop the ``--branch`` and
   # ``--depth`` flags before flashing.
-  - su - tesserae -c 'git clone --branch v0.70.0 --depth 1 https://github.com/dmellok/tesserae.git /home/tesserae/tesserae'
+  - su - tesserae -c 'git clone --branch v0.70.1 --depth 1 https://github.com/dmellok/tesserae.git /home/tesserae/tesserae'
   - su - tesserae -c 'cd /home/tesserae/tesserae && python3 -m venv .venv'
   - su - tesserae -c 'cd /home/tesserae/tesserae && .venv/bin/pip install -e ".[dev]"'
   - /home/tesserae/tesserae/.venv/bin/playwright install-deps chromium

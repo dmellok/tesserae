@@ -111,8 +111,16 @@ def _broker_configured() -> bool:
 
 def _firmware_updates_available() -> int:
     """Count device kinds where at least one registered instance is on an
-    older firmware than the aggregator reports. Uses the in-memory
-    firmware_check cache without triggering fresh fetches."""
+    older firmware than the aggregator reports.
+
+    Skips the lookup entirely when
+    ``settings.app.check_firmware_updates`` is disabled (the app-level
+    opt-in for outbound api.tesserae.ink firmware calls, off by
+    default). Otherwise reads the in-memory firmware_check cache
+    without triggering fresh fetches.
+    """
+    if not _firmware_check_enabled():
+        return 0
     from app import firmware_check as firmware_check_module
 
     devices = current_app.config.get("DEVICE_REGISTRY")
@@ -131,6 +139,24 @@ def _firmware_updates_available() -> int:
         if state == "outdated":
             outdated_kinds.add(device.kind_of)
     return len(outdated_kinds)
+
+
+def _firmware_check_enabled() -> bool:
+    """Mirror of the same helper in :mod:`app.settings.index_routes`.
+    Kept local so the widget doesn't reach into Settings internals."""
+    settings = current_app.config.get("SETTINGS_STORE")
+    if settings is None:
+        return False
+    try:
+        section = settings.get_section("app") or {}
+    except Exception:
+        return False
+    raw = section.get("check_firmware_updates")
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in ("1", "true", "yes", "on")
+    return False
 
 
 def fetch(

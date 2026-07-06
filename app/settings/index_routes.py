@@ -247,6 +247,9 @@ def settings_area(area: str) -> str | Response:
             if area == "system"
             else None
         ),
+        # v0.70.1: firmware-update lookup opt-in state, so the System tab
+        # can render the "Check for device firmware updates" switch.
+        firmware_check_enabled=(_firmware_check_enabled() if area == "system" else False),
         trmnl_token_reveal=trmnl_token_reveal,
         # Pending REST pairing codes for the Devices area's Pair card.
         # Only computed on the devices tab; the template doesn't reference
@@ -1430,8 +1433,14 @@ def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
 
     Combines the ``fw_version`` value the client reported in its most
     recent heartbeat with the latest known version for its kind from the
-    v0.70.0 firmware-check module (which polls api.tesserae.ink lazily
-    with a 60-minute cache).
+    firmware-check module (which polls api.tesserae.ink lazily with a
+    60-minute cache).
+
+    The api.tesserae.ink lookup is off by default and only runs when
+    ``settings.app.check_firmware_updates`` is enabled; when it's off,
+    the chip shows the reported ``fw_version`` with ``state="no_data"``
+    so the "update available" pill never fires. Keeps the app's default
+    posture "no outbound calls" honest.
 
     Returns a dict with:
       * ``current``: the reported fw_version, or None.
@@ -1444,7 +1453,9 @@ def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
     kind_id = device.kind_of or device.id
     current = parsed.get("fw_version")
     current_str = str(current) if isinstance(current, (str, int, float)) else None
-    latest = firmware_check_module.latest_for_kind(kind_id)
+    latest = None
+    if _firmware_check_enabled():
+        latest = firmware_check_module.latest_for_kind(kind_id)
     state = firmware_check_module.compare_versions(current_str, latest)
     return {
         "current": current_str,
@@ -1453,6 +1464,25 @@ def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
         "release_url": latest.url if latest else None,
         "notes_headline": latest.notes_headline if latest else None,
     }
+
+
+def _firmware_check_enabled() -> bool:
+    """Read the ``settings.app.check_firmware_updates`` opt-in. Off by
+    default so a fresh install never phones home to api.tesserae.ink
+    for firmware lookups; users flip it on from Settings -> System."""
+    settings = current_app.config.get("SETTINGS_STORE")
+    if settings is None:
+        return False
+    try:
+        section = settings.get_section("app") or {}
+    except Exception:
+        return False
+    raw = section.get("check_firmware_updates")
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().lower() in ("1", "true", "yes", "on")
+    return False
 
 
 def _format_duration(seconds: float) -> str:

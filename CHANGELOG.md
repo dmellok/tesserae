@@ -6,6 +6,24 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.70.1], 2026-07-07
+
+### Fixed
+
+- **Device firmware-check lookups are now opt-in and off by default.**
+  v0.70.0 shipped the Devices-card firmware chip and the
+  ``tesserae_status`` firmware-updates chip wired directly to
+  ``api.tesserae.ink/firmware/<kind>/latest`` on first render.
+  Functionally a default-on outbound call, which contradicts the
+  "app itself sends no phone-home telemetry" claim. New setting
+  ``settings.app.check_firmware_updates`` (default ``false``) gates
+  both call sites; enable it from Settings -> System -> "Check for
+  device firmware updates". When off, the Devices card still shows
+  the current firmware from each device's heartbeat but the "update
+  available" pill never fires, and the widget's firmware-updates
+  chip stays hidden. Only the device kind name is ever sent; no
+  install identifier, no device-specific fields.
+
 ## [0.70.0], 2026-07-07
 
 ### Added

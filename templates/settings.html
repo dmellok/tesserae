@@ -1008,6 +1008,26 @@ docker compose up -d</code></pre>
 {% endcall %}
 {% endif %}
 
+{# v0.70.1: firmware-update lookup opt-in. Off by default so a fresh
+   install never phones home to api.tesserae.ink; users flip it on to
+   see "update available" pills on the Devices card and the aggregate
+   count in the tesserae_status widget. The only outbound data is the
+   device kind name; no identifiers. #}
+{% call section_card(icon='cloud-arrow-down', title='Check for device firmware updates',
+                     description="When on, Tesserae looks up the latest known firmware version for each of your registered device kinds against api.tesserae.ink and shows an 'update available' pill on the Devices card when a device is behind. Off by default. Sends only the device kind name; no install identifier, no device-specific fields.") %}
+  <div class="section-body">
+    <form method="post" action="{{ url_for('auth.settings_firmware_check_toggle') }}"
+          class="form form--inline">
+      <label class="switch">
+        <input type="checkbox" name="check_firmware_updates" value="1"
+               {% if firmware_check_enabled %}checked{% endif %}
+               onchange="this.form.submit()">
+        <span>Enable firmware update lookups</span>
+      </label>
+    </form>
+  </div>
+{% endcall %}
+
 {% endif %}
 
 {# About: project meta, survey, and sponsor. Three flat cards; no
