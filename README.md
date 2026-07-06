@@ -120,7 +120,7 @@ is awaiting a real-hardware confirmation.
 
 ### Seeed Studio
 
-The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); flash from the browser in one click at [tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, Web Serial, no toolchain). Battery-powered, no assembly required. The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS firmware path if you'd rather stay on stock.
+The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware](https://github.com/dmellok/tesserae-device-firmware); flash from the browser in one click at [tesserae.ink/flash](https://tesserae.ink/flash) (Chrome / Edge, Web Serial, no toolchain). Battery-powered, no assembly required.
 
 ![A family of Tesserae-driven e-ink displays on a shelf: reTerminal E1004 with a weather dashboard, reTerminal E1002 with a metrics view, XIAO ePaper panels, and a small colour Inky. Cat photobomb optional.](docs/screenshots/hero-family.jpg)
 
