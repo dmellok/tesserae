@@ -54,17 +54,28 @@ jobs:
 
       - name: Resolve edge version
         # Builds a per-commit immutable tag that the companion HA Add-on's
-        # edge channel pins to. Format: ``<pyproject-version>-edge.<sha7>``,
-        # e.g. ``0.11.14-edge.265bd45``. Only meaningful on main pushes
-        # (where the add-on sync workflow will then bump the edge add-on's
-        # ``version:`` field to match); on tag pushes the stable flow
-        # already covers tagging, so the extra raw tag is a harmless dup.
+        # edge channel pins to. Format:
+        # ``<pyproject-version>-edge.<commit-unix-timestamp>``,
+        # e.g. ``0.11.14-edge.1783402000``.
+        #
+        # v0.71.3: the previous format ``<version>-edge.<sha7>`` used the
+        # 7-char commit sha as the pre-release suffix. Semver compares
+        # alphanumeric pre-release identifiers by ASCII order, so a
+        # commit whose sha7 starts with a lower ASCII byte than the
+        # previous commit's sha7 (say the previous ``91af66f`` → new
+        # ``4c45a66``) was seen as older by HA Supervisor and it thought
+        # the add-on was already up to date. Unix commit-time is
+        # monotonic and numeric, so semver compares it numerically and
+        # the newer edge is always greater. Only meaningful on main
+        # pushes (where sync-addon.yml then bumps the edge add-on's
+        # ``version:`` to match); on tag pushes the stable flow already
+        # covers tagging.
         id: edge
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: |
           ver="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
-          sha="$(echo '${{ github.sha }}' | cut -c1-7)"
-          edge_tag="${ver}-edge.${sha}"
+          ct="$(git log -1 --format='%ct' HEAD)"
+          edge_tag="${ver}-edge.${ct}"
           echo "tag=${edge_tag}" >> "$GITHUB_OUTPUT"
           echo "Resolved edge tag: ${edge_tag}"
 

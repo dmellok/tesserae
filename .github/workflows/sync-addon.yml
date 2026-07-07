@@ -174,10 +174,18 @@ jobs:
           set -euo pipefail
           # Pyproject version is the "base" of the edge version string -
           # so an edge of 0.11.14-era main pushes resolves to
-          # 0.11.14-edge.<sha7>. Matches the docker.yml edge-tag step.
+          # 0.11.14-edge.<commit-unix-timestamp>. Matches the docker.yml
+          # edge-tag step.
+          #
+          # v0.71.3: switched from <sha7> to unix commit time so the
+          # suffix is monotonic and numeric. Semver compares alphanumeric
+          # pre-release identifiers by ASCII order, which meant a commit
+          # whose sha7 sorted below the previous one was seen as older
+          # by HA Supervisor and looked already-installed.
           base="$(grep -E '^version = ' pyproject.toml | head -1 | sed -E 's/version = "([^"]+)"/\1/')"
           sha="$(echo "${GITHUB_SHA_FULL}" | cut -c1-7)"
-          edge_version="${base}-edge.${sha}"
+          ct="$(git log -1 --format='%ct' "${GITHUB_SHA_FULL}")"
+          edge_version="${base}-edge.${ct}"
           subject="$(git log -1 --pretty=format:'%s' "${GITHUB_SHA_FULL}")"
           # Escape backticks / quotes for safety later, leave most punctuation.
           echo "version=${edge_version}" >> "$GITHUB_OUTPUT"
