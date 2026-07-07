@@ -106,6 +106,7 @@ nav:
       - Kindle Paperwhite + KOReader: quickstart/kindle.md
   - Featured hardware:
       - Seeed reTerminal E-Series: hardware/seeed.md
+      - PicPak 4.2" BWRY (community firmware): hardware/picpak.md
   - Screens & compatibility: compatibility.md
   - Widgets:
       - Bundled widgets: widgets/gallery.md

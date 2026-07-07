@@ -1,0 +1,24 @@
+{
+  "tesserae_compat": "1.x",
+  "id": "picpak_4_2",
+  "name": "PicPak 4.2\" BWRY e-paper frame",
+  "vendor": "PicPak",
+  "url": "https://github.com/varanu5/picpak-tesserae-client",
+  "icon": "device-tablet",
+  "description": "Battery-powered 4.2\" 4-colour BWRY (black/white/red/yellow) e-paper frame. Community firmware by varanu5 speaks Tesserae's REST device API and paints frames the esp32_bin renderer packs to 2-bpp BWRY.",
+  "protocol": "picpak_client",
+  "renderers": ["esp32_bin"],
+  "panel": {
+    "w": 400,
+    "h": 300,
+    "orientation": "landscape",
+    "name": "PicPak 4-colour BWRY",
+    "gamut": "bwry_4",
+    "native_w": 400,
+    "native_h": 300,
+    "vflip": true
+  },
+  "refresh_floor_s": 60,
+  "image_format": "bin",
+  "notes_md": "Community firmware by [varanu5](https://github.com/varanu5/picpak-tesserae-client). Stable as of the current build; ongoing stress-testing by the author."
+}

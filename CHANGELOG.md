@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **PicPak 4.2" BWRY as a community-firmware hardware entry.** New
+  hardware SKU manifest at `hardware/community/picpak_4_2.json`, a
+  featured hardware page at `docs/hardware/picpak.md`, and a
+  Community vendor bucket in the compatibility matrix. Links back to
+  the community firmware at `varanu5/picpak-tesserae-client`; credit
+  sits on the firmware repo. The `picpak_client` device kind already
+  ships with Tesserae; this surfaces it in Settings → Add Device and
+  in the browsable compatibility docs.
 - **Tri-colour and greyscale gamuts for the CircuitPython PNG path.** New
   panel gamut values `bwr_3` (black/white/red tri-colour e-ink) and
   `gray_4` (4-level greyscale ramp) join `bwry_4` in the 2-bit family. A

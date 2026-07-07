@@ -51,6 +51,7 @@ The bundled client kinds Tesserae knows how to talk to. A flashed client announc
 | `pi_bin_client` | 1424×1200 | `pi_bin` | Raspberry-Pi-side client that consumes the 4-bpp .bin frame. |
 | `pi_png_client` | 1424×1200 | `pi_png` | Raspberry-Pi-side client that consumes the PNG frame. |
 | `pico_bin_client` | 1600×1200 | `pico_bin` | Battery-powered Pico Plus 2 firmware (RP2350) driving a Pimoroni Inky-style Spectra 6 panel over SPI. |
+| `picpak_client` | 400×300 | `esp32_bin` | Battery-powered PicPak 4.2" 4-colour BWRY e-paper frame. |
 | `trmnl_client` | 800×480 | `trmnl_png` | HTTP-polled e-paper client compatible with the TRMNL BYOS protocol. |
 
 ## Hardware SKUs
@@ -91,6 +92,14 @@ The reTerminal E-Series and XIAO ePaper family run the [Tesserae-native firmware
 | [Waveshare PhotoPainter 7.3"](https://www.waveshare.com/photopainter-7.3.htm) | 800×480 | `spectra_6` | `esp32_client` (inherit) | `waveshare_photopainter_73` |
 | [Waveshare 4.2" B/W e-paper](https://www.waveshare.com/4.2inch-e-paper-module.htm) | 400×300 | `mono` | `esp32_bw_client` (inherit) | `waveshare_4_2_bw` |
 | [Waveshare 13.3" Spectra E6 (ESP32-S3)](https://www.waveshare.com/esp32-s3-epaper-13.3e6.htm) | 1200×1600 portrait | `waveshare_e6` | `esp32_client` (inherit) | `waveshare_133e6` |
+
+### Community
+
+Hardware supported by community-authored firmware. Each SKU below links to the firmware repo that talks Tesserae's device API on that hardware; credit sits with the firmware's author on the linked repo.
+
+| SKU | Panel | Gamut | Protocol / Renderer | Kind id |
+|---|---|---|---|---|
+| [PicPak 4.2" BWRY e-paper frame](https://github.com/varanu5/picpak-tesserae-client) | 400×300 | `bwry_4` | `picpak_client` <br> `esp32_bin` | `picpak_4_2` |
 
 ## What's been tested on real hardware
 

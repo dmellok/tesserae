@@ -35,6 +35,7 @@ VENDOR_ORDER: list[tuple[str, str]] = [
     ("pimoroni", "Pimoroni"),
     ("trmnl", "TRMNL"),
     ("waveshare", "Waveshare"),
+    ("community", "Community"),
 ]
 
 # Vendor id -> URL. Displayed as the section link so a reader can jump
@@ -59,6 +60,11 @@ VENDOR_INTRO: dict[str, str] = {
         "Web Serial, no toolchain). Battery-powered, no assembly required. "
         'The XIAO 7.5" and TRMNL 7.5" OG DIY Kit also run the TRMNL BYOS '
         "firmware path if you'd rather stay on stock."
+    ),
+    "community": (
+        "Hardware supported by community-authored firmware. Each SKU below "
+        "links to the firmware repo that talks Tesserae's device API on that "
+        "hardware; credit sits with the firmware's author on the linked repo."
     ),
 }
 
