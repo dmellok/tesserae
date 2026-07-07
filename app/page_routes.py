@@ -986,10 +986,21 @@ def status_bar_toggle(page_id: str) -> Response:
                 f"still leave room for the rest of the dashboard."
             ),
         )
-    # Rescale existing cells first so their new y + h are inside
-    # (STATUS_BAR_HEIGHT_PX, panel.h), then prepend the bar cell.
+    # v0.71.x: grow the auto-inserted cell so it accommodates the
+    # gap-derived padding. Composer applies ``outer_pad = gap // 2``
+    # on the top edge (touches panel wall) and ``inner_pad = gap // 4``
+    # on the bottom edge (touches other cells). Bumping the cell's h
+    # by (outer_pad + inner_pad) keeps the visible content area at
+    # STATUS_BAR_HEIGHT_PX regardless of the user's gap setting AND
+    # keeps the gap slider's matting visible around the bar on all
+    # four sides. If the user later changes the gap, existing bar
+    # cells stay at their original size; toggling off + on re-sizes
+    # to the new gap.
+    outer_pad = max(0, page.gap) // 2
+    inner_pad = max(0, page.gap) // 4
+    bar_cell_h = STATUS_BAR_HEIGHT_PX + outer_pad + inner_pad
     shifted = _rescale_cells_below_bar(
-        list(page.cells), panel_h=panel.h, bar_h=STATUS_BAR_HEIGHT_PX, direction="down"
+        list(page.cells), panel_h=panel.h, bar_h=bar_cell_h, direction="down"
     )
     bar_cell = Cell(
         id=uuid.uuid4().hex[:8],
@@ -997,7 +1008,7 @@ def status_bar_toggle(page_id: str) -> Response:
         x=0,
         y=0,
         w=panel.w,
-        h=STATUS_BAR_HEIGHT_PX,
+        h=bar_cell_h,
         options=_default_status_bar_options(page.name),
     )
     _store().save(

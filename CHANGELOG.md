@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Status bar honours the page gap on all four sides.** The
+  ``tesserae_status`` widget was declared ``full_bleed=true`` so it
+  rendered edge-to-edge on the wall-touching sides; users expected the
+  gap slider's matting to be visible around the bar on all sides,
+  not just the edge shared with the widgets below. Removed
+  ``full_bleed`` from the manifest so the composer applies normal
+  gap padding, and grew the auto-inserted bar cell's height by
+  ``outer_pad + inner_pad`` at toggle-on time so the visible content
+  area stays at the design's 48 px regardless of the current page
+  gap. Existing installs with a status bar cell inserted before
+  this fix keep the older 48 px cell; toggling the switch off and
+  back on re-sizes to the new gap-aware height.
+
 ## [0.71.2], 2026-07-07
 
 ### Fixed

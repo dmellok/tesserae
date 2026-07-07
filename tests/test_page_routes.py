@@ -566,6 +566,30 @@ def test_status_bar_toggle_preserved_across_layout_change(app: Flask, tmp_path: 
         assert c.y >= 48
 
 
+def test_status_bar_cell_grows_with_gap_so_padding_fits(app: Flask, tmp_path: Path) -> None:
+    """v0.71.x: when a page has a non-zero gap, the auto-inserted
+    status bar cell's h grows by ``outer_pad + inner_pad`` so the
+    composer's gap padding paints matting on all four sides of the
+    bar without eating into the widget's usable content area."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    # Set a page-level gap; combined-endpoint autosave writes ``gap``
+    # into the page metadata.
+    client.post(f"/pages/{pid}", data={"gap": "40"})
+    assert _store(tmp_path).get(pid).gap == 40
+
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    page = _store(tmp_path).get(pid)
+    bar = page.cells[0]
+    # gap=40 -> outer_pad=20, inner_pad=10 -> bar h = 48+20+10 = 78.
+    assert bar.h == 78
+    # Cells below start at the bar's bottom, not just past 48 px.
+    for c in page.cells[1:]:
+        assert c.y >= 78
+
+
 def test_status_bar_refuses_on_very_short_panel(app: Flask, tmp_path: Path) -> None:
     """A panel that's too short can't fit a 48 px bar + at least
     STATUS_BAR_MIN_REMAINING_PX for the rest of the dashboard. Toggle
