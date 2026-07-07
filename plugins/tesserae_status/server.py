@@ -51,10 +51,23 @@ def _server_version() -> str | None:
     return None
 
 
-def _panel_battery() -> int | None:
-    """Return the battery percentage of the first bound battery device
-    with a fresh reading, or ``None`` when no data is available."""
+def _panel_battery(target_device_id: str = "") -> int | None:
+    """Return the battery percentage of the render's target device.
+
+    When ``target_device_id`` is set (per-device push render), use that
+    device's reading directly so a page bound to Kitchen + Living Room
+    displays each panel's own battery, not the min across all bound
+    devices. Empty target (editor preview / virtual panel push) falls
+    back to the pre-v0.71.x min-across-devices behaviour.
+    """
     status_cache = current_app.config.get("DEVICE_STATUS") or {}
+    if target_device_id:
+        entry = status_cache.get(target_device_id) or {}
+        parsed = entry.get("parsed") or {}
+        pct = parsed.get("battery_pct")
+        if isinstance(pct, (int, float)) and 0 < float(pct) <= 100:
+            return int(pct)
+        return None
     battery_pcts: list[int] = []
     for entry in status_cache.values():
         parsed = (entry or {}).get("parsed") or {}
@@ -64,15 +77,36 @@ def _panel_battery() -> int | None:
     return min(battery_pcts) if battery_pcts else None
 
 
-def _wifi_label() -> str | None:
+def _wifi_label(target_device_id: str = "") -> str | None:
     """Return a coarse Wi-Fi strength label ("Excellent" / "Good" /
-    "Fair" / "Weak") derived from the worst RSSI across bound devices.
+    "Fair" / "Weak") derived from RSSI.
 
-    Mirrors the buckets Settings uses (`_humanize_signal`) but returns
-    just the short label so it fits in a chip. ``None`` when no device
-    reports RSSI.
+    Per-device render: use the target device's RSSI. Empty target
+    falls back to the worst RSSI across bound devices (pre-v0.71.x
+    behaviour) so single-panel and virtual-panel renders still work.
     """
+
+    def _label_for(rssi_val: int) -> str:
+        if rssi_val >= -55:
+            return "Excellent"
+        if rssi_val >= -65:
+            return "Good"
+        if rssi_val >= -75:
+            return "Fair"
+        return "Weak"
+
     status_cache = current_app.config.get("DEVICE_STATUS") or {}
+    if target_device_id:
+        entry = status_cache.get(target_device_id) or {}
+        parsed = entry.get("parsed") or {}
+        rssi = parsed.get("rssi")
+        try:
+            value = int(rssi) if rssi is not None else None
+        except (TypeError, ValueError):
+            value = None
+        if value is None:
+            return None
+        return _label_for(value)
     worst: int | None = None
     for entry in status_cache.values():
         parsed = (entry or {}).get("parsed") or {}
@@ -87,13 +121,7 @@ def _wifi_label() -> str | None:
             worst = value
     if worst is None:
         return None
-    if worst >= -55:
-        return "Excellent"
-    if worst >= -65:
-        return "Good"
-    if worst >= -75:
-        return "Fair"
-    return "Weak"
+    return _label_for(worst)
 
 
 def _broker_configured() -> bool:
@@ -173,6 +201,12 @@ def fetch(
             return raw.strip().lower() in ("1", "true", "yes", "on")
         return default
 
+    # v0.71.x per-device render: composer sets ``target_device_id`` on
+    # ctx for widgets that opt into ``render.per_device_id`` in their
+    # manifest. Empty string means "no specific target" (editor
+    # preview, virtual panel push); helpers fall back to the min-
+    # across-devices aggregate in that case.
+    target_device_id = str(ctx.get("target_device_id") or "")
     version = _server_version()
 
     return {
@@ -192,8 +226,8 @@ def fetch(
         "check_for_updates": _bool("check_for_updates", False),
         "show_firmware_updates": _bool("show_firmware_updates", True),
         # Values populated server-side
-        "battery_pct": _panel_battery() if _bool("show_battery", True) else None,
-        "wifi_label": _wifi_label() if _bool("show_wifi", True) else None,
+        "battery_pct": (_panel_battery(target_device_id) if _bool("show_battery", True) else None),
+        "wifi_label": _wifi_label(target_device_id) if _bool("show_wifi", True) else None,
         "broker_available": _broker_configured() if _bool("show_broker", True) else False,
         "version": version,
         "firmware_updates": (

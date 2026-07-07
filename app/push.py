@@ -133,6 +133,39 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
     return {rid for rid, enabled in raw.items() if enabled is False}
 
 
+def _page_needs_per_device_render(page: Any) -> bool:
+    """True when ``page`` carries a cell whose widget declares
+    ``render.per_device_id: true`` in its manifest.
+
+    v0.71.x introduced this flag so the push pipeline knows to fan out
+    per bound device instead of per panel group. The tesserae_status
+    bar needs it (per-device battery + Wi-Fi chips); other widgets that
+    render identically for every device on a shared panel don't.
+
+    Falls back to False when there's no Flask app context or no
+    ``PLUGIN_REGISTRY`` on it (unit-test setups), which keeps the
+    pre-v0.71.x panel-group behaviour intact for callers that don't
+    care."""
+    try:
+        from flask import current_app
+
+        registry = current_app.config.get("PLUGIN_REGISTRY")
+    except Exception:
+        return False
+    if registry is None:
+        return False
+    for cell in getattr(page, "cells", []) or []:
+        plugin_id = getattr(cell, "plugin", None)
+        if not plugin_id:
+            continue
+        plugin = registry.get(plugin_id)
+        if plugin is None:
+            continue
+        if plugin.manifest.get("render", {}).get("per_device_id"):
+            return True
+    return False
+
+
 logger = logging.getLogger(__name__)
 
 PushStatus = Literal[
@@ -771,46 +804,62 @@ class PushManager:
 
         all_renderers: list[RendererResult] = []
         group_results: list[PushResult] = []
+        # v0.71.x: pages carrying a widget that declares
+        # ``render.per_device_id: true`` (e.g. the tesserae_status bar
+        # with its per-device battery + wifi chips) must render once per
+        # bound device so each device's frame reflects its own status,
+        # not a min-across-all-devices aggregate. Everything else keeps
+        # the panel-group fan-out (one render → many devices).
+        per_device_render = _page_needs_per_device_render(page)
         for panel, group_dids in groups:
-            compose_url = to_loopback_url(
-                f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
-            )
-            try:
-                composition_png = render_to_png(
-                    RenderRequest(
-                        url=compose_url,
-                        viewport_w=panel.w,
-                        viewport_h=panel.h,
-                        timezone_id=self._render_timezone_id(),
-                    ),
-                    pool=self._browser_pool_fn(),
+            # When per-device-render is on and there ARE bound devices,
+            # iterate over each device; a compose URL with ``device_id``
+            # tells the composer to expose it via ctx. Otherwise a
+            # single render + fan-out per group, the pre-v0.71.x path.
+            if per_device_render and group_dids:
+                render_targets: list[tuple[str, set[str] | None]] = [
+                    (did, {did}) for did in group_dids
+                ]
+            else:
+                render_targets = [
+                    ("", set(group_dids) if group_dids else None)  # type: ignore[list-item]
+                ]
+            for target_id, device_filter in render_targets:
+                base = f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
+                compose_url = to_loopback_url(
+                    f"{base}&device_id={target_id}" if target_id else base
                 )
-            except Exception as err:
-                # Some exceptions stringify to an empty message (notably
-                # ``concurrent.futures.TimeoutError`` from the BrowserPool's
-                # outer deadline), which surfaces in the History row as a
-                # bare "render:" with no detail. Fall through to the type
-                # name so the user has at least one breadcrumb.
-                err_msg = str(err) or type(err).__name__
-                group_results.append(
-                    self._log_failure(
-                        source=source,
-                        target=page_id,
-                        error=f"render: {err_msg}",
-                        duration_s=time.monotonic() - started,
+                try:
+                    composition_png = render_to_png(
+                        RenderRequest(
+                            url=compose_url,
+                            viewport_w=panel.w,
+                            viewport_h=panel.h,
+                            timezone_id=self._render_timezone_id(),
+                        ),
+                        pool=self._browser_pool_fn(),
                     )
+                except Exception as err:
+                    err_msg = str(err) or type(err).__name__
+                    group_results.append(
+                        self._log_failure(
+                            source=source,
+                            target=page_id,
+                            error=f"render: {err_msg}",
+                            duration_s=time.monotonic() - started,
+                        )
+                    )
+                    continue
+                result = self._fan_out(
+                    composition_png,
+                    panel.model_dump(),
+                    source=source,
+                    target=page_id,
+                    started=started,
+                    device_filters=device_filter,
                 )
-                continue
-            result = self._fan_out(
-                composition_png,
-                panel.model_dump(),
-                source=source,
-                target=page_id,
-                started=started,
-                device_filters=set(group_dids) if group_dids else None,
-            )
-            all_renderers.extend(result.renderers)
-            group_results.append(result)
+                all_renderers.extend(result.renderers)
+                group_results.append(result)
 
         # Aggregate the per-panel pushes into one result for the caller.
         # Each group already logged its own push + renderer events.
@@ -1019,6 +1068,25 @@ class PushManager:
             status = "sent"
             error = None
 
+        # Snapshot which devices this push targeted so the History
+        # timeline can chip each row with the actual delivery targets
+        # instead of falling back to the page's current bindings (which
+        # drift over time as users add / remove devices). The set is
+        # derived from ``device_filters`` when set, otherwise from every
+        # renderer that actually fired (renderer.device on the base
+        # kind, clone id on a user-created instance) so that a virtual-
+        # panel fan-out still labels the row.
+        if device_filters:
+            targeted_ids = sorted(device_filters)
+        else:
+            targeted_ids = sorted(
+                {
+                    getattr(self._registry.get(r.renderer_id), "device", "")
+                    for r in results
+                    if r.error is None
+                }
+                - {""}
+            )
         event_id = self._event_log.record(
             type="push",
             source=source,
@@ -1027,7 +1095,10 @@ class PushManager:
             digest=comp_digest,
             error=error,
             duration_s=duration,
-            extra={"renderers": [asdict(r) for r in results]},
+            extra={
+                "renderers": [asdict(r) for r in results],
+                "device_ids": targeted_ids,
+            },
         )
 
         # Roll the orphan-render sweep on a cadence (the just-written

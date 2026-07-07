@@ -206,6 +206,7 @@ def _parallel_fetch_plugin_data(
     preview: bool,
     *,
     sample: bool = False,
+    target_device_id: str = "",
 ) -> dict[int, Any]:
     """Run each cell's ``server.py`` fetch() in a worker thread.
 
@@ -256,7 +257,14 @@ def _parallel_fetch_plugin_data(
     def _worker(plugin_id: str, options: dict[str, Any], cell_w: int, cell_h: int) -> Any:
         with app.app_context():
             return _fetch_plugin_data(
-                plugin_id, options, panel_w, panel_h, preview, cell_w=cell_w, cell_h=cell_h
+                plugin_id,
+                options,
+                panel_w,
+                panel_h,
+                preview,
+                cell_w=cell_w,
+                cell_h=cell_h,
+                target_device_id=target_device_id,
             )
 
     results: dict[int, Any] = {}
@@ -350,6 +358,7 @@ def _fetch_plugin_data(
     *,
     cell_w: int = 0,
     cell_h: int = 0,
+    target_device_id: str = "",
 ) -> Any:
     """Call the plugin's server.py fetch() if present. Returns None on miss.
 
@@ -415,6 +424,14 @@ def _fetch_plugin_data(
         "home_lat": home_lat,
         "home_lon": home_lon,
     }
+    # v0.71.x: per-device rendering. When the push pipeline is fanning
+    # this render out to a specific device (multiple bound to the same
+    # panel), the compose URL carries ``?device_id=<id>``. Widgets that
+    # declare ``render.per_device_id: true`` in their manifest opt in
+    # to reading it; other widgets never see the field so shared
+    # renders stay identical to what they were before.
+    if target_device_id and manifest.get("render", {}).get("per_device_id"):
+        ctx["target_device_id"] = target_device_id
     install_uuid = current_app.config.get("INSTALL_ID")
     if isinstance(install_uuid, str) and install_uuid:
         if manifest.get("needs_install_id"):
@@ -558,7 +575,12 @@ def _hydrate_page(
     # app context the caller holds so each fetch can still read
     # SETTINGS_STORE / plugin registry from current_app.
     data_by_cell_index: dict[int, Any] = _parallel_fetch_plugin_data(
-        cells_meta, panel_w, panel_h, preview, sample=sample
+        cells_meta,
+        panel_w,
+        panel_h,
+        preview,
+        sample=sample,
+        target_device_id=str(page_dict.get("target_device_id") or ""),
     )
 
     cells_out: list[dict[str, Any]] = []
@@ -624,6 +646,16 @@ def compose(page_id: str) -> str:
         panel = resolve_panel_for_page(page, devices, settings_store)
         panel_w, panel_h = panel.w, panel.h
     page_dict["panel"] = {"w": panel_w, "h": panel_h}
+    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
+    # tesserae_status which of the page's bound devices this render is
+    # for, so per-device battery / signal chips actually reflect the
+    # panel receiving the frame rather than a min-across-all-devices
+    # aggregate. The push pipeline sets this when it fans out to
+    # multiple devices sharing a panel; the editor preview leaves it
+    # empty.
+    target_device_id = (request.args.get("device_id") or "").strip()
+    if target_device_id:
+        page_dict["target_device_id"] = target_device_id
     return render_template(
         "compose.html",
         page=_hydrate_page(page_dict, preview=not for_push),

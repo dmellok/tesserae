@@ -111,6 +111,7 @@
   ],
   "render": {
     "dither": "none",
-    "needs_network": true
+    "needs_network": true,
+    "per_device_id": true
   }
 }
