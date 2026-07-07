@@ -18,6 +18,7 @@ import pytest
 from app import device_loader, device_service, renderer_loader
 from app.main import REPO_ROOT
 from app.panel import (
+    fit_cells_to_panel,
     panel_groups_for_push,
     preview_groups_for_page,
     resolve_panel_for_page,
@@ -331,3 +332,63 @@ def _virtual(w: int, h: int):
     from app.state.page_store import Panel
 
     return Panel(w=w, h=h)
+
+
+# -- fit_cells_to_panel top-strip anchoring (v0.71.1) ------------------
+
+
+def test_fit_cells_to_panel_rotates_layout_to_match_target_orientation():
+    """Baseline: without the top_strip hint, a landscape layout auto-
+    rotates 90° clockwise to fit a portrait target. Locks in the pre-
+    v0.71.1 behaviour."""
+    # Bar at (0, 0, 800, 48) followed by one big body cell.
+    cells = [(0, 0, 800, 48), (0, 48, 800, 432)]
+    fitted = fit_cells_to_panel(cells, 480, 800)
+    # Landscape -> portrait rotates; bar's top-edge (y=0) maps to the
+    # right edge. This is exactly the misplacement bug the top_strip
+    # hint fixes.
+    bar = fitted[0]
+    assert bar[0] > 200, f"expected bar's x on the right edge after rotation, got {bar}"
+
+
+def test_fit_cells_to_panel_top_strip_anchors_to_top_of_portrait_target():
+    """With top_strip_index set, the status-bar-style cell stays at
+    (0, 0, target_w, ~strip_h) regardless of rotation. Others are
+    fitted into the below-strip band."""
+    cells = [(0, 0, 800, 48), (0, 48, 800, 432)]
+    fitted = fit_cells_to_panel(cells, 480, 800, top_strip_index=0)
+    bar = fitted[0]
+    assert bar[0] == 0
+    assert bar[1] == 0
+    assert bar[2] == 480  # full width of target
+    # Strip height scaled proportionally (design short = 480,
+    # target short = 480, so 48 stays about 48).
+    assert 40 <= bar[3] <= 60, f"strip height off, got {bar}"
+    # Body cell sits below the strip.
+    body = fitted[1]
+    assert body[1] >= bar[3]
+    assert body[1] + body[3] <= 800
+
+
+def test_fit_cells_to_panel_top_strip_keeps_top_when_orientation_matches():
+    """Same orientation (landscape design -> landscape target) still
+    anchors the strip at the top; the code path is orientation-
+    independent."""
+    cells = [(0, 0, 800, 48), (0, 48, 800, 432)]
+    fitted = fit_cells_to_panel(cells, 1200, 720, top_strip_index=0)
+    bar = fitted[0]
+    assert (bar[0], bar[1]) == (0, 0)
+    assert bar[2] == 1200
+    # Design short axis 480; target short axis 720. Strip scales by
+    # 720/480 = 1.5, so 48 -> 72.
+    assert bar[3] == 72
+
+
+def test_fit_cells_to_panel_top_strip_only_cell():
+    """Degenerate: page with only the status bar cell still renders
+    it at the top of the target."""
+    fitted = fit_cells_to_panel([(0, 0, 800, 48)], 480, 800, top_strip_index=0)
+    assert len(fitted) == 1
+    x, y, w, h = fitted[0]
+    assert (x, y, w) == (0, 0, 480)
+    assert h > 0

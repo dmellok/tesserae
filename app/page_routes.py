@@ -277,6 +277,20 @@ def _new_cell(*, x: int, y: int, w: int, h: int) -> Cell:
     return Cell(id=uuid.uuid4().hex[:8], plugin=None, x=x, y=y, w=w, h=h, options={})
 
 
+def _status_bar_cell_index(page: Page) -> int | None:
+    """Return the index of the auto-managed status bar cell within
+    ``page.cells``, or None when the bar is off / the id doesn't
+    resolve. Used to tell ``fit_cells_to_panel`` which cell is the
+    orientation-fixed top strip (v0.71.1: without this, a page bound
+    to a portrait panel rotates the top strip onto the right edge)."""
+    if not page.status_bar_enabled or not page.status_bar_cell_id:
+        return None
+    for i, cell in enumerate(page.cells):
+        if cell.id == page.status_bar_cell_id:
+            return i
+    return None
+
+
 # v0.71.0: fixed bar height used when auto-inserting the status_bar
 # cell. Matches the design handoff's "bar mode: 48 px tall" absolute
 # measure; e-ink panels vary in resolution but 48 px reads well on
@@ -480,7 +494,8 @@ def _ensure_cells_fit_panel(page: Page, panel: Any) -> Page:
     orientation_changed = (design_w >= design_h) != (panel.w >= panel.h)
     if in_bounds and not orientation_changed:
         return page
-    fitted = fit_cells_to_panel(coords, panel.w, panel.h)
+    top_strip_index = _status_bar_cell_index(page)
+    fitted = fit_cells_to_panel(coords, panel.w, panel.h, top_strip_index=top_strip_index)
     if fitted == coords:
         return page
     new_cells = [
@@ -1281,7 +1296,8 @@ def refit_cells(page_id: str) -> Response:
         return _flash_save(True, "Nothing to refit.")
     panel = resolve_panel_for_page(page, _devices(), _settings_store())
     coords = [(c.x, c.y, c.w, c.h) for c in page.cells]
-    fitted = fit_cells_to_panel(coords, panel.w, panel.h)
+    top_strip_index = _status_bar_cell_index(page)
+    fitted = fit_cells_to_panel(coords, panel.w, panel.h, top_strip_index=top_strip_index)
     if fitted == coords:
         return _flash_save(True, "Cells already fit the current panel.")
     new_cells = [

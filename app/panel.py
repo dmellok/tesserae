@@ -353,6 +353,8 @@ def fit_cells_to_panel(
     cells: list[tuple[int, int, int, int]],
     target_w: int,
     target_h: int,
+    *,
+    top_strip_index: int | None = None,
 ) -> list[tuple[int, int, int, int]]:
     """Project cells onto the target panel, auto-rotating 90° if the
     cells were laid out for the opposite orientation.
@@ -369,10 +371,28 @@ def fit_cells_to_panel(
       regardless of exact panel size differences (e.g. 1600x1200 →
       800x600).
 
+    When ``top_strip_index`` is set, that cell is treated as an
+    orientation-fixed top strip: it stays at (0, 0, target_w,
+    strip_h_scaled) in the target regardless of rotation, and the
+    remaining cells are fitted into the below-strip band. Without
+    this the naive 90° rotation would map the top edge onto the right
+    edge, so the status bar would render as a vertical strip on the
+    right of a portrait target (v0.71.0 status-bar toggle bug).
+
     Pure function, no Cell objects, no I/O, so this is cheap to call
     at every render/preview tick."""
     if not cells:
         return []
+    if top_strip_index is not None and 0 <= top_strip_index < len(cells):
+        return _fit_with_top_strip(cells, target_w, target_h, top_strip_index)
+    return _fit_impl(cells, target_w, target_h)
+
+
+def _fit_impl(
+    cells: list[tuple[int, int, int, int]],
+    target_w: int,
+    target_h: int,
+) -> list[tuple[int, int, int, int]]:
     design_w = max(x + w for x, y, w, h in cells)
     design_h = max(y + h for x, y, w, h in cells)
     if design_w <= 0 or design_h <= 0:
@@ -399,6 +419,70 @@ def fit_cells_to_panel(
         nh = max(1, min(target_h - ny, round(h * sy)))
         out.append((nx, ny, nw, nh))
     return out
+
+
+def _fit_with_top_strip(
+    cells: list[tuple[int, int, int, int]],
+    target_w: int,
+    target_h: int,
+    top_strip_index: int,
+) -> list[tuple[int, int, int, int]]:
+    """Fit ``cells`` where ``cells[top_strip_index]`` is an orientation-
+    fixed top strip. The strip's height in the target scales
+    proportionally to the target's short axis vs the design's, so a
+    48 px design strip stays around 48 px on similar-sized panels and
+    proportionally on very different ones. The remaining cells are
+    fitted into the band beneath the strip with the normal rotate +
+    scale rules."""
+    strip = cells[top_strip_index]
+    others = [c for i, c in enumerate(cells) if i != top_strip_index]
+    _sx, strip_y, strip_w, strip_h_design = strip
+
+    # Design short axis (height for a landscape design; width for a
+    # portrait design). The strip's h in the design is against the
+    # short axis; scale to the target's short axis so the ratio is
+    # preserved when the orientation flips.
+    design_bounds = _design_bounds(others)
+    design_w, design_h = (
+        design_bounds if design_bounds else (max(strip_w, 1), max(strip_h_design, 1))
+    )
+    design_short = min(design_w, design_h)
+    target_short = min(target_w, target_h)
+    if design_short <= 0:
+        strip_h_target = strip_h_design
+    else:
+        strip_h_target = max(1, round(strip_h_design * target_short / design_short))
+    strip_h_target = min(strip_h_target, max(1, target_h - 1))
+
+    fitted_strip = (0, 0, target_w, strip_h_target)
+
+    if not others:
+        return [fitted_strip]
+
+    # Shift others so their coord system starts at y=0 (as if the
+    # strip wasn't there), then fit into the below-strip band. The
+    # shift amount is the strip's bottom edge in design coords.
+    y_offset = max(0, strip_y + strip_h_design)
+    shifted_others = [(x, max(0, y - y_offset), w, h) for (x, y, w, h) in others]
+    below_target_h = max(1, target_h - strip_h_target)
+    fitted_others = _fit_impl(shifted_others, target_w, below_target_h)
+    # Push them down into the below-strip band.
+    fitted_others = [(x, y + strip_h_target, w, h) for (x, y, w, h) in fitted_others]
+
+    result = list(fitted_others)
+    result.insert(top_strip_index, fitted_strip)
+    return result
+
+
+def _design_bounds(
+    cells: list[tuple[int, int, int, int]],
+) -> tuple[int, int] | None:
+    if not cells:
+        return None
+    return (
+        max(x + w for x, y, w, h in cells),
+        max(y + h for x, y, w, h in cells),
+    )
 
 
 def _is_portrait(value: object) -> bool:

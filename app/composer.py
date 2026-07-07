@@ -475,7 +475,18 @@ def _hydrate_page(
     from app.panel import fit_cells_to_panel  # local import: avoid cycle
 
     raw_coords = [(int(c["x"]), int(c["y"]), int(c["w"]), int(c["h"])) for c in page_dict["cells"]]
-    fitted = fit_cells_to_panel(raw_coords, panel_w, panel_h)
+    # v0.71.1: the auto-managed status bar cell is orientation-fixed
+    # (always at the top of the target). Without this hint,
+    # fit_cells_to_panel's 90° rotation puts it on the right edge of a
+    # portrait panel.
+    status_bar_id = page_dict.get("status_bar_cell_id")
+    top_strip_index: int | None = None
+    if status_bar_id:
+        for i, c in enumerate(page_dict["cells"]):
+            if c.get("id") == status_bar_id:
+                top_strip_index = i
+                break
+    fitted = fit_cells_to_panel(raw_coords, panel_w, panel_h, top_strip_index=top_strip_index)
     page_dict = {
         **page_dict,
         "cells": [

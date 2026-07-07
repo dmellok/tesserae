@@ -6,6 +6,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.71.1], 2026-07-07
+
+### Fixed
+
+- **Status bar rendered on the right edge of portrait panels instead
+  of at the top.** ``fit_cells_to_panel`` rotates the layout 90°
+  clockwise when the design orientation doesn't match the target
+  (landscape design ↔ portrait panel), which maps the top edge onto
+  the right edge. The status bar cell got rotated along with everything
+  else and painted as a vertical strip on the right. The fitter now
+  accepts a ``top_strip_index`` hint: the flagged cell is
+  orientation-fixed and stays at ``(0, 0, target_w, strip_h_scaled)``
+  in the target regardless of rotation; the remaining cells are fitted
+  into the below-strip band with the normal rotate + scale rules. Both
+  the composer and the "refit to current panel" path pass the hint
+  automatically when the page has an auto-managed status bar.
+
 ## [0.71.0], 2026-07-07
 
 ### Added
