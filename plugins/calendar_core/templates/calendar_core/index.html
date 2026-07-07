@@ -39,22 +39,25 @@
     <li class="cf-row {% if not f.enabled %}is-disabled{% endif %}">
       <span class="cf-swatch" style="background: {{ f.colour }};" aria-hidden="true"></span>
       <span class="cf-name">
-        {{ f.name }}<span class="cf-id">{{ f.id }}</span>
-        <span class="cf-cache">
-          {% if not ci.has_cache %}
-            <span class="cf-chip cf-chip--warn">no cache yet</span>
-          {% elif ci.is_stale %}
-            <span class="cf-chip cf-chip--warn"
-                  title="Cache is older than the 15-minute TTL; a widget render will trigger a fresh fetch.">
-              cached {{ ci.age_s // 60 }} min ago (stale)
-            </span>
-          {% else %}
-            <span class="cf-chip cf-chip--ok"
-                  title="Cached bytes are served for the next {{ (ci.ttl_s - ci.age_s) // 60 }} min. Hit Refresh to force a re-fetch now.">
-              cached {{ ci.age_s // 60 }} min ago
-            </span>
-          {% endif %}
+        <span class="cf-name-line">
+          <span class="cf-name-text">{{ f.name }}</span>
+          <span class="cf-cache">
+            {% if not ci.has_cache %}
+              <span class="cf-chip cf-chip--warn">no cache yet</span>
+            {% elif ci.is_stale %}
+              <span class="cf-chip cf-chip--warn"
+                    title="Cache is older than the 15-minute TTL; a widget render will trigger a fresh fetch.">
+                cached {{ ci.age_s // 60 }} min ago (stale)
+              </span>
+            {% else %}
+              <span class="cf-chip cf-chip--ok"
+                    title="Cached bytes are served for the next {{ (ci.ttl_s - ci.age_s) // 60 }} min. Hit Refresh to force a re-fetch now.">
+                cached {{ ci.age_s // 60 }} min ago
+              </span>
+            {% endif %}
+          </span>
         </span>
+        <span class="cf-id">{{ f.id }}</span>
       </span>
       <span class="cf-url" title="{{ f.url }}">{{ f.url }}</span>
       <div class="cf-actions">
@@ -102,8 +105,9 @@
   .cf-row.is-disabled { opacity: 0.55; }
   .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
   .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); }
+  .cf-name-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; }
-  .cf-cache { margin-top: 2px; }
+  .cf-cache { display: inline-flex; }
   .cf-chip {
     display: inline-block;
     font: var(--t-size-xs)/1.2 var(--t-font-body);
