@@ -35,13 +35,38 @@
   {% if feeds %}
   <ul class="cf-list">
     {% for f in feeds %}
+    {% set ci = (cache_info or {}).get(f.id) or {} %}
     <li class="cf-row {% if not f.enabled %}is-disabled{% endif %}">
       <span class="cf-swatch" style="background: {{ f.colour }};" aria-hidden="true"></span>
-      <span class="cf-name">{{ f.name }}<span class="cf-id">{{ f.id }}</span></span>
+      <span class="cf-name">
+        {{ f.name }}<span class="cf-id">{{ f.id }}</span>
+        <span class="cf-cache">
+          {% if not ci.has_cache %}
+            <span class="cf-chip cf-chip--warn">no cache yet</span>
+          {% elif ci.is_stale %}
+            <span class="cf-chip cf-chip--warn"
+                  title="Cache is older than the 15-minute TTL; a widget render will trigger a fresh fetch.">
+              cached {{ ci.age_s // 60 }} min ago (stale)
+            </span>
+          {% else %}
+            <span class="cf-chip cf-chip--ok"
+                  title="Cached bytes are served for the next {{ (ci.ttl_s - ci.age_s) // 60 }} min. Hit Refresh to force a re-fetch now.">
+              cached {{ ci.age_s // 60 }} min ago
+            </span>
+          {% endif %}
+        </span>
+      </span>
       <span class="cf-url" title="{{ f.url }}">{{ f.url }}</span>
       <div class="cf-actions">
+        {# v0.71.3 (r/eink launch feedback): icon-only refresh button was
+           invisible to users who couldn't SSH to clear the cache. Now
+           labelled + flashes an event-count message on click so HA / Docker
+           users can tell whether the refresh pulled new events. #}
         <form method="post" action="{{ url_for('calendar_core_admin.refresh_feed', feed_id=f.id) }}" class="inline">
-          <button type="submit" class="ghost" title="Refresh now"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i></button>
+          <button type="submit" class="button" title="Delete cached bytes and re-fetch the URL now.">
+            <i class="ph ph-arrows-clockwise" aria-hidden="true"></i>
+            <span>Refresh</span>
+          </button>
         </form>
         <form method="post" action="{{ url_for('calendar_core_admin.toggle_feed', feed_id=f.id) }}" class="inline">
           <button type="submit" class="ghost" title="{{ 'Disable' if f.enabled else 'Enable' }}">
@@ -78,6 +103,16 @@
   .cf-swatch { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); }
   .cf-name { display: grid; gap: 1px; font-weight: 600; font-size: var(--t-size-md); }
   .cf-id { font: var(--t-size-xs)/1.2 var(--t-font-mono); color: var(--t-fg-soft); font-weight: 400; }
+  .cf-cache { margin-top: 2px; }
+  .cf-chip {
+    display: inline-block;
+    font: var(--t-size-xs)/1.2 var(--t-font-body);
+    padding: 1px 6px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+  .cf-chip--ok { background: color-mix(in oklab, var(--t-fg-soft) 10%, transparent); color: var(--t-fg-soft); }
+  .cf-chip--warn { background: color-mix(in oklab, #d97706 15%, transparent); color: #92400e; border-color: color-mix(in oklab, #d97706 40%, transparent); }
   .cf-url { font: var(--t-size-xs)/1.4 var(--t-font-mono); color: var(--t-fg-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cf-actions { display: flex; gap: 2px; }
   .cf-actions form { margin: 0; }

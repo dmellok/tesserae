@@ -26,7 +26,7 @@ import re
 import secrets
 import time
 import urllib.request
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -239,7 +239,36 @@ def blueprint() -> Blueprint:
     @bp.get("/")
     def index() -> str:
         feeds = _load_feeds().get("feeds") or []
-        return render_template("calendar_core/index.html", feeds=feeds)
+        # Cache-status per feed so the admin page can chip "fresh"
+        # vs "stale (N min old)" next to each row. Users on HA / Docker
+        # can't SSH to check the cache dir, so surfacing this saves the
+        # "is my feed working" back-and-forth.
+        dd = _data_dir()
+        now_ts = time.time()
+        cache_info: dict[str, dict[str, Any]] = {}
+        for f in feeds:
+            fid = f.get("id")
+            if not isinstance(fid, str):
+                continue
+            path = _ics_cache_path(dd, fid)
+            if not path.exists():
+                cache_info[fid] = {"has_cache": False}
+                continue
+            try:
+                mtime = path.stat().st_mtime
+                size = path.stat().st_size
+            except OSError:
+                cache_info[fid] = {"has_cache": False}
+                continue
+            age_s = max(0, int(now_ts - mtime))
+            cache_info[fid] = {
+                "has_cache": True,
+                "age_s": age_s,
+                "size": size,
+                "is_stale": age_s >= CACHE_TTL_S,
+                "ttl_s": CACHE_TTL_S,
+            }
+        return render_template("calendar_core/index.html", feeds=feeds, cache_info=cache_info)
 
     @bp.post("/feeds")
     def create_feed() -> Response:
@@ -296,15 +325,55 @@ def blueprint() -> Blueprint:
     @bp.post("/feeds/<feed_id>/refresh")
     def refresh_feed(feed_id: str) -> Response:
         # Force a refetch by deleting the cached blob, next call to
-        # _fetch_ics will re-download.
+        # _fetch_ics will re-download. Flash an informative message
+        # afterwards so HA / Docker users (who can't SSH to check the
+        # cache dir) can tell whether the refresh actually pulled new
+        # events.
         with contextlib.suppress(OSError):
             _ics_cache_path(_data_dir(), feed_id).unlink(missing_ok=True)
-        # Trigger a fetch immediately so the user sees an updated count.
         data = _load_feeds()
         feed = next((f for f in data.get("feeds", []) if f.get("id") == feed_id), None)
-        if feed and feed.get("url"):
-            _fetch_ics(feed["url"], _ics_cache_path(_data_dir(), feed_id))
-        flash("Feed refreshed.", "ok")
+        if not feed:
+            abort(404)
+        name = feed.get("name") or feed_id
+        url = feed.get("url") or ""
+        if not url:
+            flash(f"Feed '{name}' has no URL to refresh from.", "warn")
+            return redirect(url_for("calendar_core_admin.index"))
+        blob = _fetch_ics(url, _ics_cache_path(_data_dir(), feed_id))
+        if blob is None:
+            flash(
+                f"Refresh failed for '{name}': couldn't reach the feed URL. "
+                f"Check the URL is reachable from the server.",
+                "warn",
+            )
+            return redirect(url_for("calendar_core_admin.index"))
+        # Peek the fetched blob so the user sees an actionable count.
+        # A wide window (past 30 days .. future 90 days) captures the
+        # common "feed loaded but nothing in view" symptom.
+        try:
+            window_start = datetime.now(UTC) - timedelta(days=30)
+            window_end = datetime.now(UTC) + timedelta(days=90)
+            events = _expand_events(blob, window_start, window_end)
+            future = [
+                e
+                for e in events
+                if e.get("start") and str(e["start"]) >= datetime.now(UTC).isoformat()
+            ]
+            flash(
+                f"Refreshed '{name}': {len(events)} events in the past 30 / "
+                f"next 90 days ({len(future)} upcoming). "
+                f"Cache is {len(blob)} bytes.",
+                "ok",
+            )
+        except Exception:
+            # Fallback for a broken .ics blob: still report the bytes so
+            # the user knows the fetch succeeded but parsing didn't.
+            flash(
+                f"Refreshed '{name}' ({len(blob)} bytes on disk), but "
+                f"couldn't parse events. The .ics file may be malformed.",
+                "warn",
+            )
         return redirect(url_for("calendar_core_admin.index"))
 
     return bp
