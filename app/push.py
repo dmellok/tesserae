@@ -480,6 +480,7 @@ class PushManager:
         respect_quiet_hours: bool = False,
         source: str = "page",
         bypass_coalesce: bool = False,
+        force_publish: bool = False,
     ) -> PushResult:
         """Render a saved Page through the composer and publish.
 
@@ -529,6 +530,7 @@ class PushManager:
                     device_ids=device_ids,
                     respect_quiet_hours=respect_quiet_hours,
                     source=source,
+                    force_publish=force_publish,
                 )
             finally:
                 self._lock.release()
@@ -543,6 +545,7 @@ class PushManager:
         device_id: str | None = None,
         fit: str | None = None,
         bypass_coalesce: bool = True,
+        force_publish: bool = True,
     ) -> PushResult:
         """Hand arbitrary image bytes to every renderer.
 
@@ -569,7 +572,12 @@ class PushManager:
         else:
             try:
                 result = self._push_bytes_locked(
-                    image_bytes, source_label, source="file", device_id=device_id, fit=fit
+                    image_bytes,
+                    source_label,
+                    source="file",
+                    device_id=device_id,
+                    fit=fit,
+                    force_publish=force_publish,
                 )
             finally:
                 self._lock.release()
@@ -766,6 +774,7 @@ class PushManager:
         device_ids: set[str] | None = None,
         respect_quiet_hours: bool = False,
         source: str = "page",
+        force_publish: bool = False,
     ) -> PushResult:
         started = time.monotonic()
         page = self._page_store.get(page_id)
@@ -855,6 +864,7 @@ class PushManager:
                     target=page_id,
                     started=started,
                     device_filters=device_filter,
+                    force_publish=force_publish,
                 )
                 all_renderers.extend(result.renderers)
                 group_results.append(result)

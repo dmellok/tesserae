@@ -185,6 +185,33 @@ def test_push_skips_publish_when_composition_matches_last_served(
     assert len(mqtt_client.published) == publishes_after_first
 
 
+def test_push_force_publish_bypasses_content_skip(tmp_path: Path, composition_png: bytes) -> None:
+    """Issue #81: a user-initiated Send / Push (send_page / gallery)
+    must repaint the panel even when the composition digest is
+    bit-identical to the last render (widget data cached, weather value
+    unchanged inside its refresh interval, etc.). The content-checksum
+    skip is only for scheduled / automated refires.
+
+    ``PushManager.push(force_publish=True)`` bypasses the skip and
+    fires the publish so the served digest advances, letting the
+    device's next /frame poll get a fresh URL instead of a 304."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    with patch("app.push.render_to_png", return_value=png):
+        first = manager.push("home")
+    assert first.status == "sent"
+
+    with patch("app.push.render_to_png", return_value=png):
+        second = manager.push("home", force_publish=True)
+
+    # force_publish=True must publish again even though the composition
+    # is bit-identical to the first render.
+    assert second.status == "sent"
+    assert all(not r.unchanged for r in second.renderers)
+    assert len(mqtt_client.published) == 2
+
+
 def test_push_still_publishes_when_composition_changes(
     tmp_path: Path, composition_png: bytes
 ) -> None:
@@ -274,12 +301,12 @@ def test_push_image_bypass_coalesce_always_fires(tmp_path: Path, composition_png
         device_id="esp32",
         bypass_coalesce=True,
     )
-    # Sequential (both serialise on _lock) and both enter the pipeline,
-    # the coalesce bypass didn't drop the second one. The second push's
-    # composition digest matches the first, so it exits as ``no_change``
-    # (content-checksum skip, v0.71.x) rather than re-publishing.
+    # Sequential (both serialise on _lock), both enter the pipeline,
+    # both re-publish. ``push_image`` defaults to ``force_publish=True``
+    # (issue #81): user-initiated Send flows must always paint the
+    # panel, even when the image bytes match the last render.
     assert r1.status == "sent"
-    assert r2.status == "no_change"
+    assert r2.status == "sent"
 
 
 def test_supersede_records_event_log_row(tmp_path: Path, composition_png: bytes) -> None:

@@ -106,8 +106,10 @@ def test_saved_dashboard_invokes_push(app: Flask) -> None:
     client.post("/send/page", data={"page_id": "home"}, follow_redirects=False)
     # v0.69: user-initiated Send-page click passes bypass_coalesce=True
     # so a schedule tick for the same device can't silently supersede
-    # the manual click.
-    pm.push.assert_called_once_with("home", bypass_coalesce=True)
+    # the manual click. v0.71.x (issue #81): also force_publish=True so
+    # the panel repaints even when the composition digest is bit-
+    # identical to the last render.
+    pm.push.assert_called_once_with("home", bypass_coalesce=True, force_publish=True)
 
 
 def test_url_invokes_push_url_image(app: Flask) -> None:

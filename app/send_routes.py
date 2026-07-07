@@ -336,7 +336,12 @@ def send_page() -> Response:
     # User-initiated click; skip coalescing so the panel never silently
     # gets superseded by a schedule firing on the same device.
     _run_in_background(
-        lambda: _push().push(page_id, bypass_coalesce=True),
+        # ``force_publish=True``: this is a user click on Send / Push, so
+        # the panel should repaint even when the composition digest is
+        # bit-identical to the last render (widget data cached, weather
+        # value unchanged, etc.). The content-checksum push skip only
+        # applies to scheduled / automated refires (issue #81).
+        lambda: _push().push(page_id, bypass_coalesce=True, force_publish=True),
         label=f"page:{page_id}",
     )
     return_to = (request.form.get("return_to") or "").strip()
