@@ -509,21 +509,33 @@ def _hydrate_page(
             _resolved_options(plugin_id, cell.get("options", {})) if plugin_id else {}
         )
         full_bleed = bool(plugin and plugin.manifest.get("render", {}).get("full_bleed"))
-        left_pad = outer_pad if cell["x"] == 0 else inner_pad
-        top_pad = outer_pad if cell["y"] == 0 else inner_pad
-        right_pad = outer_pad if cell["x"] + cell["w"] == panel_w else inner_pad
-        bottom_pad = outer_pad if cell["y"] + cell["h"] == panel_h else inner_pad
+        if full_bleed:
+            # Full-bleed widgets (e.g. the tesserae_status bar) render
+            # edge-to-edge with no gap padding, so the fixed 48 px bar
+            # doesn't get eaten by a large user-picked matting gap.
+            layout = {
+                "x": cell["x"],
+                "y": cell["y"],
+                "w": cell["w"],
+                "h": cell["h"],
+            }
+        else:
+            left_pad = outer_pad if cell["x"] == 0 else inner_pad
+            top_pad = outer_pad if cell["y"] == 0 else inner_pad
+            right_pad = outer_pad if cell["x"] + cell["w"] == panel_w else inner_pad
+            bottom_pad = outer_pad if cell["y"] + cell["h"] == panel_h else inner_pad
+            layout = {
+                "x": cell["x"] + left_pad,
+                "y": cell["y"] + top_pad,
+                "w": max(1, cell["w"] - left_pad - right_pad),
+                "h": max(1, cell["h"] - top_pad - bottom_pad),
+            }
         cells_meta.append(
             {
                 "cell": cell,
                 "plugin_id": plugin_id,
                 "resolved_options": resolved_options,
-                "layout": {
-                    "x": cell["x"] + left_pad,
-                    "y": cell["y"] + top_pad,
-                    "w": max(1, cell["w"] - left_pad - right_pad),
-                    "h": max(1, cell["h"] - top_pad - bottom_pad),
-                },
+                "layout": layout,
                 "font_family": cell_font_family,
                 "full_bleed": full_bleed,
             }

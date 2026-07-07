@@ -443,15 +443,18 @@ def test_status_bar_toggle_inserts_cell_and_rescales(app: Flask, tmp_path: Path)
     assert max(c.y + c.h for c in page.cells) <= 600
 
 
-def test_status_bar_toggle_off_removes_cell_and_restores(app: Flask, tmp_path: Path) -> None:
-    """Flipping off removes the auto-managed cell and reverses the
-    rescale so the layout returns close to its pre-toggle shape."""
+def test_status_bar_toggle_off_removes_cell_and_fills_vacated_space(
+    app: Flask, tmp_path: Path
+) -> None:
+    """Flipping off removes the auto-managed cell and refits the
+    remaining cells to the full panel, so the space the bar occupied
+    is absorbed by the other widgets rather than left as a top strip
+    of matting. The refit uses fit_cells_to_panel, so it's tolerant
+    of layout edits made while the bar was on."""
     _set_panel(app, 800, 600)
     client = app.test_client()
     _sign_in(client)
     pid = _new(client, name="Home", layout="2x2_grid")
-    original = _store(tmp_path).get(pid)
-    positions = [(c.x, c.y, c.w, c.h) for c in original.cells]
 
     client.post(f"/pages/{pid}/status-bar/toggle", data={})
     client.post(f"/pages/{pid}/status-bar/toggle", data={})
@@ -460,14 +463,10 @@ def test_status_bar_toggle_off_removes_cell_and_restores(app: Flask, tmp_path: P
     assert page.status_bar_enabled is False
     assert page.status_bar_cell_id is None
     assert len(page.cells) == 4
-    restored = [(c.x, c.y, c.w, c.h) for c in page.cells]
-    # Reverse rescale is quantised to ints so exact equality isn't
-    # guaranteed; allow a couple of px slop per axis.
-    for (rx, ry, rw, rh), (ox, oy, ow, oh) in zip(restored, positions, strict=True):
-        assert abs(rx - ox) <= 2
-        assert abs(ry - oy) <= 2
-        assert abs(rw - ow) <= 2
-        assert abs(rh - oh) <= 2
+    # The refit fills the panel: the top row starts at y=0 and the
+    # bottom row ends at (or very near) panel.h. No leftover strip.
+    assert min(c.y for c in page.cells) == 0
+    assert max(c.y + c.h for c in page.cells) >= 600 - 2
 
 
 def test_status_bar_toggle_preserved_across_layout_change(app: Flask, tmp_path: Path) -> None:

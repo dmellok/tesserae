@@ -22,6 +22,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   into the below-strip band with the normal rotate + scale rules. Both
   the composer and the "refit to current panel" path pass the hint
   automatically when the page has an auto-managed status bar.
+- **Status bar swallowed by the gap slider.** When the user set a
+  larger matting gap, the composer's outer padding ate into the
+  48 px bar cell, leaving very little for the widget content. The
+  ``render.full_bleed`` manifest flag (previously captured but not
+  applied) now actually skips the padding subtraction, and the
+  ``tesserae_status`` plugin declares it. The bar renders edge-to-
+  edge regardless of the gap slider's value; other widgets are
+  unchanged.
+- **Disabling the status bar left a strip of matting at the top.**
+  The reverse-rescale on toggle-off only undid the shift + scale
+  applied when enabling, which meant any layout edits made while the
+  bar was on could leave a gap. Toggle-off now refits the remaining
+  cells to the full panel via ``fit_cells_to_panel``, so the vacated
+  band is absorbed proportionally by the widgets that are left.
 
 ## [0.71.0], 2026-07-07
 

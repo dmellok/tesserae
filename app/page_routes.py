@@ -336,6 +336,28 @@ def _rescale_cells_below_bar(
     return out
 
 
+def _refit_after_status_bar_removal(cells: list[Cell], *, panel_w: int, panel_h: int) -> list[Cell]:
+    """After removing the auto-managed status bar cell, project the
+    remaining cells onto the full panel via ``fit_cells_to_panel`` so
+    they absorb the vacated top band.
+
+    Two-step: shift cells up so their min-y sits at 0 (removes the
+    top gap left by the bar), then fit-to-panel scales the rest to
+    fill the height. Simple reverse-rescale doesn't do this when the
+    layout has been edited since enabling (cells resized, moved).
+    """
+    if not cells:
+        return []
+    coords = [(c.x, c.y, c.w, c.h) for c in cells]
+    min_y = min(y for _, y, _, _ in coords)
+    shifted = [(x, y - min_y, w, h) for (x, y, w, h) in coords]
+    fitted = fit_cells_to_panel(shifted, panel_w, panel_h)
+    return [
+        cell.model_copy(update={"x": nx, "y": ny, "w": nw, "h": nh})
+        for cell, (nx, ny, nw, nh) in zip(cells, fitted, strict=True)
+    ]
+
+
 def _default_status_bar_options(page_name: str) -> dict[str, Any]:
     """Sensible defaults for the auto-inserted status_bar cell. Match
     the widget's plugin.json default values so the first paint looks
@@ -936,12 +958,14 @@ def status_bar_toggle(page_id: str) -> Response:
         abort(404)
     panel = resolve_panel_for_page(page, _devices(), _settings_store())
     if page.status_bar_enabled:
-        # Toggle OFF: remove the managed cell, reverse the rescale.
+        # Toggle OFF: remove the managed cell, then rescale everything
+        # else up to fill the vacated top band. Uses fit_cells_to_panel
+        # so leftover space (e.g. from a user-modified cell that's
+        # shorter than its shifted footprint) is absorbed rather than
+        # left as an awkward strip of matting.
         bar_id = page.status_bar_cell_id
         remaining = [c for c in page.cells if c.id != bar_id] if bar_id else list(page.cells)
-        restored = _rescale_cells_below_bar(
-            remaining, panel_h=panel.h, bar_h=STATUS_BAR_HEIGHT_PX, direction="up"
-        )
+        restored = _refit_after_status_bar_removal(remaining, panel_w=panel.w, panel_h=panel.h)
         _store().save(
             page.model_copy(
                 update={
