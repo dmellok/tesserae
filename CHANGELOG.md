@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.71.2], 2026-07-07
+
 ### Fixed
 
 - **Full-bleed cells now honour the gap between neighbouring cells.**
