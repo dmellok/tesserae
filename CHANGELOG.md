@@ -8,6 +8,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Status bar update chip no longer fires against an older release.**
+  The ``tesserae_status`` widget trusted ``api.tesserae.ink``'s
+  ``is_current`` flag, so callers running an edge / local build ahead
+  of the latest published release surfaced a ghost "update pending"
+  chip pointing back at the older version. Client now compares
+  ``latest`` to ``current`` on the leading numeric triplet and only
+  paints the chip when the latest release is strictly newer.
+- **Status bar rate-limits its update check.** The version-check fetch
+  fired on every render (each dashboard push), hammering
+  ``api.tesserae.ink`` for the same answer. The widget now caches the
+  most recent response in ``localStorage`` for 1 hour, keyed by
+  channel + current version, so at most one fetch per hour per browser
+  session — cache invalidates automatically on app upgrade because the
+  current-version key changes.
 - **Status bar honours the page gap on all four sides.** The
   ``tesserae_status`` widget was declared ``full_bleed=true`` so it
   rendered edge-to-edge on the wall-touching sides; users expected the

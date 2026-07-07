@@ -230,13 +230,91 @@ function wireClock(shadow, data, state) {
   }, 30 * 1000);
 }
 
+// One hour: matches other polling intervals in Tesserae and keeps the
+// widget from hammering api.tesserae.ink on every push (composition
+// re-render). Cached negative results (running-is-latest) are honoured
+// too so we don't refetch when there is nothing new.
+const UPDATE_CHECK_TTL_MS = 60 * 60 * 1000;
+const UPDATE_CHECK_CACHE_PREFIX = "tesserae_status:vcheck:";
+
+function updateCheckCacheKey(channel, current) {
+  return `${UPDATE_CHECK_CACHE_PREFIX}${channel}:${current}`;
+}
+
+function readUpdateCheckCache(channel, current) {
+  try {
+    if (typeof localStorage !== "object" || localStorage === null) return null;
+    const raw = localStorage.getItem(updateCheckCacheKey(channel, current));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.ts !== "number") return null;
+    if (Date.now() - parsed.ts > UPDATE_CHECK_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeUpdateCheckCache(channel, current, latestVersion, latestUrl) {
+  try {
+    if (typeof localStorage !== "object" || localStorage === null) return;
+    localStorage.setItem(
+      updateCheckCacheKey(channel, current),
+      JSON.stringify({ ts: Date.now(), latestVersion, latestUrl }),
+    );
+  } catch {
+    // Quota exceeded / private-mode storage disabled; skip silently.
+  }
+}
+
+// Best-effort semver compare on the leading numeric triplet. Returns
+// > 0 when a > b, < 0 when a < b, 0 when equal. Pre-release / build
+// suffixes ("-edge.123") are stripped so an edge build compares as
+// its release triplet — an edge build of X.Y.Z is treated as equal
+// to X.Y.Z rather than "behind" it.
+function versionCompare(a, b) {
+  const parts = (v) =>
+    String(v || "")
+      .replace(/^v/, "")
+      .split(/[.\-+]/)
+      .slice(0, 3)
+      .map((n) => parseInt(n, 10) || 0);
+  const aa = parts(a);
+  const bb = parts(b);
+  for (let i = 0; i < 3; i++) {
+    const diff = (aa[i] || 0) - (bb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+function applyUpdateResult(shadow, data, state, latestVersion, latestUrl) {
+  if (!latestVersion) return;
+  const current = String(data.version).replace(/^v/, "");
+  // Defensive: only surface the update chip when latest is STRICTLY
+  // newer than the running build. Guards against api.tesserae.ink
+  // reporting is_current: false when the caller is actually ahead of
+  // the latest published release (edge / local builds, or a paused
+  // release marker on the server side).
+  if (versionCompare(latestVersion, current) <= 0) return;
+  state.latestVersion = latestVersion;
+  state.latestUrl = latestUrl || null;
+  state.updateAvailable = true;
+  paint(shadow, data, state);
+  wireClock(shadow, data, state);
+}
+
 function wireUpdateCheck(shadow, data, state) {
   if (!data.check_for_updates || !data.version) return;
+  const channel = "stable";
+  const current = String(data.version).replace(/^v/, "");
+  const cached = readUpdateCheckCache(channel, current);
+  if (cached) {
+    applyUpdateResult(shadow, data, state, cached.latestVersion, cached.latestUrl);
+    return;
+  }
   if (typeof fetch !== "function") return;
-  const params = new URLSearchParams({
-    channel: "stable",
-    current: String(data.version).replace(/^v/, ""),
-  });
+  const params = new URLSearchParams({ channel, current });
   if (data.install_scoped_id) params.set("install", data.install_scoped_id);
   const url = `https://api.tesserae.ink/version/latest?${params.toString()}`;
   const ctrl = typeof AbortController === "function" ? new AbortController() : null;
@@ -247,12 +325,11 @@ function wireUpdateCheck(shadow, data, state) {
     .then((r) => (r.ok ? r.json() : null))
     .then((body) => {
       if (timeoutId) clearTimeout(timeoutId);
-      if (!body || body.is_current !== false || !body.latest || !body.latest.version) return;
-      state.latestVersion = String(body.latest.version);
-      state.latestUrl = body.latest.url || null;
-      state.updateAvailable = true;
-      paint(shadow, data, state);
-      wireClock(shadow, data, state);
+      if (!body || !body.latest || !body.latest.version) return;
+      const latestVersion = String(body.latest.version);
+      const latestUrl = body.latest.url || null;
+      writeUpdateCheckCache(channel, current, latestVersion, latestUrl);
+      applyUpdateResult(shadow, data, state, latestVersion, latestUrl);
     })
     .catch(() => {
       if (timeoutId) clearTimeout(timeoutId);

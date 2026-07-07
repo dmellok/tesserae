@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Tesserae, Status Bar",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "widget",
   "description": "Dashboard status strip: identity on the left, ambient info chips on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
   "icon": "ph-squares-four",
