@@ -12,6 +12,9 @@ speaks Tesserae's REST device API directly and paints frames the
 - **Repo**: [`varanu5/picpak-tesserae-client`](https://github.com/varanu5/picpak-tesserae-client)
 - **Author**: [@varanu5](https://github.com/varanu5)
 - **Status**: stable, ongoing stress-testing by the author.
+- **Compatibility discussion**: [tesserae#61](https://github.com/dmellok/tesserae/issues/61) —
+  varanu5's write-up of what works, the BWRY palette order, the
+  2-bpp packing layout, and the vertical-scan flip requirement.
 
 The firmware is not part of the Tesserae repo; it lives with its
 author. Grab it from the repo above, flash to a PicPak per the

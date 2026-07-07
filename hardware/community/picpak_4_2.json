@@ -20,5 +20,5 @@
   },
   "refresh_floor_s": 60,
   "image_format": "bin",
-  "notes_md": "Community firmware by [varanu5](https://github.com/varanu5/picpak-tesserae-client). Stable as of the current build; ongoing stress-testing by the author."
+  "notes_md": "Community firmware by [varanu5](https://github.com/varanu5/picpak-tesserae-client). Compatibility details in [issue #61](https://github.com/dmellok/tesserae/issues/61). Stable as of the current build; ongoing stress-testing by the author."
 }
