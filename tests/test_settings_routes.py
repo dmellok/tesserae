@@ -633,6 +633,52 @@ def test_calibration_tone_dither_survives_bwry_gamut(app_with_gate: Flask) -> No
     assert 'name="pi_bin__kitchen_pi:contrast"' in body
 
 
+def test_calibration_block_survives_save_when_instance_id_collides_with_base(
+    app_with_gate: Flask,
+) -> None:
+    """Issue #52 (bablokb): the tone & dither block vanishes after a
+    combined-form save when the device instance id equals a base
+    renderer's topic prefix (his device id is ``pi_bin``, the same
+    collision behind the earlier duplicate-block report, item 4).
+
+    ``_drop_clones`` removed every renderer whose ``device`` matched the
+    instance id; for id ``pi_bin`` that includes the BASE ``pi_bin``
+    renderer (its ``device`` is the ``pi_bin`` topic prefix), so
+    ``clone_for_instances`` then had no base to clone from and the
+    device was left with zero clones until the next process restart
+    rebuilt the registry from disk. ``for_device`` returned nothing, so
+    ``calibration_picture_quality`` was empty and the block dropped out
+    of the DOM."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    client.post("/settings/devices/add", data={"id": "pi_bin", "kind": "pi_bin_client"})
+
+    # First render (equivalent to a fresh process): block is present.
+    body_before = client.get("/settings/devices").get_data(as_text=True)
+    assert 'name="pi_bin__pi_bin:dither"' in body_before
+
+    # Combined-form save (change a slider), exactly what the user does.
+    client.post(
+        "/settings/devices/pi_bin/save",
+        data={
+            "_active_tab": "calibration",
+            "device_name": "pi_bin",
+            "panel_w": "640",
+            "panel_h": "400",
+            "panel_orientation": "landscape",
+            "quiet_hours_enabled": "0",
+            "pi_bin__pi_bin:saturation": "1.5",
+        },
+    )
+
+    # After the save, without a restart, the block must still be there.
+    body_after = client.get("/settings/devices").get_data(as_text=True)
+    assert "Pi BIN client — tone" in body_after
+    assert 'name="pi_bin__pi_bin:dither"' in body_after
+    assert 'name="pi_bin__pi_bin:saturation"' in body_after
+    assert 'name="pi_bin__pi_bin:contrast"' in body_after
+
+
 def test_device_card_exposes_pi_png_settings(app_with_gate: Flask) -> None:
     """Pi PNG client devices get rotate / scale / bg / saturation on
     the device card, none of those are renderer-wide any more.

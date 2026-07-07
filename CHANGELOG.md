@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Calibration tone & dither block no longer disappears after save on a
+  device whose id matches a base renderer prefix.** `_drop_clones`
+  removed every renderer whose `device` matched the instance id; for an
+  instance literally named `pi_bin` (or `pi_png`, `esp32`, …) that also
+  matched the base renderer, so the combined-form save deleted the base
+  and left the device with no renderer clones until the next restart.
+  The device's Calibration tab then rendered no picture-quality fields.
+  `_drop_clones` now only removes clone records (`<base>__<instance>`),
+  never a base renderer (#52).
 - **Panel gamut / calibration changes now repaint instead of serving a
   stale 304.** The content-checksum skip keyed only on the composition
   digest, so switching a device's panel (e.g. Spectra 6 to ACeP),

@@ -182,9 +182,19 @@ def derive_topic(kind_topic: str, new_id: str, *, suffix: str) -> str:
 
 
 def _drop_clones(renderers: RendererRegistry, instance_id: str) -> None:
-    """Remove any renderer clones whose resolved device is this instance."""
+    """Remove any renderer clones whose resolved device is this instance.
+
+    Match only clone records (ids of the form ``<base>__<instance>``),
+    never a base renderer. When an instance id collides with a base
+    renderer's topic prefix (e.g. a device literally named ``pi_bin``),
+    the base ``pi_bin`` renderer's ``device`` is also ``pi_bin``, so a
+    bare ``device == instance_id`` match would delete the base itself.
+    ``clone_for_instances`` then has no base to clone from and the device
+    is left with zero renderers until the next process restart rebuilds
+    the registry from disk. That surfaced as the Calibration tab's tone &
+    dither block vanishing after every combined-form save (issue #52)."""
     for rid in list(renderers.renderers):
-        if renderers.renderers[rid].device == instance_id:
+        if "__" in rid and renderers.renderers[rid].device == instance_id:
             renderers.renderers.pop(rid, None)
 
 
