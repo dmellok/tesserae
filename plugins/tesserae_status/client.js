@@ -123,22 +123,26 @@ function buildChips(data, state) {
       value: String(data.broker_label || "HA").trim(),
     });
   }
-  // Update chips: rendered only when an update is available.
+  // Update chips: rendered ONLY when an update is available. Both chips
+  // lead with what's new (server version / "Firmware") and carry a
+  // ph-download-simple icon + badge dot so the reader gets one
+  // consistent "there is a download to install" signal across the two.
   if (data.check_for_updates && data.version && state.updateAvailable && state.latestVersion) {
     chips.push({
       key: "version",
-      icon: "ph-tag",
-      value: `v${String(data.version).replace(/^v/, "")}`,
-      updateSub: `-> ${updateShorthand(state.latestVersion, data.version)}`,
+      icon: "ph-download-simple",
+      value: `v${String(state.latestVersion).replace(/^v/, "")}`,
+      updateSub: "available",
       isUpdate: true,
     });
   }
   if (data.show_firmware_updates && Number.isFinite(data.firmware_updates) && data.firmware_updates > 0) {
+    const n = data.firmware_updates;
     chips.push({
       key: "firmware",
-      icon: "ph-cpu",
-      value: "FW",
-      updateSub: `${data.firmware_updates} update${data.firmware_updates === 1 ? "" : "s"}`,
+      icon: "ph-download-simple",
+      value: "Firmware",
+      updateSub: `${n} available`,
       isUpdate: true,
     });
   }
@@ -208,17 +212,6 @@ function formatTime(d, format) {
     return `${h12}:${m}${suffix}`;
   }
   return `${String(h24).padStart(2, "0")}:${m}`;
-}
-
-function updateShorthand(latest, current) {
-  const l = String(latest).replace(/^v/, "");
-  const c = String(current).replace(/^v/, "");
-  const lp = l.split(".");
-  const cp = c.split(".");
-  if (lp.length === 3 && cp.length === 3 && lp[0] === cp[0] && lp[1] === cp[1]) {
-    return `.${lp[2]}`;
-  }
-  return `v${l}`;
 }
 
 function wireClock(shadow, data, state) {

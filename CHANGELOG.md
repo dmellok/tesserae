@@ -20,8 +20,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   ``api.tesserae.ink`` for the same answer. The widget now caches the
   most recent response in ``localStorage`` for 1 hour, keyed by
   channel + current version, so at most one fetch per hour per browser
-  session — cache invalidates automatically on app upgrade because the
-  current-version key changes.
+  session. The cache invalidates automatically on app upgrade because
+  the current-version key changes.
+
+### Changed
+
+- **Update chips lead with the new version.** The ``tesserae_status``
+  server-version chip previously showed the RUNNING version with a
+  small "-> .N" hint at the newer patch. It now leads with the new
+  version ("v0.71.5 available") and pairs both server and firmware
+  chips with a ``ph-download-simple`` icon so the two read as one
+  consistent "there is something to install" signal.
 - **Status bar honours the page gap on all four sides.** The
   ``tesserae_status`` widget was declared ``full_bleed=true`` so it
   rendered edge-to-edge on the wall-touching sides; users expected the
