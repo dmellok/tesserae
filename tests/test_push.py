@@ -160,6 +160,56 @@ def test_push_fans_out_to_every_renderer(tmp_path: Path, composition_png: bytes)
         assert decoded["url"].startswith("http://broker.local:8000/renders/")
 
 
+def test_push_skips_publish_when_composition_matches_last_served(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """v0.71.x content-checksum skip: when the newly-rendered composition
+    matches every bound device's last-served composition_digest, don't
+    publish. The panel isn't asked to re-paint, which is where the
+    battery win is."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    with patch("app.push.render_to_png", return_value=png):
+        first = manager.push("home")
+    assert first.status == "sent"
+    publishes_after_first = len(mqtt_client.published)
+    assert publishes_after_first == 1
+
+    with patch("app.push.render_to_png", return_value=png):
+        second = manager.push("home")
+
+    assert second.status == "no_change"
+    assert all(r.unchanged and r.error is None for r in second.renderers)
+    # No additional publish for the same digest.
+    assert len(mqtt_client.published) == publishes_after_first
+
+
+def test_push_still_publishes_when_composition_changes(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """A change to the rendered PNG produces a new digest, which
+    doesn't match the cached one, so the publish fires again."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    with patch("app.push.render_to_png", return_value=png):
+        manager.push("home")
+
+    # A different image → different digest.
+    img = Image.new("RGB", (100, 100), (0, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    changed_png = buf.getvalue()
+
+    with patch("app.push.render_to_png", return_value=changed_png):
+        second = manager.push("home")
+
+    assert second.status == "sent"
+    assert all(not r.unchanged for r in second.renderers)
+    assert len(mqtt_client.published) == 2
+
+
 def test_push_not_found_when_page_missing(tmp_path: Path, composition_png: bytes) -> None:
     manager, _, _ = _wired(tmp_path, composition_png, [])
     result = manager.push("does_not_exist")
@@ -224,9 +274,12 @@ def test_push_image_bypass_coalesce_always_fires(tmp_path: Path, composition_png
         device_id="esp32",
         bypass_coalesce=True,
     )
-    # Sequential (both serialise on _lock) but both fire.
+    # Sequential (both serialise on _lock) and both enter the pipeline,
+    # the coalesce bypass didn't drop the second one. The second push's
+    # composition digest matches the first, so it exits as ``no_change``
+    # (content-checksum skip, v0.71.x) rather than re-publishing.
     assert r1.status == "sent"
-    assert r2.status == "sent"
+    assert r2.status == "no_change"
 
 
 def test_supersede_records_event_log_row(tmp_path: Path, composition_png: bytes) -> None:

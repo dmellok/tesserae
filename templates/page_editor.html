@@ -100,6 +100,30 @@
               value=cell.zoom, min=0.7, max=2.0, step=0.05, unit='×',
               help='Pretends the cell is smaller, then scales the widget back up, text and icons grow without breaking layout. Persists through to the panel.') }}
 
+    {# v0.71.x per-cell padding override (r/eink launch DM feedback,
+       flinkazoid). Hidden behind a <details> disclosure so the cell
+       card stays lean; the same block is where per-cell layout tweaks
+       will collect over time. Off by default = inherit the page-level
+       gap-derived padding. When on, the slider value replaces both
+       the gap-derived padding AND the full-bleed manifest rule for
+       this cell. #}
+    <details class="dx-cell-tweaks">
+      <summary>Layout tweaks</summary>
+      <div class="dx-cell-tweaks-body">
+        <label class="switch dx-cell-tweak-switch">
+          <input type="checkbox" name="padding_override_enabled" value="1"
+                 {% if cell.padding_override is not none %}checked{% endif %}
+                 data-cell-tweak-toggle>
+          <span>Override page-gap padding for this cell</span>
+        </label>
+        {{ slider('cell-' ~ cell.id ~ '-padding', 'padding_override',
+                  'Padding (px)',
+                  value=(cell.padding_override if cell.padding_override is not none else 0),
+                  min=0, max=80, step=1, unit='px',
+                  help='Applied to all four inner edges of the cell. Wins over the page-level gap and the widget\'s full-bleed flag when the switch above is on.') }}
+      </div>
+    </details>
+
     {# Geometry is owned by the layout editor (drag handles + presets)
        and persisted via /cells/batch. Don't send x/y/w/h from here -
        update_cell defaults to the cell's current geometry when these

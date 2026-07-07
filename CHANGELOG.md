@@ -50,6 +50,31 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   0.64.16. Rolled to the current version so generated SDKs carry the
   right release marker.
 
+### Added
+
+- **Per-cell padding override (feedback from r/eink launch DMs).**
+  Each cell now has an optional ``padding_override`` field surfaced
+  in the page editor as a **Layout tweaks** disclosure (collapsed by
+  default so the cell edit card stays lean). Ticking "Override
+  page-gap padding for this cell" turns on a 0-80 px slider whose
+  value replaces the page-level gap-derived padding on that cell,
+  and also beats the widget's ``render.full_bleed`` manifest flag,
+  so users can dial in per-widget breathing room without touching
+  the page gap the other cells share.
+- **Content-checksum push skip (feedback from r/eink launch DMs).**
+  When the newly-rendered composition PNG matches a bound device's
+  last-served digest, the push pipeline no longer publishes to that
+  device. The panel isn't asked to re-paint, which is a real battery
+  win on the bigger e-ink panels and the primary optimisation
+  callers were doing externally (checksumming their own data and
+  suppressing the webhook). Skipped renderers surface as
+  ``unchanged=True`` on the per-renderer result and log a
+  ``no_change`` event. When every bound renderer for a push is
+  unchanged, the whole push logs as ``no_change`` too, and the
+  History timeline shows a distinct "no change" chip. HTTP-polled
+  devices' next fetch still returns 304 via the existing ETag path;
+  MQTT-only devices skip the retained re-publish entirely.
+
 ## [0.71.1], 2026-07-07
 
 ### Fixed

@@ -102,6 +102,13 @@ class Cell(BaseModel):
     # slider in the editor exposes 0.7–2.0; the wider 0.5–3.0 envelope is
     # the explicit-JSON safety net.
     zoom: float = Field(default=1.0, ge=0.5, le=3.0)
+    # v0.71.x per-cell padding override (r/eink launch feedback). None
+    # means "inherit the page-level gap"; an integer means "use this
+    # value on all four inner edges", ignoring the gap and the
+    # ``render.full_bleed`` manifest flag. Clamped to the same 0..80
+    # envelope the page-level corner-radius slider uses so the UI
+    # doesn't need a second range.
+    padding_override: int | None = Field(default=None, ge=0, le=80)
 
 
 class Page(BaseModel):

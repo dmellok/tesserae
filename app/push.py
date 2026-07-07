@@ -135,7 +135,9 @@ def _disabled_renderer_ids(settings: SettingsStore) -> set[str]:
 
 logger = logging.getLogger(__name__)
 
-PushStatus = Literal["sent", "busy", "failed", "not_found", "quiet", "held", "superseded"]
+PushStatus = Literal[
+    "sent", "busy", "failed", "not_found", "quiet", "held", "superseded", "no_change"
+]
 
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
 # Larger downloads are rejected before going through Pillow.
@@ -236,6 +238,13 @@ class RendererResult:
     url: str
     bytes_written: int
     error: str | None = None
+    # v0.71.x (r/eink launch feedback): True when the composition_digest
+    # matched the device's last-served digest and publish was skipped
+    # to save the panel a re-paint. The renderer artifact still lives
+    # in the renders dir (or was refreshed via ``touch`` there) so a
+    # future HTTP-polled fetch can still serve it; only the outbound
+    # publish is skipped.
+    unchanged: bool = False
 
 
 @dataclass(frozen=True)
@@ -659,10 +668,17 @@ class PushManager:
                 # the user's re-send never gets silently superseded.
                 self._lock.acquire()
                 try:
+                    # ``force_publish=True``: resend is an explicit user
+                    # action from the History page; even when the same
+                    # composition is already the panel's current frame,
+                    # honour the click and re-publish (v0.71.x content-
+                    # checksum skip otherwise would collapse this into
+                    # ``no_change`` and swallow the user's intent).
                     result = self._push_bytes_locked(
                         comp_path.read_bytes(),
                         record.target,
                         source="resend",
+                        force_publish=True,
                     )
                 finally:
                     self._lock.release()
@@ -798,10 +814,20 @@ class PushManager:
 
         # Aggregate the per-panel pushes into one result for the caller.
         # Each group already logged its own push + renderer events.
-        failed = [r for r in group_results if r.status not in ("sent",)]
-        status: PushStatus = "sent" if group_results and not failed else "failed"
+        # ``no_change`` groups count as success from the pipeline's POV;
+        # the aggregate is ``no_change`` only when every group was
+        # unchanged, ``sent`` when at least one group actually pushed,
+        # ``failed`` when any group failed.
+        good = [r for r in group_results if r.status in ("sent", "no_change")]
+        failed = [r for r in group_results if r not in good]
         if not group_results:
+            status: PushStatus = "failed"
+        elif failed:
             status = "failed"
+        elif all(r.status == "no_change" for r in group_results):
+            status = "no_change"
+        else:
+            status = "sent"
         digest = next((r.composition_digest for r in group_results if r.composition_digest), "")
         return PushResult(
             status=status,
@@ -821,6 +847,7 @@ class PushManager:
         started: float | None = None,
         device_id: str | None = None,
         fit: str | None = None,
+        force_publish: bool = False,
     ) -> PushResult:
         """Shared tail end of push_image / push_webpage / republish."""
         started = started if started is not None else time.monotonic()
@@ -833,6 +860,7 @@ class PushManager:
             started=started,
             device_filters={device_id} if device_id else None,
             image_fit=fit,
+            force_publish=force_publish,
         )
 
     def _fan_out(
@@ -845,6 +873,7 @@ class PushManager:
         started: float,
         device_filters: set[str] | None = None,
         image_fit: str | None = None,
+        force_publish: bool = False,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
@@ -864,12 +893,55 @@ class PushManager:
         panel = Panel(**panel_dims)
         results: list[RendererResult] = []
         disabled = _disabled_renderer_ids(self._settings)
+        # v0.71.x content-checksum skip: when the newly-rendered
+        # composition matches the last-served composition for a given
+        # bound device, don't publish. Saves the panel a re-paint on
+        # every scheduled tick, which is a real battery win on the
+        # bigger e-ink panels. HTTP-polled devices still get the frame
+        # via their next /api/display or /api/v1/device/<id>/frame poll
+        # (ETag 304 handles the "same frame" case there already);
+        # MQTT-only devices would otherwise re-paint on every retained
+        # publish.
         for renderer in self._registry.all():
             if renderer.id in disabled:
                 continue
             if device_filters is not None and renderer.device not in device_filters:
                 continue
             renderer_start = time.monotonic()
+            last = self._latest_renders.get(renderer.device)
+            if not force_publish and last and last.get("composition_digest") == comp_digest:
+                result = RendererResult(
+                    renderer_id=renderer.id,
+                    topic=renderer.topic,
+                    digest=str(last.get("digest") or ""),
+                    url="",
+                    bytes_written=0,
+                    unchanged=True,
+                )
+                results.append(result)
+                # Bump the freshness timestamp so latest_render_for()
+                # callers still see a recent tick, but leave every other
+                # field unchanged; the digest / filename / renderer_id
+                # already point at the correct artefact.
+                last["timestamp"] = time.time()
+                self._save_latest_renders()
+                self._event_log.record(
+                    type="renderer",
+                    source=renderer.id,
+                    target=renderer.topic,
+                    status="no_change",
+                    digest=str(last.get("digest") or "") or None,
+                    error=None,
+                    duration_s=time.monotonic() - renderer_start,
+                    extra={
+                        "url": "",
+                        "bytes_written": 0,
+                        "retain": renderer.retain,
+                        "composition_digest": comp_digest,
+                        "skipped": True,
+                    },
+                )
+                continue
             try:
                 result = self._publish_artifact(
                     renderer, composition_png, panel, image_fit=image_fit
@@ -931,12 +1003,21 @@ class PushManager:
         if not results:
             status: PushStatus = "sent"  # nothing to publish, but render worked
             error: str | None = None
-        elif all(r.error is None for r in results):
-            status = "sent"
-            error = None
-        else:
+        elif all(r.error is not None for r in results):
             status = "failed"
             error = "one or more renderers failed"
+        elif all(r.error is None and r.unchanged for r in results):
+            # Every bound renderer's device already had this exact
+            # composition; nothing published, log as no_change so the
+            # timeline can chip it distinctly from a real push.
+            status = "no_change"
+            error = None
+        elif any(r.error is not None for r in results):
+            status = "failed"
+            error = "one or more renderers failed"
+        else:
+            status = "sent"
+            error = None
 
         event_id = self._event_log.record(
             type="push",

@@ -1354,6 +1354,28 @@
 .dx-status-bar-jump { margin: 8px 0 0; }
 :root[data-theme="dark"] .dx-status-bar-toggle { border-color: var(--t-border); }
 
+/* Per-cell "Layout tweaks" disclosure (v0.71.x). Hides the
+   padding-override checkbox + slider by default so the cell edit card
+   stays lean; the same block is where per-cell tweaks collect over
+   time (e.g. per-edge padding, per-cell corner-radius overrides). */
+.dx-cell-tweaks {
+  border: 1px dashed var(--dx-border-faint);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 10px 0 0;
+}
+.dx-cell-tweaks > summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0;
+  font-size: 13px;
+  color: var(--dx-text-muted, #56564f);
+}
+.dx-cell-tweaks[open] > summary { margin-bottom: 6px; }
+.dx-cell-tweaks-body { padding: 4px 0 2px; }
+.dx-cell-tweak-switch { margin: 0 0 8px; }
+:root[data-theme="dark"] .dx-cell-tweaks { border-color: var(--t-border); }
+
 .dx-tone-grid {
   display: grid;
   grid-template-columns: 1fr;

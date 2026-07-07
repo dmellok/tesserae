@@ -409,6 +409,79 @@ def test_apply_unknown_layout_via_fetch_returns_json(app: Flask) -> None:
     assert resp.json == {"ok": False, "message": "Unknown layout 'nope'."}
 
 
+# -- per-cell padding override (v0.71.x) ---------------------------
+
+
+def test_padding_override_saves_when_checkbox_ticked(app: Flask, tmp_path: Path) -> None:
+    """Form parser: checkbox on + slider value → clamped int stored."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "padding_override_enabled": "1",
+            "padding_override": "24",
+        },
+    )
+    page = _store(tmp_path).get(pid)
+    assert page.cells[0].padding_override == 24
+
+
+def test_padding_override_clears_when_checkbox_off(app: Flask, tmp_path: Path) -> None:
+    """Form parser: checkbox absent from the form-submitted subset
+    resets the override back to None (inherit page gap), even when
+    the slider value is still present in the form body."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    # Turn it on first.
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "padding_override_enabled": "1",
+            "padding_override": "12",
+        },
+    )
+    assert _store(tmp_path).get(pid).cells[0].padding_override == 12
+    # Turn it off (checkbox absent).
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "padding_override": "12",
+        },
+    )
+    assert _store(tmp_path).get(pid).cells[0].padding_override is None
+
+
+def test_padding_override_ignored_when_partial_form_lacks_both_fields(
+    app: Flask, tmp_path: Path
+) -> None:
+    """A partial-form autosave (e.g. only ``x/y/w/h`` from the layout
+    editor) mustn't clobber the padding override the user set on the
+    cell edit form."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={
+            "plugin": "widget_a",
+            "padding_override_enabled": "1",
+            "padding_override": "16",
+        },
+    )
+    # Partial POST with neither field present.
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+    assert _store(tmp_path).get(pid).cells[0].padding_override == 16
+
+
 # -- status bar toggle (v0.71.0) -----------------------------------
 
 

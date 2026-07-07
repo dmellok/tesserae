@@ -37,6 +37,7 @@
      matches the actual guarantee; separate receipt tracking is a
      follow-up. #}
   {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>pushed</span>
+  {% elif status == 'no_change' %}<span class="dx-pill is-info"><span class="dx-pill-dot"></span>no change</span>
   {% elif status == 'busy' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>busy</span>
   {% elif status == 'quiet' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>quiet</span>
   {% elif status == 'not_found' %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>not found</span>
@@ -112,7 +113,7 @@
   {% else %}
   <ul class="dx-discovered-list">
     {% for ev in history %}
-    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet') %}
+    {% set is_failed = ev.status not in ('sent', 'busy', 'quiet', 'no_change') %}
     <li class="dx-inset-row dx-history-row{% if is_failed %} dx-history-row--failed{% endif %}">
       {% if ev.digest %}
       <a class="dx-history-thumb" href="{{ url_for('renders', filename=ev.digest ~ '.png') }}" data-lightbox aria-label="Open render for push #{{ ev.id }}">

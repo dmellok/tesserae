@@ -1089,7 +1089,27 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "font": (form.get("font") or None),
             "options": options,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
+            "padding_override": _padding_override_from_form(form, cell.padding_override),
         }
+    )
+
+
+def _padding_override_from_form(form: Any, current: int | None) -> int | None:
+    """Parse the "Layout tweaks" pane's padding-override pair.
+
+    UI shape is a checkbox (``padding_override_enabled``) gating a
+    slider (``padding_override``). Checkbox off -> None (inherit the
+    page gap). Checkbox on -> clamp the slider value to the same
+    0..80 envelope the page-level corner-radius slider uses. Missing
+    checkbox is treated as "not on this form" (keep current value)
+    so partial-form autosave paths don't wipe the setting."""
+    if "padding_override_enabled" not in form and "padding_override" not in form:
+        return current
+    enabled = form.get("padding_override_enabled") in ("1", "true", "on")
+    if not enabled:
+        return None
+    return _coerce_int(
+        form.get("padding_override"), current if current is not None else 0, lo=0, hi=80
     )
 
 
