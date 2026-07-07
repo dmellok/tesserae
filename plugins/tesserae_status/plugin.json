@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Tesserae, Status Bar",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "widget",
   "description": "Dashboard status strip: identity on the left, ambient info chips on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
   "icon": "ph-squares-four",
@@ -68,33 +68,6 @@
       ]
     },
     {
-      "name": "show_weather",
-      "type": "boolean",
-      "label": "Weather chip",
-      "default": false,
-      "help": "Static custom value (Tesserae's status widget doesn't fetch weather itself). Set the icon and value fields below to a live-looking summary or leave off."
-    },
-    {
-      "name": "weather_icon",
-      "type": "select",
-      "label": "Weather icon",
-      "default": "ph-sun",
-      "choices": [
-        { "value": "ph-sun", "label": "Sun" },
-        { "value": "ph-cloud", "label": "Cloud" },
-        { "value": "ph-cloud-rain", "label": "Rain" },
-        { "value": "ph-cloud-snow", "label": "Snow" },
-        { "value": "ph-cloud-lightning", "label": "Storm" },
-        { "value": "ph-moon", "label": "Night" }
-      ]
-    },
-    {
-      "name": "weather_value",
-      "type": "string",
-      "label": "Weather value (e.g. \"12°\")",
-      "default": ""
-    },
-    {
       "name": "show_battery",
       "type": "boolean",
       "label": "Battery chip",
@@ -133,49 +106,7 @@
       "type": "boolean",
       "label": "Show firmware update indicator",
       "default": true,
-      "help": "Appears only when at least one bound device kind has a newer firmware known to Tesserae. Renders as \"FW\" with badge / accent sub. Nothing renders when everything is up to date."
-    },
-    {
-      "name": "custom_slot_1_icon",
-      "type": "select",
-      "label": "Custom slot 1 icon",
-      "default": "ph-thermometer-simple",
-      "choices": [
-        { "value": "ph-thermometer-simple", "label": "Thermometer" },
-        { "value": "ph-trash", "label": "Bin" },
-        { "value": "ph-moon-stars", "label": "Moon" },
-        { "value": "ph-calendar-dots", "label": "Calendar" },
-        { "value": "ph-house", "label": "Home" },
-        { "value": "ph-drop", "label": "Drop" },
-        { "value": "ph-wind", "label": "Wind" }
-      ]
-    },
-    {
-      "name": "custom_slot_1_value",
-      "type": "string",
-      "label": "Custom slot 1 value (blank = hide)",
-      "default": ""
-    },
-    {
-      "name": "custom_slot_2_icon",
-      "type": "select",
-      "label": "Custom slot 2 icon",
-      "default": "ph-calendar-dots",
-      "choices": [
-        { "value": "ph-thermometer-simple", "label": "Thermometer" },
-        { "value": "ph-trash", "label": "Bin" },
-        { "value": "ph-moon-stars", "label": "Moon" },
-        { "value": "ph-calendar-dots", "label": "Calendar" },
-        { "value": "ph-house", "label": "Home" },
-        { "value": "ph-drop", "label": "Drop" },
-        { "value": "ph-wind", "label": "Wind" }
-      ]
-    },
-    {
-      "name": "custom_slot_2_value",
-      "type": "string",
-      "label": "Custom slot 2 value (blank = hide)",
-      "default": ""
+      "help": "Appears only when at least one bound device kind has a newer firmware known to Tesserae AND the app-level firmware lookup is enabled in Settings -> System. Renders as \"FW\" with badge / accent sub. Nothing renders when everything is up to date."
     }
   ],
   "render": {

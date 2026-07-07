@@ -409,6 +409,104 @@ def test_apply_unknown_layout_via_fetch_returns_json(app: Flask) -> None:
     assert resp.json == {"ok": False, "message": "Unknown layout 'nope'."}
 
 
+# -- status bar toggle (v0.71.0) -----------------------------------
+
+
+def test_status_bar_toggle_inserts_cell_and_rescales(app: Flask, tmp_path: Path) -> None:
+    """Flipping the status-bar switch on prepends a tesserae_status cell
+    at (0, 0, panel.w, 48) and shifts + rescales existing cells into
+    the (bar_h, panel.h) band so nothing overlaps."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    before = _store(tmp_path).get(pid)
+    assert len(before.cells) == 4
+    assert before.status_bar_enabled is False
+
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    page = _store(tmp_path).get(pid)
+    assert page.status_bar_enabled is True
+    assert page.status_bar_cell_id is not None
+    assert len(page.cells) == 5
+
+    bar = page.cells[0]
+    assert bar.id == page.status_bar_cell_id
+    assert bar.plugin == "tesserae_status"
+    assert (bar.x, bar.y, bar.w, bar.h) == (0, 0, 800, 48)
+    # Existing top-row cells rescaled into (48, 600), so their y starts
+    # at 48 rather than 0, and their h shrinks by the (600-48)/600 ratio.
+    top = [c for c in page.cells if c.plugin != "tesserae_status" and c.y < 300]
+    assert top, "expected at least one top-row cell after rescale"
+    assert all(c.y >= 48 for c in top)
+    # Panel-full: bar top + rescaled cells reach the bottom of the panel.
+    assert max(c.y + c.h for c in page.cells) <= 600
+
+
+def test_status_bar_toggle_off_removes_cell_and_restores(app: Flask, tmp_path: Path) -> None:
+    """Flipping off removes the auto-managed cell and reverses the
+    rescale so the layout returns close to its pre-toggle shape."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="2x2_grid")
+    original = _store(tmp_path).get(pid)
+    positions = [(c.x, c.y, c.w, c.h) for c in original.cells]
+
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+
+    page = _store(tmp_path).get(pid)
+    assert page.status_bar_enabled is False
+    assert page.status_bar_cell_id is None
+    assert len(page.cells) == 4
+    restored = [(c.x, c.y, c.w, c.h) for c in page.cells]
+    # Reverse rescale is quantised to ints so exact equality isn't
+    # guaranteed; allow a couple of px slop per axis.
+    for (rx, ry, rw, rh), (ox, oy, ow, oh) in zip(restored, positions, strict=True):
+        assert abs(rx - ox) <= 2
+        assert abs(ry - oy) <= 2
+        assert abs(rw - ow) <= 2
+        assert abs(rh - oh) <= 2
+
+
+def test_status_bar_toggle_preserved_across_layout_change(app: Flask, tmp_path: Path) -> None:
+    """Switching layout presets while the status bar is on keeps the
+    bar cell at row 0 rather than remapping it into the preset's first
+    slot."""
+    _set_panel(app, 800, 600)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    page = _store(tmp_path).get(pid)
+    bar_id = page.status_bar_cell_id
+
+    client.post(f"/pages/{pid}/layout", data={"layout": "2x2_grid"})
+    page = _store(tmp_path).get(pid)
+    assert page.status_bar_enabled is True
+    assert page.status_bar_cell_id == bar_id
+    assert page.cells[0].id == bar_id
+    assert page.cells[0].plugin == "tesserae_status"
+    # Four cells from the 2x2 preset, rescaled beneath the bar.
+    assert len(page.cells) == 5
+    for c in page.cells[1:]:
+        assert c.y >= 48
+
+
+def test_status_bar_refuses_on_very_short_panel(app: Flask, tmp_path: Path) -> None:
+    """A panel that's too short can't fit a 48 px bar + at least
+    STATUS_BAR_MIN_REMAINING_PX for the rest of the dashboard. Toggle
+    endpoint refuses rather than crushing the layout."""
+    _set_panel(app, 200, 120)
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    client.post(f"/pages/{pid}/status-bar/toggle", data={})
+    page = _store(tmp_path).get(pid)
+    assert page.status_bar_enabled is False
+
+
 # -- cell CRUD ------------------------------------------------------
 
 

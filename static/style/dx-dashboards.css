@@ -69,3 +69,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Push button widens to fit "Push to N", so its width varies row-to-row
+   and drags the right-aligned action group left with it, breaking the
+   vertical alignment of the Edit button across the list. Pin a
+   min-width big enough for "Push to 99" and centre the label so short
+   variants ("Push", "Push to 2") sit inside the same footprint. Icon-
+   only buttons (Duplicate, Delete) are unaffected because they don't
+   carry this class. */
+.dx-btn-push {
+  min-width: 96px;
+  justify-content: center;
+}

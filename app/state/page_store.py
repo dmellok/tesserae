@@ -151,6 +151,15 @@ class Page(BaseModel):
     # macro fallback of black).
     bleed_color: str = "#ffffff"
     icon: str | None = None
+    # v0.71.0: page-level status bar. When enabled, an auto-managed
+    # status_bar cell sits at (0, 0, panel.w, STATUS_BAR_HEIGHT_PX) at
+    # the top of the layout; other cells are shifted / rescaled to
+    # fit into the remaining vertical space. ``status_bar_cell_id``
+    # points to the auto-managed cell so we can find + rescale + remove
+    # it on toggle-off without confusing it with a user-added
+    # tesserae_status widget placed elsewhere.
+    status_bar_enabled: bool = False
+    status_bar_cell_id: str | None = None
 
     @model_validator(mode="before")
     @classmethod

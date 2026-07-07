@@ -1315,6 +1315,45 @@
 :root[data-theme="dark"] .dx-palette-save,
 :root[data-theme="dark"] .dx-palette-import { border-color: var(--t-border); }
 
+/* Status-bar toggle card in the page editor (v0.71.0). A <details>
+   wrapper with a two-column summary (title + switch). The caret in
+   the title is CSS-rotated on [open] instead of the browser default
+   triangle so the marker matches the rest of the editor. The switch
+   inside <summary> gets pointer-events reset to detach it from the
+   click-anywhere-to-toggle behaviour of <summary>. */
+.dx-status-bar-toggle {
+  border: 1px dashed var(--dx-border-faint);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin: 12px 0 0;
+}
+.dx-status-bar-toggle > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+}
+.dx-status-bar-toggle > summary::-webkit-details-marker { display: none; }
+.dx-status-bar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.dx-status-bar-caret {
+  transition: transform 0.15s ease;
+}
+.dx-status-bar-toggle[open] .dx-status-bar-caret {
+  transform: rotate(90deg);
+}
+.dx-status-bar-switch { margin: 0; }
+.dx-status-bar-body { padding: 8px 0 4px; }
+.dx-status-bar-jump { margin: 8px 0 0; }
+:root[data-theme="dark"] .dx-status-bar-toggle { border-color: var(--t-border); }
+
 .dx-tone-grid {
   display: grid;
   grid-template-columns: 1fr;

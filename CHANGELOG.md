@@ -6,6 +6,43 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.71.0], 2026-07-07
+
+### Added
+
+- **Page-level status bar toggle.** The dashboard editor now has a
+  "Status bar" section below the corner-radius slider. Flip the
+  switch and Tesserae auto-inserts a full-width 48 px
+  ``tesserae_status`` cell at the top of the layout; existing cells
+  shift down and rescale proportionally to fit the remaining space.
+  Flipping it back off removes the bar and reverses the rescale so
+  the layout returns to its pre-toggle shape. Switching layout
+  presets while the bar is on preserves it at row 0 rather than
+  remapping it into the preset's first slot. Always horizontal at
+  the top regardless of panel orientation.
+
+### Fixed
+
+- **Status bar widget: icons now render on the compose canvas.**
+  Phosphor's ``.ph-bold`` class rules live in the compose document,
+  which the shadow root doesn't inherit, so the chip icons were
+  rendering as blank squares. The widget now links
+  ``/static/style/spectra-widgets.css`` into its shadow root, same
+  pattern the weather widgets use.
+- **Status bar widget: text scales with the cell.** Font sizes are
+  now driven by container-query height units (``cqh``) with clamps at
+  each end, so a 48 px bar and a 400 px cell both render at the right
+  weight instead of shrinking to 12 px everywhere.
+
+### Removed
+
+- **Status bar widget: weather chip and the two custom text slots
+  dropped.** Weather was misleading in a widget that has no live
+  weather source of its own; the custom slots duplicated existing
+  widgets. If you were relying on either, drop a
+  ``weather_now`` widget or a small text widget onto the dashboard
+  directly.
+
 ## [0.70.1], 2026-07-07
 
 ### Fixed

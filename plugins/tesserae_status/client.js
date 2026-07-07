@@ -16,9 +16,10 @@
 // badge dot on the icon or explicit accent-red text, never hue alone.
 //
 // Update chips (app version, panel firmware) render only when an
-// update is pending, so the everyday state is just the ambient stats.
-// The version chip's update indicator fires after a fetch against
-// api.tesserae.ink/version/latest (opt-in via ``check_for_updates``).
+// update is pending. The app-version chip's update indicator fires
+// after a fetch against api.tesserae.ink/version/latest (opt-in via
+// ``check_for_updates``); firmware chip counts come from the app-
+// level firmware_check cache (opt-in in Settings -> System).
 
 const INK = "#1B1A16";
 const PAPER = "#FCFBF7";
@@ -46,7 +47,12 @@ function paint(shadow, data, state) {
   const mode = data.mode === "block" ? "block" : "bar";
   const chipMode = normaliseChipMode(data.chipMode);
   const chips = buildChips(data, state);
+  // The <link> pulls Phosphor bold (font-face + .ph-bold rules) into
+  // the shadow root; class selectors don't pierce the shadow boundary
+  // so without it every <i class="ph-bold ph-..."> would render as a
+  // bare square. Matches the pattern the weather widgets use.
   shadow.innerHTML = `
+    <link rel="stylesheet" href="/static/style/spectra-widgets.css">
     ${styles(bg, fg, red, mode)}
     <div class="frame" data-mode="${mode}" data-chipmode="${chipMode}">
       ${identityHtml(data, chipMode)}
@@ -79,20 +85,13 @@ function identityHtml(data, chipMode) {
 
 function buildChips(data, state) {
   const chips = [];
-  // Always-on ambient stats (in order): time, weather, battery, wifi, broker.
+  // Always-on ambient stats (in order): time, battery, wifi, broker.
   if (data.show_time) {
     chips.push({
       key: "time",
       icon: "ph-clock",
       value: formatTime(new Date(), data.time_format || "24h"),
       live: "time",
-    });
-  }
-  if (data.show_weather && String(data.weather_value || "").trim()) {
-    chips.push({
-      key: "weather",
-      icon: normaliseIcon(data.weather_icon, "ph-sun"),
-      value: String(data.weather_value).trim(),
     });
   }
   if (data.show_battery && Number.isFinite(data.battery_pct)) {
@@ -134,23 +133,6 @@ function buildChips(data, state) {
       value: "FW",
       updateSub: `${data.firmware_updates} update${data.firmware_updates === 1 ? "" : "s"}`,
       isUpdate: true,
-    });
-  }
-  // Two optional custom slots (user-provided icon + text).
-  const slot1 = String(data.custom_slot_1_value || "").trim();
-  if (slot1) {
-    chips.push({
-      key: "slot1",
-      icon: normaliseIcon(data.custom_slot_1_icon, "ph-thermometer-simple"),
-      value: slot1,
-    });
-  }
-  const slot2 = String(data.custom_slot_2_value || "").trim();
-  if (slot2) {
-    chips.push({
-      key: "slot2",
-      icon: normaliseIcon(data.custom_slot_2_icon, "ph-calendar-dots"),
-      value: slot2,
     });
   }
   return chips;
@@ -210,27 +192,6 @@ function wifiIcon(label) {
   }
 }
 
-const PH_ALLOWED = new Set([
-  "ph-clock",
-  "ph-sun",
-  "ph-cloud",
-  "ph-cloud-rain",
-  "ph-cloud-snow",
-  "ph-cloud-lightning",
-  "ph-moon",
-  "ph-moon-stars",
-  "ph-thermometer-simple",
-  "ph-trash",
-  "ph-calendar-dots",
-  "ph-house",
-  "ph-drop",
-  "ph-wind",
-]);
-function normaliseIcon(value, fallback) {
-  const v = String(value || "").trim();
-  return PH_ALLOWED.has(v) ? v : fallback;
-}
-
 function formatTime(d, format) {
   const h24 = d.getHours();
   const m = String(d.getMinutes()).padStart(2, "0");
@@ -247,7 +208,6 @@ function updateShorthand(latest, current) {
   const c = String(current).replace(/^v/, "");
   const lp = l.split(".");
   const cp = c.split(".");
-  // If major/minor match, show only the patch delta (e.g. "-> .18").
   if (lp.length === 3 && cp.length === 3 && lp[0] === cp[0] && lp[1] === cp[1]) {
     return `.${lp[2]}`;
   }
@@ -284,9 +244,6 @@ function wireUpdateCheck(shadow, data, state) {
       state.latestVersion = String(body.latest.version);
       state.latestUrl = body.latest.url || null;
       state.updateAvailable = true;
-      // Repaint so the version chip enters with the badge dot / accent
-      // sub in the correct slot. Chip order stays stable because the
-      // rebuild uses the same builder.
       paint(shadow, data, state);
       wireClock(shadow, data, state);
     })
@@ -326,6 +283,13 @@ function escapeHtml(s) {
 }
 
 // -- styles ------------------------------------------------------------
+//
+// Text and icons auto-size against the container's height (cqh units)
+// so the strip stays legible whether it's a 48 px bar, a 120 px tall
+// block, or the ~400 px cell the composer preview shows. The clamp()
+// wrappers keep the extremes readable: never smaller than what a
+// mid-DPR e-ink panel can legibly rasterise, never larger than the
+// design values from the handoff.
 
 function styles(bg, fg, red, mode) {
   return `
@@ -339,7 +303,7 @@ function styles(bg, fg, red, mode) {
         font-family: "Space Grotesk", var(--font-family, system-ui, sans-serif);
         font-weight: 600;
         letter-spacing: 0;
-        container-type: inline-size;
+        container-type: size;
       }
       .frame {
         width: 100%;
@@ -349,34 +313,45 @@ function styles(bg, fg, red, mode) {
         align-items: center;
         color: ${fg};
       }
+      /* Bar mode. clamp height to 48 px minimum so it never collapses
+         when a user drops it into a very short cell. */
       .frame[data-mode="bar"] {
         min-height: 48px;
-        padding: 0 22px;
+        padding: 0 clamp(14px, 4cqh, 22px);
         border-bottom: 3px solid ${fg};
+        gap: clamp(10px, 4cqh, 18px);
       }
       .frame[data-mode="block"] {
-        padding: 15px 18px;
+        padding: clamp(10px, 6cqh, 18px);
         border: 3px solid ${fg};
         flex-direction: column;
         align-items: stretch;
-        gap: 11px;
+        gap: clamp(8px, 4cqh, 14px);
       }
       /* Identity ---------------------------------------------------- */
       .identity {
         display: inline-flex;
         align-items: center;
-        gap: 11px;
+        gap: clamp(6px, 2cqh, 11px);
         flex: 0 0 auto;
       }
-      .frame[data-mode="block"] .identity { gap: 10px; }
-      .leading-icon { font-size: 21px; line-height: 1; }
+      .leading-icon {
+        font-size: clamp(16px, 45cqh, 32px);
+        line-height: 1;
+      }
+      .frame[data-mode="block"] .leading-icon {
+        font-size: clamp(18px, 12cqh, 32px);
+      }
       .name {
-        font-size: 16px;
+        font-size: clamp(13px, 34cqh, 26px);
         font-weight: 700;
         letter-spacing: -0.2px;
         line-height: 1.1;
       }
-      /* Rule separating identity from chips ------------------------- */
+      .frame[data-mode="block"] .name {
+        font-size: clamp(14px, 9cqh, 22px);
+      }
+      /* Rule (block mode only) -------------------------------------- */
       .rule {
         display: none;
       }
@@ -395,22 +370,18 @@ function styles(bg, fg, red, mode) {
       }
       .frame[data-mode="bar"] .chips {
         justify-content: flex-end;
-        gap: 20px;
+        gap: clamp(12px, 4.5cqh, 24px);
         flex-wrap: nowrap;
-      }
-      .frame[data-mode="bar"][data-chipmode="icon-only"] .chips,
-      .frame[data-mode="bar"][data-chipmode="text-only"] .chips {
-        gap: 22px;
       }
       .frame[data-mode="block"] .chips {
         flex-wrap: wrap;
-        gap: 12px 18px;
+        gap: clamp(8px, 3cqh, 14px) clamp(12px, 4cqh, 20px);
       }
       /* Chip -------------------------------------------------------- */
       .chip {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
+        gap: clamp(4px, 1.5cqh, 8px);
         white-space: nowrap;
         color: ${fg};
       }
@@ -421,19 +392,27 @@ function styles(bg, fg, red, mode) {
         justify-content: center;
         line-height: 1;
       }
-      .frame[data-mode="bar"] .chip-icon i { font-size: 20px; }
-      .frame[data-mode="block"] .chip-icon i { font-size: 20px; }
+      .frame[data-mode="bar"] .chip-icon i {
+        font-size: clamp(14px, 42cqh, 28px);
+      }
+      .frame[data-mode="block"] .chip-icon i {
+        font-size: clamp(15px, 10cqh, 24px);
+      }
       .chip-text {
         display: inline-flex;
         align-items: baseline;
-        gap: 6px;
+        gap: clamp(3px, 1.5cqh, 8px);
         line-height: 1.1;
       }
-      .frame[data-mode="bar"] .chip-value { font-size: 15px; }
-      .frame[data-mode="block"] .chip-value { font-size: 14px; }
+      .frame[data-mode="bar"] .chip-value {
+        font-size: clamp(12px, 32cqh, 22px);
+      }
+      .frame[data-mode="block"] .chip-value {
+        font-size: clamp(12px, 8cqh, 18px);
+      }
       .chip-value { font-weight: 600; }
       .chip-sub {
-        font-size: 13px;
+        font-size: clamp(11px, 25cqh, 16px);
         font-weight: 700;
         letter-spacing: 0.2px;
         color: ${red};
@@ -443,19 +422,14 @@ function styles(bg, fg, red, mode) {
         position: absolute;
         top: -2px;
         right: -3px;
-        width: 9px;
-        height: 9px;
+        width: clamp(6px, 2cqh, 12px);
+        height: clamp(6px, 2cqh, 12px);
         border-radius: 50%;
         background: ${red};
         box-shadow: 0 0 0 2px ${bg};
       }
-      .frame[data-mode="block"] .badge {
-        width: 8px;
-        height: 8px;
-      }
-      /* Icon-only + text-only tweaks --------------------------------- */
+      /* Icon-only mode collapses the icon+text gap. */
       .frame[data-chipmode="icon-only"] .chip { gap: 0; }
-      .frame[data-chipmode="text-only"] .chip-text { gap: 6px; }
     </style>
   `;
 }

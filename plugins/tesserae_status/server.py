@@ -185,9 +185,6 @@ def fetch(
         "time_format": str(options.get("time_format") or "24h"),
         # Chip visibility flags
         "show_time": _bool("show_time", True),
-        "show_weather": _bool("show_weather", False),
-        "weather_icon": str(options.get("weather_icon") or "ph-sun"),
-        "weather_value": str(options.get("weather_value") or ""),
         "show_battery": _bool("show_battery", True),
         "show_wifi": _bool("show_wifi", True),
         "show_broker": _bool("show_broker", True),
@@ -202,11 +199,6 @@ def fetch(
         "firmware_updates": (
             _firmware_updates_available() if _bool("show_firmware_updates", True) else 0
         ),
-        # Custom slots
-        "custom_slot_1_icon": str(options.get("custom_slot_1_icon") or "ph-thermometer-simple"),
-        "custom_slot_1_value": str(options.get("custom_slot_1_value") or "").strip(),
-        "custom_slot_2_icon": str(options.get("custom_slot_2_icon") or "ph-calendar-dots"),
-        "custom_slot_2_value": str(options.get("custom_slot_2_value") or "").strip(),
         # Aggregate-only install identifier for the update-check fetch.
         "install_scoped_id": ctx.get("widget_scoped_id") or "",
     }

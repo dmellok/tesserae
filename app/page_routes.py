@@ -277,22 +277,116 @@ def _new_cell(*, x: int, y: int, w: int, h: int) -> Cell:
     return Cell(id=uuid.uuid4().hex[:8], plugin=None, x=x, y=y, w=w, h=h, options={})
 
 
+# v0.71.0: fixed bar height used when auto-inserting the status_bar
+# cell. Matches the design handoff's "bar mode: 48 px tall" absolute
+# measure; e-ink panels vary in resolution but 48 px reads well on
+# every tier-1 panel we support (200 dpi Spectra 6, mono Inky4,
+# TRMNL). If a panel is shorter than about 200 px this would eat too
+# much of the layout, so the toggle refuses when the panel would end
+# up with less than STATUS_BAR_MIN_REMAINING_PX for the rest of the
+# cells.
+STATUS_BAR_HEIGHT_PX = 48
+STATUS_BAR_MIN_REMAINING_PX = 120
+
+
+def _rescale_cells_below_bar(
+    cells: list[Cell], panel_h: int, bar_h: int, direction: str
+) -> list[Cell]:
+    """Rescale existing cells to make room for (``direction="down"``)
+    or reclaim room from (``direction="up"``) the status bar.
+
+    ``direction="down"`` (toggling on): existing cells originally span
+    (0, panel_h); after inserting the bar they need to fit in
+    (bar_h, panel_h). y_new = bar_h + y_old * scale, h_new = h_old *
+    scale, where scale = (panel_h - bar_h) / panel_h.
+
+    ``direction="up"`` (toggling off): reverse. y_new = (y_old - bar_h)
+    / scale, h_new = h_old / scale.
+    """
+    if direction not in ("down", "up"):
+        raise ValueError(f"bad direction {direction!r}")
+    if panel_h <= 0:
+        return cells
+    scale = (panel_h - bar_h) / panel_h
+    if scale <= 0:
+        return cells
+    out: list[Cell] = []
+    for cell in cells:
+        if direction == "down":
+            new_y = bar_h + round(cell.y * scale)
+            new_h = max(1, round(cell.h * scale))
+        else:
+            new_y = max(0, round((cell.y - bar_h) / scale))
+            new_h = max(1, round(cell.h / scale))
+        out.append(cell.model_copy(update={"y": new_y, "h": new_h}))
+    return out
+
+
+def _default_status_bar_options(page_name: str) -> dict[str, Any]:
+    """Sensible defaults for the auto-inserted status_bar cell. Match
+    the widget's plugin.json default values so the first paint looks
+    the same as the design handoff (dark panelBg, bar mode, icon+text
+    chips, common ambient stats on)."""
+    return {
+        "mode": "bar",
+        "chipMode": "icon-text",
+        "dashboardName": "",
+        "leadingIcon": True,
+        "panelBg": "#1B1A16",
+        "show_time": True,
+        "time_format": "24h",
+        "show_battery": True,
+        "show_wifi": True,
+        "show_broker": True,
+        "broker_label": "HA",
+        "check_for_updates": False,
+        "show_firmware_updates": True,
+    }
+
+
 def _apply_layout_to_cells(layout_slug: str, page: Page) -> list[Cell]:
     """Build a new cells list by reusing existing cells (plugin + options)
     in order and repositioning them to match the layout's slots. Extra
-    slots get unassigned cells; surplus existing cells are dropped."""
+    slots get unassigned cells; surplus existing cells are dropped.
+
+    When ``page.status_bar_enabled`` is true, the auto-managed status
+    bar cell is preserved (kept at (0, 0, panel.w, STATUS_BAR_HEIGHT_PX))
+    and the preset's cells are rescaled to fit into the space below it
+    so switching layouts doesn't drop the status bar or shove it into
+    a random slot."""
     layout = LAYOUTS_BY_SLUG.get(layout_slug)
     if layout is None:
         raise ValueError(f"unknown layout {layout_slug!r}")
     panel = resolve_panel_for_page(page, _devices(), _settings_store())
+    bar_cell = None
+    reusable = list(page.cells)
+    if page.status_bar_enabled and page.status_bar_cell_id:
+        bar_cell = next((c for c in page.cells if c.id == page.status_bar_cell_id), None)
+        if bar_cell is not None:
+            reusable = [c for c in reusable if c.id != bar_cell.id]
     positions = to_panel_pixels(layout, panel.w, panel.h)
+    if bar_cell is not None:
+        # Rescale the preset's positions into (STATUS_BAR_HEIGHT_PX, panel.h).
+        bar_h = STATUS_BAR_HEIGHT_PX
+        remaining = max(1, panel.h - bar_h)
+        scale = remaining / panel.h
+        positions = [
+            (x, bar_h + round(y * scale), w, max(1, round(h * scale))) for (x, y, w, h) in positions
+        ]
     out: list[Cell] = []
     for i, (x, y, w, h) in enumerate(positions):
-        if i < len(page.cells):
-            existing = page.cells[i]
+        if i < len(reusable):
+            existing = reusable[i]
             out.append(existing.model_copy(update={"x": x, "y": y, "w": w, "h": h}))
         else:
             out.append(_new_cell(x=x, y=y, w=w, h=h))
+    if bar_cell is not None:
+        # Re-anchor the bar to full-width + fixed height in case the panel
+        # size changed since it was last positioned.
+        anchored = bar_cell.model_copy(
+            update={"x": 0, "y": 0, "w": panel.w, "h": STATUS_BAR_HEIGHT_PX}
+        )
+        out.insert(0, anchored)
     return out
 
 
@@ -805,6 +899,79 @@ def duplicate(page_id: str) -> Response:
     _store().save(copy)
     flash(f"Duplicated as {new_name!r}.", "ok")
     return redirect(url_for("pages.edit", page_id=new_id))
+
+
+@bp.post("/<page_id>/status-bar/toggle")
+def status_bar_toggle(page_id: str) -> Response:
+    """Toggle the page-level status bar (v0.71.0).
+
+    On: insert an auto-managed status_bar cell at (0, 0, panel.w, 48),
+    shift + rescale existing cells to fit below it, remember the
+    inserted cell's id on ``page.status_bar_cell_id``.
+
+    Off: find the auto-managed cell by id, remove it, reverse the
+    shift + rescale so the layout goes back to its pre-toggle shape.
+
+    Refuses on panels below ``STATUS_BAR_MIN_REMAINING_PX + 48`` in
+    height (bar would eat too much of the layout to leave usable
+    space for other cells).
+    """
+    page = _store().get(page_id)
+    if page is None:
+        abort(404)
+    panel = resolve_panel_for_page(page, _devices(), _settings_store())
+    if page.status_bar_enabled:
+        # Toggle OFF: remove the managed cell, reverse the rescale.
+        bar_id = page.status_bar_cell_id
+        remaining = [c for c in page.cells if c.id != bar_id] if bar_id else list(page.cells)
+        restored = _rescale_cells_below_bar(
+            remaining, panel_h=panel.h, bar_h=STATUS_BAR_HEIGHT_PX, direction="up"
+        )
+        _store().save(
+            page.model_copy(
+                update={
+                    "cells": restored,
+                    "status_bar_enabled": False,
+                    "status_bar_cell_id": None,
+                }
+            )
+        )
+        current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+        return _flash_save(True, "Status bar removed.")
+    # Toggle ON.
+    if panel.h < STATUS_BAR_HEIGHT_PX + STATUS_BAR_MIN_REMAINING_PX:
+        return _flash_save(
+            False,
+            (
+                f"Panel is too short ({panel.h} px) to fit a status bar and "
+                f"still leave room for the rest of the dashboard."
+            ),
+        )
+    # Rescale existing cells first so their new y + h are inside
+    # (STATUS_BAR_HEIGHT_PX, panel.h), then prepend the bar cell.
+    shifted = _rescale_cells_below_bar(
+        list(page.cells), panel_h=panel.h, bar_h=STATUS_BAR_HEIGHT_PX, direction="down"
+    )
+    bar_cell = Cell(
+        id=uuid.uuid4().hex[:8],
+        plugin="tesserae_status",
+        x=0,
+        y=0,
+        w=panel.w,
+        h=STATUS_BAR_HEIGHT_PX,
+        options=_default_status_bar_options(page.name),
+    )
+    _store().save(
+        page.model_copy(
+            update={
+                "cells": [bar_cell, *shifted],
+                "status_bar_enabled": True,
+                "status_bar_cell_id": bar_cell.id,
+            }
+        )
+    )
+    current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
+    return _flash_save(True, "Status bar added at the top.")
 
 
 @bp.post("/<page_id>/layout")
