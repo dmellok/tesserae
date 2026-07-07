@@ -29,7 +29,14 @@
 {% endmacro %}
 
 {% macro status_chip(status) %}
-  {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>delivered</span>
+  {# v0.71.x (discussion #62): "delivered" implied end-to-end receipt,
+     but the push pipeline's ``sent`` status only means the server
+     successfully published the frame (broker publish, or a REST
+     device with a new digest ready to poll). It doesn't guarantee
+     the panel has applied it yet. Renamed to ``pushed`` so the chip
+     matches the actual guarantee; separate receipt tracking is a
+     follow-up. #}
+  {% if status == 'sent' %}<span class="dx-pill is-ok"><span class="dx-pill-dot"></span>pushed</span>
   {% elif status == 'busy' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>busy</span>
   {% elif status == 'quiet' %}<span class="dx-pill is-warn"><span class="dx-pill-dot"></span>quiet</span>
   {% elif status == 'not_found' %}<span class="dx-pill is-danger"><span class="dx-pill-dot"></span>not found</span>

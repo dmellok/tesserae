@@ -23,7 +23,7 @@ openapi: 3.0.3
 
 info:
   title: Tesserae REST API
-  version: 0.64.16
+  version: 0.71.1
   description: |
     _Self-hosted e-ink dashboard server, device + automation HTTP API._
 

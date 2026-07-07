@@ -430,8 +430,9 @@ def test_slug_self_heal_leaves_unsupported_gamut_alone(app: Flask, tmp_path: Pat
     from app.device_service import update_instance_panel
 
     devices = app.config["DEVICE_REGISTRY"]
-    from app.renderer_loader import RendererRegistry  # noqa: F401
     from pathlib import Path as _Path
+
+    from app.renderer_loader import RendererRegistry  # noqa: F401
 
     update_instance_panel(
         devices=devices,

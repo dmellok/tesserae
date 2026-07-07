@@ -26,6 +26,29 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   unresolvable, it backfills the family's default bundled slug and
   persists it. Devices whose gamut has no matching family (mono,
   bwry_4, rgb24, rgb16) are still passed through untouched.
+- **Manual re-add after device delete now wipes leftover state
+  (issue #48 follow-up).** The discovery path already wiped orphan
+  state on a MAC-differs signal, but the manual "Add device" form has
+  no MAC to compare, so re-adding a device under the same id kept
+  dashboards / history / per-device settings from the previous
+  instance. ``devices_add`` now looks up the delete-marker for the
+  target id and, when one exists, calls ``wipe_orphan_state`` before
+  creating the new instance so the new device starts pristine.
+
+### Changed
+
+- **History status label renamed "delivered" → "pushed" (discussion
+  #62).** The chip on the History timeline reflected the server-
+  side ``sent`` status, but "delivered" implied end-to-end receipt.
+  The push pipeline only guarantees a successful publish (broker
+  publish, or a REST device with a new digest ready to poll); it
+  doesn't know whether the panel has applied the frame yet.
+  Renamed to "pushed" so the chip matches the guarantee. Separate
+  receipt tracking is a follow-up.
+- **OpenAPI spec version bumped to match the release (discussion
+  #28).** ``schema/openapi.yaml`` had ``info.version`` stuck at
+  0.64.16. Rolled to the current version so generated SDKs carry the
+  right release marker.
 
 ## [0.71.1], 2026-07-07
 

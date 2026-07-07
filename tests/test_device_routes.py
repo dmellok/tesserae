@@ -207,6 +207,49 @@ def test_config_form_rejects_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     assert "sleep_interval_s" not in dev_section
 
 
+def test_manual_re_add_after_delete_wipes_orphan_state(app: Flask, tmp_path: Path) -> None:
+    """Issue #48 follow-up: when a user deletes a device (leaving orphan
+    state on disk because the wipe-orphan checkbox was unticked) and
+    then manually re-adds a device under the same id, the leftover
+    state gets wiped so the new device starts pristine. Discovery-path
+    already covered by MAC-differs; manual-add couldn't know the
+    incoming MAC so the marker + wipe fires unconditionally when a
+    marker exists."""
+    from app.state.deleted_device_markers import DeletedDeviceMarkers
+    from app.state.page_store import Cell, Page
+
+    client = app.test_client()
+    _sign_in(client)
+    _add_instance(client, id="lab_pi", kind="pi_bin_client", name="Lab Pi")
+    # Give the device an owned dashboard so we have something to
+    # detect the wipe on. Use the live PageStore the app holds so the
+    # save propagates through the same in-memory state the delete
+    # handler observes.
+    page_store = app.config["PAGE_STORE"]
+    page_store.save(
+        Page(
+            id="p1",
+            name="Homelab",
+            device_ids=["lab_pi"],
+            cells=[Cell(id="c1", plugin=None, x=0, y=0, w=100, h=100)],
+        )
+    )
+    assert page_store.get("p1") is not None
+
+    # Delete without wiping orphan state; marker records the id, page
+    # stays behind bound to lab_pi (that's the leftover-state case).
+    client.post("/settings/devices/lab_pi/delete", data={})
+    markers = DeletedDeviceMarkers(tmp_path)
+    assert markers.get("lab_pi") is not None
+    assert page_store.get("p1") is not None
+
+    # Manual re-add under the same id wipes the leftover state:
+    # exclusively-bound page removed, marker cleared.
+    _add_instance(client, id="lab_pi", kind="pi_bin_client", name="Lab Pi 2")
+    assert page_store.get("p1") is None
+    assert DeletedDeviceMarkers(tmp_path).get("lab_pi") is None
+
+
 def test_config_form_saves_and_publishes_on_valid_input(app: Flask, tmp_path: Path) -> None:
     client = app.test_client()
     _sign_in(client)

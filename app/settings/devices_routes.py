@@ -134,11 +134,31 @@ def devices_add() -> Response:
     needed, the new device shows up immediately in the page editor's
     Target-device dropdown."""
     form = request.form
+    target_id = form.get("id") or ""
+    # v0.71.x (issue #48 follow-up): manual add doesn't know the
+    # incoming MAC (the form doesn't collect one), so the MAC-differs
+    # heuristic the discovery path uses can't fire. Users typing an id
+    # that matches a previously-deleted instance almost always mean
+    # "fresh device, same id by choice" - keeping the leftover
+    # dashboards / history / settings under that id from the deleted
+    # device is a genuine surprise. Wipe orphan state when a marker is
+    # present, then clear the marker so re-runs don't double-wipe.
+    if target_id:
+        markers = DeletedDeviceMarkers(Path(current_app.config["DATA_ROOT"]))
+        if markers.get(target_id) is not None:
+            device_cleanup.wipe_orphan_state(
+                device_id=target_id,
+                page_store=current_app.config["PAGE_STORE"],
+                event_log=current_app.config["EVENT_LOG"],
+                settings_store=settings_store(),
+                data_root=Path(current_app.config["DATA_ROOT"]),
+            )
+            markers.clear(target_id)
     result = device_service.create_instance(
         devices=devices(),
         renderers=renderers(),
         data_root=device_data_root(),
-        instance_id=form.get("id") or "",
+        instance_id=target_id,
         kind_id=(form.get("kind") or "").strip(),
         name=form.get("name") or "",
         panel_overrides=panel_overrides_from_form(form),
@@ -1137,7 +1157,7 @@ def devices_delete(instance_id: str) -> Response:
     the manifest / registry entry come down. Without the flag, the
     state stays and the device's last-known MAC gets stashed as a
     marker so a later re-register can decide whether to auto-wipe
-    based on Bernhard's MAC-differs check."""
+    via the MAC-differs check (issue #48)."""
     device_to_delete = devices().get(instance_id)
     last_mac = (
         str(device_to_delete.manifest.get("mac") or "").strip()
