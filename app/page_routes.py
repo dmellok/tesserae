@@ -176,7 +176,7 @@ def _coerce_cell_option(field: dict[str, Any], raw: str | None, all_form: Any) -
     ftype = field.get("type", "string")
     if ftype == "boolean":
         return f"opt_{field['name']}" in all_form
-    if ftype == "number":
+    if ftype == "number" or ftype == "slider":
         if raw is None or raw == "":
             return field.get("default")
         try:

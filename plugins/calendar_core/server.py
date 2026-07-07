@@ -128,10 +128,30 @@ def _fetch_ics(url: str, cache_path: Path) -> bytes | None:
     return blob
 
 
-def _expand_events(blob: bytes, start: datetime, end: datetime) -> list[dict[str, Any]]:
-    """Parse an .ics blob + return a JSON-safe list of events in
-    [start, end), including recurring expansions handled by
-    recurring_ical_events."""
+# v0.71.x (r/eink launch feedback): expanded-events cache. On a busy
+# calendar with lots of recurring rules (daily standup, weekly 1:1)
+# ``recurring_ical_events.of(cal).between(start, end)`` on a 90+ day
+# window is measured in seconds, and every schedule/day/week/month
+# widget on the dashboard was paying that cost on every render. We
+# now expand once into a wide "warm" window per (feed_id, ics_mtime)
+# and let per-widget calls slice from the cached list. Cache lives on
+# the module for the process lifetime; ``ics_mtime`` changing (fresh
+# feed pull) invalidates the entry automatically. Threadsafe by
+# accident: dict get/set are atomic in CPython, and the worst-case
+# race is two threads expanding the same feed in parallel.
+_EXPANSION_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+# Warm window: 30 days back (all-day multi-day events still visible)
+# to 180 days forward (covers 3 months + a buffer). ``fill`` mode
+# ceils at 90 days so this is comfortably wider than any widget will
+# ask for; requests outside the warm window fall back to a per-call
+# expansion.
+_WARM_WINDOW_BACK_DAYS = 30
+_WARM_WINDOW_FORWARD_DAYS = 180
+
+
+def _expand_events_full(blob: bytes, start: datetime, end: datetime) -> list[dict[str, Any]]:
+    """Uncached expansion (the previous ``_expand_events`` body). Used
+    for the initial warm-cache fill and for windows outside it."""
     try:
         cal = icalendar.Calendar.from_ical(blob)
     except Exception:
@@ -179,6 +199,43 @@ def _expand_events(blob: bytes, start: datetime, end: datetime) -> list[dict[str
     return out
 
 
+def _expand_events_cached(
+    feed_id: str,
+    ics_mtime: float,
+    blob: bytes,
+    start: datetime,
+    end: datetime,
+) -> list[dict[str, Any]]:
+    """Expand a feed's events through a warm cache when the requested
+    window fits inside it, otherwise fall back to a fresh expansion
+    of just the requested window."""
+    now = datetime.now(UTC)
+    warm_start = now - timedelta(days=_WARM_WINDOW_BACK_DAYS)
+    warm_end = now + timedelta(days=_WARM_WINDOW_FORWARD_DAYS)
+    within_warm = start >= warm_start and end <= warm_end
+    if not within_warm:
+        return _expand_events_full(blob, start, end)
+    cached = _EXPANSION_CACHE.get(feed_id)
+    if cached is not None and cached[0] == ics_mtime:
+        events = cached[1]
+    else:
+        events = _expand_events_full(blob, warm_start, warm_end)
+        _EXPANSION_CACHE[feed_id] = (ics_mtime, events)
+    # Slice the warm-cached list to the widget's specific window.
+    start_iso = start.astimezone(UTC).isoformat()
+    end_iso = end.astimezone(UTC).isoformat()
+    return [
+        e
+        for e in events
+        if (e.get("end") or e.get("start", "")) >= start_iso and (e.get("start") or "") < end_iso
+    ]
+
+
+# Public API for the calendar_* widgets uses the cached path. Direct
+# callers (tests / one-off diagnostics) can still hit ``_expand_events_full``.
+_expand_events = _expand_events_full
+
+
 def load_events(
     feed_ids: list[str] | None,
     start: datetime,
@@ -203,10 +260,15 @@ def load_events(
         url = feed.get("url")
         if not url:
             continue
-        blob = _fetch_ics(url, _ics_cache_path(dd, fid))
+        cache_path = _ics_cache_path(dd, fid)
+        blob = _fetch_ics(url, cache_path)
         if blob is None:
             continue
-        for ev in _expand_events(blob, start, end):
+        try:
+            ics_mtime = cache_path.stat().st_mtime
+        except OSError:
+            ics_mtime = 0.0
+        for ev in _expand_events_cached(fid, ics_mtime, blob, start, end):
             ev["feed_id"] = fid
             ev["feed_name"] = feed.get("name") or fid
             ev["feed_colour"] = feed.get("colour") or DEFAULT_COLOUR

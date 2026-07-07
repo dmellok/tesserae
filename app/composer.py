@@ -207,6 +207,8 @@ def _parallel_fetch_plugin_data(
     *,
     sample: bool = False,
     target_device_id: str = "",
+    page_name: str = "",
+    page_icon: str = "",
 ) -> dict[int, Any]:
     """Run each cell's ``server.py`` fetch() in a worker thread.
 
@@ -265,6 +267,8 @@ def _parallel_fetch_plugin_data(
                 cell_w=cell_w,
                 cell_h=cell_h,
                 target_device_id=target_device_id,
+                page_name=page_name,
+                page_icon=page_icon,
             )
 
     results: dict[int, Any] = {}
@@ -359,6 +363,8 @@ def _fetch_plugin_data(
     cell_w: int = 0,
     cell_h: int = 0,
     target_device_id: str = "",
+    page_name: str = "",
+    page_icon: str = "",
 ) -> Any:
     """Call the plugin's server.py fetch() if present. Returns None on miss.
 
@@ -432,6 +438,14 @@ def _fetch_plugin_data(
     # renders stay identical to what they were before.
     if target_device_id and manifest.get("render", {}).get("per_device_id"):
         ctx["target_device_id"] = target_device_id
+    # v0.71.x: expose the containing page's display metadata so widgets
+    # like tesserae_status can inherit the dashboard's icon / name for
+    # their leading chip. Always populated when the composer knows
+    # them; widgets that don't care simply ignore the fields.
+    if page_name:
+        ctx["page_name"] = page_name
+    if page_icon:
+        ctx["page_icon"] = page_icon
     install_uuid = current_app.config.get("INSTALL_ID")
     if isinstance(install_uuid, str) and install_uuid:
         if manifest.get("needs_install_id"):
@@ -581,6 +595,8 @@ def _hydrate_page(
         preview,
         sample=sample,
         target_device_id=str(page_dict.get("target_device_id") or ""),
+        page_name=str(page_dict.get("name") or ""),
+        page_icon=str(page_dict.get("icon") or ""),
     )
 
     cells_out: list[dict[str, Any]] = []

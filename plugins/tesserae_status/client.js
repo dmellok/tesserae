@@ -72,8 +72,15 @@ function normaliseChipMode(value) {
 function identityHtml(data, chipMode) {
   const name = String(data.dashboardName || data.page_name || "Dashboard").trim();
   const iconEnabled = data.leadingIcon !== false && chipMode !== "text-only";
+  // Inherit the dashboard's page-level icon (Settings → dashboard icon
+  // picker) when available. ``page_icon`` arrives without the ``ph-``
+  // prefix (the page-store strips it on write), so prepend it back
+  // when composing the class. Fall back to the neutral ``squares-four``
+  // when the page has no icon override.
+  const pageIconSlug = String(data.page_icon || "").trim();
+  const iconClass = pageIconSlug ? `ph-${pageIconSlug}` : "ph-squares-four";
   const iconHtml = iconEnabled
-    ? `<i class="ph-bold ph-squares-four leading-icon" aria-hidden="true"></i>`
+    ? `<i class="ph-bold ${iconClass} leading-icon" aria-hidden="true"></i>`
     : "";
   return `
     <div class="identity">

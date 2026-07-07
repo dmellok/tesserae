@@ -214,6 +214,7 @@ def fetch(
         "chipMode": str(options.get("chipMode") or "icon-text"),
         "dashboardName": str(options.get("dashboardName") or "").strip(),
         "page_name": str(ctx.get("page_name") or ""),
+        "page_icon": str(ctx.get("page_icon") or ""),
         "leadingIcon": _bool("leadingIcon", True),
         "panelBg": str(options.get("panelBg") or "#1B1A16"),
         "time_format": str(options.get("time_format") or "24h"),

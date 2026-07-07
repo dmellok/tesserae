@@ -46,10 +46,10 @@
     },
     {
       "name": "panelBg",
-      "type": "string",
-      "label": "Background colour (hex, e.g. #1B1A16)",
+      "type": "color",
+      "label": "Background colour",
       "default": "#1B1A16",
-      "help": "Freeform hex. Text, icons, and rules auto-flip between ink (#1B1A16) and paper (#FCFBF7) based on background luminance; the update accent flips between two reds for legibility on light vs dark."
+      "help": "Text, icons, and rules auto-flip between ink (#1B1A16) and paper (#FCFBF7) based on background luminance; the update accent flips between two reds for legibility on light vs dark."
     },
     {
       "name": "show_time",
