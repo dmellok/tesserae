@@ -1018,21 +1018,31 @@
           </div>
           {% endif %}
 
-          {# Contrast + Saturation moved here in v0.67; storage is the
-             same per-clone renderer-settings path they were on before,
-             so the combined save form still routes correctly. #}
-          {% if section.calibration_picture_quality %}
-          <hr class="dx-divider">
-          {% for pq in section.calibration_picture_quality %}
-          <p class="device-subhead">{{ pq.base_name }} — tone &amp; dither</p>
-          {% for field in pq.fields %}
-            {% set value = pq.state.get(field.name, field.get('default', '')) %}
-            {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}
-            {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
-          {% endfor %}
-          {% endfor %}
-          {% endif %}
         </div>
+        {% endif %}
+
+        {# v0.71.x (issue #52 follow-up): the renderer picture-quality
+           block (Contrast / Saturation / Dither) used to be nested
+           inside ``{% if section.palette_apply_endpoint %}``. That
+           gate is None for any panel gamut without a matching palette
+           family (bwry_4 / mono / rgb24 / rgb16), so a save that
+           resolved gamut to bwry_4 silently dropped the whole
+           picture-quality block. Lifted to its own top-level guard;
+           it's driven off ``calibration_picture_quality`` which comes
+           from the renderer clones' manifests, not from palette
+           family, so it renders whenever the device has clones with
+           calibration fields. Storage path (per-clone renderer
+           settings) unchanged. #}
+        {% if section.calibration_picture_quality %}
+        <hr class="dx-divider">
+        {% for pq in section.calibration_picture_quality %}
+        <p class="device-subhead">{{ pq.base_name }} — tone &amp; dither</p>
+        {% for field in pq.fields %}
+          {% set value = pq.state.get(field.name, field.get('default', '')) %}
+          {% set field_id = section.id ~ '-cal-' ~ pq.base_id ~ '-' ~ field.name %}
+          {{ auto_field(field_id, pq.clone_id ~ ':' ~ field.name, field, value, form=_combined_form_id) }}
+        {% endfor %}
+        {% endfor %}
         {% endif %}
       </section>
 
