@@ -186,11 +186,11 @@ def test_push_skips_publish_when_composition_matches_last_served(
 
 
 def test_push_force_publish_bypasses_content_skip(tmp_path: Path, composition_png: bytes) -> None:
-    """Issue #81: a user-initiated Send / Push (send_page / gallery)
-    must repaint the panel even when the composition digest is
-    bit-identical to the last render (widget data cached, weather value
-    unchanged inside its refresh interval, etc.). The content-checksum
-    skip is only for scheduled / automated refires.
+    """User-initiated Send / Push (send_page / gallery) repaints the
+    panel even when the composition digest is bit-identical to the
+    last render (widget data cached, weather value unchanged inside
+    its refresh interval, etc.). The content-checksum skip is only
+    for scheduled / automated refires.
 
     ``PushManager.push(force_publish=True)`` bypasses the skip and
     fires the publish so the served digest advances, letting the

@@ -554,8 +554,19 @@ def _rebuild_transport(
     if embedded_self_connect and embedded_user and not transport_user:
         transport_user = embedded_user
         transport_pass = embedded_pass or None
+    # v0.71.x (issue #81): keep ``host`` empty when the operator hasn't
+    # configured a broker. The previous fallback to ``"localhost"`` made
+    # ``BrokerConfig.host`` truthy on REST-only installs, which broke
+    # ``MqttTransport.publish``'s ``if not self._config.host`` no-op
+    # (issue #67). Result: user-initiated gallery / dashboard pushes on
+    # a broker-less fleet raised ``RuntimeError("transport not connected")``
+    # deep inside ``_fan_out``, ``_latest_renders`` never updated, and
+    # the REST client kept getting 304 on ``/frame`` against a stale
+    # digest. Passing an empty string is safe: ``transport.connect()``
+    # below only fires when ``host`` was originally truthy, and paho
+    # is never asked to dial an empty string.
     config = BrokerConfig(
-        host=host or "localhost",
+        host=host,
         port=int(broker_raw.get("port") or embedded_port or 1883),
         username=transport_user,
         password=transport_pass,
