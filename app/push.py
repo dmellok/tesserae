@@ -821,9 +821,7 @@ class PushManager:
                     (did, {did}) for did in group_dids
                 ]
             else:
-                render_targets = [
-                    ("", set(group_dids) if group_dids else None)  # type: ignore[list-item]
-                ]
+                render_targets = [("", set(group_dids) if group_dids else None)]
             for target_id, device_filter in render_targets:
                 base = f"{base_url}/compose/{page_id}?for_push=1&w={panel.w}&h={panel.h}"
                 compose_url = to_loopback_url(
