@@ -133,6 +133,8 @@ server URL.
    | `inky_7colour` | Pimoroni Inky ACeP, `.bin` packer target | `inky_7colour` |
    | `acep_7colour` | ACeP, semantic alias | `inky_7colour` |
    | `mono` | 1-bit B/W | `mono` |
+   | `bwr_3` | 3-colour B/W/Red tri-colour e-ink | `bwr_3` |
+   | `gray_4` | 4-level greyscale ramp (2-bit, no highlight) | `gray_4` |
    | `bwry_4` | 4-colour B/W/Red/Yellow (PicPak-class 4.2" panels) | `bwry_4` |
    | `rgb24` | Full 24-bit colour (LCD-hybrid) | `rgb24` |
    | `rgb16` | 16-bit colour (RGB565) | `rgb16` |

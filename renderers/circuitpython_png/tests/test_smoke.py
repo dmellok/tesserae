@@ -80,6 +80,35 @@ def test_circuitpython_png_mono_output_is_indexed(circuitpython_png, composition
     assert colors <= {(0, 0, 0), (255, 255, 255)}
 
 
+def test_circuitpython_png_bwr_3_uses_tricolour_palette(circuitpython_png, composition_png) -> None:
+    # Discussion #24: black/white/red tri-colour e-ink. Output must be
+    # an indexed PNG drawn only from the 3-entry BWR palette so
+    # adafruit_imageload mounts it without an on-device quantise.
+    from app.quantizer import BWR_3_PALETTE
+
+    panel = Panel(w=200, h=100, gamut="bwr_3")
+    artifact = circuitpython_png.transform(
+        composition_png, panel=panel, settings=circuitpython_png.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.mode == "P"
+    assert _colors_used(out) <= set(BWR_3_PALETTE)
+
+
+def test_circuitpython_png_gray_4_uses_grey_ramp(circuitpython_png, composition_png) -> None:
+    # Discussion #24: 2-bit greyscale panel. Output must quantise to the
+    # 4-level grey ramp, not a highlight palette.
+    from app.quantizer import GRAY_4_PALETTE
+
+    panel = Panel(w=200, h=100, gamut="gray_4")
+    artifact = circuitpython_png.transform(
+        composition_png, panel=panel, settings=circuitpython_png.settings_defaults()
+    )
+    out = Image.open(io.BytesIO(artifact))
+    assert out.mode == "P"
+    assert _colors_used(out) <= set(GRAY_4_PALETTE)
+
+
 def test_circuitpython_png_spectra_6_uses_palette_colors(
     circuitpython_png, composition_png
 ) -> None:

@@ -158,6 +158,14 @@ def test_canonicalise_gamut_passes_bwry_through() -> None:
     assert canonicalise_gamut("not-a-real-gamut") == "waveshare_e6"
 
 
+def test_canonicalise_gamut_passes_bwr3_and_gray4_through() -> None:
+    """Discussion #24: the CircuitPython 2-bit family (``bwr_3`` tri-
+    colour, ``gray_4`` grey ramp) is accepted and canonicalises to
+    itself so a client can declare it over /discover."""
+    assert canonicalise_gamut("bwr_3") == "bwr_3"
+    assert canonicalise_gamut("gray_4") == "gray_4"
+
+
 def test_pack_inky_7colour_red_nibble_differs_from_e6() -> None:
     """Red is index 3 on E6 (nibble 0x3) but index 4 on the 7-colour gamut
     (identity LUT → nibble 0x4): the index spaces genuinely differ.

@@ -138,6 +138,34 @@ BWRY_4_PALETTE: tuple[tuple[int, int, int], ...] = (
 # of the untranslated buffer directly.
 _BWRY_4_NIBBLE_BY_PALETTE_INDEX: tuple[int, ...] = (0x0, 0x1, 0x2, 0x3)
 
+# Black / White / Red tri-colour panels (the most common highlight
+# e-ink: Waveshare 2.13"/2.9"/4.2" "B" variants, many Pimoroni Inky
+# pHAT reds). Same 2-bit indexed family as BWRY, one highlight instead
+# of two. Used by the PNG renderers (``circuitpython_png``) so a client
+# can declare ``gamut = "bwr_3"`` and get a 3-colour indexed image
+# instead of wasting a palette slot on the unused yellow of ``bwry_4``.
+# Red matches the BWRY red so a mixed BWR + BWRY fleet dithers reds the
+# same way.
+BWR_3_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),  # black
+    (255, 255, 255),  # white
+    (255, 0, 0),  # red
+)
+
+# Four-level greyscale ramp (2-bit, no highlight): the grayscale e-ink
+# class CircuitPython's display stack drives as a 2-bit indexed buffer
+# (Waveshare 4.2" grayscale, some GDEW panels). Distinct from ``mono``
+# (2 levels) and from BWR/BWRY (highlight colours, not greys). Nominal
+# even ramp; a real panel's mid-greys drift, but the renderer emits the
+# nominal palette so the wire format stays deterministic per gamut
+# (calibrated ramps can follow the same path ``bwry_4`` will).
+GRAY_4_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),  # black
+    (85, 85, 85),  # dark grey
+    (170, 170, 170),  # light grey
+    (255, 255, 255),  # white
+)
+
 
 # Calibrated targets, what the panels actually reproduce under normal
 # viewing light. Used **only** when the per-device ``calibrated`` toggle
@@ -202,10 +230,13 @@ PANEL_GAMUTS: tuple[str, ...] = ("waveshare_e6", "inky_7colour", "bwry_4")
 # Semantic labels (``spectra_6``,
 # ``acep_7colour``) alias into the canonical PANEL_GAMUTS values at
 # persistence time so the .bin packer's lookup keeps working; the
-# rest (``mono``, ``rgb24``, ``rgb16``) sit as metadata for
-# renderers / clients that key off panel type (CircuitPython generic
-# driver, TRMNL mono path, future full-colour LCD hybrids) without
-# going through the .bin packer.
+# rest (``mono``, ``rgb24``, ``rgb16``, ``bwr_3``, ``gray_4``) sit as
+# metadata for renderers / clients that key off panel type
+# (CircuitPython generic driver, TRMNL mono path, future full-colour
+# LCD hybrids) without going through the .bin packer. ``bwr_3`` (tri-
+# colour B/W/Red) and ``gray_4`` (2-bit greyscale ramp) are the
+# CircuitPython "grayscale" 2-bit family the ``circuitpython_png``
+# renderer quantises to an indexed PNG.
 ACCEPTED_GAMUTS: frozenset[str] = frozenset(
     {
         "waveshare_e6",
@@ -216,6 +247,8 @@ ACCEPTED_GAMUTS: frozenset[str] = frozenset(
         "rgb24",
         "rgb16",
         "bwry_4",
+        "bwr_3",
+        "gray_4",
     }
 )
 

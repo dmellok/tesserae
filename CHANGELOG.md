@@ -6,6 +6,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Tri-colour and greyscale gamuts for the CircuitPython PNG path.** New
+  panel gamut values `bwr_3` (black/white/red tri-colour e-ink) and
+  `gray_4` (4-level greyscale ramp) join `bwry_4` in the 2-bit family. A
+  client can declare either over `/discover`, and the `circuitpython_png`
+  renderer quantises to the matching indexed palette so `adafruit_imageload`
+  mounts it directly with no on-device quantise.
+
 ### Fixed
 
 - **Calibration tone & dither block no longer disappears after save on a

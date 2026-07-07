@@ -12,6 +12,9 @@ RAM, so the device just paints what arrives.
 Output palette selected from the bound panel's gamut:
 
 * ``mono``                             -> 1-bit black + white
+* ``bwr_3``                            -> 3-colour black/white/red
+* ``gray_4``                           -> 4-level greyscale ramp (2-bit)
+* ``bwry_4``                           -> 4-colour black/white/red/yellow
 * ``spectra_6`` / ``waveshare_e6``     -> 6-colour Spectra 6
 * ``acep_7colour`` / ``inky_7colour``  -> 7-colour ACeP
 * ``rgb24`` / ``rgb16``                -> plain 24-bit RGB PNG,
@@ -41,7 +44,9 @@ from typing import Any
 from PIL import Image, ImageEnhance
 
 from app.quantizer import (
+    BWR_3_PALETTE,
     BWRY_4_PALETTE,
+    GRAY_4_PALETTE,
     INKY_7COLOUR_PALETTE,
     SPECTRA_6_PALETTE,
     fit_to_panel,
@@ -84,6 +89,8 @@ def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...] | None:
       * ``spectra_6`` / ``waveshare_e6`` / ``e6`` -> Spectra 6
       * ``acep_7colour`` / ``acep_7color`` / ``inky_7colour`` -> 7-colour
       * ``bwry_4`` -> 4-colour BWRY (v0.69.3 for PicPak-class panels)
+      * ``bwr_3`` -> 3-colour black/white/red tri-colour e-ink
+      * ``gray_4`` -> 4-level greyscale ramp (2-bit, no highlight)
       * ``rgb24`` / ``rgb16`` -> None (24-bit RGB PNG passthrough,
         v0.69.1 per issue #41)
     """
@@ -92,6 +99,10 @@ def _palette_for(gamut: str | None) -> tuple[tuple[int, int, int], ...] | None:
         return _MONO_PALETTE
     if g == "bwry_4":
         return BWRY_4_PALETTE
+    if g == "bwr_3":
+        return BWR_3_PALETTE
+    if g == "gray_4":
+        return GRAY_4_PALETTE
     if g in ("acep_7colour", "acep_7color", "inky_7colour"):
         return INKY_7COLOUR_PALETTE
     if g in ("rgb24", "rgb16"):
