@@ -197,9 +197,14 @@ def test_config_form_rejects_out_of_bounds(app: Flask, tmp_path: Path) -> None:
     )
     body = resp.get_data(as_text=True)
     assert "Invalid Lab ESP32 config" in body
-    # Nothing persisted, nothing published.
+    # The bad config value is not persisted. (An unrelated
+    # ``palette_profile_slug`` entry may appear on the device from the
+    # v0.71.x calibration self-heal that fires when the settings page
+    # renders after the redirect — it fills a supported gamut's default
+    # slug so the tone editor stays visible. Check the specific field.)
     store = SettingsStore(tmp_path / "core" / "settings.json")
-    assert "esp32_lab" not in store.get_section("devices")
+    dev_section = store.get_section("devices").get("esp32_lab", {})
+    assert "sleep_interval_s" not in dev_section
 
 
 def test_config_form_saves_and_publishes_on_valid_input(app: Flask, tmp_path: Path) -> None:

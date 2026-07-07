@@ -6,6 +6,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Full-bleed cells now honour the gap between neighbouring cells.**
+  v0.71.1's ``render.full_bleed`` handling skipped padding entirely,
+  which made the status bar sit flush against the widgets below it
+  (no visible matting even at large gap settings). Full-bleed now
+  only drops the outer padding (edges touching the panel wall);
+  inner padding between the cell and its neighbours still applies,
+  so the gap slider stays visible around the bar.
+- **Palette / tone editor no longer disappears from the Calibration
+  tab after a save (issue #52 follow-up).** The section is gated on
+  ``palette_profile_slug`` resolving to a real profile; if the slug
+  got into a state where it pointed at nothing (fresh install with no
+  applied profile, or a stale slug from a deleted user profile), the
+  whole palette + tone block vanished from the DOM. ``_palette_profile_slug_for``
+  now self-heals: on any read where the device has a supported
+  gamut (Spectra 6 or Inky 7-colour) and the stored slug is empty or
+  unresolvable, it backfills the family's default bundled slug and
+  persists it. Devices whose gamut has no matching family (mono,
+  bwry_4, rgb24, rgb16) are still passed through untouched.
+
 ## [0.71.1], 2026-07-07
 
 ### Fixed

@@ -461,13 +461,56 @@ def _has_custom_image(instance_id: str) -> bool:
 
 def _palette_profile_slug_for(device: Device) -> str:
     """Read the device's active palette profile slug from the settings
-    store, defaulting to an empty string when no override is set."""
+    store.
+
+    Self-heals for panels whose gamut has a matching profile family
+    (spectra6 / inky_7colour): when the stored slug is empty OR points
+    at a profile that no longer resolves, backfill the family's
+    default bundled slug and persist it. This keeps the Calibration
+    tab's tone / palette section rendered across saves that would
+    otherwise leave the slug in a broken state (issue #52 follow-up,
+    the "section vanishes after saving a slider" symptom).
+
+    Devices whose gamut has no matching family (mono, bwry_4, rgb24,
+    rgb16) still return "" so the section stays hidden as intended.
+    """
     raw = settings_store().get_for_runtime(
         "devices",
         device.id,
         [{"name": "palette_profile_slug", "type": "string", "default": ""}],
     )
-    return str(raw.get("palette_profile_slug") or "").strip()
+    slug = str(raw.get("palette_profile_slug") or "").strip()
+
+    family = _palette_family_for(device)
+    if not family:
+        return slug
+
+    if slug and _resolves_to_profile(slug):
+        return slug
+
+    from app.palette_profiles.bundled import default_slug_for
+
+    fallback = default_slug_for(family)
+    if slug != fallback:
+        settings_store().update_for_namespace(
+            "devices",
+            device.id,
+            {"palette_profile_slug": fallback},
+            [{"name": "palette_profile_slug", "type": "string", "default": ""}],
+        )
+    return fallback
+
+
+def _resolves_to_profile(slug: str) -> bool:
+    """True when a slug resolves to a bundled or on-disk user profile.
+    Used by the slug self-heal to detect stale slugs that would otherwise
+    hide the tone editor."""
+    if palette_profiles.bundled_profile(slug) is not None:
+        return True
+    from pathlib import Path
+
+    store = palette_profiles.PaletteProfileStore(Path(current_app.config["DATA_ROOT"]))
+    return store.load(slug) is not None
 
 
 def _palette_family_for(device: Device) -> str:

@@ -509,27 +509,29 @@ def _hydrate_page(
             _resolved_options(plugin_id, cell.get("options", {})) if plugin_id else {}
         )
         full_bleed = bool(plugin and plugin.manifest.get("render", {}).get("full_bleed"))
-        if full_bleed:
-            # Full-bleed widgets (e.g. the tesserae_status bar) render
-            # edge-to-edge with no gap padding, so the fixed 48 px bar
-            # doesn't get eaten by a large user-picked matting gap.
-            layout = {
-                "x": cell["x"],
-                "y": cell["y"],
-                "w": cell["w"],
-                "h": cell["h"],
-            }
-        else:
-            left_pad = outer_pad if cell["x"] == 0 else inner_pad
-            top_pad = outer_pad if cell["y"] == 0 else inner_pad
-            right_pad = outer_pad if cell["x"] + cell["w"] == panel_w else inner_pad
-            bottom_pad = outer_pad if cell["y"] + cell["h"] == panel_h else inner_pad
-            layout = {
-                "x": cell["x"] + left_pad,
-                "y": cell["y"] + top_pad,
-                "w": max(1, cell["w"] - left_pad - right_pad),
-                "h": max(1, cell["h"] - top_pad - bottom_pad),
-            }
+        # Full-bleed widgets (e.g. the tesserae_status bar) drop the
+        # OUTER padding: any cell edge that touches the panel wall
+        # renders at zero, so the widget goes edge-to-edge on those
+        # sides. Inner padding (matting between this cell and a
+        # neighbouring cell) still applies, so the user's gap slider
+        # stays visible around the widgets that sit below or beside
+        # the bar. Without this the 48 px bar either eats 3/4 of its
+        # own height at large gaps (pre-v0.71.1) or has no visible
+        # matting anywhere (v0.71.1's skip-everything shortcut).
+        outer_left = 0 if full_bleed else outer_pad
+        outer_top = 0 if full_bleed else outer_pad
+        outer_right = 0 if full_bleed else outer_pad
+        outer_bottom = 0 if full_bleed else outer_pad
+        left_pad = outer_left if cell["x"] == 0 else inner_pad
+        top_pad = outer_top if cell["y"] == 0 else inner_pad
+        right_pad = outer_right if cell["x"] + cell["w"] == panel_w else inner_pad
+        bottom_pad = outer_bottom if cell["y"] + cell["h"] == panel_h else inner_pad
+        layout = {
+            "x": cell["x"] + left_pad,
+            "y": cell["y"] + top_pad,
+            "w": max(1, cell["w"] - left_pad - right_pad),
+            "h": max(1, cell["h"] - top_pad - bottom_pad),
+        }
         cells_meta.append(
             {
                 "cell": cell,

@@ -362,6 +362,94 @@ def test_update_tone_refused_when_no_profile_applied(app: Flask) -> None:
     assert not prof_dir.exists() or not list(prof_dir.glob("*.json"))
 
 
+def test_slug_self_heal_on_stale_slug_for_supported_family(app: Flask, tmp_path: Path) -> None:
+    """Issue #52 follow-up: after a save the Calibration tab's tone
+    section vanishes when the device's ``palette_profile_slug`` points
+    at a profile that no longer resolves (deleted user profile, disk
+    cleanup, etc.). The self-heal in ``_palette_profile_slug_for``
+    backfills the family's default bundled slug so the tone editor
+    stays rendered."""
+    from app.settings.index_routes import _palette_profile_slug_for, _palette_profile_tone_for
+
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    # Poke a stale slug straight into settings, mimicking a user profile
+    # that got deleted while it was still the device's active slug.
+    store = app.config["SETTINGS_STORE"]
+    store.update_for_namespace(
+        "devices",
+        dev,
+        {"palette_profile_slug": "ghost-profile-that-doesnt-exist"},
+        [{"name": "palette_profile_slug", "type": "string", "default": ""}],
+    )
+    with app.test_request_context():
+        device = app.config["DEVICE_REGISTRY"].get(dev)
+        healed_slug = _palette_profile_slug_for(device)
+        assert healed_slug == "paperlesspaper-spectra6"
+        tone = _palette_profile_tone_for(device)
+        assert tone.get("editable") is True
+
+    # And that healed slug is persisted, so a second read is a plain hit.
+    raw = store.get_for_runtime(
+        "devices",
+        dev,
+        [{"name": "palette_profile_slug", "type": "string", "default": ""}],
+    )
+    assert raw["palette_profile_slug"] == "paperlesspaper-spectra6"
+
+
+def test_slug_self_heal_on_empty_slug_for_supported_family(app: Flask, tmp_path: Path) -> None:
+    """A fresh device with a Spectra 6 gamut and no slug set gets the
+    family default backfilled so the tone editor is visible out of
+    the box."""
+    from app.settings.index_routes import _palette_profile_slug_for, _palette_profile_tone_for
+
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client)
+    with app.test_request_context():
+        device = app.config["DEVICE_REGISTRY"].get(dev)
+        healed_slug = _palette_profile_slug_for(device)
+        assert healed_slug == "paperlesspaper-spectra6"
+        tone = _palette_profile_tone_for(device)
+        assert tone.get("editable") is True
+
+
+def test_slug_self_heal_leaves_unsupported_gamut_alone(app: Flask, tmp_path: Path) -> None:
+    """Panels whose gamut has no matching profile family (mono / bwry_4
+    / rgb24 / rgb16) should still hide the palette section, not get
+    forced onto a Spectra 6 profile."""
+    from app.settings.index_routes import _palette_profile_slug_for, _palette_profile_tone_for
+
+    client = app.test_client()
+    _sign_in(client)
+    dev = _register_device(client, kind="pi_bin_client")
+    device = app.config["DEVICE_REGISTRY"].get(dev)
+    # Force gamut to mono to model an unsupported family.
+    from app.device_service import update_instance_panel
+
+    devices = app.config["DEVICE_REGISTRY"]
+    from app.renderer_loader import RendererRegistry  # noqa: F401
+    from pathlib import Path as _Path
+
+    update_instance_panel(
+        devices=devices,
+        renderers=app.config["RENDERER_REGISTRY"],
+        data_root=_Path(app.config["DATA_ROOT"]) / "devices",
+        instance_id=dev,
+        w=device.panel["w"],
+        h=device.panel["h"],
+        orientation=device.panel.get("orientation", "landscape"),
+        gamut="bwry_4",
+    )
+    with app.test_request_context():
+        device = app.config["DEVICE_REGISTRY"].get(dev)
+        assert _palette_profile_slug_for(device) == ""
+        tone = _palette_profile_tone_for(device)
+        assert tone.get("editable") is False
+
+
 def test_delete_bundled_profile_refused(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
