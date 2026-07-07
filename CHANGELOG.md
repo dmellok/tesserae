@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Panel gamut / calibration changes now repaint instead of serving a
+  stale 304.** The content-checksum skip keyed only on the composition
+  digest, so switching a device's panel (e.g. Spectra 6 to ACeP),
+  editing a calibration profile, or changing saturation/contrast/dither
+  left the device on the previous palette's frame until the dashboard
+  pixels themselves changed. The skip now compares a full render
+  signature (composition + panel geometry/gamut + resolved renderer
+  settings), so any input that alters the packed bytes triggers a fresh
+  render (#81).
 - **Status bar update chip no longer fires against an older release.**
   The ``tesserae_status`` widget trusted ``api.tesserae.ink``'s
   ``is_current`` flag, so callers running an edge / local build ahead

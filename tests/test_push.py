@@ -237,6 +237,64 @@ def test_push_still_publishes_when_composition_changes(
     assert len(mqtt_client.published) == 2
 
 
+def test_push_gamut_change_repaints_despite_same_composition(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """Issue #81: the content-skip must key on the render inputs, not the
+    composition alone. Changing a device's panel gamut (Spectra 6 ->
+    ACeP) changes the packed .bin bytes even when the composition PNG is
+    byte-identical, so the second push has to re-publish instead of
+    skipping and leaving the device on a stale 304.
+
+    The stub renderer emits the same bytes for both gamuts on purpose:
+    the skip decision must come from the render *signature* (which folds
+    in the panel gamut), not from the artifact digest."""
+    renderers = [_make_renderer(tmp_path, "pi_bin", "bin", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    panel_spectra = Panel(w=100, h=100, gamut="waveshare_e6")
+    panel_acep = Panel(w=100, h=100, gamut="inky_7colour")
+
+    with (
+        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.panel_groups_for_push", return_value=[(panel_spectra, [])]),
+    ):
+        first = manager.push("home")
+    assert first.status == "sent"
+    publishes_after_first = len(mqtt_client.published)
+
+    with (
+        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.panel_groups_for_push", return_value=[(panel_acep, [])]),
+    ):
+        second = manager.push("home")
+
+    # Same composition, different gamut: re-publish, don't skip.
+    assert second.status == "sent"
+    assert all(not r.unchanged and r.error is None for r in second.renderers)
+    assert len(mqtt_client.published) == publishes_after_first + 1
+
+
+def test_push_same_gamut_still_skips(tmp_path: Path, composition_png: bytes) -> None:
+    """Guard the optimisation the issue-#81 fix must not regress: an
+    unchanged composition AND unchanged panel still skips the re-paint."""
+    renderers = [_make_renderer(tmp_path, "pi_bin", "bin", retain=False)]
+    manager, mqtt_client, png = _wired(tmp_path, composition_png, renderers)
+
+    panel = Panel(w=100, h=100, gamut="waveshare_e6")
+    with (
+        patch("app.push.render_to_png", return_value=png),
+        patch("app.push.panel_groups_for_push", return_value=[(panel, [])]),
+    ):
+        manager.push("home")
+        publishes = len(mqtt_client.published)
+        second = manager.push("home")
+
+    assert second.status == "no_change"
+    assert all(r.unchanged and r.error is None for r in second.renderers)
+    assert len(mqtt_client.published) == publishes
+
+
 def test_push_not_found_when_page_missing(tmp_path: Path, composition_png: bytes) -> None:
     manager, _, _ = _wired(tmp_path, composition_png, [])
     result = manager.push("does_not_exist")

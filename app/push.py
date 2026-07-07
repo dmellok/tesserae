@@ -965,8 +965,15 @@ class PushManager:
             if device_filters is not None and renderer.device not in device_filters:
                 continue
             renderer_start = time.monotonic()
+            # Resolve settings up front so the skip signature sees the same
+            # inputs the render would (gamut, calibration, saturation, …).
+            # Reused by _publish_artifact below, so no double resolution.
+            render_settings = self._resolve_render_settings(renderer, image_fit=image_fit)
+            signature = self._render_signature(
+                comp_digest=comp_digest, panel=panel, settings=render_settings
+            )
             last = self._latest_renders.get(renderer.device)
-            if not force_publish and last and last.get("composition_digest") == comp_digest:
+            if not force_publish and last and last.get("render_signature") == signature:
                 result = RendererResult(
                     renderer_id=renderer.id,
                     topic=renderer.topic,
@@ -1001,7 +1008,7 @@ class PushManager:
                 continue
             try:
                 result = self._publish_artifact(
-                    renderer, composition_png, panel, image_fit=image_fit
+                    renderer, composition_png, panel, image_fit=image_fit, settings=render_settings
                 )
             except Exception as err:
                 logger.exception("renderer %s failed", renderer.id)
@@ -1035,6 +1042,11 @@ class PushManager:
                     # URL that always serves a viewable frame, even when
                     # the per-renderer artifact is a packed binary buffer.
                     "composition_digest": comp_digest,
+                    # Full render-input fingerprint (composition + panel +
+                    # settings). The next push skips re-rendering only when
+                    # this matches, so a gamut / calibration change repaints
+                    # even against an unchanged composition (issue #81).
+                    "render_signature": signature,
                 }
                 self._save_latest_renders()
             # One event per renderer per push: lets /events filter for a
@@ -1249,15 +1261,33 @@ class PushManager:
         img.save(out, format="PNG", optimize=True)
         return out.getvalue()
 
-    def _publish_artifact(
-        self,
-        renderer: Renderer,
-        composition_png: bytes,
-        panel: Panel,
-        *,
-        image_fit: str | None = None,
-    ) -> RendererResult:
-        """Run one renderer end-to-end: settings -> transform -> write -> publish."""
+    def _resolve_render_settings(
+        self, renderer: Renderer, *, image_fit: str | None = None
+    ) -> dict[str, Any]:
+        """Resolve the effective settings for one renderer push: base
+        runtime settings, the per-push fit override, and any Calibration-
+        tab palette / tone / dither / edge profile applied to the device.
+
+        Pulled out of :meth:`_publish_artifact` so the content-skip in
+        :meth:`_fan_out` can fold the same inputs into its render
+        signature without rendering. A gamut / calibration / saturation
+        change alters the packed bytes even when the composition PNG is
+        byte-identical, so the skip has to see them too (issue #81).
+
+        Calibration-tab palette override: when the device has a profile
+        applied, the resolved RGB tuples land under ``_palette_override``.
+        .bin renderers read it and pass it to
+        :func:`app.quantizer.pack_to_panel_bin` as ``palette_override``,
+        which wins over the module-level ``_CALIBRATED_PALETTES`` lookup
+        when the clone's ``calibrated`` toggle is also on.
+
+        Phase 2 (v0.67.1) adds ``_profile_tone`` (exposure, s_curve) and
+        ``_profile_dither`` (serpentine, diffusion_strength) side channels
+        for the renderer to pick up. Contrast + saturation stay on the
+        per-clone renderer settings so existing configs keep working; the
+        profile's contrast/saturation get merged only when actively
+        different from their defaults.
+        """
         settings = self._settings.get_for_runtime(
             "renderers", renderer.id, renderer.manifest.get("settings", [])
         )
@@ -1266,19 +1296,6 @@ class PushManager:
             # read ``image_fit`` (server-side fit_to_panel); pi_png passes it
             # to the client via its ``scale`` payload field.
             settings = {**settings, "image_fit": image_fit, "scale": image_fit}
-        # Calibration-tab palette override: when the device has a profile
-        # applied, inject the resolved RGB tuples into settings under the
-        # ``_palette_override`` key. .bin renderers read it and pass to
-        # :func:`app.quantizer.pack_to_panel_bin` as ``palette_override``,
-        # which wins over the module-level ``_CALIBRATED_PALETTES`` lookup
-        # when the clone's ``calibrated`` toggle is also on.
-        #
-        # Phase 2 (v0.67.1) adds ``_profile_tone`` (exposure, s_curve)
-        # and ``_profile_dither`` (serpentine, diffusion_strength) side
-        # channels for the renderer to pick up. Contrast + saturation
-        # stay on the per-clone renderer settings so existing configs
-        # keep working; the profile's contrast/saturation get merged in
-        # only when they're actively different from their defaults.
         if self._palette_profile_store is not None and renderer.device is not None:
             profile = _resolve_full_profile(
                 device_id=renderer.device,
@@ -1307,6 +1324,42 @@ class PushManager:
                     "preserve_line_art": profile.edges.preserve_line_art,
                 }
                 settings = {**settings, **extras}
+        return settings
+
+    def _render_signature(self, *, comp_digest: str, panel: Panel, settings: dict[str, Any]) -> str:
+        """Fingerprint every input that changes a renderer's packed bytes
+        for a device: the composition, the panel geometry + gamut, and the
+        resolved renderer settings (saturation / contrast / dither /
+        calibration palette). :meth:`_fan_out`'s content-skip compares this
+        instead of the bare composition digest, so a gamut or calibration
+        change repaints even when the dashboard pixels didn't move. Before
+        this the skip keyed on the composition alone, so switching a
+        pi_bin device's panel from Spectra 6 to ACeP left it serving the
+        old palette's ``.bin`` (a stale 304) until the composition itself
+        changed (issue #81)."""
+        payload = {
+            "comp": comp_digest,
+            "panel": panel.model_dump(),
+            "settings": settings,
+        }
+        blob = json.dumps(payload, sort_keys=True, default=str)
+        return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+    def _publish_artifact(
+        self,
+        renderer: Renderer,
+        composition_png: bytes,
+        panel: Panel,
+        *,
+        image_fit: str | None = None,
+        settings: dict[str, Any] | None = None,
+    ) -> RendererResult:
+        """Run one renderer end-to-end: settings -> transform -> write ->
+        publish. ``settings`` may be pre-resolved by the caller (the skip
+        check in :meth:`_fan_out` already resolves them to build the render
+        signature); when ``None`` we resolve them here."""
+        if settings is None:
+            settings = self._resolve_render_settings(renderer, image_fit=image_fit)
         # Device-aware low-battery chip: per-renderer so each device's
         # last-known battery decides whether its push wears the warning.
         # A composition fanned out to a Pi + a TRMNL only paints the
