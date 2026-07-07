@@ -295,6 +295,50 @@ def test_push_same_gamut_still_skips(tmp_path: Path, composition_png: bytes) -> 
     assert len(mqtt_client.published) == publishes
 
 
+def test_unbound_push_over_base_renderers_is_clean_on_brokerless_install(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """Issue #67: an unbound dashboard (bound to no device) fans out to
+    every base kind renderer. On a broker-less install those renderers
+    still call ``transport.publish``; before the host-default fix that
+    raised ``RuntimeError('transport not connected')`` and marked the
+    whole push failed in history, even though the user's actual REST
+    device painted fine. With a broker-less transport (empty host, never
+    connected) the publish now no-ops, so the push reports success and no
+    renderer carries an error."""
+    renderers = [
+        _make_renderer(tmp_path, "esp32_bin", "bin", retain=True),
+        _make_renderer(tmp_path, "circuitpython_png", "png", retain=False),
+        _make_renderer(tmp_path, "pi_png", "png", retain=False),
+    ]
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(Page(id="home", name="Home", panel=Panel(w=100, h=100), cells=[]))
+    registry = RendererRegistry(renderers={r.id: r for r in renderers})
+
+    # Broker-less: empty host, transport constructed but never connected,
+    # exactly the transport_wiring shape after the host-default fix.
+    transport = MqttTransport(
+        BrokerConfig(host=""), client_factory=lambda cid: _FakeMqttClient(cid)
+    )
+
+    manager = PushManager(
+        registry=registry,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+    )
+
+    with patch("app.push.render_to_png", return_value=composition_png):
+        result = manager.push("home")
+
+    assert result.status == "sent"
+    assert result.renderers, "expected the base renderers to fan out"
+    assert all(r.error is None for r in result.renderers)
+
+
 def test_push_not_found_when_page_missing(tmp_path: Path, composition_png: bytes) -> None:
     manager, _, _ = _wired(tmp_path, composition_png, [])
     result = manager.push("does_not_exist")
