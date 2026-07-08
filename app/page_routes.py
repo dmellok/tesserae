@@ -362,7 +362,12 @@ def _default_status_bar_options(page_name: str) -> dict[str, Any]:
     """Sensible defaults for the auto-inserted status_bar cell. Match
     the widget's plugin.json default values so the first paint looks
     the same as the design handoff (dark panelBg, bar mode, icon+text
-    chips, common ambient stats on)."""
+    chips, common ambient stats on).
+
+    v0.72.0: ``check_for_updates`` flipped on by default. Enabling the
+    status bar is an implicit opt-in to the update-indicator chip; the
+    fetch is rate-limited to once per hour and only paints when the
+    latest release is strictly newer than the running build."""
     return {
         "mode": "bar",
         "chipMode": "icon-text",
@@ -375,7 +380,7 @@ def _default_status_bar_options(page_name: str) -> dict[str, Any]:
         "show_wifi": True,
         "show_broker": True,
         "broker_label": "HA",
-        "check_for_updates": False,
+        "check_for_updates": True,
         "show_firmware_updates": True,
     }
 
@@ -1020,6 +1025,14 @@ def status_bar_toggle(page_id: str) -> Response:
             }
         )
     )
+    # v0.72.0: enabling the status bar is an implicit opt-in to the
+    # firmware update indicator (the bar's most valuable chip when a
+    # panel actually has firmware waiting). Flip the app-level opt-in
+    # unconditionally at toggle-on so the firmware-update count the
+    # widget renders is non-zero when devices are behind. The setting
+    # persists after the bar is turned off; disabling the bar doesn't
+    # revert it (device settings pages also depend on the check).
+    _settings_store().patch_section("app", {"check_firmware_updates": True})
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _flash_save(True, "Status bar added at the top.")
 
