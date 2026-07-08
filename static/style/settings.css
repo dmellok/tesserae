@@ -1315,39 +1315,29 @@
 :root[data-theme="dark"] .dx-palette-save,
 :root[data-theme="dark"] .dx-palette-import { border-color: var(--t-border); }
 
-/* Status-bar toggle card in the page editor (v0.71.0). A <details>
-   wrapper with a two-column summary (title + switch). The caret in
-   the title is CSS-rotated on [open] instead of the browser default
-   triangle so the marker matches the rest of the editor. The switch
-   inside <summary> gets pointer-events reset to detach it from the
-   click-anywhere-to-toggle behaviour of <summary>. */
+/* Status-bar toggle card in the page editor (v0.72.0). Flat header
+   row (title + switch) followed by the body panel; no expand/collapse
+   since the body content is small enough to always show and the
+   previous <details> shell made the section read as broken when the
+   body was tiny. */
 .dx-status-bar-toggle {
   border: 1px dashed var(--dx-border-faint);
   border-radius: 6px;
   padding: 8px 12px;
   margin: 12px 0 0;
 }
-.dx-status-bar-toggle > summary {
-  list-style: none;
-  cursor: pointer;
+.dx-status-bar-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   padding: 4px 0;
 }
-.dx-status-bar-toggle > summary::-webkit-details-marker { display: none; }
 .dx-status-bar-title {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-weight: 600;
-}
-.dx-status-bar-caret {
-  transition: transform 0.15s ease;
-}
-.dx-status-bar-toggle[open] .dx-status-bar-caret {
-  transform: rotate(90deg);
 }
 .dx-status-bar-switch { margin: 0; }
 .dx-status-bar-body { padding: 8px 0 4px; }

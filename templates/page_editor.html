@@ -349,38 +349,36 @@
         {{ slider('page-radius', 'corner_radius', 'Corner radius', value=page.corner_radius, min=0, max=80, unit='px') }}
       </form>
 
-      {# v0.71.0: page-level status bar toggle. Independent form so the
-         switch persists without touching the theme/gap/radius block
-         above. Expand/collapse is client-side (open state kept in
-         sessionStorage per page id) and orthogonal to the switch:
-         users can collapse the body panel while leaving the switch
-         on. #}
+      {# v0.72.0: page-level status bar toggle. No expand/collapse
+         (previous <details> shell added animation but the body panel
+         collapses to essentially nothing on the "disabled" state,
+         which read as broken). Rendered as a flat header row with the
+         proper switch component (track + thumb) so the interaction
+         reads as a toggle and matches the rest of the editor. #}
       {% set _sb_cell = None %}
       {% if page.status_bar_enabled and page.status_bar_cell_id %}
         {% for _c in page.cells %}
           {% if _c.id == page.status_bar_cell_id %}{% set _sb_cell = _c %}{% endif %}
         {% endfor %}
       {% endif %}
-      <details class="dx-status-bar-toggle" data-page-id="{{ page.id }}"
-               {% if page.status_bar_enabled %}open{% endif %}>
-        <summary>
+      <section class="dx-status-bar-toggle" data-page-id="{{ page.id }}">
+        <div class="dx-status-bar-head">
           <span class="dx-status-bar-title">
-            <i class="ph ph-caret-right dx-status-bar-caret" aria-hidden="true"></i>
             <i class="ph ph-app-window" aria-hidden="true"></i>
             <span>Status bar</span>
           </span>
           <form method="post"
                 action="{{ url_for('pages.status_bar_toggle', page_id=page.id) }}"
-                class="form form--inline dx-status-bar-switch"
-                onclick="event.stopPropagation();">
+                class="form form--inline dx-status-bar-switch">
             <label class="switch">
               <input type="checkbox" name="status_bar_enabled"
                      {% if page.status_bar_enabled %}checked{% endif %}
                      onchange="this.form.submit()">
-              <span>{% if page.status_bar_enabled %}Enabled{% else %}Disabled{% endif %}</span>
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+              <span class="switch-label">{% if page.status_bar_enabled %}Enabled{% else %}Disabled{% endif %}</span>
             </label>
           </form>
-        </summary>
+        </div>
         <div class="dx-status-bar-body">
           {% if page.status_bar_enabled and _sb_cell %}
             <p class="field-help">
@@ -402,7 +400,7 @@
             </p>
           {% endif %}
         </div>
-      </details>
+      </section>
     </section>
 
     <section class="dx-section-card">
