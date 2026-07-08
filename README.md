@@ -9,10 +9,10 @@
 
 <p align="center">
   <a href="docs/screenshots/hero-rack.jpg">
-    <img src="docs/screenshots/hero-rack.jpg" alt="Six different e-ink panels on a wooden tabletop, each painting a different Tesserae dashboard: framed weather + clock + Spotify, a Waveshare Spectra 6 board showing the F1 schedule, a 13.3 inch Spectra 6 panel running a GitHub stats dashboard, a Kindle Paperwhite running an OctoPrint dashboard, a Waveshare 7.3 inch PhotoPainter showing a weather + pollen view, and a framed Inky 13.3 inch with the month calendar plus Hacker News" width="900">
+    <img src="docs/screenshots/hero-rack.jpg" alt="Nine e-ink panels arranged on a wooden dresser, each running a different Tesserae dashboard: a framed GitHub contribution graph, a Home Assistant sensor dashboard with cat litter tracking, a Hacker News feed with a word clock, a monthly calendar with a Spotify top artists panel, a Melbourne weather + music dashboard, a GitHub stats colour dashboard, a Kindle Paperwhite with local weather, a Belgian Grand Prix F1 countdown, and a large framed Melbourne weather + climate + batteries dashboard. A black cat sits on the shelf above, next to a pothos plant." width="900">
   </a>
   <br>
-  <em>Six panels, one Tesserae server.</em>
+  <em>Nine panels, one Tesserae server.</em>
 </p>
 
 Self-hosted dashboard companion for e-ink displays. Compose tile-based
