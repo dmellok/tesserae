@@ -6,6 +6,8 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+## [0.72.0], 2026-07-08
+
 ### Added
 
 - **PicPak 4.2" BWRY as a community-firmware hardware entry.** New
@@ -78,6 +80,37 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   gap. Existing installs with a status bar cell inserted before
   this fix keep the older 48 px cell; toggling the switch off and
   back on re-sizes to the new gap-aware height.
+- **Status-bar toggle in the page editor is flat, not a disclosure.**
+  The section previously wrapped its "Enabled / Disabled" switch in a
+  ``<details>`` shell so the body panel could expand and collapse. The
+  body is a one-liner of help text plus (when enabled) a jump link, so
+  the expand animation revealed essentially nothing and read as broken.
+  Header row now sits above a fixed body panel; no expand/collapse
+  state to persist. The switch itself is now a proper track+thumb
+  toggle (was rendering as a bare checkbox before).
+- **Auto-insert status bar cell defaults ``check_for_updates`` to on.**
+  Enabling the status bar is an implicit opt-in to the update-indicator
+  chip; the fetch is rate-limited to once per hour and only paints
+  when the latest release is strictly newer than the running build.
+- **"Enable firmware update lookups" toggle rendered as a proper switch.**
+  Previously the input's label styled as a switch but the track+thumb
+  spans were missing, so the control rendered as a bare checkbox with
+  text. Now matches the pattern used everywhere else.
+
+### Fixed (continued)
+
+- **Install-identifier and firmware-check sections in Settings → System
+  no longer float with a gap above.** The ``settings-stack`` wrapping
+  div closed BEFORE those two sections, so they inherited none of the
+  stack's spacing rules. Closed the wrapper after the firmware-check
+  block so they sit inside the stack.
+
+### Removed
+
+- **"Tesserae account" reference in the install-identifier
+  description.** There is no such thing as a Tesserae account; the copy
+  read "Not tied to your identity, hardware, or Tesserae account". Now
+  reads "Not tied to your identity or hardware."
 
 ## [0.71.2], 2026-07-07
 
