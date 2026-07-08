@@ -32,6 +32,14 @@ def composition_png() -> bytes:
     return buf.getvalue()
 
 
+def _distinct_png(colour: tuple[int, int, int]) -> bytes:
+    """A solid-colour PNG. Different colours give different digests so a
+    test can tell two rendered frames apart."""
+    buf = io.BytesIO()
+    Image.new("RGB", (100, 100), colour).save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def _make_renderer(tmp_path: Path, rid: str, ext: str, retain: bool) -> Renderer:
     mod = ModuleType(f"_test.{rid}")
 
@@ -677,6 +685,87 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
         miss = manager.push("multi", device_ids={"esp32_port_not_bound"})
     assert miss.status == "failed"
     assert rtp2.call_count == 0
+
+
+def test_unbound_push_does_not_overwrite_a_bound_devices_frame(
+    tmp_path: Path, composition_png: bytes
+) -> None:
+    """Issue #83: sending an UNBOUND dashboard must not leak onto a device
+    that's bound to a DIFFERENT dashboard.
+
+    Setup: one device bound to page A. Send A (device's clone renderer
+    fires, stamps ``_latest_renders[device]``). Then send page B, which is
+    bound to no device. Before the fix, the unbound push fanned out to
+    every renderer including the device's clone, so B's frame overwrote
+    the device's ``_latest_renders`` entry and the device painted B on its
+    next /frame poll. After the fix the unbound push skips per-device clone
+    renderers, so the device's latest frame still points at A."""
+    from app import device_loader, device_service, renderer_loader
+    from app.main import REPO_ROOT
+
+    data_root = tmp_path / "devices"
+    devices = device_loader.discover(
+        REPO_ROOT / "devices",
+        schema_path=REPO_ROOT / "schema" / "device.schema.json",
+        data_root=data_root,
+    )
+    renderers = renderer_loader.discover(
+        REPO_ROOT / "renderers",
+        schema_path=REPO_ROOT / "schema" / "renderer.schema.json",
+        data_root=tmp_path / "rdata",
+    )
+    device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="esp32_a",
+        kind_id="esp32_client",
+    )
+
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(Page(id="bound", name="Bound", device_ids=["esp32_a"], cells=[]))
+    # Unbound page: no device_ids, renders at its own virtual panel.
+    # Width a multiple of 8 so the 1-bpp base renderers can pack it.
+    page_store.save(Page(id="loose", name="Loose", panel=Panel(w=800, h=480), cells=[]))
+
+    transport = MqttTransport(
+        BrokerConfig(host="x"), client_factory=lambda cid: _FakeMqttClient(cid)
+    )
+    transport.connect()
+    manager = PushManager(
+        registry=renderers,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=EventLog(tmp_path / "events.db"),
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+        devices=devices,
+    )
+
+    # Two distinct compositions so the frames are genuinely different.
+    png_a = _distinct_png((10, 20, 30))
+    png_b = _distinct_png((200, 100, 50))
+
+    with patch("app.push.render_to_png", return_value=png_a):
+        manager.push("bound")
+    bound_frame = manager.latest_render_for("esp32_a")
+    assert bound_frame is not None
+    frame_after_bound = bound_frame["digest"]
+
+    with patch("app.push.render_to_png", return_value=png_b):
+        loose = manager.push("loose")
+
+    # The unbound push renders (it still fans out to base renderers), but
+    # must NOT touch the bound device's clone.
+    assert loose.status in ("sent", "no_change")
+    assert not any(r.renderer_id == "esp32_bin__esp32_a" for r in loose.renderers), (
+        "unbound push must not fire the bound device's clone renderer"
+    )
+    # The device's latest frame still points at dashboard A.
+    still = manager.latest_render_for("esp32_a")
+    assert still is not None
+    assert still["digest"] == frame_after_bound
 
 
 # -- 0.49.1 regression: HTTP-polled devices don't depend on MQTT --------

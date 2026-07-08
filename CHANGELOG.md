@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Unbound dashboard no longer leaks onto a bound device's panel.**
+  Sending a dashboard bound to no device fanned out to every renderer,
+  including the per-device clone renderers of devices bound to other
+  dashboards. That overwrote the bound device's latest-render entry, so
+  the device painted the unbound dashboard on its next
+  ``/api/v1/device/<id>/frame`` poll. Hard to catch because it only
+  showed if the client happened to poll in the small window after the
+  unbound push. Unbound / virtual-panel pushes now skip per-device
+  clone renderers; only base renderers fan out (legacy single-head /
+  retained MQTT topic still works). Bound devices only ever receive
+  frames from pushes that target them (#83).
+
 ## [0.72.0], 2026-07-08
 
 ### Added

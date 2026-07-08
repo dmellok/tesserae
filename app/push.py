@@ -962,7 +962,19 @@ class PushManager:
         for renderer in self._registry.all():
             if renderer.id in disabled:
                 continue
-            if device_filters is not None and renderer.device not in device_filters:
+            if device_filters is not None:
+                if renderer.device not in device_filters:
+                    continue
+            elif "__" in renderer.id:
+                # Unbound / virtual-panel push (no targeted device). Skip
+                # per-device clone renderers (id ``<base>__<instance>``):
+                # each clone belongs to a bound device that has its own
+                # bound dashboard. Firing a clone here would stamp THIS
+                # (unrelated) dashboard's frame into that device's
+                # ``_latest_renders`` entry, so the device's next
+                # /api/v1/device/<id>/frame poll would paint the wrong
+                # dashboard (#83). Only base renderers fan out on an
+                # unbound push (legacy single-head / retained MQTT topic).
                 continue
             renderer_start = time.monotonic()
             # Resolve settings up front so the skip signature sees the same
