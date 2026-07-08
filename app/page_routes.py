@@ -1025,14 +1025,6 @@ def status_bar_toggle(page_id: str) -> Response:
             }
         )
     )
-    # v0.72.0: enabling the status bar is an implicit opt-in to the
-    # firmware update indicator (the bar's most valuable chip when a
-    # panel actually has firmware waiting). Flip the app-level opt-in
-    # unconditionally at toggle-on so the firmware-update count the
-    # widget renders is non-zero when devices are behind. The setting
-    # persists after the bar is turned off; disabling the bar doesn't
-    # revert it (device settings pages also depend on the check).
-    _settings_store().patch_section("app", {"check_firmware_updates": True})
     current_app.config.get("PREVIEW_CACHE", {}).pop(page_id, None)
     return _flash_save(True, "Status bar added at the top.")
 

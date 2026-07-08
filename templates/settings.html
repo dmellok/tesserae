@@ -913,7 +913,6 @@ docker compose up -d</code></pre>
       </div>
     </form>
   </section>
-</div>
 
 {% if system_webhook_reveal_token %}
 <div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="webhook-reveal-title">
@@ -990,7 +989,7 @@ docker compose up -d</code></pre>
    history, a traveler's home waypoint) resets. #}
 {% if install_id_meta %}
 {% call section_card(icon='fingerprint', title='Install identifier',
-                     description="A random UUID minted on first start, stored locally. Some widgets need a stable identifier so they can remember state across sessions (a pet's history, a shared-world traveler's home waypoint). Not tied to your identity, hardware, or Tesserae account. Regenerate any time.") %}
+                     description="A random UUID minted on first start, stored locally. Some widgets need a stable identifier so they can remember state across sessions (a pet's history, a shared-world traveler's home waypoint). Not tied to your identity or hardware. Regenerate any time.") %}
   <div class="section-body">
     <p><strong>Current:</strong> <code>{{ install_id_meta.id }}</code></p>
     {% if install_id_meta.created_at %}
@@ -1022,12 +1021,14 @@ docker compose up -d</code></pre>
         <input type="checkbox" name="check_firmware_updates" value="1"
                {% if firmware_check_enabled %}checked{% endif %}
                onchange="this.form.submit()">
-        <span>Enable firmware update lookups</span>
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-label">Enable firmware update lookups</span>
       </label>
     </form>
   </div>
 {% endcall %}
 
+</div>
 {% endif %}
 
 {# About: project meta, survey, and sponsor. Three flat cards; no
