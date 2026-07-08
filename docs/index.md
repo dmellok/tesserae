@@ -1,9 +1,11 @@
 # Tesserae
 
 **Self-hosted e-ink dashboard companion.** Compose tile-based dashboards in
-the browser, render them headless, and push the resulting frame to one or more
-panels, Raspberry Pi and ESP32 over MQTT, TRMNL devices and Kindle (via
-KOReader) over HTTP-pull.
+the browser, render them headless, and deliver the resulting frame to one or
+more panels over a small REST device API (MQTT retained topic is still
+supported for existing setups). Every reference client, Raspberry Pi, ESP32,
+Seeed reTerminal E-Series, TRMNL, jailbroken Kindle via KOReader, speaks the
+same protocol.
 
 Sibling rebuild of [inky-dash](https://github.com/dmellok/inky-dash), same job,
 but every layer of the publishing pipeline is a **drop-a-folder** extension
@@ -24,7 +26,7 @@ individual tile of a mosaic; the editor composes a dashboard out of cells.
 1. **Compose** a dashboard of cells in the editor; each cell is a widget plugin.
 2. **Render** the dashboard headlessly with Chromium at the target panel's exact pixel size.
 3. **Quantise** the frame to the panel's colour palette and pack it for the wire.
-4. **Publish**, over MQTT (Pi, ESP32) or HTTP-pull (TRMNL, Kindle). A small client on the panel paints it and sleeps.
+4. **Deliver** the packed frame over the REST device API (`GET /api/v1/device/<id>/frame` for battery-poll clients, `POST /api/v1/device/<id>/frame` for always-on clients). MQTT retained topics still work for existing MQTT-based setups. A small client on the panel paints the frame and sleeps.
 
 Every layer, the bundled widgets + the community catalog, the themes, the fonts, the renderers, the
 device kinds, is a drop-a-folder plugin or a dedicated app surface
@@ -35,13 +37,21 @@ full spec.
 ## Project status
 
 Tesserae is a self-hosted hobby project, built in the open by a solo
-maintainer. The composer → renderers → transport → devices pipeline,
-scheduler, Home Assistant MQTT auto-discovery, webhook push, the
-Spectra theme system (browse / builder / image-to-palette extraction),
-font picker, and form-driven page editor are all shipping. Four
-reference clients (ESP32, Pi `.bin`, Pi PNG, TRMNL / KOReader) run on
-real hardware, see
+maintainer with a growing group of community contributors. The
+composer → renderers → transport → devices pipeline, scheduler, Home
+Assistant MQTT auto-discovery, webhook push, the Spectra theme system
+(browse / builder / image-to-palette extraction), font picker, and
+form-driven page editor are all shipping. Real-hardware coverage now
+sits at **14 verified panels across Seeed, Pimoroni, Waveshare, TRMNL,
+and Kindle**, driven by a client fleet that includes the
+Tesserae-native firmware for the Seeed reTerminal E-Series (browser
+flash, battery-powered), `esp32_bin` (13.3" Waveshare + 7.3"
+PhotoPainter), `pi_bin` and `pi_png` (Pi HAT panels including the Inky
+Impression family), `pico_bin` (battery-powered Pi Pico Plus 2W
+driving Inky-style Spectra 6), `trmnl_png` (TRMNL BYOS devices +
+jailbroken Kindle via KOReader), `circuitpython_png` (generic
+CircuitPython boards), and the community-firmware `picpak_client`
+(PicPak 4.2" BWRY). See
 [what's tested](compatibility.md#whats-been-tested-on-real-hardware).
-The panel matrix is still small, so testers on other displays are
-very welcome, as are contributors:
+Testers on other displays are welcome, as are contributors:
 [open an issue or PR](https://github.com/dmellok/tesserae).
