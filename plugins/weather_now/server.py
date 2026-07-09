@@ -86,7 +86,8 @@ def fetch(
         f"?latitude={lat}&longitude={lon}"
         "&current=temperature_2m,weather_code,apparent_temperature,"
         "wind_speed_10m,wind_direction_10m,relative_humidity_2m,is_day,"
-        "dew_point_2m,wind_gusts_10m,cloud_cover,pressure_msl,visibility"
+        "dew_point_2m,wind_gusts_10m,cloud_cover,pressure_msl,visibility,"
+        "uv_index"
         "&daily=temperature_2m_max,temperature_2m_min,"
         "uv_index_max,sunrise,sunset,precipitation_probability_max"
         f"&temperature_unit={temp_unit}"
@@ -122,6 +123,7 @@ def fetch(
 
     speed_unit = "mph" if units == "imperial" else "km/h"
     rain_chance = _first(daily.get("precipitation_probability_max"))
+    uv_index = current.get("uv_index")
 
     # The 8-metric grid the Refined / Geometric / Swiss variants paint.
     # Order is hand-tuned: most-useful first so a 4-cell variant
@@ -129,8 +131,8 @@ def fetch(
     metrics = [
         _metric("Humidity", current.get("relative_humidity_2m"), "%", "humidity", "blue"),
         _metric("Wind", current.get("wind_speed_10m"), speed_unit, "wind", "ink"),
-        _metric("Rain", rain_chance, "%", "rainprob", "blue"),
-        _metric("UV Index", _first(daily.get("uv_index_max")), "", "uv", "yellow"),
+        _metric("Rain (today)", rain_chance, "%", "rainprob", "blue"),
+        _metric("UV Index", uv_index, "", "uv", "yellow"),
         _metric("Pressure", current.get("pressure_msl"), "hPa", "pressure", "ink"),
         _metric("Dew", current.get("dew_point_2m"), "°", "dew", "blue"),
         _metric(
@@ -150,7 +152,7 @@ def fetch(
         "wind_dir": current.get("wind_direction_10m"),
         "code": code,
         "is_day": is_day,
-        "uv": _first(daily.get("uv_index_max")),
+        "uv": uv_index,
         "sunrise": sunrise_iso,
         "sunset": sunset_iso,
         "today_max": _first(daily.get("temperature_2m_max")),

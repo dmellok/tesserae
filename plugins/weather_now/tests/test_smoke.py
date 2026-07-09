@@ -9,6 +9,8 @@ from unittest.mock import patch
 import pytest
 from flask.testing import FlaskClient
 
+from plugins.weather_now import server as weather_now_server
+
 _FAKE_PAYLOAD = json.dumps(
     {
         "current": {
@@ -19,6 +21,7 @@ _FAKE_PAYLOAD = json.dumps(
             "wind_direction_10m": 180,
             "relative_humidity_2m": 58,
             "is_day": 1,
+            "uv_index": 2.1,
         },
         "daily": {
             "time": ["2026-06-01"],
@@ -78,3 +81,50 @@ def test_weather_now_location_search_promotes_to_label(client: FlaskClient, size
     body = resp.get_data(as_text=True)
     assert "Berlin" in body
     assert "Melbourne" not in body
+
+
+def test_weather_now_uses_current_uv_and_labels_daily_rain(tmp_path) -> None:
+    """UV is a current condition; rain probability remains today's chance."""
+    payload = {
+        "current": {
+            "temperature_2m": 26.1,
+            "weather_code": 2,
+            "apparent_temperature": 31.2,
+            "wind_speed_10m": 8.8,
+            "wind_direction_10m": 90,
+            "relative_humidity_2m": 91,
+            "is_day": 0,
+            "uv_index": 0.0,
+        },
+        "daily": {
+            "time": ["2026-07-09"],
+            "temperature_2m_max": [31],
+            "temperature_2m_min": [25],
+            "uv_index_max": [9.05],
+            "sunrise": ["2026-07-09T05:45"],
+            "sunset": ["2026-07-09T19:12"],
+            "precipitation_probability_max": [99],
+        },
+    }
+    urls: list[str] = []
+
+    def fake_fetch_json(url: str, **kwargs) -> dict:
+        del kwargs
+        urls.append(url)
+        return payload
+
+    opts = {
+        "latitude": 22.5455,
+        "longitude": 114.0683,
+        "units": "metric",
+        "label": "Home",
+    }
+    with patch.object(weather_now_server, "fetch_json", side_effect=fake_fetch_json):
+        result = weather_now_server.fetch(opts, {}, ctx={"data_dir": tmp_path})
+
+    assert urls and "uv_index" in urls[0].split("&daily=", 1)[0]
+    assert result["uv"] == 0.0
+    metrics = {metric["icon"]: metric for metric in result["metrics"]}
+    assert metrics["uv"]["value"] == 0.0
+    assert metrics["rainprob"]["label"] == "Rain (today)"
+    assert metrics["rainprob"]["value"] == 99
