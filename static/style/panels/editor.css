@@ -64,6 +64,12 @@
 .minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
 .ed.dark .minibtn.accent{color:var(--t-accent)}
 
+/* ---- palette drag drop preview ---- */
+.drop-preview{position:absolute;z-index:40;pointer-events:none;border:2px dashed var(--t-accent);border-radius:7px;background:color-mix(in oklab,var(--t-accent) 12%,transparent)}
+.cv-panel.drop-active{box-shadow:0 0 0 2px var(--t-accent),0 0 0 6px color-mix(in oklab,var(--t-accent) 22%,transparent)}
+body.dragging-palette{cursor:grabbing}
+body.dragging-palette .pi{cursor:grabbing}
+
 /* ---- palette widget groups ---- */
 .pwg{margin-bottom:8px}
 .pwgh{display:flex;align-items:center;gap:8px;padding:7px 8px 3px;font:700 10.5px var(--t-font);letter-spacing:.06em;text-transform:uppercase;color:var(--t-muted)}

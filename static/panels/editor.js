@@ -671,25 +671,58 @@
 
   function onPaletteDown(ev, item) {
     ev.preventDefault();
+    // Label pill following the cursor.
     var ghost = el("div", "ghost", item.label);
     ghost.style.cssText = "position:fixed;pointer-events:none;z-index:9999;left:0;top:0;padding:6px 10px;" +
       "background:var(--t-surface);border:1px solid var(--t-border-strong);border-radius:8px;" +
       "font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(16,12,8,.14)";
     document.body.appendChild(ghost);
-    function move(m) { ghost.style.transform = "translate(" + (m.clientX + 8) + "px," + (m.clientY + 8) + "px)"; }
+    // Drop-footprint preview drawn on the artboard so you see exactly where and
+    // how big the element will land.
+    var preview = el("div", "drop-preview");
+    preview.style.display = "none";
+    artboard.appendChild(preview);
+    document.body.classList.add("dragging-palette");
+
+    // The snapped drop box for a given pointer position, or null when the
+    // cursor is off the artboard.
+    function dropBox(m) {
+      var r = artboard.getBoundingClientRect(), z = currentZoom();
+      var cx = (m.clientX - r.left) / z, cy = (m.clientY - r.top) / z;
+      if (cx < 0 || cy < 0 || cx > S.doc.w || cy > S.doc.h) return null;
+      return {
+        x: clamp(snap(cx - item.w / 2), 0, S.doc.w - item.w),
+        y: clamp(snap(cy - item.h / 2), 0, S.doc.h - item.h),
+      };
+    }
+    function move(m) {
+      ghost.style.transform = "translate(" + (m.clientX + 8) + "px," + (m.clientY + 8) + "px)";
+      var box = dropBox(m);
+      if (box) {
+        preview.style.left = box.x + "px"; preview.style.top = box.y + "px";
+        preview.style.width = item.w + "px"; preview.style.height = item.h + "px";
+        preview.style.display = "block";
+        ghost.style.opacity = "0.55"; // pill recedes once the footprint shows
+        artboard.classList.add("drop-active");
+      } else {
+        preview.style.display = "none";
+        ghost.style.opacity = "1";
+        artboard.classList.remove("drop-active");
+      }
+    }
     function up(m) {
       document.removeEventListener("pointermove", move);
       document.removeEventListener("pointerup", up);
       ghost.remove();
-      var r = artboard.getBoundingClientRect(), z = currentZoom();
-      var cx = (m.clientX - r.left) / z, cy = (m.clientY - r.top) / z;
-      if (cx < 0 || cy < 0 || cx > S.doc.w || cy > S.doc.h) return;
+      preview.remove();
+      document.body.classList.remove("dragging-palette");
+      artboard.classList.remove("drop-active");
+      var box = dropBox(m);
+      if (!box) return;
       pushHistory();
-      var x = clamp(snap(cx - item.w / 2), 0, S.doc.w - item.w);
-      var y = clamp(snap(cy - item.h / 2), 0, S.doc.h - item.h);
       var e = item.kind
-        ? makeDecoration(item.kind, x, y, item.w, item.h)
-        : makeElement(item.key, item.fragment, x, y, item.w, item.h);
+        ? makeDecoration(item.kind, box.x, box.y, item.w, item.h)
+        : makeElement(item.key, item.fragment, box.x, box.y, item.w, item.h);
       S.doc.els.push(e);
       S.sel = new Set([e.id]);
       scheduleSave(); paint();
