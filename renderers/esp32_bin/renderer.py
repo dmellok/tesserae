@@ -44,6 +44,7 @@ from typing import Any
 
 from PIL import Image
 
+from app.dither_regions import rasterize_region_mask, transform_mask
 from app.quantizer import fit_to_panel, pack_to_panel_bin, underscan_image
 from app.state.page_store import Panel
 
@@ -75,10 +76,19 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     img = Image.open(io.BytesIO(png_bytes))
+    # Per-cell dither map (issue #86). Rasterise at composition dims, then
+    # transform in lockstep with the image (same rotate/flip/fit/underscan/
+    # vflip) so it stays aligned with the packed bytes. None for Send-page
+    # uploads and all-diffuse dashboards, which keeps the pre-#86 path.
+    regions = settings.get("_dither_regions")
+    mask_img = None
+    if regions:
+        mask_img = rasterize_region_mask(regions, img.width, img.height)
     native_w, native_h = _firmware_native_dims(panel)
     firmware_landscape = native_w > native_h
     img_landscape = img.size[0] > img.size[1]
-    if firmware_landscape != img_landscape:
+    orientation_mismatch = firmware_landscape != img_landscape
+    if orientation_mismatch:
         # Orientation mismatch (either input PNG or user-calibrated
         # composition), rotate 90° CW so the input's left edge lands
         # at the panel's top edge. PIL ``rotate(angle)`` is
@@ -102,6 +112,16 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # (PIL's FLIP_TOP_BOTTOM is a strided copy).
     if panel.vflip:
         img = img.transpose(Image.FLIP_TOP_BOTTOM)
+    if mask_img is not None:
+        mask_img = transform_mask(
+            mask_img,
+            native_w=native_w,
+            native_h=native_h,
+            rotate=-90 if orientation_mismatch else 0,
+            flip=bool(panel.flip),
+            underscan=int(panel.underscan or 0),
+            vflip=bool(panel.vflip),
+        )
     # Profile tone / dither knobs (v0.67.1). Populated by app.push
     # only when the device has a Calibration-tab profile applied;
     # missing keys keep the pre-v0.67 defaults so no-profile devices
@@ -137,6 +157,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         lab_compress_min=int(tone.get("lab_compress_min", 0)),
         lab_compress_max=int(tone.get("lab_compress_max", 100)),
         color_match=str(dither_extras.get("color_match", "rgb")),
+        region_nearest_mask=mask_img,
     )
 
 

@@ -13,6 +13,7 @@ from typing import Any
 
 from PIL import Image
 
+from app.dither_regions import rasterize_region_mask, transform_mask
 from app.quantizer import fit_to_panel, pack_to_panel_bin, underscan_image
 from app.state.page_store import Panel
 
@@ -45,6 +46,15 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     native landscape dimensions.
     """
     img = Image.open(io.BytesIO(png_bytes))
+    # Per-cell dither map (issue #86). The composer rasterises each cell's
+    # ``render.dither`` hint into a mask at composition dims; we transform it
+    # in lockstep with the image below so it stays pixel-aligned through the
+    # portrait/flip/fit/underscan pipeline, then hand it to the packer. None
+    # (Send-page uploads, all-diffuse dashboards) keeps the pre-#86 path.
+    regions = settings.get("_dither_regions")
+    mask_img = None
+    if regions:
+        mask_img = rasterize_region_mask(regions, img.width, img.height)
     # Native landscape dims regardless of which way the user has the
     # panel oriented in settings.
     native_w = max(panel.w, panel.h)
@@ -66,6 +76,15 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
     # Per-device underscan: inset content so it clears a physical mat/bezel.
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
+    if mask_img is not None:
+        mask_img = transform_mask(
+            mask_img,
+            native_w=native_w,
+            native_h=native_h,
+            rotate=90 if panel.w < panel.h else 0,
+            flip=bool(panel.flip),
+            underscan=int(panel.underscan or 0),
+        )
     tone = settings.get("_profile_tone") or {}
     dither_extras = settings.get("_profile_dither") or {}
     edges = settings.get("_profile_edges") or {}
@@ -93,6 +112,7 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         lab_compress_min=int(tone.get("lab_compress_min", 0)),
         lab_compress_max=int(tone.get("lab_compress_max", 100)),
         color_match=str(dither_extras.get("color_match", "rgb")),
+        region_nearest_mask=mask_img,
     )
 
 

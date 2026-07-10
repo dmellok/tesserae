@@ -39,6 +39,7 @@ from typing import Any
 
 from PIL import Image
 
+from app.dither_regions import rasterize_region_mask, transform_mask
 from app.quantizer import (
     fit_to_panel,
     pack_to_panel_bin_1bpp,
@@ -70,10 +71,18 @@ def _setting(settings: dict[str, Any], key: str) -> Any:
 
 def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> bytes:
     img = Image.open(io.BytesIO(png_bytes))
+    # Per-cell dither map (issue #86): rasterise at composition dims and
+    # transform in lockstep so flat-UI regions snap to crisp mono instead of
+    # a stippled grey. None keeps the pre-#86 path.
+    regions = settings.get("_dither_regions")
+    mask_img = None
+    if regions:
+        mask_img = rasterize_region_mask(regions, img.width, img.height)
     native_w, native_h = _firmware_native_dims(panel)
     firmware_landscape = native_w > native_h
     img_landscape = img.size[0] > img.size[1]
-    if firmware_landscape != img_landscape:
+    orientation_mismatch = firmware_landscape != img_landscape
+    if orientation_mismatch:
         # Orientation mismatch, rotate 90 deg CW so the input's left
         # edge lands at the panel's top edge. PIL ``rotate(angle)`` is
         # counter-clockwise, so -90 gives CW.
@@ -86,12 +95,22 @@ def transform(png_bytes: bytes, *, panel: Panel, settings: dict[str, Any]) -> by
         img = fit_to_panel(img, target_w=native_w, target_h=native_h, scale=fit, bg="white")
     if panel.underscan:
         img = underscan_image(img, underscan=panel.underscan)
+    if mask_img is not None:
+        mask_img = transform_mask(
+            mask_img,
+            native_w=native_w,
+            native_h=native_h,
+            rotate=-90 if orientation_mismatch else 0,
+            flip=bool(panel.flip),
+            underscan=int(panel.underscan or 0),
+        )
     return pack_to_panel_bin_1bpp(
         img,
         width=native_w,
         height=native_h,
         dither=_setting(settings, "dither"),
         contrast=float(_setting(settings, "contrast")),
+        region_nearest_mask=mask_img,
     )
 
 

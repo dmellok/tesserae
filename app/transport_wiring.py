@@ -637,6 +637,10 @@ def _rebuild_transport(
         # profile as ``_palette_override`` in settings; .bin renderers
         # pass the override through to :func:`pack_to_panel_bin`.
         palette_profile_store=PaletteProfileStore(app.config["DATA_ROOT"]),
+        # Per-cell dither map (issue #86): resolves each cell's widget
+        # ``render.dither`` hint at compose time. .bin renderers turn it
+        # into a nearest-colour mask; None leaves the global-dither path.
+        plugin_registry=app.config.get("PLUGIN_REGISTRY"),
     )
     # Sweep render artifacts orphaned by event-log eviction (or a manual
     # history clear) at boot. Idempotent + never fatal.

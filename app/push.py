@@ -50,6 +50,7 @@ from typing import Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.device_loader import DeviceRegistry
+from app.dither_regions import has_nearest_region, regions_from_page
 from app.palette_profiles import (
     PaletteProfile,
     PaletteProfileStore,
@@ -60,6 +61,7 @@ from app.panel import (
     panel_groups_for_push,
     resolve_settings_panel,
 )
+from app.plugin_loader import PluginRegistry
 from app.quiet_hours import device_is_quiet
 from app.renderer import BrowserPool, RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
@@ -340,8 +342,13 @@ class PushManager:
         browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
         device_status_fn: Callable[[], dict[str, dict[str, Any]]] | None = None,
         palette_profile_store: PaletteProfileStore | None = None,
+        plugin_registry: PluginRegistry | None = None,
     ) -> None:
         self._registry = registry
+        # Optional, enables the per-cell dither map (issue #86). Read to
+        # resolve each cell's widget ``render.dither`` hint into a region
+        # mask at compose time. None keeps the pre-#86 global-dither path.
+        self._plugins = plugin_registry
         self._page_store = page_store
         self._transport = transport
         self._settings = settings
@@ -846,6 +853,17 @@ class PushManager:
         # not a min-across-all-devices aggregate. Everything else keeps
         # the panel-group fan-out (one render → many devices).
         per_device_render = _page_needs_per_device_render(page)
+        # Per-cell dither map (issue #86): resolve each cell's widget
+        # ``render.dither`` into a region list once for the whole page. The
+        # geometry is composition-space (cell pixels), so it's shared across
+        # panel groups; the .bin renderers rasterise + transform it to match
+        # each panel. Skip entirely unless some cell opts out of dithering,
+        # so all-photo / all-diffuse pages pack byte-identically to before.
+        dither_regions: list[dict[str, Any]] | None = None
+        if self._plugins is not None:
+            candidate = regions_from_page(page, self._plugins)
+            if has_nearest_region(candidate):
+                dither_regions = candidate
         for panel, group_dids in groups:
             # When per-device-render is on and there ARE bound devices,
             # iterate over each device; a compose URL with ``device_id``
@@ -891,6 +909,7 @@ class PushManager:
                     started=started,
                     device_filters=device_filter,
                     force_publish=force_publish,
+                    dither_regions=dither_regions,
                 )
                 all_renderers.extend(result.renderers)
                 group_results.append(result)
@@ -957,6 +976,7 @@ class PushManager:
         device_filters: set[str] | None = None,
         image_fit: str | None = None,
         force_publish: bool = False,
+        dither_regions: list[dict[str, Any]] | None = None,
     ) -> PushResult:
         """Common fanout: thumbnail + per-renderer transform / publish / log.
 
@@ -965,7 +985,14 @@ class PushManager:
         panel lands only on the devices that share that panel. ``None``
         fans out to every renderer (legacy / virtual-panel). ``image_fit``
         (optional): fit mode for non-panel-sized input, passed through to
-        each renderer's transform; ``None`` keeps each renderer's default."""
+        each renderer's transform; ``None`` keeps each renderer's default.
+
+        ``dither_regions`` (issue #86, optional): per-cell ``render.dither``
+        map for this composition, injected into each renderer's settings as
+        ``_dither_regions``. .bin renderers rasterise it into a nearest-
+        colour mask; others ignore the key. It rides the resolved settings,
+        so it also folds into the render signature, a widget's dither hint
+        changing repaints even when the composition pixels don't move."""
         comp_digest = hashlib.sha256(composition_png).hexdigest()[:16]
         thumb_path = self._renders_dir / f"{comp_digest}.png"
         if not thumb_path.exists():
@@ -1007,6 +1034,12 @@ class PushManager:
             # inputs the render would (gamut, calibration, saturation, …).
             # Reused by _publish_artifact below, so no double resolution.
             render_settings = self._resolve_render_settings(renderer, image_fit=image_fit)
+            # Per-cell dither map (issue #86) only reaches the server-side
+            # quantise packers (the .bin family). PNG renderers (pi_png,
+            # trmnl_*) quantise on the client, so the key is meaningless to
+            # them and is left off to keep their render signature stable.
+            if dither_regions is not None and renderer.extension == "bin":
+                render_settings = {**render_settings, "_dither_regions": dither_regions}
             signature = self._render_signature(
                 comp_digest=comp_digest, panel=panel, settings=render_settings
             )

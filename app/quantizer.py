@@ -698,6 +698,57 @@ def quantize_to_png(
 # --- numpy-backed dither for the panel-bin packer ---------------------
 
 
+def _as_pixel_mask(mask: Image.Image, width: int, height: int) -> np.ndarray:
+    """Flatten a region mask ("L" image) to a 1D boolean array (length
+    H*W, scanline order) matching the packer's index buffer. True where the
+    mask asks for nearest-colour. Resizes nearest-neighbour if the mask
+    arrives at the wrong size (defensive; the .bin renderer already aligns
+    it), thresholds at mid-grey so only the painted extremes count."""
+    m = mask.convert("L")
+    if m.size != (width, height):
+        m = m.resize((width, height), Image.Resampling.NEAREST)
+    arr = np.asarray(m, dtype=np.uint8) >= 128
+    flat: np.ndarray = arr.ravel()
+    return flat
+
+
+def _apply_nearest_override(
+    raw: bytes,
+    rgb: Image.Image,
+    palette: tuple[tuple[int, int, int], ...],
+    *,
+    width: int,
+    height: int,
+    region_nearest_mask: Image.Image | None,
+    extra_mask: np.ndarray | None = None,
+) -> bytes:
+    """Overlay a plain nearest-colour quantise onto the dithered index
+    buffer ``raw`` wherever a mask asks for it, and return the merged buffer.
+
+    Two mask sources, unioned: ``region_nearest_mask`` (issue #86, the per-
+    cell dither map, an "L" image) and ``extra_mask`` (a flat bool array,
+    used by the colour packer's preserve-line-art pass). The nearest quantise
+    is taken from the SAME tone-mapped ``rgb`` the dither ran on, computed
+    once and only when some mask is actually non-empty, so an all-diffuse
+    frame with no masks returns ``raw`` untouched, byte-identical to before.
+
+    Shared by all three .bin packers (colour / 1-bpp mono / 4-bpp gray) so
+    the composite semantics stay identical across panel types."""
+    override = np.zeros(len(raw), dtype=bool)
+    if extra_mask is not None:
+        override |= extra_mask
+    if region_nearest_mask is not None:
+        override |= _as_pixel_mask(region_nearest_mask, width, height)
+    if not override.any():
+        return raw
+    pal_img = _palette_image(palette)
+    nearest = rgb.quantize(palette=pal_img, dither=Image.Dither.NONE).tobytes()
+    nearest_arr = np.frombuffer(nearest, dtype=np.uint8)
+    merged_arr = np.frombuffer(raw, dtype=np.uint8).copy()
+    merged_arr[override] = nearest_arr[override]
+    return merged_arr.tobytes()
+
+
 def _nearest_palette_indices(pixels: np.ndarray, palette: np.ndarray) -> np.ndarray:
     """Vectorised nearest-palette lookup. Squared euclidean in sRGB -
     cheap and good enough for a 6-colour gamut."""
@@ -983,6 +1034,7 @@ def pack_to_panel_bin(
     lab_compress_min: int = 0,
     lab_compress_max: int = 100,
     color_match: str = "rgb",
+    region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise against the selected ``gamut`` palette and pack to the
     panel's native buffer.
@@ -1032,6 +1084,11 @@ def pack_to_panel_bin(
     * ``contrast``, pre-quantise multiplier (1.0 = no change). Useful
       when near-black / near-white regions are dithering noisily into
       grey equivalents on the panel.
+    * ``region_nearest_mask`` (issue #86), optional ``"L"`` image at
+      ``(width, height)``. Pixels >= 128 are forced onto a plain nearest-
+      colour quantise instead of the frame dither, so flat-colour UI cells
+      stay clean while photo cells keep diffusing. ``None`` reproduces the
+      pre-#86 single-strategy behaviour byte-for-byte.
     """
     if gamut == "bwry_4":
         if width % 4:
@@ -1159,23 +1216,32 @@ def pack_to_panel_bin(
     else:
         raise ValueError(f"unknown dither mode: {dither!r}")
 
-    # Preserve-line-art post-processing (v0.67.2 experimental). Detect
-    # sharp edges in the tone-mapped source and replace the dither
-    # output at those pixels with plain nearest-neighbour quantise;
-    # keeps text and hairline rules crisp without ditching the
-    # error-diffusion win on the surrounding photographic regions. No-
-    # op when the source has no edges above the threshold, so
-    # dashboards with no text pay next to nothing.
-    if preserve_line_art:
-        mask = _line_art_mask(rgb)
-        if mask.any():
-            pal_img = _palette_image(palette)
-            nearest = rgb.quantize(palette=pal_img, dither=Image.Dither.NONE).tobytes()
-            merged = bytearray(raw)
-            nearest_arr = np.frombuffer(nearest, dtype=np.uint8)
-            merged_arr = np.frombuffer(merged, dtype=np.uint8).copy()
-            merged_arr[mask] = nearest_arr[mask]
-            raw = merged_arr.tobytes()
+    # Nearest-colour overrides. Two independent masks steer pixels away
+    # from the frame's dither and onto a plain nearest-neighbour quantise:
+    #
+    #  * ``preserve_line_art`` (v0.67.2): sharp edges detected in the tone-
+    #    mapped source, so text and hairline rules stay crisp without
+    #    losing the error-diffusion win on surrounding photographic regions.
+    #  * ``region_nearest_mask`` (issue #86): per-widget ``render.dither``
+    #    hints rasterised into a region map by the composer, so flat-colour
+    #    UI cells map straight to the palette while photo cells still
+    #    diffuse. Composition-mode agnostic (grid today, canvas later): the
+    #    packer only sees a mask, never a cell.
+    #
+    # Both select from the SAME nearest quantise of the SAME tone-mapped
+    # ``rgb`` the dither ran on, unioned and applied in one pass (see
+    # :func:`_apply_nearest_override`), so an all-photo dashboard with no
+    # hints pays nothing.
+    line_mask = _line_art_mask(rgb) if preserve_line_art else None
+    raw = _apply_nearest_override(
+        raw,
+        rgb,
+        palette,
+        width=width,
+        height=height,
+        region_nearest_mask=region_nearest_mask,
+        extra_mask=line_mask,
+    )
 
     # palette index -> firmware/library nibble via bytes.translate (C-speed).
     # 256-byte LUT; anything past the gamut's entries falls through to 0x0
@@ -1228,6 +1294,7 @@ def pack_to_panel_bin_1bpp(
     height: int,
     dither: DitherMode = "floyd-steinberg",
     contrast: float = 1.0,
+    region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise to mono B/W and pack to the firmware's 1-bpp wire format.
 
@@ -1290,6 +1357,18 @@ def pack_to_panel_bin_1bpp(
     else:
         raise ValueError(f"unknown dither mode: {dither!r}")
 
+    # Per-cell dither map (issue #86): snap flat-UI regions to nearest mono
+    # instead of dithering them. On a 2-colour panel this is the difference
+    # between crisp black text and a stippled grey approximation.
+    raw = _apply_nearest_override(
+        raw,
+        rgb,
+        palette,
+        width=width,
+        height=height,
+        region_nearest_mask=region_nearest_mask,
+    )
+
     # Palette indices: 0 = black, 1 = white. Bit-set must be white,
     # so the mask straight from the indices already matches the wire
     # convention. np.packbits defaults to bitorder='big', i.e. MSB
@@ -1326,6 +1405,7 @@ def pack_to_panel_bin_4bpp_gray(
     height: int,
     dither: DitherMode = "floyd-steinberg",
     contrast: float = 1.0,
+    region_nearest_mask: Image.Image | None = None,
 ) -> bytes:
     """Quantise to 16-level grayscale and pack to the panel's native 4-bpp
     grayscale wire format.
@@ -1395,6 +1475,18 @@ def pack_to_panel_bin_4bpp_gray(
         raw = _dither_ordered(rgb, pal_arr, _CROSSHATCH_8, strength=96.0)
     else:
         raise ValueError(f"unknown dither mode: {dither!r}")
+
+    # Per-cell dither map (issue #86): snap flat-UI regions to the nearest
+    # gray level instead of dithering them, so a solid panel background or
+    # crisp text region doesn't pick up error-diffusion speckle.
+    raw = _apply_nearest_override(
+        raw,
+        rgb,
+        palette,
+        width=width,
+        height=height,
+        region_nearest_mask=region_nearest_mask,
+    )
 
     # Palette indices are 0..15 already; each maps directly to a nibble
     # value (0 = black, 15 = white). Reshape, split even/odd columns

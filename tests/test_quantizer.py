@@ -6,6 +6,7 @@ the firmware contract relies on."""
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -18,8 +19,20 @@ from app.quantizer import (
     canonicalise_gamut,
     fit_to_panel,
     pack_to_panel_bin,
+    pack_to_panel_bin_1bpp,
+    pack_to_panel_bin_4bpp_gray,
     rotate_png,
 )
+
+
+def _gradient(width: int, height: int) -> Image.Image:
+    """A horizontal grey gradient, tonal content that Floyd-Steinberg
+    dithers to something other than a flat nearest-colour fill, so the
+    region-mask composite tests can tell the two strategies apart."""
+    ramp = np.linspace(0, 255, width, dtype=np.uint8)
+    arr = np.repeat(ramp[None, :, None], height, axis=0)
+    arr = np.repeat(arr, 3, axis=2)
+    return Image.fromarray(arr)
 
 
 @pytest.fixture
@@ -45,6 +58,71 @@ def test_pack_byte_count_is_panel_div_two(red_panel: Image.Image) -> None:
     packed = pack_to_panel_bin(red_panel, width=100, height=80, dither="none")
     # Two pixels per byte across the full panel.
     assert len(packed) == 100 * 80 // 2
+
+
+def test_region_mask_none_is_byte_identical(red_panel: Image.Image) -> None:
+    """No mask (and an all-zero mask) must pack byte-for-byte the same as
+    the pre-#86 path, so existing all-diffuse dashboards never change."""
+    img = _gradient(64, 16)
+    base = pack_to_panel_bin(img, width=64, height=16, dither="floyd-steinberg")
+    none = pack_to_panel_bin(
+        img, width=64, height=16, dither="floyd-steinberg", region_nearest_mask=None
+    )
+    empty = pack_to_panel_bin(
+        img,
+        width=64,
+        height=16,
+        dither="floyd-steinberg",
+        region_nearest_mask=Image.new("L", (64, 16), 0),
+    )
+    assert none == base
+    assert empty == base
+
+
+def test_region_mask_full_frame_equals_nearest(red_panel: Image.Image) -> None:
+    """A mask covering the whole frame forces the nearest-colour path, so
+    the output equals a plain ``dither='none'`` pack of the same source."""
+    img = _gradient(64, 16)
+    nearest = pack_to_panel_bin(img, width=64, height=16, dither="none")
+    masked_full = pack_to_panel_bin(
+        img,
+        width=64,
+        height=16,
+        dither="floyd-steinberg",
+        region_nearest_mask=Image.new("L", (64, 16), 255),
+    )
+    assert masked_full == nearest
+
+
+def test_region_mask_partial_is_a_true_composite() -> None:
+    """A mask over half the frame yields output that differs from both the
+    all-diffuse and all-nearest packs, i.e. each region really took its own
+    strategy rather than one winning globally."""
+    img = _gradient(64, 16)
+    base = pack_to_panel_bin(img, width=64, height=16, dither="floyd-steinberg")
+    nearest = pack_to_panel_bin(img, width=64, height=16, dither="none")
+    half = Image.new("L", (64, 16), 0)
+    half.paste(255, (32, 0, 64, 16))  # right half nearest
+    masked = pack_to_panel_bin(
+        img, width=64, height=16, dither="floyd-steinberg", region_nearest_mask=half
+    )
+    assert masked != base
+    assert masked != nearest
+
+
+def test_region_mask_1bpp_and_gray_accept_and_apply() -> None:
+    """The mono and grayscale packers honour the mask too: a full-frame mask
+    equals their ``dither='none'`` output, an all-diffuse gradient differs."""
+    img = _gradient(64, 16)
+    full = Image.new("L", (64, 16), 255)
+    for packer in (pack_to_panel_bin_1bpp, pack_to_panel_bin_4bpp_gray):
+        base = packer(img, width=64, height=16, dither="floyd-steinberg")
+        nearest = packer(img, width=64, height=16, dither="none")
+        masked_full = packer(
+            img, width=64, height=16, dither="floyd-steinberg", region_nearest_mask=full
+        )
+        assert masked_full == nearest
+        assert base != nearest  # gradient really does dither differently
 
 
 def test_pack_odd_width_rejected() -> None:
