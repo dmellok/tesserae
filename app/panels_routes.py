@@ -234,6 +234,37 @@ def catalog() -> Response:
     return jsonify({"widgets": build_catalog(_registry())})
 
 
+@bp.post("/data.json")
+def widget_data() -> Response:
+    """Live data for one widget instance, so the editor previews the real
+    render instead of the static sample. Body: ``{widget, options, w?, h?}``.
+    Mirrors the canvas compose path exactly (resolved options -> fetch() ->
+    sample fallback on error), so what the editor shows matches a Send."""
+    _guard()
+    body = request.get_json(silent=True) or {}
+    widget = body.get("widget")
+    if not isinstance(widget, str) or not widget:
+        return jsonify({"data": None})
+    options = body.get("options")
+    options = options if isinstance(options, dict) else {}
+    w = int(body["w"]) if isinstance(body.get("w"), int) else 600
+    h = int(body["h"]) if isinstance(body.get("h"), int) else 400
+
+    from app.composer import _fetch_plugin_data, _resolved_options
+    from app.widget_samples import get_sample
+
+    result: Any = None
+    try:
+        opts = _resolved_options(widget, options)
+        result = _fetch_plugin_data(widget, opts, w, h, preview=False, cell_w=w, cell_h=h)
+    except Exception:
+        result = None
+    if not isinstance(result, dict) or result.get("error"):
+        sample = get_sample(widget)
+        result = sample if isinstance(sample, dict) else result
+    return jsonify({"data": result if isinstance(result, dict) else None})
+
+
 def _materialised_options(plugin: Any) -> list[dict[str, Any]]:
     """Resolve a widget's ``cell_options`` (swapping ``choices_from`` for
     concrete choices) using the grid editor's shared machinery, so the canvas

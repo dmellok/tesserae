@@ -66,6 +66,8 @@
     devices: [],
     mount: {}, // elId -> { fp, host } cached widget shadow hosts
     pq: "", // palette search query (lowercased)
+    data: {}, // live data keyed by "<widget>|<options-json>"
+    dataPending: {}, // in-flight data fetches, same key
   };
 
   var artboard, scaler;
@@ -155,8 +157,15 @@
     return e.widget + "|" + (e.fragment || "full") + "|" + e.w + "x" + e.h + "|" +
       JSON.stringify(e.options || {});
   }
-  function ctxFor(e) {
+  // Live data is fetched per (widget, options); fragment/size don't change it.
+  function dataKey(e) { return e.widget + "|" + JSON.stringify(e.options || {}); }
+  function dataFor(e) {
+    var k = dataKey(e);
+    if (k in S.data) return S.data[k]; // fetched live value (may be null)
     var w = widgetFor(e.widget);
+    return (w && w.sample) || null; // instant placeholder until live arrives
+  }
+  function ctxFor(e) {
     return {
       cell: {
         w: e.w, h: e.h, size: resolveSize(e.w, e.h),
@@ -165,10 +174,46 @@
       },
       panel: { w: S.doc.w, h: S.doc.h, portrait: S.doc.h > S.doc.w },
       font: { family: DEFAULT_FONT, weight: 400 },
-      data: (w && w.sample) || null,
+      data: dataFor(e),
       fragment: e.fragment || "full",
       preview: false,
     };
+  }
+
+  // Fetch real data for every placed widget instance not already cached or
+  // in-flight; when it lands, re-mount the affected elements so the editor
+  // shows the live render (the same data a Send would use).
+  function ensureData() {
+    if (!S.cfg.dataUrl) return;
+    var want = {};
+    S.doc.els.forEach(function (e) {
+      if (!e.widget) return;
+      var k = dataKey(e);
+      if (k in S.data || S.dataPending[k]) return;
+      want[k] = { widget: e.widget, options: e.options || {}, w: e.w, h: e.h };
+    });
+    Object.keys(want).forEach(function (k) {
+      var req = want[k];
+      S.dataPending[k] = true;
+      fetch(S.cfg.dataUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ widget: req.widget, options: req.options, w: req.w, h: req.h }),
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (j) { S.data[k] = j && "data" in j ? j.data : null; })
+        .catch(function () { S.data[k] = null; })
+        .then(function () {
+          delete S.dataPending[k];
+          // Invalidate cached mounts for elements on this key so they re-render
+          // with the live data.
+          var hit = false;
+          S.doc.els.forEach(function (e) {
+            if (e.widget && dataKey(e) === k && S.mount[e.id]) { delete S.mount[e.id]; hit = true; }
+          });
+          if (hit) paint();
+        });
+    });
   }
   // Mount the real widget into a fresh shadow-rooted host. Async import is
   // cached by the browser, so this is cheap after the first mount of a widget.
@@ -245,6 +290,7 @@
     renderLayers();
     renderProps();
     updateUndoButtons();
+    ensureData();
   }
 
   function fitZoom() {
@@ -938,6 +984,7 @@
       docUrl: root.dataset.docUrl,
       saveUrl: root.dataset.saveUrl,
       catalogUrl: root.dataset.catalogUrl,
+      dataUrl: root.dataset.dataUrl,
       devicesUrl: root.dataset.devicesUrl,
       sendUrl: root.dataset.sendUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,

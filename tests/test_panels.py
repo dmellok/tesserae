@@ -286,6 +286,29 @@ def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.Monk
     assert 'name="opt_units"' in resp.get_data(as_text=True)
 
 
+def test_widget_data_live_with_sample_fallback(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The editor's live-data endpoint fetches real data; with no location
+    configured, weather_now errors and falls back to its dev-gallery sample so
+    the preview still renders."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/experiments/composer/data.json", json={"widget": "weather_now", "options": {}}
+    )
+    assert resp.status_code == 200
+    data = resp.get_json()["data"]
+    assert isinstance(data, dict) and data.get("temp") == 19  # sample fallback
+
+
+def test_widget_data_empty_widget(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/experiments/composer/data.json", json={"widget": ""})
+    assert resp.status_code == 200 and resp.get_json()["data"] is None
+
+
 def test_source_options_parses_form(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
