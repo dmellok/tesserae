@@ -64,6 +64,15 @@
 .minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
 .ed.dark .minibtn.accent{color:var(--t-accent)}
 
+/* ---- palette widget groups ---- */
+.pwg{margin-bottom:8px}
+.pwgh{display:flex;align-items:center;gap:8px;padding:7px 8px 3px;font:700 10.5px var(--t-font);letter-spacing:.06em;text-transform:uppercase;color:var(--t-muted)}
+.pwgh i{font-size:13px;color:var(--t-fg-soft)}
+.pwgh.frag i{color:var(--t-accent)}
+.pwgh.frag::after{content:"parts";margin-left:auto;font:600 9px var(--t-font-mono);color:var(--t-accent);text-transform:none;letter-spacing:0;background:var(--t-accent-soft);padding:1px 5px;border-radius:4px}
+.pwg .pi{padding:5px 9px}
+.pwg .pi .ico{width:26px;height:26px;font-size:13px}
+
 /* ---- data sources ---- */
 .wgh .srcname{flex:1;min-width:0;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--t-fg);font:700 12.5px var(--t-font);padding:3px 6px}
 .wgh .srcname:hover{border-color:var(--t-border)}

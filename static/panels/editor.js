@@ -519,8 +519,11 @@
       });
       if (!frags.length) return;
       shown++;
+      // A widget with more than the implicit "full" fragment is decomposed;
+      // tint its header so composable widgets stand out in the palette.
+      var hasParts = (w.fragments || []).length > 1;
       var group = el("div", "pwg");
-      var head = el("div", "pwgh");
+      var head = el("div", "pwgh" + (hasParts ? " frag" : ""));
       head.innerHTML = '<i class="ph-bold ' + (w.icon || "ph-puzzle-piece") + '"></i>';
       head.appendChild(document.createTextNode(w.name || w.key));
       group.appendChild(head);
