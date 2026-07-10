@@ -68,6 +68,7 @@
     pq: "", // palette search query (lowercased)
     data: {}, // live data keyed by "<widget>|<options-json>"
     dataPending: {}, // in-flight data fetches, same key
+    appearance: { themes: [], styles: [], fonts: [] },
   };
 
   var artboard, scaler;
@@ -173,7 +174,7 @@
         options: e.options || {}, fragment: e.fragment || "full",
       },
       panel: { w: S.doc.w, h: S.doc.h, portrait: S.doc.h > S.doc.w },
-      font: { family: DEFAULT_FONT, weight: 400 },
+      font: { family: fontFamily(S.doc.font), weight: 400 },
       data: dataFor(e),
       fragment: e.fragment || "full",
       preview: false,
@@ -251,6 +252,9 @@
     } else {
       host = el("div", "elhost");
       host.style.cssText = "width:100%;height:100%;container-type:size;overflow:hidden;pointer-events:none";
+      // Widget backgrounds are transparent so the canvas background shows
+      // through and elements read as one composed surface, not a card grid.
+      host.style.setProperty("--bg", "transparent");
       S.mount[e.id] = { fp: fp, host: host };
       mountWidget(e, host);
     }
@@ -619,6 +623,72 @@
     document.addEventListener("pointermove", move);
     document.addEventListener("pointerup", up);
     move(ev);
+  }
+
+  // ---- appearance (theme / style / font / background) ------------------
+  function fontFamily(id) {
+    if (id) {
+      var f = (S.appearance.fonts || []).filter(function (x) { return x.id === id; })[0];
+      if (f) return '"' + f.name + '", ' + DEFAULT_FONT;
+    }
+    return DEFAULT_FONT;
+  }
+  function applyAppearance() {
+    if (!artboard || !S.doc) return;
+    artboard.setAttribute("data-theme", S.doc.theme || "light");
+    artboard.setAttribute("data-style", S.doc.style || "standard");
+    var fam = fontFamily(S.doc.font);
+    artboard.style.setProperty("--font-family", fam);
+    artboard.style.fontFamily = fam;
+    artboard.style.background = S.doc.bg || "var(--bg)";
+  }
+  // theme/style/font change re-mounts widgets (some bake tokens/fonts at
+  // render time); background only repaints the artboard.
+  function appearanceChanged(remount) {
+    scheduleSave();
+    applyAppearance();
+    if (remount) { S.mount = {}; paint(); }
+  }
+  function apSelect(field, options, valKey, labKey, cb) {
+    var sel = el("select", "psel");
+    sel.innerHTML = options.map(function (o) {
+      return '<option value="' + esc(o[valKey]) + '">' + esc(o[labKey]) + "</option>";
+    }).join("");
+    sel.value = S.doc[field] || "";
+    sel.addEventListener("change", function () { cb(sel.value); });
+    return sel;
+  }
+  function apRow(label, control) {
+    var row = el("div", "prow");
+    row.innerHTML = '<span class="plab">' + label + "</span>";
+    row.appendChild(control);
+    return row;
+  }
+  function renderAppearance() {
+    var mount = $("panels-appearance");
+    if (!mount || !S.doc) return;
+    mount.textContent = "";
+    var ap = S.appearance || {};
+    mount.appendChild(apRow("Theme", apSelect("theme", ap.themes || [], "value", "label",
+      function (v) { S.doc.theme = v; appearanceChanged(true); })));
+    mount.appendChild(apRow("Style", apSelect("style", ap.styles || [], "id", "label",
+      function (v) { S.doc.style = v; appearanceChanged(true); })));
+    var fontOpts = [{ id: "", name: "Default" }].concat(ap.fonts || []);
+    mount.appendChild(apRow("Font", apSelect("font", fontOpts, "id", "name",
+      function (v) { S.doc.font = v; appearanceChanged(true); })));
+
+    var br = el("div", "prow");
+    br.innerHTML = '<span class="plab">Background</span>';
+    var wrap = el("span"); wrap.style.cssText = "display:flex;gap:6px;align-items:center";
+    var color = el("input"); color.type = "color";
+    color.value = /^#[0-9a-fA-F]{6}$/.test(S.doc.bg || "") ? S.doc.bg : "#f7f5f0";
+    color.style.cssText = "width:30px;height:26px;padding:0;border:1px solid var(--t-border);border-radius:6px;cursor:pointer;background:none";
+    color.addEventListener("input", function () { S.doc.bg = color.value; appearanceChanged(false); });
+    var clr = el("button", "minibtn", "Theme");
+    clr.title = "Use the theme background";
+    clr.addEventListener("click", function () { S.doc.bg = ""; appearanceChanged(false); renderAppearance(); });
+    wrap.appendChild(color); wrap.appendChild(clr);
+    br.appendChild(wrap); mount.appendChild(br);
   }
 
   // ---- layers -----------------------------------------------------------
@@ -1049,10 +1119,13 @@
     ])
       .then(function (res) {
         S.catalog = (res[0] && res[0].widgets) || [];
+        S.appearance = (res[0] && res[0].appearance) || { themes: [], styles: [], fonts: [] };
         S.doc = res[1];
         if (!S.doc.els) S.doc.els = [];
         var palette = $("panels-palette");
         if (palette) renderPalette(palette);
+        renderAppearance();
+        applyAppearance();
         var title = $("panels-title");
         if (title) title.textContent = S.doc.name || "Untitled Panel";
         syncDeviceSelection();

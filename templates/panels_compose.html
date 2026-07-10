@@ -20,21 +20,24 @@
   {# Chart.js as a global so widgets importing static/spectra-chart.js see
      window.Chart. Non-module so composer.js's dynamic imports don't race it. #}
   <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+  <style>{{ font_face_css|safe }}</style>
   <style>
     html, body { margin: 0; padding: 0; }
     #panels-board {
       position: relative;
       width: {{ w }}px;
       height: {{ h }}px;
-      background: var(--bg, #F7F5F0);
+      background: {{ bg or 'var(--bg, #F7F5F0)' }};
       color: var(--text-primary, #1B1A16);
       overflow: hidden;
     }
     .cell { position: absolute; overflow: hidden; }
-    .cell-content { width: 100%; height: 100%; container-type: size; }
+    {# Widget backgrounds are transparent so the canvas background shows through,
+       matching the editor. #}
+    .cell-content { width: 100%; height: 100%; container-type: size; --bg: transparent; }
   </style>
 </head>
-<body data-theme="light" data-style="standard">
+<body data-theme="{{ theme }}" data-style="{{ style }}" style="--font-family: '{{ font_family }}', system-ui, sans-serif;">
   <div id="panels-board">
     {% for e in els %}
     <div class="cell"
@@ -49,7 +52,7 @@
          data-panel-w="{{ w }}"
          data-panel-h="{{ h }}"
          data-cell-zoom="1"
-         data-font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+         data-font-family="{{ font_family }}, system-ui, sans-serif">
       <div class="cell-content"></div>
     </div>
     {% endfor %}

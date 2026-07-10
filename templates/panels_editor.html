@@ -22,6 +22,9 @@
      with the same semantic palette (--bg, --accent-*, …) a real panel uses. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
+  {# @font-face rules for every loaded font plugin, so the font picker's
+     choices actually render on the canvas. #}
+  <style>{{ font_face_css|safe }}</style>
   <script>
     // Ingress URL prefix for editor.js's dynamic client.js imports.
     window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
@@ -63,6 +66,10 @@
     </div>
 
     <div style="grid-row:2;grid-column:1;border-right:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;gap:12px;padding:12px;min-height:0">
+      <div class="card2" style="flex:none">
+        <div class="pnh"><span class="t"><i class="ph-bold ph-paint-brush-broad"></i>Appearance</span></div>
+        <div class="pnb" id="panels-appearance"></div>
+      </div>
       <div class="card2" style="flex:1.4;min-height:0">
         <div class="pnh"><span class="t"><i class="ph-bold ph-shapes"></i>Widgets</span><span class="x" style="text-transform:none;letter-spacing:0;font-size:10.5px">drag onto canvas</span></div>
         <div style="padding:8px 8px 4px;flex:none"><input id="panels-palette-search" class="dinput wide" autocomplete="off" placeholder="Search widgets…" style="width:100%"></div>

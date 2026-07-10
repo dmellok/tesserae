@@ -96,7 +96,13 @@ def editor(canvas_id: str) -> str:
     doc = _store().get(canvas_id)
     if doc is None:
         abort(404)
-    return render_template("panels_editor.html", canvas_id=doc.id)
+    from app.composer import _font_face_css
+
+    return render_template(
+        "panels_editor.html",
+        canvas_id=doc.id,
+        font_face_css=_font_face_css(_registry().fonts),
+    )
 
 
 @bp.get("/c/<canvas_id>/doc.json")
@@ -225,13 +231,39 @@ def send(canvas_id: str) -> Response:
     return jsonify({"sent": sent, "errors": errors})
 
 
+def _appearance() -> dict[str, Any]:
+    """Theme / style / font options for the editor's appearance pickers,
+    reusing the grid editor's registries so the lists match everywhere."""
+    from app.composer import _MATRIX_STYLES
+    from app.state.theme_registry import build_registry, picker_options
+
+    user_store = current_app.config.get("USER_THEMES_STORE")
+    user_themes = [t.to_registry_theme() for t in user_store.list_all()] if user_store else None
+    comm_store = current_app.config.get("COMMUNITY_THEMES_STORE")
+    community_themes = (
+        [t.to_registry_theme() for t in comm_store.list_all()] if comm_store else None
+    )
+    settings = current_app.config.get("SETTINGS_STORE")
+    disabled_raw = settings.get_section("app").get("disabled_theme_ids") or [] if settings else []
+    disabled = {str(x) for x in disabled_raw if isinstance(x, str)}
+    themes = picker_options(
+        build_registry(user_themes=user_themes, community_themes=community_themes),
+        disabled_ids=disabled,
+    )
+    fonts = [
+        {"id": f.id, "name": f.name}
+        for f in sorted(_registry().fonts.values(), key=lambda x: x.name.lower())
+    ]
+    return {"themes": themes, "styles": _MATRIX_STYLES, "fonts": fonts}
+
+
 @bp.get("/catalog.json")
 def catalog() -> Response:
-    """Widget catalog for the editor's Data panel + bind list: every widget
-    that declares a ``data_schema``, in the ``{key,name,icon,color,desc,
-    fields,sample}`` shape the editor expects."""
+    """Widget palette (every renderable widget with its fragments) plus the
+    canvas appearance options (themes / styles / fonts) the editor's pickers
+    consume."""
     _guard()
-    return jsonify({"widgets": build_catalog(_registry())})
+    return jsonify({"widgets": build_catalog(_registry()), "appearance": _appearance()})
 
 
 @bp.post("/data.json")

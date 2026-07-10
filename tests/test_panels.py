@@ -89,6 +89,43 @@ def test_catalog_lists_widgets_with_fragments(app: Flask) -> None:
     assert len(by_key) > 20  # all widgets, not a filtered subset
 
 
+def test_catalog_includes_appearance(app: Flask) -> None:
+    """The catalog carries the theme / style / font options the editor's
+    appearance pickers consume."""
+    client = app.test_client()
+    _sign_in(client)
+    ap = client.get("/experiments/composer/catalog.json").get_json()["appearance"]
+    assert any(t["value"] == "light" for t in ap["themes"])
+    assert any(s["id"] == "standard" for s in ap["styles"])
+    assert isinstance(ap["fonts"], list)
+
+
+def test_appearance_roundtrips(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={"theme": "dark", "style": "editorial", "bg": "#101014", "els": []},
+    )
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert doc["theme"] == "dark" and doc["style"] == "editorial" and doc["bg"] == "#101014"
+
+
+def test_compose_applies_theme_and_background(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={"theme": "dark", "style": "editorial", "bg": "#101014", "els": []},
+    )
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert 'data-theme="dark"' in body and 'data-style="editorial"' in body
+    assert "#101014" in body  # background colour applied to the board
+
+
 class _FakePlugin:
     def __init__(self, pid: str, manifest: dict[str, Any]) -> None:
         self.id = pid

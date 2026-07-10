@@ -732,11 +732,18 @@ def compose_canvas(canvas_id: str) -> str:
                 data = sample if isinstance(sample, dict) else data
             item["data"] = data
         els_out.append(item)
+    registry = current_app.config["PLUGIN_REGISTRY"]
+    font = _resolve_font(doc.font or None, registry)
     return render_template(
         "panels_compose.html",
         els=els_out,
         w=doc.w,
         h=doc.h,
+        theme=doc.theme or "light",
+        style=doc.style or "standard",
+        font_family=font.name if font else "system-ui, sans-serif",
+        bg=doc.bg or "",
+        font_face_css=_font_face_css(registry.fonts),
     )
 
 

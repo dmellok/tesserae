@@ -66,6 +66,13 @@ class CanvasPage(BaseModel):
     name: str = "Untitled Panel"
     w: int = Field(default=600, gt=0)
     h: int = Field(default=400, gt=0)
+    # Canvas-wide appearance. theme = Spectra colour palette (data-theme),
+    # style = typographic axis (data-style), font = font plugin id (blank =
+    # default), bg = background colour override (blank = the theme's --bg).
+    theme: str = "light"
+    style: str = "standard"
+    font: str = ""
+    bg: str = ""
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
