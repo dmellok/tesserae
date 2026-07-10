@@ -17,7 +17,7 @@ from flask import Flask
 
 from app.main import REPO_ROOT, create_app
 from app.panels_schema import build_catalog, catalog_entry, derive_schema
-from app.state.panel_store import CanvasPage, CanvasStore, Element
+from app.state.panel_store import CanvasPage, CanvasSource, CanvasStore, Element
 
 
 @pytest.fixture
@@ -342,6 +342,144 @@ def test_preview_png_screenshots_at_panel_dims(app: Flask, monkeypatch: pytest.M
     assert resp.mimetype == "image/png"
     assert resp.data == b"\x89PNGfake"
     assert (seen["w"], seen["h"]) == (800, 480)
+
+
+# -- configurable data sources (issue #60 follow-up) ---------------------
+
+
+def test_sources_coerce_legacy_string_list() -> None:
+    """Old documents stored ``sources`` as bare catalog keys; those lift into
+    default source instances keyed by themselves so they still validate."""
+    doc = CanvasPage.model_validate({"id": "d1", "sources": ["weather_now", "device_battery"]})
+    assert [(s.sid, s.key) for s in doc.sources] == [
+        ("weather_now", "weather_now"),
+        ("device_battery", "device_battery"),
+    ]
+    assert doc.sources[0].options == {}
+
+
+def test_source_instances_roundtrip(tmp_path: Path) -> None:
+    """A configured source (key + options) survives a store reload."""
+    path = tmp_path / "panels.json"
+    store = CanvasStore(path)
+    store.save(
+        CanvasPage(
+            id="c1",
+            sources=[
+                CanvasSource(
+                    sid="src_berlin",
+                    key="weather_now",
+                    name="Berlin",
+                    options={"units": "metric", "location": {"latitude": 52.5}},
+                )
+            ],
+            els=[Element(id="e1", type="big", binding="src_berlin.temp")],
+        )
+    )
+    reloaded = CanvasStore(path).get("c1")
+    assert reloaded is not None
+    src = reloaded.sources[0]
+    assert src.sid == "src_berlin" and src.key == "weather_now" and src.name == "Berlin"
+    assert src.options["units"] == "metric"
+    assert reloaded.els[0].binding == "src_berlin.temp"
+
+
+def test_ensure_sources_backfills_legacy_bindings() -> None:
+    """A pre-sources document (bindings, no sources) gets a default source per
+    bound widget, keyed ``sid == widget_key`` so the binding keeps resolving.
+    Idempotent on a second call."""
+    doc = CanvasPage(
+        id="d2",
+        els=[
+            Element(id="e1", type="big", binding="weather_now.temp"),
+            Element(id="e2", type="small", binding="weather_now.cond"),
+            Element(id="e3", type="text", binding=None),
+        ],
+    )
+    doc.ensure_sources()
+    assert [(s.sid, s.key) for s in doc.sources] == [("weather_now", "weather_now")]
+    doc.ensure_sources()  # no duplicate on re-run
+    assert len(doc.sources) == 1
+
+
+def test_doc_route_backfills_and_persists_sources(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hydrating a legacy doc through doc.json backfills its sources once and
+    saves them, so the editor always sees a source per bound widget."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    # Save a doc with a binding but no sources (legacy shape).
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={"sources": [], "els": [{"id": "e1", "type": "big", "binding": "weather_now.temp"}]},
+    )
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert [(s["sid"], s["key"]) for s in doc["sources"]] == [("weather_now", "weather_now")]
+
+
+def test_source_form_renders_cell_options(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The source-config fragment renders a widget's cell_options with the
+    shared macros (location search, units select)."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/experiments/composer/source-form", json={"key": "weather_now", "sid": "s1"}
+    )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'name="opt_units"' in html  # the units select
+    assert "data-location-search" in html  # the location control
+
+
+def test_source_form_404_unknown_widget(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    assert client.post("/experiments/composer/source-form", json={"key": "nope"}).status_code == 404
+
+
+def test_source_options_parses_form(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A submitted config form parses back into a normalised options dict via
+    the shared per-cell coercion."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/experiments/composer/source-options",
+        data={
+            "key": "weather_now",
+            "opt_units": "imperial",
+            "opt_label": "Home",
+            "opt_location": "",
+        },
+    )
+    assert resp.status_code == 200
+    options = resp.get_json()["options"]
+    assert options["units"] == "imperial"
+    assert options["label"] == "Home"
+    assert options["location"] == {}  # empty location coerces to a dict
+
+
+def test_compose_keys_data_by_source_id(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With a configured source, the compose data map is keyed ``<sid>.<field>``
+    and falls back to the widget sample when live fetch yields nothing."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "sources": [{"sid": "src_a", "key": "weather_now", "name": "A", "options": {}}],
+            "els": [{"id": "e1", "type": "big", "binding": "src_a.temp"}],
+        },
+    )
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert '"src_a.temp"' in body  # data keyed by source id, not widget key
 
 
 def test_build_catalog_sorts_and_omits_schemaless() -> None:

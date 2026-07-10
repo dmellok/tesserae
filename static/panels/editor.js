@@ -7,9 +7,10 @@
  * mutates the DOM node directly and commits to state only on pointer-up, so
  * interaction stays smooth regardless of element count.
  *
- * Deferred: marquee multi-select, grouping, alignment guides, simulate mode,
- * panel-size switcher, and the server-side compose render (Phase 4). Plain
- * vanilla JS, no build step.
+ * Selection is a Set of element ids: single-click selects one, Shift-click
+ * toggles, a marquee drag on empty canvas selects intersecting elements, and
+ * grouped elements select as a unit. Dragging any selected element moves the
+ * whole selection together. Plain vanilla JS, no build step.
  */
 (function () {
   "use strict";
@@ -52,15 +53,57 @@
     cfg: null,
     doc: null,
     catalog: [],
-    sel: null,
+    sel: new Set(), // selected element ids
     saveTimer: null,
     past: [],
     future: [],
     charts: {},
-    clip: null,
+    clip: null, // array of cloned elements
     sim: false,
     devices: [],
+    ov: {}, // per-source live-preview sample overrides: {sid: {field: value}}
   };
+
+  // ---- selection --------------------------------------------------------
+  function isSel(id) { return S.sel.has(id); }
+  function selArr() { return Array.from(S.sel); }
+  function selEls() { return S.doc.els.filter(function (e) { return S.sel.has(e.id); }); }
+  function selCount() { return S.sel.size; }
+
+  // Expand a list of ids so that selecting any grouped element pulls in the
+  // rest of its group.
+  function withGroups(ids) {
+    var groups = {};
+    var wanted = {};
+    ids.forEach(function (id) { wanted[id] = 1; });
+    S.doc.els.forEach(function (e) { if (e.group && wanted[e.id]) groups[e.group] = 1; });
+    var out = {};
+    ids.forEach(function (id) { out[id] = 1; });
+    S.doc.els.forEach(function (e) { if (e.group && groups[e.group]) out[e.id] = 1; });
+    return Object.keys(out);
+  }
+
+  // Replace the whole selection (group-expanded) and repaint.
+  function setSel(ids) {
+    S.sel = new Set(withGroups(ids || []));
+    paint();
+  }
+  // Shift-click: toggle an element's group in/out of the selection.
+  function toggleSel(id) {
+    var grp = withGroups([id]);
+    var next = selArr();
+    if (S.sel.has(id)) {
+      next = next.filter(function (x) { return grp.indexOf(x) < 0; });
+    } else {
+      next = next.concat(grp);
+    }
+    S.sel = new Set(next);
+    paint();
+  }
+  // Drop ids that no longer exist (after undo/redo swaps the element list).
+  function pruneSel() {
+    S.sel = new Set(selArr().filter(function (id) { return byId(id); }));
+  }
 
   // Text-like elements that read poorly below this size on e-ink panels.
   var READ_MIN = 16;
@@ -80,7 +123,7 @@
     if (!S.past.length) return;
     S.future.push(snapshot());
     S.doc.els = S.past.pop();
-    if (!byId(S.sel)) S.sel = null;
+    pruneSel();
     scheduleSave();
     paint();
   }
@@ -88,7 +131,7 @@
     if (!S.future.length) return;
     S.past.push(snapshot());
     S.doc.els = S.future.pop();
-    if (!byId(S.sel)) S.sel = null;
+    pruneSel();
     scheduleSave();
     paint();
   }
@@ -113,15 +156,32 @@
   function widgetFor(key) {
     return S.catalog.filter(function (c) { return c.key === key; })[0] || null;
   }
+  function sourceFor(sid) {
+    return (S.doc.sources || []).filter(function (s) { return s.sid === sid; })[0] || null;
+  }
+  function newSid() { return "src_" + Math.random().toString(36).slice(2, 8); }
+  // A binding is ``<source-sid>.<field>``. Resolve to the source instance's
+  // live-preview override if set, else the widget's declared sample value.
   function sampleAt(binding) {
     if (!binding) return null;
-    var p = binding.split(".");
-    var w = widgetFor(p[0]);
-    return w && w.sample && p[1] in w.sample ? w.sample[p[1]] : null;
+    var i = binding.indexOf(".");
+    if (i < 0) return null;
+    var sid = binding.slice(0, i), field = binding.slice(i + 1);
+    var src = sourceFor(sid);
+    if (!src) return null;
+    var ov = S.ov[sid];
+    if (ov && field in ov) return ov[field];
+    var w = widgetFor(src.key);
+    return w && w.sample && field in w.sample ? w.sample[field] : null;
   }
   // Resolver handed to the shared renderer (PanelsRender): map a binding path
-  // to its value from the catalog samples, with live edits applied in place.
+  // to its value, with live edits applied in place.
   function resolve(binding) { return sampleAt(binding); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
 
   function destroyCharts() {
     Object.keys(S.charts).forEach(function (id) {
@@ -132,7 +192,7 @@
 
   // ---- artboard ---------------------------------------------------------
   function elNode(e) {
-    var node = el("div", "el" + (e.id === S.sel ? " psel" : ""));
+    var node = el("div", "el" + (isSel(e.id) ? " psel" : ""));
     node.dataset.id = e.id;
     node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
       "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;");
@@ -142,9 +202,11 @@
     if (S.sim && TEXTLIKE[e.type] && e.font_size < READ_MIN) {
       node.appendChild(el("div", "elwarn", '<i class="ph-bold ph-warning"></i>Small text'));
     }
-    if (e.id === S.sel) {
-      node.appendChild(el("div", "ring"));
-      if (!e.locked) {
+    if (isSel(e.id)) {
+      node.appendChild(el("div", "ring" + (selCount() > 1 ? " multi" : "")));
+      // Resize handles only when a single element is selected; a multi
+      // selection shows just the rings and moves as a unit.
+      if (!e.locked && selCount() === 1) {
         HANDLES.forEach(function (h) {
           var hd = el("div", "hd " + h);
           hd.dataset.h = h;
@@ -211,11 +273,11 @@
   // other elements' equivalents and the panel edges/centre; fall back to the
   // grid on any axis with no alignment hit. Returns the snapped position plus
   // the guide coordinates to draw (null when that axis fell back to grid).
-  function computeSnap(e, nx, ny) {
+  function computeSnap(e, nx, ny, skip) {
     var xt = [0, S.doc.w / 2, S.doc.w];
     var yt = [0, S.doc.h / 2, S.doc.h];
     S.doc.els.forEach(function (o) {
-      if (o.id === e.id) return;
+      if (o.id === e.id || (skip && skip.has(o.id))) return;
       xt.push(o.x, o.x + o.w / 2, o.x + o.w);
       yt.push(o.y, o.y + o.h / 2, o.y + o.h);
     });
@@ -248,33 +310,55 @@
     for (var i = 0; i < S.doc.els.length; i++) if (S.doc.els[i].id === id) return i;
     return -1;
   }
-  function copySel() { var e = byId(S.sel); if (e) S.clip = clone(e); }
-  function placeCopy(src) {
+  function copySel() { var els = selEls(); if (els.length) S.clip = els.map(clone); }
+  // Place cloned elements offset from their source, remapping group ids so the
+  // copies form their own group(s), then select the new set.
+  function placeCopies(list) {
+    if (!list || !list.length) return;
     pushHistory();
-    var d = clone(src);
-    d.id = uid();
-    d.x = clamp(d.x + 14, 0, S.doc.w - d.w);
-    d.y = clamp(d.y + 14, 0, S.doc.h - d.h);
-    S.doc.els.push(d);
-    S.sel = d.id;
+    var gmap = {};
+    var ids = [];
+    list.forEach(function (src) {
+      var d = clone(src);
+      d.id = uid();
+      d.x = clamp(d.x + 14, 0, S.doc.w - d.w);
+      d.y = clamp(d.y + 14, 0, S.doc.h - d.h);
+      if (d.group) {
+        if (!gmap[d.group]) gmap[d.group] = "g_" + uid();
+        d.group = gmap[d.group];
+      }
+      S.doc.els.push(d);
+      ids.push(d.id);
+    });
+    S.sel = new Set(ids);
     scheduleSave();
     paint();
   }
-  function paste() { if (S.clip) placeCopy(S.clip); }
-  function duplicate() { var e = byId(S.sel); if (e) placeCopy(e); }
-  function reorder(fn) {
-    var e = byId(S.sel);
-    if (!e) return;
+  function paste() { placeCopies(S.clip); }
+  function duplicate() { placeCopies(selEls()); }
+  // Move the whole selection to front / back, preserving relative paint order.
+  function toFront() {
+    if (!S.sel.size) return;
     pushHistory();
-    S.doc.els = S.doc.els.filter(function (x) { return x.id !== e.id; });
-    fn(e);
+    var keep = S.doc.els.filter(function (e) { return !S.sel.has(e.id); });
+    var moved = S.doc.els.filter(function (e) { return S.sel.has(e.id); });
+    S.doc.els = keep.concat(moved);
     scheduleSave();
     paint();
   }
-  function toFront() { reorder(function (e) { S.doc.els.push(e); }); }
-  function toBack() { reorder(function (e) { S.doc.els.unshift(e); }); }
+  function toBack() {
+    if (!S.sel.size) return;
+    pushHistory();
+    var keep = S.doc.els.filter(function (e) { return !S.sel.has(e.id); });
+    var moved = S.doc.els.filter(function (e) { return S.sel.has(e.id); });
+    S.doc.els = moved.concat(keep);
+    scheduleSave();
+    paint();
+  }
+  // Fine z-shift by one, single selection only (order is ambiguous for many).
   function shift(dir) {
-    var i = idxOf(S.sel);
+    if (S.sel.size !== 1) return;
+    var i = idxOf(selArr()[0]);
     var j = i + dir;
     if (i < 0 || j < 0 || j >= S.doc.els.length) return;
     pushHistory();
@@ -284,29 +368,60 @@
     scheduleSave();
     paint();
   }
+  // Clamp a delta so the selection's bounding box stays inside the artboard,
+  // keeping every element's relative position intact. Each entry carries the
+  // element's origin (ox, oy) at the start of the gesture.
+  function clampGroupDelta(items, dx, dy) {
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    items.forEach(function (m) {
+      minX = Math.min(minX, m.ox); maxX = Math.max(maxX, m.ox + m.e.w);
+      minY = Math.min(minY, m.oy); maxY = Math.max(maxY, m.oy + m.e.h);
+    });
+    return { dx: clamp(dx, -minX, S.doc.w - maxX), dy: clamp(dy, -minY, S.doc.h - maxY) };
+  }
   function nudge(dx, dy) {
-    var e = byId(S.sel);
-    if (!e || e.locked) return;
+    var els = selEls().filter(function (e) { return !e.locked; });
+    if (!els.length) return;
     pushHistory();
-    e.x = clamp(e.x + dx, 0, S.doc.w - e.w);
-    e.y = clamp(e.y + dy, 0, S.doc.h - e.h);
+    var items = els.map(function (e) { return { e: e, ox: e.x, oy: e.y }; });
+    var c = clampGroupDelta(items, dx, dy);
+    items.forEach(function (m) { m.e.x = m.ox + c.dx; m.e.y = m.oy + c.dy; });
     scheduleSave();
     paint();
   }
+  // Rectangle overlap test against a marquee box (artboard px).
+  function intersects(e, x1, y1, x2, y2) {
+    return e.x < x2 && e.x + e.w > x1 && e.y < y2 && e.y + e.h > y1;
+  }
 
   // ---- move + resize ----------------------------------------------------
-  function select(id) { S.sel = id; paint(); }
+  function select(id) { setSel(id ? [id] : []); }
 
   function onElDown(ev) {
     ev.stopPropagation();
     var id = ev.currentTarget.dataset.id;
-    if (id !== S.sel) select(id);
     var e = byId(id);
-    if (!e || e.locked) return;
-    var node = ev.currentTarget;
+    if (!e) return;
+    // Shift-click toggles this element (and its group) without starting a drag.
+    if (ev.shiftKey) { toggleSel(id); return; }
+    // Clicking outside the current selection collapses to this element (its
+    // group). Clicking a member of a multi selection keeps it, so the whole
+    // set can be dragged together.
+    var wasSel = isSel(id);
+    if (!wasSel) select(id); // repaints; nodes below are re-queried afterwards
+    if (e.locked) return;
+
+    // The primary (clicked) element drives snapping; every unlocked selected
+    // element moves with it. Re-query live nodes since select() may have
+    // repainted the artboard.
+    var items = selEls().filter(function (x) { return !x.locked; }).map(function (x) {
+      return { e: x, ox: x.x, oy: x.y, node: artboard.querySelector('[data-id="' + x.id + '"]') };
+    });
+    var clicked = artboard.querySelector('[data-id="' + id + '"]');
+    if (!clicked) return;
     var z = currentZoom(), sx = ev.clientX, sy = ev.clientY, ox = e.x, oy = e.y;
     var before = snapshot(), moved = false;
-    node.setPointerCapture(ev.pointerId);
+    clicked.setPointerCapture(ev.pointerId);
     function move(m) {
       var dx = (m.clientX - sx) / z, dy = (m.clientY - sy) / z;
       if (!moved && Math.abs(dx) + Math.abs(dy) < 2) return;
@@ -316,29 +431,31 @@
         // Free placement: no grid, no alignment snapping.
         nx = Math.round(rx); ny = Math.round(ry);
       } else {
-        var s = computeSnap(e, rx, ry);
+        var s = computeSnap(e, rx, ry, S.sel);
         nx = s.x; ny = s.y; gx = s.gx; gy = s.gy;
       }
-      nx = clamp(nx, 0, S.doc.w - e.w);
-      ny = clamp(ny, 0, S.doc.h - e.h);
-      node.style.left = nx + "px"; node.style.top = ny + "px";
-      e.x = nx; e.y = ny;
+      var c = clampGroupDelta(items, nx - ox, ny - oy);
+      items.forEach(function (mi) {
+        mi.e.x = mi.ox + c.dx; mi.e.y = mi.oy + c.dy;
+        if (mi.node) { mi.node.style.left = mi.e.x + "px"; mi.node.style.top = mi.e.y + "px"; }
+      });
       if (m.altKey) hideGuides(); else showGuides(gx, gy, e);
     }
     function up() {
-      node.releasePointerCapture(ev.pointerId);
-      node.removeEventListener("pointermove", move);
-      node.removeEventListener("pointerup", up);
+      clicked.releasePointerCapture(ev.pointerId);
+      clicked.removeEventListener("pointermove", move);
+      clicked.removeEventListener("pointerup", up);
       hideGuides();
       if (moved) { commitHistory(before); scheduleSave(); renderProps(); updateUndoButtons(); }
+      else if (wasSel && selCount() > 1) { select(id); } // click-through collapses
     }
-    node.addEventListener("pointermove", move);
-    node.addEventListener("pointerup", up);
+    clicked.addEventListener("pointermove", move);
+    clicked.addEventListener("pointerup", up);
   }
 
   function onHandleDown(ev, dir) {
     ev.stopPropagation();
-    var e = byId(S.sel);
+    var e = byId(selArr()[0]);
     if (!e || e.locked) return;
     var node = ev.currentTarget.parentElement;
     var z = currentZoom(), sx = ev.clientX, sy = ev.clientY;
@@ -373,6 +490,55 @@
     ev.currentTarget.addEventListener("pointerup", up);
   }
 
+  // ---- marquee multi-select --------------------------------------------
+  // Drag on the empty artboard to rubber-band a selection; Shift extends the
+  // current one. A plain click (no drag) clears. Preview highlights live via
+  // an inline outline so charts aren't torn down on every move; the real
+  // selection paint happens once on pointer-up.
+  function onArtboardDown(ev) {
+    if (ev.target !== artboard) return;
+    var r = artboard.getBoundingClientRect(), z = currentZoom();
+    var sx = (ev.clientX - r.left) / z, sy = (ev.clientY - r.top) / z;
+    var additive = ev.shiftKey;
+    var base = additive ? selArr() : [];
+    var box = el("div", "ov-marquee");
+    artboard.appendChild(box);
+    var moved = false, hit = [];
+    artboard.setPointerCapture(ev.pointerId);
+    function preview(ids) {
+      var want = {};
+      ids.forEach(function (id) { want[id] = 1; });
+      S.doc.els.forEach(function (e) {
+        var node = artboard.querySelector('[data-id="' + e.id + '"]');
+        if (node) node.style.outline = want[e.id] ? "1.5px solid var(--t-accent)" : "";
+      });
+    }
+    function move(m) {
+      var cx = clamp((m.clientX - r.left) / z, 0, S.doc.w);
+      var cy = clamp((m.clientY - r.top) / z, 0, S.doc.h);
+      if (!moved && Math.abs(cx - sx) + Math.abs(cy - sy) < 3) return;
+      moved = true;
+      var x1 = Math.min(sx, cx), y1 = Math.min(sy, cy), x2 = Math.max(sx, cx), y2 = Math.max(sy, cy);
+      box.style.left = x1 + "px"; box.style.top = y1 + "px";
+      box.style.width = (x2 - x1) + "px"; box.style.height = (y2 - y1) + "px";
+      box.style.display = "block";
+      hit = S.doc.els
+        .filter(function (e) { return e.visible !== false && intersects(e, x1, y1, x2, y2); })
+        .map(function (e) { return e.id; });
+      preview(withGroups(base.concat(hit)));
+    }
+    function up() {
+      artboard.releasePointerCapture(ev.pointerId);
+      artboard.removeEventListener("pointermove", move);
+      artboard.removeEventListener("pointerup", up);
+      box.remove();
+      if (!moved) { if (!additive) select(null); return; }
+      setSel(base.concat(hit)); // full paint clears the inline preview outlines
+    }
+    artboard.addEventListener("pointermove", move);
+    artboard.addEventListener("pointerup", up);
+  }
+
   // ---- palette create-drag ---------------------------------------------
   function renderPalette(mount) {
     PALETTE.forEach(function (p) {
@@ -405,7 +571,7 @@
       var y = clamp(snap(cy - p.h / 2), 0, S.doc.h - p.h);
       var e = defaultsFor(p.type, x, y, p.w, p.h);
       S.doc.els.push(e);
-      S.sel = e.id;
+      S.sel = new Set([e.id]);
       scheduleSave();
       paint();
     }
@@ -425,9 +591,9 @@
       mount.appendChild(empty); return;
     }
     S.doc.els.slice().reverse().forEach(function (e) {
-      var row = el("div", "lrow" + (e.id === S.sel ? " psel" : "") + (e.visible ? "" : " hidden"));
+      var row = el("div", "lrow" + (isSel(e.id) ? " psel" : "") + (e.visible ? "" : " hidden"));
       row.innerHTML =
-        '<i class="ph-bold ph-square ic"></i>' +
+        '<i class="ph-bold ' + (e.group ? "ph-link" : "ph-square") + ' ic"></i>' +
         '<span class="nm"></span>' +
         '<span class="act">' +
           '<i class="ph-bold ' + (e.visible ? "ph-eye" : "ph-eye-slash") + ' li" data-act="vis" title="Show / hide"></i>' +
@@ -438,7 +604,7 @@
         var act = ev.target && ev.target.dataset ? ev.target.dataset.act : null;
         if (act === "vis") { ev.stopPropagation(); pushHistory(); e.visible = !e.visible; scheduleSave(); paint(); return; }
         if (act === "lock") { ev.stopPropagation(); pushHistory(); e.locked = !e.locked; scheduleSave(); paint(); return; }
-        select(e.id);
+        if (ev.shiftKey) toggleSel(e.id); else select(e.id);
       });
       mount.appendChild(row);
     });
@@ -447,36 +613,112 @@
   // ---- data + properties ------------------------------------------------
   function bindOptions() {
     var opts = ['<option value="">— none —</option>'];
-    S.catalog.forEach(function (w) {
+    (S.doc.sources || []).forEach(function (src) {
+      var w = widgetFor(src.key);
+      if (!w) return;
+      var label = src.name || w.name;
       (w.fields || []).forEach(function (f) {
-        var path = w.key + "." + f.name;
-        opts.push('<option value="' + path + '">' + w.name + " · " + (f.label || f.name) + "</option>");
+        var path = src.sid + "." + f.name;
+        opts.push('<option value="' + esc(path) + '">' + esc(label) + " · " +
+          esc(f.label || f.name) + "</option>");
       });
     });
     return opts.join("");
   }
 
+  // ---- data sources -----------------------------------------------------
+  function addSource(key) {
+    var w = widgetFor(key);
+    if (!w) return;
+    pushHistory();
+    if (!S.doc.sources) S.doc.sources = [];
+    var src = { sid: newSid(), key: key, name: "", options: {} };
+    S.doc.sources.push(src);
+    scheduleSave();
+    renderProps();
+    openConfig(src.sid); // straight into configuration
+  }
+  function renameSource(sid, name) {
+    var src = sourceFor(sid);
+    if (!src) return;
+    src.name = name;
+    scheduleSave();
+  }
+  // Removing a source unbinds any element pointing at it.
+  function removeSource(sid) {
+    if (!sourceFor(sid)) return;
+    pushHistory();
+    S.doc.sources = (S.doc.sources || []).filter(function (s) { return s.sid !== sid; });
+    S.doc.els.forEach(function (e) {
+      if (e.binding && e.binding.slice(0, e.binding.indexOf(".")) === sid) e.binding = null;
+    });
+    delete S.ov[sid];
+    scheduleSave();
+    paint();
+  }
+
+  function sourceValue(sid, key, field) {
+    var ov = S.ov[sid];
+    if (ov && field in ov) return ov[field];
+    var w = widgetFor(key);
+    return w && w.sample ? w.sample[field] : null;
+  }
+
   function renderDataPanel(mount, count) {
-    if (count) count.textContent = S.catalog.length + " source" + (S.catalog.length === 1 ? "" : "s");
+    var sources = S.doc.sources || [];
+    if (count) count.textContent = sources.length + " source" + (sources.length === 1 ? "" : "s");
     mount.textContent = "";
+
+    var add = el("button", "minibtn", '<i class="ph-bold ph-plus"></i> Add data source');
+    add.style.cssText = "width:100%;justify-content:center;margin-bottom:10px";
+    add.addEventListener("click", function () { openAddMenu(add); });
+    mount.appendChild(add);
+
     if (!S.catalog.length) {
-      var none = el("div", "note"); none.style.padding = "14px";
+      var none = el("div", "note"); none.style.padding = "10px 2px";
       none.textContent = "No widgets declare a data schema yet.";
       mount.appendChild(none); return;
     }
-    S.catalog.forEach(function (w) {
+    if (!sources.length) {
+      var empty = el("div", "note"); empty.style.padding = "10px 2px";
+      empty.textContent = "Add a data source, then bind an element's field to it.";
+      mount.appendChild(empty); return;
+    }
+
+    sources.forEach(function (src) {
+      var w = widgetFor(src.key);
       var head = el("div", "wgh");
-      var badge = el("span", "wi"); badge.style.background = w.color || "#256E6B";
-      badge.innerHTML = '<i class="ph-bold ' + (w.icon || "ph-puzzle-piece") + '"></i>';
+      var badge = el("span", "wi");
+      badge.style.background = (w && w.color) || "#256E6B";
+      badge.innerHTML = '<i class="ph-bold ' + ((w && w.icon) || "ph-puzzle-piece") + '"></i>';
       head.appendChild(badge);
-      head.appendChild(document.createTextNode(w.name || w.key));
-      var ct = el("span", "ct"); ct.textContent = (w.fields || []).length;
-      head.appendChild(ct); mount.appendChild(head);
+      var nameInput = el("input", "srcname");
+      nameInput.value = src.name || (w ? w.name : src.key);
+      nameInput.placeholder = w ? w.name : src.key;
+      nameInput.addEventListener("input", function () { renameSource(src.sid, nameInput.value); });
+      nameInput.addEventListener("change", function () { paint(); });
+      nameInput.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      head.appendChild(nameInput);
+      var cfg = el("i", "ph-bold ph-sliders li", "");
+      cfg.title = "Configure"; cfg.style.cursor = "pointer";
+      cfg.addEventListener("click", function () { openConfig(src.sid); });
+      head.appendChild(cfg);
+      var rm = el("i", "ph-bold ph-trash li", "");
+      rm.title = "Remove source"; rm.style.cursor = "pointer";
+      rm.addEventListener("click", function () { removeSource(src.sid); });
+      head.appendChild(rm);
+      mount.appendChild(head);
+
+      if (!w) {
+        var miss = el("div", "note"); miss.style.padding = "4px 2px";
+        miss.textContent = "Widget \"" + src.key + "\" is unavailable.";
+        mount.appendChild(miss); return;
+      }
       (w.fields || []).forEach(function (f) {
         var row = el("div", "fld");
         var k = el("span", "fk"); k.textContent = f.label || f.name;
         var vwrap = el("span", "dfield-val");
-        var sv = w.sample ? w.sample[f.name] : null;
+        var sv = sourceValue(src.sid, src.key, f.name);
         if (f.type === "arr") {
           vwrap.innerHTML = '<span class="v"></span>';
           vwrap.querySelector(".v").textContent = (Array.isArray(sv) ? sv.length : 0) + " items";
@@ -484,9 +726,9 @@
           var input = el("input", "dinput");
           input.value = sv == null ? "" : String(sv);
           input.addEventListener("input", function () {
-            if (!w.sample) w.sample = {};
-            w.sample[f.name] = f.type === "num" ? Number(input.value) || 0 : input.value;
-            repaintBound(w.key + "." + f.name);
+            if (!S.ov[src.sid]) S.ov[src.sid] = {};
+            S.ov[src.sid][f.name] = f.type === "num" ? Number(input.value) || 0 : input.value;
+            repaintBound(src.sid + "." + f.name);
           });
           input.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
           vwrap.appendChild(input);
@@ -494,6 +736,32 @@
         row.appendChild(k); row.appendChild(vwrap); mount.appendChild(row);
       });
     });
+  }
+
+  // A small popover listing catalog widgets to add as a source. Multiple
+  // instances of the same widget are allowed (two cities, two batteries).
+  function openAddMenu(anchor) {
+    var existing = document.querySelector(".src-add-menu");
+    if (existing) { existing.remove(); return; }
+    var menu = el("div", "src-add-menu");
+    S.catalog.forEach(function (w) {
+      var item = el("button", "src-add-item");
+      item.innerHTML = '<span class="wi" style="background:' + ((w.color) || "#256E6B") +
+        '"><i class="ph-bold ' + (w.icon || "ph-puzzle-piece") + '"></i></span>';
+      item.appendChild(document.createTextNode(w.name || w.key));
+      item.addEventListener("click", function () { menu.remove(); addSource(w.key); });
+      menu.appendChild(item);
+    });
+    if (!S.catalog.length) {
+      var n = el("div", "note"); n.style.padding = "8px"; n.textContent = "No widgets available.";
+      menu.appendChild(n);
+    }
+    anchor.parentNode.insertBefore(menu, anchor.nextSibling);
+    setTimeout(function () {
+      document.addEventListener("pointerdown", function close(ev) {
+        if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("pointerdown", close); }
+      });
+    }, 0);
   }
 
   // Live-data: repaint only elements bound to the edited field, cheaply.
@@ -514,10 +782,115 @@
     });
   }
 
+  // ---- grouping + alignment --------------------------------------------
+  function groupSel() {
+    var els = selEls();
+    if (els.length < 2) return;
+    pushHistory();
+    var gid = "g_" + uid();
+    els.forEach(function (e) { e.group = gid; });
+    scheduleSave();
+    paint();
+  }
+  function ungroupSel() {
+    var els = selEls();
+    if (!els.some(function (e) { return e.group; })) return;
+    pushHistory();
+    els.forEach(function (e) { e.group = null; });
+    scheduleSave();
+    paint();
+  }
+  // Align selected elements to their shared bounding box on one edge / centre.
+  function alignSel(kind) {
+    var els = selEls().filter(function (e) { return !e.locked; });
+    if (els.length < 2) return;
+    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    els.forEach(function (e) {
+      minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x + e.w);
+      minY = Math.min(minY, e.y); maxY = Math.max(maxY, e.y + e.h);
+    });
+    var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    pushHistory();
+    els.forEach(function (e) {
+      if (kind === "left") e.x = minX;
+      else if (kind === "right") e.x = maxX - e.w;
+      else if (kind === "hcenter") e.x = Math.round(cx - e.w / 2);
+      else if (kind === "top") e.y = minY;
+      else if (kind === "bottom") e.y = maxY - e.h;
+      else if (kind === "vcenter") e.y = Math.round(cy - e.h / 2);
+      e.x = clamp(e.x, 0, S.doc.w - e.w);
+      e.y = clamp(e.y, 0, S.doc.h - e.h);
+    });
+    scheduleSave();
+    paint();
+  }
+  function colorSel(ink) {
+    var els = selEls();
+    if (!els.length) return;
+    pushHistory();
+    els.forEach(function (e) { e.color = ink; });
+    scheduleSave();
+    paint();
+  }
+
+  function renderGroupProps(mount) {
+    mount.textContent = "";
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-selection-all"></i>' + selCount() + " selected"));
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-align-left"></i>Align'));
+    var arow = el("div", "prow");
+    arow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    [["left", "Left"], ["hcenter", "Center"], ["right", "Right"],
+      ["top", "Top"], ["vcenter", "Middle"], ["bottom", "Bottom"]].forEach(function (a) {
+      var b = el("button", "minibtn", a[1]);
+      b.addEventListener("click", function () { alignSel(a[0]); });
+      arow.appendChild(b);
+    });
+    mount.appendChild(arow);
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-palette"></i>Colour'));
+    var swrow = el("div", "prow");
+    INKS.forEach(function (ink) {
+      var sw = el("span");
+      sw.style.cssText = "width:22px;height:22px;border-radius:6px;margin-right:6px;cursor:pointer;background:" +
+        ink + ";border:1px solid var(--t-border)";
+      sw.addEventListener("click", function () { colorSel(ink); });
+      swrow.appendChild(sw);
+    });
+    mount.appendChild(swrow);
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-stack"></i>Group'));
+    var grow = el("div", "prow");
+    grow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    var grp = el("button", "minibtn", '<i class="ph-bold ph-link"></i> Group');
+    var ungrp = el("button", "minibtn", '<i class="ph-bold ph-link-break"></i> Ungroup');
+    grp.addEventListener("click", groupSel);
+    ungrp.addEventListener("click", ungroupSel);
+    grow.appendChild(grp); grow.appendChild(ungrp);
+    mount.appendChild(grow);
+
+    var zr = el("div", "prow");
+    zr.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    var front = el("button", "minibtn", '<i class="ph-bold ph-arrow-line-up"></i> Front');
+    var back = el("button", "minibtn", '<i class="ph-bold ph-arrow-line-down"></i> Back');
+    var dup = el("button", "minibtn", '<i class="ph-bold ph-copy"></i> Duplicate');
+    front.addEventListener("click", toFront);
+    back.addEventListener("click", toBack);
+    dup.addEventListener("click", duplicate);
+    zr.appendChild(front); zr.appendChild(back); zr.appendChild(dup);
+    mount.appendChild(zr);
+
+    var del = el("div", "prow");
+    var btn = el("button", "minibtn", '<i class="ph-bold ph-trash"></i> Delete');
+    btn.addEventListener("click", deleteSel);
+    del.appendChild(btn); mount.appendChild(del);
+  }
+
   function renderProps() {
     var mount = $("panels-data"), count = $("panels-source-count");
     if (!mount) return;
-    var e = S.sel ? byId(S.sel) : null;
+    if (selCount() > 1) { renderGroupProps(mount); return; }
+    var e = selCount() ? byId(selArr()[0]) : null;
     if (!e) { renderDataPanel(mount, count); return; }
 
     mount.textContent = "";
@@ -569,7 +942,14 @@
   function deleteEl(id) {
     pushHistory();
     S.doc.els = S.doc.els.filter(function (e) { return e.id !== id; });
-    if (S.sel === id) S.sel = null;
+    S.sel.delete(id);
+    scheduleSave(); paint();
+  }
+  function deleteSel() {
+    if (!S.sel.size) return;
+    pushHistory();
+    S.doc.els = S.doc.els.filter(function (e) { return !S.sel.has(e.id); });
+    S.sel = new Set();
     scheduleSave(); paint();
   }
 
@@ -588,6 +968,71 @@
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function () { var s = $("panels-status"); if (s) s.textContent = "saved"; })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "save failed"; });
+  }
+
+  // ---- source config drawer --------------------------------------------
+  // Loads the widget's cell_options form (rendered server-side with the grid
+  // editor's macros) into a drawer, wires the shared interactive controls,
+  // and parses the submitted form back into an options dict server-side.
+  function openConfig(sid) {
+    var src = sourceFor(sid);
+    if (!src) return;
+    var w = widgetFor(src.key);
+    var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
+    if (!overlay || !body || !S.cfg.sourceFormUrl) return;
+    title.textContent = (src.name || (w ? w.name : src.key)) + " · configure";
+    body.innerHTML = '<div class="note" style="padding:12px">Loading…</div>';
+    body.dataset.sid = sid;
+    overlay.classList.add("open");
+    fetch(S.cfg.sourceFormUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: src.key, sid: src.sid, options: src.options || {} }),
+    })
+      .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
+      .then(function (html) {
+        if (body.dataset.sid !== sid) return; // drawer switched while loading
+        body.innerHTML = html;
+        var tc = window.tesseraeComponents;
+        if (tc) {
+          if (tc.attachLocationSearch) tc.attachLocationSearch(body);
+          if (tc.attachSliders) tc.attachSliders(body);
+          if (tc.attachPresetNumbers) tc.attachPresetNumbers(body);
+        }
+      })
+      .catch(function () { body.innerHTML = '<div class="note" style="padding:12px">Failed to load options.</div>'; });
+  }
+  function closeConfig() {
+    var overlay = $("panels-drawer");
+    if (overlay) overlay.classList.remove("open");
+  }
+  function saveConfig() {
+    var body = $("panels-drawer-body");
+    if (!body) return;
+    var src = sourceFor(body.dataset.sid);
+    if (!src) { closeConfig(); return; }
+    var form = new FormData();
+    body.querySelectorAll("input,select,textarea").forEach(function (node) {
+      if (!node.name) return;
+      if (node.type === "checkbox" || node.type === "radio") {
+        if (node.checked) form.append(node.name, node.value || "on");
+      } else if (node.tagName === "SELECT" && node.multiple) {
+        Array.prototype.forEach.call(node.selectedOptions, function (o) { form.append(node.name, o.value); });
+      } else {
+        form.append(node.name, node.value);
+      }
+    });
+    form.append("key", src.key);
+    fetch(S.cfg.sourceOptionsUrl, { method: "POST", body: form })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (j) {
+        pushHistory();
+        src.options = j.options || {};
+        scheduleSave();
+        closeConfig();
+        paint();
+      })
+      .catch(function () { var s = $("panels-status"); if (s) s.textContent = "config save failed"; });
   }
 
   // ---- devices + send ---------------------------------------------------
@@ -690,13 +1135,22 @@
       catalogUrl: root.dataset.catalogUrl,
       devicesUrl: root.dataset.devicesUrl,
       sendUrl: root.dataset.sendUrl,
+      sourceFormUrl: root.dataset.sourceFormUrl,
+      sourceOptionsUrl: root.dataset.sourceOptionsUrl,
     };
     artboard = $("panels-artboard");
     scaler = $("panels-scaler");
     var palette = $("panels-palette");
     if (palette) renderPalette(palette);
 
-    artboard.addEventListener("pointerdown", function (ev) { if (ev.target === artboard) select(null); });
+    var drawerSave = $("panels-drawer-save");
+    if (drawerSave) drawerSave.addEventListener("click", saveConfig);
+    ["panels-drawer-cancel", "panels-drawer-close", "panels-drawer-scrim"].forEach(function (id) {
+      var node = $(id);
+      if (node) node.addEventListener("click", closeConfig);
+    });
+
+    artboard.addEventListener("pointerdown", onArtboardDown);
     var undoBtn = $("panels-undo"), redoBtn = $("panels-redo");
     if (undoBtn) undoBtn.addEventListener("click", undo);
     if (redoBtn) redoBtn.addEventListener("click", redo);
@@ -715,11 +1169,17 @@
       if (mod && (ev.key === "y" || ev.key === "Y")) { ev.preventDefault(); redo(); return; }
       if (typing) return; // leave native editing shortcuts alone in inputs
       if (ev.key === "Escape") { select(null); return; }
+      if (mod && (ev.key === "a" || ev.key === "A")) {
+        ev.preventDefault(); setSel(S.doc.els.map(function (e) { return e.id; })); return;
+      }
+      if (mod && (ev.key === "g" || ev.key === "G")) {
+        ev.preventDefault(); if (ev.shiftKey) ungroupSel(); else groupSel(); return;
+      }
       if (mod && (ev.key === "c" || ev.key === "C")) { ev.preventDefault(); copySel(); return; }
       if (mod && (ev.key === "v" || ev.key === "V")) { ev.preventDefault(); paste(); return; }
       if (mod && (ev.key === "d" || ev.key === "D")) { ev.preventDefault(); duplicate(); return; }
-      if (!S.sel) return;
-      if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); deleteEl(S.sel); return; }
+      if (!S.sel.size) return;
+      if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); deleteSel(); return; }
       if (ev.key === "[") { ev.preventDefault(); shift(-1); return; }
       if (ev.key === "]") { ev.preventDefault(); shift(1); return; }
       var step = ev.shiftKey ? 10 : 1;
@@ -738,6 +1198,8 @@
         S.catalog = (res[0] && res[0].widgets) || [];
         S.doc = res[1];
         if (!S.doc.els) S.doc.els = [];
+        if (!S.doc.sources) S.doc.sources = [];
+        S.ov = {};
         var title = $("panels-title");
         if (title) title.textContent = S.doc.name || "Untitled Panel";
         syncDeviceSelection();

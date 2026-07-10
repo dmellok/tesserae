@@ -701,17 +701,25 @@ def compose_canvas(canvas_id: str) -> str:
     from app.panels_schema import build_catalog
 
     catalog = build_catalog(current_app.config["PLUGIN_REGISTRY"])
+    catalog_by_key = {str(w["key"]): w for w in catalog}
+    doc.ensure_sources()  # backfill default sources for any legacy bindings
     dumped = doc.model_dump(mode="json")
-    # Widgets actually bound by an element get a real fetch(); everything else
-    # falls back to the declared sample. A widget that errors (e.g. weather
+    # Each source is a configured widget instance; bindings reference the
+    # source id (``<sid>.<field>``). A source actually bound by an element
+    # gets a real fetch() with its resolved options; everything else falls
+    # back to the widget's declared sample. A widget that errors (e.g. weather
     # with no location) also falls back, so a render never fails on data.
     active = {str(e["binding"]).split(".", 1)[0] for e in dumped["els"] if e.get("binding")}
     data: dict[str, Any] = {}
-    for widget in catalog:
-        merged: dict[str, Any] = dict(widget.get("sample") or {})
-        if widget["key"] in active:
+    for source in doc.sources:
+        entry = catalog_by_key.get(source.key)
+        if entry is None:
+            continue  # widget lost its data_schema; nothing bindable
+        merged: dict[str, Any] = dict(entry.get("sample") or {})
+        if source.sid in active:
             try:
-                result = _fetch_plugin_data(widget["key"], {}, doc.w, doc.h, preview=False)
+                opts = _resolved_options(source.key, source.options)
+                result = _fetch_plugin_data(source.key, opts, doc.w, doc.h, preview=False)
             except Exception:
                 result = None
             if isinstance(result, dict):
@@ -719,7 +727,7 @@ def compose_canvas(canvas_id: str) -> str:
                     if key != "error":
                         merged[key] = value
         for field_name, value in merged.items():
-            data[f"{widget['key']}.{field_name}"] = value
+            data[f"{source.sid}.{field_name}"] = value
     return render_template(
         "panels_compose.html",
         els_json=json.dumps(dumped["els"]),

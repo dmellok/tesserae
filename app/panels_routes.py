@@ -101,11 +101,17 @@ def editor(canvas_id: str) -> str:
 
 @bp.get("/c/<canvas_id>/doc.json")
 def doc(canvas_id: str) -> Response:
-    """The canvas document the editor hydrates from."""
+    """The canvas document the editor hydrates from. Legacy documents (whose
+    bindings predate configurable sources) get default sources backfilled so
+    the editor always sees a source per bound widget."""
     _guard()
     found = _store().get(canvas_id)
     if found is None:
         abort(404)
+    before = len(found.sources)
+    found.ensure_sources()
+    if len(found.sources) != before:
+        _store().save(found)
     return jsonify(found.model_dump(mode="json"))
 
 
@@ -235,6 +241,53 @@ def catalog() -> Response:
     fields,sample}`` shape the editor expects."""
     _guard()
     return jsonify({"widgets": build_catalog(_registry())})
+
+
+def _materialised_options(plugin: Any) -> list[dict[str, Any]]:
+    """Resolve a widget's ``cell_options`` (swapping ``choices_from`` for
+    concrete choices) using the grid editor's shared machinery, so the canvas
+    source-config form renders identical controls."""
+    from app.page_routes import _materialize_cell_options
+
+    return _materialize_cell_options([plugin]).get(plugin.id, [])
+
+
+@bp.post("/source-form")
+def source_form() -> Response:
+    """Render a widget's ``cell_options`` as an HTML form fragment for the
+    source-config drawer. Body: ``{key, sid, options}``. Reuses the grid
+    editor's ``auto_field`` macros so the controls (location search, entity
+    overrides, selects) stay identical to per-cell config."""
+    _guard()
+    body = request.get_json(silent=True) or {}
+    key = body.get("key")
+    plugin = _registry().get(key) if isinstance(key, str) else None
+    if plugin is None:
+        abort(404)
+    values = body.get("options")
+    html = render_template(
+        "panels_source_form.html",
+        opts=_materialised_options(plugin),
+        values=values if isinstance(values, dict) else {},
+        sid=str(body.get("sid") or "new"),
+    )
+    return current_app.response_class(html, mimetype="text/html")
+
+
+@bp.post("/source-options")
+def source_options() -> Response:
+    """Parse a submitted source-config form into a normalised options dict,
+    reusing the grid editor's per-cell coercion so complex field types
+    (location search, entity overrides, multiselect) demux identically.
+    Form field ``key`` names the widget; ``opt_*`` fields carry values."""
+    _guard()
+    from app.page_routes import _cell_options_from_form
+
+    key = request.form.get("key")
+    plugin = _registry().get(key) if isinstance(key, str) else None
+    if plugin is None:
+        abort(404)
+    return jsonify({"options": _cell_options_from_form(plugin, request.form)})
 
 
 def _error(status: int, message: str) -> Response:

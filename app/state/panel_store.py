@@ -25,7 +25,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Element types the palette offers. The renderer (client + future server
 # compose) switches on this. Unknown types are rejected at validation so a
@@ -91,6 +91,34 @@ class Element(BaseModel):
         return self.type in ELEMENT_TYPES
 
 
+class CanvasSource(BaseModel):
+    """A configured widget instance a canvas binds fields from. Multiple
+    instances of the same widget (``key``) can coexist with different
+    ``options`` (e.g. weather for two cities), so bindings reference the
+    instance ``sid``, not the widget key.
+
+    An element binding is ``<sid>.<field>``. Auto-migrated default sources
+    (see :meth:`CanvasPage.ensure_sources`) use ``sid == key`` so that legacy
+    ``<key>.<field>`` bindings remain valid without rewriting elements.
+    """
+
+    sid: str
+    key: str  # plugin id whose data_schema supplies the fields
+    name: str = ""  # user-facing label; blank falls back to the widget name
+    # Per-instance widget config, matching the widget's ``cell_options`` shape;
+    # resolved via ``_resolved_options`` and passed to ``fetch()``.
+    options: dict[str, Any] = Field(default_factory=dict)
+
+
+def _coerce_sources(value: Any) -> Any:
+    """Accept the historical ``sources: list[str]`` shape (bare catalog keys,
+    never actually populated by the editor) and lift each string into a
+    default :class:`CanvasSource` keyed by itself, so old documents validate."""
+    if isinstance(value, list):
+        return [{"sid": item, "key": item} if isinstance(item, str) else item for item in value]
+    return value
+
+
 class CanvasPage(BaseModel):
     """A canvas document: a fixed artboard plus its elements and the widget
     data sources currently in play."""
@@ -99,11 +127,30 @@ class CanvasPage(BaseModel):
     name: str = "Untitled Panel"
     w: int = Field(default=600, gt=0)
     h: int = Field(default=400, gt=0)
-    # Active widget data sources (catalog keys) whose fields are bindable.
-    sources: list[str] = Field(default_factory=list)
+    # Configured widget data-source instances whose fields are bindable.
+    sources: list[CanvasSource] = Field(default_factory=list)
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _lift_legacy_sources(cls, value: Any) -> Any:
+        return _coerce_sources(value)
+
+    def ensure_sources(self) -> None:
+        """Add a default source for any element binding whose ``<sid>`` prefix
+        has no matching source. Idempotent. Migrates pre-sources documents:
+        a legacy ``weather_now.temp`` binding gets a ``sid == "weather_now"``
+        source so it keeps resolving, and new instances add ``src_*`` sids."""
+        known = {s.sid for s in self.sources}
+        for element in self.els:
+            if not element.binding:
+                continue
+            prefix = element.binding.split(".", 1)[0]
+            if prefix and prefix not in known:
+                self.sources.append(CanvasSource(sid=prefix, key=prefix))
+                known.add(prefix)
 
 
 class CanvasStore:

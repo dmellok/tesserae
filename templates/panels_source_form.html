@@ -1,0 +1,17 @@
+{# Source-config form fragment for the Panels canvas editor (issue #60).
+
+   Rendered by ``panels.source_form`` and injected into the editor's config
+   drawer. Reuses the grid editor's ``auto_field`` macro so a canvas data
+   source is configured with the exact same controls as a grid cell. The
+   drawer submits this form to ``panels.source_options``, which parses it back
+   into an options dict via the shared per-cell coercion. #}
+{% from "_components.html" import auto_field %}
+{% if opts %}
+  {% for opt in opts %}
+    {% set field_id = 'src-' ~ sid ~ '-opt-' ~ opt.name %}
+    {% set value = values.get(opt.name, opt.get('default', '')) %}
+    {{ auto_field(field_id, 'opt_' ~ opt.name, opt, value) }}
+  {% endfor %}
+{% else %}
+  <p class="note" style="padding:8px 2px">This widget has no configurable options.</p>
+{% endif %}

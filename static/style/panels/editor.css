@@ -63,3 +63,24 @@
 .minibtn:hover{background:var(--t-surface-sunk)}
 .minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
 .ed.dark .minibtn.accent{color:var(--t-accent)}
+
+/* ---- data sources ---- */
+.wgh .srcname{flex:1;min-width:0;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--t-fg);font:700 12.5px var(--t-font);padding:3px 6px}
+.wgh .srcname:hover{border-color:var(--t-border)}
+.wgh .srcname:focus{outline:none;border-color:var(--t-accent);background:var(--t-surface)}
+.wgh .li{color:var(--t-fg-soft);font-size:15px;padding:2px}
+.wgh .li:hover{color:var(--t-fg)}
+.src-add-menu{border:1px solid var(--t-border);border-radius:9px;background:var(--t-surface);box-shadow:var(--t-shadow-md);padding:5px;margin-bottom:10px;max-height:240px;overflow:auto}
+.src-add-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:transparent;color:var(--t-fg);font:600 12.5px var(--t-font);padding:7px 8px;border-radius:7px;cursor:pointer}
+.src-add-item:hover{background:var(--t-surface-sunk)}
+.src-add-item .wi{width:24px;height:24px;flex:none;border-radius:6px;display:grid;place-items:center;color:#fff;font-size:13px}
+
+/* ---- source config drawer ---- */
+.drawer{position:fixed;inset:0;z-index:200;display:none}
+.drawer.open{display:block}
+.drawer-scrim{position:absolute;inset:0;background:rgba(16,12,8,.34)}
+.drawer-panel{position:absolute;top:0;right:0;bottom:0;width:min(420px,92vw);background:var(--t-surface);border-left:1px solid var(--t-border);box-shadow:var(--t-shadow-lg);display:flex;flex-direction:column}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--t-border)}
+.drawer-title{font:700 14px var(--t-font);color:var(--t-fg);flex:1;min-width:0}
+.drawer-body{flex:1;min-height:0;overflow:auto;padding:16px}
+.drawer-foot{display:flex;justify-content:flex-end;gap:9px;padding:12px 16px;border-top:1px solid var(--t-border)}
