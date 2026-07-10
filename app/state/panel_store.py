@@ -58,10 +58,10 @@ class Element(BaseModel):
     id: str
     type: str = Field(..., pattern=r"^[a-z]+$")
     name: str = ""
-    x: int = Field(0, ge=0)
-    y: int = Field(0, ge=0)
-    w: int = Field(1, gt=0)
-    h: int = Field(1, gt=0)
+    x: int = Field(default=0, ge=0)
+    y: int = Field(default=0, ge=0)
+    w: int = Field(default=1, gt=0)
+    h: int = Field(default=1, gt=0)
     # Data binding as a ``<widget_key>.<field>`` path, or None for static /
     # decorative elements (text with literal content, shapes).
     binding: str | None = None
@@ -97,8 +97,8 @@ class CanvasPage(BaseModel):
 
     id: str
     name: str = "Untitled Panel"
-    w: int = Field(600, gt=0)
-    h: int = Field(400, gt=0)
+    w: int = Field(default=600, gt=0)
+    h: int = Field(default=400, gt=0)
     # Active widget data sources (catalog keys) whose fields are bindable.
     sources: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)

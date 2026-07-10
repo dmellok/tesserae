@@ -18,11 +18,10 @@
   <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 </head>
 <body>
-  {# Experimental Panels editor (issue #60), phase 0 shell. Layout + chrome
-     are the design-handoff structure; the interactive editor (drag / resize /
-     bind / render) lands in later phases. For now the Elements palette and
-     the Data panel populate from the widget catalog so the vertical slice
-     (flag -> page -> catalog -> schema) is real and testable. #}
+  {# Experimental Panels editor (issue #60). Layout + chrome follow the
+     design handoff; editor.js drives the interactive canvas (create / move /
+     resize / bind / undo / autosave). Still to come: marquee + groups,
+     alignment guides, simulate mode, and the server-side compose render. #}
   <div class="ed appfill" style="display:grid;grid-template-columns:252px 1fr 300px;grid-template-rows:56px 1fr" tabindex="0"
        data-canvas-id="{{ canvas_id }}"
        data-doc-url="{{ url_for('panels.doc', canvas_id=canvas_id) }}"
@@ -36,8 +35,8 @@
         <span style="font-size:11px;color:var(--t-muted)" id="panels-status">experimental</span>
       </div>
       <div class="tdiv"></div>
-      <div class="tbtn is-disabled" title="Undo"><i class="ph-bold ph-arrow-counter-clockwise"></i></div>
-      <div class="tbtn is-disabled" title="Redo"><i class="ph-bold ph-arrow-clockwise"></i></div>
+      <div class="tbtn is-disabled" id="panels-undo" title="Undo (Cmd/Ctrl+Z)"><i class="ph-bold ph-arrow-counter-clockwise"></i></div>
+      <div class="tbtn is-disabled" id="panels-redo" title="Redo (Shift+Cmd/Ctrl+Z)"><i class="ph-bold ph-arrow-clockwise"></i></div>
       <div class="tdiv"></div>
       <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
@@ -55,7 +54,7 @@
       <div class="card2" style="flex:1;min-height:0">
         <div class="pnh"><span class="t"><i class="ph-bold ph-stack"></i>Layers</span><span class="x mono" style="text-transform:none;letter-spacing:0">0</span></div>
         <div class="pnb scroll" id="panels-layers">
-          <div class="note" style="padding:14px">No elements yet. The interactive canvas ships in a later phase.</div>
+          <div class="note" style="padding:14px">Loading…</div>
         </div>
       </div>
     </div>
@@ -71,7 +70,7 @@
         <div class="pnh"><span class="t"><i class="ph-bold ph-database"></i>Data</span><span class="x mono" style="text-transform:none;letter-spacing:0" id="panels-source-count">0 sources</span></div>
         <div class="pnb scroll" id="panels-data" style="max-height:none"></div>
       </div>
-      <div class="note" style="padding:2px 18px 16px">Widgets are data sources. Bind their fields to elements on the canvas. Interactive binding and rendering ship in a later phase.</div>
+      <div class="note" style="padding:2px 18px 16px">Widgets are data sources. Select an element to bind it to a field; edit any value here and bound elements update live.</div>
     </div>
 
   </div>
