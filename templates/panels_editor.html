@@ -62,9 +62,10 @@
     </div>
 
     <div style="grid-row:2;grid-column:1;border-right:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;gap:12px;padding:12px;min-height:0">
-      <div class="card2" style="flex:none">
+      <div class="card2" style="flex:1.4;min-height:0">
         <div class="pnh"><span class="t"><i class="ph-bold ph-shapes"></i>Widgets</span><span class="x" style="text-transform:none;letter-spacing:0;font-size:10.5px">drag onto canvas</span></div>
-        <div class="pnb scroll" id="panels-palette"></div>
+        <div style="padding:8px 8px 4px;flex:none"><input id="panels-palette-search" class="dinput wide" autocomplete="off" placeholder="Search widgets…" style="width:100%"></div>
+        <div class="pnb scroll" id="panels-palette" style="flex:1"></div>
       </div>
       <div class="card2" style="flex:1;min-height:0">
         <div class="pnh"><span class="t"><i class="ph-bold ph-stack"></i>Layers</span><span class="x mono" style="text-transform:none;letter-spacing:0">0</span></div>

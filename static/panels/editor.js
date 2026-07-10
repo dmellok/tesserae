@@ -65,6 +65,7 @@
     sim: false,
     devices: [],
     mount: {}, // elId -> { fp, host } cached widget shadow hosts
+    pq: "", // palette search query (lowercased)
   };
 
   var artboard, scaler;
@@ -506,13 +507,24 @@
       none.textContent = "No widgets available.";
       mount.appendChild(none); return;
     }
+    var q = S.pq || "";
+    var shown = 0;
     S.catalog.forEach(function (w) {
+      var wname = (w.name || w.key).toLowerCase();
+      // Match the widget by name/id (show all its parts) or a fragment by its
+      // label (show just the matching parts).
+      var wMatch = !q || wname.indexOf(q) >= 0 || w.key.toLowerCase().indexOf(q) >= 0;
+      var frags = (w.fragments || []).filter(function (f) {
+        return wMatch || (f.label || f.id).toLowerCase().indexOf(q) >= 0;
+      });
+      if (!frags.length) return;
+      shown++;
       var group = el("div", "pwg");
       var head = el("div", "pwgh");
       head.innerHTML = '<i class="ph-bold ' + (w.icon || "ph-puzzle-piece") + '"></i>';
       head.appendChild(document.createTextNode(w.name || w.key));
       group.appendChild(head);
-      (w.fragments || []).forEach(function (f) {
+      frags.forEach(function (f) {
         var tile = el("div", "pi");
         tile.title = (w.name || w.key) + " · " + (f.label || f.id);
         tile.innerHTML = '<span class="ico"><i class="ph-bold ' + (f.icon || w.icon || "ph-puzzle-piece") +
@@ -525,6 +537,11 @@
       });
       mount.appendChild(group);
     });
+    if (!shown) {
+      var no = el("div", "note"); no.style.padding = "14px";
+      no.textContent = "No widgets match “" + q + "”.";
+      mount.appendChild(no);
+    }
   }
 
   function onPaletteDown(ev, item) {
@@ -939,6 +956,12 @@
     if (redoBtn) redoBtn.addEventListener("click", redo);
     var simBtn = $("panels-sim");
     if (simBtn) simBtn.addEventListener("click", toggleSim);
+    var psearch = $("panels-palette-search");
+    if (psearch) psearch.addEventListener("input", function () {
+      S.pq = psearch.value.trim().toLowerCase();
+      var m = $("panels-palette");
+      if (m) renderPalette(m);
+    });
     initDevices();
 
     document.addEventListener("keydown", function (ev) {
