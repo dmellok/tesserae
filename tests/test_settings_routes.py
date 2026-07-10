@@ -1070,6 +1070,21 @@ def test_humanize_power_calls_zero_zero_mains_not_dead() -> None:
     }
 
 
+def test_humanize_environment_formats_available_readings() -> None:
+    from app.settings.index_routes import _humanize_environment
+
+    assert _humanize_environment({}) is None
+    assert _humanize_environment({"temperature_c": 25.4, "humidity_pct": 58.2}) == {
+        "value": "25.4 °C",
+        "sub": "58% RH",
+    }
+    assert _humanize_environment({"humidity_pct": "61.6"}) == {
+        "value": "62% RH",
+        "sub": None,
+    }
+    assert _humanize_environment({"temperature_c": "invalid", "humidity_pct": None}) is None
+
+
 def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> None:
     """The Status tab shows Signal / Power / Firmware tiles instead of
     raw key/value pairs. Smoke-checks the tile labels are present after
@@ -1084,13 +1099,21 @@ def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> Non
     )
     app_with_gate.config["DEVICE_STATUS"]["esp32_lab"] = {
         "received_at": time.time(),
-        "parsed": {"battery_mv": 3820, "battery_pct": 67, "rssi": -64, "ip": "10.0.0.42"},
+        "parsed": {
+            "battery_mv": 3820,
+            "battery_pct": 67,
+            "rssi": -64,
+            "ip": "10.0.0.42",
+            "temperature_c": 25.4,
+            "humidity_pct": 58.2,
+        },
     }
     body = client.get("/settings/devices").get_data(as_text=True)
-    # All three tile labels render.
+    # Core tiles plus optional environmental telemetry render.
     assert "Signal" in body
     assert "Power" in body
     assert "Firmware" in body
+    assert "Environment" in body
     # Humanized signal label + dBm sub-line.
     assert "Good" in body
     assert "-64 dBm" in body
@@ -1098,6 +1121,8 @@ def test_device_card_renders_humanized_status_tiles(app_with_gate: Flask) -> Non
     assert "67%" in body
     # Firmware IP sub-line.
     assert "10.0.0.42" in body
+    assert "25.4 °C" in body
+    assert "58% RH" in body
 
 
 def test_device_card_rest_hides_dormant_mqtt_topics(app_with_gate: Flask) -> None:

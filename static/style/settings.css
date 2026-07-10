@@ -949,6 +949,9 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
+.dx-stat-grid--device {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
 .dx-stat-tile {
   background: var(--dx-inset);
   border: 1px solid #ecebe6;

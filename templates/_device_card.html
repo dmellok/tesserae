@@ -192,7 +192,7 @@
                class="dx-panel{% if active_tab == 'status' %} is-active{% endif %}"
                aria-hidden="{% if active_tab == 'status' %}false{% else %}true{% endif %}">
         {% set tiles = section.status.tiles %}
-        <div class="dx-stat-grid">
+        <div class="dx-stat-grid dx-stat-grid--device">
           {# SIGNAL #}
           <div class="dx-stat-tile">
             <div class="dx-stat-label">Signal</div>
@@ -226,6 +226,14 @@
               {% if tiles.firmware and tiles.firmware.sub %}<code>{{ tiles.firmware.sub }}</code>{% else %}-{% endif %}
             </div>
           </div>
+          {# ENVIRONMENT -- only sensor-equipped devices report this. #}
+          {% if tiles.environment %}
+          <div class="dx-stat-tile">
+            <div class="dx-stat-label">Environment</div>
+            <div class="dx-stat-value">{{ tiles.environment.value }}</div>
+            <div class="dx-stat-sub">{{ tiles.environment.sub or '-' }}</div>
+          </div>
+          {% endif %}
         </div>
 
         {# SMART SYNC PANEL #}

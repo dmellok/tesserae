@@ -103,13 +103,30 @@ def test_status_cache_renders_after_heartbeat(app: Flask) -> None:
 def test_merge_keeps_prev_values_when_new_is_none() -> None:
     """An LWT typically carries only state=offline; merge must preserve
     the last known battery / rssi / ip rather than blanking them."""
-    prev = {"battery_mv": 3820, "battery_pct": 67, "rssi": -58, "ip": "10.0.0.42"}
-    lwt = {"battery_mv": None, "battery_pct": None, "rssi": None, "ip": None, "state": "offline"}
+    prev = {
+        "battery_mv": 3820,
+        "battery_pct": 67,
+        "rssi": -58,
+        "ip": "10.0.0.42",
+        "temperature_c": 25.4,
+        "humidity_pct": 58.2,
+    }
+    lwt = {
+        "battery_mv": None,
+        "battery_pct": None,
+        "rssi": None,
+        "ip": None,
+        "temperature_c": None,
+        "humidity_pct": None,
+        "state": "offline",
+    }
     merged = merge_status_parsed(prev, lwt)
     assert merged["battery_mv"] == 3820
     assert merged["battery_pct"] == 67
     assert merged["rssi"] == -58
     assert merged["ip"] == "10.0.0.42"
+    assert merged["temperature_c"] == 25.4
+    assert merged["humidity_pct"] == 58.2
     assert merged["state"] == "offline"
 
 
