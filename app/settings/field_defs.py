@@ -165,6 +165,21 @@ APP_FIELDS: list[dict[str, Any]] = [
         ),
     },
     {
+        "name": "unbound_broadcast",
+        "type": "switch",
+        "label": "Broadcast unbound dashboards (legacy single-head MQTT)",
+        "default": False,
+        "group": "network",
+        "help": (
+            "Legacy behaviour. When a dashboard bound to no device is sent, fan "
+            "its frame out to every base renderer over the retained MQTT topics, "
+            "the single-head default from before device binding existed. Off by "
+            "default: unbound Sends no-op with a message and dashboards reach only "
+            "the devices they're bound to. Turn on only if you drive a single "
+            "panel over MQTT and never bind it."
+        ),
+    },
+    {
         "name": "quiet_hours_enabled",
         "type": "switch",
         "label": "Quiet hours",

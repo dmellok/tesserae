@@ -153,3 +153,36 @@ def test_days_label_groups() -> None:
     assert _days_label([0, 1, 4, 5, 6]) == "Mon-Tue, Fri-Sun"
     assert _days_label([3]) == "Thu"
     assert _days_label([]) == "(no days)"
+
+
+def test_unbound_page_flagged_wont_send_unless_broadcast_on(wiring) -> None:
+    """#84: an unbound page still lists on the timetable, but is flagged
+    wont_send unless the legacy unbound-broadcast opt-in is on."""
+    devices, pages, schedules = wiring
+    pages.save(Page(id="floating", name="Floating", device_ids=[], cells=[]))
+    pages.save(Page(id="pinned", name="Pinned", device_ids=["hallway"], cells=[]))
+    for sid, pid in (("floating_sched", "floating"), ("pinned_sched", "pinned")):
+        schedules.upsert(
+            Schedule(
+                id=sid,
+                name=sid,
+                page_id=pid,
+                type="interval",
+                interval_minutes=30,
+                time_of_day_start="08:00",
+                time_of_day_end="18:00",
+                days_of_week=[0, 1, 2, 3, 4],
+            )
+        )
+
+    # Default: the unbound page won't send, the bound page will.
+    hall = timetable_for_device("hallway", devices=devices, pages=pages, schedules=schedules)
+    by_page = {e.page_id: e for e in hall}
+    assert by_page["floating"].wont_send is True
+    assert by_page["pinned"].wont_send is False
+
+    # Legacy opt-in on: the unbound page delivers again, so no warning.
+    hall_legacy = timetable_for_device(
+        "hallway", devices=devices, pages=pages, schedules=schedules, unbound_broadcast=True
+    )
+    assert {e.page_id: e.wont_send for e in hall_legacy}["floating"] is False

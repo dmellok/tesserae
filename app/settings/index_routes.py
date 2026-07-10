@@ -1077,6 +1077,9 @@ def _build_sections() -> list[dict[str, Any]]:
                         devices=devices(),
                         pages=current_app.config["PAGE_STORE"],
                         schedules=current_app.config["SCHEDULE_STORE"],
+                        unbound_broadcast=bool(
+                            settings_store().get_section("app").get("unbound_broadcast", False)
+                        ),
                     )
                     if is_instance
                     else []

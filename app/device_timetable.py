@@ -48,6 +48,7 @@ class TimetableEntry:
     days_of_week: list[int]  # 0=Mon..6=Sun
     days_label: str  # human-readable: "Mon-Fri", "Weekends", or "Mon, Wed, Fri"
     enabled: bool
+    wont_send: bool  # page is unbound and the unbound-broadcast opt-in is off: fires nothing
 
 
 def _days_label(dows: list[int]) -> str:
@@ -90,14 +91,16 @@ def timetable_for_device(
     devices: DeviceRegistry,
     pages: PageStore,
     schedules: ScheduleStore,
+    unbound_broadcast: bool = False,
 ) -> list[TimetableEntry]:
     """Compute the rotation timetable for one device.
 
     The join is: pages whose ``device_ids`` include this device →
     schedules whose ``page_id`` matches one of those pages → one
-    TimetableEntry per schedule. Pages bound to no device at all (the
-    virtual-panel fan-out path) are also included on every device -
-    they fire everywhere, so they belong on every device's timetable.
+    TimetableEntry per schedule. Pages bound to no device at all are
+    still listed on every device's timetable, but unless
+    ``unbound_broadcast`` is on they no longer deliver anywhere (#84);
+    such entries are flagged ``wont_send`` so the card can warn.
 
     Returns entries sorted by window start so a glance at the card
     reads as a daily timetable."""
@@ -119,6 +122,7 @@ def timetable_for_device(
             continue
         bound_page = pages_by_id.get(schedule.page_id)
         page_name = bound_page.name if bound_page else schedule.page_id
+        page_unbound = bool(bound_page) and not bound_page.device_ids
         entries.append(
             TimetableEntry(
                 schedule_id=schedule.id,
@@ -132,6 +136,7 @@ def timetable_for_device(
                 days_of_week=list(schedule.days_of_week),
                 days_label=_days_label(list(schedule.days_of_week)),
                 enabled=schedule.enabled,
+                wont_send=page_unbound and not unbound_broadcast,
             )
         )
 
