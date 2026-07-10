@@ -538,6 +538,19 @@ def test_dither_override_ignored_when_partial_form_lacks_both_fields(
 # -- status bar toggle (v0.71.0) -----------------------------------
 
 
+def test_status_bar_toggle_hides_native_checkbox_behind_switch(app: Flask, tmp_path: Path) -> None:
+    """The shared field--switch styles hide the native checkbox so the
+    custom track is the section's only visible toggle control."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+
+    body = client.get(f"/pages/{pid}").get_data(as_text=True)
+
+    assert body.count('name="status_bar_enabled"') == 1
+    assert 'class="form form--inline dx-status-bar-switch field--switch"' in body
+
+
 def test_status_bar_toggle_inserts_cell_and_rescales(app: Flask, tmp_path: Path) -> None:
     """Flipping the status-bar switch on prepends a tesserae_status cell
     at (0, 0, panel.w, 48) and shifts + rescales existing cells into
@@ -560,6 +573,9 @@ def test_status_bar_toggle_inserts_cell_and_rescales(app: Flask, tmp_path: Path)
     assert bar.id == page.status_bar_cell_id
     assert bar.plugin == "tesserae_status"
     assert (bar.x, bar.y, bar.w, bar.h) == (0, 0, 800, 48)
+    assert bar.options["show_temperature"] is True
+    assert bar.options["show_humidity"] is True
+    assert bar.options["units"] == "metric"
     # Existing top-row cells rescaled into (48, 600), so their y starts
     # at 48 rather than 0, and their h shrinks by the (600-48)/600 ratio.
     top = [c for c in page.cells if c.plugin != "tesserae_status" and c.y < 300]

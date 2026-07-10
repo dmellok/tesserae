@@ -35,18 +35,25 @@ update.
 
 ## Chips
 
-Always-on ambient stats (in order): **time, weather, battery, wifi,
-broker**. Update chips (**app version, panel firmware**) appear only
-when an update is pending; otherwise the everyday state is the five
-ambient stats. Two **custom slots** (icon + text) append after the
-update chips.
+Always-on ambient stats (in order): **time, environment, battery,
+wifi, broker**. The environment cluster contains temperature and/or
+humidity when the target panel publishes those fields. Update chips
+(**app version, panel firmware**) appear only when an update is
+pending.
 
 Chip data comes from Tesserae's device heartbeats: battery from
 ``battery_pct``, Wi-Fi label from ``rssi`` (Excellent / Good / Fair /
-Weak buckets), broker present when MQTT is configured, firmware
-aggregate from the in-process ``firmware_check`` cache. The weather
-chip is user-provided (icon + static value) because Tesserae has no
-weather source of its own.
+Weak buckets), temperature from ``temperature_c``, and relative
+humidity from ``humidity_pct``. Temperature remains canonical Celsius
+telemetry on the server; the widget's metric / imperial option only
+changes its presentation. Broker presence comes from the MQTT
+configuration, and firmware aggregate state comes from the in-process
+``firmware_check`` cache.
+
+Per-device pushes read all panel telemetry from the render's target
+device. Editor previews and virtual-panel renders have no target, so
+the environment cluster uses the most recent single sensor-bearing
+heartbeat instead of averaging or combining values across panels.
 
 ## Auto-contrast
 

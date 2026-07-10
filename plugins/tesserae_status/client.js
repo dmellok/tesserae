@@ -92,13 +92,22 @@ function identityHtml(data, chipMode) {
 
 function buildChips(data, state) {
   const chips = [];
-  // Always-on ambient stats (in order): time, battery, wifi, broker.
+  // Always-on ambient stats (in order): time, environment, battery,
+  // wifi, broker. Temperature and humidity share one compact cluster
+  // so a sensor-equipped panel does not consume two full chip gaps.
   if (data.show_time) {
     chips.push({
       key: "time",
       icon: "ph-clock",
       value: formatTime(new Date(), data.time_format || "24h"),
       live: "time",
+    });
+  }
+  const environment = environmentMetrics(data);
+  if (environment.length > 0) {
+    chips.push({
+      key: "environment",
+      metrics: environment,
     });
   }
   if (data.show_battery && Number.isFinite(data.battery_pct)) {
@@ -149,7 +158,38 @@ function buildChips(data, state) {
   return chips;
 }
 
+function environmentMetrics(data) {
+  const metrics = [];
+  const imperial = String(data.units || "metric").toLowerCase() === "imperial";
+  if (data.show_temperature && Number.isFinite(data.temperature_c)) {
+    const temperature = imperial
+      ? (data.temperature_c * 9) / 5 + 32
+      : data.temperature_c;
+    const unit = imperial ? "F" : "C";
+    metrics.push({
+      key: "temperature",
+      icon: "ph-thermometer-simple",
+      value: `${Math.round(temperature)}°${unit}`,
+      label: `Temperature ${Math.round(temperature)} degrees ${unit}`,
+    });
+  }
+  if (data.show_humidity && Number.isFinite(data.humidity_pct)) {
+    const humidity = Math.max(0, Math.min(100, Math.round(data.humidity_pct)));
+    metrics.push({
+      key: "humidity",
+      icon: "ph-drop",
+      value: `${humidity}%`,
+      textOnlyValue: `${humidity}% RH`,
+      label: `Humidity ${humidity} percent`,
+    });
+  }
+  return metrics;
+}
+
 function chipHtml(chip, chipMode) {
+  if (Array.isArray(chip.metrics)) {
+    return environmentChipHtml(chip, chipMode);
+  }
   const showIcon = chipMode !== "text-only";
   const showText = chipMode !== "icon-only";
   const parts = [];
@@ -177,6 +217,41 @@ function chipHtml(chip, chipMode) {
   return `
     <span class="chip" role="listitem" data-kind="${chip.key}"${dataAttr}>
       ${parts.join("")}
+    </span>
+  `;
+}
+
+function environmentChipHtml(chip, chipMode) {
+  const showIcon = chipMode !== "text-only";
+  const showText = chipMode !== "icon-only";
+  const metrics = chip.metrics || [];
+  const label = metrics.map((metric) => metric.label).join(", ");
+  const body = metrics.map((metric, index) => {
+    const icon = showIcon
+      ? `<i class="ph-bold ${metric.icon}" aria-hidden="true"></i>`
+      : "";
+    const value = showText
+      ? `<span class="chip-value">${escapeHtml(
+        chipMode === "text-only" && metric.textOnlyValue
+          ? metric.textOnlyValue
+          : metric.value,
+      )}</span>`
+      : "";
+    const separator = chipMode === "text-only" && index > 0
+      ? `<span class="environment-separator" aria-hidden="true">·</span>`
+      : "";
+    return `
+      ${separator}
+      <span class="environment-metric" data-metric="${metric.key}">
+        ${icon}
+        ${value}
+      </span>
+    `;
+  }).join("");
+  return `
+    <span class="chip environment-chip" role="listitem" data-kind="${chip.key}"
+          aria-label="${escapeHtml(label)}">
+      ${body}
     </span>
   `;
 }
@@ -410,7 +485,11 @@ function styles(bg, fg, red, mode) {
         display: inline-flex;
         align-items: center;
         gap: clamp(6px, 2cqh, 11px);
-        flex: 0 0 auto;
+        flex: 0 1 auto;
+        min-width: 0;
+      }
+      .frame[data-mode="bar"] .identity {
+        max-width: 40%;
       }
       .leading-icon {
         font-size: clamp(16px, 45cqh, 32px);
@@ -422,8 +501,12 @@ function styles(bg, fg, red, mode) {
       .name {
         font-size: clamp(13px, 34cqh, 26px);
         font-weight: 700;
-        letter-spacing: -0.2px;
+        letter-spacing: 0;
         line-height: 1.1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .frame[data-mode="block"] .name {
         font-size: clamp(14px, 9cqh, 22px);
@@ -443,6 +526,7 @@ function styles(bg, fg, red, mode) {
         display: flex;
         align-items: center;
         flex: 1 1 auto;
+        min-width: 0;
         overflow: hidden;
       }
       .frame[data-mode="bar"] .chips {
@@ -458,6 +542,7 @@ function styles(bg, fg, red, mode) {
       .chip {
         display: inline-flex;
         align-items: center;
+        flex: 0 0 auto;
         gap: clamp(4px, 1.5cqh, 8px);
         white-space: nowrap;
         color: ${fg};
@@ -469,10 +554,12 @@ function styles(bg, fg, red, mode) {
         justify-content: center;
         line-height: 1;
       }
-      .frame[data-mode="bar"] .chip-icon i {
+      .frame[data-mode="bar"] .chip-icon i,
+      .frame[data-mode="bar"] .environment-metric i {
         font-size: clamp(14px, 42cqh, 28px);
       }
-      .frame[data-mode="block"] .chip-icon i {
+      .frame[data-mode="block"] .chip-icon i,
+      .frame[data-mode="block"] .environment-metric i {
         font-size: clamp(15px, 10cqh, 24px);
       }
       .chip-text {
@@ -488,6 +575,19 @@ function styles(bg, fg, red, mode) {
         font-size: clamp(12px, 8cqh, 18px);
       }
       .chip-value { font-weight: 600; }
+      .environment-chip {
+        gap: clamp(7px, 2.5cqh, 12px);
+      }
+      .environment-metric {
+        display: inline-flex;
+        align-items: center;
+        gap: clamp(3px, 1.2cqh, 6px);
+        white-space: nowrap;
+      }
+      .environment-separator {
+        font-size: clamp(12px, 28cqh, 18px);
+        line-height: 1;
+      }
       .chip-sub {
         font-size: clamp(11px, 25cqh, 16px);
         font-weight: 700;
@@ -507,6 +607,17 @@ function styles(bg, fg, red, mode) {
       }
       /* Icon-only mode collapses the icon+text gap. */
       .frame[data-chipmode="icon-only"] .chip { gap: 0; }
+      .frame[data-chipmode="icon-only"] .environment-chip {
+        gap: clamp(7px, 2.5cqh, 12px);
+      }
+      @container (max-width: 900px) {
+        .frame[data-mode="bar"] {
+          padding-inline: 12px;
+          gap: 8px;
+        }
+        .frame[data-mode="bar"] .identity { max-width: 34%; }
+        .frame[data-mode="bar"] .chips { gap: 8px; }
+      }
     </style>
   `;
 }

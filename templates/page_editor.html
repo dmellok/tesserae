@@ -387,7 +387,7 @@
           </span>
           <form method="post"
                 action="{{ url_for('pages.status_bar_toggle', page_id=page.id) }}"
-                class="form form--inline dx-status-bar-switch">
+                class="form form--inline dx-status-bar-switch field--switch">
             <label class="switch">
               <input type="checkbox" name="status_bar_enabled"
                      {% if page.status_bar_enabled %}checked{% endif %}

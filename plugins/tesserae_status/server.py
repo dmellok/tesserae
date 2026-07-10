@@ -4,8 +4,8 @@ Server-side prep:
 
 * Reads the running Tesserae version so the widget's update chip can
   compare to api.tesserae.ink/version/latest client-side.
-* Resolves panel-side signals from the bound devices: battery (min
-  across bound devices), Wi-Fi label (from RSSI), broker label
+* Resolves panel-side signals from the render target: battery,
+  temperature, humidity and Wi-Fi label (from RSSI), plus broker label
   (present when MQTT is configured).
 * Counts device kinds with a firmware update available, using the
   in-memory firmware_check cache (:mod:`app.firmware_check`). Passive
@@ -21,6 +21,7 @@ client-side; the payload just carries the values the chips render.
 
 from __future__ import annotations
 
+from math import isfinite
 from typing import Any
 
 from flask import current_app
@@ -124,6 +125,52 @@ def _wifi_label(target_device_id: str = "") -> str | None:
     return _label_for(worst)
 
 
+def _panel_environment(target_device_id: str = "") -> tuple[float | None, float | None]:
+    """Return temperature and humidity from one panel heartbeat.
+
+    Per-device renders always use the target panel. Editor previews and
+    virtual-panel renders have no target, so use the most recently received
+    heartbeat carrying either environmental field. Never aggregate across
+    panels: an average room temperature would not describe any actual device,
+    and temperature from one panel must not be paired with humidity from
+    another.
+    """
+
+    def _number(value: Any) -> float | None:
+        if isinstance(value, bool):
+            return None
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if isfinite(number) else None
+
+    def _sample(entry: Any) -> tuple[float | None, float | None]:
+        parsed = (entry or {}).get("parsed") or {}
+        temperature_c = _number(parsed.get("temperature_c"))
+        humidity_pct = _number(parsed.get("humidity_pct"))
+        if humidity_pct is not None:
+            humidity_pct = max(0.0, min(100.0, humidity_pct))
+        return temperature_c, humidity_pct
+
+    status_cache = current_app.config.get("DEVICE_STATUS") or {}
+    if target_device_id:
+        return _sample(status_cache.get(target_device_id) or {})
+
+    latest_sample = (None, None)
+    latest_received_at = float("-inf")
+    for entry in status_cache.values():
+        sample = _sample(entry)
+        if sample == (None, None):
+            continue
+        received_at = _number((entry or {}).get("received_at"))
+        sort_value = received_at if received_at is not None else float("-inf")
+        if latest_sample == (None, None) or sort_value > latest_received_at:
+            latest_sample = sample
+            latest_received_at = sort_value
+    return latest_sample
+
+
 def _broker_configured() -> bool:
     """True when an MQTT broker URL is set in the app settings."""
     settings = current_app.config.get("SETTINGS_STORE")
@@ -208,6 +255,11 @@ def fetch(
     # across-devices aggregate in that case.
     target_device_id = str(ctx.get("target_device_id") or "")
     version = _server_version()
+    show_temperature = _bool("show_temperature", True)
+    show_humidity = _bool("show_humidity", True)
+    temperature_c, humidity_pct = (
+        _panel_environment(target_device_id) if show_temperature or show_humidity else (None, None)
+    )
 
     return {
         "mode": str(options.get("mode") or "bar"),
@@ -218,8 +270,11 @@ def fetch(
         "leadingIcon": _bool("leadingIcon", True),
         "panelBg": str(options.get("panelBg") or "#1B1A16"),
         "time_format": str(options.get("time_format") or "24h"),
+        "units": str(options.get("units") or "metric"),
         # Chip visibility flags
         "show_time": _bool("show_time", True),
+        "show_temperature": show_temperature,
+        "show_humidity": show_humidity,
         "show_battery": _bool("show_battery", True),
         "show_wifi": _bool("show_wifi", True),
         "show_broker": _bool("show_broker", True),
@@ -227,6 +282,8 @@ def fetch(
         "check_for_updates": _bool("check_for_updates", False),
         "show_firmware_updates": _bool("show_firmware_updates", True),
         # Values populated server-side
+        "temperature_c": temperature_c if show_temperature else None,
+        "humidity_pct": humidity_pct if show_humidity else None,
         "battery_pct": (_panel_battery(target_device_id) if _bool("show_battery", True) else None),
         "wifi_label": _wifi_label(target_device_id) if _bool("show_wifi", True) else None,
         "broker_available": _broker_configured() if _bool("show_broker", True) else False,

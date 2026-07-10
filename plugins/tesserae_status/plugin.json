@@ -1,9 +1,9 @@
 {
   "tesserae_compat": "1.x",
   "name": "Tesserae, Status Bar",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "widget",
-  "description": "Dashboard status strip: identity on the left, ambient info chips on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
+  "description": "Dashboard status strip: identity on the left, ambient device telemetry on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Temperature and humidity come from the target panel's status heartbeat. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
   "icon": "ph-squares-four",
   "supports": { "sizes": ["xs", "sm", "md", "lg"] },
   "needs_scoped_id": true,
@@ -66,6 +66,30 @@
         { "value": "24h", "label": "24 hour" },
         { "value": "12h", "label": "12 hour" }
       ]
+    },
+    {
+      "name": "show_temperature",
+      "type": "boolean",
+      "label": "Temperature",
+      "default": true,
+      "help": "Latest temperature reported by the panel. Auto-hides when the target device does not publish temperature_c."
+    },
+    {
+      "name": "units",
+      "type": "select",
+      "label": "Temperature units",
+      "default": "metric",
+      "choices": [
+        { "value": "metric", "label": "Metric (°C)" },
+        { "value": "imperial", "label": "Imperial (°F)" }
+      ]
+    },
+    {
+      "name": "show_humidity",
+      "type": "boolean",
+      "label": "Humidity",
+      "default": true,
+      "help": "Latest relative humidity reported by the panel. Auto-hides when the target device does not publish humidity_pct."
     },
     {
       "name": "show_battery",
