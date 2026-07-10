@@ -41,6 +41,9 @@
 </head>
 <body data-theme="{{ theme }}" data-style="{{ style }}" style="--font-family: '{{ font_family }}', system-ui, sans-serif;">
   <div id="panels-board">
+    {% if bg_image %}
+    <img src="{{ bg_image }}" alt="" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:0;object-fit:{{ 'fill' if bg_fit == 'stretch' else bg_fit }}">
+    {% endif %}
     {% for e in els %}
     {% if e.kind == 'widget' %}
     <div class="cell"

@@ -95,6 +95,9 @@ class CanvasPage(BaseModel):
     style: str = "standard"
     font: str = ""
     bg: str = ""
+    # Optional background image (URL) behind all elements, and how it fits.
+    bg_image: str = ""
+    bg_fit: str = "cover"  # cover | contain | stretch
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)

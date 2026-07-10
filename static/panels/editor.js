@@ -85,6 +85,9 @@
     data: {}, // live data keyed by "<widget>|<options-json>"
     dataPending: {}, // in-flight data fetches, same key
     appearance: { themes: [], styles: [], fonts: [] },
+    zoom: null, // manual zoom multiplier; null = auto-fit
+    panX: 0, panY: 0, // pan offset in screen px
+    spaceDown: false, // space held = pan mode
   };
 
   var artboard, scaler;
@@ -329,6 +332,14 @@
     artboard.style.width = S.doc.w + "px";
     artboard.style.height = S.doc.h + "px";
     artboard.textContent = "";
+    if (S.doc.bg_image) {
+      var bgimg = el("img", "canvas-bg");
+      bgimg.src = S.doc.bg_image;
+      var fit = S.doc.bg_fit || "cover";
+      bgimg.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;" +
+        "z-index:0;object-fit:" + (fit === "stretch" ? "fill" : fit);
+      artboard.appendChild(bgimg);
+    }
     S.doc.els.forEach(function (e) { artboard.appendChild(elNode(e)); });
     S.gV = el("div", "ov-guide v");
     S.gH = el("div", "ov-guide h");
@@ -343,11 +354,24 @@
 
   function fitZoom() {
     var vp = scaler.parentElement;
-    var z = Math.min((vp.clientWidth - 56) / S.doc.w, (vp.clientHeight - 56) / S.doc.h, 1);
-    z = Math.max(z, 0.5);
-    scaler.style.transform = "scale(" + z + ")";
+    var z;
+    if (S.zoom) {
+      z = S.zoom;
+    } else {
+      z = Math.min((vp.clientWidth - 56) / S.doc.w, (vp.clientHeight - 56) / S.doc.h, 1);
+      z = Math.max(z, 0.3);
+      S.panX = 0; S.panY = 0; // auto-fit recentres
+    }
+    applyTransform(z);
     scaler.dataset.zoom = z;
+    var lab = $("panels-zoom-label");
+    if (lab) lab.textContent = S.zoom ? Math.round(z * 100) + "%" : "Fit";
   }
+  function applyTransform(z) {
+    scaler.style.transformOrigin = "center center";
+    scaler.style.transform = "translate(" + (S.panX || 0) + "px," + (S.panY || 0) + "px) scale(" + z + ")";
+  }
+  function setZoom(z) { S.zoom = z ? clamp(z, 0.2, 4) : null; fitZoom(); }
   function currentZoom() { return Number(scaler.dataset.zoom || 1); }
 
   // ---- snapping + alignment guides -------------------------------------
@@ -557,6 +581,7 @@
 
   // ---- marquee multi-select --------------------------------------------
   function onArtboardDown(ev) {
+    if (S.spaceDown) return; // space-drag pans instead of marquee-selecting
     if (ev.target !== artboard) return;
     var r = artboard.getBoundingClientRect(), z = currentZoom();
     var sx = (ev.clientX - r.left) / z, sy = (ev.clientY - r.top) / z;
@@ -805,6 +830,22 @@
     mount.appendChild(geomRow("Canvas",
       numField(S.doc.w, 1, function (v) { setPanelSize(Math.max(1, v), S.doc.h); }),
       numField(S.doc.h, 1, function (v) { setPanelSize(S.doc.w, Math.max(1, v)); })));
+
+    // Background image (URL) + fit mode.
+    var bir = el("div", "prow"); bir.innerHTML = '<span class="plab">Bg image</span>';
+    var bi = el("input", "dinput"); bi.value = S.doc.bg_image || ""; bi.placeholder = "Image URL";
+    bi.style.cssText = "width:100%;text-align:left";
+    bi.addEventListener("change", function () { pushHistory(); S.doc.bg_image = bi.value.trim(); scheduleSave(); paint(); renderAppearance(); });
+    bi.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+    bir.appendChild(bi); mount.appendChild(bir);
+    if (S.doc.bg_image) {
+      var fr = el("div", "prow"); fr.innerHTML = '<span class="plab">Fit</span>';
+      var fs = el("select", "psel");
+      fs.innerHTML = ["cover", "contain", "stretch"].map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+      fs.value = S.doc.bg_fit || "cover";
+      fs.addEventListener("change", function () { pushHistory(); S.doc.bg_fit = fs.value; scheduleSave(); paint(); });
+      fr.appendChild(fs); mount.appendChild(fr);
+    }
   }
 
   // ---- layers -----------------------------------------------------------
@@ -1512,6 +1553,41 @@
     artboard = $("panels-artboard");
     scaler = $("panels-scaler");
 
+    // Zoom controls + wheel-zoom + space-drag pan.
+    var vp = scaler.parentElement;
+    if (vp) {
+      var zc = el("div", "zoombar");
+      zc.innerHTML =
+        '<button class="zb" data-z="out" title="Zoom out"><i class="ph-bold ph-minus"></i></button>' +
+        '<span id="panels-zoom-label" class="zlab">Fit</span>' +
+        '<button class="zb" data-z="in" title="Zoom in"><i class="ph-bold ph-plus"></i></button>' +
+        '<button class="zb" data-z="fit" title="Fit to view"><i class="ph-bold ph-corners-in"></i></button>';
+      zc.addEventListener("click", function (ev) {
+        var t = ev.target.closest ? ev.target.closest("[data-z]") : null;
+        if (!t) return;
+        if (t.dataset.z === "fit") setZoom(null);
+        else { var cur = currentZoom(); setZoom(t.dataset.z === "in" ? cur * 1.25 : cur / 1.25); }
+      });
+      vp.appendChild(zc);
+      vp.addEventListener("wheel", function (ev) {
+        if (!(ev.ctrlKey || ev.metaKey)) return;
+        ev.preventDefault();
+        setZoom(currentZoom() * (ev.deltaY < 0 ? 1.1 : 0.9));
+      }, { passive: false });
+      vp.addEventListener("pointerdown", function (ev) {
+        if (!S.spaceDown) return;
+        ev.stopPropagation(); ev.preventDefault();
+        var sx = ev.clientX, sy = ev.clientY, ox = S.panX || 0, oy = S.panY || 0;
+        vp.setPointerCapture(ev.pointerId);
+        function pm(m) { S.panX = ox + (m.clientX - sx); S.panY = oy + (m.clientY - sy); applyTransform(currentZoom()); }
+        function pu() { vp.removeEventListener("pointermove", pm); vp.removeEventListener("pointerup", pu); }
+        vp.addEventListener("pointermove", pm); vp.addEventListener("pointerup", pu);
+      }, true);
+    }
+    document.addEventListener("keyup", function (ev) {
+      if (ev.code === "Space") { S.spaceDown = false; document.body.classList.remove("space-pan"); }
+    });
+
     var drawerSave = $("panels-drawer-save");
     if (drawerSave) drawerSave.addEventListener("click", saveConfig);
     ["panels-drawer-cancel", "panels-drawer-close", "panels-drawer-scrim"].forEach(function (id) {
@@ -1537,6 +1613,10 @@
       var t = document.activeElement;
       var typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
       var mod = ev.metaKey || ev.ctrlKey;
+      if (ev.code === "Space" && !typing && !mod) {
+        if (!S.spaceDown) { S.spaceDown = true; document.body.classList.add("space-pan"); }
+        ev.preventDefault(); return;
+      }
       if (mod && (ev.key === "z" || ev.key === "Z")) { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
       if (mod && (ev.key === "y" || ev.key === "Y")) { ev.preventDefault(); redo(); return; }
       if (typing) return;

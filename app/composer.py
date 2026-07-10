@@ -770,6 +770,8 @@ def compose_canvas(canvas_id: str) -> str:
         style=doc.style or "standard",
         font_family=font.name if font else "system-ui, sans-serif",
         bg=doc.bg or "",
+        bg_image=doc.bg_image or "",
+        bg_fit=doc.bg_fit or "cover",
         font_face_css=_font_face_css(registry.fonts),
     )
 

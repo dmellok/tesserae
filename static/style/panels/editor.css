@@ -64,6 +64,14 @@
 .minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
 .ed.dark .minibtn.accent{color:var(--t-accent)}
 
+/* ---- zoom + pan ---- */
+.cv-viewport{position:relative}
+.zoombar{position:absolute;right:14px;bottom:14px;z-index:50;display:flex;align-items:center;gap:2px;background:var(--t-surface);border:1px solid var(--t-border);border-radius:10px;box-shadow:var(--t-shadow-md);padding:3px}
+.zoombar .zb{width:26px;height:26px;display:grid;place-items:center;border:0;background:transparent;color:var(--t-fg);cursor:pointer;border-radius:6px;font-size:13px}
+.zoombar .zb:hover{background:var(--t-surface-sunk)}
+.zoombar .zlab{min-width:42px;text-align:center;font:600 11px var(--t-font-mono);color:var(--t-muted)}
+body.space-pan .cv-viewport{cursor:grab}
+
 /* ---- layer drag-reorder ---- */
 .lrow .grip{cursor:grab;color:var(--t-muted);font-size:13px;flex:none;margin-right:2px;touch-action:none}
 .lrow .grip:hover{color:var(--t-fg)}

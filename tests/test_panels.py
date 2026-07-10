@@ -270,6 +270,21 @@ def test_compose_renders_decorations(app: Flask) -> None:
     assert 'class="deco"' in body and "panels/decorate.js" in body
 
 
+def test_background_image(app: Flask) -> None:
+    """A canvas background image + fit mode persists and reaches the render."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={"bg_image": "https://example.com/bg.jpg", "bg_fit": "contain", "els": []},
+    )
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert doc["bg_image"] == "https://example.com/bg.jpg" and doc["bg_fit"] == "contain"
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert "https://example.com/bg.jpg" in body and "object-fit:contain" in body
+
+
 def test_text_element_and_opacity(app: Flask) -> None:
     """Text elements and per-element opacity persist and reach the render."""
     client = app.test_client()
