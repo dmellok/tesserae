@@ -232,11 +232,17 @@ def test_save_route_404_for_unknown_canvas(app: Flask, monkeypatch: pytest.Monke
     assert client.post("/experiments/composer/c/nope/save", json={}).status_code == 404
 
 
-def test_devices_json_lists_instances(app: Flask) -> None:
+def test_devices_json_lists_instances_with_panel_dims(app: Flask) -> None:
+    """Each device carries its real panel dims, so picking a target also sets
+    the canvas resolution."""
     client = app.test_client()
     _sign_in(client)
+    # Register an Inky 4" instance (600x400 Spectra 6).
+    client.post("/settings/devices/add", data={"id": "kitchen", "kind": "pimoroni_inky_4"})
     payload = client.get("/experiments/composer/devices.json").get_json()
-    assert isinstance(payload["devices"], list)  # instances only (built-in kinds excluded)
+    assert isinstance(payload["devices"], list)
+    kitchen = next(d for d in payload["devices"] if d["id"] == "kitchen")
+    assert kitchen["w"] == 600 and kitchen["h"] == 400
 
 
 def test_send_renders_and_pushes_to_devices(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

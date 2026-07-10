@@ -20,6 +20,7 @@ mypy --strict applies to this module, see pyproject.toml.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from flask import (
     Blueprint,
@@ -153,16 +154,26 @@ def preview(canvas_id: str) -> Response:
 
 @bp.get("/devices.json")
 def devices() -> Response:
-    """Registered device instances a canvas can be sent to (for the toolbar
-    device picker)."""
+    """Registered device instances a canvas can be sent to (toolbar picker).
+
+    Each entry carries the device's real panel dims (``w``/``h``) so picking a
+    target also sets the canvas resolution to match that panel."""
     _guard()
+    from app.panel import device_panel
+
     reg = current_app.config.get("DEVICE_REGISTRY")
-    out: list[dict[str, str]] = []
+    out: list[dict[str, Any]] = []
     if reg is not None:
         for d in reg.all():
-            if d.kind_of is not None:  # instances only, not built-in kinds
-                out.append({"id": d.id, "name": str(d.manifest.get("name") or d.id)})
-    out.sort(key=lambda x: x["name"].lower())
+            if d.kind_of is None:  # instances only, not built-in kinds
+                continue
+            entry: dict[str, Any] = {"id": d.id, "name": str(d.manifest.get("name") or d.id)}
+            panel = device_panel(d)
+            if panel is not None:
+                entry["w"] = panel.w
+                entry["h"] = panel.h
+            out.append(entry)
+    out.sort(key=lambda x: str(x["name"]).lower())
     return jsonify({"devices": out})
 
 

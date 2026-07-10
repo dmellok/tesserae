@@ -59,6 +59,7 @@
     charts: {},
     clip: null,
     sim: false,
+    devices: [],
   };
 
   // Text-like elements that read poorly below this size on e-ink panels.
@@ -597,17 +598,41 @@
       fetch(S.cfg.devicesUrl)
         .then(function (r) { return r.json(); })
         .then(function (p) {
-          (p.devices || []).forEach(function (d) {
+          S.devices = p.devices || [];
+          S.devices.forEach(function (d) {
             var o = document.createElement("option");
             o.value = d.id;
-            o.textContent = d.name || d.id;
+            // The label carries the panel resolution, since picking the
+            // device is also how the canvas resolution is set.
+            o.textContent = (d.name || d.id) + (d.w && d.h ? "  ·  " + d.w + "×" + d.h : "");
+            if (d.w) o.dataset.w = d.w;
+            if (d.h) o.dataset.h = d.h;
             sel.appendChild(o);
           });
-          if (S.doc && S.doc.device_ids && S.doc.device_ids.length) sel.value = S.doc.device_ids[0];
+          syncDeviceSelection();
         })
         .catch(function () { /* no devices endpoint */ });
+      sel.addEventListener("change", onDeviceChange);
     }
     if (btn) btn.addEventListener("click", sendCanvas);
+  }
+
+  function syncDeviceSelection() {
+    var sel = $("panels-device");
+    if (sel && S.doc && S.doc.device_ids && S.doc.device_ids.length) sel.value = S.doc.device_ids[0];
+  }
+
+  // Picking the target device binds it AND sets the canvas resolution to that
+  // device's real panel dims.
+  function onDeviceChange() {
+    var sel = $("panels-device");
+    if (!sel) return;
+    S.doc.device_ids = sel.value ? [sel.value] : [];
+    var opt = sel.options[sel.selectedIndex];
+    var w = opt ? Number(opt.dataset.w) : 0;
+    var h = opt ? Number(opt.dataset.h) : 0;
+    if (w && h && (w !== S.doc.w || h !== S.doc.h)) setPanelSize(w, h);
+    else scheduleSave();
   }
 
   function sendCanvas() {
@@ -677,11 +702,6 @@
     if (redoBtn) redoBtn.addEventListener("click", redo);
     var simBtn = $("panels-sim");
     if (simBtn) simBtn.addEventListener("click", toggleSim);
-    var sizeSel = $("panels-size");
-    if (sizeSel) sizeSel.addEventListener("change", function () {
-      var wh = sizeSel.value.split("x");
-      setPanelSize(Number(wh[0]) || S.doc.w, Number(wh[1]) || S.doc.h);
-    });
     initDevices();
 
     document.addEventListener("keydown", function (ev) {
@@ -720,8 +740,7 @@
         if (!S.doc.els) S.doc.els = [];
         var title = $("panels-title");
         if (title) title.textContent = S.doc.name || "Untitled Panel";
-        var sizeSel2 = $("panels-size");
-        if (sizeSel2) sizeSel2.value = S.doc.w + "x" + S.doc.h;
+        syncDeviceSelection();
         paint();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "load failed"; });
