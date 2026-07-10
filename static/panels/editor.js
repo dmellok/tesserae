@@ -265,6 +265,41 @@
   }
 
   // ---- artboard ---------------------------------------------------------
+  // ---- contrast / legibility -------------------------------------------
+  // Resolve any CSS colour (incl. Spectra tokens like var(--accent-1)) to
+  // [r,g,b] by measuring it inside the themed artboard.
+  var _probe = null;
+  function resolveRGB(color) {
+    if (!_probe) { _probe = el("span"); _probe.style.cssText = "position:absolute;left:-9999px;width:0;height:0"; }
+    if (_probe.parentNode !== artboard) artboard.appendChild(_probe);
+    _probe.style.color = "";
+    _probe.style.color = color;
+    var m = getComputedStyle(_probe).color.match(/(\d+),\s*(\d+),\s*(\d+)/);
+    return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
+  }
+  function _lum(rgb) {
+    var a = rgb.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+    return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+  }
+  function contrastRatio(a, b) {
+    var l1 = _lum(a), l2 = _lum(b), hi = Math.max(l1, l2), lo = Math.min(l1, l2);
+    return (hi + 0.05) / (lo + 0.05);
+  }
+  function effectiveBgRGB() {
+    if (S.doc.bg_image) return null; // image background: can't judge contrast
+    var c = S.doc.bg && /^#/.test(S.doc.bg) ? S.doc.bg : "var(--bg)";
+    return resolveRGB(c);
+  }
+  // A text/icon decoration is flagged when it contrasts poorly (WCAG < 3:1)
+  // with the canvas background, since low contrast dithers into mush on e-ink.
+  function lowContrast(e) {
+    if (isWidget(e) || (e.kind !== "text" && e.kind !== "icon")) return false;
+    var bg = effectiveBgRGB();
+    if (!bg) return false;
+    var fg = resolveRGB(e.color || "var(--text-primary)");
+    return !!fg && contrastRatio(fg, bg) < 3.0;
+  }
+
   function isWidget(e) { return !e.kind || e.kind === "widget"; }
 
   function elNode(e) {
@@ -306,6 +341,10 @@
       }
       node.appendChild(host);
       if (!e.widget) node.appendChild(el("div", "elplace", '<i class="ph-bold ph-cards-three"></i>'));
+    }
+
+    if (S.sim && lowContrast(e)) {
+      node.appendChild(el("div", "el-warn", '<i class="ph-bold ph-warning"></i>Low contrast'));
     }
 
     if (isSel(e.id)) {
@@ -1457,6 +1496,36 @@
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "config save failed"; });
   }
 
+  // ---- accurate preview (server render) --------------------------------
+  // Saves the doc, then shows the real headless render at panel resolution in
+  // the drawer, the same pipeline a Send screenshots.
+  function openPreview() {
+    var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
+    if (!overlay || !body || !S.cfg.previewUrl) return;
+    title.textContent = "Panel preview";
+    body.dataset.eid = "";
+    body.innerHTML = '<div class="note" style="padding:12px">Rendering at panel resolution…</div>';
+    overlay.classList.add("open");
+    fetch(S.cfg.saveUrl, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(S.doc),
+    })
+      .then(function () { return fetch(S.cfg.previewUrl + "?t=" + Date.now()); })
+      .then(function (r) { if (!r.ok) return Promise.reject(r.status); return r.blob(); })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        body.textContent = "";
+        var img = el("img"); img.src = url;
+        img.style.cssText = "width:100%;height:auto;display:block;border:1px solid var(--t-border);border-radius:8px";
+        body.appendChild(img);
+        var note = el("div", "note"); note.style.padding = "8px 2px";
+        note.textContent = "Rendered at the panel resolution via the same pipeline a Send uses.";
+        body.appendChild(note);
+      })
+      .catch(function () {
+        body.innerHTML = '<div class="note" style="padding:12px">Preview failed (the headless renderer may be unavailable).</div>';
+      });
+  }
+
   // ---- devices + send ---------------------------------------------------
   function initDevices() {
     var sel = $("panels-device");
@@ -1533,6 +1602,7 @@
     artboard.classList.toggle("sim", S.sim);
     var btn = $("panels-sim");
     if (btn) btn.classList.toggle("on", S.sim);
+    paint(); // show/hide low-contrast warnings
   }
 
   // ---- boot -------------------------------------------------------------
@@ -1547,6 +1617,7 @@
       iconCssUrl: root.dataset.iconCssUrl,
       devicesUrl: root.dataset.devicesUrl,
       sendUrl: root.dataset.sendUrl,
+      previewUrl: root.dataset.previewUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,
       sourceOptionsUrl: root.dataset.sourceOptionsUrl,
     };
@@ -1601,6 +1672,8 @@
     if (redoBtn) redoBtn.addEventListener("click", redo);
     var simBtn = $("panels-sim");
     if (simBtn) simBtn.addEventListener("click", toggleSim);
+    var previewBtn = $("panels-preview");
+    if (previewBtn) previewBtn.addEventListener("click", openPreview);
     var psearch = $("panels-palette-search");
     if (psearch) psearch.addEventListener("input", function () {
       S.pq = psearch.value.trim().toLowerCase();

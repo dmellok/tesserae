@@ -64,6 +64,10 @@
 .minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
 .ed.dark .minibtn.accent{color:var(--t-accent)}
 
+/* ---- legibility warning ---- */
+.el-warn{position:absolute;left:2px;bottom:2px;z-index:22;display:inline-flex;align-items:center;gap:4px;font:700 9px var(--t-font);text-transform:uppercase;letter-spacing:.04em;color:#7a2e12;background:#f6d5c4;border:1px solid #e0a884;border-radius:5px;padding:1px 5px;pointer-events:none}
+.el-warn i{font-size:11px}
+
 /* ---- zoom + pan ---- */
 .cv-viewport{position:relative}
 .zoombar{position:absolute;right:14px;bottom:14px;z-index:50;display:flex;align-items:center;gap:2px;background:var(--t-surface);border:1px solid var(--t-border);border-radius:10px;box-shadow:var(--t-shadow-md);padding:3px}

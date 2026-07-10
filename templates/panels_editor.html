@@ -51,6 +51,7 @@
        data-icon-css-url="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}"
        data-devices-url="{{ url_for('panels.devices') }}"
        data-send-url="{{ url_for('panels.send', canvas_id=canvas_id) }}"
+       data-preview-url="{{ url_for('panels.preview', canvas_id=canvas_id) }}"
        data-source-form-url="{{ url_for('panels.source_form') }}"
        data-source-options-url="{{ url_for('panels.source_options') }}">
 
@@ -66,6 +67,7 @@
       <div class="tdiv"></div>
       <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
       <div class="tbtn" id="panels-sim" title="Simulate e-ink"><i class="ph-bold ph-eye"></i></div>
+      <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
         <select class="psel" id="panels-device" title="Target device"><option value="">Choose device…</option></select>
         <div class="pbtn accent" id="panels-send"><i class="ph-bold ph-paper-plane-tilt"></i>Send to panel</div>
