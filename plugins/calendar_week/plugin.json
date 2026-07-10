@@ -45,5 +45,59 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#4F6F36",
+    "fields": [
+      {
+        "name": "start",
+        "type": "str",
+        "label": "Week start"
+      },
+      {
+        "name": "end",
+        "type": "str",
+        "label": "Week end"
+      },
+      {
+        "name": "days",
+        "type": "arr",
+        "label": "Days"
+      }
+    ],
+    "sample": {
+      "start": "2026-07-06",
+      "end": "2026-07-12",
+      "days": [
+        {
+          "date": "2026-07-06",
+          "day": 6,
+          "is_today": false,
+          "events": []
+        },
+        {
+          "date": "2026-07-10",
+          "day": 10,
+          "is_today": true,
+          "events": [
+            {
+              "summary": "Standup",
+              "start": "2026-07-10T09:30:00"
+            }
+          ]
+        },
+        {
+          "date": "2026-07-12",
+          "day": 12,
+          "is_today": false,
+          "events": [
+            {
+              "summary": "Market",
+              "start": "2026-07-12T08:00:00"
+            }
+          ]
+        }
+      ]
+    }
   }
 }

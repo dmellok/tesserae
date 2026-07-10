@@ -66,5 +66,55 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#4F6F36",
+    "fields": [
+      {
+        "name": "month",
+        "type": "num",
+        "label": "Month"
+      },
+      {
+        "name": "year",
+        "type": "num",
+        "label": "Year"
+      },
+      {
+        "name": "month_name",
+        "type": "str",
+        "label": "Month name"
+      },
+      {
+        "name": "days",
+        "type": "arr",
+        "label": "Days"
+      }
+    ],
+    "sample": {
+      "month": 7,
+      "year": 2026,
+      "month_name": "July",
+      "days": [
+        {
+          "date": "2026-07-10",
+          "day": 10,
+          "in_month": true,
+          "is_today": true,
+          "events": [],
+          "total": 2,
+          "extra": 0
+        },
+        {
+          "date": "2026-07-11",
+          "day": 11,
+          "in_month": true,
+          "is_today": false,
+          "events": [],
+          "total": 0,
+          "extra": 0
+        }
+      ]
+    }
   }
 }

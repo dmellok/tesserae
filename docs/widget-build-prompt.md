@@ -164,7 +164,29 @@ content at compact, leave only the hero metric + label at tiny.
 }
 ```
 
-### 6. Anti-patterns
+### 6. Declare a `data_schema` (composer-bindable)
+
+The Panels canvas editor lets users bind visual elements to individual
+*fields* of a widget's data. Include a `data_schema` block in `plugin.json` so
+your widget is available there; its keys mirror your `server.py` `fetch()`
+result:
+
+```json
+"data_schema": {
+  "fields": [
+    { "name": "temp", "type": "num", "label": "Temperature", "unit": "deg" },
+    { "name": "cond", "type": "str", "label": "Condition" }
+  ],
+  "sample": { "temp": 21, "cond": "Sunny" }
+}
+```
+
+`type` is `num` / `str` / `arr`. The `sample` must match the `fetch()` shape,
+reuse the section 8 (Server contract) payload. Without this block a published
+widget still renders on a page but exposes **no** bindable fields in the
+composer. Details: [writing-a-widget.md](dev/writing-a-widget.md#make-it-composer-bindable-data_schema).
+
+### 7. Anti-patterns
 
 - **`text-transform: uppercase` hardcoded.** Use
   `var(--label-transform, uppercase)`, Editorial style sets it to
@@ -206,7 +228,9 @@ configures those out-of-band.
 One filled-in brief per widget, following
 [`widget-design-brief.md`](widget-design-brief.md) section by section.
 Include sample markup in section 3 (Markup sketch) and a sample data
-payload in section 8 (Server contract). When you finish the brief,
+payload in section 8 (Server contract). Derive a `data_schema` block
+(fields + `sample`) from that payload so the widget is composer-bindable
+(convention 6), and include it in the manifest. When you finish the brief,
 note any open questions in a "Questions" subsection at the end. Don't
 guess on data structure, API endpoints, or naming if the user's spec
 is ambiguous.

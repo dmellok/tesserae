@@ -68,5 +68,96 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#9A7414",
+    "fields": [
+      {
+        "name": "place",
+        "type": "str",
+        "label": "Place"
+      },
+      {
+        "name": "time",
+        "type": "str",
+        "label": "Time"
+      },
+      {
+        "name": "units",
+        "type": "str",
+        "label": "Units"
+      },
+      {
+        "name": "now",
+        "type": "num",
+        "label": "Now",
+        "unit": "deg"
+      },
+      {
+        "name": "hi",
+        "type": "num",
+        "label": "High",
+        "unit": "deg"
+      },
+      {
+        "name": "lo",
+        "type": "num",
+        "label": "Low",
+        "unit": "deg"
+      },
+      {
+        "name": "temps",
+        "type": "arr",
+        "label": "Temperatures"
+      },
+      {
+        "name": "rain",
+        "type": "arr",
+        "label": "Rain chance"
+      },
+      {
+        "name": "hours",
+        "type": "arr",
+        "label": "Hours"
+      }
+    ],
+    "sample": {
+      "place": "Melbourne",
+      "time": "14:00",
+      "units": "metric",
+      "now": 19,
+      "hi": 22,
+      "lo": 14,
+      "temps": [
+        19,
+        20,
+        21,
+        21,
+        20,
+        18
+      ],
+      "rain": [
+        0,
+        10,
+        20,
+        20,
+        10,
+        0
+      ],
+      "hours": [
+        {
+          "t": "14:00",
+          "icon": "sun"
+        },
+        {
+          "t": "15:00",
+          "icon": "cloud-sun"
+        },
+        {
+          "t": "16:00",
+          "icon": "cloud"
+        }
+      ]
+    }
   }
 }

@@ -88,6 +88,38 @@
         }
       }
     },
+    "data_schema": {
+      "type": "object",
+      "description": "Declares the widget's fetch() data shape so the Panels canvas editor can offer its fields as bindable data sources. Optional: a widget without this block still renders normally but has no bindable fields in the composer. See docs/dev/writing-a-widget.md.",
+      "required": ["fields"],
+      "properties": {
+        "color": {
+          "type": "string",
+          "description": "Optional accent colour for the widget's card in the composer Data panel."
+        },
+        "fields": {
+          "type": "array",
+          "description": "The bindable fields, one per top-level fetch() result key worth exposing.",
+          "items": {
+            "type": "object",
+            "required": ["name", "type"],
+            "properties": {
+              "name": { "type": "string", "description": "The fetch() result key." },
+              "type": {
+                "enum": ["num", "str", "arr"],
+                "description": "num (number), str (text/state), or arr (list, e.g. a series or item list)."
+              },
+              "label": { "type": "string", "description": "Human-friendly field name shown in the bind list." },
+              "unit": { "type": "string", "description": "Optional unit hint (e.g. 'deg', '%', 's')." }
+            }
+          }
+        },
+        "sample": {
+          "type": "object",
+          "description": "Representative values keyed by field name, matching fetch()'s shape. Powers the editor's live preview and the render fallback when a source isn't configured yet."
+        }
+      }
+    },
     "render": {
       "type": "object",
       "properties": {

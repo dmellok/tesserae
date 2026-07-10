@@ -51,5 +51,46 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#C2410C",
+    "fields": [
+      {
+        "name": "feed",
+        "type": "str",
+        "label": "Feed"
+      },
+      {
+        "name": "stories",
+        "type": "arr",
+        "label": "Stories"
+      }
+    ],
+    "sample": {
+      "feed": "top",
+      "stories": [
+        {
+          "title": "Show HN: A self-hosted e-ink dashboard",
+          "by": "kayden",
+          "score": 214,
+          "comments": 88,
+          "url": "https://news.ycombinator.com/item?id=1"
+        },
+        {
+          "title": "Ask HN: Favourite low-power displays?",
+          "by": "areader",
+          "score": 98,
+          "comments": 41,
+          "url": "https://news.ycombinator.com/item?id=2"
+        },
+        {
+          "title": "The quiet joy of paper-like screens",
+          "by": "writer",
+          "score": 76,
+          "comments": 33,
+          "url": "https://news.ycombinator.com/item?id=3"
+        }
+      ]
+    }
   }
 }

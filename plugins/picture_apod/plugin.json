@@ -25,5 +25,36 @@
   "settings": [
     { "name": "api_key", "type": "string", "label": "NASA API key", "secret": true, "default": "DEMO_KEY" }
   ],
-  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true }
+  "render": { "dither": "floyd-steinberg", "needs_network": true, "full_bleed": true },
+  "data_schema": {
+    "color": "#3F2A6B",
+    "fields": [
+      {
+        "name": "title",
+        "type": "str",
+        "label": "Title"
+      },
+      {
+        "name": "date",
+        "type": "str",
+        "label": "Date"
+      },
+      {
+        "name": "copyright",
+        "type": "str",
+        "label": "Credit"
+      },
+      {
+        "name": "url",
+        "type": "str",
+        "label": "Image URL"
+      }
+    ],
+    "sample": {
+      "title": "The Horsehead Nebula",
+      "date": "2026-07-10",
+      "copyright": "NASA / ESA",
+      "url": "https://apod.nasa.gov/apod/image/2607/horsehead.jpg"
+    }
+  }
 }

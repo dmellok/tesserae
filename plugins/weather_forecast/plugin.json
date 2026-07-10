@@ -47,5 +47,78 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#9A7414",
+    "fields": [
+      {
+        "name": "place",
+        "type": "str",
+        "label": "Place"
+      },
+      {
+        "name": "time",
+        "type": "str",
+        "label": "Time"
+      },
+      {
+        "name": "units",
+        "type": "str",
+        "label": "Units"
+      },
+      {
+        "name": "rangeHi",
+        "type": "num",
+        "label": "Week high",
+        "unit": "deg"
+      },
+      {
+        "name": "rangeLo",
+        "type": "num",
+        "label": "Week low",
+        "unit": "deg"
+      },
+      {
+        "name": "days",
+        "type": "arr",
+        "label": "Days"
+      }
+    ],
+    "sample": {
+      "place": "Melbourne",
+      "time": "14:32",
+      "units": "metric",
+      "rangeHi": 24,
+      "rangeLo": 9,
+      "days": [
+        {
+          "day": "Mon",
+          "icon": "sun",
+          "cond": "Sunny",
+          "hi": 24,
+          "lo": 12,
+          "rain": 10,
+          "today": true
+        },
+        {
+          "day": "Tue",
+          "icon": "cloud",
+          "cond": "Cloudy",
+          "hi": 20,
+          "lo": 11,
+          "rain": 40,
+          "today": false
+        },
+        {
+          "day": "Wed",
+          "icon": "cloud-rain",
+          "cond": "Showers",
+          "hi": 17,
+          "lo": 9,
+          "rain": 70,
+          "today": false
+        }
+      ]
+    }
   }
 }

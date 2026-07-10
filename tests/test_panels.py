@@ -92,6 +92,25 @@ def test_catalog_lists_widgets_with_data_schema(
     assert weather["sample"]["temp"] == 21
 
 
+def test_catalog_derives_schema_from_sample(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Widgets without a hand-authored data_schema still appear, with fields
+    drafted from their dev-gallery sample (the whole ha_* family, todo, etc.).
+    Client-only widgets with no sample stay out."""
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/experiments/composer/catalog.json").get_json()
+    by_key = {w["key"]: w for w in payload["widgets"]}
+    # ha_sensor declares no data_schema but has a sample -> derived + bindable.
+    assert "ha_sensor" in by_key
+    assert by_key["ha_sensor"]["fields"], "expected sample-derived fields"
+    assert isinstance(by_key["ha_sensor"]["sample"], dict) and by_key["ha_sensor"]["sample"]
+    # Client-only widget (no fetch, no sample) is not a data source.
+    assert "clock_word" not in by_key
+    # Comfortably more than the two hand-authored ones now.
+    assert len(by_key) >= 10
+
+
 def test_catalog_requires_auth(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     """Even with the flag on, the endpoint is behind the admin gate."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")

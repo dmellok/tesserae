@@ -113,5 +113,49 @@
     "dither": "none",
     "needs_network": true,
     "per_device_id": true
+  },
+  "data_schema": {
+    "color": "#256E6B",
+    "fields": [
+      {
+        "name": "version",
+        "type": "str",
+        "label": "Version"
+      },
+      {
+        "name": "page_name",
+        "type": "str",
+        "label": "Page name"
+      },
+      {
+        "name": "page_icon",
+        "type": "str",
+        "label": "Page icon"
+      },
+      {
+        "name": "battery_pct",
+        "type": "num",
+        "label": "Battery",
+        "unit": "%"
+      },
+      {
+        "name": "wifi_label",
+        "type": "str",
+        "label": "Wi-Fi"
+      },
+      {
+        "name": "broker_label",
+        "type": "str",
+        "label": "Broker"
+      }
+    ],
+    "sample": {
+      "version": "0.78.1",
+      "page_name": "Kitchen",
+      "page_icon": "ph-house",
+      "battery_pct": 82,
+      "wifi_label": "-58 dBm",
+      "broker_label": "HA"
+    }
   }
 }

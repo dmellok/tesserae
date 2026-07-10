@@ -47,5 +47,41 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#C2410C",
+    "fields": [
+      {
+        "name": "kind",
+        "type": "str",
+        "label": "Kind"
+      },
+      {
+        "name": "date",
+        "type": "str",
+        "label": "Date"
+      },
+      {
+        "name": "items",
+        "type": "arr",
+        "label": "Items"
+      }
+    ],
+    "sample": {
+      "kind": "events",
+      "date": "10 July",
+      "items": [
+        {
+          "year": 1962,
+          "text": "Telstar relayed the first live transatlantic television signal.",
+          "page": "Telstar"
+        },
+        {
+          "year": 1913,
+          "text": "Death Valley recorded 56.7 C, the highest reliably measured air temperature.",
+          "page": "Death Valley"
+        }
+      ]
+    }
   }
 }

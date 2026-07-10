@@ -7,12 +7,12 @@ widgets are data sources and users bind individual fields to visual
 elements) needs that shape to offer fields for binding.
 
 This module defines the ``data_schema`` block a widget declares in its
-``plugin.json`` and assembles the editor's widget catalog from those
-declarations. It also ships :func:`derive_schema`, which DRAFTS a
-``data_schema`` from a real ``fetch()`` result so authoring is a
-confirm-and-annotate task rather than typing field lists by hand (the hybrid
-model: introspect to draft, human confirms labels/units/types, the confirmed
-block lands in the manifest).
+``plugin.json`` and assembles the editor's widget catalog. A widget with a
+hand-authored block gets its declared fields (with labels/units); a widget
+without one falls back to a schema DRAFTED from its dev-gallery sample, so it
+is still bindable without an authoring step. :func:`derive_schema` does that
+drafting (the hybrid model: introspect to draft, optionally confirm
+labels/units/types into the manifest later).
 
 ``data_schema`` shape in plugin.json::
 
@@ -105,18 +105,9 @@ def _normalise_fields(raw_fields: Any) -> list[dict[str, Any]]:
     return out
 
 
-def catalog_entry(plugin: Plugin) -> dict[str, Any] | None:
-    """Build a catalog entry for a widget that declares a ``data_schema``,
-    or None when it declares none (or an empty/invalid one), meaning the
-    widget isn't yet usable as a canvas data source."""
-    schema = plugin.manifest.get("data_schema")
-    if not isinstance(schema, dict):
-        return None
-    fields = _normalise_fields(schema.get("fields"))
-    if not fields:
-        return None
-    color = schema.get("color")
-    sample = schema.get("sample")
+def _entry(
+    plugin: Plugin, fields: list[dict[str, Any]], sample: Any, color: Any = None
+) -> dict[str, Any]:
     return {
         "key": plugin.id,
         "name": plugin.name,
@@ -128,10 +119,47 @@ def catalog_entry(plugin: Plugin) -> dict[str, Any] | None:
     }
 
 
+def _sample_derived(plugin: Plugin) -> dict[str, Any] | None:
+    """Draft a schema from the widget's dev-gallery sample payload, so a widget
+    without a hand-authored ``data_schema`` is still bindable. Reuses the
+    ``widget_samples`` registry (the same frozen payloads the ``?sample=1``
+    gallery renders), keeping one source of truth for a widget's data shape.
+    Returns None for widgets with no sample (client-only widgets, or ones whose
+    data only exists after a live fetch)."""
+    try:
+        from app.widget_samples import get_sample
+    except Exception:
+        return None
+    payload = get_sample(plugin.id)
+    if not isinstance(payload, dict) or not payload:
+        return None
+    drafted = derive_schema(payload)
+    return drafted if drafted["fields"] else None
+
+
+def catalog_entry(plugin: Plugin) -> dict[str, Any] | None:
+    """Build a catalog entry for a widget usable as a canvas data source.
+
+    Field source, in priority order: a hand-authored ``data_schema`` in the
+    manifest (best: carries labels/units), else a schema drafted from the
+    widget's dev-gallery sample. Returns None when neither yields fields, i.e.
+    the widget isn't bindable (client-only, or live-fetch-only with no sample)."""
+    schema = plugin.manifest.get("data_schema")
+    if isinstance(schema, dict):
+        fields = _normalise_fields(schema.get("fields"))
+        if fields:
+            return _entry(plugin, fields, schema.get("sample"), schema.get("color"))
+    derived = _sample_derived(plugin)
+    if derived is not None:
+        return _entry(plugin, derived["fields"], derived["sample"])
+    return None
+
+
 def build_catalog(registry: PluginRegistry) -> list[dict[str, Any]]:
-    """Assemble the editor's widget catalog from every widget plugin that
-    declares a ``data_schema``. Widgets without one are omitted (not yet
-    bindable). Sorted by display name for a stable picker order."""
+    """Assemble the editor's widget catalog from every widget plugin whose data
+    shape can be resolved (declared ``data_schema`` or drafted from a sample).
+    Widgets with neither are omitted (not yet bindable). Sorted by display name
+    for a stable picker order."""
     entries: list[dict[str, Any]] = []
     for plugin in registry.widgets():
         entry = catalog_entry(plugin)

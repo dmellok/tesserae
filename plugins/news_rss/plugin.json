@@ -35,5 +35,41 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#C2410C",
+    "fields": [
+      {
+        "name": "feed_title",
+        "type": "str",
+        "label": "Feed title"
+      },
+      {
+        "name": "url",
+        "type": "str",
+        "label": "Feed URL"
+      },
+      {
+        "name": "items",
+        "type": "arr",
+        "label": "Items"
+      }
+    ],
+    "sample": {
+      "feed_title": "Hacker News",
+      "url": "https://news.ycombinator.com/rss",
+      "items": [
+        {
+          "title": "A weekend with e-paper",
+          "url": "https://example.com/1",
+          "published": "2026-07-10T12:00:00"
+        },
+        {
+          "title": "Rendering dashboards headless",
+          "url": "https://example.com/2",
+          "published": "2026-07-10T09:30:00"
+        }
+      ]
+    }
   }
 }

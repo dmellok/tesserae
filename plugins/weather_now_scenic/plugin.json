@@ -52,5 +52,61 @@
   ],
   "design": {
     "palette": "extended"
+  },
+  "data_schema": {
+    "color": "#9A7414",
+    "fields": [
+      {
+        "name": "label",
+        "type": "str",
+        "label": "Place"
+      },
+      {
+        "name": "units",
+        "type": "str",
+        "label": "Units"
+      },
+      {
+        "name": "temp",
+        "type": "num",
+        "label": "Temperature",
+        "unit": "deg"
+      },
+      {
+        "name": "cond",
+        "type": "str",
+        "label": "Condition"
+      },
+      {
+        "name": "icon",
+        "type": "str",
+        "label": "Icon"
+      },
+      {
+        "name": "preset",
+        "type": "str",
+        "label": "Scene"
+      },
+      {
+        "name": "sunrise",
+        "type": "str",
+        "label": "Sunrise"
+      },
+      {
+        "name": "sunset",
+        "type": "str",
+        "label": "Sunset"
+      }
+    ],
+    "sample": {
+      "label": "Melbourne",
+      "units": "metric",
+      "temp": 19,
+      "cond": "Partly cloudy",
+      "icon": "cloud-sun",
+      "preset": "day",
+      "sunrise": "07:12",
+      "sunset": "17:38"
+    }
   }
 }

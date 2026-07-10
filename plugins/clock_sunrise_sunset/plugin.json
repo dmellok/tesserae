@@ -52,5 +52,43 @@
   },
   "requires": [
     "network:api.open-meteo.com"
-  ]
+  ],
+  "data_schema": {
+    "color": "#3F5A88",
+    "fields": [
+      {
+        "name": "label",
+        "type": "str",
+        "label": "Place"
+      },
+      {
+        "name": "tz",
+        "type": "str",
+        "label": "Timezone"
+      },
+      {
+        "name": "sunrise",
+        "type": "str",
+        "label": "Sunrise"
+      },
+      {
+        "name": "sunset",
+        "type": "str",
+        "label": "Sunset"
+      },
+      {
+        "name": "daylight_seconds",
+        "type": "num",
+        "label": "Daylight",
+        "unit": "s"
+      }
+    ],
+    "sample": {
+      "label": "Melbourne",
+      "tz": "Australia/Melbourne",
+      "sunrise": "07:12",
+      "sunset": "17:38",
+      "daylight_seconds": 37560
+    }
+  }
 }

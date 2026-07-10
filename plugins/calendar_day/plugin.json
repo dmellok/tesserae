@@ -36,5 +36,49 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#4F6F36",
+    "fields": [
+      {
+        "name": "date",
+        "type": "str",
+        "label": "Date"
+      },
+      {
+        "name": "count",
+        "type": "num",
+        "label": "Event count"
+      },
+      {
+        "name": "events",
+        "type": "arr",
+        "label": "Events"
+      }
+    ],
+    "sample": {
+      "date": "2026-07-10",
+      "count": 3,
+      "events": [
+        {
+          "summary": "Standup",
+          "start": "2026-07-10T09:30:00",
+          "all_day": false,
+          "location": "Zoom"
+        },
+        {
+          "summary": "Lunch with Sam",
+          "start": "2026-07-10T12:30:00",
+          "all_day": false,
+          "location": ""
+        },
+        {
+          "summary": "Dentist",
+          "start": "2026-07-10T16:00:00",
+          "all_day": false,
+          "location": "High St"
+        }
+      ]
+    }
   }
 }

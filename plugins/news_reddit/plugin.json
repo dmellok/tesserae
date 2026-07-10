@@ -81,5 +81,46 @@
   "render": {
     "dither": "none",
     "needs_network": true
+  },
+  "data_schema": {
+    "color": "#C2410C",
+    "fields": [
+      {
+        "name": "subreddit",
+        "type": "str",
+        "label": "Subreddit"
+      },
+      {
+        "name": "sort",
+        "type": "str",
+        "label": "Sort"
+      },
+      {
+        "name": "posts",
+        "type": "arr",
+        "label": "Posts"
+      }
+    ],
+    "sample": {
+      "subreddit": "eink",
+      "sort": "hot",
+      "posts": [
+        {
+          "title": "My new wall dashboard",
+          "author": "kayden",
+          "url": "https://reddit.com/r/eink/1"
+        },
+        {
+          "title": "Panel recommendations for a beginner?",
+          "author": "newbie",
+          "url": "https://reddit.com/r/eink/2"
+        },
+        {
+          "title": "Spectra 6 colour is underrated",
+          "author": "fan",
+          "url": "https://reddit.com/r/eink/3"
+        }
+      ]
+    }
   }
 }
