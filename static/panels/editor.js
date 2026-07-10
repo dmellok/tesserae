@@ -819,7 +819,9 @@
     }
     S.doc.els.slice().reverse().forEach(function (e) {
       var row = el("div", "lrow" + (isSel(e.id) ? " psel" : "") + (e.visible ? "" : " hidden"));
+      row.dataset.id = e.id;
       row.innerHTML =
+        '<i class="ph-bold ph-dots-six-vertical grip" title="Drag to reorder"></i>' +
         '<i class="ph-bold ' + (e.group ? "ph-link" : "ph-cards-three") + ' ic"></i>' +
         '<span class="nm"></span>' +
         '<span class="act">' +
@@ -827,6 +829,10 @@
           '<i class="ph-bold ' + (e.locked ? "ph-lock-simple" : "ph-lock-simple-open") + ' li" data-act="lock" title="Lock"></i>' +
         "</span>";
       row.querySelector(".nm").textContent = elLabel(e);
+      (function (elem) {
+        var grip = row.querySelector(".grip");
+        grip.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); startLayerDrag(ev, elem.id, grip); });
+      })(e);
       row.addEventListener("pointerdown", function (ev) {
         var act = ev.target && ev.target.dataset ? ev.target.dataset.act : null;
         if (act === "vis") { ev.stopPropagation(); pushHistory(); e.visible = !e.visible; scheduleSave(); paint(); return; }
@@ -835,6 +841,45 @@
       });
       mount.appendChild(row);
     });
+  }
+
+  // Reorder z (paint order) by dragging a layer row's grip. The layers list is
+  // reversed (top row = front = last in S.doc.els), so we reorder the reversed
+  // view and flip it back.
+  function startLayerDrag(ev, id, handle) {
+    ev.preventDefault();
+    var mount = $("panels-layers");
+    handle.setPointerCapture(ev.pointerId);
+    var targetIdx = null;
+    function rows() { return Array.prototype.slice.call(mount.querySelectorAll(".lrow")); }
+    function move(m) {
+      var rs = rows(), y = m.clientY;
+      targetIdx = rs.length;
+      for (var i = 0; i < rs.length; i++) {
+        var b = rs[i].getBoundingClientRect();
+        if (y < b.top + b.height / 2) { targetIdx = i; break; }
+      }
+      rs.forEach(function (r, i) { r.classList.toggle("drop-before", i === targetIdx); });
+    }
+    function up() {
+      handle.releasePointerCapture(ev.pointerId);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      rows().forEach(function (r) { r.classList.remove("drop-before"); });
+      if (targetIdx == null) return;
+      var visual = S.doc.els.slice().reverse();
+      var from = -1;
+      for (var i = 0; i < visual.length; i++) if (visual[i].id === id) { from = i; break; }
+      if (from < 0) return;
+      var moved = visual.splice(from, 1)[0];
+      var to = clamp(targetIdx > from ? targetIdx - 1 : targetIdx, 0, visual.length);
+      visual.splice(to, 0, moved);
+      pushHistory();
+      S.doc.els = visual.reverse();
+      scheduleSave(); paint();
+    }
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
   }
 
   // ---- grouping + alignment --------------------------------------------
@@ -880,6 +925,36 @@
       else if (kind === "vcenter") e.y = Math.round(cy - e.h / 2);
       e.x = clamp(e.x, 0, S.doc.w - e.w);
       e.y = clamp(e.y, 0, S.doc.h - e.h);
+    });
+    scheduleSave(); paint();
+  }
+  // Distribute selected elements so the gaps between them are equal, keeping
+  // the outermost two in place. Needs 3+ elements.
+  function distribute(axis) {
+    var els = selEls().filter(function (e) { return !e.locked; });
+    if (els.length < 3) return;
+    var pos = axis === "h" ? "x" : "y", dim = axis === "h" ? "w" : "h";
+    els = els.slice().sort(function (a, b) { return a[pos] - b[pos]; });
+    var first = els[0], last = els[els.length - 1];
+    var span = (last[pos] + last[dim]) - first[pos];
+    var used = els.reduce(function (s, e) { return s + e[dim]; }, 0);
+    var gap = (span - used) / (els.length - 1);
+    pushHistory();
+    var cursor = first[pos];
+    els.forEach(function (e) { e[pos] = Math.round(cursor); cursor += e[dim] + gap; });
+    scheduleSave(); paint();
+  }
+  // Set every selected element's width or height to the primary (first) one.
+  function matchSize(dim) {
+    var els = selEls().filter(function (e) { return !e.locked; });
+    if (els.length < 2) return;
+    var ref = byId(selArr()[0]) || els[0];
+    var v = ref[dim];
+    pushHistory();
+    els.forEach(function (e) {
+      e[dim] = v;
+      e.w = clamp(e.w, MIN, S.doc.w); e.h = clamp(e.h, MIN, S.doc.h);
+      e.x = clamp(e.x, 0, S.doc.w - e.w); e.y = clamp(e.y, 0, S.doc.h - e.h);
     });
     scheduleSave(); paint();
   }
@@ -996,6 +1071,19 @@
     mount.appendChild(alignButtons("selection"));
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-arrows-out-line-horizontal"></i>Distribute &amp; size'));
+    var drow = el("div", "prow"); drow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    [["ph-arrows-horizontal", "Space H", function () { distribute("h"); }],
+      ["ph-arrows-vertical", "Space V", function () { distribute("v"); }],
+      ["ph-arrows-out-line-horizontal", "Width", function () { matchSize("w"); }],
+      ["ph-arrows-out-line-vertical", "Height", function () { matchSize("h"); }]].forEach(function (a) {
+      var b = el("button", "minibtn", '<i class="ph-bold ' + a[0] + '"></i> ' + a[1]);
+      b.addEventListener("click", a[2]);
+      drow.appendChild(b);
+    });
+    mount.appendChild(drow);
+
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-stack"></i>Group'));
     var grow = el("div", "prow");
     grow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
