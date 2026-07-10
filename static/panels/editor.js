@@ -424,10 +424,21 @@
       mount.appendChild(empty); return;
     }
     S.doc.els.slice().reverse().forEach(function (e) {
-      var row = el("div", "lrow" + (e.id === S.sel ? " psel" : ""));
-      row.innerHTML = '<i class="ph-bold ph-square ic"></i><span class="nm"></span>';
+      var row = el("div", "lrow" + (e.id === S.sel ? " psel" : "") + (e.visible ? "" : " hidden"));
+      row.innerHTML =
+        '<i class="ph-bold ph-square ic"></i>' +
+        '<span class="nm"></span>' +
+        '<span class="act">' +
+          '<i class="ph-bold ' + (e.visible ? "ph-eye" : "ph-eye-slash") + ' li" data-act="vis" title="Show / hide"></i>' +
+          '<i class="ph-bold ' + (e.locked ? "ph-lock-simple" : "ph-lock-simple-open") + ' li" data-act="lock" title="Lock"></i>' +
+        "</span>";
       row.querySelector(".nm").textContent = e.name || e.type;
-      row.addEventListener("pointerdown", function () { select(e.id); });
+      row.addEventListener("pointerdown", function (ev) {
+        var act = ev.target && ev.target.dataset ? ev.target.dataset.act : null;
+        if (act === "vis") { ev.stopPropagation(); pushHistory(); e.visible = !e.visible; scheduleSave(); paint(); return; }
+        if (act === "lock") { ev.stopPropagation(); pushHistory(); e.locked = !e.locked; scheduleSave(); paint(); return; }
+        select(e.id);
+      });
       mount.appendChild(row);
     });
   }
