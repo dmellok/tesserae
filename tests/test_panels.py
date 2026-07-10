@@ -277,6 +277,37 @@ def test_compose_renders_decorations(app: Flask) -> None:
     assert 'class="deco"' in body and "panels/decorate.js" in body
 
 
+def test_fragment_part_scales_roundtrip_and_compose(app: Flask) -> None:
+    """Per-part scale overrides persist on a widget element and reach the
+    compose render as the cell's data-parts payload."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "e1",
+                    "widget": "weather_now",
+                    "fragment": "temp",
+                    "parts": [{"sel": ".wx-temp", "scale": 150}],
+                    "x": 0,
+                    "y": 0,
+                    "w": 200,
+                    "h": 140,
+                }
+            ]
+        },
+    )
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    parts = doc["els"][0]["parts"]
+    assert parts == [{"sel": ".wx-temp", "scale": 150}]
+
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert "data-parts=" in body and ".wx-temp" in body
+
+
 def test_background_image(app: Flask) -> None:
     """A canvas background image + fit mode persists and reaches the render."""
     client = app.test_client()

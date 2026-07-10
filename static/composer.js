@@ -37,6 +37,26 @@ function prefixShadowUrls(root, prefix) {
   }
 }
 
+// Inject the per-part scale overrides (Panels canvas) as a <style> in the
+// widget's shadow root, so an individually-scaled fragment piece renders the
+// same in a Send as it did in the editor. Reads data-parts (JSON list of
+// {sel, scale}); a no-op when there are none.
+function applyParts(shadow, cell) {
+  const existing = shadow.querySelector("style#tesserae-parts");
+  if (existing) existing.remove();
+  let parts = [];
+  try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
+  const rules = (Array.isArray(parts) ? parts : [])
+    .filter((p) => p && p.sel && p.scale != null && p.scale !== 100)
+    .map((p) => `${p.sel}{transform:scale(${p.scale / 100});transform-origin:center center;}`)
+    .join("\n");
+  if (!rules) return;
+  const st = document.createElement("style");
+  st.id = "tesserae-parts";
+  st.textContent = rules;
+  shadow.appendChild(st);
+}
+
 function reportError(cell, shadow, pluginId, err) {
   cell.classList.add("error");
   cell.dataset.error = err.message || String(err);
@@ -105,6 +125,7 @@ async function mountCell(cell) {
     }
     cellState.set(cell.dataset.cellId, { module: mod, pluginId, shadow });
     await mod.default(shadow, ctx);
+    applyParts(shadow, cell);
     prefixShadowUrls(shadow, prefix);
   } catch (err) {
     reportError(cell, shadow, pluginId, err);
@@ -220,6 +241,7 @@ async function remountAllCells() {
     tasks.push(
       Promise.resolve()
         .then(() => state.module.default(state.shadow, ctx))
+        .then(() => applyParts(state.shadow, cell))
         .then(() => prefixShadowUrls(state.shadow, prefix))
         .catch((err) => reportError(cell, state.shadow, state.pluginId, err)),
     );
@@ -279,6 +301,9 @@ async function applyCellPatch(patch) {
 
   cell.dataset.options = JSON.stringify(patch.options ?? {});
   cell.dataset.data = JSON.stringify(patch.data ?? null);
+  if (Object.prototype.hasOwnProperty.call(patch, "parts")) {
+    cell.dataset.parts = JSON.stringify(patch.parts ?? []);
+  }
 
   const state = cellState.get(patch.id);
   if (!state) return;
@@ -296,6 +321,7 @@ async function applyCellPatch(patch) {
   state.shadow.innerHTML = "";
   try {
     await state.module.default(state.shadow, ctx);
+    applyParts(state.shadow, cell);
     prefixShadowUrls(state.shadow, window.TESSERAE_URL_PREFIX || "");
   } catch (err) {
     reportError(cell, state.shadow, state.pluginId, err);

@@ -737,6 +737,7 @@ def compose_canvas(canvas_id: str) -> str:
             "fragment": e.fragment or "full",
             "rotate": e.rotate,
             "opacity": e.opacity,
+            "parts": [p.model_dump() for p in e.parts],
             "x": e.x,
             "y": e.y,
             "w": e.w,

@@ -28,6 +28,18 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class PartScale(BaseModel):
+    """A CSS-selector-scoped transform inside a widget fragment: scale the
+    sub-element(s) matching ``sel`` (a class or id selector) to ``scale``
+    percent. Lets the canvas nudge one piece of a rendered fragment, e.g. grow
+    the hero number, without forking the widget. Applied as a ``transform:
+    scale()`` injected into the widget's shadow root, both in the editor and the
+    headless compose."""
+
+    sel: str = ""
+    scale: int = Field(default=100, ge=10, le=400)
+
+
 class Element(BaseModel):
     """One placed element on the canvas: a widget instance rendered as one of
     its declared fragments, at an absolute box. ``z`` is implicit in list order
@@ -74,6 +86,9 @@ class Element(BaseModel):
     y: int = Field(default=0, ge=0)
     w: int = Field(default=1, gt=0)
     h: int = Field(default=1, gt=0)
+    # Per-sub-element scale overrides for a widget fragment (widget-only): each
+    # scales the CSS selector it names inside the rendered shadow root.
+    parts: list[PartScale] = Field(default_factory=list)
     # Per-element dither opt-out (issue #86): flat packs nearest-colour.
     dither: bool = True
     visible: bool = True

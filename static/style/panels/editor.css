@@ -74,6 +74,7 @@
 .zoombar .zb{width:26px;height:26px;display:grid;place-items:center;border:0;background:transparent;color:var(--t-fg);cursor:pointer;border-radius:6px;font-size:13px}
 .zoombar .zb:hover{background:var(--t-surface-sunk)}
 .zoombar .zlab{min-width:42px;text-align:center;font:600 11px var(--t-font-mono);color:var(--t-muted)}
+.zoombar .zrange{width:96px;margin:0 4px;accent-color:var(--t-accent);cursor:pointer}
 body.space-pan .cv-viewport{cursor:grab}
 
 /* ---- layer drag-reorder ---- */
