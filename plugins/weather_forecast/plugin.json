@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Forecast",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "kind": "widget",
   "description": "5-day forecast as a row of theme-aware cards: day name, condition icon, high / low temps, and rain probability. Data from Open-Meteo (no API key).",
   "icon": "ph-calendar-dots",
@@ -48,77 +48,9 @@
     "dither": "none",
     "needs_network": true
   },
-  "data_schema": {
-    "color": "#9A7414",
-    "fields": [
-      {
-        "name": "place",
-        "type": "str",
-        "label": "Place"
-      },
-      {
-        "name": "time",
-        "type": "str",
-        "label": "Time"
-      },
-      {
-        "name": "units",
-        "type": "str",
-        "label": "Units"
-      },
-      {
-        "name": "rangeHi",
-        "type": "num",
-        "label": "Week high",
-        "unit": "deg"
-      },
-      {
-        "name": "rangeLo",
-        "type": "num",
-        "label": "Week low",
-        "unit": "deg"
-      },
-      {
-        "name": "days",
-        "type": "arr",
-        "label": "Days"
-      }
-    ],
-    "sample": {
-      "place": "Melbourne",
-      "time": "14:32",
-      "units": "metric",
-      "rangeHi": 24,
-      "rangeLo": 9,
-      "days": [
-        {
-          "day": "Mon",
-          "icon": "sun",
-          "cond": "Sunny",
-          "hi": 24,
-          "lo": 12,
-          "rain": 10,
-          "today": true
-        },
-        {
-          "day": "Tue",
-          "icon": "cloud",
-          "cond": "Cloudy",
-          "hi": 20,
-          "lo": 11,
-          "rain": 40,
-          "today": false
-        },
-        {
-          "day": "Wed",
-          "icon": "cloud-rain",
-          "cond": "Showers",
-          "hi": 17,
-          "lo": 9,
-          "rain": 70,
-          "today": false
-        }
-      ]
-    }
-  }
+  "fragments": [
+    { "id": "full", "label": "Forecast card", "w": 300, "h": 160, "icon": "ph-calendar-dots" },
+    { "id": "days", "label": "Day strip", "w": 300, "h": 110, "icon": "ph-rows" },
+    { "id": "chart", "label": "High-temp chart", "w": 260, "h": 120, "icon": "ph-chart-line" }
+  ]
 }

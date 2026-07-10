@@ -294,18 +294,39 @@ export default function render(shadow, ctx) {
   const values = days.map((d) => Number(d.hi ?? d.high)).map((v) => Number.isFinite(v) ? v : null);
   const chartReady = values.filter((v) => v != null).length >= 2;
 
-  shadow.innerHTML = `
-    ${css}
-    <style>${layout}</style>
-    <div class="w" data-widget="weather_forecast">
-      ${titleBar}
-      <div class="w-body wxf-body">
+  // Fragments (issue #60): place one part on the Panels canvas. "days"
+  // returns early; "chart" falls through to the chart init below.
+  const frag = ctx?.fragment || "full";
+  if (frag === "days") {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}.w-body{padding:var(--space-2)}.wxf-rows{flex:1;min-height:0}</style>
+      <div class="w" data-widget="weather_forecast"><div class="w-body">
         <div class="wxf-rows">${rows || '<p class="u-muted">No forecast.</p>'}</div>
-        <div class="wxf-chart">
-          ${chartReady ? '<canvas></canvas>' : ""}
+      </div></div>`;
+    return;
+  }
+  if (frag === "chart") {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}.w-body{padding:var(--space-2)}.wxf-chart{flex:1;min-height:0;height:100%;position:relative}</style>
+      <div class="w" data-widget="weather_forecast"><div class="w-body">
+        <div class="wxf-chart">${chartReady ? '<canvas></canvas>' : '<p class="u-muted">No chart data</p>'}</div>
+      </div></div>`;
+  } else {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}</style>
+      <div class="w" data-widget="weather_forecast">
+        ${titleBar}
+        <div class="w-body wxf-body">
+          <div class="wxf-rows">${rows || '<p class="u-muted">No forecast.</p>'}</div>
+          <div class="wxf-chart">
+            ${chartReady ? '<canvas></canvas>' : ""}
+          </div>
         </div>
-      </div>
-    </div>`;
+      </div>`;
+  }
 
   if (chartReady) {
     const canvas = shadow.querySelector("canvas");

@@ -297,23 +297,46 @@ export default function render(shadow, ctx) {
       </span>`
     : "";
 
-  shadow.innerHTML = `
-    ${css}
-    <style>${layout}</style>
-    <div class="w" data-widget="weather_hourly">
-      <div class="w-title">
-        <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
-        <h3>${escapeHtml(label || "Hourly")}</h3>
-        ${rangeChip}
-      </div>
-      <div class="w-body hr-body">
-        ${iconStrip}
-        <div class="hr-chart">
-          ${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}
+  // Fragments (issue #60): place one part on the Panels canvas. "summary"
+  // returns early; "chart" falls through to the Chart.js init below so the
+  // canvas still gets its chart.
+  const frag = ctx?.fragment || "full";
+  if (frag === "summary") {
+    shadow.innerHTML = `
+      ${css}
+      <style>.w-body{height:100%;display:flex;align-items:center;justify-content:center}.hr-sum{display:flex;align-items:baseline;gap:var(--space-2);font-weight:var(--fw-bold)}.hr-sum .now{font-size:clamp(2em,26cqmin,6em)}.hr-sum .hi{color:var(--accent-1)}.hr-sum .lo{color:var(--accent-5)}.hr-sum .sep{color:var(--text-muted);opacity:.5}</style>
+      <div class="w" data-widget="weather_hourly"><div class="w-body"><span class="hr-sum">
+        ${now != null ? `<span class="now">${escapeHtml(fmtTemp(now))}</span>` : ""}
+        ${hi != null && lo != null ? `<span class="sep">·</span><span class="hi">${escapeHtml(fmtTemp(hi))}</span><span class="sep">/</span><span class="lo">${escapeHtml(fmtTemp(lo))}</span>` : ""}
+      </span></div></div>`;
+    return;
+  }
+  if (frag === "chart") {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}.hr-body{padding:var(--space-2)}.hr-chart{flex:1;min-height:0;height:100%;position:relative}</style>
+      <div class="w" data-widget="weather_hourly"><div class="w-body hr-body">
+        <div class="hr-chart">${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}</div>
+      </div></div>`;
+  } else {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}</style>
+      <div class="w" data-widget="weather_hourly">
+        <div class="w-title">
+          <i class="ph-bold ph-clock" style="color:var(--accent-4)"></i>
+          <h3>${escapeHtml(label || "Hourly")}</h3>
+          ${rangeChip}
         </div>
-        ${legend}
-      </div>
-    </div>`;
+        <div class="w-body hr-body">
+          ${iconStrip}
+          <div class="hr-chart">
+            ${hasData ? '<canvas></canvas>' : '<p class="u-muted">No hourly data.</p>'}
+          </div>
+          ${legend}
+        </div>
+      </div>`;
+  }
 
   if (!hasData) return;
   const canvas = shadow.querySelector("canvas");

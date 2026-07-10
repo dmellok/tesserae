@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Weather, Hourly",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "kind": "widget",
   "description": "Hourly temperature line with a shaded area + condition-icon strip across the top. Defaults to the next 12 hours; configurable to 24 or 48. Data from Open-Meteo (no API key).",
   "icon": "ph-chart-line",
@@ -69,95 +69,9 @@
     "dither": "none",
     "needs_network": true
   },
-  "data_schema": {
-    "color": "#9A7414",
-    "fields": [
-      {
-        "name": "place",
-        "type": "str",
-        "label": "Place"
-      },
-      {
-        "name": "time",
-        "type": "str",
-        "label": "Time"
-      },
-      {
-        "name": "units",
-        "type": "str",
-        "label": "Units"
-      },
-      {
-        "name": "now",
-        "type": "num",
-        "label": "Now",
-        "unit": "deg"
-      },
-      {
-        "name": "hi",
-        "type": "num",
-        "label": "High",
-        "unit": "deg"
-      },
-      {
-        "name": "lo",
-        "type": "num",
-        "label": "Low",
-        "unit": "deg"
-      },
-      {
-        "name": "temps",
-        "type": "arr",
-        "label": "Temperatures"
-      },
-      {
-        "name": "rain",
-        "type": "arr",
-        "label": "Rain chance"
-      },
-      {
-        "name": "hours",
-        "type": "arr",
-        "label": "Hours"
-      }
-    ],
-    "sample": {
-      "place": "Melbourne",
-      "time": "14:00",
-      "units": "metric",
-      "now": 19,
-      "hi": 22,
-      "lo": 14,
-      "temps": [
-        19,
-        20,
-        21,
-        21,
-        20,
-        18
-      ],
-      "rain": [
-        0,
-        10,
-        20,
-        20,
-        10,
-        0
-      ],
-      "hours": [
-        {
-          "t": "14:00",
-          "icon": "sun"
-        },
-        {
-          "t": "15:00",
-          "icon": "cloud-sun"
-        },
-        {
-          "t": "16:00",
-          "icon": "cloud"
-        }
-      ]
-    }
-  }
+  "fragments": [
+    { "id": "full", "label": "Hourly card", "w": 300, "h": 180, "icon": "ph-chart-line" },
+    { "id": "summary", "label": "Now / hi / lo", "w": 160, "h": 80, "icon": "ph-thermometer-simple" },
+    { "id": "chart", "label": "Hourly chart", "w": 280, "h": 120, "icon": "ph-chart-line" }
+  ]
 }
