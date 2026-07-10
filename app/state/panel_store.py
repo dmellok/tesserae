@@ -101,6 +101,8 @@ class CanvasPage(BaseModel):
     h: int = Field(default=400, gt=0)
     # Active widget data sources (catalog keys) whose fields are bindable.
     sources: list[str] = Field(default_factory=list)
+    # Device instances this canvas is sent to.
+    device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
 
 

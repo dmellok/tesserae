@@ -568,11 +568,60 @@
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "save failed"; });
   }
 
+  // ---- devices + send ---------------------------------------------------
+  function initDevices() {
+    var sel = $("panels-device");
+    var btn = $("panels-send");
+    if (sel && S.cfg.devicesUrl) {
+      fetch(S.cfg.devicesUrl)
+        .then(function (r) { return r.json(); })
+        .then(function (p) {
+          (p.devices || []).forEach(function (d) {
+            var o = document.createElement("option");
+            o.value = d.id;
+            o.textContent = d.name || d.id;
+            sel.appendChild(o);
+          });
+          if (S.doc && S.doc.device_ids && S.doc.device_ids.length) sel.value = S.doc.device_ids[0];
+        })
+        .catch(function () { /* no devices endpoint */ });
+    }
+    if (btn) btn.addEventListener("click", sendCanvas);
+  }
+
+  function sendCanvas() {
+    var sel = $("panels-device");
+    var status = $("panels-status");
+    var did = sel ? sel.value : "";
+    if (!did) { if (status) status.textContent = "pick a device first"; return; }
+    if (status) status.textContent = "sending…";
+    fetch(S.cfg.sendUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_ids: [did] }),
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!status) return;
+        status.textContent =
+          res.ok && res.j.sent && res.j.sent.length
+            ? "sent to panel"
+            : (res.j && res.j.error) || "send failed";
+      })
+      .catch(function () { if (status) status.textContent = "send failed"; });
+  }
+
   // ---- boot -------------------------------------------------------------
   function init() {
     var root = document.querySelector(".ed");
     if (!root) return;
-    S.cfg = { docUrl: root.dataset.docUrl, saveUrl: root.dataset.saveUrl, catalogUrl: root.dataset.catalogUrl };
+    S.cfg = {
+      docUrl: root.dataset.docUrl,
+      saveUrl: root.dataset.saveUrl,
+      catalogUrl: root.dataset.catalogUrl,
+      devicesUrl: root.dataset.devicesUrl,
+      sendUrl: root.dataset.sendUrl,
+    };
     artboard = $("panels-artboard");
     scaler = $("panels-scaler");
     var palette = $("panels-palette");
@@ -582,6 +631,7 @@
     var undoBtn = $("panels-undo"), redoBtn = $("panels-redo");
     if (undoBtn) undoBtn.addEventListener("click", undo);
     if (redoBtn) redoBtn.addEventListener("click", redo);
+    initDevices();
 
     document.addEventListener("keydown", function (ev) {
       var t = document.activeElement;

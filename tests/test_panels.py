@@ -9,6 +9,7 @@ The interactive editor lands in later phases; these lock the vertical slice
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -229,6 +230,48 @@ def test_save_route_404_for_unknown_canvas(app: Flask, monkeypatch: pytest.Monke
     client = app.test_client()
     _sign_in(client)
     assert client.post("/experiments/composer/c/nope/save", json={}).status_code == 404
+
+
+def test_devices_json_lists_instances(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/experiments/composer/devices.json").get_json()
+    assert isinstance(payload["devices"], list)  # instances only (built-in kinds excluded)
+
+
+def test_send_renders_and_pushes_to_devices(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Send renders the canvas once and hands the PNG to push_image per bound
+    device, persisting the selection. Browser + push are mocked."""
+    monkeypatch.setattr("app.renderer.render_to_png", lambda request, pool=None: b"PNGBYTES")
+    calls: list[dict[str, Any]] = []
+
+    def fake_push_image(png: bytes, **kw: Any) -> object:
+        calls.append({"png": png, **kw})
+        return SimpleNamespace(status="sent", error=None)
+
+    monkeypatch.setattr(app.config["PUSH_MANAGER"], "push_image", fake_push_image)
+
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    resp = client.post(f"/experiments/composer/c/{cid}/send", json={"device_ids": ["dev_a"]})
+    body = resp.get_json()
+    assert resp.status_code == 200
+    assert body["sent"] == ["dev_a"] and body["errors"] == []
+    assert calls[0]["png"] == b"PNGBYTES" and calls[0]["device_id"] == "dev_a"
+    # Selection persisted on the doc.
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert doc["device_ids"] == ["dev_a"]
+
+
+def test_send_400_without_a_device(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    assert (
+        client.post(f"/experiments/composer/c/{cid}/send", json={"device_ids": []}).status_code
+        == 400
+    )
 
 
 def test_compose_canvas_renders_elements_and_data(app: Flask) -> None:

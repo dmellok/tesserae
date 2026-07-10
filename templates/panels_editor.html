@@ -26,7 +26,9 @@
        data-canvas-id="{{ canvas_id }}"
        data-doc-url="{{ url_for('panels.doc', canvas_id=canvas_id) }}"
        data-save-url="{{ url_for('panels.save', canvas_id=canvas_id) }}"
-       data-catalog-url="{{ url_for('panels.catalog') }}">
+       data-catalog-url="{{ url_for('panels.catalog') }}"
+       data-devices-url="{{ url_for('panels.devices') }}"
+       data-send-url="{{ url_for('panels.send', canvas_id=canvas_id) }}">
 
     <div class="tbar" style="grid-column:1/4">
       <span class="bmark"></span>
@@ -40,9 +42,8 @@
       <div class="tdiv"></div>
       <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
-        <div class="pbtn" id="panels-add-widget"><i class="ph-bold ph-plus-circle"></i>Widget</div>
-        <div class="pbtn"><i class="ph-bold ph-eye"></i>Simulate e-ink</div>
-        <div class="pbtn accent"><i class="ph-bold ph-paper-plane-tilt"></i>Send to panel</div>
+        <select class="psel" id="panels-device" title="Target device"><option value="">Choose device…</option></select>
+        <div class="pbtn accent" id="panels-send"><i class="ph-bold ph-paper-plane-tilt"></i>Send to panel</div>
       </div>
     </div>
 

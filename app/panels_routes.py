@@ -151,6 +151,72 @@ def preview(canvas_id: str) -> Response:
     return current_app.response_class(png, mimetype="image/png")
 
 
+@bp.get("/devices.json")
+def devices() -> Response:
+    """Registered device instances a canvas can be sent to (for the toolbar
+    device picker)."""
+    _guard()
+    reg = current_app.config.get("DEVICE_REGISTRY")
+    out: list[dict[str, str]] = []
+    if reg is not None:
+        for d in reg.all():
+            if d.kind_of is not None:  # instances only, not built-in kinds
+                out.append({"id": d.id, "name": str(d.manifest.get("name") or d.id)})
+    out.sort(key=lambda x: x["name"].lower())
+    return jsonify({"devices": out})
+
+
+@bp.post("/c/<canvas_id>/send")
+def send(canvas_id: str) -> Response:
+    """Render the canvas and push it to its bound device(s).
+
+    Renders once at the canvas dims (shared render target) and hands the PNG
+    to :meth:`PushManager.push_image` per device, which fits/quantises/packs
+    and publishes through the same pipeline the Send page uses. The selected
+    devices are persisted on the doc so a later push targets the same set."""
+    _guard()
+    doc = _store().get(canvas_id)
+    if doc is None:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    picked = body.get("device_ids")
+    if isinstance(picked, list):
+        doc.device_ids = [str(x) for x in picked if isinstance(x, str) and x]
+        _store().save(doc)
+    if not doc.device_ids:
+        return _error(400, "no device selected")
+
+    from app.renderer import RenderRequest, render_to_png, to_loopback_url
+
+    path = url_for("composer.compose_canvas", canvas_id=canvas_id)
+    url = to_loopback_url(request.host_url.rstrip("/") + path)
+    png = render_to_png(RenderRequest(url=url, viewport_w=doc.w, viewport_h=doc.h), pool=None)
+
+    push = current_app.config.get("PUSH_MANAGER")
+    if push is None:
+        return _error(503, "push pipeline unavailable")
+    sent: list[str] = []
+    errors: list[dict[str, str]] = []
+    for did in doc.device_ids:
+        try:
+            result = push.push_image(png, source_label=f"panels:{canvas_id}", device_id=did)
+        except Exception as err:  # a renderer / broker fault shouldn't 500 the route
+            errors.append({"device": did, "error": f"{type(err).__name__}: {err}"})
+            continue
+        if getattr(result, "status", "") in ("sent", "no_change"):
+            sent.append(did)
+        else:
+            errors.append(
+                {
+                    "device": did,
+                    "error": str(
+                        getattr(result, "error", None) or getattr(result, "status", "failed")
+                    ),
+                }
+            )
+    return jsonify({"sent": sent, "errors": errors})
+
+
 @bp.get("/catalog.json")
 def catalog() -> Response:
     """Widget catalog for the editor's Data panel + bind list: every widget

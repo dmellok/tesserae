@@ -701,11 +701,25 @@ def compose_canvas(canvas_id: str) -> str:
     from app.panels_schema import build_catalog
 
     catalog = build_catalog(current_app.config["PLUGIN_REGISTRY"])
+    dumped = doc.model_dump(mode="json")
+    # Widgets actually bound by an element get a real fetch(); everything else
+    # falls back to the declared sample. A widget that errors (e.g. weather
+    # with no location) also falls back, so a render never fails on data.
+    active = {str(e["binding"]).split(".", 1)[0] for e in dumped["els"] if e.get("binding")}
     data: dict[str, Any] = {}
     for widget in catalog:
-        for field_name, value in (widget.get("sample") or {}).items():
+        merged: dict[str, Any] = dict(widget.get("sample") or {})
+        if widget["key"] in active:
+            try:
+                result = _fetch_plugin_data(widget["key"], {}, doc.w, doc.h, preview=False)
+            except Exception:
+                result = None
+            if isinstance(result, dict):
+                for key, value in result.items():
+                    if key != "error":
+                        merged[key] = value
+        for field_name, value in merged.items():
             data[f"{widget['key']}.{field_name}"] = value
-    dumped = doc.model_dump(mode="json")
     return render_template(
         "panels_compose.html",
         els_json=json.dumps(dumped["els"]),
