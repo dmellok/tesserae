@@ -266,7 +266,8 @@
       (isWidget(e) && !e.widget ? " el-empty" : ""));
     node.dataset.id = e.id;
     node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
-      "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;");
+      "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;") +
+      (e.rotate ? "transform:rotate(" + e.rotate + "deg);" : "");
 
     if (!isWidget(e)) {
       // Static decoration: render fresh (cheap), pointer-transparent so clicks
@@ -288,7 +289,11 @@
         host.style.cssText = "width:100%;height:100%;container-type:size;overflow:hidden;pointer-events:none";
         // Widget backgrounds are transparent so the canvas background shows
         // through and elements read as one composed surface, not a card grid.
+        // The card fill is var(--surface-gradient, var(--surface)), so both
+        // are cleared (plus --bg for widgets that use it).
         host.style.setProperty("--bg", "transparent");
+        host.style.setProperty("--surface", "transparent");
+        host.style.setProperty("--surface-gradient", "transparent");
         S.mount[e.id] = { fp: fp, host: host };
         mountWidget(e, host);
       }
@@ -514,6 +519,13 @@
     ev.currentTarget.setPointerCapture(ev.pointerId);
     function move(m) {
       var dx = (m.clientX - sx) / z, dy = (m.clientY - sy) / z;
+      // Rotate the drag delta into the element's local axes so a handle drag
+      // resizes along the rotated edges rather than the screen axes.
+      if (e.rotate) {
+        var a = -e.rotate * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a);
+        var ldx = dx * c - dy * sn, ldy = dx * sn + dy * c;
+        dx = ldx; dy = ldy;
+      }
       changed = true;
       var nx = o.x, ny = o.y, nw = o.w, nh = o.h;
       if (dir.indexOf("l") >= 0) { nw = Math.max(MIN, o.w - dx); nx = o.x + o.w - nw; }
@@ -799,14 +811,22 @@
     els.forEach(function (e) { e.group = null; });
     scheduleSave(); paint();
   }
-  function alignSel(kind) {
+  // Align the selection to the canvas edges/centre ("canvas") or to the
+  // selection's own bounding box ("selection", 2+ elements).
+  function alignSel(kind, target) {
     var els = selEls().filter(function (e) { return !e.locked; });
-    if (els.length < 2) return;
-    var minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    els.forEach(function (e) {
-      minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x + e.w);
-      minY = Math.min(minY, e.y); maxY = Math.max(maxY, e.y + e.h);
-    });
+    if (!els.length) return;
+    var minX, maxX, minY, maxY;
+    if (target === "canvas") {
+      minX = 0; minY = 0; maxX = S.doc.w; maxY = S.doc.h;
+    } else {
+      if (els.length < 2) return;
+      minX = Infinity; maxX = -Infinity; minY = Infinity; maxY = -Infinity;
+      els.forEach(function (e) {
+        minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x + e.w);
+        minY = Math.min(minY, e.y); maxY = Math.max(maxY, e.y + e.h);
+      });
+    }
     var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
     pushHistory();
     els.forEach(function (e) {
@@ -820,6 +840,38 @@
       e.y = clamp(e.y, 0, S.doc.h - e.h);
     });
     scheduleSave(); paint();
+  }
+  // A row of six align buttons for the given target.
+  function alignButtons(target) {
+    var row = el("div", "prow");
+    row.style.cssText = "display:flex;gap:5px;flex-wrap:wrap";
+    [["left", "ph-align-left"], ["hcenter", "ph-align-center-horizontal"], ["right", "ph-align-right"],
+      ["top", "ph-align-top"], ["vcenter", "ph-align-center-vertical"], ["bottom", "ph-align-bottom"]]
+      .forEach(function (a) {
+        var b = el("button", "minibtn", '<i class="ph-bold ' + a[1] + '"></i>');
+        b.title = a[0];
+        b.addEventListener("click", function () { alignSel(a[0], target); });
+        row.appendChild(b);
+      });
+    return row;
+  }
+  // Rotation control shared by widget + decoration props. Live-previews on the
+  // node during drag; commits on release.
+  function rotationRow(e) {
+    var row = el("div", "prow");
+    row.innerHTML = '<span class="plab">Rotate</span>';
+    var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:8px";
+    var r = el("input"); r.type = "range"; r.min = 0; r.max = 359; r.value = e.rotate || 0; r.style.width = "86px";
+    var val = el("span", "mono"); val.textContent = (e.rotate || 0) + "°";
+    r.addEventListener("input", function () {
+      val.textContent = r.value + "°";
+      var n = artboard.querySelector('[data-id="' + e.id + '"]');
+      if (n) n.style.transform = r.value === "0" ? "" : "rotate(" + r.value + "deg)";
+    });
+    r.addEventListener("change", function () { pushHistory(); e.rotate = Number(r.value); scheduleSave(); });
+    wrap.appendChild(r); wrap.appendChild(val);
+    row.appendChild(wrap);
+    return row;
   }
 
   // ---- properties -------------------------------------------------------
@@ -843,16 +895,10 @@
   function renderGroupProps(mount) {
     mount.textContent = "";
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-selection-all"></i>' + selCount() + " selected"));
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-align-left"></i>Align'));
-    var arow = el("div", "prow");
-    arow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
-    [["left", "Left"], ["hcenter", "Center"], ["right", "Right"],
-      ["top", "Top"], ["vcenter", "Middle"], ["bottom", "Bottom"]].forEach(function (a) {
-      var b = el("button", "minibtn", a[1]);
-      b.addEventListener("click", function () { alignSel(a[0]); });
-      arow.appendChild(b);
-    });
-    mount.appendChild(arow);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-align-center-horizontal"></i>Align in selection'));
+    mount.appendChild(alignButtons("selection"));
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-stack"></i>Group'));
     var grow = el("div", "prow");
     grow.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
@@ -939,6 +985,15 @@
       var ibtn = el("button", "minibtn", '<i class="ph-bold ph-' + (e.icon || "star") + '"></i> ' + esc(e.icon || "star"));
       ibtn.addEventListener("click", function () { openIconPicker(e); });
       irow.appendChild(ibtn); mount.appendChild(irow);
+
+      var wrow = el("div", "prow");
+      wrow.innerHTML = '<span class="plab">Weight</span>';
+      var wsel = el("select", "psel");
+      wsel.innerHTML = ["thin", "light", "regular", "bold", "fill", "duotone"]
+        .map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+      wsel.value = e.weight || "bold";
+      wsel.addEventListener("change", function () { pushHistory(); e.weight = wsel.value; scheduleSave(); paint(); });
+      wrow.appendChild(wsel); mount.appendChild(wrow);
     }
 
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-ruler"></i>Arrange'));
@@ -948,6 +1003,9 @@
     var sz = el("div", "prow");
     sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
     mount.appendChild(sz);
+    mount.appendChild(rotationRow(e));
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
     propRowBtns(mount, e);
   }
 
@@ -1058,12 +1116,15 @@
     var sz = el("div", "prow");
     sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
     mount.appendChild(sz);
+    mount.appendChild(rotationRow(e));
     var drow = el("div", "prow");
     drow.innerHTML = '<span class="plab">Dither</span>';
     var dbtn = el("button", "minibtn",
       e.dither ? '<i class="ph-bold ph-check-square"></i> On' : '<i class="ph-bold ph-square"></i> Flat');
     dbtn.addEventListener("click", function () { pushHistory(); e.dither = !e.dither; scheduleSave(); renderProps(); });
     drow.appendChild(dbtn); mount.appendChild(drow);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
 
     propRowBtns(mount, e);
   }

@@ -59,6 +59,10 @@ class Element(BaseModel):
     stroke: int = Field(default=2, ge=0)
     radius: int = Field(default=0, ge=0)
     icon: str = ""
+    # Phosphor icon weight for kind == "icon": thin|light|regular|bold|fill|duotone.
+    weight: str = "bold"
+    # Rotation in degrees, applied to the whole element around its centre.
+    rotate: int = 0
     x: int = Field(default=0, ge=0)
     y: int = Field(default=0, ge=0)
     w: int = Field(default=1, gt=0)

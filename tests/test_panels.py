@@ -270,6 +270,46 @@ def test_compose_renders_decorations(app: Flask) -> None:
     assert 'class="deco"' in body and "panels/decorate.js" in body
 
 
+def test_rotation_and_icon_weight(app: Flask) -> None:
+    """Rotation and icon weight persist and reach the compose render."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "w1",
+                    "widget": "weather_now",
+                    "rotate": 45,
+                    "x": 0,
+                    "y": 0,
+                    "w": 120,
+                    "h": 90,
+                },
+                {
+                    "id": "i1",
+                    "kind": "icon",
+                    "icon": "heart",
+                    "weight": "fill",
+                    "rotate": 15,
+                    "x": 0,
+                    "y": 0,
+                    "w": 60,
+                    "h": 60,
+                },
+            ]
+        },
+    )
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    els = {e["id"]: e for e in doc["els"]}
+    assert els["w1"]["rotate"] == 45
+    assert els["i1"]["weight"] == "fill" and els["i1"]["rotate"] == 15
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert "rotate(45deg)" in body  # widget rotation applied on the compose cell
+
+
 # -- routes: save / doc / send / devices / render ------------------------
 
 

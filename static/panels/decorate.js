@@ -20,7 +20,10 @@
 
     if (kind === "icon") {
       var i = document.createElement("i");
-      i.className = "ph-bold ph-" + (el.icon || "star");
+      // Phosphor weight class: regular is the bare "ph", others are "ph-<weight>".
+      var weight = el.weight || "bold";
+      var wcls = weight === "regular" ? "ph" : "ph-" + weight;
+      i.className = wcls + " ph-" + (el.icon || "star");
       var size = Math.max(8, Math.round(Math.min(px(el.w, 64), px(el.h, 64)) * 0.82));
       i.style.cssText = "display:flex;align-items:center;justify-content:center;" +
         "width:100%;height:100%;line-height:1;color:" + color + ";font-size:" + size + "px";

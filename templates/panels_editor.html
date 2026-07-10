@@ -12,6 +12,12 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  {# All phosphor weights so the icon-decoration weight picker (thin / light /
+     regular / bold / fill / duotone) renders every option. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/thin/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/light/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
   {# forms.css supplies the field controls the source-config drawer reuses from
      the grid editor's macros (location search, selects, switches). #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/forms.css') }}">

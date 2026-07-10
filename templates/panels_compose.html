@@ -15,6 +15,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/thin/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/light/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   {# Chart.js as a global so widgets importing static/spectra-chart.js see
@@ -33,8 +35,8 @@
     }
     .cell { position: absolute; overflow: hidden; }
     {# Widget backgrounds are transparent so the canvas background shows through,
-       matching the editor. #}
-    .cell-content { width: 100%; height: 100%; container-type: size; --bg: transparent; }
+       matching the editor. The card fill is var(--surface-gradient, --surface). #}
+    .cell-content { width: 100%; height: 100%; container-type: size; --bg: transparent; --surface: transparent; --surface-gradient: transparent; }
   </style>
 </head>
 <body data-theme="{{ theme }}" data-style="{{ style }}" style="--font-family: '{{ font_family }}', system-ui, sans-serif;">
@@ -42,7 +44,7 @@
     {% for e in els %}
     {% if e.kind == 'widget' %}
     <div class="cell"
-         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;"
+         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}"
          data-cell-id="{{ e.id }}"
          data-plugin="{{ e.widget }}"
          data-fragment="{{ e.fragment }}"
@@ -58,7 +60,7 @@
     </div>
     {% else %}
     <div class="deco" data-el='{{ e|tojson }}'
-         style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;"></div>
+         style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}"></div>
     {% endif %}
     {% endfor %}
   </div>
