@@ -30,6 +30,20 @@
       return i;
     }
 
+    if (kind === "text") {
+      var t = document.createElement("div");
+      var size = el.size && el.size > 0 ? el.size : Math.max(10, Math.round(px(el.h, 40) * 0.5));
+      var wmap = { thin: 300, light: 300, regular: 400, bold: 700, fill: 800, duotone: 700 };
+      var fw = wmap[el.weight] || 700;
+      var align = el.align || "left";
+      var justify = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+      t.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:" + justify +
+        ";color:" + color + ";font-size:" + size + "px;font-weight:" + fw + ";line-height:1.15;" +
+        "text-align:" + align + ";overflow:hidden;font-family:var(--font-family, inherit)";
+      t.textContent = el.text != null && el.text !== "" ? el.text : "Text";
+      return t;
+    }
+
     if (kind === "line") {
       var wrap = document.createElement("div");
       wrap.style.cssText = "width:100%;height:100%;display:flex;align-items:center;justify-content:center";

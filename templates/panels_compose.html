@@ -44,7 +44,7 @@
     {% for e in els %}
     {% if e.kind == 'widget' %}
     <div class="cell"
-         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}"
+         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"
          data-cell-id="{{ e.id }}"
          data-plugin="{{ e.widget }}"
          data-fragment="{{ e.fragment }}"
@@ -60,7 +60,7 @@
     </div>
     {% else %}
     <div class="deco" data-el='{{ e|tojson }}'
-         style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}"></div>
+         style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"></div>
     {% endif %}
     {% endfor %}
   </div>

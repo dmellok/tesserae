@@ -270,6 +270,37 @@ def test_compose_renders_decorations(app: Flask) -> None:
     assert 'class="deco"' in body and "panels/decorate.js" in body
 
 
+def test_text_element_and_opacity(app: Flask) -> None:
+    """Text elements and per-element opacity persist and reach the render."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "t1",
+                    "kind": "text",
+                    "text": "Hello",
+                    "align": "center",
+                    "size": 24,
+                    "opacity": 50,
+                    "x": 0,
+                    "y": 0,
+                    "w": 120,
+                    "h": 40,
+                }
+            ]
+        },
+    )
+    e = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()["els"][0]
+    assert e["kind"] == "text" and e["text"] == "Hello" and e["align"] == "center"
+    assert e["size"] == 24 and e["opacity"] == 50
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert 'class="deco"' in body and "opacity: 0.5" in body
+
+
 def test_rotation_and_icon_weight(app: Flask) -> None:
     """Rotation and icon weight persist and reach the compose render."""
     client = app.test_client()

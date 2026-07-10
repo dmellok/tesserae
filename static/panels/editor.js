@@ -29,6 +29,7 @@
 
   // Static decoration primitives offered in the palette.
   var DECOS = [
+    { kind: "text", label: "Text", icon: "ph-text-t", w: 180, h: 44 },
     { kind: "rect", label: "Rectangle", icon: "ph-square", w: 140, h: 90 },
     { kind: "ellipse", label: "Circle", icon: "ph-circle", w: 100, h: 100 },
     { kind: "line", label: "Line", icon: "ph-minus", w: 180, h: 16 },
@@ -163,16 +164,18 @@
   function makeElement(widget, fragment, x, y, w, h) {
     return {
       id: uid(), kind: "widget", widget: widget || "", fragment: fragment || "full",
-      options: {}, x: x, y: y, w: w, h: h,
+      options: {}, x: x, y: y, w: w, h: h, opacity: 100,
       dither: true, visible: true, locked: false, group: null,
     };
   }
   function makeDecoration(kind, x, y, w, h) {
+    var solidInk = kind === "line" || kind === "icon" || kind === "text";
     return {
       id: uid(), kind: kind, widget: "", fragment: "full", options: {},
-      color: kind === "line" || kind === "icon" ? "var(--text-primary)" : "var(--accent-1)",
+      color: solidInk ? "var(--text-primary)" : "var(--accent-1)",
       fill: true, stroke: kind === "line" ? 3 : 2, radius: kind === "rect" ? 8 : 0,
-      icon: kind === "icon" ? "star" : "",
+      icon: kind === "icon" ? "star" : "", weight: "bold",
+      text: kind === "text" ? "Text" : "", align: "left", size: 0, opacity: 100,
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -265,8 +268,9 @@
     var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
       (isWidget(e) && !e.widget ? " el-empty" : ""));
     node.dataset.id = e.id;
+    var op = e.visible === false ? 0.4 : (e.opacity == null ? 1 : e.opacity / 100);
     node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
-      "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;") +
+      "px;height:" + e.h + "px;opacity:" + op + ";" +
       (e.rotate ? "transform:rotate(" + e.rotate + "deg);" : "");
 
     if (!isWidget(e)) {
@@ -796,6 +800,11 @@
     clr.addEventListener("click", function () { S.doc.bg = ""; appearanceChanged(false); renderAppearance(); });
     wrap.appendChild(color); wrap.appendChild(clr);
     br.appendChild(wrap); mount.appendChild(br);
+
+    // Canvas size (setPanelSize handles history + clamping elements inside).
+    mount.appendChild(geomRow("Canvas",
+      numField(S.doc.w, 1, function (v) { setPanelSize(Math.max(1, v), S.doc.h); }),
+      numField(S.doc.h, 1, function (v) { setPanelSize(S.doc.w, Math.max(1, v)); })));
   }
 
   // ---- layers -----------------------------------------------------------
@@ -906,6 +915,61 @@
     row.appendChild(wrap);
     return row;
   }
+  function opacityRow(e) {
+    var row = el("div", "prow");
+    row.innerHTML = '<span class="plab">Opacity</span>';
+    var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:8px";
+    var cur = e.opacity == null ? 100 : e.opacity;
+    var r = el("input"); r.type = "range"; r.min = 0; r.max = 100; r.value = cur; r.style.width = "86px";
+    var val = el("span", "mono"); val.textContent = cur + "%";
+    r.addEventListener("input", function () {
+      val.textContent = r.value + "%";
+      var n = artboard.querySelector('[data-id="' + e.id + '"]');
+      if (n) n.style.opacity = Number(r.value) / 100;
+    });
+    r.addEventListener("change", function () { pushHistory(); e.opacity = Number(r.value); scheduleSave(); });
+    wrap.appendChild(r); wrap.appendChild(val);
+    row.appendChild(wrap);
+    return row;
+  }
+  // Editable position/size/rotation/opacity, shared by widget + decoration.
+  function numField(value, min, cb) {
+    var inp = el("input", "dinput");
+    inp.type = "number"; if (min != null) inp.min = min;
+    inp.value = value; inp.style.cssText = "width:58px;text-align:left";
+    inp.addEventListener("change", function () {
+      var v = Math.round(Number(inp.value));
+      if (isFinite(v)) cb(v);
+    });
+    inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+    return inp;
+  }
+  function geomRow(label, a, b) {
+    var row = el("div", "prow");
+    row.innerHTML = '<span class="plab">' + label + "</span>";
+    var wrap = el("span"); wrap.style.cssText = "display:flex;gap:6px";
+    wrap.appendChild(a); wrap.appendChild(b);
+    row.appendChild(wrap);
+    return row;
+  }
+  function commitGeom(e, patch) {
+    pushHistory();
+    for (var k in patch) e[k] = patch[k];
+    e.w = clamp(e.w, MIN, S.doc.w); e.h = clamp(e.h, MIN, S.doc.h);
+    e.x = clamp(e.x, 0, S.doc.w - e.w); e.y = clamp(e.y, 0, S.doc.h - e.h);
+    scheduleSave(); paint();
+  }
+  function arrangeGeom(mount, e) {
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-ruler"></i>Arrange'));
+    mount.appendChild(geomRow("Position",
+      numField(e.x, 0, function (v) { commitGeom(e, { x: v }); }),
+      numField(e.y, 0, function (v) { commitGeom(e, { y: v }); })));
+    mount.appendChild(geomRow("Size",
+      numField(e.w, MIN, function (v) { commitGeom(e, { w: v }); }),
+      numField(e.h, MIN, function (v) { commitGeom(e, { h: v }); })));
+    mount.appendChild(rotationRow(e));
+    mount.appendChild(opacityRow(e));
+  }
 
   // ---- properties -------------------------------------------------------
   function propRowBtns(mount, e) {
@@ -996,8 +1060,31 @@
   }
   function renderDecoProps(mount, e) {
     mount.textContent = "";
-    var name = { rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
+    var name = { text: "Text", rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-shapes"></i>' + name));
+
+    if (e.kind === "text") {
+      var trow = el("div", "prow"); trow.innerHTML = '<span class="plab">Text</span>';
+      var tin = el("input", "dinput"); tin.value = e.text || ""; tin.style.cssText = "width:100%;text-align:left";
+      tin.addEventListener("input", function () { previewDeco(e, { text: tin.value }); });
+      tin.addEventListener("change", function () { pushHistory(); e.text = tin.value; scheduleSave(); });
+      tin.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      trow.appendChild(tin); mount.appendChild(trow);
+      mount.appendChild(decoSlider(e, "Font size", "size", 0, 200)); // 0 = auto from box
+      var alrow = el("div", "prow"); alrow.innerHTML = '<span class="plab">Align</span>';
+      var alsel = el("select", "psel");
+      alsel.innerHTML = ["left", "center", "right"].map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+      alsel.value = e.align || "left";
+      alsel.addEventListener("change", function () { pushHistory(); e.align = alsel.value; scheduleSave(); paint(); });
+      alrow.appendChild(alsel); mount.appendChild(alrow);
+      var twrow = el("div", "prow"); twrow.innerHTML = '<span class="plab">Weight</span>';
+      var twsel = el("select", "psel");
+      twsel.innerHTML = ["regular", "bold"].map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+      twsel.value = e.weight === "regular" ? "regular" : "bold";
+      twsel.addEventListener("change", function () { pushHistory(); e.weight = twsel.value; scheduleSave(); paint(); });
+      twrow.appendChild(twsel); mount.appendChild(twrow);
+    }
+
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-palette"></i>Colour'));
     mount.appendChild(colorControl(e));
 
@@ -1029,14 +1116,7 @@
       wrow.appendChild(wsel); mount.appendChild(wrow);
     }
 
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-ruler"></i>Arrange'));
-    var arr = el("div", "prow");
-    arr.innerHTML = '<span class="plab">Position</span><span class="mono">' + e.x + " · " + e.y + "</span>";
-    mount.appendChild(arr);
-    var sz = el("div", "prow");
-    sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
-    mount.appendChild(sz);
-    mount.appendChild(rotationRow(e));
+    arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
     propRowBtns(mount, e);
@@ -1142,14 +1222,7 @@
     }
 
     // Arrange.
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-ruler"></i>Arrange'));
-    var arr = el("div", "prow");
-    arr.innerHTML = '<span class="plab">Position</span><span class="mono">' + e.x + " · " + e.y + "</span>";
-    mount.appendChild(arr);
-    var sz = el("div", "prow");
-    sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
-    mount.appendChild(sz);
-    mount.appendChild(rotationRow(e));
+    arrangeGeom(mount, e);
     var drow = el("div", "prow");
     drow.innerHTML = '<span class="plab">Dither</span>';
     var dbtn = el("button", "minibtn",

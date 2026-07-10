@@ -61,6 +61,13 @@ class Element(BaseModel):
     icon: str = ""
     # Phosphor icon weight for kind == "icon": thin|light|regular|bold|fill|duotone.
     weight: str = "bold"
+    # Text-element (kind == "text") content, horizontal alignment, and font
+    # size in px (0 = auto-size from the box height).
+    text: str = ""
+    align: str = "left"
+    size: int = Field(default=0, ge=0)
+    # Element opacity 0-100 (applies to widgets and decorations alike).
+    opacity: int = Field(default=100, ge=0, le=100)
     # Rotation in degrees, applied to the whole element around its centre.
     rotate: int = 0
     x: int = Field(default=0, ge=0)
