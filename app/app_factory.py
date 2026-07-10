@@ -574,6 +574,12 @@ def create_app(
     app.config["DEVICE_SCHEMA_PATH"] = device_schema
     app.config["DISCOVERY_CACHE"] = discovery_cache
     app.config["PAGE_STORE"] = page_store
+    # Canvas documents for the experimental Panels editor (issue #60). Cheap
+    # to construct (empty until the feature is used); the routes are gated by
+    # the composer experiment flag regardless.
+    from app.state.panel_store import CanvasStore
+
+    app.config["PANEL_STORE"] = CanvasStore(data_root / "core" / "panels.json")
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
     app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store

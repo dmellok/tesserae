@@ -16,6 +16,7 @@ from flask import Flask
 
 from app.main import REPO_ROOT, create_app
 from app.panels_schema import build_catalog, catalog_entry, derive_schema
+from app.state.panel_store import CanvasPage, CanvasStore, Element
 
 
 @pytest.fixture
@@ -39,22 +40,37 @@ def _sign_in(client: Any) -> None:
 # -- experiment gating ---------------------------------------------------
 
 
-def test_editor_and_catalog_404_when_flag_off(app: Flask) -> None:
-    """With the composer experiment off (the default), both routes 404, so
-    the feature is invisible."""
+def test_composer_reachable_by_default_but_unlinked(app: Flask) -> None:
+    """The composer experiment is on by default (no env, no settings), so an
+    admin who knows the URL gets in. It has no nav entry, so it stays hidden
+    otherwise, that's the soft-launch posture."""
     client = app.test_client()
     _sign_in(client)
+    assert client.get("/experiments/composer/catalog.json").status_code == 200
+    landing = client.get("/experiments/composer/", follow_redirects=False)
+    assert landing.status_code == 302
+    assert "/experiments/composer/c/" in landing.location
+
+
+def test_composer_can_be_disabled_via_settings(app: Flask) -> None:
+    """Setting experiments.composer false turns the routes back to 404, no
+    restart needed (the guard reads the flag per request)."""
+    client = app.test_client()
+    _sign_in(client)
+    app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
     assert client.get("/experiments/composer/").status_code == 404
     assert client.get("/experiments/composer/catalog.json").status_code == 404
 
 
-def test_editor_loads_when_flag_on(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
+    """With no docs yet, the landing route creates a blank canvas and
+    redirects into its editor, which serves the shell."""
     client = app.test_client()
     _sign_in(client)
-    resp = client.get("/experiments/composer/")
-    assert resp.status_code == 200
-    assert b"panels/editor.js" in resp.data
+    landing = client.get("/experiments/composer/", follow_redirects=False)
+    editor = client.get(landing.location)
+    assert editor.status_code == 200
+    assert b"panels/editor.js" in editor.data
 
 
 def test_catalog_lists_widgets_with_data_schema(
@@ -150,6 +166,69 @@ def test_catalog_entry_requires_valid_fields() -> None:
 
     empty = _FakePlugin("e", {"name": "E", "data_schema": {"fields": []}})
     assert catalog_entry(empty) is None  # type: ignore[arg-type]
+
+
+def test_canvas_store_roundtrips(tmp_path: Path) -> None:
+    """A saved canvas survives a fresh store load from disk."""
+    path = tmp_path / "panels.json"
+    store = CanvasStore(path)
+    doc = CanvasPage(
+        id="abc123",
+        name="Kitchen",
+        w=800,
+        h=480,
+        sources=["weather_now"],
+        els=[Element(id="e1", type="big", x=8, y=8, w=160, h=90, binding="weather_now.temp")],
+    )
+    store.save(doc)
+    assert len(store) == 1
+
+    reloaded = CanvasStore(path).get("abc123")
+    assert reloaded is not None
+    assert reloaded.name == "Kitchen" and (reloaded.w, reloaded.h) == (800, 480)
+    assert reloaded.els[0].binding == "weather_now.temp"
+    assert reloaded.els[0].dither is True  # default on
+
+    assert CanvasStore(path).delete("abc123") is True
+    assert CanvasStore(path).get("abc123") is None
+
+
+def test_element_type_is_known() -> None:
+    assert Element(id="a", type="text").type_is_known() is True
+    assert Element(id="b", type="bogus").type_is_known() is False
+
+
+def test_save_route_persists_and_validates(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    # Mint a canvas via the landing route, then read its id from the doc.
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+
+    good = {
+        "name": "My Panel",
+        "w": 600,
+        "h": 400,
+        "sources": ["weather_now"],
+        "els": [{"id": "e1", "type": "chip", "x": 10, "y": 10, "w": 120, "h": 40}],
+    }
+    resp = client.post(f"/experiments/composer/c/{cid}/save", json=good)
+    assert resp.status_code == 200 and resp.get_json()["elements"] == 1
+    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert doc["name"] == "My Panel" and doc["els"][0]["type"] == "chip"
+
+    # An unknown element type is rejected, the store is not corrupted.
+    bad = dict(good, els=[{"id": "x", "type": "wormhole", "x": 0, "y": 0, "w": 5, "h": 5}])
+    assert client.post(f"/experiments/composer/c/{cid}/save", json=bad).status_code == 400
+    still = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    assert still["els"][0]["type"] == "chip"  # last good doc intact
+
+
+def test_save_route_404_for_unknown_canvas(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    assert client.post("/experiments/composer/c/nope/save", json={}).status_code == 404
 
 
 def test_build_catalog_sorts_and_omits_schemaless() -> None:
