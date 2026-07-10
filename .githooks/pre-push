@@ -1,11 +1,49 @@
 #!/usr/bin/env bash
-# Tesserae pre-push hook, nudges to bump pyproject.toml + create a
-# vX.Y.Z tag when shippable code has changed since the last tag. Bypass
-# with `git push --no-verify` for docs-only / WIP pushes.
+# Tesserae pre-push hook. Two guards:
+#   1. Refuses to push a v* release tag unless explicitly opted in
+#      (pushing one cuts a public GitHub Release, see below).
+#   2. Nudges to bump pyproject.toml + create a vX.Y.Z tag when
+#      shippable code has changed since the last tag.
+# Bypass either with `git push --no-verify` for docs-only / WIP pushes.
 #
 # Activated by running once:   git config core.hooksPath .githooks
 
 set -eu
+
+# --- Release guard --------------------------------------------------
+# Pushing a v* tag triggers .github/workflows/release.yml, which
+# publishes a GitHub Release and marks it --latest, so
+# api.tesserae.ink/version/latest serves it as the newest version.
+# Block that by default so a routine `git push --tags` /
+# `git push --follow-tags` can't cut a release unintentionally.
+#
+# To cut a release on purpose ("specifically advised"):
+#     TESSERAE_ALLOW_RELEASE=1 git push origin vX.Y.Z
+#
+# pre-push receives one line per ref on stdin:
+#   <local ref> <local oid> <remote ref> <remote oid>
+release_tag=""
+while read -r local_ref _ _ _; do
+    case "$local_ref" in
+        refs/tags/v*) release_tag="${local_ref#refs/tags/}" ;;
+    esac
+done
+if [ -n "$release_tag" ] && [ "${TESSERAE_ALLOW_RELEASE:-}" != "1" ]; then
+    cat <<EOF >&2
+
+  pre-push: refusing to push release tag "$release_tag".
+
+            Pushing a v* tag triggers the release workflow, which
+            publishes a GitHub Release and marks it --latest. To cut a
+            release deliberately, re-run with the opt-in:
+
+      TESSERAE_ALLOW_RELEASE=1 git push origin $release_tag
+
+  To skip all pre-push checks for a one-off push:  git push --no-verify
+
+EOF
+    exit 1
+fi
 
 last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
 if [ -z "$last_tag" ]; then
