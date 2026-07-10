@@ -309,7 +309,24 @@ macro here instead.
 {%- macro multiselect_field(field_id, name, label, value=None, options=[], help=None) -%}
   {%- set sel = (value if (value is not string and value is iterable) else ([value] if value else [])) -%}
   {%- set sel_str = sel | map('string') | list -%}
-  {%- set real = options | selectattr('value') | list -%}
+  {%- set all_real = options | selectattr('value') | list -%}
+  {#- Order the checked options first, in the saved (``value``) order,
+     then the unchecked ones in the plugin's ``choices()`` order.
+     FormData submits checkboxes in DOM order, so if we rendered in raw
+     choices() order the editor would show the wrong arrangement and the
+     next save (e.g. a theme change fans out a save of every cell) would
+     overwrite the user's drag-reordered selection with the default
+     order. See issue #94. -#}
+  {%- set ns = namespace(selected=[], rest=[]) -%}
+  {%- for v in sel_str -%}
+    {%- for opt in all_real if opt.value | string == v -%}
+      {%- set ns.selected = ns.selected + [opt] -%}
+    {%- endfor -%}
+  {%- endfor -%}
+  {%- for opt in all_real if opt.value | string not in sel_str -%}
+    {%- set ns.rest = ns.rest + [opt] -%}
+  {%- endfor -%}
+  {%- set real = ns.selected + ns.rest -%}
 <div class="field">
   <label>{{ label }}{{ info_pop(help) }}</label>
   <div class="multiselect" data-multiselect>

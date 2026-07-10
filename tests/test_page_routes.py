@@ -934,6 +934,50 @@ def test_multiselect_cell_option_coercion() -> None:
     assert _coerce_cell_option(field, "", {"opt_entities": ""}) == []
 
 
+def _multiselect_checkbox_order(app: Flask, value: Any, options: list[dict[str, str]]) -> list[str]:
+    """Render the ``multiselect_field`` macro and pull the checkbox
+    values back out in DOM order (which is the order they'd submit in)."""
+    import re
+
+    with app.app_context():
+        tmpl = app.jinja_env.from_string(
+            "{% from '_components.html' import multiselect_field %}"
+            "{{ multiselect_field('f', 'entities', 'Entities', value=value, options=options) }}"
+        )
+        html = tmpl.render(value=value, options=options)
+    return re.findall(r'type="checkbox"[^>]*value="([^"]*)"', html)
+
+
+def test_multiselect_renders_saved_selection_first_in_saved_order(app: Flask) -> None:
+    """Regression for #94: the editor must render the checked options in
+    the saved (``value``) order ahead of the unchecked ones, so a user's
+    drag-reordered selection round-trips instead of reverting to the raw
+    ``choices()`` order. Without this, saving any cell (e.g. a theme
+    change fans out a save of every cell) rewrites the entity order to
+    the default arrangement and wipes the user's ordering."""
+    # choices() hands them back in a fixed (alphabetical) order...
+    options = [
+        {"value": "light.a", "label": "A"},
+        {"value": "light.b", "label": "B"},
+        {"value": "light.c", "label": "C"},
+    ]
+    # ...but the user saved a custom order with the middle one first.
+    order = _multiselect_checkbox_order(app, ["light.c", "light.a"], options)
+    # Checked entries lead, in saved order; the unchecked one trails.
+    assert order == ["light.c", "light.a", "light.b"]
+
+
+def test_multiselect_tolerates_bare_string_and_missing_value(app: Flask) -> None:
+    """The macro accepts a bare-string or empty ``value`` (unset option)
+    without dropping or reordering the unchecked choices."""
+    options = [
+        {"value": "light.a", "label": "A"},
+        {"value": "light.b", "label": "B"},
+    ]
+    assert _multiselect_checkbox_order(app, "light.b", options) == ["light.b", "light.a"]
+    assert _multiselect_checkbox_order(app, None, options) == ["light.a", "light.b"]
+
+
 # -- _ensure_cells_fit_panel ------------------------------------------------
 
 

@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Reordered multi-select entries survive a save.** The editor's
+  multi-select picker (Home Assistant entities / sensors) rendered its
+  options in the plugin's default ``choices()`` order and only toggled
+  which were checked, so a drag-reordered selection was never redrawn in
+  the saved order. Saving any cell rewrites every cell's form, so an
+  unrelated change like switching the dashboard theme re-submitted the
+  entities in the default order and wiped the arrangement. The picker
+  now renders checked options first, in the saved order, then the rest,
+  so the order round-trips. (#94)
+
 - **Unbound dashboard no longer leaks onto a bound device's panel.**
   Sending a dashboard bound to no device fanned out to every renderer,
   including the per-device clone renderers of devices bound to other
