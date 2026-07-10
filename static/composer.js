@@ -48,7 +48,11 @@ function applyParts(shadow, cell) {
   try { parts = JSON.parse(cell.dataset.parts || "[]"); } catch { parts = []; }
   const rules = (Array.isArray(parts) ? parts : [])
     .filter((p) => p && p.sel && p.scale != null && p.scale !== 100)
-    .map((p) => `${p.sel}{transform:scale(${p.scale / 100});transform-origin:center center;}`)
+    .map((p) => {
+      // Icons are inline <i>; give them inline-block so the transform applies.
+      const iconFix = /\.ph-/.test(p.sel) ? "display:inline-block;" : "";
+      return `${p.sel}{transform:scale(${p.scale / 100});transform-origin:center center;${iconFix}}`;
+    })
     .join("\n");
   if (!rules) return;
   const st = document.createElement("style");

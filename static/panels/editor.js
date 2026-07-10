@@ -265,43 +265,83 @@
       });
   }
 
-  // ---- fragment parts (per-sub-element scale) ---------------------------
-  // Inject a <style> into a widget's shadow root scaling each declared part
-  // (CSS selector). ``overrideSel`` / ``overrideScale`` let a live slider drag
-  // preview without mutating the model. Mirrors composer.js's applyParts, so
-  // the editor and a Send agree.
+  // ---- fragment parts (zoom individual icons / text) --------------------
+  // One CSS rule that scales the selector; icons (inline <i>) get
+  // inline-block so the transform actually applies. Shared shape with
+  // composer.js so the editor and a Send agree.
+  function partRule(sel, scale) {
+    var r = sel + "{transform:scale(" + (Number(scale) / 100) + ");transform-origin:center center;";
+    if (/\.ph-/.test(sel)) r += "display:inline-block;";
+    return r + "}";
+  }
+  // Inject a <style> into a widget's shadow root scaling each saved part.
+  // ``overrideSel`` / ``overrideScale`` let a live slider drag preview a piece
+  // that may not be saved yet, without mutating the model.
   function applyParts(e, shadow, overrideSel, overrideScale) {
     if (!shadow) return;
     var ex = shadow.querySelector("style#panels-parts");
     if (ex) ex.remove();
-    var parts = Array.isArray(e.parts) ? e.parts : [];
-    var rules = parts.map(function (p) {
-      var sc = (overrideSel != null && p.sel === overrideSel) ? overrideScale : p.scale;
-      if (!p.sel || sc == null || Number(sc) === 100) return "";
-      return p.sel + "{transform:scale(" + (Number(sc) / 100) + ");transform-origin:center center;}";
+    var map = {};
+    (Array.isArray(e.parts) ? e.parts : []).forEach(function (p) { if (p.sel) map[p.sel] = p.scale; });
+    if (overrideSel != null) map[overrideSel] = overrideScale;
+    var rules = Object.keys(map).map(function (sel) {
+      var sc = map[sel];
+      return (sc == null || Number(sc) === 100) ? "" : partRule(sel, sc);
     }).filter(Boolean).join("\n");
     if (!rules) return;
     var st = el("style"); st.id = "panels-parts"; st.textContent = rules;
     shadow.appendChild(st);
   }
-  // Class / id selectors present in a mounted widget's shadow root, so the
-  // parts picker can offer what's actually there. Skips layout scaffolding
-  // and phosphor weight classes (noise), keeps glyph + semantic classes.
+
+  // Phosphor weight + layout-scaffold classes are noise, never a piece.
   var PART_SKIP = {
     w: 1, "w-body": 1, "w-title": 1, "w-title-meta": 1,
     ph: 1, "ph-bold": 1, "ph-thin": 1, "ph-light": 1, "ph-regular": 1, "ph-fill": 1, "ph-duotone": 1,
   };
-  function discoverParts(e) {
+  function humanGlyph(cls) {
+    return cls.replace(/^ph-/, "").replace(/-/g, " ").replace(/^./, function (c) { return c.toUpperCase(); });
+  }
+  // Turn a selector into a friendly piece name: ".wx-temp" -> "Temp",
+  // ".ph-cloud-sun" -> "Cloud sun icon".
+  function humanizeSel(sel) {
+    var s = sel.replace(/^[.#]/, "");
+    if (/^ph-/.test(s)) return humanGlyph(s) + " icon";
+    s = s.replace(/^(wx|st|sq|snp|saa|img|sensor|zone|climate|energy|hist|list)-/, "").replace(/[-_]/g, " ").trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : sel;
+  }
+  // The scalable "pieces" of a mounted widget: its icons and its text leaves,
+  // each with a friendly label + a stable selector. This is what the picker
+  // lists so the user zooms "Temperature" or "Weather icon", not a selector.
+  function discoverPieces(e) {
     var m = S.mount[e.id];
     var root = m && m.host && m.host.shadowRoot;
     if (!root) return [];
-    var seen = {};
-    root.querySelectorAll("[class],[id]").forEach(function (node) {
-      if (node.id) seen["#" + node.id] = 1;
-      var cl = node.classList;
-      if (cl) for (var i = 0; i < cl.length; i++) { if (!PART_SKIP[cl[i]]) seen["." + cl[i]] = 1; }
+    var out = [], seen = {};
+    function push(sel, label) { if (sel && !seen[sel]) { seen[sel] = 1; out.push({ sel: sel, label: label }); } }
+    root.querySelectorAll('i[class*="ph-"]').forEach(function (node) {
+      var glyph = null, cl = node.classList;
+      for (var i = 0; i < cl.length; i++) { if (/^ph-/.test(cl[i]) && !PART_SKIP[cl[i]]) glyph = cl[i]; }
+      if (glyph) push("." + glyph, humanGlyph(glyph) + " icon");
     });
-    return Object.keys(seen).sort().slice(0, 48);
+    root.querySelectorAll("span,div,h1,h2,h3,h4,p,small,strong,li").forEach(function (node) {
+      var txt = (node.textContent || "").trim();
+      if (!txt || txt.length > 48) return;
+      for (var i = 0; i < node.children.length; i++) {
+        if ((node.children[i].textContent || "").trim()) return; // not a text leaf
+      }
+      var sel = null;
+      if (node.id) sel = "#" + node.id;
+      else {
+        var cls = null, cl = node.classList;
+        for (var j = 0; j < cl.length; j++) { if (!PART_SKIP[cl[j]] && !/^ph-/.test(cl[j])) cls = cl[j]; }
+        if (cls) sel = "." + cls;
+      }
+      if (!sel) return;
+      var label = humanizeSel(sel);
+      if (label.length <= 2) label = txt.length > 18 ? txt.slice(0, 18) + "…" : txt;
+      push(sel, label);
+    });
+    return out.slice(0, 16);
   }
 
   // ---- artboard ---------------------------------------------------------
@@ -1156,66 +1196,68 @@
     row.appendChild(wrap);
     return row;
   }
-  // A single fragment-part row: selector label + scale slider + remove.
-  function partScaleRow(e, p) {
+  // Current saved zoom for a piece (100 = untouched).
+  function pieceScale(e, sel) {
+    var p = (e.parts || []).filter(function (x) { return x.sel === sel; })[0];
+    return p ? (p.scale == null ? 100 : p.scale) : 100;
+  }
+  // Upsert a piece's zoom; 100 removes it so ``parts`` stays tidy.
+  function setPieceScale(e, sel, scale) {
+    if (!Array.isArray(e.parts)) e.parts = [];
+    if (Number(scale) === 100) {
+      e.parts = e.parts.filter(function (x) { return x.sel !== sel; });
+      return;
+    }
+    var p = e.parts.filter(function (x) { return x.sel === sel; })[0];
+    if (p) p.scale = Number(scale);
+    else e.parts.push({ sel: sel, scale: Number(scale) });
+  }
+  // One friendly piece row: label + zoom slider.
+  function pieceRow(e, pc) {
     var row = el("div", "prow");
-    var lab = el("span", "plab"); lab.textContent = p.sel; lab.title = p.sel;
-    lab.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:92px";
+    var lab = el("span", "plab"); lab.textContent = pc.label; lab.title = pc.sel;
+    lab.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:104px";
     row.appendChild(lab);
-    var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:6px";
-    var cur = p.scale == null ? 100 : p.scale;
-    var r = el("input"); r.type = "range"; r.min = 25; r.max = 300; r.step = 1; r.value = cur; r.style.width = "62px";
+    var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:8px";
+    var cur = pieceScale(e, pc.sel);
+    var r = el("input"); r.type = "range"; r.min = 50; r.max = 300; r.step = 1; r.value = cur; r.style.width = "76px";
     var val = el("span", "mono"); val.textContent = cur + "%";
     r.addEventListener("input", function () {
       val.textContent = r.value + "%";
       var m = S.mount[e.id];
-      if (m && m.host) applyParts(e, m.host.shadowRoot, p.sel, Number(r.value));
+      if (m && m.host) applyParts(e, m.host.shadowRoot, pc.sel, Number(r.value));
     });
-    r.addEventListener("change", function () { pushHistory(); p.scale = Number(r.value); scheduleSave(); });
+    r.addEventListener("change", function () { pushHistory(); setPieceScale(e, pc.sel, Number(r.value)); scheduleSave(); });
     r.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
-    var rm = el("button", "minibtn", '<i class="ph-bold ph-x"></i>'); rm.style.padding = "4px 6px";
-    rm.addEventListener("click", function () {
-      pushHistory();
-      e.parts = (e.parts || []).filter(function (x) { return x !== p; });
-      var m = S.mount[e.id];
-      if (m && m.host) applyParts(e, m.host.shadowRoot);
-      scheduleSave(); renderProps();
+    r.addEventListener("dblclick", function () {
+      r.value = 100; val.textContent = "100%";
+      pushHistory(); setPieceScale(e, pc.sel, 100); scheduleSave();
+      var m = S.mount[e.id]; if (m && m.host) applyParts(e, m.host.shadowRoot);
     });
-    wrap.appendChild(r); wrap.appendChild(val); wrap.appendChild(rm);
+    wrap.appendChild(r); wrap.appendChild(val);
     row.appendChild(wrap);
     return row;
   }
-  // "Fragment parts" section: scale individual pieces of the rendered fragment
-  // by CSS selector. The add-field autocompletes from the classes/ids actually
-  // in the mounted shadow root.
+  // "Zoom parts": a plain list of the widget's icons + text, each with its own
+  // zoom slider, so the user enlarges an individual piece without touching CSS.
+  // Double-click a slider to reset it to 100%.
   function partsSection(mount, e) {
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-crosshair-simple"></i>Fragment parts'));
-    var found = discoverParts(e);
-    var addRow = el("div", "prow"); addRow.style.cssText = "display:flex;gap:6px";
-    var inp = el("input", "dinput"); inp.placeholder = ".class or #id";
-    inp.style.cssText = "flex:1;min-width:0"; inp.setAttribute("list", "panels-parts-list");
-    inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
-    var dl = el("datalist"); dl.id = "panels-parts-list";
-    dl.innerHTML = found.map(function (s) { return '<option value="' + esc(s) + '"></option>'; }).join("");
-    var add = el("button", "minibtn", '<i class="ph-bold ph-plus"></i>'); add.style.padding = "4px 8px";
-    function commitAdd() {
-      var sel = (inp.value || "").trim();
-      if (!sel) return;
-      pushHistory();
-      if (!Array.isArray(e.parts)) e.parts = [];
-      if (!e.parts.some(function (p) { return p.sel === sel; })) e.parts.push({ sel: sel, scale: 100 });
-      inp.value = ""; scheduleSave(); renderProps();
-    }
-    add.addEventListener("click", commitAdd);
-    inp.addEventListener("keydown", function (ev) { if (ev.key === "Enter") { ev.preventDefault(); commitAdd(); } });
-    addRow.appendChild(inp); addRow.appendChild(add); addRow.appendChild(dl);
-    mount.appendChild(addRow);
-    (e.parts || []).forEach(function (p) { mount.appendChild(partScaleRow(e, p)); });
-    if (!(e.parts || []).length) {
-      var hint = el("div", "note"); hint.style.cssText = "padding:2px 2px 6px;font-size:10.5px";
-      hint.textContent = found.length ? "Add a part, then scale it." : "Loads once the widget renders.";
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-magnifying-glass-plus"></i>Zoom parts'));
+    var pieces = discoverPieces(e);
+    var known = {};
+    pieces.forEach(function (p) { known[p.sel] = 1; });
+    // Keep any saved piece whose selector isn't currently discovered so it can
+    // still be seen and reset (e.g. after a fragment change).
+    (e.parts || []).forEach(function (p) {
+      if (p.sel && !known[p.sel]) { pieces.push({ sel: p.sel, label: humanizeSel(p.sel) }); known[p.sel] = 1; }
+    });
+    if (!pieces.length) {
+      var hint = el("div", "note"); hint.style.cssText = "padding:2px 2px 8px;font-size:10.5px";
+      hint.textContent = "Loads once the widget renders.";
       mount.appendChild(hint);
+      return;
     }
+    pieces.forEach(function (pc) { mount.appendChild(pieceRow(e, pc)); });
   }
   // Editable position/size/rotation/opacity, shared by widget + decoration.
   function numField(value, min, cb) {
