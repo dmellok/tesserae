@@ -69,6 +69,9 @@ tesserae = "app.main:_serve"
 dev = [
     "pytest>=8.0",
     "pytest-cov>=4.1",
+    # Parallel test execution (`pytest -n auto`), local and in CI. The suite
+    # is tmp_path-isolated with no shared ports, so it's parallel-safe.
+    "pytest-xdist>=3.5",
     "mypy>=1.9",
     # Pinned to a minor range: ruff ships new lint rules in minor bumps,
     # which would otherwise break CI on an unrelated upgrade. Bump

@@ -58,6 +58,7 @@
     past: [],
     future: [],
     charts: {},
+    clip: null,
   };
 
   var artboard, scaler;
@@ -281,6 +282,14 @@
         if (c) S.charts[e.id] = drawChart(e, c);
       }
     });
+    // Drag overlays (re-created because textContent wiped the old ones).
+    S.gV = el("div", "ov-guide v");
+    S.gH = el("div", "ov-guide h");
+    S.badge = el("div", "ov-badge");
+    [S.gV, S.gH, S.badge].forEach(function (o) {
+      o.style.display = "none";
+      artboard.appendChild(o);
+    });
     fitZoom();
     renderLayers();
     renderProps();
@@ -295,6 +304,107 @@
     scaler.dataset.zoom = z;
   }
   function currentZoom() { return Number(scaler.dataset.zoom || 1); }
+
+  // ---- snapping + alignment guides -------------------------------------
+  var SNAP_THRESHOLD = 6; // artboard px
+
+  function nearestTarget(anchors, targets) {
+    var best = null;
+    anchors.forEach(function (a) {
+      targets.forEach(function (t) {
+        var d = Math.abs(a.p - t);
+        if (d <= SNAP_THRESHOLD && (!best || d < best.d)) best = { d: d, pos: t - a.off, guide: t };
+      });
+    });
+    return best;
+  }
+
+  // Snap the dragged element's left/centre/right (and top/middle/bottom) to
+  // other elements' equivalents and the panel edges/centre; fall back to the
+  // grid on any axis with no alignment hit. Returns the snapped position plus
+  // the guide coordinates to draw (null when that axis fell back to grid).
+  function computeSnap(e, nx, ny) {
+    var xt = [0, S.doc.w / 2, S.doc.w];
+    var yt = [0, S.doc.h / 2, S.doc.h];
+    S.doc.els.forEach(function (o) {
+      if (o.id === e.id) return;
+      xt.push(o.x, o.x + o.w / 2, o.x + o.w);
+      yt.push(o.y, o.y + o.h / 2, o.y + o.h);
+    });
+    var mx = nearestTarget([{ p: nx, off: 0 }, { p: nx + e.w / 2, off: e.w / 2 }, { p: nx + e.w, off: e.w }], xt);
+    var my = nearestTarget([{ p: ny, off: 0 }, { p: ny + e.h / 2, off: e.h / 2 }, { p: ny + e.h, off: e.h }], yt);
+    return {
+      x: mx ? mx.pos : snap(nx),
+      y: my ? my.pos : snap(ny),
+      gx: mx ? mx.guide : null,
+      gy: my ? my.guide : null,
+    };
+  }
+
+  function showGuides(gx, gy, e) {
+    if (gx != null) { S.gV.style.left = gx + "px"; S.gV.style.display = "block"; } else S.gV.style.display = "none";
+    if (gy != null) { S.gH.style.top = gy + "px"; S.gH.style.display = "block"; } else S.gH.style.display = "none";
+    S.badge.textContent = Math.round(e.x) + " · " + Math.round(e.y);
+    S.badge.style.left = e.x + "px";
+    S.badge.style.top = Math.max(0, e.y - 22) + "px";
+    S.badge.style.display = "block";
+  }
+  function hideGuides() {
+    if (S.gV) S.gV.style.display = "none";
+    if (S.gH) S.gH.style.display = "none";
+    if (S.badge) S.badge.style.display = "none";
+  }
+
+  // ---- clipboard + z-order + nudge -------------------------------------
+  function idxOf(id) {
+    for (var i = 0; i < S.doc.els.length; i++) if (S.doc.els[i].id === id) return i;
+    return -1;
+  }
+  function copySel() { var e = byId(S.sel); if (e) S.clip = clone(e); }
+  function placeCopy(src) {
+    pushHistory();
+    var d = clone(src);
+    d.id = uid();
+    d.x = clamp(d.x + 14, 0, S.doc.w - d.w);
+    d.y = clamp(d.y + 14, 0, S.doc.h - d.h);
+    S.doc.els.push(d);
+    S.sel = d.id;
+    scheduleSave();
+    paint();
+  }
+  function paste() { if (S.clip) placeCopy(S.clip); }
+  function duplicate() { var e = byId(S.sel); if (e) placeCopy(e); }
+  function reorder(fn) {
+    var e = byId(S.sel);
+    if (!e) return;
+    pushHistory();
+    S.doc.els = S.doc.els.filter(function (x) { return x.id !== e.id; });
+    fn(e);
+    scheduleSave();
+    paint();
+  }
+  function toFront() { reorder(function (e) { S.doc.els.push(e); }); }
+  function toBack() { reorder(function (e) { S.doc.els.unshift(e); }); }
+  function shift(dir) {
+    var i = idxOf(S.sel);
+    var j = i + dir;
+    if (i < 0 || j < 0 || j >= S.doc.els.length) return;
+    pushHistory();
+    var tmp = S.doc.els[i];
+    S.doc.els[i] = S.doc.els[j];
+    S.doc.els[j] = tmp;
+    scheduleSave();
+    paint();
+  }
+  function nudge(dx, dy) {
+    var e = byId(S.sel);
+    if (!e || e.locked) return;
+    pushHistory();
+    e.x = clamp(e.x + dx, 0, S.doc.w - e.w);
+    e.y = clamp(e.y + dy, 0, S.doc.h - e.h);
+    scheduleSave();
+    paint();
+  }
 
   // ---- move + resize ----------------------------------------------------
   function select(id) { S.sel = id; paint(); }
@@ -313,15 +423,25 @@
       var dx = (m.clientX - sx) / z, dy = (m.clientY - sy) / z;
       if (!moved && Math.abs(dx) + Math.abs(dy) < 2) return;
       moved = true;
-      var nx = clamp(snap(ox + dx), 0, S.doc.w - e.w);
-      var ny = clamp(snap(oy + dy), 0, S.doc.h - e.h);
+      var rx = ox + dx, ry = oy + dy, nx, ny, gx = null, gy = null;
+      if (m.altKey) {
+        // Free placement: no grid, no alignment snapping.
+        nx = Math.round(rx); ny = Math.round(ry);
+      } else {
+        var s = computeSnap(e, rx, ry);
+        nx = s.x; ny = s.y; gx = s.gx; gy = s.gy;
+      }
+      nx = clamp(nx, 0, S.doc.w - e.w);
+      ny = clamp(ny, 0, S.doc.h - e.h);
       node.style.left = nx + "px"; node.style.top = ny + "px";
       e.x = nx; e.y = ny;
+      if (m.altKey) hideGuides(); else showGuides(gx, gy, e);
     }
     function up() {
       node.releasePointerCapture(ev.pointerId);
       node.removeEventListener("pointermove", move);
       node.removeEventListener("pointerup", up);
+      hideGuides();
       if (moved) { commitHistory(before); scheduleSave(); renderProps(); updateUndoButtons(); }
     }
     node.addEventListener("pointermove", move);
@@ -528,6 +648,17 @@
     sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
     mount.appendChild(sz);
 
+    var zr = el("div", "prow");
+    zr.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
+    var front = el("button", "minibtn", '<i class="ph-bold ph-arrow-line-up"></i> Front');
+    var back = el("button", "minibtn", '<i class="ph-bold ph-arrow-line-down"></i> Back');
+    var dup = el("button", "minibtn", '<i class="ph-bold ph-copy"></i> Duplicate');
+    front.addEventListener("click", toFront);
+    back.addEventListener("click", toBack);
+    dup.addEventListener("click", duplicate);
+    zr.appendChild(front); zr.appendChild(back); zr.appendChild(dup);
+    mount.appendChild(zr);
+
     var del = el("div", "prow");
     var btn = el("button", "minibtn", '<i class="ph-bold ph-trash"></i> Delete');
     btn.addEventListener("click", function () { deleteEl(e.id); });
@@ -579,15 +710,25 @@
       var t = document.activeElement;
       var typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA");
       var mod = ev.metaKey || ev.ctrlKey;
+      // Undo/redo work globally (even while a field is focused).
       if (mod && (ev.key === "z" || ev.key === "Z")) {
-        ev.preventDefault();
-        if (ev.shiftKey) redo(); else undo();
-        return;
+        ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return;
       }
       if (mod && (ev.key === "y" || ev.key === "Y")) { ev.preventDefault(); redo(); return; }
-      if ((ev.key === "Delete" || ev.key === "Backspace") && S.sel && !typing) {
-        ev.preventDefault(); deleteEl(S.sel);
-      }
+      if (typing) return; // leave native editing shortcuts alone in inputs
+      if (ev.key === "Escape") { select(null); return; }
+      if (mod && (ev.key === "c" || ev.key === "C")) { ev.preventDefault(); copySel(); return; }
+      if (mod && (ev.key === "v" || ev.key === "V")) { ev.preventDefault(); paste(); return; }
+      if (mod && (ev.key === "d" || ev.key === "D")) { ev.preventDefault(); duplicate(); return; }
+      if (!S.sel) return;
+      if (ev.key === "Delete" || ev.key === "Backspace") { ev.preventDefault(); deleteEl(S.sel); return; }
+      if (ev.key === "[") { ev.preventDefault(); shift(-1); return; }
+      if (ev.key === "]") { ev.preventDefault(); shift(1); return; }
+      var step = ev.shiftKey ? 10 : 1;
+      if (ev.key === "ArrowLeft") { ev.preventDefault(); nudge(-step, 0); }
+      else if (ev.key === "ArrowRight") { ev.preventDefault(); nudge(step, 0); }
+      else if (ev.key === "ArrowUp") { ev.preventDefault(); nudge(0, -step); }
+      else if (ev.key === "ArrowDown") { ev.preventDefault(); nudge(0, step); }
     });
     window.addEventListener("resize", function () { if (S.doc) fitZoom(); });
 
