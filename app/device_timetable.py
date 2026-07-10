@@ -122,7 +122,7 @@ def timetable_for_device(
             continue
         bound_page = pages_by_id.get(schedule.page_id)
         page_name = bound_page.name if bound_page else schedule.page_id
-        page_unbound = bool(bound_page) and not bound_page.device_ids
+        page_unbound = bound_page is not None and not bound_page.device_ids
         entries.append(
             TimetableEntry(
                 schedule_id=schedule.id,
