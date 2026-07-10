@@ -686,11 +686,14 @@ def compose_canvas(canvas_id: str) -> str:
 
     Lives under ``/compose/`` so it inherits that path's loopback bypass (the
     headless renderer reaches it without the login gate). Gated by the
-    ``composer`` experiment. Injects the element list + a data map (each
-    widget's declared sample keyed ``widget.field``) into
-    ``panels_compose.html``, which paints them with the shared PanelsRender.
+    ``composer`` experiment. Each element is a widget instance rendered as one
+    fragment: this fetches its data with the element's resolved options (falling
+    back to the dev-gallery sample so an unconfigured or erroring widget still
+    paints), then hands the elements to ``panels_compose.html``, which mounts
+    each as the real widget via ``composer.js`` with ``ctx.fragment`` set.
     """
     from app import experiments
+    from app.widget_samples import get_sample
 
     if not experiments.is_enabled("composer"):
         abort(404)
@@ -698,40 +701,40 @@ def compose_canvas(canvas_id: str) -> str:
     doc = store.get(canvas_id) if store is not None else None
     if doc is None:
         abort(404)
-    from app.panels_schema import build_catalog
 
-    catalog = build_catalog(current_app.config["PLUGIN_REGISTRY"])
-    catalog_by_key = {str(w["key"]): w for w in catalog}
-    doc.ensure_sources()  # backfill default sources for any legacy bindings
-    dumped = doc.model_dump(mode="json")
-    # Each source is a configured widget instance; bindings reference the
-    # source id (``<sid>.<field>``). A source actually bound by an element
-    # gets a real fetch() with its resolved options; everything else falls
-    # back to the widget's declared sample. A widget that errors (e.g. weather
-    # with no location) also falls back, so a render never fails on data.
-    active = {str(e["binding"]).split(".", 1)[0] for e in dumped["els"] if e.get("binding")}
-    data: dict[str, Any] = {}
-    for source in doc.sources:
-        entry = catalog_by_key.get(source.key)
-        if entry is None:
-            continue  # widget lost its data_schema; nothing bindable
-        merged: dict[str, Any] = dict(entry.get("sample") or {})
-        if source.sid in active:
+    els_out: list[dict[str, Any]] = []
+    for e in doc.els:
+        if e.visible is False:
+            continue
+        item: dict[str, Any] = {
+            "id": e.id,
+            "widget": e.widget,
+            "fragment": e.fragment or "full",
+            "x": e.x,
+            "y": e.y,
+            "w": e.w,
+            "h": e.h,
+            "options": {},
+            "data": None,
+        }
+        if e.widget:
+            opts = _resolved_options(e.widget, e.options)
+            item["options"] = opts
+            data: Any = None
             try:
-                opts = _resolved_options(source.key, source.options)
-                result = _fetch_plugin_data(source.key, opts, doc.w, doc.h, preview=False)
+                data = _fetch_plugin_data(
+                    e.widget, opts, doc.w, doc.h, preview=False, cell_w=e.w, cell_h=e.h
+                )
             except Exception:
-                result = None
-            if isinstance(result, dict):
-                for key, value in result.items():
-                    if key != "error":
-                        merged[key] = value
-        for field_name, value in merged.items():
-            data[f"{source.sid}.{field_name}"] = value
+                data = None
+            if not isinstance(data, dict) or data.get("error"):
+                sample = get_sample(e.widget)
+                data = sample if isinstance(sample, dict) else data
+            item["data"] = data
+        els_out.append(item)
     return render_template(
         "panels_compose.html",
-        els_json=json.dumps(dumped["els"]),
-        data_json=json.dumps(data),
+        els=els_out,
         w=doc.w,
         h=doc.h,
     )

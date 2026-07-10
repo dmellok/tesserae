@@ -46,6 +46,25 @@
         }
       }
     },
+    "fragments": {
+      "type": "array",
+      "description": "Named, independently-placeable pieces of the widget for the Panels canvas editor. render() paints just one when it receives ctx.fragment; a widget with no fragments (or ctx.fragment absent) renders the whole widget. Declaring fragments lets a user drop, say, just the temperature or the sun-times of a weather widget onto the canvas. See docs/dev/writing-a-widget.md.",
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Fragment id passed to render() as ctx.fragment. 'full' is reserved for the whole widget."
+          },
+          "label": { "type": "string" },
+          "icon": { "type": "string", "pattern": "^ph-[a-z0-9-]+$" },
+          "w": { "type": "integer", "minimum": 1, "description": "Default placement width in px." },
+          "h": { "type": "integer", "minimum": 1, "description": "Default placement height in px." }
+        }
+      }
+    },
     "cell_options": {
       "type": "array",
       "items": {

@@ -164,27 +164,25 @@ content at compact, leave only the hero metric + label at tiny.
 }
 ```
 
-### 6. Declare a `data_schema` (composer-bindable)
+### 6. Fragments (composer-placeable parts)
 
-The Panels canvas editor lets users bind visual elements to individual
-*fields* of a widget's data. Include a `data_schema` block in `plugin.json` so
-your widget is available there; its keys mirror your `server.py` `fetch()`
-result:
+The Panels canvas editor lets users drop widgets onto a freeform canvas.
+Widgets place whole by default. If your widget has parts worth placing on their
+own (the temperature vs. the sun-times of a weather card), declare `fragments`
+in `plugin.json` and gate `render()` on `ctx.fragment`:
 
 ```json
-"data_schema": {
-  "fields": [
-    { "name": "temp", "type": "num", "label": "Temperature", "unit": "deg" },
-    { "name": "cond", "type": "str", "label": "Condition" }
-  ],
-  "sample": { "temp": 21, "cond": "Sunny" }
-}
+"fragments": [
+  { "id": "full", "label": "Full card",   "w": 320, "h": 200 },
+  { "id": "temp", "label": "Temperature", "w": 160, "h": 90 }
+]
 ```
 
-`type` is `num` / `str` / `arr`. The `sample` must match the `fetch()` shape,
-reuse the section 8 (Server contract) payload. Without this block a published
-widget still renders on a page but exposes **no** bindable fields in the
-composer. Details: [writing-a-widget.md](dev/writing-a-widget.md#make-it-composer-bindable-data_schema).
+`render(shadow, ctx)` paints only `ctx.fragment` (default `"full"` = whole
+widget); `fetch()` is unchanged and each fragment stands alone in its own box.
+Backward-compatible: no `fragments` block = places whole. Prefer a few
+meaningful fragments over slicing everything. Details:
+[writing-a-widget.md](dev/writing-a-widget.md#make-it-composable-fragments).
 
 ### 7. Anti-patterns
 
@@ -228,9 +226,9 @@ configures those out-of-band.
 One filled-in brief per widget, following
 [`widget-design-brief.md`](widget-design-brief.md) section by section.
 Include sample markup in section 3 (Markup sketch) and a sample data
-payload in section 8 (Server contract). Derive a `data_schema` block
-(fields + `sample`) from that payload so the widget is composer-bindable
-(convention 6), and include it in the manifest. When you finish the brief,
+payload in section 8 (Server contract). If the widget has parts worth placing
+independently on the canvas, list them as `fragments` in the manifest and note
+which markup each paints (convention 6). When you finish the brief,
 note any open questions in a "Questions" subsection at the end. Don't
 guess on data structure, API endpoints, or naming if the user's spec
 is ambiguous.

@@ -822,7 +822,31 @@ def _devref_egress() -> dict[str, Any]:
     }
 
 
+def _weather_now() -> dict[str, Any]:
+    return {
+        "label": "Melbourne",
+        "icon": "partly",
+        "temp": 19,
+        "cond": "Partly cloudy",
+        "feels": 18,
+        "metrics": [
+            {"label": "Humidity", "icon": "humidity", "value": 62, "unit": "%"},
+            {"label": "Wind", "icon": "wind", "value": 14, "unit": "km/h"},
+            {"label": "Rain", "icon": "rainprob", "value": 20, "unit": "%"},
+            {"label": "UV", "icon": "uv", "value": 3},
+        ],
+        "sun": {
+            "rise": "07:12",
+            "set": "17:38",
+            "riseMin": 432,
+            "setMin": 1058,
+            "nowMin": 840,
+        },
+    }
+
+
 SAMPLES: dict[str, Any] = {
+    "weather_now": _weather_now,
     "calendar_schedule": _calendar_schedule,
     "devref_egress": _devref_egress,
     "github_activity_heatmap": _github_activity_heatmap,

@@ -25,132 +25,50 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
-
-# Element types the palette offers. The renderer (client + future server
-# compose) switches on this. Unknown types are rejected at validation so a
-# malformed doc can't smuggle an unhandled type into the render path.
-ELEMENT_TYPES = (
-    "big",
-    "small",
-    "text",
-    "icon",
-    "spark",
-    "bar",
-    "chip",
-    "progress",
-    "list",
-    "image",
-    "shape",
-)
-
-# The fixed Spectra-6 ink palette elements may use (the editor offers no
-# arbitrary RGB). Default is ink (near-black). Not enforced as an enum so a
-# future gamut can widen it without a migration, the renderer dithers
-# whatever lands here onto the device palette.
-DEFAULT_INK = "#1B1A16"
+from pydantic import BaseModel, Field
 
 
 class Element(BaseModel):
-    """One placed visual element. Coordinates are artboard pixels; ``z`` is
-    implicit in list order (paint order, first painted first)."""
+    """One placed element on the canvas: a widget instance rendered as one of
+    its declared fragments, at an absolute box. ``z`` is implicit in list order
+    (paint order, first painted first).
+
+    Each element is its own widget instance with its own ``options``, so two
+    elements can be the same widget configured differently (weather for two
+    cities), and ``fragment`` selects which part of the widget paints.
+    """
 
     id: str
-    type: str = Field(..., pattern=r"^[a-z]+$")
-    name: str = ""
+    # Plugin id whose render() paints this element. Empty = an unassigned box
+    # (placed but not yet pointed at a widget).
+    widget: str = ""
+    # Which declared fragment to paint; "full" is the whole widget. Passed to
+    # the widget's render() as ``ctx.fragment``.
+    fragment: str = "full"
+    # Per-instance widget config, matching the widget's ``cell_options`` shape;
+    # resolved via ``_resolved_options`` and handed to ``fetch()``.
+    options: dict[str, Any] = Field(default_factory=dict)
     x: int = Field(default=0, ge=0)
     y: int = Field(default=0, ge=0)
     w: int = Field(default=1, gt=0)
     h: int = Field(default=1, gt=0)
-    # Data binding as a ``<widget_key>.<field>`` path, or None for static /
-    # decorative elements (text with literal content, shapes).
-    binding: str | None = None
-    text: str = ""
-    prefix: str = ""
-    suffix: str = ""
-    upper: bool = False
-    weight: int = 700
-    color: str = DEFAULT_INK
-    align: str = "left"
-    font_size: int = 24
-    icon: str = ""
-    # Dithering defaults ON (issue #86): flat is a deliberate opt-out, since
-    # dithering renders anti-aliased text + shading as tone on low-palette
-    # panels. When False the element's region packs nearest-colour.
+    # Per-element dither opt-out (issue #86): flat packs nearest-colour.
     dither: bool = True
     visible: bool = True
     locked: bool = False
     group: str | None = None
-    # Shape-only knobs; ignored by other types.
-    shape_kind: str = "rect"
-    mode: str = "fill"
-    stroke: int = 2
-    radius: int = 0
-
-    def type_is_known(self) -> bool:
-        return self.type in ELEMENT_TYPES
-
-
-class CanvasSource(BaseModel):
-    """A configured widget instance a canvas binds fields from. Multiple
-    instances of the same widget (``key``) can coexist with different
-    ``options`` (e.g. weather for two cities), so bindings reference the
-    instance ``sid``, not the widget key.
-
-    An element binding is ``<sid>.<field>``. Auto-migrated default sources
-    (see :meth:`CanvasPage.ensure_sources`) use ``sid == key`` so that legacy
-    ``<key>.<field>`` bindings remain valid without rewriting elements.
-    """
-
-    sid: str
-    key: str  # plugin id whose data_schema supplies the fields
-    name: str = ""  # user-facing label; blank falls back to the widget name
-    # Per-instance widget config, matching the widget's ``cell_options`` shape;
-    # resolved via ``_resolved_options`` and passed to ``fetch()``.
-    options: dict[str, Any] = Field(default_factory=dict)
-
-
-def _coerce_sources(value: Any) -> Any:
-    """Accept the historical ``sources: list[str]`` shape (bare catalog keys,
-    never actually populated by the editor) and lift each string into a
-    default :class:`CanvasSource` keyed by itself, so old documents validate."""
-    if isinstance(value, list):
-        return [{"sid": item, "key": item} if isinstance(item, str) else item for item in value]
-    return value
 
 
 class CanvasPage(BaseModel):
-    """A canvas document: a fixed artboard plus its elements and the widget
-    data sources currently in play."""
+    """A canvas document: a fixed artboard plus its freely-placed elements."""
 
     id: str
     name: str = "Untitled Panel"
     w: int = Field(default=600, gt=0)
     h: int = Field(default=400, gt=0)
-    # Configured widget data-source instances whose fields are bindable.
-    sources: list[CanvasSource] = Field(default_factory=list)
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
-
-    @field_validator("sources", mode="before")
-    @classmethod
-    def _lift_legacy_sources(cls, value: Any) -> Any:
-        return _coerce_sources(value)
-
-    def ensure_sources(self) -> None:
-        """Add a default source for any element binding whose ``<sid>`` prefix
-        has no matching source. Idempotent. Migrates pre-sources documents:
-        a legacy ``weather_now.temp`` binding gets a ``sid == "weather_now"``
-        source so it keeps resolving, and new instances add ``src_*`` sids."""
-        known = {s.sid for s in self.sources}
-        for element in self.els:
-            if not element.binding:
-                continue
-            prefix = element.binding.split(".", 1)[0]
-            if prefix and prefix not in known:
-                self.sources.append(CanvasSource(sid=prefix, key=prefix))
-                known.add(prefix)
 
 
 class CanvasStore:

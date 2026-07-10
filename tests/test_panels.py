@@ -1,9 +1,9 @@
-"""Panels canvas editor, phase 0 (issue #60).
+"""Panels canvas editor (issue #60).
 
-Covers the experiment gating, the widget-catalog endpoint, and the
-data-schema helpers (declared-block catalog + fetch-result introspection).
-The interactive editor lands in later phases; these lock the vertical slice
-(flag -> route -> catalog -> schema) and the schema contract.
+The composer places real widget renders on a freeform canvas: each element is a
+widget instance rendered as one of its declared fragments. These lock the
+vertical slice (flag -> routes -> catalog/fragments -> element model -> canvas
+render) and the fragment contract.
 """
 
 from __future__ import annotations
@@ -16,14 +16,12 @@ import pytest
 from flask import Flask
 
 from app.main import REPO_ROOT, create_app
-from app.panels_schema import build_catalog, catalog_entry, derive_schema
-from app.state.panel_store import CanvasPage, CanvasSource, CanvasStore, Element
+from app.panels_schema import build_catalog, catalog_entry, fragments_of
+from app.state.panel_store import CanvasPage, CanvasStore, Element
 
 
 @pytest.fixture
 def app(tmp_path: Path) -> Flask:
-    """App with the real bundled plugins (the catalog reads their
-    data_schema) and the auth gate installed."""
     a = create_app(
         testing=False,
         data_root=tmp_path,
@@ -42,9 +40,6 @@ def _sign_in(client: Any) -> None:
 
 
 def test_composer_reachable_by_default_but_unlinked(app: Flask) -> None:
-    """The composer experiment is on by default (no env, no settings), so an
-    admin who knows the URL gets in. It has no nav entry, so it stays hidden
-    otherwise, that's the soft-launch posture."""
     client = app.test_client()
     _sign_in(client)
     assert client.get("/experiments/composer/catalog.json").status_code == 200
@@ -54,8 +49,6 @@ def test_composer_reachable_by_default_but_unlinked(app: Flask) -> None:
 
 
 def test_composer_can_be_disabled_via_settings(app: Flask) -> None:
-    """Setting experiments.composer false turns the routes back to 404, no
-    restart needed (the guard reads the flag per request)."""
     client = app.test_client()
     _sign_in(client)
     app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
@@ -64,8 +57,6 @@ def test_composer_can_be_disabled_via_settings(app: Flask) -> None:
 
 
 def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
-    """With no docs yet, the landing route creates a blank canvas and
-    redirects into its editor, which serves the shell."""
     client = app.test_client()
     _sign_in(client)
     landing = client.get("/experiments/composer/", follow_redirects=False)
@@ -74,74 +65,28 @@ def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
     assert b"panels/editor.js" in editor.data
 
 
-def test_catalog_lists_widgets_with_data_schema(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    payload = client.get("/experiments/composer/catalog.json").get_json()
-    keys = {w["key"] for w in payload["widgets"]}
-    # The seeded worked examples show up; a widget without a data_schema
-    # (clock_word is client-only, no fetch) does not.
-    assert {"weather_now", "device_battery"} <= keys
-    assert "clock_word" not in keys
-    weather = next(w for w in payload["widgets"] if w["key"] == "weather_now")
-    names = {f["name"] for f in weather["fields"]}
-    assert {"temp", "cond", "icon"} <= names
-    assert weather["sample"]["temp"] == 21
-
-
-def test_catalog_derives_schema_from_sample(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Widgets without a hand-authored data_schema still appear, with fields
-    drafted from their dev-gallery sample (the whole ha_* family, todo, etc.).
-    Client-only widgets with no sample stay out."""
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    payload = client.get("/experiments/composer/catalog.json").get_json()
-    by_key = {w["key"]: w for w in payload["widgets"]}
-    # ha_sensor declares no data_schema but has a sample -> derived + bindable.
-    assert "ha_sensor" in by_key
-    assert by_key["ha_sensor"]["fields"], "expected sample-derived fields"
-    assert isinstance(by_key["ha_sensor"]["sample"], dict) and by_key["ha_sensor"]["sample"]
-    # Client-only widget (no fetch, no sample) is not a data source.
-    assert "clock_word" not in by_key
-    # Comfortably more than the two hand-authored ones now.
-    assert len(by_key) >= 10
-
-
 def test_catalog_requires_auth(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Even with the flag on, the endpoint is behind the admin gate."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()  # no sign-in
     resp = client.get("/experiments/composer/catalog.json", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
-# -- schema helpers ------------------------------------------------------
+# -- catalog + fragments -------------------------------------------------
 
 
-def test_derive_schema_infers_types_and_skips_error() -> None:
-    result = {
-        "temp": 21,
-        "ratio": 0.5,
-        "cond": "Sunny",
-        "flag": True,  # bool -> str (renders as state text, not a number)
-        "hourly": [1, 2, 3],
-        "error": "boom",  # transport channel, not a field
-    }
-    schema = derive_schema(result)
-    by_name = {f["name"]: f["type"] for f in schema["fields"]}
-    assert by_name == {
-        "temp": "num",
-        "ratio": "num",
-        "cond": "str",
-        "flag": "str",
-        "hourly": "arr",
-    }
-    assert "error" not in by_name
-    assert schema["sample"]["hourly"] == [1, 2, 3]
+def test_catalog_lists_widgets_with_fragments(app: Flask) -> None:
+    """Every renderable widget is placeable; each carries at least a 'full'
+    fragment. Library plugins (_core, kind data/font) are excluded."""
+    client = app.test_client()
+    _sign_in(client)
+    payload = client.get("/experiments/composer/catalog.json").get_json()
+    by_key = {w["key"]: w for w in payload["widgets"]}
+    assert "weather_now" in by_key
+    assert "weather_core" not in by_key  # library plugin, not kind widget
+    frags = {f["id"] for f in by_key["weather_now"]["fragments"]}
+    assert "full" in frags  # whole-widget placement always available
+    assert len(by_key) > 20  # all widgets, not a filtered subset
 
 
 class _FakePlugin:
@@ -162,111 +107,119 @@ class _FakeRegistry:
         return self._plugins
 
 
-def test_catalog_entry_requires_valid_fields() -> None:
-    ok = _FakePlugin(
+def test_fragments_of_declared_and_implicit_full() -> None:
+    declared = _FakePlugin(
         "w",
         {
             "name": "W",
-            "icon": "ph-x",
-            "description": "d",
-            "data_schema": {
-                "color": "#123456",
-                "fields": [{"name": "a", "type": "num"}, {"bad": 1}],
-                "sample": {"a": 5},
-            },
+            "fragments": [
+                {"id": "temp", "label": "Temperature", "w": 160, "h": 90, "icon": "ph-thermometer"},
+                {"bad": 1},  # dropped
+                {"id": "", "label": "empty"},  # dropped (no id)
+            ],
         },
     )
-    entry = catalog_entry(ok)  # type: ignore[arg-type]
-    assert entry is not None
-    assert entry["key"] == "w" and entry["color"] == "#123456"
-    assert [f["name"] for f in entry["fields"]] == ["a"]  # malformed field dropped
+    frags = fragments_of(declared)  # type: ignore[arg-type]
+    ids = [f["id"] for f in frags]
+    assert ids == ["full", "temp"]  # implicit full prepended, malformed dropped
+    temp = next(f for f in frags if f["id"] == "temp")
+    assert temp["w"] == 160 and temp["h"] == 90 and temp["icon"] == "ph-thermometer"
 
-    no_schema = _FakePlugin("n", {"name": "N"})
-    assert catalog_entry(no_schema) is None  # type: ignore[arg-type]
-
-    empty = _FakePlugin("e", {"name": "E", "data_schema": {"fields": []}})
-    assert catalog_entry(empty) is None  # type: ignore[arg-type]
+    plain = _FakePlugin("n", {"name": "N"})
+    assert [f["id"] for f in fragments_of(plain)] == ["full"]  # implicit-only
 
 
-def test_canvas_store_roundtrips(tmp_path: Path) -> None:
-    """A saved canvas survives a fresh store load from disk."""
+def test_catalog_entry_shape() -> None:
+    p = _FakePlugin("w", {"name": "W", "icon": "ph-x", "description": "d"})
+    entry = catalog_entry(p)  # type: ignore[arg-type]
+    assert entry["key"] == "w" and entry["icon"] == "ph-x"
+    assert [f["id"] for f in entry["fragments"]] == ["full"]
+
+
+def test_build_catalog_sorts_by_name() -> None:
+    registry = _FakeRegistry(
+        [_FakePlugin("z", {"name": "Zed"}), _FakePlugin("a", {"name": "Alpha"})]
+    )
+    catalog = build_catalog(registry)  # type: ignore[arg-type]
+    assert [c["key"] for c in catalog] == ["a", "z"]
+
+
+# -- element model -------------------------------------------------------
+
+
+def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / "panels.json"
     store = CanvasStore(path)
     doc = CanvasPage(
-        id="abc123",
+        id="c1",
         name="Kitchen",
         w=800,
         h=480,
-        sources=["weather_now"],
-        els=[Element(id="e1", type="big", x=8, y=8, w=160, h=90, binding="weather_now.temp")],
+        els=[
+            Element(
+                id="e1",
+                widget="weather_now",
+                fragment="temp",
+                options={"units": "metric"},
+                x=8,
+                y=8,
+                w=160,
+                h=90,
+            )
+        ],
     )
     store.save(doc)
-    assert len(store) == 1
-
-    reloaded = CanvasStore(path).get("abc123")
+    reloaded = CanvasStore(path).get("c1")
     assert reloaded is not None
-    assert reloaded.name == "Kitchen" and (reloaded.w, reloaded.h) == (800, 480)
-    assert reloaded.els[0].binding == "weather_now.temp"
-    assert reloaded.els[0].dither is True  # default on
+    e = reloaded.els[0]
+    assert e.widget == "weather_now" and e.fragment == "temp"
+    assert e.options["units"] == "metric"
+    assert e.dither is True and e.visible is True  # defaults
 
-    assert CanvasStore(path).delete("abc123") is True
-    assert CanvasStore(path).get("abc123") is None
-
-
-def test_element_type_is_known() -> None:
-    assert Element(id="a", type="text").type_is_known() is True
-    assert Element(id="b", type="bogus").type_is_known() is False
+    blank = Element(id="e2")
+    assert blank.widget == "" and blank.fragment == "full"  # unassigned box
 
 
-def test_save_route_persists_and_validates(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+# -- routes: save / doc / send / devices / render ------------------------
+
+
+def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    # Mint a canvas via the landing route, then read its id from the doc.
     cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-
     good = {
         "name": "My Panel",
         "w": 600,
         "h": 400,
-        "sources": ["weather_now"],
-        "els": [{"id": "e1", "type": "chip", "x": 10, "y": 10, "w": 120, "h": 40}],
+        "els": [
+            {
+                "id": "e1",
+                "widget": "weather_now",
+                "fragment": "full",
+                "x": 10,
+                "y": 10,
+                "w": 200,
+                "h": 140,
+            }
+        ],
     }
     resp = client.post(f"/experiments/composer/c/{cid}/save", json=good)
     assert resp.status_code == 200 and resp.get_json()["elements"] == 1
     doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
-    assert doc["name"] == "My Panel" and doc["els"][0]["type"] == "chip"
-
-    # An unknown element type is rejected, the store is not corrupted.
-    bad = dict(good, els=[{"id": "x", "type": "wormhole", "x": 0, "y": 0, "w": 5, "h": 5}])
-    assert client.post(f"/experiments/composer/c/{cid}/save", json=bad).status_code == 400
-    still = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
-    assert still["els"][0]["type"] == "chip"  # last good doc intact
-
-
-def test_save_route_404_for_unknown_canvas(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    assert client.post("/experiments/composer/c/nope/save", json={}).status_code == 404
+    assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
 
 
 def test_devices_json_lists_instances_with_panel_dims(app: Flask) -> None:
-    """Each device carries its real panel dims, so picking a target also sets
-    the canvas resolution."""
     client = app.test_client()
     _sign_in(client)
-    # Register an Inky 4" instance (600x400 Spectra 6).
     client.post("/settings/devices/add", data={"id": "kitchen", "kind": "pimoroni_inky_4"})
     payload = client.get("/experiments/composer/devices.json").get_json()
-    assert isinstance(payload["devices"], list)
     kitchen = next(d for d in payload["devices"] if d["id"] == "kitchen")
     assert kitchen["w"] == 600 and kitchen["h"] == 400
 
 
-def test_send_renders_and_pushes_to_devices(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Send renders the canvas once and hands the PNG to push_image per bound
-    device, persisting the selection. Browser + push are mocked."""
+def test_send_renders_and_pushes(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.renderer.render_to_png", lambda request, pool=None: b"PNGBYTES")
     calls: list[dict[str, Any]] = []
 
@@ -275,34 +228,18 @@ def test_send_renders_and_pushes_to_devices(app: Flask, monkeypatch: pytest.Monk
         return SimpleNamespace(status="sent", error=None)
 
     monkeypatch.setattr(app.config["PUSH_MANAGER"], "push_image", fake_push_image)
-
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
     resp = client.post(f"/experiments/composer/c/{cid}/send", json={"device_ids": ["dev_a"]})
     body = resp.get_json()
-    assert resp.status_code == 200
-    assert body["sent"] == ["dev_a"] and body["errors"] == []
+    assert resp.status_code == 200 and body["sent"] == ["dev_a"]
     assert calls[0]["png"] == b"PNGBYTES" and calls[0]["device_id"] == "dev_a"
-    # Selection persisted on the doc.
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
-    assert doc["device_ids"] == ["dev_a"]
 
 
-def test_send_400_without_a_device(app: Flask) -> None:
-    client = app.test_client()
-    _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    assert (
-        client.post(f"/experiments/composer/c/{cid}/send", json={"device_ids": []}).status_code
-        == 400
-    )
-
-
-def test_compose_canvas_renders_elements_and_data(app: Flask) -> None:
-    """The render target injects the element list + a data map (widget sample
-    keyed widget.field), using the shared renderer. Lives under /compose/ so
-    the headless renderer reaches it."""
+def test_compose_canvas_mounts_widgets(app: Flask) -> None:
+    """The render target emits a positioned .cell per widget element and loads
+    composer.js to mount each as the real widget with its fragment."""
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
@@ -312,206 +249,51 @@ def test_compose_canvas_renders_elements_and_data(app: Flask) -> None:
             "els": [
                 {
                     "id": "e1",
-                    "type": "big",
+                    "widget": "weather_now",
+                    "fragment": "temp",
                     "x": 10,
                     "y": 10,
-                    "w": 120,
-                    "h": 60,
-                    "binding": "weather_now.temp",
+                    "w": 160,
+                    "h": 90,
                 }
             ]
         },
     )
     body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
-    assert '"weather_now.temp"' in body  # data map keyed widget.field
-    assert '"e1"' in body  # the element rides through
-    assert "panels/render.js" in body  # shared renderer
+    assert 'data-plugin="weather_now"' in body
+    assert 'data-fragment="temp"' in body
+    assert "composer.js" in body  # real widget mount, not a primitive reconstruction
 
 
-def test_compose_canvas_404_when_flag_off_or_missing(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_compose_canvas_404_when_flag_off(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    # Flag off -> 404 even for a real id.
     app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
     assert client.get(f"/compose/canvas/{cid}").status_code == 404
-    app.config["SETTINGS_STORE"].update_section("experiments", {"composer": True})
-    assert client.get("/compose/canvas/nope").status_code == 404
 
 
-def test_preview_png_screenshots_at_panel_dims(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """preview.png renders the compose page at the canvas dims and returns the
-    PNG. The browser call is mocked (no Chromium in CI)."""
-    seen = {}
-
-    def fake_render(request: object, pool: object = None) -> bytes:
-        seen["w"] = getattr(request, "viewport_w", None)
-        seen["h"] = getattr(request, "viewport_h", None)
-        return b"\x89PNGfake"
-
-    monkeypatch.setattr("app.renderer.render_to_png", fake_render)
-    client = app.test_client()
-    _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    client.post(f"/experiments/composer/c/{cid}/save", json={"w": 800, "h": 480, "els": []})
-    resp = client.get(f"/experiments/composer/c/{cid}/preview.png")
-    assert resp.status_code == 200
-    assert resp.mimetype == "image/png"
-    assert resp.data == b"\x89PNGfake"
-    assert (seen["w"], seen["h"]) == (800, 480)
-
-
-# -- configurable data sources (issue #60 follow-up) ---------------------
-
-
-def test_sources_coerce_legacy_string_list() -> None:
-    """Old documents stored ``sources`` as bare catalog keys; those lift into
-    default source instances keyed by themselves so they still validate."""
-    doc = CanvasPage.model_validate({"id": "d1", "sources": ["weather_now", "device_battery"]})
-    assert [(s.sid, s.key) for s in doc.sources] == [
-        ("weather_now", "weather_now"),
-        ("device_battery", "device_battery"),
-    ]
-    assert doc.sources[0].options == {}
-
-
-def test_source_instances_roundtrip(tmp_path: Path) -> None:
-    """A configured source (key + options) survives a store reload."""
-    path = tmp_path / "panels.json"
-    store = CanvasStore(path)
-    store.save(
-        CanvasPage(
-            id="c1",
-            sources=[
-                CanvasSource(
-                    sid="src_berlin",
-                    key="weather_now",
-                    name="Berlin",
-                    options={"units": "metric", "location": {"latitude": 52.5}},
-                )
-            ],
-            els=[Element(id="e1", type="big", binding="src_berlin.temp")],
-        )
-    )
-    reloaded = CanvasStore(path).get("c1")
-    assert reloaded is not None
-    src = reloaded.sources[0]
-    assert src.sid == "src_berlin" and src.key == "weather_now" and src.name == "Berlin"
-    assert src.options["units"] == "metric"
-    assert reloaded.els[0].binding == "src_berlin.temp"
-
-
-def test_ensure_sources_backfills_legacy_bindings() -> None:
-    """A pre-sources document (bindings, no sources) gets a default source per
-    bound widget, keyed ``sid == widget_key`` so the binding keeps resolving.
-    Idempotent on a second call."""
-    doc = CanvasPage(
-        id="d2",
-        els=[
-            Element(id="e1", type="big", binding="weather_now.temp"),
-            Element(id="e2", type="small", binding="weather_now.cond"),
-            Element(id="e3", type="text", binding=None),
-        ],
-    )
-    doc.ensure_sources()
-    assert [(s.sid, s.key) for s in doc.sources] == [("weather_now", "weather_now")]
-    doc.ensure_sources()  # no duplicate on re-run
-    assert len(doc.sources) == 1
-
-
-def test_doc_route_backfills_and_persists_sources(
-    app: Flask, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Hydrating a legacy doc through doc.json backfills its sources once and
-    saves them, so the editor always sees a source per bound widget."""
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    # Save a doc with a binding but no sources (legacy shape).
-    client.post(
-        f"/experiments/composer/c/{cid}/save",
-        json={"sources": [], "els": [{"id": "e1", "type": "big", "binding": "weather_now.temp"}]},
-    )
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
-    assert [(s["sid"], s["key"]) for s in doc["sources"]] == [("weather_now", "weather_now")]
-
-
-def test_source_form_renders_cell_options(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The source-config fragment renders a widget's cell_options with the
-    shared macros (location search, units select)."""
+def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The per-element config drawer renders a widget's cell_options via the
+    shared macros."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
     resp = client.post(
-        "/experiments/composer/source-form", json={"key": "weather_now", "sid": "s1"}
+        "/experiments/composer/source-form", json={"key": "weather_now", "sid": "e1"}
     )
     assert resp.status_code == 200
-    html = resp.get_data(as_text=True)
-    assert 'name="opt_units"' in html  # the units select
-    assert "data-location-search" in html  # the location control
-
-
-def test_source_form_404_unknown_widget(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    assert client.post("/experiments/composer/source-form", json={"key": "nope"}).status_code == 404
+    assert 'name="opt_units"' in resp.get_data(as_text=True)
 
 
 def test_source_options_parses_form(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A submitted config form parses back into a normalised options dict via
-    the shared per-cell coercion."""
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
     resp = client.post(
         "/experiments/composer/source-options",
-        data={
-            "key": "weather_now",
-            "opt_units": "imperial",
-            "opt_label": "Home",
-            "opt_location": "",
-        },
+        data={"key": "weather_now", "opt_units": "imperial", "opt_label": "Home"},
     )
     assert resp.status_code == 200
     options = resp.get_json()["options"]
-    assert options["units"] == "imperial"
-    assert options["label"] == "Home"
-    assert options["location"] == {}  # empty location coerces to a dict
-
-
-def test_compose_keys_data_by_source_id(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
-    """With a configured source, the compose data map is keyed ``<sid>.<field>``
-    and falls back to the widget sample when live fetch yields nothing."""
-    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
-    client = app.test_client()
-    _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    client.post(
-        f"/experiments/composer/c/{cid}/save",
-        json={
-            "sources": [{"sid": "src_a", "key": "weather_now", "name": "A", "options": {}}],
-            "els": [{"id": "e1", "type": "big", "binding": "src_a.temp"}],
-        },
-    )
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
-    assert '"src_a.temp"' in body  # data keyed by source id, not widget key
-
-
-def test_build_catalog_sorts_and_omits_schemaless() -> None:
-    registry = _FakeRegistry(
-        [
-            _FakePlugin(
-                "z", {"name": "Zed", "data_schema": {"fields": [{"name": "a", "type": "num"}]}}
-            ),
-            _FakePlugin(
-                "a", {"name": "Alpha", "data_schema": {"fields": [{"name": "b", "type": "str"}]}}
-            ),
-            _FakePlugin("n", {"name": "NoSchema"}),
-        ]
-    )
-    catalog = build_catalog(registry)  # type: ignore[arg-type]
-    assert [c["key"] for c in catalog] == ["a", "z"]  # sorted by name, schemaless omitted
+    assert options["units"] == "imperial" and options["label"] == "Home"

@@ -161,41 +161,48 @@ These are the things AI most often gets wrong on e-ink. Call them out explicitly
 - [ ] **Verify every size in `/_test/render`, not just `md`.** `lg` is forgiving and `md` usually looks fine; `sm` and `xs` are where layouts break. Insist the model produces screenshots at all four sizes before declaring the widget done.
 - [ ] **Translate technical errors to friendly messages.** The `error` string from `server.py:fetch()` lands directly in the cell; `"HTTPError: 404 Not Found"` reads as "broken widget" while `"Country code 'XX' is not supported."` reads as "I typed something wrong." Catch the categories you can name (invalid input, upstream down, rate-limited) and pass everything else through with a tame fallback.
 
-## Make it composer-bindable (`data_schema`)
+## Make it composable (`fragments`)
 
 The **Panels** canvas editor (experimental, under `/experiments/composer/`)
-treats widgets as *data sources*: instead of placing a whole widget, a user
-places a visual element (big number, text, sparkline, chip, list, ...) and
-binds it to one **field** of a widget's data. For your widget to offer fields
-there, declare a `data_schema` block in `plugin.json` describing your
-`fetch()` result's shape:
+lets a user drop widgets onto a freeform canvas and place them anywhere. By
+default a widget places whole. If you want its parts to be individually
+placeable, say the temperature or the sun-times of a weather card on their own,
+declare `fragments` in `plugin.json` and teach `render()` to paint just one:
 
 ```json
-"data_schema": {
-  "color": "#256E6B",
-  "fields": [
-    { "name": "temp", "type": "num", "label": "Temperature", "unit": "deg" },
-    { "name": "cond", "type": "str", "label": "Condition" },
-    { "name": "hourly", "type": "arr", "label": "Hourly series" }
-  ],
-  "sample": { "temp": 21, "cond": "Sunny", "hourly": [19, 20, 21, 20] }
+"fragments": [
+  { "id": "full", "label": "Full card",   "w": 320, "h": 200 },
+  { "id": "temp", "label": "Temperature", "w": 160, "h": 90, "icon": "ph-thermometer" },
+  { "id": "sun",  "label": "Sun times",   "w": 200, "h": 60, "icon": "ph-sun" }
+]
+```
+
+```js
+export default function render(shadow, ctx) {
+  const frag = ctx.fragment || "full";        // "full" = the whole widget
+  const data = ctx.data;                        // fetch() output, unchanged
+  if (frag === "temp") { paintTemp(shadow, data); return; }
+  if (frag === "sun")  { paintSun(shadow, data); return; }
+  paintFull(shadow, data);
 }
 ```
 
-- **`fields`** — one entry per top-level `fetch()` key worth exposing. `type`
-  is `num` (number), `str` (text/state), or `arr` (a list, e.g. a series or
-  rows). `label` and `unit` are optional but make the bind list readable.
-- **`sample`** — representative values keyed by field name, matching your
-  `fetch()` shape. It powers the editor's live preview and the render fallback
-  when a source isn't configured yet, so keep it realistic.
+- **The data path is unchanged.** Your `server.py` `fetch()` still runs once
+  with the instance's options; `ctx.fragment` only decides which markup you
+  paint. So each placed fragment carries its own config (location, entity, etc.)
+  via the normal `cell_options` drawer.
+- **Each fragment must stand alone.** It renders into its own box at the size
+  the user drew, so paint from `100%`/container units and the semantic tokens as
+  always; don't assume the surrounding card's layout is present.
+- **`w`/`h`** are the default box the palette drops the fragment at; the user
+  resizes freely afterward. `full` is optional, list it if the whole-widget
+  placement wants a non-default size.
 
-Optional but recommended: a widget without `data_schema` still renders normally
-on a page, but shows up in the composer with **no bindable fields**. Bundled
-widgets can fall back to their dev-gallery sample, but community/catalog widgets
-have no such fallback, so declaring `data_schema` is the *only* way a published
-widget becomes composer-bindable. Draft it from a real `fetch()` result rather
-than by hand (`app.panels_schema.derive_schema(result)` does exactly that), then
-tidy the labels/units.
+Backward-compatible: a widget with no `fragments` block places as a single whole
+widget (implicit `full`), and `ctx.fragment` is simply absent, so existing
+widgets need no changes. Prefer a handful of meaningful fragments over slicing
+every element; if a piece is really its own thing, a separate small widget (the
+way the `github_*` family is built) is often cleaner than a fragment.
 
 ## Structured design first (optional)
 

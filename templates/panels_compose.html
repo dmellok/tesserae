@@ -3,31 +3,57 @@
 <head>
   <meta charset="utf-8">
   {# Canvas render target (issue #60). Playwright screenshots this at panel
-     dims; the packed frame goes to the device. It renders elements with the
-     SAME PanelsRender module the editor uses, so what you design is what the
-     panel paints. Reachable over loopback (path under /compose/) so the
-     headless renderer doesn't hit the login gate. #}
+     dims; the packed frame goes to the device. Each element is a real widget
+     mounted by composer.js with ctx.fragment set, so what a panel paints is
+     the widget's own render, not a reconstruction. Reachable over loopback
+     (path under /compose/) so the headless renderer skips the login gate. #}
+  <script>
+    // Ingress URL prefix for composer.js's dynamic client.js imports.
+    window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/fill/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/duotone/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
+  {# Chart.js as a global so widgets importing static/spectra-chart.js see
+     window.Chart. Non-module so composer.js's dynamic imports don't race it. #}
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
   <style>
-    html, body { margin: 0; padding: 0; background: #F7F5F0; }
+    html, body { margin: 0; padding: 0; }
     #panels-board {
       position: relative;
       width: {{ w }}px;
       height: {{ h }}px;
-      background: #F7F5F0;
-      color: #1B1A16;
-      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-      font-variant-numeric: tabular-nums;
+      background: var(--bg, #F7F5F0);
+      color: var(--text-primary, #1B1A16);
       overflow: hidden;
     }
+    .cell { position: absolute; overflow: hidden; }
+    .cell-content { width: 100%; height: 100%; container-type: size; }
   </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
-  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
 </head>
-<body>
-  <div id="panels-board"></div>
-  <script id="panels-els" type="application/json">{{ els_json | safe }}</script>
-  <script id="panels-data" type="application/json">{{ data_json | safe }}</script>
-  <script src="{{ url_for('static', filename='panels/render.js') }}"></script>
-  <script src="{{ url_for('static', filename='panels/compose.js') }}"></script>
+<body data-theme="light" data-style="standard">
+  <div id="panels-board">
+    {% for e in els %}
+    <div class="cell"
+         style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;"
+         data-cell-id="{{ e.id }}"
+         data-plugin="{{ e.widget }}"
+         data-fragment="{{ e.fragment }}"
+         data-options='{{ e.options|tojson }}'
+         data-data='{{ e.data|tojson }}'
+         data-cell-w="{{ e.w }}"
+         data-cell-h="{{ e.h }}"
+         data-panel-w="{{ w }}"
+         data-panel-h="{{ h }}"
+         data-cell-zoom="1"
+         data-font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
+      <div class="cell-content"></div>
+    </div>
+    {% endfor %}
+  </div>
+  <script type="module" src="{{ url_for('static', filename='composer.js') }}"></script>
 </body>
 </html>

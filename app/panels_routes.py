@@ -101,17 +101,11 @@ def editor(canvas_id: str) -> str:
 
 @bp.get("/c/<canvas_id>/doc.json")
 def doc(canvas_id: str) -> Response:
-    """The canvas document the editor hydrates from. Legacy documents (whose
-    bindings predate configurable sources) get default sources backfilled so
-    the editor always sees a source per bound widget."""
+    """The canvas document the editor hydrates from."""
     _guard()
     found = _store().get(canvas_id)
     if found is None:
         abort(404)
-    before = len(found.sources)
-    found.ensure_sources()
-    if len(found.sources) != before:
-        _store().save(found)
     return jsonify(found.model_dump(mode="json"))
 
 
@@ -131,9 +125,6 @@ def save(canvas_id: str) -> Response:
         doc = CanvasPage.model_validate(body)
     except ValidationError as err:
         return _error(400, f"invalid canvas document: {err.error_count()} problem(s)")
-    unknown = [e.type for e in doc.els if not e.type_is_known()]
-    if unknown:
-        return _error(400, f"unknown element type(s): {sorted(set(unknown))}")
     _store().save(doc)
     return jsonify({"status": "ok", "id": canvas_id, "elements": len(doc.els)})
 

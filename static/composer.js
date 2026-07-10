@@ -56,6 +56,10 @@ function buildCtx(cell, options, pluginData, fontFamily) {
   const zoom = Number(cell.dataset.cellZoom) || 1;
   const virtualW = Math.max(1, Math.round(w / (zoom > 0 ? zoom : 1)));
   const virtualH = Math.max(1, Math.round(h / (zoom > 0 ? zoom : 1)));
+  // Panels canvas: which fragment of the widget to paint. "full" (the
+  // default) is the whole widget, so grid cells and un-decomposed widgets
+  // are unaffected.
+  const fragment = cell.dataset.fragment || "full";
   return {
     cell: {
       w: virtualW,
@@ -64,10 +68,12 @@ function buildCtx(cell, options, pluginData, fontFamily) {
       plugin: cell.dataset.plugin || "",
       plugin_id: cell.dataset.plugin || "",
       options,
+      fragment,
     },
     panel: { w: panelW, h: panelH, portrait: panelH > panelW },
     font: { family: fontFamily, weight: 400 },
     data: pluginData,
+    fragment,
     preview: new URLSearchParams(location.search).get("preview") === "1",
   };
 }

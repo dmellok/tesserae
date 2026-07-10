@@ -179,6 +179,60 @@ export default function render(shadow, ctx) {
 
   const arcBlock = sunArc(data.sun);
 
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card below. Each fragment paints self-contained, filling its own box.
+  const frag = ctx?.fragment || "full";
+  const SHEET = '<link rel="stylesheet" href="/static/style/spectra-widgets.css">';
+  if (frag === "temp") {
+    shadow.innerHTML = `${SHEET}
+      <style>
+        .w-body { display: flex; align-items: center; justify-content: center; height: 100%; gap: var(--space-3); }
+        .wx-now { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+        .wx-now .ph-bold { font-size: clamp(2.4em, 30cqmin, 8em); color: ${heroAccent}; line-height: 1; }
+        .wx-lockup { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+        .wx-temp { font-size: clamp(2.2em, 26cqmin, 7em); line-height: var(--lh-tight); }
+        .wx-cond { font-size: clamp(0.85em, 5cqmin, 1.5em); color: var(--text-secondary); }
+      </style>
+      <div class="w" data-widget="weather_now"><div class="w-body">
+        <div class="wx-now">
+          <i class="ph-bold ${icon}"></i>
+          <div class="wx-lockup"><div class="wx-temp">${escapeHtml(temp)}</div>${
+            cond ? `<div class="wx-cond">${escapeHtml(cond)}</div>` : ""
+          }</div>
+        </div>
+      </div></div>`;
+    return;
+  }
+  if (frag === "metrics") {
+    shadow.innerHTML = `${SHEET}
+      <style>
+        .w-body { display: flex; align-items: center; height: 100%; }
+        .wx-forecast { display: flex; align-items: stretch; gap: var(--space-3); width: 100%; }
+        .wx-cell { flex: 1; min-width: 0; }
+        .wx-cell .d { display: none; }
+      </style>
+      <div class="w" data-widget="weather_now"><div class="w-body">${
+        cells ? `<div class="wx-forecast">${cells}</div>` : '<p class="u-muted">No metrics</p>'
+      }</div></div>`;
+    return;
+  }
+  if (frag === "sun") {
+    shadow.innerHTML = `${SHEET}
+      <style>
+        .w-body { height: 100%; display: grid; }
+        .wx-sun { display: grid; grid-template-rows: 1fr auto; gap: var(--space-2); height: 100%; min-height: 0; padding: var(--space-3); }
+        .wx-sun svg { width: 100%; height: 100%; min-height: 0; display: block; align-self: end; }
+        .wx-sun-meta { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); letter-spacing: var(--ls-label); text-transform: var(--label-transform, uppercase); }
+        .wx-sun-end { display: inline-flex; align-items: center; gap: 0.35em; }
+        .wx-sun-day { color: var(--text-secondary); }
+      </style>
+      <div class="w" data-widget="weather_now"><div class="w-body">${
+        arcBlock || '<p class="u-muted">No sun data</p>'
+      }</div></div>`;
+    return;
+  }
+
   // Size-tiered layout. The base (.wx-body) is the md case: hero +
   // 4-cell metric strip. Container queries adjust either end:
   //
