@@ -1,13 +1,17 @@
 """esp32_client device contract.
 
-The firmware wakes on its sleep interval, fetches the retained .bin frame,
-paints, then publishes a heartbeat before going back to sleep. The
+The firmware wakes on its sleep interval, fetches the current .bin frame,
+publishes a heartbeat, paints any changed frame, then goes back to sleep. The
 heartbeat carries the bits useful for surfacing battery + signal health
 in the admin UI.
 
 Expected status payload:
 
-    {"battery_mv": int, "battery_pct": int, "rssi": int, "ip": "..."}
+    {"battery_mv": int, "battery_pct": int, "rssi": int, "ip": "...",
+     "temperature_c": float, "humidity_pct": float}
+
+Environmental fields are optional. Temperature stays canonical in Celsius;
+renderers with a unit preference can convert it at presentation time.
 
 Config payload (published from Tesserae, subscribed by the firmware):
 
@@ -39,6 +43,8 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         "battery_pct": None,
         "rssi": None,
         "ip": None,
+        "temperature_c": None,
+        "humidity_pct": None,
         # Optional smart-sync fields (issue #10). Firmware that publishes
         # either of these gives the server a more accurate wake-time
         # prediction than the configured ``sleep_interval_s`` fallback.
@@ -64,6 +70,8 @@ def parse_status(payload: bytes) -> dict[str, Any]:
         ("battery_pct", int),
         ("rssi", int),
         ("ip", str),
+        ("temperature_c", float),
+        ("humidity_pct", float),
         ("sleep_until", float),
         ("next_sleep_s", int),
     ):

@@ -42,11 +42,22 @@ from app.transport import BrokerConfig, MqttTransport
 logger = logging.getLogger(__name__)
 
 
-# Heartbeat fields that drift every beat (battery, signal, uptime). They
+# Heartbeat fields that drift every beat (battery, signal, environment,
+# uptime). They
 # update the live status cache + HA sensors, but a change in one of these
 # alone shouldn't write an event-log row, otherwise every heartbeat logs.
 _VOLATILE_STATUS_KEYS: frozenset[str] = frozenset(
-    {"battery_mv", "battery_pct", "rssi", "voltage", "uptime", "uptime_s", "last_paint"}
+    {
+        "battery_mv",
+        "battery_pct",
+        "rssi",
+        "voltage",
+        "temperature_c",
+        "humidity_pct",
+        "uptime",
+        "uptime_s",
+        "last_paint",
+    }
 )
 
 

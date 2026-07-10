@@ -98,9 +98,21 @@ def test_status_changed_meaningfully() -> None:
 
     # First sighting always counts.
     assert status_changed_meaningfully({}, {"state": "idle"}) is True
-    # Volatile-only drift (battery / rssi) does not.
-    prev = {"state": "idle", "battery_pct": 80, "rssi": -60}
-    same = {"state": "idle", "battery_pct": 74, "rssi": -71}
+    # Volatile-only drift (battery / rssi / environment) does not.
+    prev = {
+        "state": "idle",
+        "battery_pct": 80,
+        "rssi": -60,
+        "temperature_c": 25.4,
+        "humidity_pct": 58.2,
+    }
+    same = {
+        "state": "idle",
+        "battery_pct": 74,
+        "rssi": -71,
+        "temperature_c": 25.5,
+        "humidity_pct": 58.1,
+    }
     assert status_changed_meaningfully(prev, same) is False
     # A real field change does.
     assert status_changed_meaningfully(prev, {"state": "rendering", "battery_pct": 80}) is True

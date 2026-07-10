@@ -34,13 +34,22 @@ def test_manifest_fields(esp) -> None:
 
 def test_parse_status_normalises_known_fields(esp) -> None:
     payload = json.dumps(
-        {"battery_mv": 3850, "battery_pct": 72, "rssi": -64, "ip": "10.0.0.42"}
+        {
+            "battery_mv": 3850,
+            "battery_pct": 72,
+            "rssi": -64,
+            "ip": "10.0.0.42",
+            "temperature_c": "25.4",
+            "humidity_pct": "58.2",
+        }
     ).encode()
     parsed = esp.parse_status(payload)
     assert parsed["battery_mv"] == 3850
     assert parsed["battery_pct"] == 72
     assert parsed["rssi"] == -64
     assert parsed["ip"] == "10.0.0.42"
+    assert parsed["temperature_c"] == 25.4
+    assert parsed["humidity_pct"] == 58.2
 
 
 def test_parse_status_empty_payload_returns_none_fields(esp) -> None:
@@ -50,6 +59,8 @@ def test_parse_status_empty_payload_returns_none_fields(esp) -> None:
         "battery_pct": None,
         "rssi": None,
         "ip": None,
+        "temperature_c": None,
+        "humidity_pct": None,
         # Smart-sync optional fields (issue #10).
         "sleep_until": None,
         "next_sleep_s": None,

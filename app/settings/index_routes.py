@@ -10,6 +10,7 @@ shape regardless of source. Helpers below (``_values_for_core``,
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from pathlib import Path
@@ -1362,13 +1363,35 @@ def _humanize_firmware(parsed: dict[str, Any]) -> dict[str, Any] | None:
     return {"value": str(fw) if fw is not None else "Unknown", "sub": str(ip) if ip else None}
 
 
+def _humanize_environment(parsed: dict[str, Any]) -> dict[str, str | None] | None:
+    """Format optional environmental telemetry for one compact status tile."""
+
+    def finite_float(value: Any) -> float | None:
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        return number if math.isfinite(number) else None
+
+    temperature = finite_float(parsed.get("temperature_c"))
+    humidity = finite_float(parsed.get("humidity_pct"))
+    if temperature is None and humidity is None:
+        return None
+    if temperature is not None:
+        return {
+            "value": f"{temperature:.1f} °C",
+            "sub": f"{humidity:.0f}% RH" if humidity is not None else None,
+        }
+    return {"value": f"{humidity:.0f}% RH", "sub": None}
+
+
 def _status_tiles(parsed: dict[str, Any]) -> dict[str, Any]:
-    """Three-tile humanized summary used on the Status tab of the
-    device card (Signal / Power / Firmware)."""
+    """Humanized summary used on the Status tab of the device card."""
     return {
         "signal": _humanize_signal(parsed.get("rssi")),
         "power": _humanize_power(parsed),
         "firmware": _humanize_firmware(parsed),
+        "environment": _humanize_environment(parsed),
     }
 
 
