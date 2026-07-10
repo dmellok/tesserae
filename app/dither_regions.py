@@ -1,16 +1,17 @@
 """Mode-agnostic dither region map (issue #86).
 
 Dithering is applied once, globally, to the whole composition at pack time
-(per device gamut + calibration). Flat-colour UI widgets (calendar, weather,
-clock, HA tiles) read cleaner mapped straight to the panel palette with
-nearest-colour and no error diffusion; diffusion only earns its place on
-tonal / photographic content. Widgets already declare the intent via
-``render.dither`` in their manifest ("none" for most graphical widgets),
-but nothing consumed it in the render path.
+(per device gamut + calibration). On rich panels a flat-colour UI cell can
+read cleaner mapped straight to the palette with nearest-colour and no error
+diffusion. But on low-palette panels (1-bit mono, 6-colour Spectra) dither
+is what renders anti-aliased text and subtle shading as apparent tone, so
+flattening there loses detail. Flat is therefore strictly opt-in per cell
+(the editor's Advanced pane), never inferred from a widget manifest; the
+default keeps the frame's dither everywhere so no panel regresses.
 
-This module turns those per-widget hints into a list of positioned
-rectangles plus a rasteriser the ``.bin`` packers consume as a per-pixel
-"force nearest here" mask.
+This module turns the per-cell opt-outs into a list of positioned rectangles
+plus a rasteriser the ``.bin`` packers consume as a per-pixel "force nearest
+here" mask.
 
 The list-of-rects contract is composition-mode agnostic on purpose. Grid
 mode feeds it one rect per cell (:func:`regions_from_page`); a future
@@ -34,7 +35,6 @@ from typing import TYPE_CHECKING, Any
 from PIL import Image, ImageDraw
 
 if TYPE_CHECKING:
-    from app.plugin_loader import PluginRegistry
     from app.state.page_store import Page
 
 # Value written into the "L" mask where a region wants nearest-colour. 0 is
@@ -44,40 +44,36 @@ _NEAREST = 255
 _FRAME = 0
 
 
-def _wants_nearest(dither_hint: str | None) -> bool:
-    """A widget opts out of dithering with ``render.dither: "none"``. Any
-    other value (or an absent hint) means "use the frame default", i.e. let
-    the device's global dither strategy run over this region."""
-    return dither_hint == "none"
-
-
-def regions_from_page(page: Page, registry: PluginRegistry) -> list[dict[str, Any]]:
+def regions_from_page(page: Page) -> list[dict[str, Any]]:
     """Per-cell dither regions for a dashboard page, in z-order (cell order).
 
-    Each region is ``{x, y, w, h, nearest}``; ``nearest`` is True when the
-    cell's widget declares ``render.dither: "none"``. Cells with no plugin
-    (layout placeholders) are skipped. Coordinates are the cell's panel
-    pixels, the composition's own orientation, the .bin renderer applies the
-    same geometric transforms to the rasterised mask as it does to the image
-    (see :func:`transform_mask`)."""
+    Each region is ``{x, y, w, h, nearest}``. ``nearest`` is True only when
+    the cell's ``dither`` override is ``"none"`` (the editor's Advanced pane,
+    "Flat colour"). Everything else, no override, ``"auto"``, or any cell
+    with no explicit opt-out, keeps the frame's dither.
+
+    Dithering is the default on purpose. On low-palette panels (1-bit mono,
+    6-colour Spectra) error diffusion is what renders anti-aliased text and
+    subtle shading as apparent tone; flattening a cell to nearest-colour
+    there throws that detail away. So flat is strictly opt-in per cell, never
+    inferred from the widget's manifest, a widget that looks "flat" still
+    has anti-aliased edges that want dithering on those panels.
+
+    Cells with no plugin (layout placeholders) are skipped. Coordinates are
+    the cell's panel pixels, the composition's own orientation, the .bin
+    renderer applies the same geometric transforms to the rasterised mask as
+    it does to the image (see :func:`transform_mask`)."""
     regions: list[dict[str, Any]] = []
     for cell in page.cells:
         if not cell.plugin:
             continue
-        hint: str | None = None
-        plugin = registry.get(cell.plugin)
-        if plugin is not None:
-            render_meta = plugin.manifest.get("render")
-            if isinstance(render_meta, dict):
-                raw = render_meta.get("dither")
-                hint = raw if isinstance(raw, str) else None
         regions.append(
             {
                 "x": int(cell.x),
                 "y": int(cell.y),
                 "w": int(cell.w),
                 "h": int(cell.h),
-                "nearest": _wants_nearest(hint),
+                "nearest": cell.dither == "none",
             }
         )
     return regions

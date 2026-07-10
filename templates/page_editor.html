@@ -108,7 +108,7 @@
        the gap-derived padding AND the full-bleed manifest rule for
        this cell. #}
     <details class="dx-cell-tweaks">
-      <summary>Layout tweaks</summary>
+      <summary>Advanced</summary>
       <div class="dx-cell-tweaks-body">
         <label class="switch dx-cell-tweak-switch">
           <input type="checkbox" name="padding_override_enabled" value="1"
@@ -121,6 +121,24 @@
                   value=(cell.padding_override if cell.padding_override is not none else 0),
                   min=0, max=80, step=1, unit='px',
                   help='Applied to all four inner edges of the cell. Wins over the page-level gap and the widget\'s full-bleed flag when the switch above is on.') }}
+        {# v0.74.x per-cell dither override (issue #86). Off by default =
+           the cell is dithered like everything else. Dithering is what
+           renders anti-aliased text and shading as tone on low-colour
+           panels (1-bit, 6-colour Spectra), so flattening is opt-in only.
+           On + Flat forces nearest-colour for this cell; useful for solid
+           blocks / sharp line art. Only affects server-quantise .bin panels. #}
+        <label class="switch dx-cell-tweak-switch">
+          <input type="checkbox" name="dither_override_enabled" value="1"
+                 {% if cell.dither is not none %}checked{% endif %}
+                 data-cell-tweak-toggle>
+          <span>Override dithering for this cell</span>
+        </label>
+        <label for="cell-{{ cell.id }}-dither">Dithering</label>
+        <select id="cell-{{ cell.id }}-dither" name="dither_mode">
+          <option value="auto" {% if cell.dither == 'auto' %}selected{% endif %}>Dither (smooth)</option>
+          <option value="none" {% if cell.dither == 'none' %}selected{% endif %}>Flat colour (no dither)</option>
+        </select>
+        <p class="field-help">Dithering (the default) error-diffuses the cell; on 1-bit and 6-colour panels it's what keeps text and shading legible. Flat maps straight to the palette with no diffusion, cleaner only for solid blocks or sharp line art. Applies when the switch above is on, and only on e-ink panels the server quantises (Inky / ESP32 .bin).</p>
       </div>
     </details>
 

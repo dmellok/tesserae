@@ -1106,6 +1106,7 @@ def _apply_cell_form(cell: Cell, form: Any, panel: Any) -> Cell:
             "options": options,
             "zoom": _coerce_float(form.get("zoom"), cell.zoom, lo=0.5, hi=3.0),
             "padding_override": _padding_override_from_form(form, cell.padding_override),
+            "dither": _dither_override_from_form(form, cell.dither),
         }
     )
 
@@ -1127,6 +1128,26 @@ def _padding_override_from_form(form: Any, current: int | None) -> int | None:
     return _coerce_int(
         form.get("padding_override"), current if current is not None else 0, lo=0, hi=80
     )
+
+
+def _dither_override_from_form(form: Any, current: str | None) -> str | None:
+    """Parse the Advanced pane's dither-override pair (issue #86).
+
+    UI shape mirrors the padding override: a checkbox
+    (``dither_override_enabled``) gates a select (``dither_mode``, ``none``
+    for flat / ``auto`` for smooth). Checkbox off -> None (inherit the
+    widget's ``render.dither`` manifest hint, the default). A missing
+    checkbox means the pair wasn't on this form (partial-form autosave), so
+    keep the current value rather than wiping it."""
+    if "dither_override_enabled" not in form and "dither_mode" not in form:
+        return current
+    enabled = form.get("dither_override_enabled") in ("1", "true", "on")
+    if not enabled:
+        return None
+    mode = (form.get("dither_mode") or "").strip()
+    if mode in ("none", "auto"):
+        return mode
+    return current if current in ("none", "auto") else "none"
 
 
 @bp.post("/<page_id>/preview")

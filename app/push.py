@@ -61,7 +61,6 @@ from app.panel import (
     panel_groups_for_push,
     resolve_settings_panel,
 )
-from app.plugin_loader import PluginRegistry
 from app.quiet_hours import device_is_quiet
 from app.renderer import BrowserPool, RenderRequest, render_to_png, to_loopback_url
 from app.renderer_loader import Renderer, RendererRegistry
@@ -342,13 +341,8 @@ class PushManager:
         browser_pool_fn: Callable[[], BrowserPool | None] | None = None,
         device_status_fn: Callable[[], dict[str, dict[str, Any]]] | None = None,
         palette_profile_store: PaletteProfileStore | None = None,
-        plugin_registry: PluginRegistry | None = None,
     ) -> None:
         self._registry = registry
-        # Optional, enables the per-cell dither map (issue #86). Read to
-        # resolve each cell's widget ``render.dither`` hint into a region
-        # mask at compose time. None keeps the pre-#86 global-dither path.
-        self._plugins = plugin_registry
         self._page_store = page_store
         self._transport = transport
         self._settings = settings
@@ -853,17 +847,14 @@ class PushManager:
         # not a min-across-all-devices aggregate. Everything else keeps
         # the panel-group fan-out (one render → many devices).
         per_device_render = _page_needs_per_device_render(page)
-        # Per-cell dither map (issue #86): resolve each cell's widget
-        # ``render.dither`` into a region list once for the whole page. The
-        # geometry is composition-space (cell pixels), so it's shared across
-        # panel groups; the .bin renderers rasterise + transform it to match
-        # each panel. Skip entirely unless some cell opts out of dithering,
-        # so all-photo / all-diffuse pages pack byte-identically to before.
-        dither_regions: list[dict[str, Any]] | None = None
-        if self._plugins is not None:
-            candidate = regions_from_page(page, self._plugins)
-            if has_nearest_region(candidate):
-                dither_regions = candidate
+        # Per-cell dither map (issue #86): collect the cells that opted out
+        # of dithering (Advanced pane -> Flat colour) once for the whole
+        # page. Geometry is composition-space (cell pixels), so it's shared
+        # across panel groups; the .bin renderers rasterise + transform it to
+        # match each panel. Skip entirely unless some cell opts out, so every
+        # other page packs byte-identically to before.
+        candidate = regions_from_page(page)
+        dither_regions = candidate if has_nearest_region(candidate) else None
         for panel, group_dids in groups:
             # When per-device-render is on and there ARE bound devices,
             # iterate over each device; a compose URL with ``device_id``

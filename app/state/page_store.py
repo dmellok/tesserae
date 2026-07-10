@@ -109,6 +109,13 @@ class Cell(BaseModel):
     # envelope the page-level corner-radius slider uses so the UI
     # doesn't need a second range.
     padding_override: int | None = Field(default=None, ge=0, le=80)
+    # v0.74.x per-cell dither override (issue #86). None means "inherit
+    # the widget's ``render.dither`` manifest hint" (the default, so
+    # existing pages are unchanged). ``"none"`` forces this cell onto the
+    # flat nearest-colour path; ``"auto"`` forces the frame's dither even
+    # when the widget's manifest opted out. Consumed by
+    # ``app.dither_regions.regions_from_page``.
+    dither: str | None = None
 
 
 class Page(BaseModel):

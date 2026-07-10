@@ -1,10 +1,12 @@
 """Mode-agnostic dither region map (issue #86).
 
-The producer turns per-widget ``render.dither`` hints into positioned
-rectangles; the rasteriser paints them into a nearest-colour mask in
-painter's order (so a future canvas mode with overlapping elements resolves
-the same way as today's non-overlapping grid); the transform keeps the mask
-aligned with the image through the .bin renderers' geometric pipeline.
+Dithering is the default on every panel; flattening a cell to nearest-colour
+is opt-in via the cell's ``dither`` override ("none"). The producer collects
+those opt-outs into positioned rectangles; the rasteriser paints them into a
+nearest-colour mask in painter's order (so a future canvas mode with
+overlapping elements resolves the same way as today's non-overlapping grid);
+the transform keeps the mask aligned with the image through the .bin
+renderers' geometric pipeline.
 """
 
 from __future__ import annotations
@@ -13,7 +15,6 @@ import importlib.util
 import io
 from pathlib import Path
 from types import ModuleType
-from typing import Any
 
 import numpy as np
 import pytest
@@ -29,52 +30,51 @@ from app.main import REPO_ROOT
 from app.state.page_store import Cell, Page, Panel
 
 
-class _FakePlugin:
-    def __init__(self, dither: str | None) -> None:
-        render: dict[str, Any] = {}
-        if dither is not None:
-            render["dither"] = dither
-        self.manifest: dict[str, Any] = {"render": render}
+def _cell(
+    cid: str,
+    plugin: str | None,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    dither: str | None = None,
+) -> Cell:
+    return Cell(id=cid, plugin=plugin, x=x, y=y, w=w, h=h, dither=dither)
 
 
-class _FakeRegistry:
-    def __init__(self, mapping: dict[str, str | None]) -> None:
-        self._mapping = mapping
-
-    def get(self, plugin_id: str) -> _FakePlugin | None:
-        if plugin_id not in self._mapping:
-            return None
-        return _FakePlugin(self._mapping[plugin_id])
-
-
-def _cell(cid: str, plugin: str | None, x: int, y: int, w: int, h: int) -> Cell:
-    return Cell(id=cid, plugin=plugin, x=x, y=y, w=w, h=h)
-
-
-def test_regions_from_page_marks_none_dither_as_nearest() -> None:
+def test_only_flat_override_marks_a_cell_nearest() -> None:
+    """Nearest is opt-in per cell: only ``dither == "none"`` flattens. No
+    override (the default) and an explicit ``"auto"`` both keep the frame's
+    dither, so nothing regresses on low-palette panels unless the user asks."""
     page = Page(
         id="p",
         name="P",
         cells=[
-            _cell("a", "weather_now", 0, 0, 100, 100),  # dither: none -> nearest
-            _cell("b", "picture_apod", 100, 0, 100, 100),  # dither: fs -> frame
-            _cell("c", None, 200, 0, 50, 50),  # placeholder, skipped
+            _cell("a", "weather_now", 0, 0, 100, 100, dither="none"),  # flat opt-in
+            _cell("b", "weather_now", 100, 0, 100, 100, dither="auto"),  # explicit dither
+            _cell("c", "picture_apod", 200, 0, 100, 100),  # default -> dither
+            _cell("d", None, 300, 0, 50, 50),  # placeholder, skipped
         ],
     )
-    registry = _FakeRegistry({"weather_now": "none", "picture_apod": "floyd-steinberg"})
-    regions = regions_from_page(page, registry)  # type: ignore[arg-type]
-    assert [r["nearest"] for r in regions] == [True, False]
+    regions = regions_from_page(page)
+    assert [r["nearest"] for r in regions] == [True, False, False]
     assert regions[0]["x"] == 0 and regions[0]["w"] == 100
     assert has_nearest_region(regions) is True
 
 
-def test_regions_missing_plugin_defaults_to_frame_dither() -> None:
-    """A cell whose plugin id doesn't resolve (uninstalled widget) must not
-    force nearest, we can't claim it's flat UI, so leave it on the frame
-    default rather than guess."""
-    page = Page(id="p", name="P", cells=[_cell("a", "ghost", 0, 0, 10, 10)])
-    regions = regions_from_page(page, _FakeRegistry({}))  # type: ignore[arg-type]
-    assert regions == [{"x": 0, "y": 0, "w": 10, "h": 10, "nearest": False}]
+def test_page_with_no_overrides_has_no_nearest_regions() -> None:
+    """A page where no cell opts out packs byte-identically to before, so the
+    push side skips the mask entirely."""
+    page = Page(
+        id="p",
+        name="P",
+        cells=[
+            _cell("a", "weather_now", 0, 0, 10, 10),
+            _cell("b", "picture_apod", 10, 0, 10, 10),
+        ],
+    )
+    regions = regions_from_page(page)
+    assert all(r["nearest"] is False for r in regions)
     assert has_nearest_region(regions) is False
 
 

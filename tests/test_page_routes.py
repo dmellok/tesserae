@@ -482,6 +482,59 @@ def test_padding_override_ignored_when_partial_form_lacks_both_fields(
     assert _store(tmp_path).get(pid).cells[0].padding_override == 16
 
 
+def test_dither_override_saves_selected_mode(app: Flask, tmp_path: Path) -> None:
+    """Advanced pane (issue #86): checkbox on + a mode → stored on the cell."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "dither_override_enabled": "1", "dither_mode": "none"},
+    )
+    assert _store(tmp_path).get(pid).cells[0].dither == "none"
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "dither_override_enabled": "1", "dither_mode": "auto"},
+    )
+    assert _store(tmp_path).get(pid).cells[0].dither == "auto"
+
+
+def test_dither_override_clears_when_checkbox_off(app: Flask, tmp_path: Path) -> None:
+    """Switch off (checkbox absent, select still present) resets to None so
+    the cell falls back to the widget's manifest dither hint."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "dither_override_enabled": "1", "dither_mode": "none"},
+    )
+    assert _store(tmp_path).get(pid).cells[0].dither == "none"
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "dither_mode": "none"},  # checkbox absent
+    )
+    assert _store(tmp_path).get(pid).cells[0].dither is None
+
+
+def test_dither_override_ignored_when_partial_form_lacks_both_fields(
+    app: Flask, tmp_path: Path
+) -> None:
+    """A partial-form autosave (geometry only) must not wipe the override."""
+    client = app.test_client()
+    _sign_in(client)
+    pid = _new(client, name="Home", layout="1_cell")
+    cell_id = _store(tmp_path).get(pid).cells[0].id
+    client.post(
+        f"/pages/{pid}/cells/{cell_id}",
+        data={"plugin": "widget_a", "dither_override_enabled": "1", "dither_mode": "auto"},
+    )
+    client.post(f"/pages/{pid}/cells/{cell_id}", data={"plugin": "widget_a"})
+    assert _store(tmp_path).get(pid).cells[0].dither == "auto"
+
+
 # -- status bar toggle (v0.71.0) -----------------------------------
 
 
