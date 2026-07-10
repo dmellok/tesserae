@@ -231,6 +231,70 @@ def test_save_route_404_for_unknown_canvas(app: Flask, monkeypatch: pytest.Monke
     assert client.post("/experiments/composer/c/nope/save", json={}).status_code == 404
 
 
+def test_compose_canvas_renders_elements_and_data(app: Flask) -> None:
+    """The render target injects the element list + a data map (widget sample
+    keyed widget.field), using the shared renderer. Lives under /compose/ so
+    the headless renderer reaches it."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "e1",
+                    "type": "big",
+                    "x": 10,
+                    "y": 10,
+                    "w": 120,
+                    "h": 60,
+                    "binding": "weather_now.temp",
+                }
+            ]
+        },
+    )
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert '"weather_now.temp"' in body  # data map keyed widget.field
+    assert '"e1"' in body  # the element rides through
+    assert "panels/render.js" in body  # shared renderer
+
+
+def test_compose_canvas_404_when_flag_off_or_missing(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    # Flag off -> 404 even for a real id.
+    app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
+    assert client.get(f"/compose/canvas/{cid}").status_code == 404
+    app.config["SETTINGS_STORE"].update_section("experiments", {"composer": True})
+    assert client.get("/compose/canvas/nope").status_code == 404
+
+
+def test_preview_png_screenshots_at_panel_dims(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """preview.png renders the compose page at the canvas dims and returns the
+    PNG. The browser call is mocked (no Chromium in CI)."""
+    seen = {}
+
+    def fake_render(request: object, pool: object = None) -> bytes:
+        seen["w"] = getattr(request, "viewport_w", None)
+        seen["h"] = getattr(request, "viewport_h", None)
+        return b"\x89PNGfake"
+
+    monkeypatch.setattr("app.renderer.render_to_png", fake_render)
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(f"/experiments/composer/c/{cid}/save", json={"w": 800, "h": 480, "els": []})
+    resp = client.get(f"/experiments/composer/c/{cid}/preview.png")
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+    assert resp.data == b"\x89PNGfake"
+    assert (seen["w"], seen["h"]) == (800, 480)
+
+
 def test_build_catalog_sorts_and_omits_schemaless() -> None:
     registry = _FakeRegistry(
         [

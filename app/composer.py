@@ -680,6 +680,41 @@ def compose(page_id: str) -> str:
     )
 
 
+@bp.get("/compose/canvas/<canvas_id>")
+def compose_canvas(canvas_id: str) -> str:
+    """Render target for a Panels canvas document (issue #60).
+
+    Lives under ``/compose/`` so it inherits that path's loopback bypass (the
+    headless renderer reaches it without the login gate). Gated by the
+    ``composer`` experiment. Injects the element list + a data map (each
+    widget's declared sample keyed ``widget.field``) into
+    ``panels_compose.html``, which paints them with the shared PanelsRender.
+    """
+    from app import experiments
+
+    if not experiments.is_enabled("composer"):
+        abort(404)
+    store = current_app.config.get("PANEL_STORE")
+    doc = store.get(canvas_id) if store is not None else None
+    if doc is None:
+        abort(404)
+    from app.panels_schema import build_catalog
+
+    catalog = build_catalog(current_app.config["PLUGIN_REGISTRY"])
+    data: dict[str, Any] = {}
+    for widget in catalog:
+        for field_name, value in (widget.get("sample") or {}).items():
+            data[f"{widget['key']}.{field_name}"] = value
+    dumped = doc.model_dump(mode="json")
+    return render_template(
+        "panels_compose.html",
+        els_json=json.dumps(dumped["els"]),
+        data_json=json.dumps(data),
+        w=doc.w,
+        h=doc.h,
+    )
+
+
 @bp.get("/_test/render")
 def test_render() -> str:
     """Mount one plugin into a known cell size, no Page needed.

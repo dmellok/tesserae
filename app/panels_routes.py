@@ -131,6 +131,26 @@ def save(canvas_id: str) -> Response:
     return jsonify({"status": "ok", "id": canvas_id, "elements": len(doc.els)})
 
 
+@bp.get("/c/<canvas_id>/preview.png")
+def preview(canvas_id: str) -> Response:
+    """Render the canvas to a PNG at its panel dims and return it.
+
+    Screenshots the loopback ``/compose/canvas/<id>`` page (the shared
+    renderer) via the same Playwright path a device push uses, so the preview
+    is pixel-faithful to what a panel would paint. Cold Chromium (pool=None)
+    keeps this dependency-free; a warm pool is a later optimisation."""
+    _guard()
+    doc = _store().get(canvas_id)
+    if doc is None:
+        abort(404)
+    from app.renderer import RenderRequest, render_to_png, to_loopback_url
+
+    path = url_for("composer.compose_canvas", canvas_id=canvas_id)
+    url = to_loopback_url(request.host_url.rstrip("/") + path)
+    png = render_to_png(RenderRequest(url=url, viewport_w=doc.w, viewport_h=doc.h), pool=None)
+    return current_app.response_class(png, mimetype="image/png")
+
+
 @bp.get("/catalog.json")
 def catalog() -> Response:
     """Widget catalog for the editor's Data panel + bind list: every widget

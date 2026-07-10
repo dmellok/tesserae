@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  {# Canvas render target (issue #60). Playwright screenshots this at panel
+     dims; the packed frame goes to the device. It renders elements with the
+     SAME PanelsRender module the editor uses, so what you design is what the
+     panel paints. Reachable over loopback (path under /compose/) so the
+     headless renderer doesn't hit the login gate. #}
+  <style>
+    html, body { margin: 0; padding: 0; background: #F7F5F0; }
+    #panels-board {
+      position: relative;
+      width: {{ w }}px;
+      height: {{ h }}px;
+      background: #F7F5F0;
+      color: #1B1A16;
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-variant-numeric: tabular-nums;
+      overflow: hidden;
+    }
+  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+</head>
+<body>
+  <div id="panels-board"></div>
+  <script id="panels-els" type="application/json">{{ els_json | safe }}</script>
+  <script id="panels-data" type="application/json">{{ data_json | safe }}</script>
+  <script src="{{ url_for('static', filename='panels/render.js') }}"></script>
+  <script src="{{ url_for('static', filename='panels/compose.js') }}"></script>
+</body>
+</html>
