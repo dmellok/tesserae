@@ -541,7 +541,8 @@ def devices_register_discovered(discovered_id: str) -> Response:
         return redirect(url_for("auth.settings_area", area="devices"))
 
     form = request.form
-    kind_id = (form.get("kind") or entry.kind or "").strip()
+    explicit_kind = (form.get("kind") or "").strip()
+    kind_id = explicit_kind or entry.kind or ""
     if not kind_id:
         flash(
             f"Discovered device {discovered_id!r} didn't advertise a kind; "
@@ -550,26 +551,35 @@ def devices_register_discovered(discovered_id: str) -> Response:
         )
         return redirect(url_for("auth.settings_area", area="devices"))
 
+    # Did the user pick a different variant from the picker (issue #82)?
+    # The two 4" Inky panels share the pi_bin protocol but differ in gamut
+    # and dims; a pi_bin client can't say which it is, so its heartbeat
+    # dims / gamut are exactly what we distrust here. An explicit variant
+    # pick is the stronger signal: skip the heartbeat panel overrides so
+    # the chosen kind's authoritative panel stands unmodified.
+    user_picked_variant = bool(explicit_kind) and explicit_kind != (entry.kind or "")
+
     # Guard against firmware reporting panel_w / panel_h as zero (a
     # default-int from a C struct that wasn't populated). Without this
     # check the resulting instance lands with a corrupted panel that
     # Panel(w > 0, h > 0) rejects later, breaking /send. Better to let
     # create_instance fall back to the kind's default panel.
     panel_overrides: dict[str, Any] = {}
-    if entry.panel_w is not None and entry.panel_w > 0:
-        panel_overrides["w"] = entry.panel_w
-    if entry.panel_h is not None and entry.panel_h > 0:
-        panel_overrides["h"] = entry.panel_h
-    # Gamut carried in the discover payload (v0.69.1, issue #41) lets a
-    # generic CircuitPython client tell Tesserae which colour target it
-    # paints against so the same generic kind can drive different-shape
-    # panels without a per-SKU manifest add. Canonicalise here so the
-    # on-disk value always matches the .bin packer's lookup keys or an
-    # accepted metadata label (mono / rgb24 / rgb16).
-    if entry.gamut:
-        from app.quantizer import canonicalise_gamut
+    if not user_picked_variant:
+        if entry.panel_w is not None and entry.panel_w > 0:
+            panel_overrides["w"] = entry.panel_w
+        if entry.panel_h is not None and entry.panel_h > 0:
+            panel_overrides["h"] = entry.panel_h
+        # Gamut carried in the discover payload (v0.69.1, issue #41) lets a
+        # generic CircuitPython client tell Tesserae which colour target it
+        # paints against so the same generic kind can drive different-shape
+        # panels without a per-SKU manifest add. Canonicalise here so the
+        # on-disk value always matches the .bin packer's lookup keys or an
+        # accepted metadata label (mono / rgb24 / rgb16).
+        if entry.gamut:
+            from app.quantizer import canonicalise_gamut
 
-        panel_overrides["gamut"] = canonicalise_gamut(entry.gamut)
+            panel_overrides["gamut"] = canonicalise_gamut(entry.gamut)
 
     # TRMNL discoveries carry the original access_token in the cache
     # entry's parsed payload so create_instance can preserve it, the

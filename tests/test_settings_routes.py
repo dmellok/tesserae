@@ -962,6 +962,61 @@ def test_discovered_json_lists_only_unregistered(app_with_gate: Flask) -> None:
     assert "esp32_attic" not in {d["id"] for d in data["devices"]}
 
 
+def test_register_discovered_honours_declared_gamut(app_with_gate: Flask) -> None:
+    """Issue #82, auto path: a pi_bin heartbeat that declares its gamut +
+    real dims lands on the right panel even though it named the Spectra 6
+    kind. The legacy ACeP panel (640x400, 7-colour) must not register as
+    600x400 waveshare_e6."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record(
+        "inky_legacy",
+        b'{"kind":"pimoroni_inky_4","panel_w":640,"panel_h":400,"gamut":"acep_7colour"}',
+    )
+    resp = client.post("/settings/devices/discovery/inky_legacy/register", follow_redirects=False)
+    assert resp.status_code == 302
+    inst = app_with_gate.config["DEVICE_REGISTRY"].get("inky_legacy")
+    assert inst is not None and inst.panel is not None
+    assert (inst.panel["w"], inst.panel["h"]) == (640, 400)
+    assert inst.panel["gamut"] == "inky_7colour"
+
+
+def test_register_discovered_variant_pick_overrides_heartbeat(app_with_gate: Flask) -> None:
+    """Issue #82, manual path: when the user picks a variant from the
+    picker it is authoritative over the heartbeat's (untrusted) dims. A
+    client naming the Spectra 6 kind at 600x400 must land on the picked
+    ACeP kind's canonical 640x400, not the heartbeat resolution."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    cache = app_with_gate.config["DISCOVERY_CACHE"]
+    cache.record("inky_pick", b'{"kind":"pimoroni_inky_4","panel_w":600,"panel_h":400}')
+    resp = client.post(
+        "/settings/devices/discovery/inky_pick/register",
+        data={"kind": "pimoroni_inky_4_acep"},
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    inst = app_with_gate.config["DEVICE_REGISTRY"].get("inky_pick")
+    assert inst is not None and inst.panel is not None
+    assert inst.kind_of == "pimoroni_inky_4_acep"
+    # ACeP canonical dims win; the heartbeat's 600 is discarded.
+    assert (inst.panel["w"], inst.panel["h"]) == (640, 400)
+
+
+def test_variant_options_preselects_by_declared_gamut(app_with_gate: Flask) -> None:
+    """The picker pre-selects the sibling whose panel matches a declared
+    gamut, so one-click register is correct without touching the dropdown
+    once the client firmware learns to declare its gamut."""
+    from app.settings._shared import variant_options
+
+    with app_with_gate.app_context():
+        opts = variant_options("pimoroni_inky_4", "acep_7colour")
+    assert len(opts) >= 2
+    selected = [o for o in opts if o["selected"]]
+    assert [o["id"] for o in selected] == ["pimoroni_inky_4_acep"]
+
+
 def test_delete_refuses_built_in_kind(app_with_gate: Flask) -> None:
     """Built-in kinds ship with the app and must not be deletable."""
     client = app_with_gate.test_client()

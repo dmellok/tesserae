@@ -416,19 +416,31 @@ def register_discovered(discovered_id: str) -> Response:
     if entry is None or not entry.kind:
         flash("That device is no longer announcing itself, add it by hand.", "error")
         return redirect(url_for("onboarding.step", step="device"))
+    # Parity with app.settings.devices_routes.devices_register_discovered
+    # (issue #82). An explicit variant pick is authoritative over the
+    # heartbeat's dims / gamut (which we can't trust to identify the
+    # panel); without one, honour the declared dims + gamut.
+    explicit_kind = (request.form.get("kind") or "").strip()
+    kind_id = explicit_kind or entry.kind
+    user_picked_variant = bool(explicit_kind) and explicit_kind != (entry.kind or "")
     # Guard against firmware reporting panel dims as zero; mirrors the
     # check in app.settings.devices_routes.devices_register_discovered.
     overrides: dict[str, Any] = {}
-    if entry.panel_w is not None and entry.panel_w > 0:
-        overrides["w"] = entry.panel_w
-    if entry.panel_h is not None and entry.panel_h > 0:
-        overrides["h"] = entry.panel_h
+    if not user_picked_variant:
+        if entry.panel_w is not None and entry.panel_w > 0:
+            overrides["w"] = entry.panel_w
+        if entry.panel_h is not None and entry.panel_h > 0:
+            overrides["h"] = entry.panel_h
+        if entry.gamut:
+            from app.quantizer import canonicalise_gamut
+
+            overrides["gamut"] = canonicalise_gamut(entry.gamut)
     result = device_service.create_instance(
         devices=_devices(),
         renderers=_renderers(),
         data_root=_data_root(),
         instance_id=discovered_id,
-        kind_id=entry.kind,
+        kind_id=kind_id,
         panel_overrides=overrides,
     )
     if not result.ok or result.device is None:

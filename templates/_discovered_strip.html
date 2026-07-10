@@ -30,6 +30,17 @@
   <div class="dx-discovered-actions">
     {% if d.kind %}
     <form method="post" action="{{ url_for('auth.devices_register_discovered', discovered_id=d.id) }}" class="form form--inline">
+      {% if d.variants %}
+      {# Sibling panels share a wire protocol but differ in gamut / dims
+         (e.g. Inky 4" Spectra 6 600×400 vs legacy ACeP 640×400). The
+         client can't say which it is, so let the user confirm; the
+         pre-selected option follows a declared gamut when present. #}
+      <select name="kind" class="dx-variant-select" aria-label="Panel variant">
+        {% for v in d.variants %}
+        <option value="{{ v.id }}"{% if v.selected %} selected{% endif %}>{{ v.name }}{% if v.w and v.h %} ({{ v.w }}×{{ v.h }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      {% endif %}
       <button type="submit" class="dx-btn-primary-sm"><i class="ph ph-plus" aria-hidden="true"></i><span>Register</span></button>
     </form>
     {% else %}

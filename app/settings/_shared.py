@@ -149,6 +149,80 @@ def device_kinds() -> list[Device]:
     return [d for d in devices().all() if d.kind_of is None]
 
 
+def _kind_protocol(kind: Device) -> str:
+    """The wire protocol a kind speaks. Hardware-catalog SKUs carry it
+    under ``_catalog_entry.protocol``; a folder-defined protocol kind is
+    its own protocol (its id)."""
+    ce = kind.manifest.get("_catalog_entry")
+    if isinstance(ce, dict) and isinstance(ce.get("protocol"), str) and ce["protocol"]:
+        return str(ce["protocol"])
+    return kind.id
+
+
+def variant_options(kind_id: str | None, declared_gamut: str | None) -> list[dict[str, Any]]:
+    """Sibling kinds that share ``kind_id``'s wire protocol, for the
+    discovered-device variant picker (issue #82).
+
+    Two 4" Pimoroni Inky panels illustrate the need: the current Spectra 6
+    (``pimoroni_inky_4``, 600x400) and the legacy 7-colour ACeP
+    (``pimoroni_inky_4_acep``, 640x400) share the pi_bin protocol but
+    differ in gamut and dims. A pi_bin client can't tell Tesserae which
+    variant it is, so the legacy panel registers as Spectra 6 with the
+    wrong resolution.
+
+    Returns [] when the kind is unknown or is the only kind on its
+    protocol (the template falls back to the bare Register button).
+
+    When the heartbeat DID declare a gamut, the sibling whose panel
+    matches it is marked ``selected`` so one-click register lands on the
+    right variant even before the picker is touched, the auto path that
+    kicks in once the client firmware learns to declare its gamut."""
+    if not kind_id:
+        return []
+    base = devices().get(kind_id)
+    if base is None or base.kind_of is not None:
+        return []
+    protocol = _kind_protocol(base)
+    siblings = [k for k in device_kinds() if _kind_protocol(k) == protocol]
+    if len(siblings) < 2:
+        return []
+
+    from app.quantizer import canonicalise_gamut
+
+    want_gamut = (
+        canonicalise_gamut(declared_gamut.strip())
+        if isinstance(declared_gamut, str) and declared_gamut.strip()
+        else None
+    )
+    options: list[dict[str, Any]] = []
+    matched = False
+    for k in siblings:
+        panel = k.panel or {}
+        raw_gamut = panel.get("gamut")
+        canon = (
+            canonicalise_gamut(str(raw_gamut)) if isinstance(raw_gamut, str) and raw_gamut else None
+        )
+        select_by_gamut = want_gamut is not None and canon == want_gamut and not matched
+        matched = matched or select_by_gamut
+        options.append(
+            {
+                "id": k.id,
+                "name": k.name,
+                "w": panel.get("w"),
+                "h": panel.get("h"),
+                "gamut": canon,
+                "selected": select_by_gamut,
+            }
+        )
+    # No gamut match (or none declared): default the select to the kind
+    # the heartbeat actually named.
+    if not matched:
+        for opt in options:
+            opt["selected"] = opt["id"] == kind_id
+    options.sort(key=lambda o: (not o["selected"], str(o["name"])))
+    return options
+
+
 # -- form / field helpers -----------------------------------------------
 
 
@@ -360,10 +434,12 @@ def format_discovered(items: list[DiscoveredDevice]) -> list[dict[str, Any]]:
                 "kind": d.kind,
                 "panel_w": d.panel_w,
                 "panel_h": d.panel_h,
+                "gamut": d.gamut,
                 "fw_version": d.fw_version,
                 "ip": d.ip,
                 "relative": format_relative(max(0.0, now - d.received_at)),
                 "parsed": d.parsed,
+                "variants": variant_options(d.kind, d.gamut),
             }
         )
     return out
