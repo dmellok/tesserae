@@ -603,6 +603,7 @@
               <i class="ph ph-squares-four" aria-hidden="true"></i>
               <span>{{ entry.page_name }}</span>
               {% if not entry.enabled %}<span class="pill">disabled</span>{% endif %}
+              {% if entry.wont_send %}<span class="pill" title="This dashboard isn't bound to any device, so it won't send. Bind it to a device, or enable legacy unbound broadcast in Settings.">unbound · won't send</span>{% endif %}
             </div>
             <div class="timetable-edit">
               <a class="button ghost" href="{{ url_for('schedules.index') }}#schedule-{{ entry.schedule_id }}">

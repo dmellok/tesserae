@@ -168,8 +168,22 @@ def _page_needs_per_device_render(page: Any) -> bool:
 
 logger = logging.getLogger(__name__)
 
+
+def _unbound_broadcast_enabled(settings: Any) -> bool:
+    """True when the legacy 'an unbound Send broadcasts to every base
+    renderer' path is explicitly opted into (single-head MQTT setups
+    that never bind a device). Off by default: binding is the delivery
+    model, so an unbound Send no-ops instead of broadcasting."""
+    value = (settings.get_section("app") or {}).get("unbound_broadcast", False)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
 PushStatus = Literal[
-    "sent", "busy", "failed", "not_found", "quiet", "held", "superseded", "no_change"
+    "sent", "busy", "failed", "not_found", "quiet", "held", "superseded", "no_change", "unbound"
 ]
 
 # Max bytes we'll pull from a remote image URL (Send-page Image URL tab).
@@ -802,6 +816,18 @@ class PushManager:
                     status="failed",
                     error="dashboard targets none of the requested device(s)",
                 )
+        # Binding is the delivery model (#84). A dashboard is delivered
+        # only to devices it's explicitly bound to. The legacy path where
+        # an unbound Send fans out to every base renderer over the retained
+        # MQTT topics (a single-head leftover) is gated behind an explicit
+        # opt-in. By default, drop empty-dids virtual groups: bound groups
+        # still deliver, a wholly-unbound Send no-ops with a clear message.
+        if not _unbound_broadcast_enabled(self._settings):
+            bound_groups = [(panel, dids) for panel, dids in groups if dids]
+            if len(bound_groups) != len(groups):
+                if not bound_groups:
+                    return self._log_unbound_skip(page_id, source=source)
+                groups = bound_groups
         if respect_quiet_hours:
             groups = self._filter_quiet_devices(groups)
             if not groups:
@@ -1658,5 +1684,26 @@ class PushManager:
             status="quiet",
             page_id=page_id,
             error="all bound devices in quiet hours",
+            event_id=event_id,
+        )
+
+    def _log_unbound_skip(self, page_id: str, *, source: str = "page") -> PushResult:
+        """Record a soft skip when a Send targets a dashboard bound to no
+        device and the legacy unbound-broadcast opt-in is off. Not a
+        failure: binding is the delivery model, so the fix is to bind the
+        dashboard to a device. Surfaced in Events so 'why didn't it send?'
+        is a one-look answer."""
+        msg = "dashboard isn't bound to any device"
+        event_id = self._event_log.record(
+            type="push",
+            source=source,
+            target=page_id,
+            status="unbound",
+            error=msg,
+        )
+        return PushResult(
+            status="unbound",
+            page_id=page_id,
+            error=msg,
             event_id=event_id,
         )

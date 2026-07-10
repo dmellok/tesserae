@@ -101,6 +101,17 @@ class _FakeMqttClient:
         return (0, 1)
 
 
+def _legacy_settings(tmp_path: Path) -> SettingsStore:
+    """Settings with the legacy unbound-broadcast opt-in on, so tests that
+    Send an unbound 'virtual panel' page still fan out to base renderers
+    (the pre-#84 behaviour these fan-out / skip / clone tests target).
+    The new default (opt-in off, unbound Send no-ops) is covered by the
+    binding-gate tests below."""
+    s = SettingsStore(tmp_path / "settings.json")
+    s.update_section("app", {"unbound_broadcast": True})
+    return s
+
+
 def _wired(tmp_path: Path, composition_png: bytes, renderers: list[Renderer]):
     page_store = PageStore(tmp_path / "pages.json")
     page = Page(
@@ -126,7 +137,7 @@ def _wired(tmp_path: Path, composition_png: bytes, renderers: list[Renderer]):
         registry=registry,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -333,7 +344,7 @@ def test_unbound_push_over_base_renderers_is_clean_on_brokerless_install(
         registry=registry,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -585,7 +596,7 @@ def test_multi_device_page_renders_once_per_panel_and_routes(
         registry=renderers,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -663,7 +674,7 @@ def test_push_device_filter_targets_single_display(tmp_path: Path, composition_p
         registry=renderers,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -736,7 +747,7 @@ def test_unbound_push_does_not_overwrite_a_bound_devices_frame(
         registry=renderers,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -819,7 +830,7 @@ def test_http_polled_device_skips_mqtt_publish(tmp_path: Path, composition_png: 
         registry=renderers,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -890,7 +901,7 @@ def test_http_polled_push_succeeds_without_broker_connection(
         registry=renderers,
         page_store=page_store,
         transport=transport,
-        settings=SettingsStore(tmp_path / "settings.json"),
+        settings=_legacy_settings(tmp_path),
         event_log=EventLog(tmp_path / "events.db"),
         renders_dir=tmp_path / "renders",
         base_url_fn=lambda: "http://broker.local:8000",
@@ -902,3 +913,56 @@ def test_http_polled_push_succeeds_without_broker_connection(
 
     assert result.status == "sent"
     assert all(r.error is None for r in result.renderers)
+
+
+def _wired_default(tmp_path: Path, composition_png: bytes, renderers: list[Renderer]):
+    """Like _wired but with default settings (unbound broadcast OFF), for
+    exercising the #84 binding gate."""
+    page_store = PageStore(tmp_path / "pages.json")
+    page_store.save(Page(id="home", name="Home", panel=Panel(w=100, h=100), cells=[]))
+    registry = RendererRegistry(renderers={r.id: r for r in renderers})
+    fakes = {}
+
+    def factory(client_id: str):
+        fakes["client"] = _FakeMqttClient(client_id)
+        return fakes["client"]
+
+    transport = MqttTransport(BrokerConfig(host="x"), client_factory=factory)
+    transport.connect()
+    event_log = EventLog(tmp_path / "events.db")
+    manager = PushManager(
+        registry=registry,
+        page_store=page_store,
+        transport=transport,
+        settings=SettingsStore(tmp_path / "settings.json"),
+        event_log=event_log,
+        renders_dir=tmp_path / "renders",
+        base_url_fn=lambda: "http://broker.local:8000",
+    )
+    return manager, fakes["client"], event_log
+
+
+def test_unbound_send_noops_by_default(tmp_path: Path, composition_png: bytes) -> None:
+    """#84: an unbound dashboard Send no-ops (status 'unbound') instead of
+    broadcasting to base renderers, and nothing is published."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, client, event_log = _wired_default(tmp_path, composition_png, renderers)
+    with patch("app.push.render_to_png", return_value=composition_png):
+        result = manager.push("home")
+    assert result.status == "unbound"
+    assert "isn't bound" in (result.error or "")
+    assert client.published == []
+    # Surfaced in the event log as a soft skip, not a failure.
+    rows = event_log.list(type="push")
+    assert rows[0].status == "unbound"
+
+
+def test_unbound_send_broadcasts_when_opted_in(tmp_path: Path, composition_png: bytes) -> None:
+    """With the legacy opt-in on, an unbound Send still fans out to base
+    renderers (back-compat for single-head MQTT setups)."""
+    renderers = [_make_renderer(tmp_path, "pi_png", "png", retain=False)]
+    manager, client, _ = _wired(tmp_path, composition_png, renderers)
+    with patch("app.push.render_to_png", return_value=composition_png):
+        result = manager.push("home")
+    assert result.status == "sent"
+    assert len(client.published) == 1
