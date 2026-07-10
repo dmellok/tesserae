@@ -155,6 +155,54 @@ def preview(canvas_id: str) -> Response:
     return current_app.response_class(png, mimetype="image/png")
 
 
+@bp.get("/canvases.json")
+def canvases() -> Response:
+    """All canvas documents (for the editor's canvas switcher)."""
+    _guard()
+    out = [
+        {"id": d.id, "name": d.name, "w": d.w, "h": d.h, "elements": len(d.els)}
+        for d in _store().list()
+    ]
+    out.sort(key=lambda x: str(x["name"]).lower())
+    return jsonify({"canvases": out})
+
+
+@bp.post("/c/<canvas_id>/rename")
+def rename(canvas_id: str) -> Response:
+    """Rename a canvas."""
+    _guard()
+    doc = _store().get(canvas_id)
+    if doc is None:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    name = str(body.get("name") or "").strip()
+    if name:
+        doc.name = name
+        _store().save(doc)
+    return jsonify({"status": "ok", "name": doc.name})
+
+
+@bp.post("/c/<canvas_id>/duplicate")
+def duplicate(canvas_id: str) -> Response:
+    """Duplicate a canvas into a new document and return its id."""
+    _guard()
+    doc = _store().get(canvas_id)
+    if doc is None:
+        abort(404)
+    copy = doc.model_copy(deep=True)
+    copy.id = _new_id()
+    copy.name = f"{doc.name} copy"
+    _store().save(copy)
+    return jsonify({"status": "ok", "id": copy.id})
+
+
+@bp.post("/c/<canvas_id>/delete")
+def delete(canvas_id: str) -> Response:
+    """Delete a canvas."""
+    _guard()
+    return jsonify({"status": "ok", "deleted": _store().delete(canvas_id)})
+
+
 @bp.get("/devices.json")
 def devices() -> Response:
     """Registered device instances a canvas can be sent to (toolbar picker).

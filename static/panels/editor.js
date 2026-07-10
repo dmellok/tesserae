@@ -1526,6 +1526,111 @@
       });
   }
 
+  // ---- canvas switcher --------------------------------------------------
+  function editorUrl(id) { return S.cfg.compBase + "/c/" + id; }
+  function compUrl(id, action) { return S.cfg.compBase + "/c/" + id + "/" + action; }
+  function canvasMenuEsc(ev) { if (ev.key === "Escape") closeCanvasMenu(); }
+
+  function closeCanvasMenu() {
+    var m = document.querySelector(".canvas-menu");
+    if (m) m.remove();
+    document.removeEventListener("pointerdown", closeCanvasMenu);
+    document.removeEventListener("keydown", canvasMenuEsc);
+  }
+
+  function toggleCanvasMenu(anchor) {
+    if (document.querySelector(".canvas-menu")) { closeCanvasMenu(); return; }
+    var menu = el("div", "canvas-menu");
+    menu.innerHTML =
+      '<div class="cm-head"><span>Canvases</span><button class="cm-new"><i class="ph-bold ph-plus"></i>New</button></div>' +
+      '<div class="cm-list"><div class="note" style="padding:10px 12px">Loading…</div></div>';
+    document.body.appendChild(menu);
+    var r = anchor.getBoundingClientRect();
+    menu.style.left = Math.round(r.left) + "px";
+    menu.style.top = Math.round(r.bottom + 6) + "px";
+    menu.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+    menu.querySelector(".cm-new").addEventListener("click", createCanvas);
+    setTimeout(function () { document.addEventListener("pointerdown", closeCanvasMenu); }, 0);
+    document.addEventListener("keydown", canvasMenuEsc);
+    loadCanvasList(menu.querySelector(".cm-list"));
+  }
+
+  function iconBtn(icon, title, fn) {
+    var b = el("button", "cm-act", '<i class="ph-bold ' + icon + '"></i>');
+    b.title = title;
+    b.addEventListener("click", function (ev) { ev.stopPropagation(); fn(); });
+    return b;
+  }
+
+  function loadCanvasList(list) {
+    fetch(S.cfg.compBase + "/canvases.json")
+      .then(function (r) { return r.json(); })
+      .then(function (p) {
+        var items = (p && p.canvases) || [];
+        list.textContent = "";
+        if (!items.length) {
+          list.innerHTML = '<div class="note" style="padding:10px 12px">No canvases yet.</div>';
+          return;
+        }
+        items.forEach(function (c) {
+          var row = el("div", "cm-row" + (c.id === S.cfg.canvasId ? " on" : ""));
+          var open = el("button", "cm-open",
+            '<span class="cm-name"></span><span class="cm-meta">' + c.w + "×" + c.h + " · " + c.elements + " el</span>");
+          open.querySelector(".cm-name").textContent = c.name;
+          open.addEventListener("click", function () {
+            if (c.id === S.cfg.canvasId) closeCanvasMenu();
+            else location.href = editorUrl(c.id);
+          });
+          var acts = el("div", "cm-acts");
+          acts.appendChild(iconBtn("ph-pencil-simple", "Rename", function () { renameCanvas(c); }));
+          acts.appendChild(iconBtn("ph-copy", "Duplicate", function () { duplicateCanvas(c); }));
+          acts.appendChild(iconBtn("ph-trash", "Delete", function () { deleteCanvas(c); }));
+          row.appendChild(open);
+          row.appendChild(acts);
+          list.appendChild(row);
+        });
+      })
+      .catch(function () { list.innerHTML = '<div class="note" style="padding:10px 12px">Failed to load.</div>'; });
+  }
+
+  function createCanvas() {
+    fetch(S.cfg.compBase + "/new", { method: "POST" })
+      .then(function (r) { location.href = r.url; })
+      .catch(function () {});
+  }
+
+  function renameCanvas(c) {
+    var name = window.prompt("Rename canvas", c.name);
+    if (name === null) return;
+    name = name.trim();
+    if (!name) return;
+    fetch(compUrl(c.id, "rename"), {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: name }),
+    }).then(function () {
+      if (c.id === S.cfg.canvasId) {
+        if (S.doc) S.doc.name = name;
+        var t = $("panels-title"); if (t) t.textContent = name;
+      }
+      var m = document.querySelector(".canvas-menu");
+      if (m) loadCanvasList(m.querySelector(".cm-list"));
+    });
+  }
+
+  function duplicateCanvas(c) {
+    fetch(compUrl(c.id, "duplicate"), { method: "POST" })
+      .then(function (r) { return r.json(); })
+      .then(function (p) { if (p && p.id) location.href = editorUrl(p.id); });
+  }
+
+  function deleteCanvas(c) {
+    if (!window.confirm('Delete "' + c.name + '"? This cannot be undone.')) return;
+    fetch(compUrl(c.id, "delete"), { method: "POST" }).then(function () {
+      if (c.id === S.cfg.canvasId) { location.href = S.cfg.compBase + "/"; return; }
+      var m = document.querySelector(".canvas-menu");
+      if (m) loadCanvasList(m.querySelector(".cm-list"));
+    });
+  }
+
   // ---- devices + send ---------------------------------------------------
   function initDevices() {
     var sel = $("panels-device");
@@ -1620,7 +1725,11 @@
       previewUrl: root.dataset.previewUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,
       sourceOptionsUrl: root.dataset.sourceOptionsUrl,
+      canvasId: root.dataset.canvasId,
     };
+    // Canvas-management URLs derive from this editor's own path
+    // (…/c/<id>), so they carry any ingress prefix for free.
+    S.cfg.compBase = location.pathname.replace(/\/c\/[^/]+$/, "");
     artboard = $("panels-artboard");
     scaler = $("panels-scaler");
 
@@ -1674,6 +1783,10 @@
     if (simBtn) simBtn.addEventListener("click", toggleSim);
     var previewBtn = $("panels-preview");
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
+    var canvasBtn = $("panels-canvas-menu");
+    if (canvasBtn) canvasBtn.addEventListener("click", function (ev) {
+      ev.stopPropagation(); toggleCanvasMenu(canvasBtn);
+    });
     var psearch = $("panels-palette-search");
     if (psearch) psearch.addEventListener("input", function () {
       S.pq = psearch.value.trim().toLowerCase();

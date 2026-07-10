@@ -386,6 +386,40 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
 
 
+def test_canvas_management(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+
+    # list starts with the auto-minted canvas
+    listing = client.get("/experiments/composer/canvases.json").get_json()
+    assert [c["id"] for c in listing["canvases"]] == [cid]
+
+    # rename
+    resp = client.post(f"/experiments/composer/c/{cid}/rename", json={"name": "Kitchen"})
+    assert resp.status_code == 200 and resp.get_json()["name"] == "Kitchen"
+    assert client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()["name"] == "Kitchen"
+
+    # duplicate carries the name (with a suffix) into a fresh id
+    resp = client.post(f"/experiments/composer/c/{cid}/duplicate")
+    dup_id = resp.get_json()["id"]
+    assert dup_id != cid
+    dup = client.get(f"/experiments/composer/c/{dup_id}/doc.json").get_json()
+    assert dup["name"] == "Kitchen copy"
+    assert len(client.get("/experiments/composer/canvases.json").get_json()["canvases"]) == 2
+
+    # delete removes it
+    resp = client.post(f"/experiments/composer/c/{dup_id}/delete")
+    assert resp.status_code == 200 and resp.get_json()["deleted"] is True
+    remaining = client.get("/experiments/composer/canvases.json").get_json()["canvases"]
+    assert [c["id"] for c in remaining] == [cid]
+
+    # missing canvas 404s on rename/duplicate
+    assert client.post("/experiments/composer/c/nope/rename", json={"name": "x"}).status_code == 404
+    assert client.post("/experiments/composer/c/nope/duplicate").status_code == 404
+
+
 def test_devices_json_lists_instances_with_panel_dims(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
