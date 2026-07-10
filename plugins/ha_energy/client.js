@@ -322,10 +322,29 @@ export default function render(shadow, ctx) {
         </div>`;
     }).join("");
 
-  shadow.innerHTML = `
-    ${css}
-    <style>${layout}</style>
-    <div class="w" data-widget="ha_energy">
+  const sparkBlock = compSparkline ? `
+    <div class="energy-spark-legend">
+      <span class="energy-spark-key"><span class="key-line" style="background:${accent}"></span>Today</span>
+      <span class="energy-spark-key is-ghost"><span class="key-line"></span>Yesterday</span>
+    </div>
+    <div class="energy-spark-wrap">${compSparkline}</div>` : "";
+
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card. sankey / trend / stats each fill their own box. The sankey init
+  // below is guarded on the canvas being present, so trend / stats skip it.
+  const frag = ctx?.fragment || "full";
+  let inner;
+  if (frag === "sankey") {
+    inner = `<div class="w-body"><div class="energy-sankey" style="flex:1 1 auto;height:100%"><canvas></canvas></div></div>`;
+  } else if (frag === "trend") {
+    inner = `<div class="w-body">${sparkBlock || '<p class="u-muted">No history.</p>'}</div>`;
+  } else if (frag === "stats") {
+    inner = `<div class="w-body" style="justify-content:center;align-items:center">${
+      chips.length ? `<div class="energy-chips">${chips.join("")}</div>` : '<p class="u-muted">No stats.</p>'
+    }</div>`;
+  } else {
+    inner = `
       <div class="w-title">
         <i class="ph-bold ${sunPhase.icon}" style="color:${sunPhase.color}"></i>
         <h3>${escapeHtml(place)}</h3>
@@ -335,14 +354,16 @@ export default function render(shadow, ctx) {
         ${chips.length ? `<div class="energy-chips">${chips.join("")}</div>` : ""}
         <div class="energy-sankey"><canvas></canvas></div>
         ${railLegend ? `<div class="energy-rail-legend">${railLegend}</div>` : ""}
-        ${compSparkline ? `
-          <div class="energy-spark-legend">
-            <span class="energy-spark-key"><span class="key-line" style="background:${accent}"></span>Today</span>
-            <span class="energy-spark-key is-ghost"><span class="key-line"></span>Yesterday</span>
-          </div>
-          <div class="energy-spark-wrap">${compSparkline}</div>` : ""}
-      </div>
-    </div>`;
+        ${sparkBlock}
+      </div>`;
+  }
+
+  shadow.innerHTML = `
+    ${css}
+    <style>${layout}
+      ${frag === "trend" ? ".energy-spark-wrap{height:100%;flex:1 1 auto}" : ""}
+    </style>
+    <div class="w" data-widget="ha_energy">${inner}</div>`;
 
   const sankeyCanvas = shadow.querySelector(".energy-sankey canvas");
   const t = tokens(shadow.host);
@@ -359,7 +380,9 @@ export default function render(shadow, ctx) {
     Export: t.accent5,
   };
 
-  if (flows.length > 0) {
+  if (!sankeyCanvas) {
+    // trend / stats fragments have no chart, nothing to paint.
+  } else if (flows.length > 0) {
     // Generous nodePadding pushes the sibling sink rails (House /
     // Charge / Export) apart so the gaps between ribbons become the
     // visual story. The library carves `canvas_height - nodePadding

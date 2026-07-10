@@ -107,7 +107,39 @@ export default function render(shadow, ctx) {
     return;
   }
 
-  const body = items.length === 1 ? renderSingle(items[0], hours) : renderMulti(items, title, hours);
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card. "chart" drops the title + legend; "value" is the current reading.
+  const frag = ctx?.fragment || "full";
+  const single = items.length === 1;
+
+  if (frag === "value") {
+    const it = items[0];
+    const accent = TREND_ACCENT[it.trend] || TREND_ACCENT.flat;
+    const ph = TREND_ICON[it.trend] || TREND_ICON.flat;
+    shadow.innerHTML = `
+      ${css}
+      <style>
+        .hist-frag-value { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: var(--space-1); }
+        .hist-frag-value .v { font-size: clamp(1.8em, 26cqmin, 6em); font-weight: var(--fw-black); line-height: 1; color: ${accent}; font-variant-numeric: tabular-nums; }
+        .hist-frag-value .v small { font-size: .38em; color: var(--text-muted); font-weight: var(--fw-bold); }
+        .hist-frag-value .lo-hi { display: flex; gap: var(--space-3); font-size: var(--fs-caption); font-weight: var(--fw-bold); color: var(--text-muted); text-transform: uppercase; letter-spacing: var(--ls-label); }
+      </style>
+      <div class="w" data-widget="ha_history"><div class="w-body hist-frag-value">
+        <span class="v">${escapeHtml(it.current)}${it.unit ? `<small> ${escapeHtml(it.unit)}</small>` : ""} <i class="ph-bold ${ph}" style="color:${accent};font-size:.42em;vertical-align:.35em"></i></span>
+        <span class="lo-hi"><span>Low ${escapeHtml(it.min || "-")}</span><span>High ${escapeHtml(it.max || "-")}</span></span>
+      </div></div>`;
+    return;
+  }
+
+  let body;
+  if (frag === "chart") {
+    body = single && Array.isArray(items[0].values) && items[0].values.length
+      ? '<div class="w-body"><div style="flex:1 1 auto;min-height:0;position:relative"><canvas></canvas></div></div>'
+      : '<div class="w-body"><p class="u-muted">No chart for this selection.</p></div>';
+  } else {
+    body = single ? renderSingle(items[0], hours) : renderMulti(items, title, hours);
+  }
   shadow.innerHTML = `
     ${css}
     <div class="w" data-widget="ha_history">${body}</div>`;

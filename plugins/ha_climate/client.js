@@ -497,6 +497,41 @@ export default function render(shadow, ctx) {
     }
   `;
 
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card. The dial + chips fragments key off the primary entity.
+  const frag = ctx?.fragment || "full";
+  if (frag === "dial") {
+    shadow.innerHTML = `
+      ${css}
+      <style>.climate-frag-dial { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }</style>
+      <div class="w" data-widget="ha_climate"><div class="w-body"><div class="climate-frag-dial">${thermostatDial(primary, { size: "big" })}</div></div></div>`;
+    return;
+  }
+  if (frag === "chips") {
+    const color = primary.unavailable ? "var(--text-muted)" : heroAccent;
+    const subBits = [];
+    if (primary.target) subBits.push(`Target ${tempStr(primary.target, primary.unit)}`);
+    else if (primary.target_low && primary.target_high) {
+      subBits.push(`${tempStr(primary.target_low, primary.unit)}–${tempStr(primary.target_high, primary.unit)}`);
+    }
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}
+        .climate-frag-chips { display: flex; flex-direction: column; gap: var(--space-1); justify-content: center; height: 100%; }
+      </style>
+      <div class="w" data-widget="ha_climate"><div class="w-body"><div class="climate-frag-chips">
+        <span class="climate-name">${escapeHtml(primary.name)}</span>
+        ${subBits.length ? `<span class="climate-target">${subBits.join(" · ")}</span>` : ""}
+        <div class="climate-chip-row">
+          ${modePill(primary, color)}
+          ${actionChip(primary, color)}
+          ${humidityChip(primary)}
+        </div>
+      </div></div></div>`;
+    return;
+  }
+
   // Title-bar icon picks up the primary entity's mode accent.
   const body = isMulti
     ? `<div class="climate-grid">${items.map(renderTile).join("")}</div>`

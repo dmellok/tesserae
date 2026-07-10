@@ -88,6 +88,13 @@ def test_catalog_lists_widgets_with_fragments(app: Flask) -> None:
     assert "full" in frags  # whole-widget placement always available
     assert len(by_key) > 20  # all widgets, not a filtered subset
 
+    # The composite HA widgets expose their visual centrepieces as fragments.
+    assert {"full", "sankey", "trend", "stats"} <= {
+        f["id"] for f in by_key["ha_energy"]["fragments"]
+    }
+    assert {"full", "dial", "chips"} <= {f["id"] for f in by_key["ha_climate"]["fragments"]}
+    assert {"full", "chart", "value"} <= {f["id"] for f in by_key["ha_history"]["fragments"]}
+
 
 def test_catalog_includes_appearance(app: Flask) -> None:
     """The catalog carries the theme / style / font options the editor's

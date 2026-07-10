@@ -250,6 +250,40 @@ export default function render(shadow, ctx) {
     }
   `;
 
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card. The value + spark fragments key off the lead (or only) sensor.
+  const frag = ctx?.fragment || "full";
+  const lead = items[0];
+  if (frag === "value") {
+    const accent = lead.unavailable ? "var(--text-muted)" : sensorAccent(lead.icon);
+    const trendBit = lead.trend && trendIcon(lead.trend)
+      ? `<i class="ph-bold ${trendIcon(lead.trend)}" style="color:${trendAccent(lead.trend)};font-size:.42em;margin-left:.2em;vertical-align:.35em"></i>`
+      : "";
+    shadow.innerHTML = `
+      ${css}
+      <style>
+        .sensor-frag-value { display: flex; align-items: center; justify-content: center; height: 100%; }
+        .sensor-frag-value .v { font-size: clamp(1.8em, 26cqmin, 6em); font-weight: var(--fw-black); line-height: 1; color: ${accent}; font-variant-numeric: tabular-nums; }
+        .sensor-frag-value .u { font-size: .4em; color: var(--text-muted); font-weight: var(--fw-bold); margin-left: .12em; }
+      </style>
+      <div class="w" data-widget="ha_sensor"><div class="w-body sensor-frag-value">
+        <span class="v">${escapeHtml(lead.value ?? "-")}${lead.unit ? `<span class="u">${escapeHtml(lead.unit)}</span>` : ""}${trendBit}</span>
+      </div></div>`;
+    return;
+  }
+  if (frag === "spark") {
+    const accent = lead.unavailable ? "var(--text-muted)" : sensorAccent(lead.icon);
+    const spark = Array.isArray(lead.sparkline) && lead.sparkline.length >= 2
+      ? sparklineSvg(lead.sparkline, accent, { w: 200, h: 60, fill: true, strokeWidth: 2.4 })
+      : '<p class="u-muted">No history.</p>';
+    shadow.innerHTML = `
+      ${css}
+      <style>.sensor-frag-spark { height: 100%; width: 100%; display: flex; align-items: stretch; }</style>
+      <div class="w" data-widget="ha_sensor"><div class="w-body"><div class="sensor-frag-spark">${spark}</div></div></div>`;
+    return;
+  }
+
   const body = items.length === 1 ? renderStat(items[0], title) : renderList(items, title);
   shadow.innerHTML = `
     ${css}

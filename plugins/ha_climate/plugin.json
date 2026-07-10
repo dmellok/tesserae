@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, Climate",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "kind": "widget",
   "description": "One or more Home Assistant climate / thermostat entities Each entity tints by what the thermostat is doing right now (heating / cooling / idle). Requires the Home Assistant Core plugin.",
   "icon": "ph-thermometer-simple",
@@ -26,6 +26,11 @@
       "default": [],
       "choices_from": "entity"
     }
+  ],
+  "fragments": [
+    { "id": "full", "label": "Full card", "w": 300, "h": 200, "icon": "ph-thermometer-simple" },
+    { "id": "dial", "label": "Thermostat dial", "w": 180, "h": 180, "icon": "ph-gauge" },
+    { "id": "chips", "label": "Mode + humidity", "w": 200, "h": 100, "icon": "ph-fan" }
   ],
   "render": {
     "dither": "none",

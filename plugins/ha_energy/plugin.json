@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Home Assistant, Energy",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "kind": "widget",
   "description": "Live solar / grid / battery / house-consumption snapshot from your HA energy dashboard, with today's totals and a 24-hour sparkline. Wires to the same sensor.* entities you've already configured under HA's Energy panel.",
   "icon": "ph-lightning",
@@ -61,6 +61,12 @@
       "label": "Place label",
       "default": "Home"
     }
+  ],
+  "fragments": [
+    { "id": "full", "label": "Full card", "w": 320, "h": 260, "icon": "ph-lightning" },
+    { "id": "sankey", "label": "Flow diagram", "w": 300, "h": 200, "icon": "ph-flow-arrow" },
+    { "id": "trend", "label": "Today vs yesterday", "w": 300, "h": 90, "icon": "ph-chart-line" },
+    { "id": "stats", "label": "Battery + solar", "w": 200, "h": 90, "icon": "ph-battery-charging" }
   ],
   "render": {
     "dither": "none",

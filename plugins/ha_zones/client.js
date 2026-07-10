@@ -174,6 +174,33 @@ export default function render(shadow, ctx) {
     }
   `;
 
+  // Fragments (issue #60): the Panels canvas can place just one part of the
+  // widget. ``ctx.fragment`` selects which; "full" (default) is the whole
+  // card. Each fragment paints self-contained, filling its own box.
+  const frag = ctx?.fragment || "full";
+  if (frag === "roster") {
+    shadow.innerHTML = `
+      ${css}
+      <style>${layout}</style>
+      <div class="w" data-widget="ha_zones"><div class="w-body list-body">${rows}</div></div>`;
+    return;
+  }
+  if (frag === "count") {
+    shadow.innerHTML = `
+      ${css}
+      <style>
+        .zones-count { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: var(--space-1); }
+        .zones-count .n { font-size: clamp(2.4em, 40cqmin, 7em); font-weight: var(--fw-black); line-height: 1; color: var(--accent-3); font-variant-numeric: tabular-nums; }
+        .zones-count .n small { color: var(--text-muted); font-size: .5em; font-weight: var(--fw-bold); }
+        .zones-count .l { font-size: var(--fs-caption); font-weight: var(--fw-bold); letter-spacing: var(--ls-label); text-transform: uppercase; color: var(--text-muted); }
+      </style>
+      <div class="w" data-widget="ha_zones"><div class="w-body zones-count">
+        <span class="n">${home}<small>/${total}</small></span>
+        <span class="l">Home</span>
+      </div></div>`;
+    return;
+  }
+
   shadow.innerHTML = `
     ${css}
     <style>${layout}</style>
