@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panels, Tesserae (experimental)</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
+  {# Tokens + fonts baseline (Inter / JetBrains Mono / --t-* palette). The
+     ported panels stylesheets layer their editor chrome on top; they only
+     load on this standalone full-window page, so any token they restate is
+     scoped here and can't affect the admin shell. #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/bold/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/regular/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/chrome.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/editor.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/picker.css') }}">
+  <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+</head>
+<body>
+  {# Experimental Panels editor (issue #60), phase 0 shell. Layout + chrome
+     are the design-handoff structure; the interactive editor (drag / resize /
+     bind / render) lands in later phases. For now the Elements palette and
+     the Data panel populate from the widget catalog so the vertical slice
+     (flag -> page -> catalog -> schema) is real and testable. #}
+  <div class="ed appfill" style="display:grid;grid-template-columns:252px 1fr 300px;grid-template-rows:56px 1fr" tabindex="0">
+
+    <div class="tbar" style="grid-column:1/4">
+      <span class="bmark"></span>
+      <div style="display:flex;flex-direction:column;line-height:1.15;margin-right:2px">
+        <span style="font-weight:700;font-size:14px">Untitled Panel</span>
+        <span style="font-size:11px;color:var(--t-muted)">experimental</span>
+      </div>
+      <div class="tdiv"></div>
+      <div class="tbtn is-disabled" title="Undo"><i class="ph-bold ph-arrow-counter-clockwise"></i></div>
+      <div class="tbtn is-disabled" title="Redo"><i class="ph-bold ph-arrow-clockwise"></i></div>
+      <div class="tdiv"></div>
+      <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
+        <div class="pbtn" id="panels-add-widget"><i class="ph-bold ph-plus-circle"></i>Widget</div>
+        <div class="pbtn"><i class="ph-bold ph-eye"></i>Simulate e-ink</div>
+        <div class="pbtn accent"><i class="ph-bold ph-paper-plane-tilt"></i>Send to panel</div>
+      </div>
+    </div>
+
+    <div style="grid-row:2;grid-column:1;border-right:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;gap:12px;padding:12px;min-height:0">
+      <div class="card2" style="flex:none">
+        <div class="pnh"><span class="t"><i class="ph-bold ph-shapes"></i>Elements</span><span class="x" style="text-transform:none;letter-spacing:0;font-size:10.5px">drag onto panel</span></div>
+        <div class="pnb pgrid" id="panels-palette"></div>
+      </div>
+      <div class="card2" style="flex:1;min-height:0">
+        <div class="pnh"><span class="t"><i class="ph-bold ph-stack"></i>Layers</span><span class="x mono" style="text-transform:none;letter-spacing:0">0</span></div>
+        <div class="pnb scroll" id="panels-layers">
+          <div class="note" style="padding:14px">No elements yet. The interactive canvas ships in a later phase.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cv-viewport" style="grid-row:2;grid-column:2">
+      <div class="cv-scaler" id="panels-scaler">
+        <div class="cv-panel eink" id="panels-artboard" style="width:600px;height:400px"></div>
+      </div>
+    </div>
+
+    <div style="grid-row:2;grid-column:3;border-left:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;min-height:0">
+      <div class="card2" style="margin:12px;flex:none">
+        <div class="pnh"><span class="t"><i class="ph-bold ph-database"></i>Data</span><span class="x mono" style="text-transform:none;letter-spacing:0" id="panels-source-count">0 sources</span></div>
+        <div class="pnb scroll" id="panels-data" style="max-height:none"></div>
+      </div>
+      <div class="note" style="padding:2px 18px 16px">Widgets are data sources. Bind their fields to elements on the canvas. Interactive binding and rendering ship in a later phase.</div>
+    </div>
+
+  </div>
+
+  <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>
+</body>
+</html>

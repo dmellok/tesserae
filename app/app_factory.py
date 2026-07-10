@@ -815,6 +815,9 @@ def create_app(
 
     marketplace_routes.register(app)
     app.register_blueprint(composer.bp)
+    from app import panels_routes
+
+    panels_routes.register(app)
     settings_routes.register(app)
     from app import condition_routes
 

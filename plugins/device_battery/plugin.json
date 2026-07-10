@@ -20,5 +20,13 @@
       "default": true
     }
   ],
-  "render": { "dither": "none", "needs_network": false }
+  "render": { "dither": "none", "needs_network": false },
+  "data_schema": {
+    "color": "#4F6F36",
+    "fields": [
+      { "name": "total_devices", "type": "num", "label": "Device count" },
+      { "name": "devices", "type": "arr", "label": "Devices" }
+    ],
+    "sample": { "total_devices": 3, "devices": [] }
+  }
 }

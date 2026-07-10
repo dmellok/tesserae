@@ -1,0 +1,65 @@
+/* Interactive Panels editor — mechanics layer (chrome tokens live in editor.css) */
+
+.appfill{width:100vw;height:100vh}
+.ed select.psel{appearance:none;-webkit-appearance:none;border:1px solid var(--t-border);border-radius:8px;background:var(--t-surface);color:var(--t-fg);font:600 12px var(--t-font);padding:6px 26px 6px 10px;cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371706c' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 8px center}
+.ed select.psel:focus{outline:none;border-color:var(--t-accent);box-shadow:0 0 0 3px color-mix(in oklab,var(--t-accent) 22%,transparent)}
+
+/* workspace */
+.cv-viewport{position:relative;overflow:auto;display:grid;place-items:center;min-height:0;min-width:0}
+.cv-viewport::before{content:"";position:absolute;inset:0;background-image:radial-gradient(color-mix(in oklab,var(--t-fg) 9%,transparent) 1px,transparent 1.5px);background-size:22px 22px;opacity:.5;pointer-events:none}
+.cv-scaler{transform-origin:center center;position:relative;z-index:1;flex:none}
+.cv-panel{position:relative;overflow:visible}
+.cv-panel .clip{position:absolute;inset:0;overflow:hidden}
+
+/* elements */
+.el{position:absolute;box-sizing:border-box;user-select:none;touch-action:none;display:flex;cursor:move;will-change:transform}
+.el.locked{cursor:default}
+.el .ring{position:absolute;inset:-1.5px;border:1.5px solid var(--t-accent);border-radius:2px;pointer-events:none;z-index:20}
+.el .ring.multi{border-style:solid;opacity:.9}
+.el .hd{position:absolute;width:10px;height:10px;background:#fff;border:1.5px solid var(--t-accent);border-radius:2px;z-index:21;pointer-events:auto}
+.el .hd.tl{left:-6px;top:-6px;cursor:nwse-resize}.el .hd.tr{right:-6px;top:-6px;cursor:nesw-resize}
+.el .hd.bl{left:-6px;bottom:-6px;cursor:nesw-resize}.el .hd.br{right:-6px;bottom:-6px;cursor:nwse-resize}
+.el .hd.tm{left:50%;top:-6px;margin-left:-5px;cursor:ns-resize}.el .hd.bm{left:50%;bottom:-6px;margin-left:-5px;cursor:ns-resize}
+.el .hd.lm{left:-6px;top:50%;margin-top:-5px;cursor:ew-resize}.el .hd.rm{right:-6px;top:50%;margin-top:-5px;cursor:ew-resize}
+.el .elwarn{position:absolute;left:0;top:100%;margin-top:5px;z-index:22;display:flex;align-items:center;gap:5px;background:var(--t-warn-bg);border:1px solid var(--t-warn-bd);color:var(--t-warn);font:700 10px var(--t-font);padding:3px 7px;border-radius:7px;white-space:nowrap;box-shadow:var(--t-shadow-sm)}
+.el .elwarn i{font-size:12px}
+.el.hidden{display:none}
+
+.ov-guide{position:absolute;z-index:30;pointer-events:none;background:var(--t-accent);display:none}
+.ov-guide.v{width:1px;top:0;bottom:0}
+.ov-guide.h{height:1px;left:0;right:0}
+.ov-marquee{position:absolute;z-index:29;border:1.5px dashed var(--t-accent);background:color-mix(in oklab,var(--t-accent) 12%,transparent);border-radius:2px;display:none;pointer-events:none}
+.ov-badge{position:absolute;z-index:31;font:700 10px var(--t-font-mono);background:var(--t-accent);color:var(--t-accent-fg);padding:2px 6px;border-radius:4px;white-space:nowrap;display:none;pointer-events:none}
+.ov-read{position:absolute;z-index:31;font:600 10px var(--t-font-mono);background:var(--t-fg);color:var(--t-bg);padding:3px 7px;border-radius:5px;white-space:nowrap;display:none;pointer-events:none;box-shadow:var(--t-shadow-sm)}
+
+.ghost{position:fixed;z-index:9999;pointer-events:none;top:0;left:0;display:none;align-items:center;gap:9px;padding:9px 13px;border-radius:10px;background:var(--t-surface);border:1px solid var(--t-accent);box-shadow:var(--t-shadow-lg);font:600 13px var(--t-font)}
+.ghost .gi{width:26px;height:26px;display:grid;place-items:center;border-radius:7px;background:var(--t-accent-soft);color:var(--t-accent);font-size:14px}
+
+.dinput{width:60px;border:1px solid var(--t-border);border-radius:6px;background:var(--t-surface);color:var(--t-fg);font:600 11px var(--t-font-mono);padding:3px 7px;text-align:right}
+.dinput:focus{outline:none;border-color:var(--t-accent);box-shadow:0 0 0 2px color-mix(in oklab,var(--t-accent) 20%,transparent)}
+.dinput.wide{width:112px;text-align:left}
+
+.lrow .li{background:transparent;border:0;padding:0;margin:0;font:inherit;color:inherit;cursor:pointer}
+.lrow .rn{border:1px solid var(--t-accent);border-radius:5px;background:var(--t-surface);color:var(--t-fg);font:600 12.5px var(--t-font);padding:2px 6px;width:130px}
+.lrow .rn:focus{outline:none}
+
+.emptyprops{display:grid;place-items:center;text-align:center;gap:10px;padding:40px 18px;color:var(--t-muted)}
+.emptyprops .pic{width:52px;height:52px;border-radius:14px;background:var(--t-surface-sunk);color:var(--t-fg-soft);display:grid;place-items:center;font-size:24px}
+.emptyprops .h{font:700 14px var(--t-font);color:var(--t-fg)}
+.emptyprops .s{font:500 12px/1.5 var(--t-font);max-width:200px}
+
+.kbd{font:600 10px var(--t-font-mono);background:var(--t-surface-sunk);border:1px solid var(--t-border);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:var(--t-fg-soft)}
+
+.tbtn.mini{width:30px;height:30px;font-size:15px}
+.zoomctl{display:inline-flex;align-items:center;background:var(--t-surface-sunk);border:1px solid var(--t-border);border-radius:9px;overflow:hidden}
+.zoomctl b{width:30px;height:32px;display:grid;place-items:center;cursor:pointer;color:var(--t-fg-soft)}
+.zoomctl b:hover{background:var(--t-surface);color:var(--t-fg)}
+.zoomctl .z{min-width:52px;text-align:center;font:600 12px var(--t-font-mono);border-left:1px solid var(--t-border);border-right:1px solid var(--t-border);height:32px;display:grid;place-items:center;cursor:pointer}
+
+.pnb.scroll{overflow:auto;min-height:0}
+.dfield-val{margin-left:auto;display:flex;align-items:center;gap:8px}
+.minibtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:8px;font:600 12px var(--t-font);cursor:pointer;border:1px solid var(--t-border);background:var(--t-surface);color:var(--t-fg)}
+.minibtn:hover{background:var(--t-surface-sunk)}
+.minibtn.accent{background:var(--t-accent-soft);color:var(--t-accent-ink);border-color:color-mix(in oklab,var(--t-accent) 25%,transparent)}
+.ed.dark .minibtn.accent{color:var(--t-accent)}

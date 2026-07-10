@@ -51,5 +51,25 @@
   },
   "requires": [
     "network:api.open-meteo.com"
-  ]
+  ],
+  "data_schema": {
+    "color": "#9A7414",
+    "fields": [
+      { "name": "temp", "type": "num", "label": "Temperature", "unit": "deg" },
+      { "name": "feels", "type": "num", "label": "Feels like", "unit": "deg" },
+      { "name": "humidity", "type": "num", "label": "Humidity", "unit": "%" },
+      { "name": "wind", "type": "num", "label": "Wind", "unit": "km/h" },
+      { "name": "uv", "type": "num", "label": "UV index" },
+      { "name": "high", "type": "num", "label": "High", "unit": "deg" },
+      { "name": "low", "type": "num", "label": "Low", "unit": "deg" },
+      { "name": "rain_chance", "type": "num", "label": "Rain chance", "unit": "%" },
+      { "name": "cond", "type": "str", "label": "Condition" },
+      { "name": "icon", "type": "str", "label": "Condition icon" }
+    ],
+    "sample": {
+      "temp": 21, "feels": 22, "humidity": 62, "wind": 13, "uv": 4,
+      "high": 24, "low": 15, "rain_chance": 10,
+      "cond": "Partly cloudy", "icon": "cloud-sun"
+    }
+  }
 }
