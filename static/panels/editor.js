@@ -58,7 +58,12 @@
     future: [],
     charts: {},
     clip: null,
+    sim: false,
   };
+
+  // Text-like elements that read poorly below this size on e-ink panels.
+  var READ_MIN = 16;
+  var TEXTLIKE = { big: 1, small: 1, text: 1, chip: 1 };
 
   var artboard, scaler;
 
@@ -131,6 +136,11 @@
     node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
       "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;");
     node.appendChild(PanelsRender.element(e, resolve));
+    // Readability warning in simulate mode: small text dithers into mush on
+    // low-palette panels.
+    if (S.sim && TEXTLIKE[e.type] && e.font_size < READ_MIN) {
+      node.appendChild(el("div", "elwarn", '<i class="ph-bold ph-warning"></i>Small text'));
+    }
     if (e.id === S.sel) {
       node.appendChild(el("div", "ring"));
       if (!e.locked) {
@@ -611,6 +621,29 @@
       .catch(function () { if (status) status.textContent = "send failed"; });
   }
 
+  // ---- panel size + simulate -------------------------------------------
+  function setPanelSize(w, h) {
+    pushHistory();
+    S.doc.w = w;
+    S.doc.h = h;
+    // Keep every element inside the new bounds.
+    S.doc.els.forEach(function (e) {
+      e.w = Math.min(e.w, w);
+      e.h = Math.min(e.h, h);
+      e.x = clamp(e.x, 0, w - e.w);
+      e.y = clamp(e.y, 0, h - e.h);
+    });
+    scheduleSave();
+    paint();
+  }
+  function toggleSim() {
+    S.sim = !S.sim;
+    artboard.classList.toggle("sim", S.sim);
+    var btn = $("panels-sim");
+    if (btn) btn.classList.toggle("on", S.sim);
+    paint();
+  }
+
   // ---- boot -------------------------------------------------------------
   function init() {
     var root = document.querySelector(".ed");
@@ -631,6 +664,13 @@
     var undoBtn = $("panels-undo"), redoBtn = $("panels-redo");
     if (undoBtn) undoBtn.addEventListener("click", undo);
     if (redoBtn) redoBtn.addEventListener("click", redo);
+    var simBtn = $("panels-sim");
+    if (simBtn) simBtn.addEventListener("click", toggleSim);
+    var sizeSel = $("panels-size");
+    if (sizeSel) sizeSel.addEventListener("change", function () {
+      var wh = sizeSel.value.split("x");
+      setPanelSize(Number(wh[0]) || S.doc.w, Number(wh[1]) || S.doc.h);
+    });
     initDevices();
 
     document.addEventListener("keydown", function (ev) {
@@ -669,6 +709,8 @@
         if (!S.doc.els) S.doc.els = [];
         var title = $("panels-title");
         if (title) title.textContent = S.doc.name || "Untitled Panel";
+        var sizeSel2 = $("panels-size");
+        if (sizeSel2) sizeSel2.value = S.doc.w + "x" + S.doc.h;
         paint();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "load failed"; });
