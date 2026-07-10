@@ -217,6 +217,59 @@ def test_element_defaults_and_roundtrip(tmp_path: Path) -> None:
     assert blank.widget == "" and blank.fragment == "full"  # unassigned box
 
 
+def test_decoration_element_roundtrip(tmp_path: Path) -> None:
+    """A decoration element (shape / line / icon) persists its props."""
+    path = tmp_path / "panels.json"
+    store = CanvasStore(path)
+    store.save(
+        CanvasPage(
+            id="c1",
+            els=[
+                Element(
+                    id="d1",
+                    kind="rect",
+                    color="var(--accent-1)",
+                    fill=False,
+                    stroke=3,
+                    radius=12,
+                    x=0,
+                    y=0,
+                    w=100,
+                    h=60,
+                )
+            ],
+        )
+    )
+    e = CanvasStore(path).get("c1").els[0]  # type: ignore[union-attr]
+    assert e.kind == "rect" and e.color == "var(--accent-1)"
+    assert e.fill is False and e.stroke == 3 and e.radius == 12
+
+
+def test_compose_renders_decorations(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    client.post(
+        f"/experiments/composer/c/{cid}/save",
+        json={
+            "els": [
+                {
+                    "id": "d1",
+                    "kind": "line",
+                    "color": "var(--accent-2)",
+                    "stroke": 4,
+                    "x": 0,
+                    "y": 0,
+                    "w": 200,
+                    "h": 10,
+                }
+            ]
+        },
+    )
+    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    assert 'class="deco"' in body and "panels/decorate.js" in body
+
+
 # -- routes: save / doc / send / devices / render ------------------------
 
 

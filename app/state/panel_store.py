@@ -39,6 +39,8 @@ class Element(BaseModel):
     """
 
     id: str
+    # What this element is: a placed widget, or a static decoration shape.
+    kind: str = "widget"  # widget | rect | ellipse | line | icon
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -48,6 +50,15 @@ class Element(BaseModel):
     # Per-instance widget config, matching the widget's ``cell_options`` shape;
     # resolved via ``_resolved_options`` and handed to ``fetch()``.
     options: dict[str, Any] = Field(default_factory=dict)
+    # Decoration props (kind != "widget"; ignored for widgets). ``color`` is a
+    # CSS colour or a Spectra token (e.g. "var(--accent-1)") so decorations can
+    # follow the theme. ``fill`` false = outlined, ``stroke`` = outline/line
+    # thickness, ``radius`` = rect corner radius, ``icon`` = phosphor name.
+    color: str = ""
+    fill: bool = True
+    stroke: int = Field(default=2, ge=0)
+    radius: int = Field(default=0, ge=0)
+    icon: str = ""
     x: int = Field(default=0, ge=0)
     y: int = Field(default=0, ge=0)
     w: int = Field(default=1, gt=0)

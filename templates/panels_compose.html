@@ -40,6 +40,7 @@
 <body data-theme="{{ theme }}" data-style="{{ style }}" style="--font-family: '{{ font_family }}', system-ui, sans-serif;">
   <div id="panels-board">
     {% for e in els %}
+    {% if e.kind == 'widget' %}
     <div class="cell"
          style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;"
          data-cell-id="{{ e.id }}"
@@ -55,8 +56,19 @@
          data-font-family="{{ font_family }}, system-ui, sans-serif">
       <div class="cell-content"></div>
     </div>
+    {% else %}
+    <div class="deco" data-el='{{ e|tojson }}'
+         style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;"></div>
+    {% endif %}
     {% endfor %}
   </div>
+  <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
+  <script>
+    // Draw the static decorations (shapes / lines / icons) into their boxes.
+    document.querySelectorAll(".deco").forEach(function (d) {
+      try { d.appendChild(window.PanelsDecorate.render(JSON.parse(d.dataset.el))); } catch (e) { /* skip */ }
+    });
+  </script>
   <script type="module" src="{{ url_for('static', filename='composer.js') }}"></script>
 </body>
 </html>

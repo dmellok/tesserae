@@ -706,8 +706,27 @@ def compose_canvas(canvas_id: str) -> str:
     for e in doc.els:
         if e.visible is False:
             continue
+        if e.kind and e.kind != "widget":
+            # Static decoration; drawn client-side by decorate.js, no fetch.
+            els_out.append(
+                {
+                    "id": e.id,
+                    "kind": e.kind,
+                    "color": e.color,
+                    "fill": e.fill,
+                    "stroke": e.stroke,
+                    "radius": e.radius,
+                    "icon": e.icon,
+                    "x": e.x,
+                    "y": e.y,
+                    "w": e.w,
+                    "h": e.h,
+                }
+            )
+            continue
         item: dict[str, Any] = {
             "id": e.id,
+            "kind": "widget",
             "widget": e.widget,
             "fragment": e.fragment or "full",
             "x": e.x,

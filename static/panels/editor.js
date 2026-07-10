@@ -27,6 +27,21 @@
   ];
   var DEFAULT_FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
 
+  // Static decoration primitives offered in the palette.
+  var DECOS = [
+    { kind: "rect", label: "Rectangle", icon: "ph-square", w: 140, h: 90 },
+    { kind: "ellipse", label: "Circle", icon: "ph-circle", w: 100, h: 100 },
+    { kind: "line", label: "Line", icon: "ph-minus", w: 180, h: 16 },
+    { kind: "icon", label: "Icon", icon: "ph-star", w: 72, h: 72 },
+  ];
+  // Base colour palette: Spectra semantic tokens (follow the theme) offered
+  // alongside a native colour picker.
+  var INKS = [
+    "var(--text-primary)", "var(--bg)", "var(--surface-sunken)",
+    "var(--accent-1)", "var(--accent-2)", "var(--accent-3)",
+    "var(--accent-4)", "var(--accent-5)", "var(--accent-6)",
+  ];
+
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, html) {
     var n = document.createElement(tag);
@@ -147,9 +162,18 @@
   // ---- element factory --------------------------------------------------
   function makeElement(widget, fragment, x, y, w, h) {
     return {
-      id: uid(), widget: widget || "", fragment: fragment || "full",
+      id: uid(), kind: "widget", widget: widget || "", fragment: fragment || "full",
       options: {}, x: x, y: y, w: w, h: h,
       dither: true, visible: true, locked: false, group: null,
+    };
+  }
+  function makeDecoration(kind, x, y, w, h) {
+    return {
+      id: uid(), kind: kind, widget: "", fragment: "full", options: {},
+      color: kind === "line" || kind === "icon" ? "var(--text-primary)" : "var(--accent-1)",
+      fill: true, stroke: kind === "line" ? 3 : 2, radius: kind === "rect" ? 8 : 0,
+      icon: kind === "icon" ? "star" : "",
+      x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
   }
 
@@ -235,31 +259,42 @@
   }
 
   // ---- artboard ---------------------------------------------------------
+  function isWidget(e) { return !e.kind || e.kind === "widget"; }
+
   function elNode(e) {
-    var node = el("div", "el" + (isSel(e.id) ? " psel" : "") + (e.widget ? "" : " el-empty"));
+    var node = el("div", "el" + (isSel(e.id) ? " psel" : "") +
+      (isWidget(e) && !e.widget ? " el-empty" : ""));
     node.dataset.id = e.id;
     node.style.cssText = "position:absolute;left:" + e.x + "px;top:" + e.y + "px;width:" + e.w +
       "px;height:" + e.h + "px;" + (e.visible ? "" : "opacity:.4;");
 
-    // Reuse the cached widget host when nothing that affects the render changed;
-    // otherwise mount fresh. The host is pointer-transparent so drag/select hit
-    // the element wrapper, not the widget preview.
-    var fp = fpOf(e);
-    var cached = S.mount[e.id];
-    var host;
-    if (cached && cached.fp === fp && cached.host) {
-      host = cached.host;
+    if (!isWidget(e)) {
+      // Static decoration: render fresh (cheap), pointer-transparent so clicks
+      // hit the element wrapper.
+      var deco = window.PanelsDecorate ? PanelsDecorate.render(e) : el("div");
+      deco.style.pointerEvents = "none";
+      node.appendChild(deco);
     } else {
-      host = el("div", "elhost");
-      host.style.cssText = "width:100%;height:100%;container-type:size;overflow:hidden;pointer-events:none";
-      // Widget backgrounds are transparent so the canvas background shows
-      // through and elements read as one composed surface, not a card grid.
-      host.style.setProperty("--bg", "transparent");
-      S.mount[e.id] = { fp: fp, host: host };
-      mountWidget(e, host);
+      // Reuse the cached widget host when nothing that affects the render
+      // changed; otherwise mount fresh. The host is pointer-transparent so
+      // drag/select hit the element wrapper, not the widget preview.
+      var fp = fpOf(e);
+      var cached = S.mount[e.id];
+      var host;
+      if (cached && cached.fp === fp && cached.host) {
+        host = cached.host;
+      } else {
+        host = el("div", "elhost");
+        host.style.cssText = "width:100%;height:100%;container-type:size;overflow:hidden;pointer-events:none";
+        // Widget backgrounds are transparent so the canvas background shows
+        // through and elements read as one composed surface, not a card grid.
+        host.style.setProperty("--bg", "transparent");
+        S.mount[e.id] = { fp: fp, host: host };
+        mountWidget(e, host);
+      }
+      node.appendChild(host);
+      if (!e.widget) node.appendChild(el("div", "elplace", '<i class="ph-bold ph-cards-three"></i>'));
     }
-    node.appendChild(host);
-    if (!e.widget) node.appendChild(el("div", "elplace", '<i class="ph-bold ph-cards-three"></i>'));
 
     if (isSel(e.id)) {
       node.appendChild(el("div", "ring" + (selCount() > 1 ? " multi" : "")));
@@ -559,6 +594,31 @@
     }
     var q = S.pq || "";
     var shown = 0;
+
+    // Shapes / lines / icons at the top of the palette.
+    var decos = DECOS.filter(function (d) {
+      return !q || d.label.toLowerCase().indexOf(q) >= 0 || d.kind.indexOf(q) >= 0;
+    });
+    if (decos.length) {
+      shown++;
+      var dg = el("div", "pwg");
+      var dh = el("div", "pwgh");
+      dh.innerHTML = '<i class="ph-bold ph-shapes"></i>';
+      dh.appendChild(document.createTextNode("Shapes & elements"));
+      dg.appendChild(dh);
+      decos.forEach(function (d) {
+        var tile = el("div", "pi");
+        tile.title = d.label;
+        tile.innerHTML = '<span class="ico"><i class="ph-bold ' + d.icon + '"></i></span><span class="lab"></span>';
+        tile.querySelector(".lab").textContent = d.label;
+        tile.addEventListener("pointerdown", function (ev) {
+          onPaletteDown(ev, { kind: d.kind, w: d.w, h: d.h, label: d.label });
+        });
+        dg.appendChild(tile);
+      });
+      mount.appendChild(dg);
+    }
+
     S.catalog.forEach(function (w) {
       var wname = (w.name || w.key).toLowerCase();
       // Match the widget by name/id (show all its parts) or a fragment by its
@@ -615,7 +675,9 @@
       pushHistory();
       var x = clamp(snap(cx - item.w / 2), 0, S.doc.w - item.w);
       var y = clamp(snap(cy - item.h / 2), 0, S.doc.h - item.h);
-      var e = makeElement(item.key, item.fragment, x, y, item.w, item.h);
+      var e = item.kind
+        ? makeDecoration(item.kind, x, y, item.w, item.h)
+        : makeElement(item.key, item.fragment, x, y, item.w, item.h);
       S.doc.els.push(e);
       S.sel = new Set([e.id]);
       scheduleSave(); paint();
@@ -803,11 +865,141 @@
     propRowBtns(mount, null);
   }
 
+  // ---- decoration properties -------------------------------------------
+  // Re-render just this element's decoration node with patched props (live
+  // slider/colour preview without committing to state or full repaint).
+  function previewDeco(e, patch) {
+    var node = artboard.querySelector('[data-id="' + e.id + '"]');
+    if (!node || !window.PanelsDecorate) return;
+    var temp = {};
+    for (var k in e) temp[k] = e[k];
+    for (var p in patch) temp[p] = patch[p];
+    var deco = PanelsDecorate.render(temp);
+    deco.style.pointerEvents = "none";
+    if (node.firstChild) node.replaceChild(deco, node.firstChild);
+    else node.appendChild(deco);
+  }
+  function colorControl(e) {
+    var row = el("div", "prow");
+    row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px";
+    // data-theme so the Spectra token swatches resolve to the canvas theme.
+    row.setAttribute("data-theme", S.doc.theme || "light");
+    function pick(c) { pushHistory(); e.color = c; scheduleSave(); paint(); }
+    INKS.forEach(function (ink) {
+      var s = el("span");
+      var on = ink === e.color;
+      s.style.cssText = "width:22px;height:22px;border-radius:6px;cursor:pointer;background:" + ink +
+        (on ? ";outline:2px solid var(--t-accent);outline-offset:2px" : ";border:1px solid var(--t-border)");
+      s.addEventListener("click", function () { pick(ink); });
+      row.appendChild(s);
+    });
+    var native = el("input"); native.type = "color";
+    native.value = /^#[0-9a-fA-F]{6}$/.test(e.color || "") ? e.color : "#000000";
+    native.style.cssText = "width:22px;height:22px;padding:0;border:1px solid var(--t-border);border-radius:6px;cursor:pointer;background:none";
+    native.addEventListener("input", function () { previewDeco(e, { color: native.value }); });
+    native.addEventListener("change", function () { pick(native.value); });
+    row.appendChild(native);
+    return row;
+  }
+  function decoSlider(e, label, prop, min, max) {
+    var row = el("div", "prow");
+    row.innerHTML = '<span class="plab">' + label + "</span>";
+    var wrap = el("span"); wrap.style.cssText = "display:flex;align-items:center;gap:8px";
+    var r = el("input"); r.type = "range"; r.min = min; r.max = max; r.value = e[prop]; r.style.width = "96px";
+    var val = el("span", "mono"); val.textContent = e[prop];
+    r.addEventListener("input", function () {
+      var patch = {}; patch[prop] = Number(r.value); val.textContent = r.value; previewDeco(e, patch);
+    });
+    r.addEventListener("change", function () { pushHistory(); e[prop] = Number(r.value); scheduleSave(); paint(); });
+    wrap.appendChild(r); wrap.appendChild(val);
+    row.appendChild(wrap);
+    return row;
+  }
+  function renderDecoProps(mount, e) {
+    mount.textContent = "";
+    var name = { rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-shapes"></i>' + name));
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-palette"></i>Colour'));
+    mount.appendChild(colorControl(e));
+
+    if (e.kind === "rect" || e.kind === "ellipse") {
+      var frow = el("div", "prow");
+      frow.innerHTML = '<span class="plab">Style</span>';
+      var fbtn = el("button", "minibtn", e.fill
+        ? '<i class="ph-bold ph-square"></i> Filled' : '<i class="ph-bold ph-bounding-box"></i> Outlined');
+      fbtn.addEventListener("click", function () { pushHistory(); e.fill = !e.fill; scheduleSave(); renderProps(); paint(); });
+      frow.appendChild(fbtn); mount.appendChild(frow);
+      if (!e.fill) mount.appendChild(decoSlider(e, "Thickness", "stroke", 1, 20));
+      if (e.kind === "rect") mount.appendChild(decoSlider(e, "Radius", "radius", 0, 80));
+    } else if (e.kind === "line") {
+      mount.appendChild(decoSlider(e, "Thickness", "stroke", 1, 40));
+    } else if (e.kind === "icon") {
+      var irow = el("div", "prow");
+      irow.innerHTML = '<span class="plab">Icon</span>';
+      var ibtn = el("button", "minibtn", '<i class="ph-bold ph-' + (e.icon || "star") + '"></i> ' + esc(e.icon || "star"));
+      ibtn.addEventListener("click", function () { openIconPicker(e); });
+      irow.appendChild(ibtn); mount.appendChild(irow);
+    }
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-ruler"></i>Arrange'));
+    var arr = el("div", "prow");
+    arr.innerHTML = '<span class="plab">Position</span><span class="mono">' + e.x + " · " + e.y + "</span>";
+    mount.appendChild(arr);
+    var sz = el("div", "prow");
+    sz.innerHTML = '<span class="plab">Size</span><span class="mono">' + e.w + " × " + e.h + "</span>";
+    mount.appendChild(sz);
+    propRowBtns(mount, e);
+  }
+
+  // ---- icon picker (reuses the drawer) ---------------------------------
+  var iconNames = null;
+  function loadIconNames(cb) {
+    if (iconNames) { cb(iconNames); return; }
+    if (!S.cfg.iconCssUrl) { cb([]); return; }
+    fetch(S.cfg.iconCssUrl)
+      .then(function (r) { return r.text(); })
+      .then(function (css) {
+        var seen = {}, out = [], re = /\.ph-bold\.ph-([a-z0-9-]+):before/g, m;
+        while ((m = re.exec(css))) { if (!seen[m[1]]) { seen[m[1]] = 1; out.push(m[1]); } }
+        iconNames = out;
+        cb(out);
+      })
+      .catch(function () { cb([]); });
+  }
+  function openIconPicker(e) {
+    var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
+    if (!overlay || !body) return;
+    title.textContent = "Pick an icon";
+    body.dataset.eid = ""; // Save just closes; selection is immediate
+    body.innerHTML =
+      '<input class="dinput wide" id="panels-icon-search" placeholder="Search icons…" style="width:100%;margin-bottom:8px" autocomplete="off">' +
+      '<div class="icon-grid" id="panels-icon-grid"><div class="note" style="padding:10px">Loading…</div></div>';
+    overlay.classList.add("open");
+    loadIconNames(function (names) {
+      var grid = $("panels-icon-grid"), search = $("panels-icon-search");
+      if (!grid) return;
+      function draw(q) {
+        grid.textContent = "";
+        var list = q ? names.filter(function (n) { return n.indexOf(q) >= 0; }) : names;
+        list.slice(0, 400).forEach(function (n) {
+          var t = el("button", "icon-tile" + (n === e.icon ? " on" : ""));
+          t.title = n;
+          t.innerHTML = '<i class="ph-bold ph-' + n + '"></i>';
+          t.addEventListener("click", function () { pushHistory(); e.icon = n; scheduleSave(); closeConfig(); paint(); });
+          grid.appendChild(t);
+        });
+        if (!list.length) { var no = el("div", "note"); no.style.padding = "10px"; no.textContent = "No icons match."; grid.appendChild(no); }
+      }
+      if (search) search.addEventListener("input", function () { draw(search.value.trim().toLowerCase()); });
+      draw("");
+    });
+  }
+
   function renderEmptyProps(mount) {
     mount.textContent = "";
     var note = el("div", "note");
     note.style.cssText = "padding:16px 4px;line-height:1.5";
-    note.textContent = "Drag a widget from the palette onto the canvas, then select it here to pick a part and configure it.";
+    note.textContent = "Drag a widget or a shape from the palette onto the canvas, then select it here to configure it.";
     mount.appendChild(note);
   }
 
@@ -817,6 +1009,7 @@
     if (selCount() > 1) { renderGroupProps(mount); return; }
     var e = selCount() ? byId(selArr()[0]) : null;
     if (!e) { renderEmptyProps(mount); return; }
+    if (!isWidget(e)) { renderDecoProps(mount, e); return; }
 
     mount.textContent = "";
     // Widget picker.
@@ -1055,6 +1248,7 @@
       saveUrl: root.dataset.saveUrl,
       catalogUrl: root.dataset.catalogUrl,
       dataUrl: root.dataset.dataUrl,
+      iconCssUrl: root.dataset.iconCssUrl,
       devicesUrl: root.dataset.devicesUrl,
       sendUrl: root.dataset.sendUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,
