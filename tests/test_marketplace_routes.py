@@ -102,6 +102,30 @@ def test_install_marks_restart_pending_but_does_not_restart(app: Flask) -> None:
     assert app.config.get("MARKETPLACE_RESTART_PENDING") is True
 
 
+def test_browse_shows_install_counts(app: Flask, monkeypatch: object) -> None:
+    """The Browse page renders the per-widget install count fetched from
+    api.tesserae.ink, keyed by catalog id, on each card."""
+    client = app.test_client()
+    _sign_in(client)
+    mkt = MagicMock(spec=Marketplace)
+    entry = _fake_entry("spotify")
+    mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
+    mkt.fetch_index.return_value = [entry]
+    mkt.cached_index.return_value = [entry]
+    mkt.installed.return_value = {}
+    mkt.screenshots_base.return_value = ""
+    mkt.plugins_dir.return_value = None
+    app.config["MARKETPLACE"] = mkt
+
+    from app import online
+
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        online, "widget_install_counts", lambda: {"spotify": 1234}
+    )
+    body = client.get("/plugins/browse").get_data(as_text=True)
+    assert "1,234" in body  # the count is rendered on the card
+
+
 def test_install_reports_and_logs_telemetry(app: Flask, monkeypatch: object) -> None:
     """A successful install pings api.tesserae.ink (best-effort) and logs a
     'telemetry' event so it shows on /events, when online features are on."""
@@ -119,6 +143,13 @@ def test_install_reports_and_logs_telemetry(app: Flask, monkeypatch: object) -> 
     rows = app.config["EVENT_LOG"].list(type="telemetry")
     assert rows and rows[0].source == "install"
     assert rows[0].target == "sample" and rows[0].status == "sent"
+    # The event names the widget (id + human name) so /events shows which
+    # widget was installed, in the summary target and the expanded detail.
+    assert rows[0].extra.get("widget") == "sample"
+    assert rows[0].extra.get("name") == "Sample"
+    # And it actually renders on the /events page.
+    events_body = client.get("/events?type=telemetry").get_data(as_text=True)
+    assert "sample" in events_body
 
 
 def test_install_no_ping_when_online_off(app: Flask, monkeypatch: object) -> None:

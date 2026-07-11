@@ -87,15 +87,18 @@ def _install_counts() -> dict[str, int]:
         return {}
 
 
-def _report_install(catalog_id: str) -> None:
+def _report_install(entry: CatalogEntry) -> None:
     """Best-effort: report the install to api.tesserae.ink for the anonymous
     per-widget count, and log a ``telemetry`` event so it shows on /events.
 
-    Gated by the master online-features switch. Never raises; a failure here
-    must not affect the install the user just completed.
+    The event's ``target`` is the widget id and its ``extra`` names the widget
+    (id + human name) so the /events row and its expanded detail both say which
+    widget was installed. Gated by the master online-features switch. Never
+    raises; a failure here must not affect the install the user just completed.
     """
     from app import online
 
+    catalog_id = entry.id
     try:
         settings = current_app.config.get("SETTINGS_STORE")
         if not online.online_enabled(settings):
@@ -110,7 +113,12 @@ def _report_install(catalog_id: str) -> None:
                 source="install",
                 target=catalog_id,
                 status="sent" if sent else "failed",
-                extra={"endpoint": "widgets/install", "version": version or ""},
+                extra={
+                    "widget": catalog_id,
+                    "name": entry.name,
+                    "version": version or "",
+                    "endpoint": "widgets/install",
+                },
             )
     except Exception:
         logger.debug("marketplace: install report failed for %s", catalog_id, exc_info=True)
@@ -385,7 +393,7 @@ def install() -> Response:
         flash("Install failed with an unexpected error (see server log).", "error")
         return redirect(url_for("marketplace.browse"))
     _mark_restart_pending()
-    _report_install(catalog_id)
+    _report_install(entry)
     flash(
         f"Installed {entry.name} v{result.version}. Click "
         '"Restart required" in the top bar when you\'re done installing '
