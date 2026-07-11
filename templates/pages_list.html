@@ -19,6 +19,15 @@
       <input type="text" name="name" class="dx-input" placeholder="e.g. Home dashboard"
              autocomplete="off" aria-label="New dashboard name" data-new-dashboard-input>
     </div>
+    {% if composer_enabled %}
+    {# Grid = preset-cell layout (default); Freeform = the composer canvas. #}
+    <div class="dx-pair-input" style="flex:0 0 auto">
+      <select name="layout_kind" class="dx-input" aria-label="Layout">
+        <option value="grid">Grid layout</option>
+        <option value="canvas">Freeform canvas</option>
+      </select>
+    </div>
+    {% endif %}
     <div class="dx-pair-action">
       <button type="submit" class="dx-btn-primary" data-new-dashboard-btn disabled>
         <i class="ph ph-plus" aria-hidden="true"></i><span>Create dashboard</span>
@@ -55,10 +64,17 @@
             <i class="ph ph-{{ page.icon or 'cube' }}"></i>
           </span>
           <div class="dx-dashboard-text">
-            <div class="dx-dashboard-name">{{ page.name }}</div>
+            <div class="dx-dashboard-name">
+              {{ page.name }}
+              {% if page.layout_kind == 'canvas' %}<span class="dx-pill">Freeform</span>{% endif %}
+            </div>
             <div class="dx-meta-strip">
               <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>
+              {% if page.layout_kind == 'canvas' %}
+              <span><span class="dx-meta-k">Elements</span><span class="dx-meta-v">{{ (page.canvas.els|length) if page.canvas else 0 }}</span></span>
+              {% else %}
               <span><span class="dx-meta-k">Cells</span><span class="dx-meta-v">{{ page.cells|length }}</span></span>
+              {% endif %}
               <span><span class="dx-meta-k">Last pushed</span><span class="dx-meta-v">{{ page_last_pushed_rel.get(page.id, 'never') }}</span></span>
             </div>
           </div>

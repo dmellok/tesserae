@@ -1266,3 +1266,46 @@ def test_materialize_cell_options_keeps_empty_fallback_for_unrelated_errors() ->
     out = _materialize_cell_options([plugin])
 
     assert out["ha_zones"][0]["choices"] == []
+
+
+# -- freeform (canvas) dashboards integration (issue #60) ----------------
+
+
+def test_create_freeform_dashboard_redirects_to_composer(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post(
+        "/pages/new", data={"name": "Wall", "layout_kind": "canvas"}, follow_redirects=False
+    )
+    assert resp.status_code == 302
+    assert "/pages/canvas/c/" in resp.location
+    pid = resp.location.rsplit("/", 1)[1]
+    page = app.config["PAGE_STORE"].get(pid)
+    assert page is not None and page.layout_kind == "canvas" and page.canvas is not None
+
+
+def test_edit_canvas_page_redirects_to_composer(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout
+
+    app.config["PAGE_STORE"].save(
+        Page(id="cv", name="C", layout_kind="canvas", canvas=CanvasLayout())
+    )
+    resp = client.get("/pages/cv", follow_redirects=False)
+    assert resp.status_code == 302 and resp.location.endswith("/pages/canvas/c/cv")
+
+
+def test_dashboards_list_shows_freeform_badge_and_choice(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout
+
+    app.config["PAGE_STORE"].save(
+        Page(id="cv", name="Corner", layout_kind="canvas", canvas=CanvasLayout())
+    )
+    body = client.get("/pages").get_data(as_text=True)
+    assert "Corner" in body and "Freeform" in body
+    assert 'name="layout_kind"' in body  # create form offers Grid / Freeform

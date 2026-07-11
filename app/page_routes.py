@@ -789,6 +789,8 @@ def index() -> str:
     page_last_pushed_rel = {
         pid: _humanise_age(time.time() - ts) for pid, ts in page_last_pushed.items()
     }
+    from app import experiments
+
     return render_template(
         "pages_list.html",
         pages=pages,
@@ -796,6 +798,7 @@ def index() -> str:
         page_devices=page_devices,
         page_groups=page_groups,
         page_last_pushed_rel=page_last_pushed_rel,
+        composer_enabled=experiments.is_enabled("composer"),
     )
 
 
@@ -823,6 +826,28 @@ def create() -> Response:
 
     taken = {p.id for p in _store().list()}
     page_id = _random_page_id(taken)
+
+    # Freeform (canvas) dashboards skip the grid layout entirely and drop the
+    # user into the composer. Gated by the composer experiment so the option
+    # only reaches installs that have it enabled.
+    from app import experiments
+
+    if (form.get("layout_kind") or "grid").strip() == "canvas" and experiments.is_enabled(
+        "composer"
+    ):
+        from app.state.panel_store import CanvasLayout
+
+        page = Page(
+            id=page_id,
+            name=name,
+            layout_kind="canvas",
+            theme=(form.get("theme") or "light"),
+            style=(form.get("style") or "standard"),
+            font=(form.get("font") or None),
+            canvas=CanvasLayout(),
+        )
+        _store().save(page)
+        return redirect(url_for("panels.editor", canvas_id=page.id))
 
     # Panel dims come from app settings; the new page inherits them.
     panel = resolve_settings_panel(_settings_store())
@@ -855,10 +880,14 @@ def create() -> Response:
 
 
 @bp.get("/<page_id>")
-def edit(page_id: str) -> str:
+def edit(page_id: str) -> Response | str:
     page = _store().get(page_id)
     if page is None:
         abort(404)
+    # Freeform dashboards open in the composer, not the grid editor, so any
+    # /pages/<id> link (list card, deep link) reaches the right editor.
+    if page.layout_kind == "canvas":
+        return redirect(url_for("panels.editor", canvas_id=page.id))
     return render_template("page_editor.html", **_editor_context(page))
 
 
