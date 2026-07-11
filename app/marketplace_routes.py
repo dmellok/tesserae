@@ -73,6 +73,49 @@ def _mark_restart_pending() -> None:
     current_app.config["MARKETPLACE_RESTART_PENDING"] = True
 
 
+def _install_counts() -> dict[str, int]:
+    """Per-widget install counts for the Browse cards. Best-effort and gated by
+    the master online-features switch; ``{}`` when off or the endpoint is down
+    (the cards then simply omit the count)."""
+    from app import online
+
+    try:
+        if not online.online_enabled(current_app.config.get("SETTINGS_STORE")):
+            return {}
+        return online.widget_install_counts()
+    except Exception:
+        return {}
+
+
+def _report_install(catalog_id: str) -> None:
+    """Best-effort: report the install to api.tesserae.ink for the anonymous
+    per-widget count, and log a ``telemetry`` event so it shows on /events.
+
+    Gated by the master online-features switch. Never raises; a failure here
+    must not affect the install the user just completed.
+    """
+    from app import online
+
+    try:
+        settings = current_app.config.get("SETTINGS_STORE")
+        if not online.online_enabled(settings):
+            return
+        install_id = current_app.config.get("INSTALL_ID")
+        version = current_app.config.get("APP_VERSION")
+        sent = online.report_widget_install(catalog_id, install_id, version)
+        event_log = current_app.config.get("EVENT_LOG")
+        if event_log is not None:
+            event_log.record(
+                type="telemetry",
+                source="install",
+                target=catalog_id,
+                status="sent" if sent else "failed",
+                extra={"endpoint": "widgets/install", "version": version or ""},
+            )
+    except Exception:
+        logger.debug("marketplace: install report failed for %s", catalog_id, exc_info=True)
+
+
 def _filter_entries(
     entries: list[CatalogEntry],
     *,
@@ -113,6 +156,7 @@ def _entries_payload(
     installed: dict[str, Any],
     screenshots_base: str,
     plugins_dir: Any,
+    install_counts: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     """Shape catalog entries for the template: include install state,
     screenshot URL, and the "Update available" decision so the
@@ -132,6 +176,7 @@ def _entries_payload(
     still has the folder, the Browse page should let them Uninstall
     it rather than show a confusing "Install" button that refuses on
     folder collision."""
+    counts = install_counts or {}
     out: list[dict[str, Any]] = []
     for entry in entries:
         record = installed.get(entry.id)
@@ -197,6 +242,7 @@ def _entries_payload(
                 "official": entry.official,
                 "source": entry.source,
                 "stars": entry.stars,
+                "installs": counts.get(entry.id),
                 "version": entry.release_version,
                 "installed": is_installed,
                 "installed_from_disk": installed_from_disk,
@@ -290,9 +336,12 @@ def browse() -> str:
     full_index = mkt.cached_index() or entries
     entries = _filter_entries(entries, tag=active_tag, kind=active_kind, query=active_query)
     installed = mkt.installed()
+    install_counts = _install_counts()
     return render_template(
         "plugins_browse.html",
-        entries=_entries_payload(entries, installed, mkt.screenshots_base(), mkt.plugins_dir()),
+        entries=_entries_payload(
+            entries, installed, mkt.screenshots_base(), mkt.plugins_dir(), install_counts
+        ),
         tags=_collect_tags(full_index),
         kinds=_collect_kinds(full_index),
         active_tag=active_tag,
@@ -336,6 +385,7 @@ def install() -> Response:
         flash("Install failed with an unexpected error (see server log).", "error")
         return redirect(url_for("marketplace.browse"))
     _mark_restart_pending()
+    _report_install(catalog_id)
     flash(
         f"Installed {entry.name} v{result.version}. Click "
         '"Restart required" in the top bar when you\'re done installing '

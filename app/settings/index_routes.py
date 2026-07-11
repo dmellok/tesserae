@@ -248,9 +248,10 @@ def settings_area(area: str) -> str | Response:
             if area == "system"
             else None
         ),
-        # v0.70.1: firmware-update lookup opt-in state, so the System tab
-        # can render the "Check for device firmware updates" switch.
-        firmware_check_enabled=(_firmware_check_enabled() if area == "system" else False),
+        # Master online-features switch state (on by default), so the System
+        # tab can render the "Online features" switch. Governs every outbound
+        # api.tesserae.ink call: update checks + the marketplace install count.
+        online_features_enabled=(_firmware_check_enabled() if area == "system" else True),
         trmnl_token_reveal=trmnl_token_reveal,
         # Pending REST pairing codes for the Devices area's Pair card.
         # Only computed on the devices tab; the template doesn't reference
@@ -1536,22 +1537,14 @@ def _firmware_view(device: Device, parsed: dict[str, Any]) -> dict[str, Any]:
 
 
 def _firmware_check_enabled() -> bool:
-    """Read the ``settings.app.check_firmware_updates`` opt-in. Off by
-    default so a fresh install never phones home to api.tesserae.ink
-    for firmware lookups; users flip it on from Settings -> System."""
-    settings = current_app.config.get("SETTINGS_STORE")
-    if settings is None:
-        return False
-    try:
-        section = settings.get_section("app") or {}
-    except Exception:
-        return False
-    raw = section.get("check_firmware_updates")
-    if isinstance(raw, bool):
-        return raw
-    if isinstance(raw, str):
-        return raw.strip().lower() in ("1", "true", "yes", "on")
-    return False
+    """Whether outbound api.tesserae.ink calls are allowed.
+
+    Reads the master ``settings.app.online_features`` switch (on by default;
+    see :func:`app.online.online_enabled`). Firmware lookups, the app update
+    check, and the marketplace install count all ride this one switch."""
+    from app import online
+
+    return online.online_enabled(current_app.config.get("SETTINGS_STORE"))
 
 
 def _format_duration(seconds: float) -> str:

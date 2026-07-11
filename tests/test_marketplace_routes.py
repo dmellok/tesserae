@@ -102,6 +102,43 @@ def test_install_marks_restart_pending_but_does_not_restart(app: Flask) -> None:
     assert app.config.get("MARKETPLACE_RESTART_PENDING") is True
 
 
+def test_install_reports_and_logs_telemetry(app: Flask, monkeypatch: object) -> None:
+    """A successful install pings api.tesserae.ink (best-effort) and logs a
+    'telemetry' event so it shows on /events, when online features are on."""
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    from app import online
+
+    calls: list[tuple[str, object, object]] = []
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        online, "report_widget_install", lambda w, i, v: bool(calls.append((w, i, v))) or True
+    )
+    client.post("/plugins/browse/install", data={"catalog_id": "sample"})
+    assert calls and calls[0][0] == "sample"
+    rows = app.config["EVENT_LOG"].list(type="telemetry")
+    assert rows and rows[0].source == "install"
+    assert rows[0].target == "sample" and rows[0].status == "sent"
+
+
+def test_install_no_ping_when_online_off(app: Flask, monkeypatch: object) -> None:
+    """With the master switch off, install makes no api.tesserae.ink call and
+    logs no telemetry event."""
+    client = app.test_client()
+    _sign_in(client)
+    _inject_mocks(app)
+    app.config["SETTINGS_STORE"].patch_section("app", {"online_features": False})
+    from app import online
+
+    called: list[object] = []
+    monkeypatch.setattr(  # type: ignore[attr-defined]
+        online, "report_widget_install", lambda *a: bool(called.append(a)) or True
+    )
+    client.post("/plugins/browse/install", data={"catalog_id": "sample"})
+    assert called == []
+    assert app.config["EVENT_LOG"].list(type="telemetry") == []
+
+
 def test_uninstall_marks_restart_pending_but_does_not_restart(app: Flask) -> None:
     """Same expectation on the uninstall side."""
     client = app.test_client()

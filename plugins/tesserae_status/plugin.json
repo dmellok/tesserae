@@ -1,7 +1,7 @@
 {
   "tesserae_compat": "1.x",
   "name": "Tesserae, Status Bar",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "kind": "widget",
   "description": "Dashboard status strip: identity on the left, ambient device telemetry on the right. Renders as a fixed-height bar (48 px) or a resizable block; each chip switches between icon+text, icon-only, or text-only. Temperature and humidity come from the target panel's status heartbeat. Auto-contrasts against a freeform background colour so it stays legible on 1-bit, 4-colour, and Spectra 6 panels. Update chips (app version, panel firmware) surface as a badge dot or accent text, never colour alone.",
   "icon": "ph-squares-four",
@@ -123,14 +123,14 @@
       "type": "boolean",
       "label": "Show app version + update indicator",
       "default": false,
-      "help": "When on, the widget fetches api.tesserae.ink/version/latest. If the running version matches the latest, nothing renders; when an update is pending, a version chip appears with a badge dot or accent \"-> .18\" text. Aggregate install count only, no PII."
+      "help": "When on, the widget fetches api.tesserae.ink/version/latest. If the running version matches the latest, nothing renders; when an update is pending, a version chip appears with a badge dot or accent \"-> .18\" text. Aggregate install count only, no PII. Requires the master Online features switch (Settings -> System) to be on; when that is off, the widget makes no api.tesserae.ink call."
     },
     {
       "name": "show_firmware_updates",
       "type": "boolean",
       "label": "Show firmware update indicator",
       "default": true,
-      "help": "Appears only when at least one bound device kind has a newer firmware known to Tesserae AND the app-level firmware lookup is enabled in Settings -> System. Renders as \"FW\" with badge / accent sub. Nothing renders when everything is up to date."
+      "help": "Appears only when at least one bound device kind has a newer firmware known to Tesserae AND the master Online features switch is on in Settings -> System. Renders as \"FW\" with badge / accent sub. Nothing renders when everything is up to date."
     }
   ],
   "render": {

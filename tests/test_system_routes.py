@@ -42,9 +42,25 @@ def test_settings_system_page_renders(app: Flask) -> None:
     assert resp.status_code == 200
     assert "Updates" in body
     assert "Backups" in body
+    assert "Online features" in body  # master api.tesserae.ink switch
     # The Updater's current_state() resolves against the real repo, the
     # version string from pyproject should appear.
     assert "v0." in body  # e.g. "v0.2.0"
+
+
+def test_online_features_toggle(app: Flask) -> None:
+    """The master switch flips settings.app.online_features. Checkbox absent
+    means off; present means on."""
+    client = app.test_client()
+    _sign_in(client)
+    store = app.config["SETTINGS_STORE"]
+    # Absent checkbox -> off.
+    resp = client.post("/settings/system/online-features/toggle", data={}, follow_redirects=False)
+    assert resp.status_code == 302
+    assert store.get_section("app").get("online_features") is False
+    # Present -> on.
+    client.post("/settings/system/online-features/toggle", data={"online_features": "1"})
+    assert store.get_section("app").get("online_features") is True
 
 
 def test_create_then_download_then_delete_backup(app: Flask, tmp_path: Path) -> None:

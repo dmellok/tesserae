@@ -1,20 +1,28 @@
 # Privacy
 
-**The Tesserae app itself sends no phone-home telemetry.** The core app
-does not contact any third-party analytics service. A fresh install
-never reports back to the maintainer; no `app.started` /
-`app.heartbeat` / `update.applied` events are emitted from the app
-itself, and no analytics identifier is embedded in the app's own
-outbound traffic.
+**Tesserae contacts one first-party endpoint, `api.tesserae.ink`, and
+nothing else.** There is no account system and no third-party analytics
+in the app. The single endpoint is used for two things: checking for app
+and device-firmware updates, and reporting an anonymous, aggregate count
+of how many installs use each marketplace widget.
 
-Individual widgets you install may make external network calls
-documented in their own READMEs. Two of them, both opt-in and both
-shipping with v0.70.0, do fetch from a Tesserae-hosted aggregation
-endpoint. Details in [Widgets that fetch from external services](#widgets-that-fetch-from-external-services) below.
+This is controlled by one master switch, **Settings → System → Online
+features**, which is **on by default**. Turn it off and Tesserae never
+contacts `api.tesserae.ink`; the update indicators and install counts
+simply disappear. Nothing else in the app phones home.
 
-## What the core app itself never sends
+What a request may include: your install's random ID, the widget id, and
+your running version. A coarse country is derived from your IP address
+for aggregate geography and the IP is then discarded. No account, no
+personal data, and no IP addresses or User-Agent strings are stored.
 
-The Tesserae app itself does not send:
+Individual widgets you install may make their own external network calls,
+documented in their own READMEs. Those are separate from the app.
+
+## What the app never sends
+
+Beyond the `api.tesserae.ink` requests described above (widget id,
+install id, version), the app does not send:
 
 - IP addresses
 - hostnames
@@ -42,7 +50,13 @@ per-install identity across restarts.
 Widgets can also request a **widget-scoped derivation** via
 `needs_scoped_id`, which returns `SHA-256(install_id + plugin_id)`.
 Different widgets get different derived identifiers so their outbound
-calls can't be correlated by an external service.
+calls can't be correlated by an external service; the `tesserae_status`
+update chip uses this scoped form.
+
+The marketplace install count uses the **raw** install ID instead (the
+app-level identity), so a unique install counts once per widget. It
+carries no name or personal data; regenerating the identifier below
+makes you a fresh install from the count's point of view.
 
 You can regenerate the identifier at any time in
 **Settings → System → Install identifier**. Regeneration resets any
@@ -50,44 +64,48 @@ per-install state the widget side has accumulated (a pet's history, a
 traveler's home waypoint), because from those services' point of view
 you look like a new install.
 
-## Widgets that fetch from external services
+## What the app sends to api.tesserae.ink
 
-Widgets you install may fetch data from external sources: weather from
-Open-Meteo, RSS from feed URLs, calendars from iCal endpoints. Two
-widgets shipping with v0.70.0 optionally fetch from `api.tesserae.ink`.
-Both are opt-in.
+Everything below rides the single **Online features** switch (on by
+default). Turning it off stops all of it.
 
-### `tesserae_status` update-indicator chip
+### Marketplace install count
 
-When the update-indicator chip is enabled on a `tesserae_status` widget
+When you install a widget from the marketplace, Tesserae POSTs to
+`https://api.tesserae.ink/widgets/install` with the widget id, your
+install's random ID, and your running version, so the widget's card can
+show an anonymous "how many installs use this" count. Reinstalling the
+same widget does not inflate the count (it dedupes on your install ID).
+The Browse page reads the aggregate counts from
+`https://api.tesserae.ink/widgets/installs`. A coarse country is derived
+from the request IP on the server side and the IP is then discarded.
+
+### App update check (`tesserae_status`)
+
+When the update-indicator chip is enabled on a `tesserae_status`
 placement, the widget fetches
 `https://api.tesserae.ink/version/latest?channel=stable&current=<v>&install=<scoped-id>`
-on each render so it can show an amber "update available" chip when a
-newer Tesserae release exists. The `install` parameter is the
-widget-scoped derivation of your install identifier (see above); it
-lets aggregate install counts dedupe across days without correlating
-with any other widget's identity. No IP address or User-Agent is
-stored on the api.tesserae.ink side; only a coarse country lookup +
-the query params. See the
-[tesserae-api source](https://github.com/dmellok/tesserae-api) for the
-exact implementation.
-
-The chip is off by default. Turn it on per composition when you want
-the update signal on your dashboard.
+so it can show an amber "update available" chip when a newer Tesserae
+release exists. The `install` parameter is the widget-scoped derivation
+of your install identifier. No IP address or User-Agent is stored; only
+a coarse country lookup plus the query params. The chip is off per
+placement by default, and does nothing at all when Online features is
+off.
 
 ### Device firmware check
 
-Tesserae can look up the latest known firmware version for each of
-your registered device kinds against
+Tesserae looks up the latest known firmware version for each of your
+registered device kinds against
 `https://api.tesserae.ink/firmware/<kind>/latest`, so the Devices card
-shows "v1.1.0 (v1.2.0 available)" when a device is behind. **Off by
-default** as of v0.70.1: turn it on from **Settings → System → Check
-for device firmware updates**. When enabled, the lookup happens
-lazily (on the first Devices page render, and on demand every 60 min
-after). The only outbound data is the device kind name; no install
-identifier, no device-specific fields. When disabled, the Devices
-card still shows the current firmware version reported by each
-device's heartbeat; the "update available" pill just never fires.
+shows "v1.1.0 (v1.2.0 available)" when a device is behind. The lookup
+happens lazily (first Devices page render, then on demand every 60 min).
+The only outbound data is the device kind name; no install identifier,
+no device-specific fields. With Online features off, the Devices card
+still shows the firmware version each device reports in its heartbeat;
+the "update available" pill just never fires.
+
+See the [tesserae-api source](https://github.com/dmellok/tesserae-api)
+for the exact server-side implementation.
 
 ### Home Assistant App auto-update
 

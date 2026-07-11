@@ -6,6 +6,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Online features (on by default, one-switch opt-out).** Tesserae now
+  reports an anonymous, aggregate install count to `api.tesserae.ink`
+  when you add a widget from the marketplace, and the Browse cards show
+  the count. Each request may include your install's random ID, the
+  widget id, and the running version; a coarse country is derived from
+  the request IP and the IP is then discarded. No account, no personal
+  data, no IP addresses or User-Agent strings are stored. A single switch
+  at **Settings → System → Online features** governs this and the app +
+  device-firmware update checks; it is on by default, and turning it off
+  stops all contact with `api.tesserae.ink`. This replaces the separate
+  firmware-update opt-in, which is now part of this switch. Install pings
+  surface on the `/events` timeline under the telemetry filter.
+
 ### Fixed
 
 - **Reordered multi-select entries survive a save.** The editor's

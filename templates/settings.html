@@ -1007,22 +1007,21 @@ docker compose up -d</code></pre>
 {% endcall %}
 {% endif %}
 
-{# v0.70.1: firmware-update lookup opt-in. Off by default so a fresh
-   install never phones home to api.tesserae.ink; users flip it on to
-   see "update available" pills on the Devices card and the aggregate
-   count in the tesserae_status widget. The only outbound data is the
-   device kind name; no identifiers. #}
-{% call section_card(icon='cloud-arrow-down', title='Check for device firmware updates',
-                     description="When on, Tesserae looks up the latest known firmware version for each of your registered device kinds against api.tesserae.ink and shows an 'update available' pill on the Devices card when a device is behind. Off by default. Sends only the device kind name; no install identifier, no device-specific fields.") %}
+{# Master online-features switch. On by default; governs every outbound
+   api.tesserae.ink call: app + device-firmware update checks and the
+   anonymous marketplace install count. Off means the app never contacts
+   api.tesserae.ink. #}
+{% call section_card(icon='cloud-arrow-down', title='Online features',
+                     description="When on, Tesserae contacts api.tesserae.ink to check for app and device-firmware updates, and to report an anonymous install count for the widgets you add from the marketplace. Each request may include your install's random ID, the widget id, and your running version. A coarse country is derived from your IP for aggregate geography and the IP is then discarded. No account, no personal data, and no IP addresses or browser details are stored. Turn this off and Tesserae never contacts api.tesserae.ink; update indicators and install counts are hidden.") %}
   <div class="section-body">
-    <form method="post" action="{{ url_for('auth.settings_firmware_check_toggle') }}"
+    <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}"
           class="form form--inline">
       <label class="switch">
-        <input type="checkbox" name="check_firmware_updates" value="1"
-               {% if firmware_check_enabled %}checked{% endif %}
+        <input type="checkbox" name="online_features" value="1"
+               {% if online_features_enabled %}checked{% endif %}
                onchange="this.form.submit()">
         <span class="switch-track"><span class="switch-thumb"></span></span>
-        <span class="switch-label">Enable firmware update lookups</span>
+        <span class="switch-label">Contact api.tesserae.ink for updates and install counts</span>
       </label>
     </form>
   </div>
@@ -1044,7 +1043,7 @@ docker compose up -d</code></pre>
 
   <section class="dx-section-card">
     {{ card_head('Tesserae', icon_name='info') }}
-    <p class="lede">A self-hosted dashboard server. AGPL, no paid tier, no phone-home telemetry.</p>
+    <p class="lede">A self-hosted dashboard server. AGPL, no paid tier, no accounts. Contacts api.tesserae.ink only for update checks and anonymous install counts; turn it off under System &rarr; Online features.</p>
     <dl class="meta about-meta">
       <div><dt>Version</dt><dd><code>{{ about_app_version }}</code></dd></div>
       <div><dt>License</dt><dd><code>AGPL-3.0-or-later</code></dd></div>

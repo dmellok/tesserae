@@ -334,20 +334,25 @@ def system_install_id_regenerate() -> Response:
     return system_redirect()
 
 
-@bp.post("/settings/system/firmware-check/toggle", endpoint="settings_firmware_check_toggle")
-def system_firmware_check_toggle() -> Response:
-    """Flip ``settings.app.check_firmware_updates`` (v0.70.1).
+@bp.post("/settings/system/online-features/toggle", endpoint="settings_online_features_toggle")
+def system_online_features_toggle() -> Response:
+    """Flip the master ``settings.app.online_features`` switch.
 
-    The firmware-update lookup is off by default so a fresh install
-    never phones home to api.tesserae.ink. Users opt in from
-    Settings -> System; toggling here writes the new value and the
-    Devices card + tesserae_status widget pick it up on the next
-    render. Checkbox absent from the form body means unchecked.
+    On by default. It governs every outbound api.tesserae.ink call: the app +
+    device-firmware update checks and the anonymous marketplace install count.
+    Turning it off means the app never contacts api.tesserae.ink, and the
+    update indicators + install counts are hidden. The Devices card, the
+    tesserae_status widget, and the widget Browse page pick up the new value on
+    the next render. Checkbox absent from the form body means unchecked.
     """
-    enabled = request.form.get("check_firmware_updates") in ("1", "true", "on")
-    settings_store().patch_section("app", {"check_firmware_updates": enabled})
+    enabled = request.form.get("online_features") in ("1", "true", "on")
+    settings_store().patch_section("app", {"online_features": enabled})
     flash(
-        ("Firmware update lookups enabled." if enabled else "Firmware update lookups disabled."),
+        (
+            "Online features enabled. Update checks and anonymous install counts are active."
+            if enabled
+            else "Online features disabled. Tesserae will not contact api.tesserae.ink."
+        ),
         "ok",
     )
     return system_redirect()

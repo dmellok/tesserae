@@ -188,13 +188,11 @@ def _firmware_updates_available() -> int:
     """Count device kinds where at least one registered instance is on an
     older firmware than the aggregator reports.
 
-    Skips the lookup entirely when
-    ``settings.app.check_firmware_updates`` is disabled (the app-level
-    opt-in for outbound api.tesserae.ink firmware calls, off by
-    default). Otherwise reads the in-memory firmware_check cache
-    without triggering fresh fetches.
+    Skips the lookup entirely when the master ``settings.app.online_features``
+    switch is off (no outbound api.tesserae.ink calls). Otherwise reads the
+    in-memory firmware_check cache without triggering fresh fetches.
     """
-    if not _firmware_check_enabled():
+    if not _online_enabled():
         return 0
     from app import firmware_check as firmware_check_module
 
@@ -216,22 +214,20 @@ def _firmware_updates_available() -> int:
     return len(outdated_kinds)
 
 
+def _online_enabled() -> bool:
+    """Whether outbound api.tesserae.ink calls are allowed for this widget.
+
+    Reads the master ``settings.app.online_features`` switch (on by default).
+    When off, the widget makes no update-check or firmware call at all."""
+    from app import online
+
+    return online.online_enabled(current_app.config.get("SETTINGS_STORE"))
+
+
 def _firmware_check_enabled() -> bool:
-    """Mirror of the same helper in :mod:`app.settings.index_routes`.
-    Kept local so the widget doesn't reach into Settings internals."""
-    settings = current_app.config.get("SETTINGS_STORE")
-    if settings is None:
-        return False
-    try:
-        section = settings.get_section("app") or {}
-    except Exception:
-        return False
-    raw = section.get("check_firmware_updates")
-    if isinstance(raw, bool):
-        return raw
-    if isinstance(raw, str):
-        return raw.strip().lower() in ("1", "true", "yes", "on")
-    return False
+    """Back-compat alias for :func:`_online_enabled` (firmware rides the
+    master online-features switch now)."""
+    return _online_enabled()
 
 
 def fetch(
@@ -279,7 +275,9 @@ def fetch(
         "show_wifi": _bool("show_wifi", True),
         "show_broker": _bool("show_broker", True),
         "broker_label": str(options.get("broker_label") or "HA"),
-        "check_for_updates": _bool("check_for_updates", False),
+        # Master online-features switch gates the client's version fetch and
+        # the install id it would send; off means no api.tesserae.ink call.
+        "check_for_updates": _bool("check_for_updates", False) and _online_enabled(),
         "show_firmware_updates": _bool("show_firmware_updates", True),
         # Values populated server-side
         "temperature_c": temperature_c if show_temperature else None,
@@ -291,6 +289,7 @@ def fetch(
         "firmware_updates": (
             _firmware_updates_available() if _bool("show_firmware_updates", True) else 0
         ),
-        # Aggregate-only install identifier for the update-check fetch.
-        "install_scoped_id": ctx.get("widget_scoped_id") or "",
+        # Aggregate-only install identifier for the update-check fetch. Withheld
+        # entirely when online features are off.
+        "install_scoped_id": (ctx.get("widget_scoped_id") or "") if _online_enabled() else "",
     }
