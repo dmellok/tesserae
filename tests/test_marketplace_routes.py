@@ -126,12 +126,16 @@ def test_browse_shows_install_counts(app: Flask, monkeypatch: object) -> None:
     assert "1,234" in body  # the count is rendered on the card
 
 
-def test_install_reports_and_logs_telemetry(app: Flask, monkeypatch: object) -> None:
+def test_install_reports_and_logs_telemetry(
+    app: Flask, monkeypatch: object, test_install_uuid: object
+) -> None:
     """A successful install pings api.tesserae.ink (best-effort) and logs a
     'telemetry' event so it shows on /events, when online features are on."""
     client = app.test_client()
     _sign_in(client)
     _inject_mocks(app)
+    marked = test_install_uuid()  # type: ignore[operator]
+    app.config["INSTALL_ID"] = marked
     from app import online
 
     calls: list[tuple[str, object, object]] = []
@@ -140,6 +144,7 @@ def test_install_reports_and_logs_telemetry(app: Flask, monkeypatch: object) -> 
     )
     client.post("/plugins/browse/install", data={"catalog_id": "sample"})
     assert calls and calls[0][0] == "sample"
+    assert calls[0][1] == marked and marked.startswith("7e57c0de-")  # forwards the install id
     rows = app.config["EVENT_LOG"].list(type="telemetry")
     assert rows and rows[0].source == "install"
     assert rows[0].target == "sample" and rows[0].status == "sent"

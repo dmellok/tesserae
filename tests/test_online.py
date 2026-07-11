@@ -60,7 +60,9 @@ class _FakeResp:
         return False
 
 
-def test_report_widget_install_posts_expected_payload(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_report_widget_install_posts_expected_payload(
+    monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any
+) -> None:
     captured: dict[str, Any] = {}
 
     def fake_urlopen(req: Any, timeout: float) -> _FakeResp:
@@ -69,14 +71,15 @@ def test_report_widget_install_posts_expected_payload(monkeypatch: pytest.Monkey
         captured["body"] = req.data
         return _FakeResp(204)
 
+    uid = test_install_uuid()
     monkeypatch.setattr(online.urllib.request, "urlopen", fake_urlopen)
-    ok = online.report_widget_install("spotify", "uuid-123", "0.93.0", api_base="https://x.test")
+    ok = online.report_widget_install("spotify", uid, "0.93.0", api_base="https://x.test")
     assert ok is True
     assert captured["url"] == "https://x.test/widgets/install"
     assert captured["method"] == "POST"
     assert json.loads(captured["body"]) == {
         "widget": "spotify",
-        "install": "uuid-123",
+        "install": uid,
         "version": "0.93.0",
     }
 
@@ -91,7 +94,7 @@ def test_report_widget_install_best_effort(monkeypatch: pytest.MonkeyPatch) -> N
     assert online.report_widget_install("", "u", "0") is False
 
 
-def test_send_heartbeat_posts(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_send_heartbeat_posts(monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any) -> None:
     captured: dict[str, Any] = {}
 
     def fake_urlopen(req: Any, timeout: float) -> _FakeResp:
@@ -100,12 +103,13 @@ def test_send_heartbeat_posts(monkeypatch: pytest.MonkeyPatch) -> None:
         captured["body"] = req.data
         return _FakeResp(204)
 
+    uid = test_install_uuid()
     monkeypatch.setattr(online.urllib.request, "urlopen", fake_urlopen)
-    ok = online.send_heartbeat({"install": "u", "version": "1"}, api_base="https://x.test")
+    ok = online.send_heartbeat({"install": uid, "version": "1"}, api_base="https://x.test")
     assert ok is True
     assert captured["url"] == "https://x.test/heartbeat"
     assert captured["method"] == "POST"
-    assert json.loads(captured["body"])["install"] == "u"
+    assert json.loads(captured["body"])["install"] == uid
 
 
 def test_send_heartbeat_best_effort(monkeypatch: pytest.MonkeyPatch) -> None:

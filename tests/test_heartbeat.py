@@ -26,7 +26,12 @@ def _device(kind: str, transport: str) -> SimpleNamespace:
 
 
 def _app(
-    tmp_path: Path, *, online_on: bool = True, devices: list[Any] | None = None, ha: bool = False
+    tmp_path: Path,
+    *,
+    install: str,
+    online_on: bool = True,
+    devices: list[Any] | None = None,
+    ha: bool = False,
 ) -> tuple[_FakeApp, list[dict[str, Any]]]:
     app_section: dict[str, Any] = {"ha_discovery_enabled": ha}
     if not online_on:
@@ -38,7 +43,7 @@ def _app(
     config = {
         "SETTINGS_STORE": settings,
         "DATA_ROOT": tmp_path,
-        "INSTALL_ID": "11111111-1111-1111-1111-111111111111",
+        "INSTALL_ID": install,
         "APP_VERSION": "0.94.2",
         "DEVICE_REGISTRY": registry,
         "EVENT_LOG": event_log,
@@ -46,14 +51,16 @@ def _app(
     return _FakeApp(config), records
 
 
-def test_build_payload_shape(tmp_path: Path) -> None:
+def test_build_payload_shape(tmp_path: Path, test_install_uuid: Any) -> None:
+    uid = test_install_uuid()
     app, _ = _app(
         tmp_path,
+        install=uid,
         devices=[_device("pimoroni_inky_4", "mqtt"), _device("waveshare_x", "rest")],
         ha=True,
     )
     p = heartbeat.build_payload(app)  # type: ignore[arg-type]
-    assert p["install"] == "11111111-1111-1111-1111-111111111111"
+    assert p["install"] == uid and uid.startswith("7e57c0de-")
     assert p["version"] == "0.94.2"
     assert p["channel"] == "stable"
     assert p["transport"] == "both"  # one mqtt + one rest device
@@ -66,14 +73,16 @@ def test_build_payload_shape(tmp_path: Path) -> None:
     assert p["deploy"] in ("ha_addon", "docker", "lxc", "source", "pip")
 
 
-def test_build_payload_no_devices(tmp_path: Path) -> None:
-    app, _ = _app(tmp_path, devices=[])
+def test_build_payload_no_devices(tmp_path: Path, test_install_uuid: Any) -> None:
+    app, _ = _app(tmp_path, install=test_install_uuid(), devices=[])
     p = heartbeat.build_payload(app)  # type: ignore[arg-type]
     assert p["devices"] == "0" and p["device_kinds"] == [] and p["transport"] == "none"
 
 
-def test_maybe_send_skips_when_online_off(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    app, records = _app(tmp_path, online_on=False)
+def test_maybe_send_skips_when_online_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any
+) -> None:
+    app, records = _app(tmp_path, install=test_install_uuid(), online_on=False)
     calls: list[Any] = []
     monkeypatch.setattr(online, "send_heartbeat", lambda f: bool(calls.append(f)) or True)
     assert heartbeat.maybe_send(app, now=1000.0) is False  # type: ignore[arg-type]
@@ -82,8 +91,10 @@ def test_maybe_send_skips_when_online_off(tmp_path: Path, monkeypatch: pytest.Mo
     assert records == []
 
 
-def test_maybe_send_sends_then_dedupes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    app, records = _app(tmp_path, devices=[_device("k", "rest")])
+def test_maybe_send_sends_then_dedupes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any
+) -> None:
+    app, records = _app(tmp_path, install=test_install_uuid(), devices=[_device("k", "rest")])
     calls: list[Any] = []
     monkeypatch.setattr(online, "send_heartbeat", lambda f: bool(calls.append(f)) or True)
 
@@ -103,9 +114,9 @@ def test_maybe_send_sends_then_dedupes(tmp_path: Path, monkeypatch: pytest.Monke
 
 
 def test_maybe_send_retries_sooner_on_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any
 ) -> None:
-    app, records = _app(tmp_path)
+    app, records = _app(tmp_path, install=test_install_uuid())
     monkeypatch.setattr(online, "send_heartbeat", lambda f: False)
     assert heartbeat.maybe_send(app, now=1000.0) is False  # type: ignore[arg-type]
     due = json.loads((tmp_path / "core" / "heartbeat.json").read_text())["next_due"]
