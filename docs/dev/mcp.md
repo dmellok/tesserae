@@ -1,7 +1,7 @@
 # Build dashboards with AI (MCP)
 
-Tesserae ships an optional [MCP](https://modelcontextprotocol.io) server so an AI
-agent (Claude Desktop, Claude Code, or any MCP client) can build **freeform
+Tesserae ships an optional [MCP](https://modelcontextprotocol.io) integration so
+an AI agent (Claude Desktop, Claude Code, or any MCP client) can build **freeform
 (canvas) dashboards** for you: it lists your widgets and devices, lays out a
 canvas, **renders a preview to check its own work**, and pushes to a panel.
 
@@ -9,60 +9,186 @@ It's experimental and off by default.
 
 ## How it works
 
-The canvas editor is, underneath, a JSON-document editor. The MCP server lets an
-agent write that same document directly and render a preview PNG to see the
-result, so it can place, look, and adjust:
+The canvas editor is, underneath, a JSON-document editor. The MCP integration
+lets an agent write that same document directly and render a preview PNG to see
+the result, so it can place, look, and adjust:
 
 ```
 create_canvas_page → set_canvas → render_preview → (look) → set_canvas → …
 ```
 
-Two pieces:
+There are two pieces, and they can run on **different machines**:
 
-- **The API** (`/api/mcp/*`) — a token-authed surface built into Tesserae, gated
-  behind the `mcp` experiment. Ships with Tesserae; nothing to install.
-- **The bridge** (`tesserae-mcp`) — a small stdio MCP server your agent launches;
-  it talks to a running Tesserae. It's a **separate package**,
-  [dmellok/tesserae-mcp](https://github.com/dmellok/tesserae-mcp), installed on
-  the machine where your agent runs.
+- **The API** (`/api/mcp/*`) is built into Tesserae. It ships with the app, so
+  there's nothing to install on the Tesserae side (Docker, Home Assistant, or
+  source). You just enable it.
+- **The bridge** (`tesserae-mcp`) is a small stdio program your agent launches.
+  It's a separate package, [dmellok/tesserae-mcp](https://github.com/dmellok/tesserae-mcp),
+  installed on **the machine where your agent runs** (your laptop/desktop). It
+  talks to your Tesserae over HTTP.
 
-## Enable it
+So: nothing to `pip install` inside Tesserae or Home Assistant. You install the
+bridge only on your agent's machine.
 
-1. In Tesserae, go to **Settings → System → MCP** and click **Enable MCP API**.
-2. If your agent runs on a **different machine** from Tesserae, click **Regenerate
-   token** and copy it. On the **same machine** you can skip the token (loopback
-   is trusted).
-3. Install the bridge on the machine where your agent runs:
+---
+
+## Step 1 — Enable the API in Tesserae
+
+1. Open Tesserae → **Settings → System → MCP**.
+2. Click **Enable MCP API**.
+3. **Token:** if your agent runs on the **same machine** as Tesserae, you can
+   skip this (loopback is trusted). If it runs on a **different machine**, click
+   **Regenerate token** and copy it — you'll need it in Step 3.
+
+While the experiment is off, `/api/mcp` returns 404, so the API is invisible
+until you switch it on here.
+
+---
+
+## Step 2 — Install the bridge (on your agent's machine)
+
+The bridge is a command-line tool, so **[pipx](https://pipx.pypa.io)** is the
+cleanest way to install it: pipx puts it in its own isolated environment and adds
+it to your `PATH`, which is exactly what an MCP client needs.
+
+=== "pipx (recommended)"
 
     ```bash
-    pip install git+https://github.com/dmellok/tesserae-mcp
+    # macOS
+    brew install pipx
+    pipx ensurepath
+
+    # or, any platform
+    python3 -m pip install --user pipx
+    python3 -m pipx ensurepath
     ```
 
-## Connect an agent
+    Then install the bridge:
 
-Point your MCP client at the `tesserae-mcp` command. Example (Claude Desktop /
-Claude Code `mcpServers` config):
+    ```bash
+    pipx install git+https://github.com/dmellok/tesserae-mcp
+    ```
 
-```json
-{
-  "mcpServers": {
-    "tesserae": {
-      "command": "tesserae-mcp",
-      "env": {
-        "TESSERAE_URL": "http://127.0.0.1:8765",
-        "TESSERAE_MCP_TOKEN": "<your-token>"
+    Confirm it's on your `PATH`:
+
+    ```bash
+    which tesserae-mcp
+    ```
+
+    (You may need to open a new terminal after `pipx ensurepath`.)
+
+=== "venv"
+
+    ```bash
+    python3 -m venv ~/.tesserae-mcp
+    ~/.tesserae-mcp/bin/python -m pip install git+https://github.com/dmellok/tesserae-mcp
+    ```
+
+    The command is then `~/.tesserae-mcp/bin/tesserae-mcp` (use that full path in
+    the config below).
+
+=== "from a clone"
+
+    ```bash
+    git clone https://github.com/dmellok/tesserae-mcp
+    cd tesserae-mcp
+    python3 -m pip install mcp
+    # run with:  python -m tesserae_mcp
+    ```
+
+!!! warning "`error: externally-managed-environment`"
+    Homebrew and other modern Python installs block `pip install` into the
+    system Python ([PEP 668](https://peps.python.org/pep-0668/)). That's exactly
+    why pipx (or a venv) is recommended here — both sidestep it. Avoid
+    `--break-system-packages`.
+
+---
+
+## Step 3 — Configure your agent
+
+Point your MCP client at the `tesserae-mcp` command, with two environment
+variables:
+
+- **`TESSERAE_URL`** — where your Tesserae is reachable. Default
+  `http://127.0.0.1:8765`. For a Docker/Home Assistant install, use its LAN
+  address, e.g. `http://192.168.1.50:8765`.
+- **`TESSERAE_MCP_TOKEN`** — the token from Step 1. **Omit it** when the agent
+  and Tesserae are on the same machine (loopback is trusted).
+
+=== "Claude Code"
+
+    One command:
+
+    ```bash
+    claude mcp add tesserae --scope user \
+      --env TESSERAE_URL=http://127.0.0.1:8765 \
+      -- tesserae-mcp
+    ```
+
+    Add the token for a remote Tesserae:
+
+    ```bash
+    claude mcp add tesserae --scope user \
+      --env TESSERAE_URL=http://192.168.1.50:8765 \
+      --env TESSERAE_MCP_TOKEN=your-token-here \
+      -- tesserae-mcp
+    ```
+
+    `--scope user` makes it available in every project; drop it to scope to the
+    current project. Check with `claude mcp list`, or `/mcp` inside a session.
+
+=== "Claude Desktop"
+
+    Edit `claude_desktop_config.json`:
+
+    - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+    - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+    ```json
+    {
+      "mcpServers": {
+        "tesserae": {
+          "command": "tesserae-mcp",
+          "env": {
+            "TESSERAE_URL": "http://127.0.0.1:8765",
+            "TESSERAE_MCP_TOKEN": "your-token-here"
+          }
+        }
       }
     }
-  }
-}
-```
+    ```
 
-- `TESSERAE_URL` — where your Tesserae is reachable (default `http://127.0.0.1:8765`).
-- `TESSERAE_MCP_TOKEN` — the token from Settings. Omit it when the agent and
-  Tesserae share a machine.
+    Drop `TESSERAE_MCP_TOKEN` if the agent and Tesserae share a machine. Restart
+    Claude Desktop after editing.
 
-Then just ask: *"Build me an 800×480 dashboard with the time, today's weather for
-Melbourne, and my next calendar event, then show me a preview."*
+    !!! note "Desktop can't find `tesserae-mcp`?"
+        GUI apps don't inherit your shell `PATH`, so the bare command may not
+        resolve. Run `which tesserae-mcp` and use the **absolute path** it prints
+        (e.g. `/Users/you/.local/bin/tesserae-mcp`) as `"command"`.
+
+---
+
+## Step 4 — Use it
+
+Make sure Tesserae is running, then ask your agent something like:
+
+> Using Tesserae, build an 800×480 canvas dashboard with the time, today's
+> weather for Melbourne, and my next calendar event, then show me a preview.
+
+It'll call `list_widgets` / `get_widget_options` to see what's available,
+`create_canvas_page`, `set_canvas` to lay it out, and `render_preview` to show
+you the result. Iterate from there ("make the clock bigger", "move weather to the
+top"), and when you're happy, `push_to_device`.
+
+### Watch it work live
+
+Open the dashboard in Tesserae's canvas editor (Dashboards → the agent-made page,
+tagged **Agent**) while the agent works. The editor updates in real time as the
+agent saves, so you can watch it place and adjust elements. If you start editing
+yourself, it won't overwrite your unsaved changes — you'll get a "changed
+externally" reload prompt instead.
+
+---
 
 ## Tools
 
@@ -78,6 +204,8 @@ Melbourne, and my next calendar event, then show me a preview."*
 | `render_preview` | Render the canvas to a PNG the agent can see |
 | `push_to_device` | Push the canvas to explicit device(s) |
 
+---
+
 ## Guardrails
 
 - The API **404s** entirely while the `mcp` experiment is off.
@@ -88,8 +216,37 @@ Melbourne, and my next calendar event, then show me a preview."*
 - Pushing is **always explicit** — the agent must name the device(s); nothing is
   pushed automatically.
 
+---
+
+## Troubleshooting
+
+**"Cannot reach Tesserae at …"** — Tesserae isn't running at `TESSERAE_URL`, or
+the port isn't reachable from the agent's machine. Confirm the URL in a browser.
+For a Home Assistant install, the add-on must expose a **direct port** on your
+LAN; an ingress-only setup can't be reached by an external agent.
+
+**HTTP 401 / unauthorized** — the agent is calling from a non-loopback address
+without a valid token. Generate one in Settings → System → MCP and set
+`TESSERAE_MCP_TOKEN`. (Same machine as Tesserae? You shouldn't hit this — check
+`TESSERAE_URL` really is `127.0.0.1`.)
+
+**HTTP 404 on every call** — the `mcp` experiment is off. Enable it in Settings →
+System → MCP.
+
+**`tesserae-mcp: command not found`** — after `pipx install`, run
+`pipx ensurepath` and open a new terminal. For Claude Desktop, use the absolute
+path from `which tesserae-mcp` (GUI apps don't inherit your shell `PATH`).
+
+**`externally-managed-environment`** — see the warning in Step 2; use pipx or a
+venv rather than installing into the system Python.
+
+---
+
 ## Notes
 
 - The bridge needs a **running** Tesserae (rendering uses its headless browser).
 - Core Tesserae never imports the `mcp` package; it lives entirely in the
   separate `tesserae-mcp` bridge.
+- The API surface and canvas-document schema are the contract between the two.
+  See the [`tesserae-mcp` repo](https://github.com/dmellok/tesserae-mcp) for the
+  bridge itself.
