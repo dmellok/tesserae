@@ -3030,6 +3030,30 @@
   outline-offset: -1px;
   border-color: var(--t-accent);
 }
+/* A <select> carrying .dx-input sheds its OS chrome and picks up the same
+   custom caret the form-macro selects use, so it reads as a sibling of the
+   text inputs it sits beside (e.g. the dashboard Grid/Freeform picker). */
+select.dx-input {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-fg-soft) 50%),
+    linear-gradient(135deg, var(--t-fg-soft) 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+}
+select.dx-input:focus,
+select.dx-input:hover {
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--t-accent) 50%),
+    linear-gradient(135deg, var(--t-accent) 50%, transparent 50%);
+}
 
 /* Inset row: shared shape behind Discovered devices, History entries,
    Widgets index rows, Schedule conditions, Events rows. The

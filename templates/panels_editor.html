@@ -31,6 +31,51 @@
   {# @font-face rules for every loaded font plugin, so the font picker's
      choices actually render on the canvas. #}
   <style>{{ font_face_css|safe }}</style>
+  {# Editor chrome that lives outside the ported panels stylesheets: the
+     small-screen block-out, the first-open experimental disclaimer, and the
+     save/back affordances. Kept here so they travel with this page only. #}
+  <style>
+    #panels-back { text-decoration: none; }
+    .ed-mobile-block { display: none; }
+    .ed-modal[hidden] { display: none; }
+    .ed-modal {
+      position: fixed; inset: 0; z-index: 210;
+      display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .ed-modal-scrim { position: absolute; inset: 0; background: rgba(20,18,14,.42); }
+    .ed-modal-card {
+      position: relative; max-width: 430px;
+      background: var(--t-surface); border: 1px solid var(--t-border);
+      border-radius: 16px; padding: 26px 26px 22px;
+      box-shadow: var(--t-shadow-lg, 0 20px 50px rgba(0,0,0,.25));
+    }
+    .ed-modal-icon {
+      width: 44px; height: 44px; display: grid; place-items: center;
+      border-radius: 12px; background: var(--t-accent-soft);
+      color: var(--t-accent); font-size: 22px;
+    }
+    .ed-modal-card h2 { margin: 14px 0 8px; font-size: 19px; }
+    .ed-modal-card p { margin: 0 0 20px; font-size: 13.5px; color: var(--t-fg-soft); line-height: 1.55; }
+    .ed-modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+    .ed-mobile-card {
+      max-width: 340px; text-align: center;
+      background: var(--t-surface); border: 1px solid var(--t-border);
+      border-radius: 14px; padding: 28px 24px;
+      box-shadow: var(--t-shadow-md, 0 12px 30px rgba(0,0,0,.18));
+    }
+    .ed-mobile-card > i { font-size: 34px; color: var(--t-accent); }
+    .ed-mobile-card h2 { margin: 12px 0 8px; font-size: 18px; }
+    .ed-mobile-card p { margin: 0 0 18px; font-size: 13.5px; color: var(--t-fg-soft); line-height: 1.5; }
+    @media (max-width: 820px) {
+      .ed { display: none !important; }
+      .ed-modal { display: none !important; }
+      .ed-mobile-block {
+        display: flex; position: fixed; inset: 0; z-index: 200;
+        align-items: center; justify-content: center; padding: 24px;
+        background: var(--t-bg, #f5f4f0);
+      }
+    }
+  </style>
   <script>
     // Ingress URL prefix for editor.js's dynamic client.js imports.
     window.TESSERAE_URL_PREFIX = {{ request.script_root|tojson }};
@@ -56,6 +101,7 @@
        data-source-options-url="{{ url_for('panels.source_options') }}">
 
     <div class="tbar" style="grid-column:1/4">
+      <a class="tbtn" href="{{ url_for('pages.index') }}" title="Back to Tesserae dashboards" id="panels-back"><i class="ph-bold ph-arrow-left"></i></a>
       <span class="bmark"></span>
       <div style="display:flex;flex-direction:column;line-height:1.15;margin-right:2px">
         <span style="font-weight:700;font-size:14px" id="panels-title">Untitled Panel</span>
@@ -70,6 +116,8 @@
       <div class="tbtn" id="panels-sim" title="Simulate e-ink"><i class="ph-bold ph-eye"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
+        <div class="pbtn" id="panels-save-btn" title="Save now (Cmd/Ctrl+S)"><i class="ph-bold ph-floppy-disk"></i>Save</div>
+        <div class="tdiv"></div>
         <select class="psel" id="panels-device" title="Target device"><option value="">Choose device…</option></select>
         <div class="pbtn accent" id="panels-send"><i class="ph-bold ph-paper-plane-tilt"></i>Send to panel</div>
       </div>
@@ -126,6 +174,57 @@
       </div>
     </div>
   </div>
+
+  {# Small-screen block-out. The canvas editor needs pointer + keyboard on a
+     desktop-sized viewport; on a phone we hide the editor entirely and offer
+     a way back rather than let someone fight an unusable layout. #}
+  <div class="ed-mobile-block">
+    <div class="ed-mobile-card">
+      <i class="ph-bold ph-device-mobile"></i>
+      <h2>Best on a bigger screen</h2>
+      <p>The freeform canvas editor is built for a mouse and keyboard on a
+         desktop-sized display. Phone editing isn't supported yet, dragging and
+         layout won't behave here.</p>
+      <a class="pbtn accent" href="{{ url_for('pages.index') }}"><i class="ph-bold ph-arrow-left"></i>Back to Tesserae</a>
+    </div>
+  </div>
+
+  {# First-open experimental disclaimer. Shown once per browser (localStorage),
+     sets expectations and points people at bug reports. #}
+  <div class="ed-modal" id="panels-disclaimer" hidden>
+    <div class="ed-modal-scrim" id="panels-disclaimer-scrim"></div>
+    <div class="ed-modal-card">
+      <div class="ed-modal-icon"><i class="ph-bold ph-flask"></i></div>
+      <h2>This editor is experimental</h2>
+      <p>The freeform canvas is still a work in progress. Things may shift,
+         break, or change between releases, so save often. If something
+         misbehaves, a quick bug report genuinely helps decide what gets fixed
+         first.</p>
+      <div class="ed-modal-actions">
+        <a class="pbtn" href="https://github.com/dmellok/tesserae/issues/new" target="_blank" rel="noopener"><i class="ph-bold ph-bug"></i>Report a bug</a>
+        <button class="pbtn accent" id="panels-disclaimer-ok" type="button">Got it, let me in</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Show the experimental disclaimer once per browser.
+    (function () {
+      var KEY = "tesserae.panels.disclaimerSeen";
+      var modal = document.getElementById("panels-disclaimer");
+      if (!modal) return;
+      try { if (localStorage.getItem(KEY)) return; } catch (e) { /* private mode */ }
+      modal.hidden = false;
+      function dismiss() {
+        modal.hidden = true;
+        try { localStorage.setItem(KEY, "1"); } catch (e) { /* ignore */ }
+      }
+      var ok = document.getElementById("panels-disclaimer-ok");
+      var scrim = document.getElementById("panels-disclaimer-scrim");
+      if (ok) ok.addEventListener("click", dismiss);
+      if (scrim) scrim.addEventListener("click", dismiss);
+    })();
+  </script>
 
   <script src="{{ url_for('static', filename='components.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>

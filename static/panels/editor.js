@@ -1601,6 +1601,13 @@
     clearTimeout(S.saveTimer);
     S.saveTimer = setTimeout(save, 400);
   }
+  // Flush any pending debounce and write immediately (Save button, Cmd/Ctrl+S).
+  function saveNow() {
+    clearTimeout(S.saveTimer);
+    var status = $("panels-status");
+    if (status) status.textContent = "saving…";
+    save();
+  }
   function save() {
     fetch(S.cfg.saveUrl, {
       method: "POST",
@@ -1962,6 +1969,8 @@
     if (simBtn) simBtn.addEventListener("click", toggleSim);
     var previewBtn = $("panels-preview");
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
+    var saveBtn = $("panels-save-btn");
+    if (saveBtn) saveBtn.addEventListener("click", saveNow);
     var canvasBtn = $("panels-canvas-menu");
     if (canvasBtn) canvasBtn.addEventListener("click", function (ev) {
       ev.stopPropagation(); toggleCanvasMenu(canvasBtn);
@@ -1982,6 +1991,7 @@
         if (!S.spaceDown) { S.spaceDown = true; document.body.classList.add("space-pan"); }
         ev.preventDefault(); return;
       }
+      if (mod && (ev.key === "s" || ev.key === "S")) { ev.preventDefault(); saveNow(); return; }
       if (mod && (ev.key === "z" || ev.key === "Z")) { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
       if (mod && (ev.key === "y" || ev.key === "Y")) { ev.preventDefault(); redo(); return; }
       if (typing) return;

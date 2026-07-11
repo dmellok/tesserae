@@ -6,6 +6,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Canvas editor guardrails.** The freeform canvas editor gains an explicit
+  Save button (also Cmd/Ctrl+S) and a back-to-dashboards link in its toolbar,
+  a first-open notice that the editor is experimental with a link to file bug
+  reports, and a small-screen block-out that explains phone editing is not
+  supported and offers a way back.
+
 ### Changed
 
 - **Removed the usage survey** from Settings → About. The aggregate heartbeat
