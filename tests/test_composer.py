@@ -34,6 +34,81 @@ def test_compose_route_404s_on_unknown_page(client: FlaskClient) -> None:
     assert resp.status_code == 404
 
 
+def test_canvas_page_renders_via_compose(app: Flask) -> None:
+    """A dashboard with layout_kind='canvas' renders its freeform layout through
+    the same /compose/<page_id> route grid pages use, so push / scheduler /
+    rotation drive it by page id."""
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout, Element
+
+    store = app.config["PAGE_STORE"]
+    store.save(
+        Page(
+            id="cvs1",
+            name="Freeform",
+            layout_kind="canvas",
+            canvas=CanvasLayout(
+                w=600,
+                h=400,
+                els=[
+                    Element(id="e1", kind="text", text="HeyThere", x=10, y=10, w=120, h=40),
+                    Element(id="e2", widget="clock", fragment="full", x=0, y=0, w=200, h=200),
+                ],
+            ),
+        )
+    )
+    body = app.test_client().get("/compose/cvs1").get_data(as_text=True)
+    assert "panels-stage" in body  # the scaled canvas stage
+    assert 'data-plugin="clock"' in body  # widget element mounted
+    assert 'class="deco"' in body and "HeyThere" in body  # decoration element present
+
+
+def test_canvas_page_scales_to_target_panel(app: Flask) -> None:
+    """An authored 300x200 canvas pushed to a 600x400 panel scales 2x."""
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout
+
+    store = app.config["PAGE_STORE"]
+    store.save(Page(id="cvs2", name="F", layout_kind="canvas", canvas=CanvasLayout(w=300, h=200)))
+    body = app.test_client().get("/compose/cvs2?w=600&h=400").get_data(as_text=True)
+    assert "scale(2" in body  # min(600/300, 400/200) == 2.0
+
+
+def test_canvas_page_roundtrips_in_page_store(tmp_path: object) -> None:
+    """A canvas dashboard persists its layout_kind + canvas payload through the
+    normal PageStore, so it's a first-class page (schedulable, bindable)."""
+    from pathlib import Path
+
+    from app.state.page_store import Page, PageStore
+    from app.state.panel_store import CanvasLayout, Element
+
+    path = Path(str(tmp_path)) / "pages.json"
+    store = PageStore(path)
+    store.save(
+        Page(
+            id="c1",
+            name="Freeform",
+            layout_kind="canvas",
+            device_ids=["kitchen"],
+            canvas=CanvasLayout(
+                w=800,
+                h=480,
+                theme="dark",
+                els=[Element(id="e", widget="clock", x=0, y=0, w=100, h=100)],
+            ),
+        )
+    )
+    reloaded = PageStore(path).get("c1")
+    assert reloaded is not None
+    assert reloaded.layout_kind == "canvas" and reloaded.device_ids == ["kitchen"]
+    assert reloaded.canvas is not None
+    assert reloaded.canvas.w == 800 and reloaded.canvas.theme == "dark"
+    assert reloaded.canvas.els[0].widget == "clock"
+    # A grid page keeps working unchanged (default layout_kind).
+    grid = Page(id="g1", name="Grid")
+    assert grid.layout_kind == "grid" and grid.canvas is None
+
+
 def test_resolved_options_promotes_location_dict_to_coords_and_label(app: Flask) -> None:
     """The Settings → Server → Location fallback was removed in v0.64.14
     so weather widgets stop silently rendering "Melbourne weather" when

@@ -19,6 +19,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.state.panel_store import CanvasLayout
+
 logger = logging.getLogger(__name__)
 
 
@@ -138,6 +140,12 @@ class Page(BaseModel):
 
     id: str
     name: str
+    # How this dashboard is authored + rendered. "grid" uses ``cells`` (the
+    # preset/layout editor); "canvas" uses ``canvas`` (the freeform composer,
+    # issue #60). Everything else (scheduling, rotation, binding, history) is
+    # shared, so a canvas is a first-class dashboard.
+    layout_kind: str = "grid"
+    canvas: CanvasLayout | None = None
     panel: Panel | None = None
     device_ids: list[str] = Field(default_factory=list)
     cells: list[Cell] = Field(default_factory=list)

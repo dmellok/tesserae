@@ -33,6 +33,16 @@
       color: var(--text-primary, #1B1A16);
       overflow: hidden;
     }
+    {# The stage holds elements in the authored (cw x ch) coordinate space and
+       is scaled + centred into the panel (w x h). scale == 1 when they match. #}
+    #panels-stage {
+      position: absolute;
+      left: 0; top: 0;
+      width: {{ cw }}px;
+      height: {{ ch }}px;
+      transform: translate({{ ox }}px, {{ oy }}px) scale({{ scale }});
+      transform-origin: top left;
+    }
     .cell { position: absolute; overflow: hidden; }
     {# Widget backgrounds are transparent so the canvas background shows through,
        matching the editor. The card fill is var(--surface-gradient, --surface). #}
@@ -41,6 +51,7 @@
 </head>
 <body data-theme="{{ theme }}" data-style="{{ style }}" style="--font-family: '{{ font_family }}', system-ui, sans-serif;">
   <div id="panels-board">
+    <div id="panels-stage">
     {% if bg_image %}
     <img src="{{ bg_image }}" alt="" style="position:absolute;left:0;top:0;width:100%;height:100%;z-index:0;object-fit:{{ 'fill' if bg_fit == 'stretch' else bg_fit }}">
     {% endif %}
@@ -56,8 +67,8 @@
          data-data='{{ e.data|tojson }}'
          data-cell-w="{{ e.w }}"
          data-cell-h="{{ e.h }}"
-         data-panel-w="{{ w }}"
-         data-panel-h="{{ h }}"
+         data-panel-w="{{ cw }}"
+         data-panel-h="{{ ch }}"
          data-cell-zoom="1"
          data-font-family="{{ font_family }}, system-ui, sans-serif">
       <div class="cell-content"></div>
@@ -67,6 +78,7 @@
          style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"></div>
     {% endif %}
     {% endfor %}
+    </div>
   </div>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script>

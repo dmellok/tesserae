@@ -637,77 +637,17 @@ def _panel_override(w: str | None, h: str | None) -> tuple[int, int] | None:
     return min(pw, 10000), min(ph, 10000)
 
 
-@bp.get("/compose/<page_id>")
-def compose(page_id: str) -> str:
-    preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {})
-    page = preview_cache.get(page_id)
-    if page is None:
-        store: PageStore = current_app.config["PAGE_STORE"]
-        page = store.get(page_id)
-    if page is None:
-        abort(404)
-    for_push = request.args.get("for_push") == "1"
-    preview_mode = request.args.get("preview") == "1" and not for_push
-    # Inject the resolved panel before hydrate, _hydrate_page expects
-    # page_dict["panel"] to always be present. An explicit ?w=&h= override
-    # wins (the editor's per-aspect previews and the per-panel push render
-    # at a specific size); otherwise fall back to the page's primary panel.
-    page_dict = page.model_dump(mode="json", exclude_none=True)
-    settings_store = current_app.config["SETTINGS_STORE"]
-    devices = current_app.config.get("DEVICE_REGISTRY")
-    override = _panel_override(request.args.get("w"), request.args.get("h"))
-    if override is not None:
-        panel_w, panel_h = override
-    else:
-        panel = resolve_panel_for_page(page, devices, settings_store)
-        panel_w, panel_h = panel.w, panel.h
-    page_dict["panel"] = {"w": panel_w, "h": panel_h}
-    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
-    # tesserae_status which of the page's bound devices this render is
-    # for, so per-device battery / signal chips actually reflect the
-    # panel receiving the frame rather than a min-across-all-devices
-    # aggregate. The push pipeline sets this when it fans out to
-    # multiple devices sharing a panel; the editor preview leaves it
-    # empty.
-    target_device_id = (request.args.get("device_id") or "").strip()
-    if target_device_id:
-        page_dict["target_device_id"] = target_device_id
-    return render_template(
-        "compose.html",
-        page=_hydrate_page(page_dict, preview=not for_push),
-        for_push=for_push,
-        preview_mode=preview_mode,
-    )
-
-
-@bp.get("/compose/canvas/<canvas_id>")
-def compose_canvas(canvas_id: str) -> str:
-    """Render target for a Panels canvas document (issue #60).
-
-    Lives under ``/compose/`` so it inherits that path's loopback bypass (the
-    headless renderer reaches it without the login gate). Gated by the
-    ``composer`` experiment. Each element is a widget instance rendered as one
-    fragment: this fetches its data with the element's resolved options (falling
-    back to the dev-gallery sample so an unconfigured or erroring widget still
-    paints), then hands the elements to ``panels_compose.html``, which mounts
-    each as the real widget via ``composer.js`` with ``ctx.fragment`` set.
-    """
-    from app import experiments
+def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
+    """Shape a canvas's elements for ``panels_compose.html``: decorations pass
+    their raw props (drawn client-side), widget elements get resolved options +
+    fetched data (sample fallback), all in the authored ``cw x ch`` space."""
     from app.widget_samples import get_sample
 
-    if not experiments.is_enabled("composer"):
-        abort(404)
-    store = current_app.config.get("PANEL_STORE")
-    doc = store.get(canvas_id) if store is not None else None
-    if doc is None:
-        abort(404)
-
     els_out: list[dict[str, Any]] = []
-    for e in doc.els:
+    for e in els:
         if e.visible is False:
             continue
         if e.kind and e.kind != "widget":
-            # Static decoration; drawn client-side by decorate.js, no fetch.
             els_out.append(
                 {
                     "id": e.id,
@@ -751,7 +691,7 @@ def compose_canvas(canvas_id: str) -> str:
             data: Any = None
             try:
                 data = _fetch_plugin_data(
-                    e.widget, opts, doc.w, doc.h, preview=False, cell_w=e.w, cell_h=e.h
+                    e.widget, opts, cw, ch, preview=False, cell_w=e.w, cell_h=e.h
                 )
             except Exception:
                 data = None
@@ -760,21 +700,118 @@ def compose_canvas(canvas_id: str) -> str:
                 data = sample if isinstance(sample, dict) else data
             item["data"] = data
         els_out.append(item)
+    return els_out
+
+
+def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
+    """Render a canvas layout (authored at ``layout.w x layout.h``) scaled to fit
+    a ``target_w x target_h`` panel, aspect preserved and centred. When the
+    authored size already matches the target the scale is 1 (no transform)."""
+    cw = max(1, int(layout.w))
+    ch = max(1, int(layout.h))
+    scale = min(target_w / cw, target_h / ch)
+    if scale <= 0:
+        scale = 1.0
+    ox = round((target_w - cw * scale) / 2)
+    oy = round((target_h - ch * scale) / 2)
     registry = current_app.config["PLUGIN_REGISTRY"]
-    font = _resolve_font(doc.font or None, registry)
+    font = _resolve_font(layout.font or None, registry)
     return render_template(
         "panels_compose.html",
-        els=els_out,
-        w=doc.w,
-        h=doc.h,
-        theme=doc.theme or "light",
-        style=doc.style or "standard",
+        els=_build_canvas_els(layout.els, cw, ch),
+        cw=cw,
+        ch=ch,
+        w=target_w,
+        h=target_h,
+        scale=scale,
+        ox=ox,
+        oy=oy,
+        theme=layout.theme or "light",
+        style=layout.style or "standard",
         font_family=font.name if font else "system-ui, sans-serif",
-        bg=doc.bg or "",
-        bg_image=doc.bg_image or "",
-        bg_fit=doc.bg_fit or "cover",
+        bg=layout.bg or "",
+        bg_image=layout.bg_image or "",
+        bg_fit=layout.bg_fit or "cover",
         font_face_css=_font_face_css(registry.fonts),
     )
+
+
+@bp.get("/compose/<page_id>")
+def compose(page_id: str) -> str:
+    preview_cache: dict[str, Page] = current_app.config.get("PREVIEW_CACHE", {})
+    page = preview_cache.get(page_id)
+    if page is None:
+        store: PageStore = current_app.config["PAGE_STORE"]
+        page = store.get(page_id)
+    if page is None:
+        abort(404)
+    for_push = request.args.get("for_push") == "1"
+    preview_mode = request.args.get("preview") == "1" and not for_push
+    # Inject the resolved panel before hydrate, _hydrate_page expects
+    # page_dict["panel"] to always be present. An explicit ?w=&h= override
+    # wins (the editor's per-aspect previews and the per-panel push render
+    # at a specific size); otherwise fall back to the page's primary panel.
+    page_dict = page.model_dump(mode="json", exclude_none=True)
+    settings_store = current_app.config["SETTINGS_STORE"]
+    devices = current_app.config.get("DEVICE_REGISTRY")
+    override = _panel_override(request.args.get("w"), request.args.get("h"))
+    if override is not None:
+        panel_w, panel_h = override
+    else:
+        panel = resolve_panel_for_page(page, devices, settings_store)
+        panel_w, panel_h = panel.w, panel.h
+
+    # Freeform (canvas) dashboards render the composer layout scaled to the
+    # panel, and share this route so push / scheduler / rotation drive them by
+    # page id exactly like a grid page. An unbound, un-overridden canvas renders
+    # at its authored size.
+    if page.layout_kind == "canvas" and page.canvas is not None:
+        if override is None and not page.device_ids:
+            target_w, target_h = page.canvas.w, page.canvas.h
+        else:
+            target_w, target_h = panel_w, panel_h
+        return _render_canvas(page.canvas, target_w=target_w, target_h=target_h)
+
+    page_dict["panel"] = {"w": panel_w, "h": panel_h}
+    # v0.71.x: ``?device_id=<id>`` on the compose URL tells widgets like
+    # tesserae_status which of the page's bound devices this render is
+    # for, so per-device battery / signal chips actually reflect the
+    # panel receiving the frame rather than a min-across-all-devices
+    # aggregate. The push pipeline sets this when it fans out to
+    # multiple devices sharing a panel; the editor preview leaves it
+    # empty.
+    target_device_id = (request.args.get("device_id") or "").strip()
+    if target_device_id:
+        page_dict["target_device_id"] = target_device_id
+    return render_template(
+        "compose.html",
+        page=_hydrate_page(page_dict, preview=not for_push),
+        for_push=for_push,
+        preview_mode=preview_mode,
+    )
+
+
+@bp.get("/compose/canvas/<canvas_id>")
+def compose_canvas(canvas_id: str) -> str:
+    """Render target for a Panels canvas document (issue #60).
+
+    Lives under ``/compose/`` so it inherits that path's loopback bypass (the
+    headless renderer reaches it without the login gate). Gated by the
+    ``composer`` experiment. Each element is a widget instance rendered as one
+    fragment: this fetches its data with the element's resolved options (falling
+    back to the dev-gallery sample so an unconfigured or erroring widget still
+    paints), then hands the elements to ``panels_compose.html``, which mounts
+    each as the real widget via ``composer.js`` with ``ctx.fragment`` set.
+    """
+    from app import experiments
+
+    if not experiments.is_enabled("composer"):
+        abort(404)
+    store = current_app.config.get("PANEL_STORE")
+    doc = store.get(canvas_id) if store is not None else None
+    if doc is None:
+        abort(404)
+    return _render_canvas(doc.to_layout(), target_w=doc.w, target_h=doc.h)
 
 
 @bp.get("/_test/render")

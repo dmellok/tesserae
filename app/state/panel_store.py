@@ -96,11 +96,14 @@ class Element(BaseModel):
     group: str | None = None
 
 
-class CanvasPage(BaseModel):
-    """A canvas document: a fixed artboard plus its freely-placed elements."""
+class CanvasLayout(BaseModel):
+    """The freeform-canvas layout carried by a ``Page`` whose ``layout_kind`` is
+    ``"canvas"`` (issue #60). Same shape as :class:`CanvasPage` minus the
+    dashboard-level fields (id / name / device_ids), which live on the Page so a
+    canvas behaves 1:1 with a grid page across scheduling, rotation, binding, and
+    history."""
 
-    id: str
-    name: str = "Untitled Panel"
+    # Authored artboard size. The render scales this to the target panel.
     w: int = Field(default=600, gt=0)
     h: int = Field(default=400, gt=0)
     # Canvas-wide appearance. theme = Spectra colour palette (data-theme),
@@ -113,9 +116,44 @@ class CanvasPage(BaseModel):
     # Optional background image (URL) behind all elements, and how it fits.
     bg_image: str = ""
     bg_fit: str = "cover"  # cover | contain | stretch
+    els: list[Element] = Field(default_factory=list)
+
+
+class CanvasPage(BaseModel):
+    """A canvas document: a fixed artboard plus its freely-placed elements.
+
+    Legacy standalone store (``PANEL_STORE``); canvases are migrating to
+    ``Page(layout_kind="canvas")``. Kept for reading old data + the experimental
+    editor until the migration lands.
+    """
+
+    id: str
+    name: str = "Untitled Panel"
+    w: int = Field(default=600, gt=0)
+    h: int = Field(default=400, gt=0)
+    theme: str = "light"
+    style: str = "standard"
+    font: str = ""
+    bg: str = ""
+    bg_image: str = ""
+    bg_fit: str = "cover"  # cover | contain | stretch
     # Device instances this canvas is sent to.
     device_ids: list[str] = Field(default_factory=list)
     els: list[Element] = Field(default_factory=list)
+
+    def to_layout(self) -> CanvasLayout:
+        """The render payload for this canvas (drops id/name/device_ids)."""
+        return CanvasLayout(
+            w=self.w,
+            h=self.h,
+            theme=self.theme,
+            style=self.style,
+            font=self.font,
+            bg=self.bg,
+            bg_image=self.bg_image,
+            bg_fit=self.bg_fit,
+            els=list(self.els),
+        )
 
 
 class CanvasStore:
