@@ -120,6 +120,36 @@ def test_appearance_roundtrips(app: Flask, monkeypatch: pytest.MonkeyPatch) -> N
     assert doc["theme"] == "dark" and doc["style"] == "editorial" and doc["bg"] == "#101014"
 
 
+def test_doc_and_save_carry_rev(app: Flask) -> None:
+    """doc.json and save both report a content rev; it changes when the layout
+    does. The live-sync stream + editor use it to tell edits apart."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    r0 = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()["rev"]
+    assert isinstance(r0, str) and r0
+    saved = client.post(
+        f"/pages/canvas/c/{cid}/save",
+        json={
+            "els": [{"id": "e1", "kind": "text", "text": "hi", "x": 1, "y": 1, "w": 10, "h": 10}]
+        },
+    ).get_json()
+    assert saved["rev"] and saved["rev"] != r0
+    assert client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()["rev"] == saved["rev"]
+
+
+def test_live_stream_contract(app: Flask) -> None:
+    """The SSE stream opens with a connected preamble and 404s for a bad id."""
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    resp = client.get(f"/pages/canvas/c/{cid}/stream")
+    assert resp.status_code == 200 and resp.mimetype == "text/event-stream"
+    assert b"connected" in next(resp.iter_encoded())
+    resp.close()
+    assert client.get("/pages/canvas/c/does-not-exist/stream").status_code == 404
+
+
 def test_compose_applies_theme_and_background(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

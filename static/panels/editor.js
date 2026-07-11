@@ -1596,6 +1596,7 @@
   }
 
   function scheduleSave() {
+    S.dirty = true; // local edits not yet persisted — used by live-sync to avoid clobbering
     var status = $("panels-status");
     if (status) status.textContent = "saving…";
     clearTimeout(S.saveTimer);
@@ -1615,8 +1616,89 @@
       body: JSON.stringify(S.doc),
     })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function () { var s = $("panels-status"); if (s) s.textContent = "saved"; })
+      .then(function (resp) {
+        S.dirty = false;
+        if (resp && resp.rev) S.rev = resp.rev; // so live-sync recognises our own write
+        var s = $("panels-status"); if (s) s.textContent = "saved";
+      })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "save failed"; });
+  }
+
+  // ---- live sync: reflect external edits (e.g. the MCP agent) -----------
+  // Rebuild the whole editor from a fresh doc without a page reload.
+  function hydrateDoc(doc) {
+    S.doc = doc || {};
+    if (!S.doc.els) S.doc.els = [];
+    S.rev = S.doc.rev || null;
+    S.dirty = false;
+    S.past = []; S.future = []; // history is relative to the old doc; drop it
+    setSel([]);
+    renderAppearance();
+    applyAppearance();
+    var title = $("panels-title");
+    if (title) title.textContent = S.doc.name || "Untitled Panel";
+    syncDeviceSelection();
+    paint();
+  }
+
+  function initLiveSync() {
+    if (!S.cfg.streamUrl || typeof EventSource === "undefined") return;
+    var es;
+    try { es = new EventSource(S.cfg.streamUrl); } catch (e) { return; }
+    es.addEventListener("changed", function (ev) { onExternalChange(ev.data); });
+  }
+
+  // A save landed on the server. Ignore our own writes (same rev); otherwise
+  // pull the new doc and repaint — unless we have unsaved local edits, in which
+  // case offer a non-destructive reload so the agent can't clobber the user.
+  function onExternalChange(rev) {
+    if (rev && rev === S.rev) return;
+    if (S.dirty) { showExternalBanner(); return; }
+    fetch(S.cfg.docUrl)
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (doc) {
+        if (doc.rev && doc.rev === S.rev) return;
+        if (S.dirty) { showExternalBanner(); return; } // a local edit raced in
+        closeConfig();
+        hideExternalBanner();
+        hydrateDoc(doc);
+        flashLiveBadge();
+      })
+      .catch(function () { /* transient; the next event will retry */ });
+  }
+
+  function flashLiveBadge() {
+    var s = $("panels-status");
+    if (!s) return;
+    s.textContent = "updated by agent";
+    s.classList.add("live-flash");
+    clearTimeout(S.liveFlashT);
+    S.liveFlashT = setTimeout(function () {
+      s.classList.remove("live-flash");
+      s.textContent = "saved";
+    }, 1600);
+  }
+
+  function showExternalBanner() {
+    var b = $("panels-extbanner");
+    if (b) { b.classList.add("show"); return; }
+    b = el("div", "ext-banner show");
+    b.id = "panels-extbanner";
+    b.innerHTML =
+      '<i class="ph-bold ph-arrows-clockwise"></i>' +
+      "<span>This dashboard changed externally.</span>" +
+      '<button type="button" class="ext-reload">Discard my changes &amp; reload</button>';
+    b.querySelector(".ext-reload").addEventListener("click", function () {
+      fetch(S.cfg.docUrl)
+        .then(function (r) { return r.json(); })
+        .then(function (doc) { closeConfig(); hideExternalBanner(); hydrateDoc(doc); flashLiveBadge(); });
+    });
+    document.body.appendChild(b);
+  }
+
+  function hideExternalBanner() {
+    var b = $("panels-extbanner");
+    if (b) b.classList.remove("show");
   }
 
   // ---- dark-mode toggle (mirrors the admin shell in _base.html) --------
@@ -1928,6 +2010,7 @@
       previewUrl: root.dataset.previewUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,
       sourceOptionsUrl: root.dataset.sourceOptionsUrl,
+      streamUrl: root.dataset.streamUrl,
       canvasId: root.dataset.canvasId,
     };
     // Canvas-management URLs derive from this editor's own path
@@ -2045,16 +2128,10 @@
       .then(function (res) {
         S.catalog = (res[0] && res[0].widgets) || [];
         S.appearance = (res[0] && res[0].appearance) || { themes: [], styles: [], fonts: [] };
-        S.doc = res[1];
-        if (!S.doc.els) S.doc.els = [];
         var palette = $("panels-palette");
         if (palette) renderPalette(palette);
-        renderAppearance();
-        applyAppearance();
-        var title = $("panels-title");
-        if (title) title.textContent = S.doc.name || "Untitled Panel";
-        syncDeviceSelection();
-        paint();
+        hydrateDoc(res[1]);
+        initLiveSync();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "load failed"; });
   }

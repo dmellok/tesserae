@@ -19,7 +19,12 @@ mypy --strict applies to this module, see pyproject.toml.
 
 from __future__ import annotations
 
+import hashlib
+import json
+import queue
+import time
 import uuid
+from collections.abc import Iterator
 from typing import Any
 
 from flask import (
@@ -166,6 +171,15 @@ def editor(canvas_id: str) -> str:
     )
 
 
+def _canvas_rev(page: Page) -> str:
+    """A short content hash of a canvas page's layout. The live-sync stream and
+    the editor use it to tell an external change (the MCP agent) apart from the
+    editor's own autosave: same rev = our save, echo it and ignore."""
+    layout = page.canvas.model_dump(mode="json") if page.canvas is not None else {}
+    blob = json.dumps(layout, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(blob.encode()).hexdigest()[:16]
+
+
 @bp.get("/c/<canvas_id>/doc.json")
 def doc(canvas_id: str) -> Response:
     """The canvas document the editor hydrates from."""
@@ -173,7 +187,70 @@ def doc(canvas_id: str) -> Response:
     page = _get_canvas(canvas_id)
     if page is None:
         abort(404)
-    return jsonify(_as_doc(page).model_dump(mode="json"))
+    out = _as_doc(page).model_dump(mode="json")
+    out["rev"] = _canvas_rev(page)
+    return jsonify(out)
+
+
+# Live-sync keepalive. The stream holds a worker thread for the editor's
+# lifetime (sync WSGI), and a dead client is only noticed on the next yield, so
+# keep it modest. Canvas edits are infrequent, so a change always arrives via
+# the queue, not the keepalive.
+_STREAM_KEEPALIVE_S: float = 10.0
+
+
+@bp.get("/c/<canvas_id>/stream")
+def stream(canvas_id: str) -> Response:
+    """Server-Sent Events feed that fires when this canvas is saved, so an open
+    editor can reflect external edits live (e.g. the MCP agent building it).
+
+    Emits ``event: changed`` with the new rev whenever this page's layout hash
+    changes; the editor ignores a rev that matches its own last save."""
+    _guard()
+    if _get_canvas(canvas_id) is None:
+        abort(404)
+    store = _pages()
+    q: queue.Queue[int] = queue.Queue(maxsize=64)
+
+    def on_change() -> None:
+        # The listener is page-agnostic; wake the generator, which recomputes
+        # this page's rev and only emits when it actually changed.
+        try:
+            q.put_nowait(1)
+        except queue.Full:
+            return
+
+    def current_rev() -> str:
+        page = store.get(canvas_id)
+        return _canvas_rev(page) if page is not None else ""
+
+    store.add_listener(on_change)
+
+    def generate() -> Iterator[str]:
+        yield ":connected\n\n"
+        last_rev = current_rev()
+        last_send = time.monotonic()
+        try:
+            while True:
+                timeout = max(0.1, _STREAM_KEEPALIVE_S - (time.monotonic() - last_send))
+                try:
+                    q.get(timeout=timeout)
+                    rev = current_rev()
+                    if rev and rev != last_rev:
+                        last_rev = rev
+                        yield f"event: changed\ndata: {rev}\n\n"
+                        last_send = time.monotonic()
+                except queue.Empty:
+                    yield ":keepalive\n\n"
+                    last_send = time.monotonic()
+        finally:
+            store.remove_listener(on_change)
+
+    return current_app.response_class(
+        generate(),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @bp.post("/c/<canvas_id>/save")
@@ -192,8 +269,11 @@ def save(canvas_id: str) -> Response:
         doc = CanvasPage.model_validate(body)
     except ValidationError as err:
         return _error(400, f"invalid canvas document: {err.error_count()} problem(s)")
-    _pages().save(_doc_to_page(doc))
-    return jsonify({"status": "ok", "id": canvas_id, "elements": len(doc.els)})
+    page = _doc_to_page(doc)
+    _pages().save(page)
+    return jsonify(
+        {"status": "ok", "id": canvas_id, "elements": len(doc.els), "rev": _canvas_rev(page)}
+    )
 
 
 @bp.get("/c/<canvas_id>/preview.png")

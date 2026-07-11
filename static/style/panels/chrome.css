@@ -196,3 +196,16 @@
     background-image:repeating-linear-gradient(0deg,var(--t-border-strong) 0 1px,transparent 1px 10px),repeating-linear-gradient(0deg,var(--t-fg-soft) 0 1px,transparent 1px 50px)}
   .kv{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 3px;font:600 12px var(--t-font);color:var(--t-fg-soft);border-bottom:1px solid color-mix(in oklab,var(--t-border) 55%,transparent)}
   .kv .val{font-family:var(--t-font-mono);color:var(--t-fg);background:var(--t-surface-sunk);padding:3px 8px;border-radius:6px;border:1px solid var(--t-border);min-width:56px;text-align:right}
+
+  /* live sync: agent edited the canvas underneath us */
+  #panels-status.live-flash{color:var(--t-accent);font-weight:700}
+  .ext-banner{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);
+    display:none;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;
+    background:var(--t-surface);border:1px solid var(--t-border);box-shadow:var(--t-shadow-lg);
+    font:600 13px var(--t-font);color:var(--t-fg);z-index:220;opacity:0;
+    transition:opacity .18s ease,transform .18s ease}
+  .ext-banner.show{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
+  .ext-banner i{color:var(--t-accent);font-size:16px}
+  .ext-reload{border:0;border-radius:8px;padding:6px 11px;font:600 12px var(--t-font);cursor:pointer;
+    background:var(--t-accent);color:var(--t-accent-fg)}
+  .ext-reload:hover{background:var(--t-accent-hover)}

@@ -8,6 +8,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Live canvas updates in the editor.** The freeform canvas editor now reflects
+  external saves without a reload, so you can watch an MCP agent build a
+  dashboard in real time. It follows changes silently while you're not editing;
+  if you have unsaved local edits it shows a non-destructive "changed externally"
+  reload prompt instead of clobbering them. Backed by a per-canvas Server-Sent
+  Events stream and a content rev that distinguishes your own saves from
+  external ones.
+
 - **MCP server (build dashboards with AI).** An optional Model Context Protocol
   server lets an agent (Claude Desktop / Claude Code, etc.) build freeform canvas
   dashboards: it lists your widgets and devices, lays out a canvas, renders a
