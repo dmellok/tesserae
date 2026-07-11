@@ -848,6 +848,9 @@ def create_app(
     onboarding.register(app)
     themes_routes.register(app)
     webhook_routes.register(app)
+    from app import mcp_api
+
+    mcp_api.register(app)
     trmnl_api.register(app)
     # New REST transport: per-device bearer-token HTTP endpoints under
     # /api/v1/device/*. Lives alongside MQTT (both transports active at

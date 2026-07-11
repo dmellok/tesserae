@@ -67,6 +67,7 @@
             <div class="dx-dashboard-name">
               {{ page.name }}
               {% if page.layout_kind == 'canvas' %}<span class="dx-pill">Freeform</span>{% endif %}
+              {% if page.created_by == 'mcp' %}<span class="dx-pill" title="Created by an agent over the MCP API"><i class="ph ph-robot" aria-hidden="true"></i> Agent</span>{% endif %}
             </div>
             <div class="dx-meta-strip">
               <span><span class="dx-meta-k">Size</span><code>{% if d %}{{ d.w }}×{{ d.h }}{% else %}—{% endif %}</code></span>

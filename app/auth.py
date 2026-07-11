@@ -52,6 +52,10 @@ _OPEN_PATHS: Final[tuple[str, ...]] = (
     # (see app.webhook_routes._presented_token); the session gate would
     # otherwise bounce every external caller to /login.
     "/api/v1/",
+    # MCP API (agentic canvas dashboards). Carries its own token-or-loopback
+    # auth in app.mcp_api._gate, and 404s unless the ``mcp`` experiment is on,
+    # so the session gate must not bounce it to /login first.
+    "/api/mcp/",
     # TRMNL BYOS protocol endpoints, each request carries an
     # ``access-token`` header that ``app.trmnl_api`` resolves to a
     # device. Jailbroken Kindles + TRMNL devices don't carry

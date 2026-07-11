@@ -31,6 +31,10 @@ _TRUTHY = frozenset({"1", "true", "yes", "on"})
 # names default off.
 _DEFAULTS: dict[str, bool] = {
     "composer": True,
+    # MCP API (app.mcp_api): lets an agent build canvas dashboards over a
+    # token-authed surface. Off by default since it opens a new (auth-gated)
+    # API; opt in from Settings → System → MCP.
+    "mcp": False,
 }
 
 

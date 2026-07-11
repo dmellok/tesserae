@@ -977,6 +977,128 @@ docker compose up -d</code></pre>
 </script>
 {% endif %}
 
+  <section class="dx-section-card">
+    {{ card_head('MCP (agent access)', icon_name='robot', blurb='Let an AI agent build freeform (canvas) dashboards for you: it lists your widgets, lays out a canvas, renders a preview to check its work, and pushes to a panel. Experimental.') }}
+
+    <p>
+      Status:
+      {% if system_mcp_enabled %}<span class="pill is-ok">enabled</span>
+      {% else %}<span class="pill">disabled</span>
+        <span class="muted">- the /api/mcp API 404s until you enable it.</span>
+      {% endif %}
+    </p>
+
+    <form method="post" action="{{ url_for('auth.system_mcp_toggle') }}" class="form">
+      <input type="hidden" name="enable" value="{{ 0 if system_mcp_enabled else 1 }}">
+      <p class="field-help">Enables the token-authed <code>/api/mcp</code> surface the MCP server bridges to. Off by default.</p>
+      <div class="actions">
+        {% if system_mcp_enabled %}
+        {{ button('Disable MCP API', icon='power', variant='ghost') }}
+        {% else %}
+        {{ button('Enable MCP API', icon='power') }}
+        {% endif %}
+      </div>
+    </form>
+
+    {% if system_mcp_enabled %}
+    <p>
+      Token:
+      {% if system_mcp_token_set %}<span class="pill is-ok">set</span>
+        <span class="muted">- masked. Loopback callers work without it; remote agents present it as a bearer token.</span>
+      {% else %}<span class="pill">none</span>
+        <span class="muted">- an agent on this machine works without one; generate a token for a remote agent.</span>
+      {% endif %}
+    </p>
+
+    <details>
+      <summary>Connect an agent (Claude Desktop / Claude Code)</summary>
+      <pre class="code-snippet"><code>{
+  "mcpServers": {
+    "tesserae": {
+      "command": "tesserae-mcp",
+      "env": {
+        "TESSERAE_URL": "http://127.0.0.1:8765",
+        "TESSERAE_MCP_TOKEN": "&lt;your-token&gt;"
+      }
+    }
+  }
+}</code></pre>
+      <p class="field-help">Install the bridge with <code>pip install "tesserae[mcp]"</code>. On the same machine you can omit the token (loopback is trusted).</p>
+    </details>
+
+    <form method="post" action="{{ url_for('auth.system_mcp_regenerate') }}" class="form" onsubmit="return confirm('Generate a new MCP token? Any agent using the old token will stop authenticating.');">
+      <div class="actions">
+        {{ button('Regenerate token', icon='arrows-clockwise') }}
+        {% if system_mcp_token_set %}
+        <button type="submit" class="ghost" formaction="{{ url_for('auth.system_mcp_clear') }}"
+                onclick="return confirm('Clear the MCP token? Remote agents can no longer authenticate.');">
+          <i class="ph ph-x" aria-hidden="true"></i><span>Clear</span>
+        </button>
+        {% endif %}
+      </div>
+    </form>
+    {% endif %}
+  </section>
+
+{% if system_mcp_reveal_token %}
+<div class="modal" data-modal role="dialog" aria-modal="true" aria-labelledby="mcp-reveal-title">
+  <div class="modal-card">
+    <header class="modal-head">
+      <h2 id="mcp-reveal-title"><i class="ph ph-robot"></i> New MCP token</h2>
+      <button type="button" class="modal-close" data-modal-close aria-label="Close">
+        <i class="ph ph-x"></i>
+      </button>
+    </header>
+    <div class="modal-body">
+      <p class="lede">Copy this now, it won't be shown in plaintext again. Put it in your agent's <code>TESSERAE_MCP_TOKEN</code>.</p>
+      <div class="token-row">
+        <input type="text" class="token-input" value="{{ system_mcp_reveal_token }}" readonly data-modal-token aria-label="MCP token">
+        <button type="button" class="button" data-modal-copy>
+          <i class="ph ph-copy"></i> Copy
+        </button>
+      </div>
+    </div>
+    <footer class="modal-foot">
+      <button type="button" class="button ghost" data-modal-close>Done</button>
+    </footer>
+  </div>
+</div>
+<script>
+  (function () {
+    const modal = document.querySelector('[data-modal]');
+    if (!modal) return;
+    const input = modal.querySelector('[data-modal-token]');
+    const copyBtn = modal.querySelector('[data-modal-copy]');
+    document.body.classList.add('modal-open');
+    function close() {
+      modal.remove();
+      document.body.classList.remove('modal-open');
+    }
+    modal.addEventListener('click', (ev) => {
+      if (ev.target === modal || ev.target.closest('[data-modal-close]')) close();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && document.body.contains(modal)) close();
+    });
+    if (copyBtn && input) {
+      copyBtn.addEventListener('click', async () => {
+        const value = input.value;
+        let ok = false;
+        try { await navigator.clipboard.writeText(value); ok = true; }
+        catch {
+          input.select();
+          input.setSelectionRange(0, value.length);
+          try { ok = document.execCommand('copy'); } catch { ok = false; }
+        }
+        const original = copyBtn.innerHTML;
+        copyBtn.innerHTML = ok ? '<i class="ph ph-check"></i> Copied' : '<i class="ph ph-warning"></i> Copy failed';
+        setTimeout(() => { copyBtn.innerHTML = original; }, 1800);
+      });
+    }
+  })();
+</script>
+{% endif %}
+
 {# v0.70.0: Install identifier. Random UUID minted on first startup and
    persisted at ``data/core/install_id.json``. Widgets that declare
    ``needs_install_id`` (shared-world features: the planned tamagotchi

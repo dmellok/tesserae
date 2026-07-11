@@ -124,5 +124,6 @@ nav:
       - Add hardware support: dev/adding-hardware.md
       - Client protocol spec: dev/client-protocol.md
       - OpenAPI spec & SDK generation: dev/openapi.md
+  - Build dashboards with AI (MCP): dev/mcp.md
   - Privacy: privacy.md
   - Credits: credits.md

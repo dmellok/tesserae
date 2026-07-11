@@ -132,6 +132,13 @@ def settings_area(area: str) -> str | Response:
     system_webhook_reveal_token = (
         session.pop("_webhook_token_reveal", "") if area == "system" else ""
     )
+    # MCP API card: whether the experiment is on, whether a token is set, and a
+    # one-shot token reveal (same pattern as the webhook token above).
+    from app import experiments as _experiments
+
+    system_mcp_enabled = _experiments.is_enabled("mcp")
+    system_mcp_token_set = False
+    system_mcp_reveal_token = session.pop("_mcp_token_reveal", "") if area == "system" else ""
     # Same one-shot pattern for TRMNL access tokens after devices_add
     # creates a trmnl_client instance. Only honoured on the Devices
     # tab, that's where the modal lives and where the user is when
@@ -178,6 +185,7 @@ def settings_area(area: str) -> str | Response:
         system_webhook_token_set = bool(
             (_app_raw.get("webhook_token_secret") or _app_raw.get("webhook_token") or "").strip()
         )
+        system_mcp_token_set = bool((_app_raw.get("mcp_token_secret") or "").strip())
 
     # Auth state for the System → Authentication card. Cheap to compute,
     # so we read it for any tab, the template only uses it on System.
@@ -239,6 +247,9 @@ def settings_area(area: str) -> str | Response:
         system_release_check=system_release_check,
         system_webhook_token_set=system_webhook_token_set,
         system_webhook_reveal_token=system_webhook_reveal_token,
+        system_mcp_enabled=system_mcp_enabled,
+        system_mcp_token_set=system_mcp_token_set,
+        system_mcp_reveal_token=system_mcp_reveal_token,
         system_password_set=system_password_set,
         system_password_required=system_password_required,
         # v0.70.0: install-identifier metadata for the Settings -> System

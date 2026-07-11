@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tesserae"
-version = "0.101.0"
+version = "0.102.0"
 description = "E-ink dashboard companion. Compose tile-based dashboards, render headless, push frames over MQTT."
 requires-python = ">=3.11"
 license = { text = "AGPL-3.0-or-later" }
@@ -64,6 +64,9 @@ dependencies = [
 # `tesserae` runs the production waitress server. `tesserae --dev`
 # opts into Flask's reload + debugger dev server.
 tesserae = "app.main:_serve"
+# `tesserae-mcp` is the stdio MCP bridge an AI agent connects to; it talks to a
+# running Tesserae's /api/mcp API. Needs the optional `mcp` extra.
+tesserae-mcp = "app.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
@@ -86,6 +89,11 @@ docs = [
     "mkdocs-material>=9.5,<10",
     # Click-to-zoom lightbox for the widget gallery + screenshots.
     "mkdocs-glightbox>=0.4,<1",
+]
+# Optional: the stdio MCP bridge (`tesserae-mcp`) that lets an AI agent build
+# canvas dashboards. Core Tesserae never imports `mcp`; only the bridge does.
+mcp = [
+    "mcp>=1.2,<2",
 ]
 
 [tool.setuptools.packages.find]

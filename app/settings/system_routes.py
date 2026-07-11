@@ -311,6 +311,38 @@ def system_webhook_set() -> Response:
     return system_redirect()
 
 
+# -- MCP ----------------------------------------------------------------
+
+
+@bp.post("/settings/system/mcp/toggle")
+def system_mcp_toggle() -> Response:
+    """Enable or disable the ``mcp`` experiment (the agent-facing canvas API).
+    Off by default; while off, ``/api/mcp/*`` 404s entirely."""
+    enable = bool(request.form.get("enable"))
+    settings_store().patch_section("experiments", {"mcp": enable})
+    flash("MCP API enabled." if enable else "MCP API disabled.", "ok")
+    return system_redirect()
+
+
+@bp.post("/settings/system/mcp/regenerate")
+def system_mcp_regenerate() -> Response:
+    """Mint a fresh MCP token, persist it, and stash it in the session so the
+    Settings GET that follows the redirect can show it once in a copy modal."""
+    from app.mcp_api import rotate_token
+
+    session["_mcp_token_reveal"] = rotate_token(settings_store())
+    return system_redirect()
+
+
+@bp.post("/settings/system/mcp/clear")
+def system_mcp_clear() -> Response:
+    """Clear the MCP token. Remote agents can no longer authenticate; loopback
+    callers still work while the experiment is on."""
+    settings_store().update_section("app", {"mcp_token_secret": ""})
+    flash("MCP token cleared. Remote agents can no longer authenticate.", "ok")
+    return system_redirect()
+
+
 # -- install identifier ------------------------------------------------
 
 

@@ -182,6 +182,10 @@ class Page(BaseModel):
     # tesserae_status widget placed elsewhere.
     status_bar_enabled: bool = False
     status_bar_cell_id: str | None = None
+    # Provenance marker. ``None`` for pages made in the UI; ``"mcp"`` for pages
+    # an agent created over the MCP API, so the dashboards list can flag them.
+    # ``exclude_none`` on dump keeps it absent for every existing page.
+    created_by: str | None = None
 
     @model_validator(mode="before")
     @classmethod
