@@ -58,7 +58,7 @@ from app.discovery import DiscoveryCache
 from app.ha_discovery import HomeAssistantDiscovery
 from app.scheduler import Scheduler
 from app.state.event_log import EventLog
-from app.state.page_store import PageStore
+from app.state.page_store import PageStore, migrate_canvases_to_pages
 from app.state.rotation_store import RotationStore
 from app.state.schedule_store import ScheduleStore
 from app.state.settings_store import SettingsStore
@@ -574,12 +574,17 @@ def create_app(
     app.config["DEVICE_SCHEMA_PATH"] = device_schema
     app.config["DISCOVERY_CACHE"] = discovery_cache
     app.config["PAGE_STORE"] = page_store
-    # Canvas documents for the experimental Panels editor (issue #60). Cheap
-    # to construct (empty until the feature is used); the routes are gated by
-    # the composer experiment flag regardless.
+    # Legacy standalone canvas store (issue #60). Canvases are now Page(
+    # layout_kind="canvas") in the PageStore; this only survives to read old
+    # data + serve /compose/canvas until the parallel routes retire. Migrate
+    # any existing canvas docs into the PageStore once, non-destructively.
     from app.state.panel_store import CanvasStore
 
-    app.config["PANEL_STORE"] = CanvasStore(data_root / "core" / "panels.json")
+    panel_store = CanvasStore(data_root / "core" / "panels.json")
+    app.config["PANEL_STORE"] = panel_store
+    migrated = migrate_canvases_to_pages(panel_store, page_store)
+    if migrated:
+        logger.info("migrated %d legacy canvas(es) into the page store", migrated)
     app.config["SCHEDULE_STORE"] = schedule_store
     app.config["ROTATION_STORE"] = rotation_store
     app.config["DEVICE_ROTATION_STATE_STORE"] = device_rotation_state_store

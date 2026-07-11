@@ -42,24 +42,24 @@ def _sign_in(client: Any) -> None:
 def test_composer_reachable_by_default_but_unlinked(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    assert client.get("/experiments/composer/catalog.json").status_code == 200
-    landing = client.get("/experiments/composer/", follow_redirects=False)
+    assert client.get("/pages/canvas/catalog.json").status_code == 200
+    landing = client.get("/pages/canvas/", follow_redirects=False)
     assert landing.status_code == 302
-    assert "/experiments/composer/c/" in landing.location
+    assert "/pages/canvas/c/" in landing.location
 
 
 def test_composer_can_be_disabled_via_settings(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
-    assert client.get("/experiments/composer/").status_code == 404
-    assert client.get("/experiments/composer/catalog.json").status_code == 404
+    assert client.get("/pages/canvas/").status_code == 404
+    assert client.get("/pages/canvas/catalog.json").status_code == 404
 
 
 def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    landing = client.get("/experiments/composer/", follow_redirects=False)
+    landing = client.get("/pages/canvas/", follow_redirects=False)
     editor = client.get(landing.location)
     assert editor.status_code == 200
     assert b"panels/editor.js" in editor.data
@@ -68,7 +68,7 @@ def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
 def test_catalog_requires_auth(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()  # no sign-in
-    resp = client.get("/experiments/composer/catalog.json", follow_redirects=False)
+    resp = client.get("/pages/canvas/catalog.json", follow_redirects=False)
     assert resp.status_code in (302, 401, 403)
 
 
@@ -80,7 +80,7 @@ def test_catalog_lists_widgets_with_fragments(app: Flask) -> None:
     fragment. Library plugins (_core, kind data/font) are excluded."""
     client = app.test_client()
     _sign_in(client)
-    payload = client.get("/experiments/composer/catalog.json").get_json()
+    payload = client.get("/pages/canvas/catalog.json").get_json()
     by_key = {w["key"]: w for w in payload["widgets"]}
     assert "weather_now" in by_key
     assert "weather_core" not in by_key  # library plugin, not kind widget
@@ -101,7 +101,7 @@ def test_catalog_includes_appearance(app: Flask) -> None:
     appearance pickers consume."""
     client = app.test_client()
     _sign_in(client)
-    ap = client.get("/experiments/composer/catalog.json").get_json()["appearance"]
+    ap = client.get("/pages/canvas/catalog.json").get_json()["appearance"]
     assert any(t["value"] == "light" for t in ap["themes"])
     assert any(s["id"] == "standard" for s in ap["styles"])
     assert isinstance(ap["fonts"], list)
@@ -111,24 +111,24 @@ def test_appearance_roundtrips(app: Flask, monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={"theme": "dark", "style": "editorial", "bg": "#101014", "els": []},
     )
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     assert doc["theme"] == "dark" and doc["style"] == "editorial" and doc["bg"] == "#101014"
 
 
 def test_compose_applies_theme_and_background(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={"theme": "dark", "style": "editorial", "bg": "#101014", "els": []},
     )
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert 'data-theme="dark"' in body and 'data-style="editorial"' in body
     assert "#101014" in body  # background colour applied to the board
 
@@ -252,12 +252,43 @@ def test_decoration_element_roundtrip(tmp_path: Path) -> None:
     assert e.fill is False and e.stroke == 3 and e.radius == 12
 
 
+def test_migrate_canvases_to_pages(tmp_path: Path) -> None:
+    """Legacy canvas docs migrate into the PageStore as canvas pages, without
+    clobbering existing page ids, and idempotently."""
+    from app.state.page_store import Page, PageStore, migrate_canvases_to_pages
+
+    cstore = CanvasStore(tmp_path / "panels.json")
+    cstore.save(
+        CanvasPage(
+            id="k1",
+            name="Kitchen",
+            w=800,
+            h=480,
+            theme="dark",
+            device_ids=["dev_a"],
+            els=[Element(id="e", widget="clock", x=0, y=0, w=100, h=100)],
+        )
+    )
+    cstore.save(CanvasPage(id="collide", name="Canvas C2"))
+    pstore = PageStore(tmp_path / "pages.json")
+    pstore.save(Page(id="collide", name="Keep me", layout_kind="grid"))  # pre-existing page id
+
+    assert migrate_canvases_to_pages(cstore, pstore) == 1  # only k1; collide skipped
+    k = pstore.get("k1")
+    assert k is not None and k.layout_kind == "canvas" and k.device_ids == ["dev_a"]
+    assert k.canvas is not None and k.canvas.w == 800 and k.canvas.theme == "dark"
+    assert k.canvas.els[0].widget == "clock"
+    kept = pstore.get("collide")
+    assert kept is not None and kept.name == "Keep me" and kept.layout_kind == "grid"
+    assert migrate_canvases_to_pages(cstore, pstore) == 0  # idempotent
+
+
 def test_compose_renders_decorations(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={
             "els": [
                 {
@@ -273,7 +304,7 @@ def test_compose_renders_decorations(app: Flask) -> None:
             ]
         },
     )
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert 'class="deco"' in body and "panels/decorate.js" in body
 
 
@@ -282,9 +313,9 @@ def test_fragment_part_scales_roundtrip_and_compose(app: Flask) -> None:
     compose render as the cell's data-parts payload."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={
             "els": [
                 {
@@ -300,11 +331,11 @@ def test_fragment_part_scales_roundtrip_and_compose(app: Flask) -> None:
             ]
         },
     )
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     parts = doc["els"][0]["parts"]
     assert parts == [{"sel": ".wx-temp", "scale": 150}]
 
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert "data-parts=" in body and ".wx-temp" in body
 
 
@@ -312,14 +343,14 @@ def test_background_image(app: Flask) -> None:
     """A canvas background image + fit mode persists and reaches the render."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={"bg_image": "https://example.com/bg.jpg", "bg_fit": "contain", "els": []},
     )
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     assert doc["bg_image"] == "https://example.com/bg.jpg" and doc["bg_fit"] == "contain"
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert "https://example.com/bg.jpg" in body and "object-fit:contain" in body
 
 
@@ -327,9 +358,9 @@ def test_text_element_and_opacity(app: Flask) -> None:
     """Text elements and per-element opacity persist and reach the render."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={
             "els": [
                 {
@@ -347,10 +378,10 @@ def test_text_element_and_opacity(app: Flask) -> None:
             ]
         },
     )
-    e = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()["els"][0]
+    e = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()["els"][0]
     assert e["kind"] == "text" and e["text"] == "Hello" and e["align"] == "center"
     assert e["size"] == 24 and e["opacity"] == 50
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert 'class="deco"' in body and "opacity: 0.5" in body
 
 
@@ -358,9 +389,9 @@ def test_rotation_and_icon_weight(app: Flask) -> None:
     """Rotation and icon weight persist and reach the compose render."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={
             "els": [
                 {
@@ -386,11 +417,11 @@ def test_rotation_and_icon_weight(app: Flask) -> None:
             ]
         },
     )
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     els = {e["id"]: e for e in doc["els"]}
     assert els["w1"]["rotate"] == 45
     assert els["i1"]["weight"] == "fill" and els["i1"]["rotate"] == 15
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert "rotate(45deg)" in body  # widget rotation applied on the compose cell
 
 
@@ -401,7 +432,7 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     good = {
         "name": "My Panel",
         "w": 600,
@@ -418,9 +449,9 @@ def test_save_and_doc_roundtrip(app: Flask, monkeypatch: pytest.MonkeyPatch) -> 
             }
         ],
     }
-    resp = client.post(f"/experiments/composer/c/{cid}/save", json=good)
+    resp = client.post(f"/pages/canvas/c/{cid}/save", json=good)
     assert resp.status_code == 200 and resp.get_json()["elements"] == 1
-    doc = client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
     assert doc["name"] == "My Panel" and doc["els"][0]["widget"] == "weather_now"
 
 
@@ -428,41 +459,41 @@ def test_canvas_management(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
 
     # list starts with the auto-minted canvas
-    listing = client.get("/experiments/composer/canvases.json").get_json()
+    listing = client.get("/pages/canvas/canvases.json").get_json()
     assert [c["id"] for c in listing["canvases"]] == [cid]
 
     # rename
-    resp = client.post(f"/experiments/composer/c/{cid}/rename", json={"name": "Kitchen"})
+    resp = client.post(f"/pages/canvas/c/{cid}/rename", json={"name": "Kitchen"})
     assert resp.status_code == 200 and resp.get_json()["name"] == "Kitchen"
-    assert client.get(f"/experiments/composer/c/{cid}/doc.json").get_json()["name"] == "Kitchen"
+    assert client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()["name"] == "Kitchen"
 
     # duplicate carries the name (with a suffix) into a fresh id
-    resp = client.post(f"/experiments/composer/c/{cid}/duplicate")
+    resp = client.post(f"/pages/canvas/c/{cid}/duplicate")
     dup_id = resp.get_json()["id"]
     assert dup_id != cid
-    dup = client.get(f"/experiments/composer/c/{dup_id}/doc.json").get_json()
+    dup = client.get(f"/pages/canvas/c/{dup_id}/doc.json").get_json()
     assert dup["name"] == "Kitchen copy"
-    assert len(client.get("/experiments/composer/canvases.json").get_json()["canvases"]) == 2
+    assert len(client.get("/pages/canvas/canvases.json").get_json()["canvases"]) == 2
 
     # delete removes it
-    resp = client.post(f"/experiments/composer/c/{dup_id}/delete")
+    resp = client.post(f"/pages/canvas/c/{dup_id}/delete")
     assert resp.status_code == 200 and resp.get_json()["deleted"] is True
-    remaining = client.get("/experiments/composer/canvases.json").get_json()["canvases"]
+    remaining = client.get("/pages/canvas/canvases.json").get_json()["canvases"]
     assert [c["id"] for c in remaining] == [cid]
 
     # missing canvas 404s on rename/duplicate
-    assert client.post("/experiments/composer/c/nope/rename", json={"name": "x"}).status_code == 404
-    assert client.post("/experiments/composer/c/nope/duplicate").status_code == 404
+    assert client.post("/pages/canvas/c/nope/rename", json={"name": "x"}).status_code == 404
+    assert client.post("/pages/canvas/c/nope/duplicate").status_code == 404
 
 
 def test_devices_json_lists_instances_with_panel_dims(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     client.post("/settings/devices/add", data={"id": "kitchen", "kind": "pimoroni_inky_4"})
-    payload = client.get("/experiments/composer/devices.json").get_json()
+    payload = client.get("/pages/canvas/devices.json").get_json()
     kitchen = next(d for d in payload["devices"] if d["id"] == "kitchen")
     assert kitchen["w"] == 600 and kitchen["h"] == 400
 
@@ -478,8 +509,8 @@ def test_send_renders_and_pushes(app: Flask, monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(app.config["PUSH_MANAGER"], "push_image", fake_push_image)
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
-    resp = client.post(f"/experiments/composer/c/{cid}/send", json={"device_ids": ["dev_a"]})
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    resp = client.post(f"/pages/canvas/c/{cid}/send", json={"device_ids": ["dev_a"]})
     body = resp.get_json()
     assert resp.status_code == 200 and body["sent"] == ["dev_a"]
     assert calls[0]["png"] == b"PNGBYTES" and calls[0]["device_id"] == "dev_a"
@@ -490,9 +521,9 @@ def test_compose_canvas_mounts_widgets(app: Flask) -> None:
     composer.js to mount each as the real widget with its fragment."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     client.post(
-        f"/experiments/composer/c/{cid}/save",
+        f"/pages/canvas/c/{cid}/save",
         json={
             "els": [
                 {
@@ -507,18 +538,22 @@ def test_compose_canvas_mounts_widgets(app: Flask) -> None:
             ]
         },
     )
-    body = client.get(f"/compose/canvas/{cid}").get_data(as_text=True)
+    body = client.get(f"/compose/{cid}").get_data(as_text=True)
     assert 'data-plugin="weather_now"' in body
     assert 'data-fragment="temp"' in body
     assert "composer.js" in body  # real widget mount, not a primitive reconstruction
 
 
-def test_compose_canvas_404_when_flag_off(app: Flask) -> None:
+def test_editor_gated_but_render_not_when_flag_off(app: Flask) -> None:
+    """The experimental editor is gated by the composer flag, but a canvas
+    dashboard's render is not: push / scheduler must render it regardless of
+    whether the editor is enabled."""
     client = app.test_client()
     _sign_in(client)
-    cid = client.get("/experiments/composer/").location.rsplit("/", 1)[1]
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     app.config["SETTINGS_STORE"].update_section("experiments", {"composer": False})
-    assert client.get(f"/compose/canvas/{cid}").status_code == 404
+    assert client.get(f"/pages/canvas/c/{cid}").status_code == 404  # editor gated
+    assert client.get(f"/compose/{cid}").status_code == 200  # render still works
 
 
 def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -527,9 +562,7 @@ def test_source_form_renders_widget_options(app: Flask, monkeypatch: pytest.Monk
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    resp = client.post(
-        "/experiments/composer/source-form", json={"key": "weather_now", "sid": "e1"}
-    )
+    resp = client.post("/pages/canvas/source-form", json={"key": "weather_now", "sid": "e1"})
     assert resp.status_code == 200
     assert 'name="opt_units"' in resp.get_data(as_text=True)
 
@@ -541,9 +574,7 @@ def test_widget_data_live_with_sample_fallback(app: Flask, monkeypatch: pytest.M
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    resp = client.post(
-        "/experiments/composer/data.json", json={"widget": "weather_now", "options": {}}
-    )
+    resp = client.post("/pages/canvas/data.json", json={"widget": "weather_now", "options": {}})
     assert resp.status_code == 200
     data = resp.get_json()["data"]
     assert isinstance(data, dict) and data.get("temp") == 19  # sample fallback
@@ -553,7 +584,7 @@ def test_widget_data_empty_widget(app: Flask, monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("TESSERAE_EXPERIMENT_COMPOSER", "1")
     client = app.test_client()
     _sign_in(client)
-    resp = client.post("/experiments/composer/data.json", json={"widget": ""})
+    resp = client.post("/pages/canvas/data.json", json={"widget": ""})
     assert resp.status_code == 200 and resp.get_json()["data"] is None
 
 
@@ -562,7 +593,7 @@ def test_source_options_parses_form(app: Flask, monkeypatch: pytest.MonkeyPatch)
     client = app.test_client()
     _sign_in(client)
     resp = client.post(
-        "/experiments/composer/source-options",
+        "/pages/canvas/source-options",
         data={"key": "weather_now", "opt_units": "imperial", "opt_label": "Home"},
     )
     assert resp.status_code == 200

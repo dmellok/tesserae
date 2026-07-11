@@ -19,7 +19,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.state.panel_store import CanvasLayout
+from app.state.panel_store import CanvasLayout, CanvasStore
 
 logger = logging.getLogger(__name__)
 
@@ -285,3 +285,31 @@ class PageStore:
         if existed:
             self._notify()
         return existed
+
+
+def migrate_canvases_to_pages(canvas_store: CanvasStore, page_store: PageStore) -> int:
+    """Copy legacy standalone canvas documents into the ``PageStore`` as canvas
+    pages (issue #60), unless a page with that id already exists. Non-destructive:
+    the old canvases file is left in place. Returns the number migrated.
+
+    Lets an install with existing composer canvases keep them as first-class
+    dashboards after the merge, with no data loss and no re-authoring.
+    """
+    migrated = 0
+    for doc in canvas_store.list():
+        if page_store.get(doc.id) is not None:
+            continue
+        page_store.save(
+            Page(
+                id=doc.id,
+                name=doc.name,
+                layout_kind="canvas",
+                device_ids=list(doc.device_ids),
+                theme=doc.theme,
+                style=doc.style,
+                font=doc.font or None,
+                canvas=doc.to_layout(),
+            )
+        )
+        migrated += 1
+    return migrated
