@@ -21,8 +21,9 @@ more panels over MQTT or HTTP.
 
 Open source under AGPL-3.0-or-later. No SaaS, no cloud account. The only
 outbound contact is `api.tesserae.ink` for update checks, an anonymous
-install count, and a daily aggregate heartbeat, switchable off in one place
-(Settings → System → Online features).
+install count, and a daily aggregate heartbeat, off by default and opt-in
+(you're asked once at first-run setup; toggle in Settings → System → Online
+features).
 
 **📖 [Full documentation](https://docs.tesserae.ink/):**
 install guides, [hardware quickstarts](https://docs.tesserae.ink/quickstart/),
@@ -193,9 +194,9 @@ Tesserae contacts one first-party endpoint, `api.tesserae.ink`, for
 update checks, an anonymous marketplace install count, and a daily
 aggregate heartbeat (version, platform, deployment kind, device kinds; no
 exact counts). No accounts, no personal data, no IP addresses stored, no
-third-party analytics. It is controlled by a single switch, **Settings → System →
-Online features**; turn it off and the app never contacts
-`api.tesserae.ink`. Per-device diagnostics (battery, RSSI, sleep cadence)
+third-party analytics. It is **off by default** and opt-in: a fresh install asks once
+at first-run setup, and it's a single switch at **Settings → System →
+Online features**. Per-device diagnostics (battery, RSSI, sleep cadence)
 stay on the box. [Privacy](https://docs.tesserae.ink/privacy/).
 
 ## Community

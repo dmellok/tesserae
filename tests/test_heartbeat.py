@@ -33,9 +33,7 @@ def _app(
     devices: list[Any] | None = None,
     ha: bool = False,
 ) -> tuple[_FakeApp, list[dict[str, Any]]]:
-    app_section: dict[str, Any] = {"ha_discovery_enabled": ha}
-    if not online_on:
-        app_section["online_features"] = False
+    app_section: dict[str, Any] = {"ha_discovery_enabled": ha, "online_features": online_on}
     settings = SimpleNamespace(get_section=lambda name, _s=app_section: _s if name == "app" else {})
     registry = SimpleNamespace(all=lambda _d=list(devices or []): _d)
     records: list[dict[str, Any]] = []

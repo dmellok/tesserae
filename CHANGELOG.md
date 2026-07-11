@@ -19,18 +19,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
-- **Online features (one-switch opt-out).** Tesserae now reports an
+- **Online features (opt-in, asked at first-run).** Tesserae can report an
   anonymous, aggregate install count to `api.tesserae.ink` when you add a
-  widget from the marketplace, and the Browse cards show the count. Each
+  widget from the marketplace, and show the count on the Browse cards. Each
   request may include your install's random ID, the widget id, and the
   running version; a coarse country is derived from the request IP and
   the IP is then discarded. No account, no personal data, no IP addresses
-  or User-Agent strings are stored. A single switch at **Settings →
-  System → Online features** governs this and the app + device-firmware
-  update checks; turning it off stops all contact with `api.tesserae.ink`.
-  This replaces the separate firmware-update opt-in, which is now part of
-  this switch. Install pings surface on the `/events` timeline under the
-  telemetry filter.
+  or User-Agent strings are stored. **It is off by default**: the first-run
+  wizard asks once, and a single switch at **Settings → System → Online
+  features** governs it and the app + device-firmware update checks.
+  Leaving it off means the app never contacts `api.tesserae.ink`. This
+  replaces the separate firmware-update opt-in. Never enabled in CI /
+  Codespaces / dev containers. Install pings surface on the `/events`
+  timeline under the telemetry filter.
 
 - **Daily heartbeat.** With Online features on, Tesserae sends a once-a-day
   best-effort heartbeat to `api.tesserae.ink` carrying only low-cardinality,

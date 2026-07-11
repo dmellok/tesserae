@@ -44,6 +44,32 @@ def test_root_lands_on_wizard_until_onboarded(app: Flask) -> None:
     assert resp.location.endswith("/send")
 
 
+def test_share_step_renders_consent(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    body = client.get("/onboarding/share").get_data(as_text=True)
+    assert "Yes, count me in" in body and "Keep this install offline" in body
+    assert "api.tesserae.ink" in body  # first-party disclosure
+
+
+def test_share_opt_in_enables_and_finishes(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/onboarding/share", data={"online_features": "1"}, follow_redirects=False)
+    assert resp.status_code == 302 and resp.location.endswith("/send")
+    assert app.config["SETTINGS_STORE"].get_section("app").get("online_features") is True
+    # onboarded now: / goes to Send, not the wizard.
+    assert client.get("/", follow_redirects=False).location.endswith("/send")
+
+
+def test_share_opt_out_disables_and_finishes(app: Flask) -> None:
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/onboarding/share", data={}, follow_redirects=False)  # no field = off
+    assert resp.status_code == 302 and resp.location.endswith("/send")
+    assert app.config["SETTINGS_STORE"].get_section("app").get("online_features") is False
+
+
 def test_wizard_steps_render(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)

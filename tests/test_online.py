@@ -19,9 +19,9 @@ class _Store:
         return self._section if name == "app" else {}
 
 
-def test_online_enabled_default_true() -> None:
-    # A fresh install (no keys) is online by default (opt-out model).
-    assert online.online_enabled(_Store({})) is True
+def test_online_enabled_default_off() -> None:
+    # A fresh install (no keys) is offline until the user opts in (opt-in model).
+    assert online.online_enabled(_Store({})) is False
 
 
 def test_online_enabled_explicit_off() -> None:
@@ -59,10 +59,10 @@ def test_online_enabled_false_in_ephemeral_env(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_online_enabled_not_blocked_by_generic_ci(monkeypatch: pytest.MonkeyPatch) -> None:
-    # A real install that happens to carry CI=true (leaked from a pipeline or a
-    # base image) must still be able to phone home; only precise markers gate.
+    # An opted-in install that happens to carry CI=true (leaked from a pipeline
+    # or a base image) must still phone home; only precise markers gate.
     monkeypatch.setenv("CI", "true")
-    assert online.online_enabled(_Store({})) is True
+    assert online.online_enabled(_Store({"online_features": True})) is True
 
 
 class _FakeResp:

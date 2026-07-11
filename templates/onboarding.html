@@ -323,12 +323,12 @@
       </ul>
     </section>
 
-    <form method="post" action="{{ url_for('onboarding.finish') }}" class="form">
-      <div class="wizard-nav">
-        <span></span>
-        <div class="actions">{{ button('Finish', icon='check', variant='primary') }}</div>
+    <div class="wizard-nav">
+      <span></span>
+      <div class="actions">
+        <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       </div>
-    </form>
+    </div>
     {% else %}
     <p class="lede">Create a ready-made dashboard, a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
     <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
@@ -338,6 +338,38 @@
       </div>
     </form>
     {% endif %}
+
+    {% elif step == 'share' %}
+    <h1>Help shape where Tesserae goes next?</h1>
+    <p class="lede">Tesserae is built by one person in their spare time. A tiny, anonymous signal from your install is genuinely the best map I have for what to work on. It takes one click, and it would mean a lot.</p>
+
+    <section class="wizard-community" aria-label="Online features">
+      <h2 class="wizard-subhead">Why it helps</h2>
+      <p class="lede">Opt in and Tesserae sends an anonymous heartbeat and install count, so I can see how many people run it, on what hardware, and which widgets get used. That decides what gets built, tested, and supported next. Right now I'm mostly guessing, and you'd be turning that guess into real signal.</p>
+
+      <h2 class="wizard-subhead">Completely first-party, and tiny</h2>
+      <p class="lede">This only ever talks to <code>api.tesserae.ink</code>, run by me. No third parties, no ad networks, nothing sold. What's sent: your install's random ID, the version, the widgets you add, and a coarse country from your IP (which is then discarded). No accounts, no personal data, no IP addresses stored. Read the exact payload on the <a href="https://docs.tesserae.ink/privacy/" target="_blank" rel="noreferrer noopener">privacy page</a>.</p>
+
+      <h2 class="wizard-subhead">Turn it on and you also get</h2>
+      <ul class="wizard-share-perks">
+        <li><i class="ph ph-bell" aria-hidden="true"></i> <strong>Update alerts</strong> when a new Tesserae version ships</li>
+        <li><i class="ph ph-broadcast" aria-hidden="true"></i> <strong>Firmware update indicators</strong> for your panels</li>
+        <li><i class="ph ph-chart-line-up" aria-hidden="true"></i> <strong>Install counts on widgets</strong>, so you can see what the community actually runs</li>
+        <li><i class="ph ph-heart" aria-hidden="true"></i> <strong>A say in the roadmap</strong>, counted installs shape what gets built</li>
+      </ul>
+    </section>
+
+    <div class="wizard-nav">
+      <form method="post" action="{{ url_for('onboarding.save_share') }}" class="form form--inline">
+        <input type="hidden" name="online_features" value="0">
+        <button type="submit" class="ghost"><span>Keep this install offline</span></button>
+      </form>
+      <form method="post" action="{{ url_for('onboarding.save_share') }}" class="form form--inline">
+        <input type="hidden" name="online_features" value="1">
+        <button type="submit" class="primary"><i class="ph ph-heart" aria-hidden="true"></i><span>Yes, count me in</span></button>
+      </form>
+    </div>
+    <p class="muted" style="text-align:center;margin-top:10px">Either way you're in control. Change it anytime in Settings &rarr; System &rarr; Online features.</p>
     {% endif %}
 
   </div>

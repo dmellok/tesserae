@@ -107,6 +107,7 @@ def test_browse_shows_install_counts(app: Flask, monkeypatch: object) -> None:
     api.tesserae.ink, keyed by catalog id, on each card."""
     client = app.test_client()
     _sign_in(client)
+    app.config["SETTINGS_STORE"].patch_section("app", {"online_features": True})
     mkt = MagicMock(spec=Marketplace)
     entry = _fake_entry("spotify")
     mkt.index_url.return_value = "https://catalog.invalid/widgets.json"
@@ -134,6 +135,7 @@ def test_install_reports_and_logs_telemetry(
     client = app.test_client()
     _sign_in(client)
     _inject_mocks(app)
+    app.config["SETTINGS_STORE"].patch_section("app", {"online_features": True})
     marked = test_install_uuid()  # type: ignore[operator]
     app.config["INSTALL_ID"] = marked
     from app import online

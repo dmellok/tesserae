@@ -52,9 +52,12 @@ from app.tz_resolve import _resolve_iana_timezone
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard")
+STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard", "share")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
+    # Wrap-up: the online-features opt-in. Placed last so it lands on someone
+    # who's just seen Tesserae work. Off unless the user says yes here.
+    "share": "Help out",
     # Timezone slots in right after welcome because it's foundational:
     # the scheduler interprets every fire time against it. Surfaced
     # during onboarding so users on Docker / bare metal explicitly
@@ -470,6 +473,27 @@ def push_starter(page_id: str) -> Response:
     else:
         flash(f"Push {result.status}: {result.error or '(no detail)'}", "error")
     return redirect(url_for("onboarding.step", step="dashboard"))
+
+
+@bp.post("/share")
+def save_share() -> Response:
+    """Record the online-features opt-in choice and finish the wizard.
+
+    Either choice completes setup. Yes turns on update checks, firmware
+    indicators, marketplace install counts, and the anonymous heartbeat; No
+    keeps the install fully offline. Changeable later in Settings -> System."""
+    enabled = request.form.get("online_features") in ("1", "true", "on")
+    _settings().patch_section("app", {"online_features": enabled})
+    mark_onboarded(_settings())
+    if enabled:
+        flash("Thank you, genuinely. You're now one of the installs I get to build for.", "ok")
+    else:
+        flash(
+            "No problem at all. Tesserae will not contact api.tesserae.ink; "
+            "turn it on anytime in Settings -> System -> Online features.",
+            "ok",
+        )
+    return redirect(url_for("send.index"))
 
 
 @bp.post("/skip")

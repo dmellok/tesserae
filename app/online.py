@@ -61,13 +61,15 @@ def _ephemeral_environment() -> bool:
 
 
 def online_enabled(settings_store: Any) -> bool:
-    """Master opt-out. ``settings.app.online_features`` defaults to True.
+    """Master opt-in. ``settings.app.online_features`` defaults to **off**: a
+    fresh install never contacts api.tesserae.ink until the user says yes at the
+    first-run wizard (or flips it on in Settings). Nobody is counted without an
+    explicit choice.
 
     Always False in an ephemeral CI / Codespaces / dev-container environment
-    (see :func:`_ephemeral_environment`). Otherwise honours an explicit legacy
-    ``check_firmware_updates = false`` as an opt-out, so a user who deliberately
-    disabled the old firmware lookup stays opted out after the upgrade rather
-    than being silently switched on.
+    (see :func:`_ephemeral_environment`). A pre-existing ``check_firmware_updates``
+    opt-in still counts as on, so an upgrader who had enabled the old firmware
+    lookup keeps it.
     """
     if settings_store is None or _ephemeral_environment():
         return False
@@ -76,10 +78,10 @@ def online_enabled(settings_store: Any) -> bool:
     except Exception:
         return False
     if "online_features" in section:
-        return _coerce_bool(section.get("online_features"), default=True)
+        return _coerce_bool(section.get("online_features"), default=False)
     if "check_firmware_updates" in section:
         return _coerce_bool(section.get("check_firmware_updates"), default=False)
-    return True
+    return False
 
 
 def report_widget_install(
