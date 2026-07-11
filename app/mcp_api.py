@@ -1,10 +1,11 @@
 """MCP API: a token-authenticated JSON surface for building canvas dashboards.
 
-This is the *server side* of Tesserae's MCP integration (the stdio bridge lives
-in :mod:`app.mcp_server`). It lets an AI agent do what the freeform canvas editor
-does, but by writing the canvas document directly and rendering a preview PNG to
-see the result: list widgets/devices, create + edit canvas dashboards, render a
-preview, and push to a panel.
+This is the *server side* of Tesserae's MCP integration. The stdio bridge an
+agent connects to is a separate package, ``tesserae-mcp``
+(https://github.com/dmellok/tesserae-mcp), which talks to this surface over HTTP.
+It lets an AI agent do what the freeform canvas editor does, but by writing the
+canvas document directly and rendering a preview PNG to see the result: list
+widgets/devices, create + edit canvas dashboards, render a preview, push to a panel.
 
 Everything here reuses the panels editor's own helpers (:mod:`app.panels_routes`)
 so the agent path and the UI path stay identical; nothing is reimplemented.

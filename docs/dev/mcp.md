@@ -20,9 +20,11 @@ create_canvas_page → set_canvas → render_preview → (look) → set_canvas �
 Two pieces:
 
 - **The API** (`/api/mcp/*`) — a token-authed surface built into Tesserae, gated
-  behind the `mcp` experiment.
+  behind the `mcp` experiment. Ships with Tesserae; nothing to install.
 - **The bridge** (`tesserae-mcp`) — a small stdio MCP server your agent launches;
-  it talks to a running Tesserae. Ships as an optional extra.
+  it talks to a running Tesserae. It's a **separate package**,
+  [dmellok/tesserae-mcp](https://github.com/dmellok/tesserae-mcp), installed on
+  the machine where your agent runs.
 
 ## Enable it
 
@@ -30,10 +32,10 @@ Two pieces:
 2. If your agent runs on a **different machine** from Tesserae, click **Regenerate
    token** and copy it. On the **same machine** you can skip the token (loopback
    is trusted).
-3. Install the bridge:
+3. Install the bridge on the machine where your agent runs:
 
     ```bash
-    pip install "tesserae[mcp]"
+    pip install git+https://github.com/dmellok/tesserae-mcp
     ```
 
 ## Connect an agent
@@ -89,5 +91,5 @@ Melbourne, and my next calendar event, then show me a preview."*
 ## Notes
 
 - The bridge needs a **running** Tesserae (rendering uses its headless browser).
-- Core Tesserae never imports the `mcp` package; only the `tesserae-mcp` bridge
-  does, via the `[mcp]` extra.
+- Core Tesserae never imports the `mcp` package; it lives entirely in the
+  separate `tesserae-mcp` bridge.

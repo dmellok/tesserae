@@ -12,11 +12,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   server lets an agent (Claude Desktop / Claude Code, etc.) build freeform canvas
   dashboards: it lists your widgets and devices, lays out a canvas, renders a
   preview to check its work, and pushes to a panel. Enable it under **Settings →
-  System → MCP** (off by default), then `pip install "tesserae[mcp]"` and point
-  your agent at the `tesserae-mcp` bridge. The `/api/mcp` surface is reachable
-  from loopback without a token, or with a generated token for a remote agent;
-  writes only touch canvas dashboards, pushing is always explicit, and
-  agent-created pages are flagged in the Dashboards list. See the docs.
+  System → MCP** (off by default), then run the
+  [`tesserae-mcp`](https://github.com/dmellok/tesserae-mcp) bridge on your agent's
+  machine. The `/api/mcp` surface is reachable from loopback without a token, or
+  with a generated token for a remote agent; writes only touch canvas dashboards,
+  pushing is always explicit, and agent-created pages are flagged in the
+  Dashboards list. The stdio bridge is a separate package (installed where the
+  agent runs), so Tesserae core stays free of the `mcp` dependency. See the docs.
 
 - **Dark mode in the canvas editor.** The freeform canvas editor, a standalone
   page that doesn't extend the admin shell, now follows the shell's persisted

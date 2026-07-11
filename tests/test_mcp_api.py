@@ -196,11 +196,3 @@ def test_push_ok(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     assert resp.get_json()["sent"] == ["dev1"]
     (payload,) = pm.push_image.call_args.args
     assert payload == _FAKE_PNG
-
-
-def test_mcp_server_bridge_imports() -> None:
-    """The stdio bridge module imports without the optional mcp SDK (only
-    build_server() needs it). Guards against import-time SDK coupling."""
-    import app.mcp_server as srv
-
-    assert callable(srv.main) and callable(srv.build_server)

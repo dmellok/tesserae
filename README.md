@@ -91,10 +91,12 @@ transports, and device kinds. The seams are real directories:
 [`plugins/`](plugins/) · [`renderers/`](renderers/) ·
 [`transports/`](transports/) · [`devices/`](devices/).
 
-**Build dashboards with AI (MCP).** An optional [MCP](https://modelcontextprotocol.io)
-server lets an agent lay out a freeform dashboard, render a preview to check its
-work, and push it to a panel. Enable it under Settings → System → MCP, then
-`pip install "tesserae[mcp]"`. See [the docs](https://docs.tesserae.ink/dev/mcp/).
+**Build dashboards with AI (MCP).** Tesserae exposes an optional
+[MCP](https://modelcontextprotocol.io) API so an agent can lay out a freeform
+dashboard, render a preview to check its work, and push it to a panel. Enable it
+under Settings → System → MCP, then run the
+[`tesserae-mcp`](https://github.com/dmellok/tesserae-mcp) bridge on your agent's
+machine. See [the docs](https://docs.tesserae.ink/dev/mcp/).
 
 ## Design decisions
 

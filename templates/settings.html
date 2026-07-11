@@ -1023,7 +1023,7 @@ docker compose up -d</code></pre>
     }
   }
 }</code></pre>
-      <p class="field-help">Install the bridge with <code>pip install "tesserae[mcp]"</code>. On the same machine you can omit the token (loopback is trusted).</p>
+      <p class="field-help">Install the bridge on your agent's machine with <code>pip install git+https://github.com/dmellok/tesserae-mcp</code>. On the same machine as Tesserae you can omit the token (loopback is trusted).</p>
     </details>
 
     <form method="post" action="{{ url_for('auth.system_mcp_regenerate') }}" class="form" onsubmit="return confirm('Generate a new MCP token? Any agent using the old token will stop authenticating.');">
