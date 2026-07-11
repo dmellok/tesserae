@@ -2,30 +2,39 @@
 
 Two jobs:
 
-1. Keep the suite offline. Nothing here should ever reach api.tesserae.ink:
-   the firmware fetch and the ``online.*`` egress helpers (widget-install
-   report, install-count fetch, heartbeat) are stubbed so no test hits the
-   network (slow; also writes synthetic rows to the live aggregator). Modules
-   that exercise these paths directly against a mocked transport opt out by
-   filename.
+1. Keep the suite offline. An autouse guard wraps ``urllib.request.urlopen`` and
+   refuses any request whose URL targets ``api.tesserae.ink`` (raising, which the
+   app's best-effort egress helpers swallow into a no-op). This blocks the
+   firmware check, the widget-install report, the install-count fetch, and the
+   heartbeat in one place, and automatically covers any future egress that goes
+   through urllib, so no per-function stub list has to be maintained. Modules
+   that exercise the real fetch path against a mocked transport
+   (``test_online.py``, ``test_firmware_check.py``) monkeypatch ``urlopen``
+   themselves, which transparently overrides this guard for their scope. Real
+   requests to any other host pass straight through.
 
-2. Provide the reserved-prefix synthetic install UUID (see ``make_test_install_uuid``)
-   so any test traffic that *does* reach the API can be culled by the API-side
-   job (``DELETE ... WHERE install_uuid LIKE '7e57c0de-%'``). Real v4 UUIDs are
-   random, so a real install can't collide with this fixed first group.
+2. Provide the reserved-prefix synthetic install UUID (see
+   ``make_test_install_uuid``) so any test traffic that *does* reach the API can
+   be culled by the API-side job (``DELETE ... WHERE install_uuid LIKE
+   '7e57c0de-%'``). Real v4 UUIDs are random, so a real install can't collide
+   with this fixed first group.
 """
 
 from __future__ import annotations
 
-import contextlib
+import urllib.request
 import uuid
-from unittest.mock import patch
+from typing import Any
 
 import pytest
 
 # Reserved first group ("testcode") on every synthetic install UUID, kept in one
 # place so it stays in lockstep with the API cull job's LIKE pattern.
 TEST_INSTALL_PREFIX = "7e57c0de"
+
+# Captured once, before any patching, so the guard can delegate non-API traffic
+# to the genuine implementation without recursing through its own patch.
+_REAL_URLOPEN = urllib.request.urlopen
 
 
 def make_test_install_uuid() -> str:
@@ -42,20 +51,14 @@ def test_install_uuid() -> object:
     return make_test_install_uuid
 
 
-@pytest.fixture(autouse=True)
-def _block_live_api(request: pytest.FixtureRequest) -> object:
-    """Prevent live api.tesserae.ink calls during the test suite.
+def _guarded_urlopen(req: Any, *args: Any, **kwargs: Any) -> Any:
+    url = getattr(req, "full_url", None) or (req if isinstance(req, str) else "")
+    if "api.tesserae.ink" in str(url):
+        raise RuntimeError("blocked a live api.tesserae.ink call during tests; mock the transport")
+    return _REAL_URLOPEN(req, *args, **kwargs)
 
-    ``test_firmware_check.py`` and ``test_online.py`` exercise the real fetch /
-    egress paths against a mocked transport, so they opt out of the relevant
-    stubs and drive the network layer themselves.
-    """
-    base = request.node.fspath.basename
-    with contextlib.ExitStack() as stack:
-        if base != "test_firmware_check.py":
-            stack.enter_context(patch("app.firmware_check._fetch", return_value=None))
-        if base != "test_online.py":
-            stack.enter_context(patch("app.online.report_widget_install", return_value=False))
-            stack.enter_context(patch("app.online.widget_install_counts", return_value={}))
-            stack.enter_context(patch("app.online.send_heartbeat", return_value=False))
-        yield
+
+@pytest.fixture(autouse=True)
+def _block_live_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse live api.tesserae.ink traffic for every test (see module docstring)."""
+    monkeypatch.setattr(urllib.request, "urlopen", _guarded_urlopen)
