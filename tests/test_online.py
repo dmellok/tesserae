@@ -45,6 +45,26 @@ def test_online_enabled_none_store() -> None:
     assert online.online_enabled(None) is False
 
 
+def test_online_enabled_false_in_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Precise dev/CI markers never phone home, even with the switch on.
+    for var, val in (
+        ("GITHUB_ACTIONS", "true"),
+        ("CODESPACES", "true"),
+        ("GITPOD_WORKSPACE_ID", "ws-1"),
+    ):
+        monkeypatch.setenv(var, val)
+        assert online.online_enabled(_Store({})) is False
+        assert online.online_enabled(_Store({"online_features": True})) is False
+        monkeypatch.delenv(var, raising=False)
+
+
+def test_online_enabled_not_blocked_by_generic_ci(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A real install that happens to carry CI=true (leaked from a pipeline or a
+    # base image) must still be able to phone home; only precise markers gate.
+    monkeypatch.setenv("CI", "true")
+    assert online.online_enabled(_Store({})) is True
+
+
 class _FakeResp:
     def __init__(self, status: int, body: bytes = b"") -> None:
         self.status = status

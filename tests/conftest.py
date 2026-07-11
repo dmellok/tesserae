@@ -59,6 +59,16 @@ def _guarded_urlopen(req: Any, *args: Any, **kwargs: Any) -> Any:
     return _REAL_URLOPEN(req, *args, **kwargs)
 
 
+@pytest.fixture(autouse=True)
+def _clear_ephemeral_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Drop the ephemeral-env markers for each test so ``online.online_enabled``
+    logic is exercised as if on a normal install. In CI ``GITHUB_ACTIONS`` is
+    set, which would otherwise force online_enabled False everywhere. Tests that
+    want the ephemeral behaviour set a marker back with ``monkeypatch.setenv``."""
+    for var in ("GITHUB_ACTIONS", "CODESPACES", "GITPOD_WORKSPACE_ID"):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _block_live_api() -> Any:
     """Refuse live api.tesserae.ink traffic for the whole session.

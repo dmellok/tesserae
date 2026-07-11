@@ -10,7 +10,9 @@ low-cardinality facts about the install.
 This is controlled by one master switch, **Settings → System → Online
 features**. Turn it off and Tesserae never contacts `api.tesserae.ink`;
 the update indicators and install counts simply disappear. Nothing else
-in the app phones home.
+in the app phones home. Tesserae also never contacts the endpoint from a
+build or dev environment it can positively identify (GitHub Actions,
+Codespaces, or Gitpod), since those are not real installs.
 
 What a request may include: your install's random ID, the widget id, and
 your running version. A coarse country is derived from your IP address

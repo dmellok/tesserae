@@ -41,14 +41,35 @@ def _coerce_bool(raw: Any, *, default: bool) -> bool:
     return default
 
 
+def _ephemeral_environment() -> bool:
+    """True in a build/dev/CI environment that boots the app but isn't a real
+    install: our CI, GitHub Codespaces, or Gitpod. We never phone home from
+    these so they don't pollute the aggregate stats.
+
+    Only *precise*, provider-injected markers are used. The generic ``CI`` var
+    is deliberately NOT checked: a real deployment can carry it (leaked from a
+    CI/CD pipeline or a base image), and gating on it would silently drop
+    legitimate installs. ``GITHUB_ACTIONS`` / ``CODESPACES`` are set only by
+    GitHub's runners / Codespaces, and ``GITPOD_WORKSPACE_ID`` only inside
+    Gitpod, so none of them appear on a Docker / HA add-on / pip / LXC / bare
+    install."""
+    if _coerce_bool(os.environ.get("GITHUB_ACTIONS"), default=False):
+        return True
+    if _coerce_bool(os.environ.get("CODESPACES"), default=False):
+        return True
+    return bool(os.environ.get("GITPOD_WORKSPACE_ID"))
+
+
 def online_enabled(settings_store: Any) -> bool:
     """Master opt-out. ``settings.app.online_features`` defaults to True.
 
-    Honours an explicit legacy ``check_firmware_updates = false`` as an opt-out,
-    so a user who deliberately disabled the old firmware lookup stays opted out
-    after the upgrade rather than being silently switched on.
+    Always False in an ephemeral CI / Codespaces / dev-container environment
+    (see :func:`_ephemeral_environment`). Otherwise honours an explicit legacy
+    ``check_firmware_updates = false`` as an opt-out, so a user who deliberately
+    disabled the old firmware lookup stays opted out after the upgrade rather
+    than being silently switched on.
     """
-    if settings_store is None:
+    if settings_store is None or _ephemeral_environment():
         return False
     try:
         section = settings_store.get_section("app") or {}
