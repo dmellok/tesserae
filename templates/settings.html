@@ -1015,7 +1015,7 @@ docker compose up -d</code></pre>
                      description="When on, Tesserae contacts api.tesserae.ink to check for app and device-firmware updates, to report an anonymous install count for the widgets you add from the marketplace, and to send a once-a-day heartbeat with low-cardinality facts about this install (version, OS family, CPU arch, Python minor, deployment kind, transport, a bucketed device count, and the device kinds you run). Each request may include your install's random ID and version. A coarse country is derived from your IP for aggregate geography and the IP is then discarded. No account, no personal data, no exact device counts, and no IP addresses or browser details are stored. Turn this off and Tesserae never contacts api.tesserae.ink.") %}
   <div class="section-body">
     <form method="post" action="{{ url_for('auth.settings_online_features_toggle') }}"
-          class="form form--inline">
+          class="form form--inline field--switch">
       <label class="switch">
         <input type="checkbox" name="online_features" value="1"
                {% if online_features_enabled %}checked{% endif %}
@@ -1030,7 +1030,7 @@ docker compose up -d</code></pre>
 </div>
 {% endif %}
 
-{# About: project meta, survey, and sponsor. Three flat cards; no
+{# About: project meta and the community/sponsor card. Flat cards; no
    nested forms, no manifest sections, no per-card dependencies.
    ``card_head``'s ``blurb`` slot only renders a click-to-pop ``(i)``
    popover next to the title (see the macro's docstring), so the
@@ -1081,17 +1081,6 @@ docker compose up -d</code></pre>
         </a>
       </li>
     </ul>
-  </section>
-
-  <section class="dx-section-card">
-    {{ card_head('Tell us how you use Tesserae', icon_name='clipboard-text') }}
-    <p class="lede">No phone-home means the only way to know how people actually use Tesserae is to ask. Six anonymous questions, every one optional, takes about two minutes.</p>
-    <div class="actions actions-end">
-      <a class="btn btn-primary" href="{{ about_survey_url }}" rel="noopener" target="_blank">
-        <i class="ph ph-arrow-square-out" aria-hidden="true"></i>
-        <span>Open the survey</span>
-      </a>
-    </div>
   </section>
 
 </div>

@@ -62,7 +62,7 @@ AREAS: tuple[tuple[str, str], ...] = (
 
 # Map area → section kinds that belong on that page. The "system" page
 # is hand-built (updates + backups), no manifest-driven sections.
-# Same for "about", which renders fixed cards (project meta, survey,
+# Same for "about", which renders fixed cards (project meta, community /
 # sponsor) and never iterates the manifest sections list.
 AREA_KINDS: dict[str, set[str]] = {
     "server": {"app", "panel", "broker"},

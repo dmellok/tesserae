@@ -59,6 +59,30 @@ def test_setup_sets_password_and_signs_in(app_with_gate: Flask, tmp_path: Path) 
     assert auth.verify_password(store, "hunter22z")
 
 
+def test_about_page_renders_without_survey(app_with_gate: Flask) -> None:
+    """The About tab renders (project meta + community/sponsor) and no longer
+    offers the usage survey."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/settings/about").get_data(as_text=True)
+    assert "Tesserae" in body and "AGPL-3.0-or-later" in body
+    assert "survey" not in body.lower()
+    assert "tally.so" not in body
+
+
+def test_online_features_switch_hides_native_checkbox(app_with_gate: Flask) -> None:
+    """The System-tab Online features toggle wraps its checkbox in a
+    ``field--switch`` so the raw checkbox is hidden and only the styled switch
+    shows."""
+    client = app_with_gate.test_client()
+    client.post("/setup", data={"password": "abcdefgh", "password_confirm": "abcdefgh"})
+    body = client.get("/settings/system").get_data(as_text=True)
+    assert 'name="online_features"' in body
+    # The form carries field--switch (which scopes the checkbox-hide CSS).
+    idx = body.index('name="online_features"')
+    assert "field--switch" in body[max(0, idx - 400) : idx]
+
+
 def test_setup_rejects_short_or_mismatched(app_with_gate: Flask) -> None:
     client = app_with_gate.test_client()
     short = client.post(

@@ -6,6 +6,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Removed the usage survey** from Settings → About. The aggregate heartbeat
+  now covers the "how is Tesserae used" question the survey stood in for.
+
+### Fixed
+
+- **Online features toggle showed a raw checkbox** beside the styled switch.
+  The form now carries `field--switch`, which scopes the checkbox-hide CSS, so
+  only the switch renders.
+
 ### Added
 
 - **Online features (one-switch opt-out).** Tesserae now reports an
