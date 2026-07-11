@@ -159,7 +159,7 @@
 .dx-source-webhook,
 .dx-source-ha {
   background: color-mix(in oklab, #a35a2c 16%, var(--t-surface));
-  color: #a35a2c;
+  color: var(--t-warn);
 }
 .dx-source-resend,
 .dx-source-manual,

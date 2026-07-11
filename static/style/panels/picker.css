@@ -1,7 +1,7 @@
 
 /* widget picker modal */
 .wp-scrim{position:fixed;inset:0;z-index:2000;background:rgba(16,12,8,.5);display:grid;place-items:center;padding:32px;animation:wpf .12s ease-out}
-.ed.dark .wp-scrim{background:rgba(0,0,0,.62)}
+:root[data-theme="dark"] .wp-scrim{background:rgba(0,0,0,.62)}
 @keyframes wpf{from{opacity:0}to{opacity:1}}
 .wp-card{width:min(680px,100%);max-height:min(600px,90vh);background:var(--t-surface);border:1px solid var(--t-border);border-radius:16px;box-shadow:var(--t-shadow-lg);display:flex;flex-direction:column;overflow:hidden;animation:wpp .16s cubic-bezier(.16,1,.3,1)}
 @keyframes wpp{from{transform:translateY(8px) scale(.99);opacity:.6}to{transform:none;opacity:1}}

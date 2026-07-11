@@ -1619,6 +1619,26 @@
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "save failed"; });
   }
 
+  // ---- dark-mode toggle (mirrors the admin shell in _base.html) --------
+  function initThemeToggle() {
+    var btn = $("panels-theme");
+    if (!btn) return;
+    function sync() {
+      var dark = document.documentElement.getAttribute("data-theme") === "dark";
+      btn.innerHTML = dark ? '<i class="ph-bold ph-sun"></i>' : '<i class="ph-bold ph-moon"></i>';
+      btn.classList.toggle("on", dark);
+      btn.title = dark ? "Switch to light mode" : "Toggle dark mode";
+    }
+    btn.addEventListener("click", function () {
+      var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      if (next === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      else document.documentElement.removeAttribute("data-theme");
+      try { localStorage.setItem("tesserae-theme", next); } catch (e) { /* ignore */ }
+      sync();
+    });
+    sync();
+  }
+
   // ---- per-element config drawer ---------------------------------------
   function openConfig(eid) {
     var e = byId(eid);
@@ -1971,6 +1991,7 @@
     if (previewBtn) previewBtn.addEventListener("click", openPreview);
     var saveBtn = $("panels-save-btn");
     if (saveBtn) saveBtn.addEventListener("click", saveNow);
+    initThemeToggle();
     var canvasBtn = $("panels-canvas-menu");
     if (canvasBtn) canvasBtn.addEventListener("click", function (ev) {
       ev.stopPropagation(); toggleCanvasMenu(canvasBtn);

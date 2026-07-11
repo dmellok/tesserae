@@ -93,13 +93,13 @@
 .dx-filter-chip[class*="dx-filter-chip--"].is-active {
   background: var(--evt-fg, var(--t-accent));
   border-color: var(--evt-fg, var(--t-accent));
-  color: #fff;
+  color: var(--t-accent-fg);
 }
 .dx-filter-chip[class*="dx-filter-chip--"].is-active > .ph,
-.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: #fff; }
+.dx-filter-chip[class*="dx-filter-chip--"].is-active > span { color: var(--t-accent-fg); }
 .dx-filter-chip[class*="dx-filter-chip--"].is-active .dx-count-pill {
   background: rgba(255, 255, 255, 0.22);
-  color: #fff;
+  color: var(--t-accent-fg);
 }
 
 .dx-event-body {

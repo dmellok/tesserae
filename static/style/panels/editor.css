@@ -3,6 +3,9 @@
 .appfill{width:100vw;height:100vh}
 .ed select.psel{appearance:none;-webkit-appearance:none;border:1px solid var(--t-border);border-radius:8px;background:var(--t-surface);color:var(--t-fg);font:600 12px var(--t-font);padding:6px 26px 6px 10px;cursor:pointer;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371706c' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 8px center}
+/* SVG data URIs can't read CSS custom properties, so the caret needs an
+   explicit lighter stroke in dark mode to stay legible on the dark select. */
+:root[data-theme="dark"] .ed select.psel{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b6bcc7' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>")}
 .ed select.psel:focus{outline:none;border-color:var(--t-accent);box-shadow:0 0 0 3px color-mix(in oklab,var(--t-accent) 22%,transparent)}
 
 /* workspace */
@@ -65,7 +68,7 @@
 .ed.dark .minibtn.accent{color:var(--t-accent)}
 
 /* ---- legibility warning ---- */
-.el-warn{position:absolute;left:2px;bottom:2px;z-index:22;display:inline-flex;align-items:center;gap:4px;font:700 9px var(--t-font);text-transform:uppercase;letter-spacing:.04em;color:#7a2e12;background:#f6d5c4;border:1px solid #e0a884;border-radius:5px;padding:1px 5px;pointer-events:none}
+.el-warn{position:absolute;left:2px;bottom:2px;z-index:22;display:inline-flex;align-items:center;gap:4px;font:700 9px var(--t-font);text-transform:uppercase;letter-spacing:.04em;color:var(--t-warn);background:var(--t-warn-bg);border:1px solid var(--t-warn-bd);border-radius:5px;padding:1px 5px;pointer-events:none}
 .el-warn i{font-size:11px}
 
 /* ---- zoom + pan ---- */

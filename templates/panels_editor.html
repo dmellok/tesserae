@@ -5,6 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Panels, Tesserae (experimental)</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='brand/icon.svg') }}">
+  {# Follow the admin shell's persisted light/dark choice. This standalone
+     page doesn't extend _base.html, so it carries its own copy of the
+     pre-paint theme bootstrap: set data-theme before the stylesheets load
+     so there's no light flash in dark mode. Kept in sync with _base.html. #}
+  <style>
+    html { background: #f1f0ec; color-scheme: light; }
+    html[data-theme="dark"] { background: #0e1015; color-scheme: dark; }
+  </style>
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem('tesserae-theme') === 'dark')
+          document.documentElement.setAttribute('data-theme', 'dark');
+      } catch (e) { /* localStorage unavailable */ }
+    })();
+  </script>
   {# Tokens + fonts baseline (Inter / JetBrains Mono / --t-* palette). The
      ported panels stylesheets layer their editor chrome on top; they only
      load on this standalone full-window page, so any token they restate is
@@ -115,6 +131,7 @@
       <div class="tbtn on" title="Snap to grid and guides"><i class="ph-bold ph-magnet"></i></div>
       <div class="tbtn" id="panels-sim" title="Simulate e-ink"><i class="ph-bold ph-eye"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
+      <div class="tbtn" id="panels-theme" title="Toggle dark mode"><i class="ph-bold ph-moon"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
         <div class="pbtn" id="panels-save-btn" title="Save now (Cmd/Ctrl+S)"><i class="ph-bold ph-floppy-disk"></i>Save</div>
         <div class="tdiv"></div>

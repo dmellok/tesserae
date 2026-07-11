@@ -540,7 +540,7 @@
 .page-head h1 .ph { font-size: 0.85em; color: var(--t-accent); }
 
 .lede {
-  color: #7a7a74;
+  color: var(--t-muted);
   margin: 0 0 var(--t-space-2);
   font-size: 13.5px;
   line-height: 1.55;

@@ -82,6 +82,6 @@
   color: var(--t-pill-neutral-fg, #56564f);
 }
 .dx-mkt-chip.is-active .dx-mkt-chip-count {
-  background: #fff;
+  background: var(--t-surface);
   color: var(--t-accent, #15846a);
 }

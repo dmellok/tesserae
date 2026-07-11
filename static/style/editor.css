@@ -328,7 +328,7 @@
 .header-action .ph,
 .header-action [class*="ph-"] {
   font-size: 18px;
-  color: #fff !important;
+  color: var(--t-accent-fg) !important;
   font-weight: bold;
 }
 .header-action:hover {

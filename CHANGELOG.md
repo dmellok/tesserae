@@ -8,6 +8,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Dark mode in the canvas editor.** The freeform canvas editor, a standalone
+  page that doesn't extend the admin shell, now follows the shell's persisted
+  light/dark choice (applied before paint, so no flash) and carries its own
+  toolbar toggle. Its overlays (the experimental disclaimer and small-screen
+  block-out) go dark with it.
+
 - **Canvas editor guardrails.** The freeform canvas editor gains an explicit
   Save button (also Cmd/Ctrl+S) and a back-to-dashboards link in its toolbar,
   a first-open notice that the editor is experimental with a link to file bug
@@ -20,6 +26,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   now covers the "how is Tesserae used" question the survey stood in for.
 
 ### Fixed
+
+- **Dark-mode gaps across the admin UI.** Swept hardcoded light colours onto
+  the shared token palette so they adapt in dark mode: the Devices card palette
+  (previously light in both themes), Settings chips / segmented controls /
+  hint and warning bands, and page ledes. The always-dark save bar keeps light
+  text in both themes.
+
+- **Create-dashboard button sat low.** The button on the Dashboards create row
+  now centres with the name field and layout picker instead of hugging the
+  bottom edge.
 
 - **First-run consent step could be skipped.** The online-features opt-in ran
   after the dashboard step, whose Edit and freeform actions hand off to the

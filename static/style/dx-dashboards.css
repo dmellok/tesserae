@@ -10,6 +10,10 @@
  * ============================================================ */
 
 .dx-dashboard-create {
+  /* Centre the controls: this row has no field labels, so the shorter
+     Create button would otherwise inherit .dx-pair-row's flex-end and
+     hug the bottom of the taller input/select, reading as sitting low. */
+  align-items: center;
   padding-bottom: 14px;
   margin-bottom: 10px;
   border-bottom: 1px solid var(--t-border, #ecebe5);
