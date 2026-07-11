@@ -206,6 +206,14 @@ externally" reload prompt instead.
 
 ---
 
+## What an agent can place
+
+A canvas element is one of: a **widget** (or a fragment of one), a **decoration**
+(text, rectangle, ellipse, line, icon), a **data primitive** (a widget data field
+shown as a scalable number / text / line / bar / sparkline), or a **custom HTML**
+block (static HTML + CSS in a sandboxed iframe). Elements may sit partly off the
+panel edge. The exact JSON shape for each is in the `set_canvas` tool description.
+
 ## Guardrails
 
 - The API **404s** entirely while the `mcp` experiment is off.

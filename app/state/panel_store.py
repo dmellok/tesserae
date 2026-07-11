@@ -51,8 +51,9 @@ class Element(BaseModel):
     """
 
     id: str
-    # What this element is: a placed widget, or a static decoration shape.
-    kind: str = "widget"  # widget | rect | ellipse | line | icon
+    # What this element is: a placed widget, a decoration shape, a data-bound
+    # primitive, or a custom-HTML block.
+    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -74,16 +75,36 @@ class Element(BaseModel):
     # Phosphor icon weight for kind == "icon": thin|light|regular|bold|fill|duotone.
     weight: str = "bold"
     # Text-element (kind == "text") content, horizontal alignment, and font
-    # size in px (0 = auto-size from the box height).
+    # size in px (0 = auto-size from the box height). ``text``/``align``/``size``
+    # are shared by the ``data`` kind below.
     text: str = ""
     align: str = "left"
     size: int = Field(default=0, ge=0)
+    # Data primitive (kind == "data"): binds a widget's data field to a scalable
+    # text / number / graph. ``source`` is the widget id whose fetch() supplies
+    # the data (its config lives in ``options``); ``field`` is a dotted path into
+    # that data (e.g. "current.temp" or "hourly.temps"); ``display`` is one of
+    # text | number | line | bar | sparkline; ``unit`` is a suffix, ``precision``
+    # the decimals for numbers, ``label`` an optional caption.
+    source: str = ""
+    field: str = ""
+    display: str = "text"
+    unit: str = ""
+    precision: int = Field(default=0, ge=0)
+    label: str = ""
+    # Custom HTML element (kind == "html"): agent- or user-authored markup that
+    # renders in a sandboxed iframe (no scripts, no network). ``css`` is injected
+    # into the iframe's <style>.
+    html: str = ""
+    css: str = ""
     # Element opacity 0-100 (applies to widgets and decorations alike).
     opacity: int = Field(default=100, ge=0, le=100)
     # Rotation in degrees, applied to the whole element around its centre.
     rotate: int = 0
-    x: int = Field(default=0, ge=0)
-    y: int = Field(default=0, ge=0)
+    # Position may be negative / past the panel so an element can sit partly
+    # off-canvas; the artboard clips at the panel edge. Size stays positive.
+    x: int = 0
+    y: int = 0
     w: int = Field(default=1, gt=0)
     h: int = Field(default=1, gt=0)
     # Per-sub-element scale overrides for a widget fragment (widget-only): each

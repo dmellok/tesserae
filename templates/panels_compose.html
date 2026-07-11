@@ -82,9 +82,13 @@
   </div>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script>
-    // Draw the static decorations (shapes / lines / icons) into their boxes.
+    // Draw decorations, data primitives (with their fetched data) and custom
+    // HTML into their boxes, the same renderer the editor uses.
     document.querySelectorAll(".deco").forEach(function (d) {
-      try { d.appendChild(window.PanelsDecorate.render(JSON.parse(d.dataset.el))); } catch (e) { /* skip */ }
+      try {
+        var el = JSON.parse(d.dataset.el);
+        d.appendChild(window.PanelsDecorate.render(el, el.data));
+      } catch (e) { /* skip */ }
     });
   </script>
   <script type="module" src="{{ url_for('static', filename='composer.js') }}"></script>

@@ -647,6 +647,44 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
     for e in els:
         if e.visible is False:
             continue
+        if e.kind == "data":
+            # Data primitive: fetch its source widget's data (sample fallback),
+            # same path a widget uses, so the field resolves at render time.
+            opts = _resolved_options(e.source, e.options) if e.source else {}
+            ddata: Any = None
+            if e.source:
+                try:
+                    ddata = _fetch_plugin_data(
+                        e.source, opts, cw, ch, preview=False, cell_w=e.w, cell_h=e.h
+                    )
+                except Exception:
+                    ddata = None
+                if not isinstance(ddata, dict) or ddata.get("error"):
+                    sample = get_sample(e.source)
+                    ddata = sample if isinstance(sample, dict) else ddata
+            els_out.append(
+                {
+                    "id": e.id,
+                    "kind": "data",
+                    "source": e.source,
+                    "field": e.field,
+                    "display": e.display,
+                    "unit": e.unit,
+                    "precision": e.precision,
+                    "label": e.label,
+                    "color": e.color,
+                    "align": e.align,
+                    "size": e.size,
+                    "opacity": e.opacity,
+                    "rotate": e.rotate,
+                    "x": e.x,
+                    "y": e.y,
+                    "w": e.w,
+                    "h": e.h,
+                    "data": ddata,
+                }
+            )
+            continue
         if e.kind and e.kind != "widget":
             els_out.append(
                 {
@@ -661,6 +699,8 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "text": e.text,
                     "align": e.align,
                     "size": e.size,
+                    "html": e.html,
+                    "css": e.css,
                     "opacity": e.opacity,
                     "rotate": e.rotate,
                     "x": e.x,

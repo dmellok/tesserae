@@ -8,6 +8,23 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Canvas editor: data primitives.** A new element that binds any widget's data
+  field (by dotted path) to a scalable text, number, or graph (line / bar /
+  sparkline via Chart.js). Pick a source widget, configure it, choose a field
+  from the introspected data, and style it. Renders identically in the editor
+  and the pushed frame.
+
+- **Canvas editor: custom HTML element.** Author a "mini widget" from HTML + CSS,
+  rendered in a sandboxed iframe (no scripts, no network). Set it in the editor
+  or over MCP.
+
+- **Canvas editor: partially off-canvas elements.** Elements may sit past the
+  panel edge (they clip cleanly at render), keeping a sliver on-canvas so they
+  stay grabbable.
+
+- **Canvas editor: Shift to keep aspect ratio.** Hold Shift while dragging a
+  corner handle to resize proportionally.
+
 - **Live canvas updates in the editor.** The freeform canvas editor now reflects
   external saves without a reload, so you can watch an MCP agent build a
   dashboard in real time. It follows changes silently while you're not editing;

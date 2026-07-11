@@ -34,6 +34,8 @@
     { kind: "ellipse", label: "Circle", icon: "ph-circle", w: 100, h: 100 },
     { kind: "line", label: "Line", icon: "ph-minus", w: 180, h: 16 },
     { kind: "icon", label: "Icon", icon: "ph-star", w: 72, h: 72 },
+    { kind: "data", label: "Data value", icon: "ph-chart-line", w: 160, h: 80 },
+    { kind: "html", label: "Custom HTML", icon: "ph-code", w: 200, h: 120 },
   ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
   // alongside a native colour picker.
@@ -52,6 +54,11 @@
   }
   function snap(v) { return Math.round(v / GRID) * GRID; }
   function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  // Elements may sit partly off the panel (the artboard clips), but must keep at
+  // least this many px on-canvas so they stay grabbable / findable.
+  var MIN_ONSCREEN = 24;
+  function clampX(x, w) { return clamp(x, MIN_ONSCREEN - w, S.doc.w - MIN_ONSCREEN); }
+  function clampY(y, h) { return clamp(y, MIN_ONSCREEN - h, S.doc.h - MIN_ONSCREEN); }
   function uid() {
     return "el_" + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-3);
   }
@@ -172,13 +179,18 @@
     };
   }
   function makeDecoration(kind, x, y, w, h) {
-    var solidInk = kind === "line" || kind === "icon" || kind === "text";
+    var solidInk = kind === "line" || kind === "icon" || kind === "text" || kind === "data";
     return {
       id: uid(), kind: kind, widget: "", fragment: "full", options: {},
       color: solidInk ? "var(--text-primary)" : "var(--accent-1)",
       fill: true, stroke: kind === "line" ? 3 : 2, radius: kind === "rect" ? 8 : 0,
       icon: kind === "icon" ? "star" : "", weight: "bold",
       text: kind === "text" ? "Text" : "", align: "left", size: 0, opacity: 100,
+      // data primitive
+      source: "", field: "", display: "text", unit: "", precision: 0, label: "",
+      // custom html
+      html: kind === "html" ? '<div class="mini">Edit me</div>' : "",
+      css: kind === "html" ? ".mini{font:700 18px sans-serif;color:#1B1A16}" : "",
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -188,12 +200,15 @@
     return e.widget + "|" + (e.fragment || "full") + "|" + e.w + "x" + e.h + "|" +
       JSON.stringify(e.options || {});
   }
-  // Live data is fetched per (widget, options); fragment/size don't change it.
-  function dataKey(e) { return e.widget + "|" + JSON.stringify(e.options || {}); }
+  // The widget a data value comes from: its own source for a data primitive,
+  // else the element's widget.
+  function sourceOf(e) { return e.kind === "data" ? e.source : e.widget; }
+  // Live data is fetched per (source, options); fragment/size don't change it.
+  function dataKey(e) { return sourceOf(e) + "|" + JSON.stringify(e.options || {}); }
   function dataFor(e) {
     var k = dataKey(e);
     if (k in S.data) return S.data[k]; // fetched live value (may be null)
-    var w = widgetFor(e.widget);
+    var w = widgetFor(sourceOf(e));
     return (w && w.sample) || null; // instant placeholder until live arrives
   }
   function ctxFor(e) {
@@ -218,10 +233,11 @@
     if (!S.cfg.dataUrl) return;
     var want = {};
     S.doc.els.forEach(function (e) {
-      if (!e.widget) return;
+      var src = sourceOf(e); // widget id, or a data primitive's source
+      if (!src) return;
       var k = dataKey(e);
       if (k in S.data || S.dataPending[k]) return;
-      want[k] = { widget: e.widget, options: e.options || {}, w: e.w, h: e.h };
+      want[k] = { widget: src, options: e.options || {}, w: e.w, h: e.h };
     });
     Object.keys(want).forEach(function (k) {
       var req = want[k];
@@ -240,7 +256,9 @@
           // with the live data.
           var hit = false;
           S.doc.els.forEach(function (e) {
-            if (e.widget && dataKey(e) === k && S.mount[e.id]) { delete S.mount[e.id]; hit = true; }
+            if (!sourceOf(e) || dataKey(e) !== k) return;
+            if (e.kind === "data") { hit = true; return; } // data primitives repaint from S.data
+            if (S.mount[e.id]) { delete S.mount[e.id]; hit = true; }
           });
           if (hit) paint();
         });
@@ -392,9 +410,12 @@
       (e.rotate ? "transform:rotate(" + e.rotate + "deg);" : "");
 
     if (!isWidget(e)) {
-      // Static decoration: render fresh (cheap), pointer-transparent so clicks
-      // hit the element wrapper.
-      var deco = window.PanelsDecorate ? PanelsDecorate.render(e) : el("div");
+      // Static decoration / data primitive / custom HTML: render fresh (cheap),
+      // pointer-transparent so clicks hit the element wrapper. Data primitives
+      // get the live source data so the field resolves.
+      var deco = window.PanelsDecorate
+        ? PanelsDecorate.render(e, e.kind === "data" ? dataFor(e) : null)
+        : el("div");
       deco.style.pointerEvents = "none";
       node.appendChild(deco);
     } else {
@@ -551,8 +572,8 @@
     list.forEach(function (src) {
       var d = clone(src);
       d.id = uid();
-      d.x = clamp(d.x + 14, 0, S.doc.w - d.w);
-      d.y = clamp(d.y + 14, 0, S.doc.h - d.h);
+      d.x = clampX(d.x + 14, d.w);
+      d.y = clampY(d.y + 14, d.h);
       if (d.group) { if (!gmap[d.group]) gmap[d.group] = "g_" + uid(); d.group = gmap[d.group]; }
       S.doc.els.push(d);
       ids.push(d.id);
@@ -595,7 +616,10 @@
       minX = Math.min(minX, m.ox); maxX = Math.max(maxX, m.ox + m.e.w);
       minY = Math.min(minY, m.oy); maxY = Math.max(maxY, m.oy + m.e.h);
     });
-    return { dx: clamp(dx, -minX, S.doc.w - maxX), dy: clamp(dy, -minY, S.doc.h - maxY) };
+    return {
+      dx: clamp(dx, MIN_ONSCREEN - maxX, S.doc.w - MIN_ONSCREEN - minX),
+      dy: clamp(dy, MIN_ONSCREEN - maxY, S.doc.h - MIN_ONSCREEN - minY),
+    };
   }
   function nudge(dx, dy) {
     var els = selEls().filter(function (e) { return !e.locked; });
@@ -676,16 +700,25 @@
         dx = ldx; dy = ldy;
       }
       changed = true;
-      var nx = o.x, ny = o.y, nw = o.w, nh = o.h;
-      if (dir.indexOf("l") >= 0) { nw = Math.max(MIN, o.w - dx); nx = o.x + o.w - nw; }
-      if (dir.indexOf("r") >= 0) { nw = Math.max(MIN, o.w + dx); }
-      if (dir.indexOf("t") >= 0) { nh = Math.max(MIN, o.h - dy); ny = o.y + o.h - nh; }
-      if (dir.indexOf("b") >= 0) { nh = Math.max(MIN, o.h + dy); }
-      nx = clamp(snap(nx), 0, S.doc.w - MIN);
-      ny = clamp(snap(ny), 0, S.doc.h - MIN);
-      nw = clamp(snap(nw), MIN, S.doc.w - nx);
-      nh = clamp(snap(nh), MIN, S.doc.h - ny);
-      e.x = nx; e.y = ny; e.w = nw; e.h = nh;
+      var nw = o.w, nh = o.h;
+      if (dir.indexOf("l") >= 0) nw = Math.max(MIN, o.w - dx);
+      if (dir.indexOf("r") >= 0) nw = Math.max(MIN, o.w + dx);
+      if (dir.indexOf("t") >= 0) nh = Math.max(MIN, o.h - dy);
+      if (dir.indexOf("b") >= 0) nh = Math.max(MIN, o.h + dy);
+      // Shift on a corner handle (dir length 2: tl/tr/bl/br) locks the aspect
+      // ratio: drive the smaller change from the larger so o.w/o.h holds.
+      if (m.shiftKey && dir.length === 2 && o.h) {
+        var ar = o.w / o.h;
+        if (Math.abs(nw - o.w) >= Math.abs(nh - o.h)) nh = Math.max(MIN, Math.round(nw / ar));
+        else nw = Math.max(MIN, Math.round(nh * ar));
+      }
+      nw = Math.max(MIN, snap(nw)); nh = Math.max(MIN, snap(nh));
+      // Left / top handles anchor the far edge; no [0, canvas] clamp so an
+      // element can be resized partly off the panel (the artboard clips).
+      var nx = o.x, ny = o.y;
+      if (dir.indexOf("l") >= 0) nx = o.x + o.w - nw;
+      if (dir.indexOf("t") >= 0) ny = o.y + o.h - nh;
+      e.x = snap(nx); e.y = snap(ny); e.w = nw; e.h = nh;
       node.style.left = nx + "px"; node.style.top = ny + "px";
       node.style.width = nw + "px"; node.style.height = nh + "px";
     }
@@ -841,8 +874,8 @@
       var cx = (m.clientX - r.left) / z, cy = (m.clientY - r.top) / z;
       if (cx < 0 || cy < 0 || cx > S.doc.w || cy > S.doc.h) return null;
       return {
-        x: clamp(snap(cx - item.w / 2), 0, S.doc.w - item.w),
-        y: clamp(snap(cy - item.h / 2), 0, S.doc.h - item.h),
+        x: clampX(snap(cx - item.w / 2), item.w),
+        y: clampY(snap(cy - item.h / 2), item.h),
       };
     }
     function move(m) {
@@ -1085,8 +1118,8 @@
       else if (kind === "top") e.y = minY;
       else if (kind === "bottom") e.y = maxY - e.h;
       else if (kind === "vcenter") e.y = Math.round(cy - e.h / 2);
-      e.x = clamp(e.x, 0, S.doc.w - e.w);
-      e.y = clamp(e.y, 0, S.doc.h - e.h);
+      e.x = clampX(e.x, e.w);
+      e.y = clampY(e.y, e.h);
     });
     scheduleSave(); paint();
   }
@@ -1116,7 +1149,7 @@
     els.forEach(function (e) {
       e[dim] = v;
       e.w = clamp(e.w, MIN, S.doc.w); e.h = clamp(e.h, MIN, S.doc.h);
-      e.x = clamp(e.x, 0, S.doc.w - e.w); e.y = clamp(e.y, 0, S.doc.h - e.h);
+      e.x = clampX(e.x, e.w); e.y = clampY(e.y, e.h);
     });
     scheduleSave(); paint();
   }
@@ -1283,7 +1316,7 @@
     pushHistory();
     for (var k in patch) e[k] = patch[k];
     e.w = clamp(e.w, MIN, S.doc.w); e.h = clamp(e.h, MIN, S.doc.h);
-    e.x = clamp(e.x, 0, S.doc.w - e.w); e.y = clamp(e.y, 0, S.doc.h - e.h);
+    e.x = clampX(e.x, e.w); e.y = clampY(e.y, e.h);
     scheduleSave(); paint();
   }
   function arrangeGeom(mount, e) {
@@ -1399,8 +1432,119 @@
     row.appendChild(wrap);
     return row;
   }
+  // Flatten a data object into selectable dotted paths, tagging scalars vs
+  // number-arrays so the field picker can hint what's chartable.
+  function leafPaths(obj, prefix, out, depth) {
+    out = out || []; depth = depth || 0;
+    if (obj == null || depth > 4 || out.length > 200) return out;
+    if (Array.isArray(obj)) {
+      if (obj.some(function (v) { return typeof v === "number"; })) out.push({ path: prefix, kind: "array" });
+      if (obj.length && obj[0] && typeof obj[0] === "object") leafPaths(obj[0], prefix + ".0", out, depth + 1);
+      return out;
+    }
+    if (typeof obj === "object") {
+      Object.keys(obj).forEach(function (k) { leafPaths(obj[k], prefix ? prefix + "." + k : k, out, depth + 1); });
+      return out;
+    }
+    if (prefix) out.push({ path: prefix, kind: typeof obj === "number" ? "number" : "scalar" });
+    return out;
+  }
+
+  function renderHtmlProps(mount, e) {
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-code"></i>Custom HTML'));
+    mount.appendChild(el("div", "note", "Renders in a sandboxed iframe: HTML + CSS only, no scripts or network."));
+    [["HTML", "html", 6], ["CSS", "css", 5]].forEach(function (f) {
+      var row = el("div", "prow"); row.style.display = "block";
+      row.innerHTML = '<span class="plab" style="display:block;margin-bottom:4px">' + f[0] + "</span>";
+      var ta = el("textarea", "dinput");
+      ta.rows = f[2]; ta.value = e[f[1]] || "";
+      ta.style.cssText = "width:100%;font-family:var(--t-font-mono);font-size:12px;resize:vertical";
+      ta.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      ta.addEventListener("change", function () { pushHistory(); e[f[1]] = ta.value; scheduleSave(); paint(); });
+      row.appendChild(ta); mount.appendChild(row);
+    });
+    arrangeGeom(mount, e);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
+    propRowBtns(mount, e);
+  }
+
+  function renderDataProps(mount, e) {
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-database"></i>Data source'));
+    var srow = el("div", "prow"); srow.innerHTML = '<span class="plab">Widget</span>';
+    var ssel = el("select", "psel");
+    ssel.innerHTML = '<option value="">Choose…</option>' + (S.catalog || []).map(function (w) {
+      return '<option value="' + esc(w.key) + '">' + esc(w.name || w.key) + "</option>";
+    }).join("");
+    ssel.value = e.source || "";
+    ssel.addEventListener("change", function () {
+      pushHistory(); e.source = ssel.value; e.options = {}; e.field = "";
+      scheduleSave(); paint(); renderProps();
+    });
+    srow.appendChild(ssel); mount.appendChild(srow);
+
+    if (e.source) {
+      var crow = el("div", "prow"); crow.innerHTML = '<span class="plab">Options</span>';
+      var cbtn = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Configure');
+      cbtn.addEventListener("click", function () { openConfig(e.id); });
+      crow.appendChild(cbtn); mount.appendChild(crow);
+
+      var paths = leafPaths(dataFor(e), "", [], 0);
+      var frow = el("div", "prow"); frow.innerHTML = '<span class="plab">Field</span>';
+      var fsel = el("select", "psel");
+      var opts = '<option value="">Choose…</option>' + paths.slice(0, 120).map(function (p) {
+        return '<option value="' + esc(p.path) + '">' + esc(p.path) + (p.kind === "array" ? " []" : "") + "</option>";
+      }).join("");
+      if (e.field && paths.every(function (p) { return p.path !== e.field; })) {
+        opts += '<option value="' + esc(e.field) + '">' + esc(e.field) + "</option>";
+      }
+      fsel.innerHTML = opts; fsel.value = e.field || "";
+      fsel.addEventListener("change", function () { pushHistory(); e.field = fsel.value; scheduleSave(); paint(); });
+      frow.appendChild(fsel); mount.appendChild(frow);
+    }
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-chart-line"></i>Display'));
+    var drow = el("div", "prow"); drow.innerHTML = '<span class="plab">As</span>';
+    var dsel = el("select", "psel");
+    dsel.innerHTML = ["text", "number", "line", "bar", "sparkline"]
+      .map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+    dsel.value = e.display || "text";
+    dsel.addEventListener("change", function () { pushHistory(); e.display = dsel.value; scheduleSave(); paint(); renderProps(); });
+    drow.appendChild(dsel); mount.appendChild(drow);
+
+    var isChart = e.display === "line" || e.display === "bar" || e.display === "sparkline";
+    if (!isChart) {
+      var textInput = function (label, prop) {
+        var row = el("div", "prow"); row.innerHTML = '<span class="plab">' + label + "</span>";
+        var inp = el("input", "dinput"); inp.value = e[prop] || ""; inp.style.width = "100%";
+        inp.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+        inp.addEventListener("change", function () { pushHistory(); e[prop] = inp.value; scheduleSave(); paint(); });
+        row.appendChild(inp); mount.appendChild(row);
+      };
+      textInput("Unit", "unit");
+      if (e.display === "number") mount.appendChild(decoSlider(e, "Decimals", "precision", 0, 4));
+      textInput("Label", "label");
+      mount.appendChild(decoSlider(e, "Font size", "size", 0, 200));
+      var arow = el("div", "prow"); arow.innerHTML = '<span class="plab">Align</span>';
+      var asel = el("select", "psel");
+      asel.innerHTML = ["left", "center", "right"].map(function (x) { return '<option value="' + x + '">' + x + "</option>"; }).join("");
+      asel.value = e.align || "left";
+      asel.addEventListener("change", function () { pushHistory(); e.align = asel.value; scheduleSave(); paint(); });
+      arow.appendChild(asel); mount.appendChild(arow);
+    }
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-palette"></i>Colour'));
+    mount.appendChild(colorControl(e));
+    arrangeGeom(mount, e);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
+    propRowBtns(mount, e);
+  }
+
   function renderDecoProps(mount, e) {
     mount.textContent = "";
+    if (e.kind === "html") { renderHtmlProps(mount, e); return; }
+    if (e.kind === "data") { renderDataProps(mount, e); return; }
     var name = { text: "Text", rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-shapes"></i>' + name));
 
@@ -1724,18 +1868,19 @@
   // ---- per-element config drawer ---------------------------------------
   function openConfig(eid) {
     var e = byId(eid);
-    if (!e || !e.widget) return;
-    var w = widgetFor(e.widget);
+    var key = e && sourceOf(e);
+    if (!key) return;
+    var w = widgetFor(key);
     var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
     if (!overlay || !body || !S.cfg.sourceFormUrl) return;
-    title.textContent = (w ? w.name : e.widget) + " · configure";
+    title.textContent = (w ? w.name : key) + " · configure";
     body.innerHTML = '<div class="note" style="padding:12px">Loading…</div>';
     body.dataset.eid = eid;
     overlay.classList.add("open");
     fetch(S.cfg.sourceFormUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: e.widget, sid: e.id, options: e.options || {} }),
+      body: JSON.stringify({ key: key, sid: e.id, options: e.options || {} }),
     })
       .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
       .then(function (html) {
@@ -1770,7 +1915,7 @@
         form.append(node.name, node.value);
       }
     });
-    form.append("key", e.widget);
+    form.append("key", sourceOf(e));
     fetch(S.cfg.sourceOptionsUrl, { method: "POST", body: form })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function (j) {
@@ -1982,8 +2127,8 @@
     S.doc.els.forEach(function (e) {
       e.w = Math.min(e.w, w);
       e.h = Math.min(e.h, h);
-      e.x = clamp(e.x, 0, w - e.w);
-      e.y = clamp(e.y, 0, h - e.h);
+      e.x = clamp(e.x, MIN_ONSCREEN - e.w, w - MIN_ONSCREEN);
+      e.y = clamp(e.y, MIN_ONSCREEN - e.h, h - MIN_ONSCREEN);
     });
     scheduleSave(); paint();
   }

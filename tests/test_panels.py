@@ -138,6 +138,30 @@ def test_doc_and_save_carry_rev(app: Flask) -> None:
     assert client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()["rev"] == saved["rev"]
 
 
+def test_element_offcanvas_and_new_kinds() -> None:
+    """The Element model allows negative x/y (partly off-canvas) and carries the
+    data-primitive + custom-HTML fields."""
+    e = Element(
+        id="a",
+        kind="data",
+        source="weather_now",
+        field="current.temp",
+        display="sparkline",
+        unit="°",
+        precision=1,
+        label="Now",
+        x=-30,
+        y=-5,
+        w=120,
+        h=60,
+    )
+    assert e.x == -30 and e.y == -5 and e.display == "sparkline" and e.source == "weather_now"
+    h = Element(
+        id="b", kind="html", html="<i>x</i>", css="i{font-weight:700}", x=0, y=0, w=50, h=50
+    )
+    assert h.html == "<i>x</i>" and h.css == "i{font-weight:700}"
+
+
 def test_live_stream_contract(app: Flask) -> None:
     """The SSE stream opens with a connected preamble and 404s for a bad id."""
     client = app.test_client()
