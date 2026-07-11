@@ -810,6 +810,9 @@ def create_app(
     app.config["SCHEDULER"] = scheduler
     if not testing and not is_watcher:
         scheduler.start()
+        from app import heartbeat
+
+        heartbeat.start(app)
 
     plugin_loader.register_routes(app, plugins)
     # Marketplace mounts at /plugins/browse, AFTER plugin_loader's

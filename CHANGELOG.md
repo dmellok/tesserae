@@ -21,6 +21,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
   this switch. Install pings surface on the `/events` timeline under the
   telemetry filter.
 
+- **Daily heartbeat.** With Online features on, Tesserae sends a once-a-day
+  best-effort heartbeat to `api.tesserae.ink` carrying only low-cardinality,
+  aggregate facts about the install (version, OS family, CPU arch, Python
+  minor, deployment kind, transport, a bucketed device count, the set of
+  registered device kinds, and a Home Assistant boolean). The server stores
+  only the day, not a timestamp, and dedupes to one per install per day, so
+  the cadence can't become an activity trace. No personal data, no exact
+  counts, no IP stored. Also gated by **Settings → System → Online features**;
+  the payload is documented on the privacy page.
+
 ### Fixed
 
 - **Reordered multi-select entries survive a save.** The editor's

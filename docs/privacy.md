@@ -2,9 +2,10 @@
 
 **Tesserae contacts one first-party endpoint, `api.tesserae.ink`, and
 nothing else.** There is no account system and no third-party analytics
-in the app. The single endpoint is used for two things: checking for app
-and device-firmware updates, and reporting an anonymous, aggregate count
-of how many installs use each marketplace widget.
+in the app. The single endpoint is used for: checking for app and
+device-firmware updates, reporting an anonymous, aggregate count of how
+many installs use each marketplace widget, and a once-a-day heartbeat of
+low-cardinality facts about the install.
 
 This is controlled by one master switch, **Settings → System → Online
 features**. Turn it off and Tesserae never contacts `api.tesserae.ink`;
@@ -21,8 +22,8 @@ documented in their own READMEs. Those are separate from the app.
 
 ## What the app never sends
 
-Beyond the `api.tesserae.ink` requests described above (widget id,
-install id, version), the app does not send:
+Beyond the aggregate `api.tesserae.ink` requests described above, the app
+does not send:
 
 - IP addresses
 - hostnames
@@ -79,6 +80,21 @@ same widget does not inflate the count (it dedupes on your install ID).
 The Browse page reads the aggregate counts from
 `https://api.tesserae.ink/widgets/installs`. A coarse country is derived
 from the request IP on the server side and the IP is then discarded.
+
+### Daily heartbeat
+
+Once a day, Tesserae POSTs to `https://api.tesserae.ink/heartbeat` so the
+maintainer can see how many installs are active and what to prioritise.
+The body is only low-cardinality, aggregate values: your install's random
+ID, the running version and channel, the OS family (linux/macos/windows),
+CPU arch, Python minor version, deployment kind (docker/ha_addon/pip/lxc/
+source), transport (mqtt/rest/both/none), a **bucketed** device count
+(`0`, `1`, `2-3`, `4-9`, `10+`, never the exact number), the set of
+registered device kinds, and a Home Assistant boolean. No names, paths,
+layouts, or exact counts. The server stores only the **day** (not a
+timestamp), so the cadence can't become a per-install activity trace, and
+it dedupes to one heartbeat per install per day. A coarse country is
+derived from the request IP and the IP is then discarded.
 
 ### App update check (`tesserae_status`)
 

@@ -91,6 +91,31 @@ def test_report_widget_install_best_effort(monkeypatch: pytest.MonkeyPatch) -> N
     assert online.report_widget_install("", "u", "0") is False
 
 
+def test_send_heartbeat_posts(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(req: Any, timeout: float) -> _FakeResp:
+        captured["url"] = req.full_url
+        captured["method"] = req.get_method()
+        captured["body"] = req.data
+        return _FakeResp(204)
+
+    monkeypatch.setattr(online.urllib.request, "urlopen", fake_urlopen)
+    ok = online.send_heartbeat({"install": "u", "version": "1"}, api_base="https://x.test")
+    assert ok is True
+    assert captured["url"] == "https://x.test/heartbeat"
+    assert captured["method"] == "POST"
+    assert json.loads(captured["body"])["install"] == "u"
+
+
+def test_send_heartbeat_best_effort(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(req: Any, timeout: float) -> _FakeResp:
+        raise OSError("down")
+
+    monkeypatch.setattr(online.urllib.request, "urlopen", boom)
+    assert online.send_heartbeat({"install": "u"}, api_base="https://x.test") is False
+
+
 def test_widget_install_counts_parses_and_filters(monkeypatch: pytest.MonkeyPatch) -> None:
     online.clear_counts_cache()
     body = json.dumps({"counts": {"spotify": 42, "weather_now": 7, "bad": "x", "b": True}}).encode()

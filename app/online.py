@@ -1,9 +1,9 @@
 """Outbound calls to api.tesserae.ink, behind a single master opt-out.
 
 Everything Tesserae sends to api.tesserae.ink (app + device-firmware update
-checks, and the marketplace install count) is gated by one setting,
-``settings.app.online_features``. It is ON by default; turning it off means the
-app never contacts api.tesserae.ink.
+checks, the marketplace install count, and the daily heartbeat) is gated by one
+setting, ``settings.app.online_features``. It is ON by default; turning it off
+means the app never contacts api.tesserae.ink.
 
 What is sent is documented on the privacy page: the install's random id (from
 ``data/core/install_id.json``), the widget id, and the running version. A coarse
@@ -95,6 +95,33 @@ def report_widget_install(
         return False
     except Exception as exc:
         logger.debug("online: install report failed for %s: %s", widget_id, exc)
+        return False
+
+
+def send_heartbeat(fields: dict[str, Any], *, api_base: str = API_BASE) -> bool:
+    """POST one daily heartbeat to ``/heartbeat``. Best-effort; returns success.
+
+    The caller checks :func:`online_enabled` first and builds ``fields`` (only
+    low-cardinality, aggregate values). This layer just ships them.
+    """
+    body = json.dumps(fields).encode("utf-8")
+    url = f"{api_base.rstrip('/')}/heartbeat"
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/json", "User-Agent": "tesserae-heartbeat"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=_TIMEOUT_SECONDS) as resp:
+            return 200 <= int(resp.status) < 300
+    except urllib.error.HTTPError as exc:
+        with contextlib.suppress(Exception):
+            exc.close()
+        logger.debug("online: heartbeat failed: %s", exc)
+        return False
+    except Exception as exc:
+        logger.debug("online: heartbeat failed: %s", exc)
         return False
 
 
