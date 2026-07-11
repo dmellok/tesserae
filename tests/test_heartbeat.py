@@ -113,6 +113,18 @@ def test_maybe_send_sends_then_dedupes(
     assert len(calls) == 2
 
 
+def test_start_is_noop_under_pytest(tmp_path: Path, test_install_uuid: Any) -> None:
+    """``start`` must not spin up the daemon during the suite, even when the app
+    was built with create_app(testing=False) and TESTING isn't set yet (the
+    fixtures' pattern). PYTEST_CURRENT_TEST is always set here, so it no-ops."""
+    import threading
+
+    app, _ = _app(tmp_path, install=test_install_uuid())
+    app.config.pop("TESTING", None)  # mimic mid-create_app, before TESTING is set
+    heartbeat.start(app)  # type: ignore[arg-type]
+    assert not any(t.name == "tesserae-heartbeat" for t in threading.enumerate())
+
+
 def test_maybe_send_retries_sooner_on_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, test_install_uuid: Any
 ) -> None:

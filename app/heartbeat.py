@@ -17,6 +17,7 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import os
 import platform
 import random
 import sys
@@ -201,8 +202,15 @@ def maybe_send(app: Flask, *, now: float | None = None) -> bool:
 
 
 def start(app: Flask, *, check_interval: float = _CHECK_INTERVAL_SECONDS) -> None:
-    """Start the daily-heartbeat daemon thread. No-op under testing."""
-    if app.config.get("TESTING"):
+    """Start the daily-heartbeat daemon thread. No-op under testing.
+
+    ``PYTEST_CURRENT_TEST`` is checked as well as the ``TESTING`` flag: several
+    test fixtures build the app with ``create_app(testing=False)`` (to keep the
+    auth gate) and only set ``app.config["TESTING"]`` afterwards, so without the
+    env check the daemon would start and fire a real heartbeat once the per-test
+    network guard is gone.
+    """
+    if app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"):
         return
 
     def _loop() -> None:

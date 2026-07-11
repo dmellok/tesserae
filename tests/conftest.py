@@ -25,6 +25,7 @@ from __future__ import annotations
 import urllib.request
 import uuid
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -58,7 +59,14 @@ def _guarded_urlopen(req: Any, *args: Any, **kwargs: Any) -> Any:
     return _REAL_URLOPEN(req, *args, **kwargs)
 
 
-@pytest.fixture(autouse=True)
-def _block_live_api(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Refuse live api.tesserae.ink traffic for every test (see module docstring)."""
-    monkeypatch.setattr(urllib.request, "urlopen", _guarded_urlopen)
+@pytest.fixture(scope="session", autouse=True)
+def _block_live_api() -> Any:
+    """Refuse live api.tesserae.ink traffic for the whole session.
+
+    Session-scoped (not per-test) so it also covers background daemon threads
+    that a fixture may have spun up and that fire between or after tests. Modules
+    that drive the real fetch path monkeypatch ``urlopen`` per-test, which
+    overrides this within their scope and restores it after.
+    """
+    with patch("urllib.request.urlopen", _guarded_urlopen):
+        yield
