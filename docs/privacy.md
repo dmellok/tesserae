@@ -7,9 +7,9 @@ and device-firmware updates, and reporting an anonymous, aggregate count
 of how many installs use each marketplace widget.
 
 This is controlled by one master switch, **Settings → System → Online
-features**, which is **on by default**. Turn it off and Tesserae never
-contacts `api.tesserae.ink`; the update indicators and install counts
-simply disappear. Nothing else in the app phones home.
+features**. Turn it off and Tesserae never contacts `api.tesserae.ink`;
+the update indicators and install counts simply disappear. Nothing else
+in the app phones home.
 
 What a request may include: your install's random ID, the widget id, and
 your running version. A coarse country is derived from your IP address
