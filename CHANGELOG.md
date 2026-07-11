@@ -21,6 +21,11 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **First-run consent step could be skipped.** The online-features opt-in ran
+  after the dashboard step, whose Edit and freeform actions hand off to the
+  editor and let someone leave the wizard before the consent screen was ever
+  shown. It now runs before the dashboard step, which becomes the final Finish.
+
 - **Online features toggle showed a raw checkbox** beside the styled switch.
   The form now carries `field--switch`, which scopes the checkbox-hide CSS, so
   only the switch renders.

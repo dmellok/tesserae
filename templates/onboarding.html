@@ -203,9 +203,9 @@
     <div class="wizard-nav">
       <span></span>
       {% if instances %}
-      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       {% else %}
-      <a class="ghost" href="{{ url_for('onboarding.step', step='dashboard') }}"><span>Skip for now</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+      <a class="ghost" href="{{ url_for('onboarding.step', step='share') }}"><span>Skip for now</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       {% endif %}
     </div>
     {% else %}
@@ -269,7 +269,7 @@
 
     <div class="wizard-nav">
       <span></span>
-      <a class="primary" href="{{ url_for('onboarding.step', step='dashboard') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
+      <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><i class="ph ph-arrow-right" aria-hidden="true"></i><span>Next</span></a>
     </div>
     {% endif %}{# default_transport rest vs mqtt #}
 
@@ -325,18 +325,20 @@
 
     <div class="wizard-nav">
       <span></span>
-      <div class="actions">
-        <a class="primary" href="{{ url_for('onboarding.step', step='share') }}"><span>Continue</span><i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-      </div>
+      <form method="post" action="{{ url_for('onboarding.finish') }}" class="form form--inline">
+        <button type="submit" class="primary"><i class="ph ph-check" aria-hidden="true"></i><span>Finish setup</span></button>
+      </form>
     </div>
     {% else %}
     <p class="lede">Create a ready-made dashboard, a clean clock sized to your panel and bound to the device you just registered. You can edit it later.</p>
-    <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form">
-      <div class="wizard-nav">
-        <span></span>
+    <div class="wizard-nav">
+      <form method="post" action="{{ url_for('onboarding.finish') }}" class="form form--inline">
+        <button type="submit" class="ghost"><span>I'll set this up later</span></button>
+      </form>
+      <form method="post" action="{{ url_for('onboarding.create_starter') }}" class="form form--inline">
         {{ button('Create a starter dashboard', icon='sparkle') }}
-      </div>
-    </form>
+      </form>
+    </div>
     {% endif %}
 
     {% elif step == 'share' %}

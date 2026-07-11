@@ -52,28 +52,28 @@ def test_share_step_renders_consent(app: Flask) -> None:
     assert "api.tesserae.ink" in body  # first-party disclosure
 
 
-def test_share_opt_in_enables_and_finishes(app: Flask) -> None:
+def test_share_opt_in_enables_and_advances_to_dashboard(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
+    # Share sits before the final dashboard step, so it records the choice and
+    # advances rather than finishing setup.
     resp = client.post("/onboarding/share", data={"online_features": "1"}, follow_redirects=False)
-    assert resp.status_code == 302 and resp.location.endswith("/send")
+    assert resp.status_code == 302 and resp.location.endswith("/onboarding/dashboard")
     assert app.config["SETTINGS_STORE"].get_section("app").get("online_features") is True
-    # onboarded now: / goes to Send, not the wizard.
-    assert client.get("/", follow_redirects=False).location.endswith("/send")
 
 
-def test_share_opt_out_disables_and_finishes(app: Flask) -> None:
+def test_share_opt_out_disables_and_advances_to_dashboard(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
     resp = client.post("/onboarding/share", data={}, follow_redirects=False)  # no field = off
-    assert resp.status_code == 302 and resp.location.endswith("/send")
+    assert resp.status_code == 302 and resp.location.endswith("/onboarding/dashboard")
     assert app.config["SETTINGS_STORE"].get_section("app").get("online_features") is False
 
 
 def test_wizard_steps_render(app: Flask) -> None:
     client = app.test_client()
     _sign_in(client)
-    for step in ("welcome", "timezone", "broker", "device", "dashboard"):
+    for step in ("welcome", "timezone", "broker", "device", "share", "dashboard"):
         resp = client.get(f"/onboarding/{step}")
         assert resp.status_code == 200, step
     # Unknown step falls back to welcome.

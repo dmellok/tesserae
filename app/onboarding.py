@@ -52,11 +52,14 @@ from app.tz_resolve import _resolve_iana_timezone
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
-STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "dashboard", "share")
+STEPS: tuple[str, ...] = ("welcome", "timezone", "broker", "device", "share", "dashboard")
 STEP_LABELS: dict[str, str] = {
     "welcome": "Welcome",
-    # Wrap-up: the online-features opt-in. Placed last so it lands on someone
-    # who's just seen Tesserae work. Off unless the user says yes here.
+    # The online-features opt-in. Placed just before the dashboard step so the
+    # consent screen always lands inside the linear wizard: the dashboard step
+    # hands off to the editor (Edit / freeform), which would otherwise let
+    # someone leave the flow before this was ever shown. Off unless the user
+    # says yes here.
     "share": "Help out",
     # Timezone slots in right after welcome because it's foundational:
     # the scheduler interprets every fire time against it. Surfaced
@@ -477,14 +480,15 @@ def push_starter(page_id: str) -> Response:
 
 @bp.post("/share")
 def save_share() -> Response:
-    """Record the online-features opt-in choice and finish the wizard.
+    """Record the online-features opt-in choice, then advance to the final
+    dashboard step.
 
-    Either choice completes setup. Yes turns on update checks, firmware
-    indicators, marketplace install counts, and the anonymous heartbeat; No
-    keeps the install fully offline. Changeable later in Settings -> System."""
+    Yes turns on update checks, firmware indicators, marketplace install
+    counts, and the anonymous heartbeat; No keeps the install fully offline.
+    Changeable later in Settings -> System. Setup itself is finished on the
+    dashboard step, so this only records the choice and moves on."""
     enabled = request.form.get("online_features") in ("1", "true", "on")
     _settings().patch_section("app", {"online_features": enabled})
-    mark_onboarded(_settings())
     if enabled:
         flash("Thank you, genuinely. You're now one of the installs I get to build for.", "ok")
     else:
@@ -493,7 +497,7 @@ def save_share() -> Response:
             "turn it on anytime in Settings -> System -> Online features.",
             "ok",
         )
-    return redirect(url_for("send.index"))
+    return redirect(url_for("onboarding.step", step="dashboard"))
 
 
 @bp.post("/skip")
