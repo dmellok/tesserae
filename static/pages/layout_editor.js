@@ -162,6 +162,16 @@
     return (v / total) * 100;
   }
 
+  // Position one cell node from its panel-px geometry. Pulled out of
+  // render() so a live drag can reposition just the affected nodes
+  // (CSS-only) instead of rebuilding the whole board every pointermove.
+  function positionCellNode(node, c) {
+    node.style.left = pxToPct(c.x, panelW) + "%";
+    node.style.top = pxToPct(c.y, panelH) + "%";
+    node.style.width = pxToPct(c.w, panelW) + "%";
+    node.style.height = pxToPct(c.h, panelH) + "%";
+  }
+
   function render() {
     board.style.aspectRatio = `${panelW} / ${panelH}`;
     board.innerHTML = "";
@@ -172,10 +182,7 @@
       el.className = "le-cell";
       el.dataset.cellId = c.id;
       el.dataset.idx = String(idx);
-      el.style.left = pxToPct(c.x, panelW) + "%";
-      el.style.top = pxToPct(c.y, panelH) + "%";
-      el.style.width = pxToPct(c.w, panelW) + "%";
-      el.style.height = pxToPct(c.h, panelH) + "%";
+      positionCellNode(el, c);
       el.innerHTML = `
         <span class="le-cell-label">${idx + 1}${c.plugin ? " · " + c.plugin : ""}</span>
         <button type="button" class="le-cell-delete" data-delete-cell aria-label="Delete cell ${idx + 1}">
@@ -289,13 +296,20 @@
       }
       window.location.reload();
     } else {
+      // Geometry-only change (edge drag). Re-sync the editor board from
+      // the server-echoed cells so the handles land on the settled
+      // geometry, then reload the preview iframes for the authoritative
+      // render (this also corrects any multi-aspect preview that ignored
+      // the live drag geometry).
       render();
       refreshPreview();
     }
   }
 
-  // Kick every preview iframe to pick up new geometry. Multi-device
-  // pages render one frame per distinct aspect ratio, so refresh them all.
+  // Kick every preview iframe to pick up new geometry via a full reload.
+  // Used on drag release and after a structural change (insert / delete).
+  // Multi-device pages render one frame per distinct aspect ratio, so
+  // refresh them all.
   function refreshPreview() {
     document.querySelectorAll(".preview-frame iframe").forEach((iframe) => {
       const src = iframe.getAttribute("src");
@@ -304,6 +318,29 @@
       const base = src.split("&_=")[0];
       const sep = base.includes("?") ? "&" : "?";
       iframe.setAttribute("src", base + sep + "_=" + Date.now());
+    });
+  }
+
+  // Live preview updates DURING an edge drag (Part B). Rather than the
+  // preview sitting still until the drag ends (its old behaviour), we
+  // postMessage the new panel-px geometry to composer.js, which just
+  // repositions the matching .cell boxes in place, no re-render. CSS
+  // widgets reflow live via container queries; charts settle when the
+  // drag ends and the iframe reloads (refreshPreview). The composer gates
+  // on matching panel dims, so a differently-proportioned multi-device
+  // preview leaves its boxes untouched during the drag and is corrected
+  // by the release reload.
+  function livePreview(list) {
+    const msg = {
+      type: "tesserae-geom",
+      srcW: panelW,
+      srcH: panelH,
+      cells: list.map((c) => ({ id: c.id, x: c.x, y: c.y, w: c.w, h: c.h })),
+    };
+    document.querySelectorAll(".preview-frame iframe").forEach((iframe) => {
+      try {
+        iframe.contentWindow.postMessage(msg, location.origin);
+      } catch {}
     });
   }
 
@@ -325,6 +362,39 @@
     document.body.style.cursor = edge.axis === "h" ? "ns-resize" : "ew-resize";
     board.classList.add("is-dragging");
 
+    // Cache the DOM nodes for just the cells this edge moves, so the drag
+    // repositions them directly (CSS) instead of rebuilding the whole
+    // board every pointermove (the old render()-per-move was the visible
+    // jank). Everything else on the board stays put; the non-dragged
+    // handles re-sync from render() on release.
+    const affected =
+      edge.axis === "h" ? [...edge.above, ...edge.below] : [...edge.left, ...edge.right];
+    const nodeById = new Map();
+    affected.forEach((c) => {
+      const n = board.querySelector(`.le-cell[data-cell-id="${CSS.escape(c.id)}"]`);
+      if (n) nodeById.set(c.id, n);
+    });
+
+    // Coalesce pointermove into one paint per frame: several events can
+    // fire between frames, and this drag moves multiple nodes.
+    let rafId = null;
+    let pendingCoord = null;
+    function paintDrag() {
+      rafId = null;
+      if (pendingCoord == null) return;
+      applyEdgeAt(edge, pendingCoord);
+      affected.forEach((c) => {
+        const node = nodeById.get(c.id);
+        const live = cells.find((x) => x.id === c.id);
+        if (node && live) positionCellNode(node, live);
+      });
+      // Follow the dragged handle so the grab point stays under the pointer.
+      if (edge.axis === "h") handleEl.style.top = pxToPct(pendingCoord, panelH) + "%";
+      else handleEl.style.left = pxToPct(pendingCoord, panelW) + "%";
+      livePreview(collectChanges(edge));
+      pendingCoord = null;
+    }
+
     function onMove(ev) {
       let newCoord;
       if (edge.axis === "h") {
@@ -336,9 +406,8 @@
       }
       // Snap to the active grid (or 8px freeform) and clamp to limits.
       const step = snapStep(edge.axis === "h" ? "y" : "x");
-      newCoord = clamp(Math.round(newCoord / step) * step, lo, hi);
-      applyEdgeAt(edge, newCoord);
-      render();
+      pendingCoord = clamp(Math.round(newCoord / step) * step, lo, hi);
+      if (rafId == null) rafId = requestAnimationFrame(paintDrag);
     }
 
     function onUp() {
@@ -347,8 +416,21 @@
       window.removeEventListener("pointercancel", onUp);
       document.body.style.cursor = "";
       board.classList.remove("is-dragging");
+      // Flush any coordinate that hasn't painted yet, so the release lands
+      // exactly where the pointer is.
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (pendingCoord != null) {
+        applyEdgeAt(edge, pendingCoord);
+        pendingCoord = null;
+      }
       const updates = collectChanges(edge);
       if (updates.length) {
+        // Full re-render re-syncs every handle to the settled geometry;
+        // postBatch persists and reloads the preview authoritatively.
+        render();
         postBatch({ updates }).catch(reportErr);
       }
     }

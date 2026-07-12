@@ -56,6 +56,12 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Grid layout editor: smooth edge dragging.** Dragging a cell edge no longer
+  rebuilds the whole schematic board on every pointer move; it repositions just
+  the affected cells (coalesced per animation frame), so the drag tracks at full
+  frame rate. The live preview follows the drag in place instead of sitting still
+  until release, and settles authoritatively when the drag ends.
+
 - **Weather widgets: a written-out location now resolves.** A location set as
   plain text (e.g. by an MCP agent, or `"South Morang"` / `"Paris, FR"` /
   `"-37.65,145.09"`) is geocoded server-side instead of being ignored, so the

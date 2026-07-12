@@ -332,10 +332,41 @@ async function applyCellPatch(patch) {
   }
 }
 
+// Live geometry from the layout editor's edge drag (Part B). Reposition
+// the named cells' boxes in place, no widget re-render, so the preview
+// tracks the drag smoothly. CSS widgets reflow via container queries;
+// charts / JS-sized widgets settle when the editor reloads the iframe on
+// release. Gated on matching panel dims so a differently-proportioned
+// multi-device preview (cells laid out for another aspect) is left alone
+// and corrected by the release reload instead of being mispositioned.
+function applyGeom(msg) {
+  const sample = document.querySelector(".cell[data-panel-w]");
+  if (sample) {
+    const ownW = Number(sample.dataset.panelW);
+    const ownH = Number(sample.dataset.panelH);
+    if (ownW && ownH && (ownW !== msg.srcW || ownH !== msg.srcH)) return;
+  }
+  for (const c of msg.cells || []) {
+    const el = document.querySelector(`.cell[data-cell-id="${CSS.escape(c.id)}"]`);
+    if (!el) continue;
+    el.style.left = c.x + "px";
+    el.style.top = c.y + "px";
+    el.style.width = c.w + "px";
+    el.style.height = c.h + "px";
+    el.dataset.cellW = String(c.w);
+    el.dataset.cellH = String(c.h);
+  }
+}
+
 window.addEventListener("message", async (ev) => {
   if (ev.origin !== location.origin) return;
   const d = ev.data;
-  if (!d || d.type !== "tesserae-patch") return;
+  if (!d) return;
+  if (d.type === "tesserae-geom") {
+    applyGeom(d);
+    return;
+  }
+  if (d.type !== "tesserae-patch") return;
   applyPagePatch(d.page);
   for (const cellPatch of d.cells || []) {
     await applyCellPatch(cellPatch);
