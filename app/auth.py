@@ -75,6 +75,14 @@ _LOOPBACK_PATHS: Final[tuple[str, ...]] = (
     # the in-browser preview (authed session) renders them correctly.
     "/themes/user.css",
     "/themes/community.css",
+    # Single-widget dev render behind /api/mcp/widgets/<id>/render.png. The
+    # in-process Playwright renderer fetches it over loopback with no session,
+    # exactly like /compose/<id>; without this the gate redirects to /login on a
+    # password-protected instance and the screenshot captures the login page.
+    # Scoped to /_test/render specifically so the rest of the dev gallery
+    # (/_test/widgets, ...) stays behind the session gate. composer.test_render
+    # is itself 404 unless debug/testing or loopback, so this exposes nothing new.
+    "/_test/render",
 )
 _LAN_PATHS: Final[tuple[str, ...]] = ("/renders/", "/preview/", "/mirror/")
 # Plugin assets, /plugins/<id>/<asset> only, NOT /plugins/ (the admin

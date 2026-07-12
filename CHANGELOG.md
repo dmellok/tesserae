@@ -68,6 +68,14 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **MCP `render.png` returned a login screenshot on password-protected instances.**
+  The single-widget render endpoint screenshots `/_test/render` over loopback with no
+  session; that path was not in the auth gate's loopback-exempt list, so a
+  password-protected instance redirected the render to `/login` and captured the login
+  page instead of the widget. `/_test/render` is now loopback-exempt (loopback only,
+  same trust boundary as `/compose`), so the render is faithful with or without a
+  password.
+
 - **Grid layout editor: smooth edge dragging.** Dragging a cell edge no longer
   rebuilds the whole schematic board on every pointer move; it repositions just
   the affected cells (coalesced per animation frame), so the drag tracks at full

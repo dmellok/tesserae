@@ -240,3 +240,55 @@ def test_render_png(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     # Unknown widget + bad size.
     assert client.get("/api/mcp/widgets/nope/render.png").status_code == 404
     assert client.get("/api/mcp/widgets/clock_analog/render.png?size=huge").status_code == 400
+
+
+def test_render_png_screenshots_widget_not_login_with_password(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression for the 0.109 login-screenshot bug: with a password set, the URL
+    render.png hands to the headless renderer must itself render the widget over
+    loopback, not redirect to /login."""
+    from app import auth
+
+    _enable(app)
+    auth.set_password(app.config["SETTINGS_STORE"], "pw12345678")
+    client = app.test_client()  # fresh, unauthed, loopback
+
+    captured: dict[str, str] = {}
+
+    def _capture(req: Any, pool: Any = None) -> bytes:
+        captured["url"] = req.url
+        return _FAKE_PNG
+
+    monkeypatch.setattr("app.renderer.render_to_png", _capture)
+    resp = client.get("/api/mcp/widgets/clock_analog/render.png?size=md")
+    assert resp.status_code == 200
+
+    # Fetch the exact URL the renderer was told to screenshot, over loopback with
+    # no session: it must return the widget markup, not the login page.
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(captured["url"])
+    inner = client.get(f"{parts.path}?{parts.query}")
+    assert inner.status_code == 200
+    body = inner.get_data(as_text=True)
+    assert 'data-plugin="clock_analog"' in body and "password" not in body.lower()
+
+
+def test_test_render_loopback_bypass_with_password(app: Flask) -> None:
+    """The /_test/render loopback bypass (the fix): with a password set, a
+    loopback caller with no session reaches the widget render, while a remote
+    unauthed caller is still refused (403). The fixture builds the app with the
+    auth gate installed (create_app(testing=False))."""
+    from app import auth
+
+    auth.set_password(app.config["SETTINGS_STORE"], "pw12345678")
+    client = app.test_client()  # fresh, unauthed
+    ok = client.get("/_test/render?plugin=clock_analog&size=md")  # loopback by default
+    assert ok.status_code == 200 and 'data-plugin="clock_analog"' in ok.get_data(as_text=True)
+    blocked = client.get(
+        "/_test/render?plugin=clock_analog&size=md",
+        environ_overrides={"REMOTE_ADDR": "203.0.113.9"},
+    )
+    assert blocked.status_code == 403
+    assert 'data-plugin="clock_analog"' not in blocked.get_data(as_text=True)
