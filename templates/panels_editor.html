@@ -43,6 +43,12 @@
   {# Spectra tokens + styles so the widgets mounted live on the canvas paint
      with the same semantic palette (--bg, --accent-*, …) a real panel uses. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  {# User + community themes load in the same cascade slot as the compose render
+     (after the bundled blocks) so a canvas bound to a "user-*" / community theme
+     resolves its tokens in the editor exactly as it does on the panel. Without
+     these the theme's --bg was undefined and the artboard fell back to black. #}
+  <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
+  <link rel="stylesheet" href="{{ url_for('themes.community_css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   {# @font-face rules for every loaded font plugin, so the font picker's
      choices actually render on the canvas. #}

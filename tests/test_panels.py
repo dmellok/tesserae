@@ -63,6 +63,9 @@ def test_index_mints_and_opens_a_canvas(app: Flask) -> None:
     editor = client.get(landing.location)
     assert editor.status_code == 200
     assert b"panels/editor.js" in editor.data
+    # The editor loads user + community themes so a canvas on such a theme
+    # resolves its tokens (and its background) the same as the render does.
+    assert b"user.css" in editor.data and b"community.css" in editor.data
 
 
 def test_catalog_requires_auth(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:

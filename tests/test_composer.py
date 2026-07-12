@@ -110,6 +110,21 @@ def test_canvas_data_and_html_render_via_compose(app: Flask) -> None:
     assert "left: -10px" in body  # negative x renders (partly off-canvas)
 
 
+def test_canvas_render_loads_user_themes_and_bg_fallback(app: Flask) -> None:
+    """The canvas render resolves user/community themes (parity with grid render)
+    and falls back to the theme paper colour for an empty bg (not black), so the
+    editor and the panel agree on the background."""
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout
+
+    app.config["PAGE_STORE"].save(
+        Page(id="cbg", name="F", layout_kind="canvas", canvas=CanvasLayout(w=300, h=200, bg=""))
+    )
+    body = app.test_client().get("/compose/cbg").get_data(as_text=True)
+    assert "user.css" in body and "community.css" in body  # user/community themes loaded
+    assert "var(--bg, #F7F5F0)" in body  # empty bg → theme paper fallback, never black
+
+
 def test_canvas_page_scales_to_target_panel(app: Flask) -> None:
     """An authored 300x200 canvas pushed to a 600x400 panel scales 2x."""
     from app.state.page_store import Page

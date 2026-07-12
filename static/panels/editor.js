@@ -946,7 +946,10 @@
     var fam = fontFamily(S.doc.font);
     artboard.style.setProperty("--font-family", fam);
     artboard.style.fontFamily = fam;
-    artboard.style.background = S.doc.bg || "var(--bg)";
+    // Same fallback the compose render uses (panels_compose.html) so an empty bg
+    // previews as the theme's paper colour, not the transparent-collapses-to-black
+    // the editor showed before when --bg was undefined.
+    artboard.style.background = S.doc.bg || "var(--bg, #F7F5F0)";
   }
   // theme/style/font change re-mounts widgets (some bake tokens/fonts at
   // render time); background only repaints the artboard.

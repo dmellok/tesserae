@@ -18,6 +18,10 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/thin/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='icons/phosphor/light/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
+  {# User + community themes, same cascade slot as the grid compose page, so a
+     canvas on a user/community theme resolves its --bg / accents on the panel. #}
+  <link rel="stylesheet" href="{{ url_for('themes.user_css') }}">
+  <link rel="stylesheet" href="{{ url_for('themes.community_css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-styles.css') }}">
   {# Chart.js as a global so widgets importing static/spectra-chart.js see
      window.Chart. Non-module so composer.js's dynamic imports don't race it. #}
