@@ -18,24 +18,36 @@
     return (isFinite(n) ? n : fallback);
   }
 
-  // Resolve "a.b.0.c" against a nested object/array; undefined if any hop misses.
+  // Resolve a dotted path against a nested object/array. Grammar:
+  //   a.b.c        object keys
+  //   a.0.b        array index (or a[0].b)
+  //   a.*.b        "pluck": map .b over every item of the array a
+  //                (or a[].b), yielding an array — use this to feed charts,
+  //                e.g. "series.*.total" over [{date,total},…] -> [t1,t2,…].
   function resolvePath(obj, path) {
     if (obj == null || !path) return undefined;
-    var parts = String(path).split(".");
-    var cur = obj;
-    for (var i = 0; i < parts.length; i++) {
-      if (cur == null) return undefined;
-      var k = parts[i];
-      cur = Array.isArray(cur) && /^\d+$/.test(k) ? cur[Number(k)] : cur[k];
+    var norm = String(path).replace(/\[(\d+)\]/g, ".$1").replace(/\[\s*\*?\s*\]/g, ".*");
+    return _walk(obj, norm.split("."), 0);
+  }
+  function _walk(cur, parts, i) {
+    if (i >= parts.length) return cur;
+    if (cur == null) return undefined;
+    var k = parts[i];
+    if (k === "") return _walk(cur, parts, i + 1);
+    if (k === "*") {
+      if (!Array.isArray(cur)) return undefined;
+      return cur.map(function (item) { return _walk(item, parts, i + 1); });
     }
-    return cur;
+    var next = Array.isArray(cur) && /^\d+$/.test(k) ? cur[Number(k)] : cur[k];
+    return _walk(next, parts, i + 1);
   }
 
   function render(el, data) {
     var kind = el.kind || "rect";
     var color = el.color || "var(--text-primary, #1B1A16)";
 
-    if (kind === "html") return renderHtml(el);
+    if (kind === "html") return renderHtml(el, false);
+    if (kind === "svg") return renderHtml(el, true);
     if (kind === "data") return renderData(el, data, color);
 
     if (kind === "icon") {
@@ -43,7 +55,9 @@
       // Phosphor weight class: regular is the bare "ph", others are "ph-<weight>".
       var weight = el.weight || "bold";
       var wcls = weight === "regular" ? "ph" : "ph-" + weight;
-      i.className = wcls + " ph-" + (el.icon || "star");
+      // Accept both "star" and "ph-star" (widget icon fields use the ph- prefix).
+      var iname = String(el.icon || "star").replace(/^ph-/, "");
+      i.className = wcls + " ph-" + iname;
       var size = Math.max(8, Math.round(Math.min(px(el.w, 64), px(el.h, 64)) * 0.82));
       i.style.cssText = "display:flex;align-items:center;justify-content:center;" +
         "width:100%;height:100%;line-height:1;color:" + color + ";font-size:" + size + "px";
@@ -93,10 +107,11 @@
     return d;
   }
 
-  // Custom HTML/CSS in a locked-down iframe: sandbox="" disables scripts, the
-  // network, and same-origin, so authored markup renders but can't run code or
-  // reach anything. pointer-events:none keeps the element selectable in the editor.
-  function renderHtml(el) {
+  // Custom HTML/CSS (or SVG) in a locked-down iframe: sandbox="" disables
+  // scripts, the network, and same-origin, so authored markup renders but can't
+  // run code or reach anything. pointer-events:none keeps the element selectable.
+  // ``svg`` = true adds a rule so a pasted <svg> scales to fill the box.
+  function renderHtml(el, svg) {
     var f = document.createElement("iframe");
     f.setAttribute("sandbox", "");
     f.setAttribute("scrolling", "no");
@@ -105,7 +120,8 @@
     var reset =
       "*{box-sizing:border-box}html,body{margin:0;padding:0;width:100%;height:100%;" +
       "overflow:hidden;font-family:var(--font-family,-apple-system,'Segoe UI',Roboto,sans-serif);" +
-      "color:#1B1A16}";
+      "color:#1B1A16}" +
+      (svg ? "svg{width:100%;height:100%;display:block}" : "");
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'><style>" +
       reset + (el.css || "") + "</style></head><body>" + (el.html || "") + "</body></html>";
@@ -134,6 +150,9 @@
     var text;
     if (value == null || (Array.isArray(value) && !value.length)) {
       text = "—";
+    } else if (el.format) {
+      var f = formatValue(value, el.format);
+      text = f != null ? f : String(value);
     } else if (display === "number") {
       var n = Number(value);
       text = isFinite(n) ? n.toFixed(Math.max(0, px(el.precision, 0))) : String(value);
@@ -159,6 +178,70 @@
     return color && color.charAt(0) !== "v" ? color : "#1B1A16";
   }
 
+  // ---- value formatting (data primitives) -------------------------------
+  var _MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  var _MONF = ["January", "February", "March", "April", "May", "June", "July", "August",
+    "September", "October", "November", "December"];
+  var _DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var _DOWF = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  function _pad(n) { return (n < 10 ? "0" : "") + n; }
+  function toDate(v) {
+    if (v == null || v === "") return null;
+    var d = typeof v === "number" ? new Date(v < 1e12 ? v * 1000 : v) : new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function formatDate(d, fmt) {
+    var h12 = d.getHours() % 12 || 12;
+    return fmt.replace(/yyyy|MMMM|MMM|MM|dddd|ddd|dd|HH|hh|mm|ss|a|d|H|h|M/g, function (t) {
+      switch (t) {
+        case "yyyy": return String(d.getFullYear());
+        case "MMMM": return _MONF[d.getMonth()];
+        case "MMM": return _MON[d.getMonth()];
+        case "MM": return _pad(d.getMonth() + 1);
+        case "M": return String(d.getMonth() + 1);
+        case "dddd": return _DOWF[d.getDay()];
+        case "ddd": return _DOW[d.getDay()];
+        case "dd": return _pad(d.getDate());
+        case "d": return String(d.getDate());
+        case "HH": return _pad(d.getHours());
+        case "H": return String(d.getHours());
+        case "hh": return _pad(h12);
+        case "h": return String(h12);
+        case "mm": return _pad(d.getMinutes());
+        case "ss": return _pad(d.getSeconds());
+        case "a": return d.getHours() < 12 ? "am" : "pm";
+        default: return t;
+      }
+    });
+  }
+  function relTime(v) {
+    var d = toDate(v);
+    if (!d) return null;
+    var s = (d.getTime() - Date.now()) / 1000, abs = Math.abs(s), fut = s > 0;
+    function u(n, w) { n = Math.round(n); return fut ? "in " + n + w : n + w + " ago"; }
+    if (abs < 60) return "now";
+    if (abs < 3600) return u(abs / 60, "m");
+    if (abs < 86400) return u(abs / 3600, "h");
+    if (abs < 604800) return u(abs / 86400, "d");
+    return formatDate(d, "MMM d");
+  }
+  // Format ``value`` per ``fmt``: "relative" | a date pattern (HH:mm, MMM d, …) |
+  // a number pattern (0, 0.0, 0.00). Returns null if it doesn't apply.
+  function formatValue(value, fmt) {
+    if (!fmt) return null;
+    if (fmt === "relative") return relTime(value);
+    if (/[yMdHhmsa]/.test(fmt)) {
+      var d = toDate(value);
+      if (d) return formatDate(d, fmt);
+    }
+    var n = Number(value);
+    if (isFinite(n)) {
+      var m = fmt.match(/^0(?:\.(0+))?$/);
+      if (m) return n.toFixed(m[1] ? m[1].length : 0);
+    }
+    return null;
+  }
+
   function renderChart(el, value, display, color) {
     var wrap = document.createElement("div");
     wrap.style.cssText = "width:100%;height:100%;position:relative";
@@ -169,7 +252,7 @@
       wrap.style.cssText +=
         ";display:flex;align-items:center;justify-content:center;color:var(--text-secondary,#8a8a82);" +
         "font:600 12px var(--font-family,sans-serif)";
-      wrap.textContent = window.Chart ? "no data" : "chart unavailable";
+      wrap.textContent = window.Chart ? "no data · check field or plugin" : "chart unavailable";
       return wrap;
     }
     var ink = inkColor(color);

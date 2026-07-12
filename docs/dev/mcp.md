@@ -196,11 +196,13 @@ externally" reload prompt instead.
 | --- | --- |
 | `list_widgets` | Every placeable widget (with fragments) + theme/style/font options |
 | `get_widget_options` | A widget's configurable options (e.g. a weather location) |
+| `probe_widget_data` | A widget's live data payload, to discover real field names/shapes |
 | `list_devices` | Registered panels with their pixel dimensions |
 | `list_pages` | Existing canvas dashboards |
 | `create_canvas_page` | Create an empty canvas (size it to your panel) |
 | `get_canvas` | Read a canvas document |
-| `set_canvas` | Replace a canvas document (422 with field errors if invalid) |
+| `set_canvas` | Replace a canvas document (compact ack; `?return=doc` for the full doc) |
+| `add_element` | Append one element (each call saves, so an open editor updates live) |
 | `render_preview` | Render the canvas to a PNG the agent can see |
 | `push_to_device` | Push the canvas to explicit device(s) |
 

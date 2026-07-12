@@ -156,10 +156,16 @@ def test_element_offcanvas_and_new_kinds() -> None:
         h=60,
     )
     assert e.x == -30 and e.y == -5 and e.display == "sparkline" and e.source == "weather_now"
+    e2 = Element(
+        id="d", kind="data", source="clock", field="time", format="HH:mm", x=0, y=0, w=80, h=30
+    )
+    assert e2.format == "HH:mm"
     h = Element(
         id="b", kind="html", html="<i>x</i>", css="i{font-weight:700}", x=0, y=0, w=50, h=50
     )
     assert h.html == "<i>x</i>" and h.css == "i{font-weight:700}"
+    s = Element(id="s", kind="svg", html="<svg/>", x=0, y=0, w=40, h=40)
+    assert s.kind == "svg" and s.html == "<svg/>"
 
 
 def test_live_stream_contract(app: Flask) -> None:

@@ -53,7 +53,7 @@ class Element(BaseModel):
     id: str
     # What this element is: a placed widget, a decoration shape, a data-bound
     # primitive, or a custom-HTML block.
-    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html
+    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -92,9 +92,13 @@ class Element(BaseModel):
     unit: str = ""
     precision: int = Field(default=0, ge=0)
     label: str = ""
-    # Custom HTML element (kind == "html"): agent- or user-authored markup that
-    # renders in a sandboxed iframe (no scripts, no network). ``css`` is injected
-    # into the iframe's <style>.
+    # Optional value formatter for text/number data primitives: "relative", a date
+    # pattern (e.g. "HH:mm", "MMM d", "ddd HH:mm"), or a number pattern ("0.0").
+    format: str = ""
+    # Custom HTML element (kind == "html") or SVG element (kind == "svg"): agent-
+    # or user-authored markup that renders in a sandboxed iframe (no scripts, no
+    # network). ``html`` holds the markup (the raw <svg> for kind "svg"); ``css``
+    # is injected into the iframe's <style>.
     html: str = ""
     css: str = ""
     # Element opacity 0-100 (applies to widgets and decorations alike).

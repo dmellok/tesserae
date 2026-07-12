@@ -669,6 +669,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "source": e.source,
                     "field": e.field,
                     "display": e.display,
+                    "format": e.format,
                     "unit": e.unit,
                     "precision": e.precision,
                     "label": e.label,

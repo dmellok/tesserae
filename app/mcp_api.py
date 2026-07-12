@@ -20,6 +20,7 @@ switched on in Settings.
 from __future__ import annotations
 
 import secrets
+import uuid
 from typing import Any
 
 from flask import Blueprint, Flask, abort, current_app, jsonify, request, url_for
@@ -96,8 +97,13 @@ def _err(status: int, message: str, **extra: Any) -> Response:
 @bp.get("/catalog")
 def catalog() -> Response:
     """Every renderable widget (with its fragments) plus theme/style/font options,
-    so the agent knows what it can place and how to style the canvas."""
-    return jsonify({"widgets": build_catalog(_pr._registry()), "appearance": _pr._appearance()})
+    so the agent knows what it can place and how to style the canvas.
+
+    The per-widget ``sample`` payload is omitted here to keep the response small;
+    fetch a widget's live data shape with ``POST /widgets/<key>/data`` instead."""
+    widgets = build_catalog(_pr._registry())
+    lean = [{k: v for k, v in w.items() if k != "sample"} for w in widgets]
+    return jsonify({"widgets": lean, "appearance": _pr._appearance()})
 
 
 @bp.get("/widgets/<key>/options")
@@ -108,6 +114,32 @@ def widget_options(key: str) -> Response:
     if plugin is None:
         return _err(404, f"unknown widget {key!r}")
     return jsonify({"key": key, "options": _pr._materialised_options(plugin)})
+
+
+@bp.post("/widgets/<key>/data")
+def widget_data(key: str) -> Response:
+    """The live data payload a widget's fetch() returns (sample fallback), so the
+    agent can see the real field names + shapes before binding a data primitive.
+    Body: ``{options?}``. This is the field-discovery / probe endpoint."""
+    plugin = _pr._registry().get(key)
+    if plugin is None:
+        return _err(404, f"unknown widget {key!r}")
+    from app.composer import _fetch_plugin_data, _resolved_options
+    from app.widget_samples import get_sample
+
+    body = request.get_json(silent=True) or {}
+    raw_options = body.get("options")
+    options: dict[str, Any] = raw_options if isinstance(raw_options, dict) else {}
+    opts = _resolved_options(key, options)
+    data: Any = None
+    try:
+        data = _fetch_plugin_data(key, opts, 600, 400, preview=False, cell_w=600, cell_h=400)
+    except Exception:
+        data = None
+    if not isinstance(data, dict) or data.get("error"):
+        sample = get_sample(key)
+        data = sample if isinstance(sample, dict) else data
+    return jsonify({"key": key, "data": data})
 
 
 # -- devices ------------------------------------------------------------
@@ -183,12 +215,30 @@ def get_canvas(page_id: str) -> Response:
     return jsonify(_pr._as_doc(page).model_dump(mode="json"))
 
 
+def _saved(page: Any) -> Response:
+    """Compact save acknowledgement (id, rev, element count). Pass ``?return=doc``
+    to get the full document back instead. Keeping this small avoids echoing an
+    80k-char document on every write."""
+    layout = page.canvas
+    if request.args.get("return") == "doc":
+        return jsonify(_pr._as_doc(page).model_dump(mode="json"))
+    return jsonify(
+        {
+            "ok": True,
+            "id": page.id,
+            "rev": _pr._canvas_rev(page),
+            "elements": len(layout.els) if layout is not None else 0,
+        }
+    )
+
+
 @bp.put("/pages/<page_id>/canvas")
 def set_canvas(page_id: str) -> Response:
     """Replace a canvas dashboard's document. Body is the canvas layout
     (``{w,h,theme,style,font,bg,bg_image,bg_fit,els[],name?}``). ``id`` and bound
-    devices are preserved from the server; an invalid document returns 422 with
-    field-level messages so the agent can correct it."""
+    devices are preserved from the server. Returns a compact ``{ok,id,rev,elements}``
+    ack by default (``?return=doc`` for the full document); an invalid document
+    returns 422 with field-level messages so the agent can correct it."""
     page = _pr._get_canvas(page_id)
     if page is None:
         return _err(404, f"no canvas dashboard {page_id!r}")
@@ -205,7 +255,37 @@ def set_canvas(page_id: str) -> Response:
     new_page = _pr._doc_to_page(doc)
     new_page.created_by = page.created_by  # preserve provenance
     _pr._pages().save(new_page)
-    return jsonify(_pr._as_doc(new_page).model_dump(mode="json"))
+    return _saved(new_page)
+
+
+@bp.post("/pages/<page_id>/elements")
+def append_element(page_id: str) -> Response:
+    """Append one element to a canvas and save (each call is one save, so an open
+    editor updates live as an agent builds). Body is a single element object, e.g.
+    ``{"kind":"data","source":"weather_now","field":"temp","x":10,"y":10,"w":120,"h":60}``.
+    Returns the compact ack plus the new element's ``element_id``."""
+    from app.state.panel_store import CanvasLayout, Element
+
+    page = _pr._get_canvas(page_id)
+    if page is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _err(400, "body must be a single element object")
+    if not body.get("id"):
+        body = {**body, "id": uuid.uuid4().hex[:8]}
+    try:
+        element = Element.model_validate(body)
+    except ValidationError as exc:
+        return _err(422, "invalid element", details=exc.errors(include_url=False))
+    layout = page.canvas or CanvasLayout()
+    layout.els.append(element)
+    page.canvas = layout
+    _pr._pages().save(page)
+    resp = _saved(page)
+    data = resp.get_json()
+    data["element_id"] = element.id
+    return jsonify(data)
 
 
 # -- preview + push -----------------------------------------------------

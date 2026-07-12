@@ -8,6 +8,30 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Canvas editor: SVG primitive.** Paste raw SVG as an element; it scales to fill
+  the box and renders in a sandboxed iframe.
+
+- **Data primitives: value formatting.** A `format` option renders datetimes and
+  numbers (e.g. `HH:mm`, `MMM d`, `relative`, `0.0`), so calendar/time fields are
+  presentable. Field paths also gain array indexing and a pluck syntax
+  (`series.*.total` / `series[].total`) to feed charts from arrays of objects.
+
+- **MCP: agent affordances.** From feedback building dashboards with an agent:
+  `set_canvas` returns a compact `{ok,id,rev,elements}` ack instead of echoing the
+  whole document (opt back in with `?return=doc`); a `probe_widget_data` tool
+  returns a widget's live data so the agent can see real field names before
+  binding; an `add_element` tool appends one element per call (each a save, so an
+  open editor updates live as the agent builds); and the catalog omits per-widget
+  samples to stay small.
+
+### Fixed
+
+- **Canvas editor: layer names.** Decoration, data, and custom-HTML/SVG elements
+  showed as "Empty" in the Layers panel; they now carry meaningful names.
+
+- **Canvas editor: icon key format.** The icon primitive now accepts both `star`
+  and `ph-star` (matching the format widget icon fields use).
+
 - **Canvas editor: data primitives.** A new element that binds any widget's data
   field (by dotted path) to a scalable text, number, or graph (line / bar /
   sparkline via Chart.js). Pick a source widget, configure it, choose a field

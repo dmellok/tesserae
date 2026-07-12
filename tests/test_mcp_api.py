@@ -131,7 +131,7 @@ def test_create_get_set_roundtrip(app: Flask) -> None:
     }
     saved = client.put(f"/api/mcp/pages/{pid}/canvas", json=new_doc)
     assert saved.status_code == 200
-    assert len(saved.get_json()["els"]) == 1
+    assert saved.get_json()["elements"] == 1  # compact ack
 
     again = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
     assert again["els"][0]["text"] == "Hi"
@@ -140,6 +140,61 @@ def test_create_get_set_roundtrip(app: Flask) -> None:
     pages = client.get("/api/mcp/pages").get_json()["pages"]
     entry = next(p for p in pages if p["id"] == pid)
     assert entry["created_by"] == "mcp" and entry["elements"] == 1
+
+
+def test_set_canvas_compact_and_return_doc(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = {
+        "w": 800,
+        "h": 480,
+        "els": [{"id": "e1", "kind": "rect", "x": 0, "y": 0, "w": 20, "h": 20}],
+    }
+    # Default: compact ack, no document echoed.
+    ack = client.put(f"/api/mcp/pages/{pid}/canvas", json=body).get_json()
+    assert ack["ok"] is True and ack["elements"] == 1 and ack["rev"] and "els" not in ack
+    # Opt-in: full document.
+    doc = client.put(f"/api/mcp/pages/{pid}/canvas?return=doc", json=body).get_json()
+    assert "els" in doc and len(doc["els"]) == 1
+
+
+def test_append_element_saves_incrementally(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    r1 = client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={"kind": "text", "text": "hi", "x": 5, "y": 5, "w": 80, "h": 30},
+    )
+    assert r1.status_code == 200
+    j1 = r1.get_json()
+    assert j1["ok"] and j1["elements"] == 1 and j1["element_id"]
+    r2 = client.post(
+        f"/api/mcp/pages/{pid}/elements", json={"kind": "rect", "x": 0, "y": 0, "w": 40, "h": 40}
+    )
+    assert r2.get_json()["elements"] == 2  # accumulates
+    # Bad element → 422.
+    assert (
+        client.post(f"/api/mcp/pages/{pid}/elements", json={"kind": "rect", "w": 0}).status_code
+        == 422
+    )
+
+
+def test_probe_widget_data_returns_payload(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    resp = client.post("/api/mcp/widgets/weather_now/data", json={})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["key"] == "weather_now" and "data" in body
+    assert client.post("/api/mcp/widgets/not_a_widget/data", json={}).status_code == 404
+
+
+def test_catalog_omits_samples(app: Flask) -> None:
+    _enable(app)
+    cat = app.test_client().get("/api/mcp/catalog").get_json()
+    assert cat["widgets"] and all("sample" not in w for w in cat["widgets"])
 
 
 def test_set_invalid_returns_422(app: Flask) -> None:

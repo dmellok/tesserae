@@ -36,6 +36,7 @@
     { kind: "icon", label: "Icon", icon: "ph-star", w: 72, h: 72 },
     { kind: "data", label: "Data value", icon: "ph-chart-line", w: 160, h: 80 },
     { kind: "html", label: "Custom HTML", icon: "ph-code", w: 200, h: 120 },
+    { kind: "svg", label: "SVG", icon: "ph-bezier-curve", w: 120, h: 120 },
   ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
   // alongside a native colour picker.
@@ -108,8 +109,20 @@
     return (w && w.fragments) || [];
   }
   function elLabel(e) {
+    switch (e.kind) {
+      case "text": return e.text ? '“' + String(e.text).slice(0, 24) + '”' : "Text";
+      case "rect": return "Rectangle";
+      case "ellipse": return "Circle";
+      case "line": return "Line";
+      case "icon": return "Icon: " + (e.icon || "star");
+      case "html": return "Custom HTML";
+      case "svg": return "SVG";
+      case "data":
+        return e.source ? (e.source + (e.field ? " · " + e.field : "")) : "Data value";
+    }
+    // widget (or an unassigned box)
+    if (!e.widget) return "Empty box";
     var w = widgetFor(e.widget);
-    if (!e.widget) return "Empty";
     var base = w ? w.name : e.widget;
     if (e.fragment && e.fragment !== "full") {
       var f = fragmentsOf(e.widget).filter(function (x) { return x.id === e.fragment; })[0];
@@ -188,9 +201,12 @@
       text: kind === "text" ? "Text" : "", align: "left", size: 0, opacity: 100,
       // data primitive
       source: "", field: "", display: "text", unit: "", precision: 0, label: "",
-      // custom html
-      html: kind === "html" ? '<div class="mini">Edit me</div>' : "",
+      // custom html / svg
+      html: kind === "html" ? '<div class="mini">Edit me</div>'
+        : kind === "svg" ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1B1A16"/></svg>'
+        : "",
       css: kind === "html" ? ".mini{font:700 18px sans-serif;color:#1B1A16}" : "",
+      format: "",
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
   }
@@ -1451,9 +1467,12 @@
   }
 
   function renderHtmlProps(mount, e) {
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-code"></i>Custom HTML'));
-    mount.appendChild(el("div", "note", "Renders in a sandboxed iframe: HTML + CSS only, no scripts or network."));
-    [["HTML", "html", 6], ["CSS", "css", 5]].forEach(function (f) {
+    var svg = e.kind === "svg";
+    mount.appendChild(el("div", "psec",
+      '<i class="ph-bold ' + (svg ? "ph-bezier-curve" : "ph-code") + '"></i>' + (svg ? "SVG" : "Custom HTML")));
+    mount.appendChild(el("div", "note", "Renders in a sandboxed iframe: markup + CSS only, no scripts or network."));
+    var fields = svg ? [["SVG markup", "html", 8], ["CSS", "css", 4]] : [["HTML", "html", 6], ["CSS", "css", 5]];
+    fields.forEach(function (f) {
       var row = el("div", "prow"); row.style.display = "block";
       row.innerHTML = '<span class="plab" style="display:block;margin-bottom:4px">' + f[0] + "</span>";
       var ta = el("textarea", "dinput");
@@ -1524,6 +1543,13 @@
       textInput("Unit", "unit");
       if (e.display === "number") mount.appendChild(decoSlider(e, "Decimals", "precision", 0, 4));
       textInput("Label", "label");
+      var fr = el("div", "prow"); fr.innerHTML = '<span class="plab">Format</span>';
+      var fin = el("input", "dinput"); fin.value = e.format || ""; fin.style.width = "100%";
+      fin.placeholder = "HH:mm · MMM d · relative · 0.0";
+      fin.title = "Optional: a date pattern (HH:mm, MMM d, ddd), 'relative', or a number pattern (0.0)";
+      fin.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      fin.addEventListener("change", function () { pushHistory(); e.format = fin.value.trim(); scheduleSave(); paint(); });
+      fr.appendChild(fin); mount.appendChild(fr);
       mount.appendChild(decoSlider(e, "Font size", "size", 0, 200));
       var arow = el("div", "prow"); arow.innerHTML = '<span class="plab">Align</span>';
       var asel = el("select", "psel");
@@ -1543,7 +1569,7 @@
 
   function renderDecoProps(mount, e) {
     mount.textContent = "";
-    if (e.kind === "html") { renderHtmlProps(mount, e); return; }
+    if (e.kind === "html" || e.kind === "svg") { renderHtmlProps(mount, e); return; }
     if (e.kind === "data") { renderDataProps(mount, e); return; }
     var name = { text: "Text", rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-shapes"></i>' + name));
