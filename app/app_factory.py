@@ -416,6 +416,13 @@ def create_app(
     # 0.42.2; see https://github.com/dmellok/tesserae/issues/11 (if any).
     user_plugins_dir = data_root / "marketplace"
     user_plugins_dir.mkdir(parents=True, exist_ok=True)
+    # Widgets pushed by an authoring client (Tesserae Studio) over the MCP
+    # push API land here, isolated from catalog installs (different
+    # lifecycle: dev pushes, no InstalledRecord). Walked ahead of the
+    # marketplace dir so a pushed widget being actively edited wins over an
+    # installed copy of the same id; bundled ids still win over both.
+    authored_dir = data_root / "authored"
+    authored_dir.mkdir(parents=True, exist_ok=True)
 
     settings = SettingsStore(data_root / "core" / "settings.json")
     app.config["SETTINGS_STORE"] = settings
@@ -448,17 +455,25 @@ def create_app(
     settings.set_secret_box(secret_box)
     app.config["SECRET_BOX"] = secret_box
 
-    plugins = plugin_loader.discover(
-        plugins_dir,
-        schema_path=plugin_schema,
-        data_root=plugin_data_root,
-        # Marketplace-installed widgets live under the persistent
-        # data volume; the loader walks both dirs and merges. See
-        # the user_plugins_dir comment above.
-        additional_plugins_dirs=[user_plugins_dir],
-    )
+    def _rediscover_plugins() -> plugin_loader.PluginRegistry:
+        """Rebuild the plugin registry from the same sources used at startup.
+        The MCP widget-push API calls this for an in-process reload after a
+        push, so an authored widget goes live without a restart."""
+        return plugin_loader.discover(
+            plugins_dir,
+            schema_path=plugin_schema,
+            data_root=plugin_data_root,
+            additional_plugins_dirs=[authored_dir, user_plugins_dir],
+        )
+
+    plugins = _rediscover_plugins()
     for perr in plugins.errors:
         logger.warning("plugin loader: %s, %s", perr.plugin_id, perr.message)
+    # Stashed for the MCP push API (install / reload / list authored widgets).
+    app.config["AUTHORED_DIR"] = authored_dir
+    app.config["PLUGINS_DIR"] = plugins_dir
+    app.config["PLUGIN_SCHEMA"] = plugin_schema
+    app.config["REDISCOVER_PLUGINS"] = _rediscover_plugins
 
     renderers = renderer_loader.discover(
         renderers_dir,

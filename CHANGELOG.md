@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **MCP: push a widget you are authoring to a running instance.** New endpoints let
+  an authoring client (Tesserae Studio) install a widget over the network with no
+  shared filesystem, so authoring works against a Tesserae on another machine or in
+  the Home Assistant App / Docker. `POST /api/mcp/widgets/install` accepts a widget
+  tarball, validates it (kind widget, schema-valid, no bundled-id collision, tar-slip
+  and size guarded), writes it to a persistent `authored/` dir, and reloads: an
+  in-process registry rebuild when safe (fast, no dropped connections) or a process
+  restart when the widget adds an admin page. `DELETE /api/mcp/widgets/<id>`,
+  `POST /api/mcp/reload`, `GET /api/mcp/widgets?origin=authored`, and a faithful
+  `GET /api/mcp/widgets/<id>/render.png` round it out. Token-authed like the rest of
+  the MCP surface (loopback or bearer), behind the `mcp` experiment.
+
 - **MCP: faithful, editable, hardware-aware dashboard building.** A batch of
   agent-facing improvements from real building sessions:
   - **Partial edits.** `update_element`, `delete_element`, and `patch_canvas`

@@ -222,6 +222,33 @@ alongside `render_preview` (image).
 
 ---
 
+## Widget push (authoring)
+
+A separate set of endpoints under `/api/mcp` lets an authoring client (Tesserae
+Studio) install a widget you are building onto a running Tesserae over the network,
+with no shared filesystem, so authoring works against a remote or Home Assistant App
+/ Docker instance. These are developer pushes, not the public catalog flow (no catalog
+entry, no `sha256` gate).
+
+| Endpoint | What it does |
+| --- | --- |
+| `POST /api/mcp/widgets/install` | Install/upsert a widget from a tarball (`application/gzip` body, or `multipart` with a `tarball` part). Query: `id` (override), `reload` (`auto`/`in_process`/`restart`/`none`). |
+| `DELETE /api/mcp/widgets/<id>` | Uninstall a pushed widget (only touches the `authored/` dir). |
+| `POST /api/mcp/reload` | Rebuild the plugin registry without installing. Body/query `mode`. |
+| `GET /api/mcp/widgets?origin=authored` | List pushed widgets with an `active` flag. |
+| `GET /api/mcp/widgets/<id>/render.png` | Faithful e-ink PNG of a single widget (`size`, `opts`, `theme`, `style`). |
+
+Pushed widgets live under `<data_root>/authored/<id>`, isolated from catalog installs
+and on the persistent volume so they survive restarts / App upgrades. Install is
+guarded: tarballs are size- and count-capped, extracted with tar-slip protection, and
+only `kind: "widget"` manifests that validate against the schema and do not collide
+with a bundled id are accepted; `server.py` is never imported at install time. Reload
+is in-process (fast) unless the widget adds an admin `blueprint()`, which needs a
+restart; when a restart is scheduled the response has `restarting: true` and the client
+polls `/healthz` then `/api/mcp/catalog` until the id appears.
+
+---
+
 ## What an agent can place
 
 A canvas element is one of: a **widget** (or a fragment of one), a **decoration**

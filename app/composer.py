@@ -1020,10 +1020,14 @@ def compose_canvas(canvas_id: str) -> str:
 def test_render() -> str:
     """Mount one plugin into a known cell size, no Page needed.
 
-    Available when the app is in debug or testing mode. Used by the per-plugin
-    smoke tests that ship with every widget.
+    Available in debug or testing mode (the per-plugin smoke tests use it), and
+    over loopback so the MCP widget render endpoint can screenshot a single widget
+    on a production / HA instance. The renderer navigates via ``127.0.0.1`` (see
+    ``to_loopback_url``), the same loopback trust boundary ``/compose`` relies on.
     """
-    if not (current_app.debug or current_app.testing):
+    from app.auth import _is_loopback
+
+    if not (current_app.debug or current_app.testing or _is_loopback()):
         abort(404)
 
     plugin_id = request.args.get("plugin")

@@ -20,6 +20,7 @@ switched on in Settings.
 from __future__ import annotations
 
 import json
+import logging
 import secrets
 import uuid
 from typing import Any
@@ -37,6 +38,8 @@ from app.state.settings_store import SettingsStore
 from app.webhook_routes import _presented_token, generate_token
 
 bp = Blueprint("mcp_api", __name__, url_prefix="/api/mcp")
+
+logger = logging.getLogger(__name__)
 
 _EXPERIMENT = "mcp"
 # Where the MCP token lives in settings. ``_secret`` suffix → SecretBox-encrypted
@@ -272,6 +275,198 @@ def widget_data(key: str) -> Response:
             "fields": _flatten_fields(data) if isinstance(data, dict) else [],
         }
     )
+
+
+# -- widget push / install (Tesserae Studio) ----------------------------
+
+
+_RELOAD_MODES = ("auto", "in_process", "restart", "none")
+
+
+def _reload_registry(mode: str, *, restart_if_blueprint: bool) -> dict[str, Any]:
+    """Bring pushed-widget changes live. ``in_process`` rebuilds the registry and
+    swaps it (fast, no dropped connections); ``restart`` re-execs the process (needed
+    to register a new admin ``blueprint()``); ``auto`` picks in-process unless a
+    blueprint is involved or the rebuild fails; ``none`` does nothing. Raises on a
+    hard failure so the caller can surface it."""
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+
+    def _restart() -> dict[str, Any]:
+        updater = app.config.get("UPDATER")
+        if updater is None:
+            raise RuntimeError("restart unavailable (no updater configured)")
+        updater.restart(delay_s=1.0)
+        return {"reload": "restart", "restarting": True}
+
+    if mode == "none":
+        return {"reload": "none", "restarting": False}
+    if mode == "restart" or (mode == "auto" and restart_if_blueprint):
+        return _restart()
+
+    rediscover = app.config.get("REDISCOVER_PLUGINS")
+    if rediscover is None:
+        if mode == "in_process":
+            raise RuntimeError("in-process reload unavailable")
+        return _restart()
+    try:
+        new_registry = rediscover()
+    except Exception:
+        logger.exception("in-process plugin reload failed")
+        if mode == "in_process":
+            raise
+        return _restart()
+    # Atomic swap (single config assignment). Derived views (catalog, options)
+    # read the registry fresh per request, so nothing else needs invalidating.
+    app.config["PLUGIN_REGISTRY"] = new_registry
+    for perr in new_registry.errors:
+        logger.warning("plugin reload: %s, %s", perr.plugin_id, perr.message)
+    return {"reload": "in_process", "restarting": False}
+
+
+@bp.post("/widgets/install")
+def install_widget() -> Response:
+    """Install or upsert a single authored widget from an uploaded tarball into
+    ``<data_root>/authored/<id>``, then reload. Body: a gzipped tar (``application/
+    gzip``) whose root is the widget or a single folder containing it, or
+    ``multipart/form-data`` with a ``tarball`` part. Query: ``id`` (override the id),
+    ``reload`` (``auto`` | ``in_process`` | ``restart`` | ``none``, default ``auto``)."""
+    from app import authored_widgets as aw
+
+    if request.content_length and request.content_length > aw.MAX_COMPRESSED_BYTES:
+        return _err(413, "tarball too large")
+    if (request.content_type or "").startswith("multipart/form-data"):
+        part = request.files.get("tarball")
+        if part is None:
+            return _err(400, "multipart body must include a 'tarball' file part")
+        tar_bytes = part.read()
+    else:
+        tar_bytes = request.get_data(cache=False)
+    if not tar_bytes:
+        return _err(400, "empty request body (send the widget tarball)")
+
+    mode = request.args.get("reload", "auto")
+    if mode not in _RELOAD_MODES:
+        return _err(400, f"reload must be one of {'|'.join(_RELOAD_MODES)}")
+
+    try:
+        result = aw.install_tarball(
+            tar_bytes,
+            data_root=current_app.config["DATA_ROOT"],
+            plugins_dir=current_app.config["PLUGINS_DIR"],
+            schema_path=current_app.config["PLUGIN_SCHEMA"],
+            id_override=request.args.get("id") or None,
+        )
+    except aw.InstallError as err:
+        return _err(err.status, err.message)
+
+    try:
+        rel = _reload_registry(mode, restart_if_blueprint=bool(result["blueprint"]))
+    except Exception as err:
+        return _err(500, f"installed but reload failed: {err}")
+
+    active = not rel["restarting"] and _pr._registry().get(result["id"]) is not None
+    return jsonify(
+        {
+            "ok": True,
+            "id": result["id"],
+            "version": result["version"],
+            "installed": True,
+            "reload": rel["reload"],
+            "active": active,
+            "restarting": rel["restarting"],
+        }
+    )
+
+
+@bp.delete("/widgets/<key>")
+def uninstall_widget(key: str) -> Response:
+    """Uninstall a pushed widget (only ever removes entries under
+    ``<data_root>/authored/``). Query ``reload`` as for install."""
+    from app import authored_widgets as aw
+
+    data_root = current_app.config["DATA_ROOT"]
+    if not aw.uninstall(key, data_root=data_root):
+        return _err(404, f"no pushed widget {key!r} under authored/")
+    mode = request.args.get("reload", "auto")
+    if mode not in _RELOAD_MODES:
+        return _err(400, f"reload must be one of {'|'.join(_RELOAD_MODES)}")
+    try:
+        rel = _reload_registry(mode, restart_if_blueprint=aw.any_blueprint(data_root))
+    except Exception as err:
+        return _err(500, f"uninstalled but reload failed: {err}")
+    return jsonify(
+        {
+            "ok": True,
+            "id": key,
+            "reload": rel["reload"],
+            "active": False,
+            "restarting": rel["restarting"],
+        }
+    )
+
+
+@bp.post("/reload")
+def reload_plugins() -> Response:
+    """Reload the plugin registry without installing anything. Body/query ``mode``
+    (``auto`` | ``in_process`` | ``restart``, default ``auto``)."""
+    from app import authored_widgets as aw
+
+    body = request.get_json(silent=True) or {}
+    mode = str(body.get("mode") or request.args.get("mode") or "auto")
+    if mode not in _RELOAD_MODES:
+        return _err(400, f"mode must be one of {'|'.join(_RELOAD_MODES)}")
+    try:
+        rel = _reload_registry(
+            mode, restart_if_blueprint=aw.any_blueprint(current_app.config["DATA_ROOT"])
+        )
+    except Exception as err:
+        return _err(500, f"reload failed: {err}")
+    return jsonify({"ok": True, "mode": rel["reload"], "restarting": rel["restarting"]})
+
+
+@bp.get("/widgets")
+def list_authored_widgets() -> Response:
+    """List pushed widgets so a client can reconcile. Requires ``?origin=authored``."""
+    if request.args.get("origin") != "authored":
+        return _err(400, "pass ?origin=authored to list pushed widgets")
+    from app import authored_widgets as aw
+
+    widgets = aw.list_authored(current_app.config["DATA_ROOT"], _pr._registry())
+    return jsonify({"widgets": widgets})
+
+
+@bp.get("/widgets/<key>/render.png")
+def widget_render(key: str) -> Response:
+    """Faithful e-ink render of a single widget as a PNG, over the authed MCP
+    surface (so a client can preview against a remote / HA instance where
+    ``/_test/render`` is not reachable). Query: ``size`` (xs|sm|md|lg, default lg),
+    ``opts`` (JSON cell options), optional ``theme`` / ``style`` / ``sample`` / ``zoom``."""
+    from urllib.parse import urlencode
+
+    from app.composer import SIZE_DIMENSIONS
+    from app.renderer import RenderRequest, render_to_png, to_loopback_url
+
+    if _pr._registry().get(key) is None:
+        return _err(404, f"unknown widget {key!r}")
+    size = request.args.get("size", "lg")
+    if size not in SIZE_DIMENSIONS:
+        return _err(400, f"size must be one of {'|'.join(sorted(SIZE_DIMENSIONS))}")
+    w, h = SIZE_DIMENSIONS[size]
+    params: dict[str, str] = {"plugin": key, "size": size}
+    for arg in ("opts", "theme", "style", "sample", "zoom"):
+        val = request.args.get(arg)
+        if val:
+            params[arg] = val
+    path = url_for("composer.test_render") + "?" + urlencode(params)
+    url = to_loopback_url(request.host_url.rstrip("/") + path)
+    try:
+        png = render_to_png(
+            RenderRequest(url=url, viewport_w=w, viewport_h=h),
+            pool=current_app.config.get("BROWSER_POOL"),
+        )
+    except Exception as err:
+        return _err(502, f"render failed: {type(err).__name__}: {err}")
+    return current_app.response_class(png, mimetype="image/png")
 
 
 # -- devices ------------------------------------------------------------
