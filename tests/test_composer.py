@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
@@ -244,6 +245,136 @@ def test_resolved_options_falls_back_to_app_level_location_when_cell_empty(
         )
         assert out_cell["latitude"] == -37.8
         assert out_cell["label"] == "Melbourne"
+
+
+def test_geocode_parses_lat_lon_literal_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ``"lat,lon"`` location resolves without touching the network, so a
+    hand-authored / MCP-set element with literal coordinates Just Works. Bad
+    or out-of-range strings fall through to the name search, which we stub to
+    fail here so the assertion stays hermetic."""
+
+    def _no_network(*a: object, **k: object) -> object:
+        raise RuntimeError("no network in tests")
+
+    monkeypatch.setattr(composer, "fetch_json", _no_network)
+    composer._GEOCODE_CACHE.clear()
+    out = composer._geocode("-37.65, 145.09")
+    assert out is not None
+    assert out["latitude"] == -37.65 and out["longitude"] == 145.09
+    # A non-coordinate string and an out-of-range pair both fall to the name
+    # search, which is stubbed to fail → None (never a live lookup).
+    assert composer._geocode("not a place") is None
+    assert composer._geocode("999,999") is None
+
+
+def test_resolved_options_geocodes_bare_string_location(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue: weather widgets ignored a bare-string location and always fell
+    back to the sample city. ``_resolved_options`` (the one resolver the
+    preview AND the push share) now geocodes a bare string, so a source with
+    ``location: "South Morang"`` resolves to that place's coords and echoes
+    "South Morang" as the label, not "Melbourne"."""
+
+    def _fake_geocode(query: str) -> dict[str, float | str] | None:
+        if query.strip().lower() == "south morang":
+            return {"latitude": -37.65, "longitude": 145.09, "name": "South Morang"}
+        return None
+
+    monkeypatch.setattr(composer, "_geocode", _fake_geocode)  # type: ignore[attr-defined]
+    with app.app_context():
+        out = composer._resolved_options("weather_now", {"location": "South Morang"})
+        assert out["latitude"] == -37.65
+        assert out["longitude"] == 145.09
+        assert out["label"] == "South Morang"
+
+        # An unresolvable string does NOT fall back to the app-level location
+        # (that was the silent-Melbourne bug): coords stay unset and the label
+        # carries the query so the widget errors for the intended place.
+        app.config["SETTINGS_STORE"].update_section(
+            "app",
+            {"location": {"name": "Melbourne", "latitude": -37.8, "longitude": 144.9}},
+        )
+        miss = composer._resolved_options("weather_now", {"location": "Nowhereville"})
+        assert miss.get("latitude") in (None, "")
+        assert miss.get("longitude") in (None, "")
+        assert miss["label"] == "Nowhereville"
+
+
+def test_canvas_render_surfaces_error_for_unresolvable_location(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """In the render_preview code path (``_build_canvas_els``), a data element
+    whose configured location can't be resolved keeps the widget's error
+    payload instead of silently swapping in the demo sample."""
+    from app.state.panel_store import Element
+
+    monkeypatch.setattr(composer, "_geocode", lambda q: None)  # type: ignore[attr-defined]
+    monkeypatch.setattr(
+        composer,
+        "_fetch_plugin_data",
+        lambda *a, **k: {"error": "Location has invalid coordinates."},  # type: ignore[attr-defined]
+    )
+    with app.app_context():
+        out = composer._build_canvas_els(
+            [
+                Element(
+                    id="d1",
+                    kind="data",
+                    source="weather_now",
+                    field="temp",
+                    options={"location": "Nowhereville"},
+                    x=0,
+                    y=0,
+                    w=100,
+                    h=60,
+                )
+            ],
+            400,
+            300,
+        )
+        assert out[0]["data"].get("error")  # real error, not the Melbourne sample
+        assert out[0]["data"].get("label") != "Melbourne"
+
+
+def test_build_canvas_els_shares_fetch_across_same_widget(
+    app: Flask, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Several elements bound to the same widget + options fetch once, not
+    once per element (canvas dashboards commonly bind temp / humidity / wind
+    data primitives to one weather source)."""
+    from app.state.panel_store import Element
+
+    calls: list[str] = []
+
+    def _counting_fetch(plugin_id: str, opts: object, *a: object, **k: object) -> dict[str, int]:
+        calls.append(plugin_id)
+        return {"temp": 19, "humidity": 62}
+
+    monkeypatch.setattr(composer, "_fetch_plugin_data", _counting_fetch)  # type: ignore[attr-defined]
+    with app.app_context():
+        composer._build_canvas_els(
+            [
+                Element(
+                    id="a", kind="data", source="weather_now", field="temp", x=0, y=0, w=80, h=40
+                ),
+                Element(
+                    id="b",
+                    kind="data",
+                    source="weather_now",
+                    field="humidity",
+                    x=0,
+                    y=50,
+                    w=80,
+                    h=40,
+                ),
+                Element(id="c", widget="weather_now", fragment="temp", x=100, y=0, w=120, h=120),
+            ],
+            400,
+            300,
+        )
+    # weather_now with the same resolved options fetched exactly once.
+    assert calls.count("weather_now") == 1
 
 
 def test_resolved_options_migrates_legacy_flat_lat_lon(app: Flask) -> None:

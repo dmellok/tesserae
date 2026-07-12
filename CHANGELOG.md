@@ -26,6 +26,27 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Weather widgets: a written-out location now resolves.** A location set as
+  plain text (e.g. by an MCP agent, or `"South Morang"` / `"Paris, FR"` /
+  `"-37.65,145.09"`) is geocoded server-side instead of being ignored, so the
+  preview and the pushed frame both show weather for that place and echo its
+  name. Preview and push share one resolver, so they can no longer disagree. A
+  location that genuinely can't be resolved now surfaces an error for the place
+  you asked for rather than silently falling back to the sample city.
+
+- **Canvas: one fetch per widget.** Several data primitives bound to the same
+  widget (temperature, humidity, wind off one weather source) now share a single
+  data fetch per render instead of each fetching independently.
+
+- **Canvas theme background.** The editor and the pushed frame disagreed on an
+  unset background (one showed black), and neither loaded user / community theme
+  CSS the grid pages resolve; both now agree and fall back to the theme paper
+  colour.
+
+- **Canvas editor: external swaps remount cleanly.** When the open document is
+  replaced by an external save, the editor now forces a full remount so stale
+  element nodes can't linger.
+
 - **Canvas editor: layer names.** Decoration, data, and custom-HTML/SVG elements
   showed as "Empty" in the Layers panel; they now carry meaningful names.
 

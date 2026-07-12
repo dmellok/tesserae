@@ -19,7 +19,7 @@
       "type": "location_search",
       "label": "Location",
       "default": "",
-      "help": "Search a city to set the location. The latitude / longitude that drive the weather data come from the picked result; the Label below auto-fills with the city name."
+      "help": "Search a city to set the location. The latitude / longitude that drive the weather data come from the picked result; the Label below auto-fills with the city name. Set programmatically (e.g. via MCP), location also accepts a bare place name ('South Morang'), a 'City, CC' form ('Paris, FR'), or a literal 'lat,lon' pair ('-37.65,145.09')."
     },
     {
       "name": "label",

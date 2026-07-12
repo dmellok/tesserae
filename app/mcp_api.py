@@ -124,7 +124,7 @@ def widget_data(key: str) -> Response:
     plugin = _pr._registry().get(key)
     if plugin is None:
         return _err(404, f"unknown widget {key!r}")
-    from app.composer import _fetch_plugin_data, _resolved_options
+    from app.composer import _fetch_plugin_data, _location_configured, _resolved_options
     from app.widget_samples import get_sample
 
     body = request.get_json(silent=True) or {}
@@ -136,7 +136,10 @@ def widget_data(key: str) -> Response:
         data = _fetch_plugin_data(key, opts, 600, 400, preview=False, cell_w=600, cell_h=400)
     except Exception:
         data = None
-    if not isinstance(data, dict) or data.get("error"):
+    # Only paper over an error with the demo sample when no location was
+    # configured. A set-but-unresolvable location surfaces its real error
+    # so the agent sees the problem rather than a plausible-looking sample.
+    if (not isinstance(data, dict) or data.get("error")) and not _location_configured(options):
         sample = get_sample(key)
         data = sample if isinstance(sample, dict) else data
     return jsonify({"key": key, "data": data})

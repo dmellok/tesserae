@@ -17,10 +17,12 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Final
+from urllib.parse import quote
 
 from flask import Blueprint, abort, current_app, render_template, request
 
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
+from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
 from app.state.page_store import Page, PageStore
 
@@ -92,6 +94,106 @@ def _app_location_dict() -> dict[str, Any] | None:
     return {"latitude": lat_f, "longitude": lon_f, "name": ""}
 
 
+# Process-lifetime geocode cache. Keyed on the lowercased query string.
+# A resolved dict is cached on success; the sentinel ``False`` is cached
+# on failure so an unresolvable place doesn't re-hit the API on every
+# render tick. Cleared on process restart, which is fine.
+_GEOCODE_CACHE: dict[str, Any] = {}
+_GEOCODE_TIMEOUT_S: Final[float] = 5.0
+
+
+def _parse_lat_lon(text: str) -> dict[str, Any] | None:
+    """Parse a literal ``"lat,lon"`` pair (``"-37.65, 145.09"``) into a
+    location dict without touching the network. Returns ``None`` when the
+    string isn't two in-range numbers."""
+    parts = text.split(",")
+    if len(parts) != 2:
+        return None
+    try:
+        lat = float(parts[0].strip())
+        lon = float(parts[1].strip())
+    except ValueError:
+        return None
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        return None
+    return {"latitude": lat, "longitude": lon, "name": ""}
+
+
+def _geocode(query: str) -> dict[str, Any] | None:
+    """Resolve free-text into ``{latitude, longitude, name}``.
+
+    Tolerant of three canonical shapes: a bare place name
+    (``"South Morang"``), a ``"City, CC"`` form (``"Paris, FR"``), or a
+    literal ``"lat,lon"`` pair (``"-37.65,145.09"``). The ``lat,lon``
+    form is parsed locally; a name is resolved through the Open-Meteo
+    geocoding API (no key required), trying the full string first and
+    then the city segment so ``"Paris, FR"`` still resolves. Results
+    cache in-process so repeated renders of the same dashboard don't
+    re-hit the API. Returns ``None`` for an empty or unresolvable query
+    so the caller can surface a real error instead of guessing."""
+    q = query.strip()
+    if not q:
+        return None
+    key = q.lower()
+    if key in _GEOCODE_CACHE:
+        return _GEOCODE_CACHE[key] or None
+
+    coords = _parse_lat_lon(q)
+    if coords is not None:
+        _GEOCODE_CACHE[key] = coords
+        return coords
+
+    # Name search. "Paris, FR" won't match the API's bare-city name field,
+    # so fall back to the segment before the comma.
+    candidates = [q]
+    if "," in q:
+        head = q.split(",", 1)[0].strip()
+        if head and head != q:
+            candidates.append(head)
+    for cand in candidates:
+        try:
+            payload = fetch_json(
+                "https://geocoding-api.open-meteo.com/v1/search"
+                f"?name={quote(cand)}&count=1&language=en&format=json",
+                timeout=_GEOCODE_TIMEOUT_S,
+                retries=0,
+            )
+        except Exception:
+            continue
+        results = payload.get("results") if isinstance(payload, dict) else None
+        if not (isinstance(results, list) and results and isinstance(results[0], dict)):
+            continue
+        top = results[0]
+        lat = top.get("latitude")
+        lon = top.get("longitude")
+        if not (isinstance(lat, (int, float)) and isinstance(lon, (int, float))):
+            continue
+        resolved = {
+            "latitude": float(lat),
+            "longitude": float(lon),
+            "name": str(top.get("name") or q),
+        }
+        _GEOCODE_CACHE[key] = resolved
+        return resolved
+
+    _GEOCODE_CACHE[key] = False  # negative cache
+    return None
+
+
+def _location_configured(raw: dict[str, Any] | None) -> bool:
+    """True when an element carries an explicit location (a non-empty
+    ``location`` dict or free-text string). The weather widgets fall back
+    to a demo sample only when NO location is set; a set-but-unresolvable
+    location surfaces its own error rather than silently rendering the
+    sample city."""
+    if not isinstance(raw, dict):
+        return False
+    loc = raw.get("location")
+    if isinstance(loc, str):
+        return bool(loc.strip())
+    return isinstance(loc, dict) and bool(loc)
+
+
 def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     plugin = _registry().get(plugin_id)
     if plugin is None:
@@ -114,8 +216,30 @@ def _resolved_options(plugin_id: str, raw: dict[str, Any]) -> dict[str, Any]:
     # cell has no ``location`` dict of its own, we splice the app-level
     # one in here so the promote-to-flat step below still fills
     # ``latitude`` / ``longitude`` on the widget's options.
+    # A ``location`` may arrive as the search-field dict, or as a bare
+    # string (an MCP agent, or a hand-authored / imported doc, setting
+    # ``location: "South Morang"`` or ``"-37.65,145.09"``). Geocode the
+    # string here so both the preview and the push resolve it identically
+    # through this one code path. An explicit-but-unresolvable location
+    # does NOT fall back to the app-level location: that would resurrect
+    # the "shows Melbourne" bug. We leave coords unset and carry the query
+    # as the label so the widget surfaces an error for the intended place.
     location = merged.get("location")
-    if not (isinstance(location, dict) and location):
+    explicit_unresolved = False
+    if isinstance(location, str) and location.strip():
+        query = location.strip()
+        resolved = _geocode(query)
+        if resolved is not None:
+            location = resolved
+        else:
+            # ``label`` pre-exists (empty) from the plugin defaults, so
+            # setdefault won't take: fill it only when the user hasn't
+            # typed a custom label.
+            if not merged.get("label"):
+                merged["label"] = query
+            explicit_unresolved = True
+            location = None
+    if not (isinstance(location, dict) and location) and not explicit_unresolved:
         location = _app_location_dict()
     if isinstance(location, dict) and location:
         lat = location.get("latitude")
@@ -643,6 +767,28 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
     fetched data (sample fallback), all in the authored ``cw x ch`` space."""
     from app.widget_samples import get_sample
 
+    # Dedupe fetches across elements that resolve to the same widget +
+    # options: a canvas often has several data primitives (temp, humidity,
+    # wind) bound to the SAME weather widget, plus maybe the widget itself.
+    # Fetching once per (widget, resolved-options) means one upstream call,
+    # not one per element. Keyed on resolved options (not raw) so an
+    # element inheriting the app-level location shares with one that picked
+    # the same place explicitly.
+    fetch_memo: dict[str, Any] = {}
+
+    def _shared_fetch(plugin_id: str, opts: dict[str, Any], cell_w: int, cell_h: int) -> Any:
+        memo_key = f"{plugin_id}::{json.dumps(opts, sort_keys=True, default=str)}"
+        if memo_key in fetch_memo:
+            return fetch_memo[memo_key]
+        try:
+            fetched = _fetch_plugin_data(
+                plugin_id, opts, cw, ch, preview=False, cell_w=cell_w, cell_h=cell_h
+            )
+        except Exception:
+            fetched = None
+        fetch_memo[memo_key] = fetched
+        return fetched
+
     els_out: list[dict[str, Any]] = []
     for e in els:
         if e.visible is False:
@@ -653,13 +799,10 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             opts = _resolved_options(e.source, e.options) if e.source else {}
             ddata: Any = None
             if e.source:
-                try:
-                    ddata = _fetch_plugin_data(
-                        e.source, opts, cw, ch, preview=False, cell_w=e.w, cell_h=e.h
-                    )
-                except Exception:
-                    ddata = None
-                if not isinstance(ddata, dict) or ddata.get("error"):
+                ddata = _shared_fetch(e.source, opts, e.w, e.h)
+                if (not isinstance(ddata, dict) or ddata.get("error")) and not _location_configured(
+                    e.options
+                ):
                     sample = get_sample(e.source)
                     ddata = sample if isinstance(sample, dict) else ddata
             els_out.append(
@@ -729,14 +872,10 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
         if e.widget:
             opts = _resolved_options(e.widget, e.options)
             item["options"] = opts
-            data: Any = None
-            try:
-                data = _fetch_plugin_data(
-                    e.widget, opts, cw, ch, preview=False, cell_w=e.w, cell_h=e.h
-                )
-            except Exception:
-                data = None
-            if not isinstance(data, dict) or data.get("error"):
+            data = _shared_fetch(e.widget, opts, e.w, e.h)
+            if (not isinstance(data, dict) or data.get("error")) and not _location_configured(
+                e.options
+            ):
                 sample = get_sample(e.widget)
                 data = sample if isinstance(sample, dict) else data
             item["data"] = data
