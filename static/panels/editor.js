@@ -1802,6 +1802,8 @@
     S.rev = S.doc.rev || null;
     S.dirty = false;
     S.past = []; S.future = []; // history is relative to the old doc; drop it
+    S.mount = {}; // wholesale doc swap: force a full remount so a theme/style/font
+    //               change from an external edit (agent) recolours token-baking widgets.
     setSel([]);
     renderAppearance();
     applyAppearance();
