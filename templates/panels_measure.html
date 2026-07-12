@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  {# Text-measurement page for the MCP measure_text helper. Loads the same
+     @font-face rules the composer uses so a canvas 2d measureText() reflects
+     the real rendered metrics, then exposes window.__measure(items). #}
+  <style>{{ font_face_css|safe }}</style>
+  <script>
+    // The inspector waits on this flag before evaluating, same as a compose render.
+    window.__tesseraeComposed = true;
+    // Measure a batch of {text, font?, size?, weight?, max_width?} items. Async so
+    // each font is actually loaded before measuring (an unloaded font falls back
+    // to system metrics and reports the wrong width).
+    window.__measure = async function (items) {
+      var ctx = document.createElement("canvas").getContext("2d");
+      var out = [];
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i] || {};
+        var size = Number(it.size) || 16;
+        var weight = Number(it.weight) || 400;
+        var fam = it.font || "system-ui";
+        var spec = weight + " " + size + 'px "' + fam + '"';
+        try { await document.fonts.load(spec); } catch (e) { /* fall back */ }
+        ctx.font = spec + ", system-ui, sans-serif";
+        var m = ctx.measureText(it.text || "");
+        var ascent = m.actualBoundingBoxAscent || size * 0.8;
+        var descent = m.actualBoundingBoxDescent || size * 0.2;
+        var width = Math.ceil(m.width);
+        out.push({
+          text: it.text || "",
+          font: fam,
+          size: size,
+          weight: weight,
+          width: width,
+          height: Math.ceil(ascent + descent),
+          fits: it.max_width != null ? width <= Number(it.max_width) : null,
+        });
+      }
+      return out;
+    };
+  </script>
+</head>
+<body></body>
+</html>

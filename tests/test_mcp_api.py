@@ -251,3 +251,212 @@ def test_push_ok(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
     assert resp.get_json()["sent"] == ["dev1"]
     (payload,) = pm.push_image.call_args.args
     assert payload == _FAKE_PNG
+
+
+# -- partial updates (#3) -----------------------------------------------
+
+
+def test_patch_element_updates_in_place(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    client.put(
+        f"/api/mcp/pages/{pid}/canvas",
+        json={
+            "w": 800,
+            "h": 480,
+            "els": [{"id": "e1", "kind": "text", "text": "Hi", "x": 0, "y": 0, "w": 100, "h": 40}],
+        },
+    )
+    ack = client.patch(f"/api/mcp/pages/{pid}/elements/e1", json={"text": "Bye", "x": 20})
+    assert ack.status_code == 200 and ack.get_json()["elements"] == 1
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    assert doc["els"][0]["text"] == "Bye" and doc["els"][0]["x"] == 20
+    assert doc["els"][0]["y"] == 0  # untouched field preserved
+    # Unknown element → 404; invalid patch → 422.
+    assert client.patch(f"/api/mcp/pages/{pid}/elements/nope", json={"x": 1}).status_code == 404
+    assert client.patch(f"/api/mcp/pages/{pid}/elements/e1", json={"w": 0}).status_code == 422
+
+
+def test_delete_element(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    client.put(
+        f"/api/mcp/pages/{pid}/canvas",
+        json={
+            "w": 800,
+            "h": 480,
+            "els": [
+                {"id": "a", "kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10},
+                {"id": "b", "kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10},
+            ],
+        },
+    )
+    ack = client.delete(f"/api/mcp/pages/{pid}/elements/a")
+    assert ack.status_code == 200 and ack.get_json()["elements"] == 1
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    assert [e["id"] for e in doc["els"]] == ["b"]
+    assert client.delete(f"/api/mcp/pages/{pid}/elements/a").status_code == 404
+
+
+def test_patch_canvas_meta_only(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    client.post(
+        f"/api/mcp/pages/{pid}/elements",
+        json={"kind": "rect", "x": 0, "y": 0, "w": 10, "h": 10},
+    )
+    ack = client.patch(f"/api/mcp/pages/{pid}/canvas", json={"theme": "dark", "w": 600})
+    assert ack.status_code == 200
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    assert doc["theme"] == "dark" and doc["w"] == 600
+    assert len(doc["els"]) == 1  # elements untouched
+
+
+# -- drift guard (#8) ---------------------------------------------------
+
+
+def test_base_rev_conflict(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    rev0 = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()["rev"]
+    # Write with the correct base_rev succeeds and moves the rev on.
+    ok = client.put(
+        f"/api/mcp/pages/{pid}/canvas?base_rev={rev0}",
+        json={
+            "w": 800,
+            "h": 480,
+            "els": [{"id": "e1", "kind": "rect", "x": 0, "y": 0, "w": 9, "h": 9}],
+        },
+    )
+    assert ok.status_code == 200 and ok.get_json()["updated_by"] == "mcp"
+    # A second write with the now-stale rev is refused as a drift conflict.
+    stale = client.put(
+        f"/api/mcp/pages/{pid}/canvas?base_rev={rev0}",
+        json={"w": 800, "h": 480, "els": []},
+    )
+    assert stale.status_code == 409
+    body = stale.get_json()
+    assert body["drifted"] is True and body["current_rev"]
+
+
+# -- slim options + choices (#4/#5) -------------------------------------
+
+
+def test_widget_options_format_hint_and_choice_strip(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    opts = client.get("/api/mcp/widgets/weather_now/options").get_json()["options"]
+    loc = next(o for o in opts if o["name"] == "location")
+    assert loc["type"] == "location_search" and "lat,lon" in loc["format"]
+    # A long choice list is stripped by default; a short one is inlined.
+    for o in opts:
+        if "choices_count" in o:
+            assert "choices" not in o and o["choices_endpoint"]
+
+
+def test_widget_choices_endpoint(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    # Missing option → 400; unknown option → 404.
+    assert client.get("/api/mcp/widgets/weather_now/choices").status_code == 400
+    assert client.get("/api/mcp/widgets/weather_now/choices?option=nope").status_code == 404
+    # A real option returns a paginated shape (units has concrete choices).
+    r = client.get("/api/mcp/widgets/weather_now/choices?option=units&limit=1")
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["option"] == "units" and "total" in body and isinstance(body["choices"], list)
+
+
+# -- device capabilities (#6) -------------------------------------------
+
+
+def test_gamut_info_palette_and_mono() -> None:
+    from app import mcp_api
+
+    e6 = mcp_api._gamut_info("waveshare_e6")
+    assert e6["color_mode"].startswith("6-colour") and len(e6["colors"]) == 6
+    assert e6["mono"] is False
+    unknown = mcp_api._gamut_info("nonsense")
+    assert unknown["colors"] == [] and unknown["mono"] is True
+
+
+# -- probe data_source + fields (#1/#5) ---------------------------------
+
+
+def test_probe_reports_data_source_and_fields(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    # Force the live fetch to fail so the branch is deterministic offline.
+    monkeypatch.setattr("app.composer._fetch_plugin_data", lambda *a, **k: {"error": "boom"})
+    client = app.test_client()
+    # No location configured → falls back to the demo sample, flagged as such.
+    j = client.post("/api/mcp/widgets/weather_now/data", json={}).get_json()
+    assert j["data_source"] == "sample"
+    assert any(f["path"] == "temp" for f in j["fields"])  # bindable paths surfaced
+    # A configured (but here failing) location surfaces the real error, no sample.
+    j2 = client.post(
+        "/api/mcp/widgets/weather_now/data",
+        json={"options": {"location": {"name": "X", "latitude": 1.0, "longitude": 2.0}}},
+    ).get_json()
+    assert j2["data_source"] == "error" and j2["reason"]
+
+
+# -- layout arrange (#7) ------------------------------------------------
+
+
+def test_arrange_grid_row_column(app: Flask) -> None:
+    _enable(app)
+    client = app.test_client()
+    box = {"x": 0, "y": 0, "w": 300, "h": 200}
+    grid = client.post(
+        "/api/mcp/layout", json={"box": box, "count": 4, "layout": "grid", "cols": 2}
+    ).get_json()["boxes"]
+    assert len(grid) == 4
+    assert grid[0]["x"] == 0 and grid[1]["x"] == 150  # two columns
+    assert grid[2]["y"] == 100  # second row
+    row = client.post(
+        "/api/mcp/layout", json={"box": box, "count": 3, "layout": "row", "gap": 10}
+    ).get_json()["boxes"]
+    assert len(row) == 3 and all(b["h"] == 200 for b in row)
+    col = client.post(
+        "/api/mcp/layout", json={"box": box, "count": 2, "layout": "column"}
+    ).get_json()["boxes"]
+    assert col[0]["w"] == 300 and col[1]["y"] == 100
+    assert client.post("/api/mcp/layout", json={"box": box, "count": 0}).status_code == 400
+
+
+# -- render report + measure (#2/#7a) -----------------------------------
+
+
+def test_render_report_shape(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    fake = {
+        "board": {"w": 800, "h": 480, "background": "rgb(1,2,3)", "theme": "light"},
+        "elements": [
+            {"id": "e1", "kind": "text", "data_source": "static", "overflow_x": True, "text": "hi"}
+        ],
+    }
+    monkeypatch.setattr("app.renderer.inspect_composed", lambda req, pool=None: fake)
+    client = app.test_client()
+    pid = _create_page(client)
+    body = client.get(f"/api/mcp/pages/{pid}/render_report").get_json()
+    assert body["id"] == pid and body["rev"]
+    assert body["board"]["w"] == 800
+    assert body["elements"][0]["overflow_x"] is True
+
+
+def test_measure_text(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    monkeypatch.setattr(
+        "app.renderer.inspect_composed",
+        lambda req, pool=None: [{"text": "4.89 kg", "width": 120, "height": 24, "fits": False}],
+    )
+    client = app.test_client()
+    out = client.post("/api/mcp/measure-text", json={"text": "4.89 kg", "max_width": 80})
+    assert out.status_code == 200
+    items = out.get_json()["items"]
+    assert items[0]["width"] == 120 and items[0]["fits"] is False
+    assert client.post("/api/mcp/measure-text", json={}).status_code == 400

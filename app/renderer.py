@@ -158,6 +158,18 @@ class FetchRequest:
     accept: str | None = None
 
 
+@dataclass(frozen=True)
+class InspectRequest:
+    """Navigate a composed page (same hydration waits as a screenshot) and return
+    the JSON-serialisable result of evaluating ``script`` in it, instead of a
+    screenshot. Powers the MCP structured render report and text measurement, so
+    an agent can read what actually rendered (values, overflow, computed colours)
+    rather than eyeballing a PNG."""
+
+    render: RenderRequest
+    script: str
+
+
 _IMAGE_WAIT_JS: Final[str] = """async () => {
     // Walk every <img> across the page AND every shadow root (each
     // widget lives in its own shadow tree), then resolve once they've
@@ -269,6 +281,65 @@ def _screenshot_one(browser: Browser, request: RenderRequest) -> bytes:
     # last attempt. The assert keeps mypy honest about the bound.
     assert last_err is not None
     raise last_err
+
+
+def _new_composer_page(browser: Browser, request: RenderRequest) -> tuple[Any, Any]:
+    """Open a fresh context + page sized to the request and return
+    ``(context, page)``. Caller owns closing the context."""
+    context_kwargs: dict[str, Any] = {
+        "viewport": {"width": request.viewport_w, "height": request.viewport_h},
+        "device_scale_factor": 1,
+        "color_scheme": "light",
+    }
+    if request.timezone_id:
+        context_kwargs["timezone_id"] = request.timezone_id
+    context = browser.new_context(**context_kwargs)
+    page = context.new_page()
+    page.set_default_timeout(request.timeout_ms)
+    page.set_default_navigation_timeout(request.timeout_ms)
+    return context, page
+
+
+def _navigate_and_settle(page: Any, request: RenderRequest, attempt: int) -> None:
+    """Navigate to the request URL and wait until the composed page is ready to
+    read (compose-done signal, images, fonts). Shared by the screenshot and the
+    inspect paths so both see the same fully-hydrated DOM."""
+    t0 = time.monotonic()
+    if not request.is_composer:
+        page.goto(request.url, wait_until="load")
+        try:
+            page.wait_for_load_state("networkidle", timeout=8_000)
+        except PlaywrightError:
+            logger.debug("external url networkidle wait gave up", exc_info=True)
+    elif request.wait_until == "networkidle":
+        page.goto(request.url, wait_until="load")
+    else:
+        page.goto(request.url, wait_until=request.wait_until)
+    t_goto = time.monotonic()
+    if request.is_composer:
+        try:
+            page.wait_for_function("window.__tesseraeComposed === true", timeout=request.timeout_ms)
+        except PlaywrightError as err:
+            logger.warning("composer mount wait timed out: %s", err)
+    t1 = time.monotonic()
+    try:
+        page.evaluate(_IMAGE_WAIT_JS)
+    except PlaywrightError as err:
+        logger.warning("image wait skipped: %s", err)
+    t_img = time.monotonic()
+    try:
+        page.evaluate(_FONT_WAIT_JS)
+    except PlaywrightError as err:
+        logger.warning("font wait skipped: %s", err)
+    logger.info(
+        "render nav (s): attempt=%d goto=%.2f compose=%.2f images=%.2f fonts=%.2f (url=%s)",
+        attempt,
+        t_goto - t0,
+        t1 - t_goto,
+        t_img - t1,
+        time.monotonic() - t_img,
+        request.url,
+    )
 
 
 def _screenshot_attempt(browser: Browser, request: RenderRequest, attempt: int) -> bytes:
@@ -442,6 +513,48 @@ def _fetch_one(browser: Browser, request: FetchRequest) -> str:
             logger.debug("fetch context close failed (continuing)", exc_info=True)
 
 
+def _inspect_attempt(browser: Browser, request: InspectRequest, attempt: int) -> Any:
+    """Navigate the composed page and return ``page.evaluate(script)``. Fresh
+    context per attempt, same hydration waits the screenshot path uses."""
+    context, page = _new_composer_page(browser, request.render)
+    try:
+        _navigate_and_settle(page, request.render, attempt)
+        return page.evaluate(request.script)
+    finally:
+        try:
+            context.close()
+        except Exception:
+            logger.debug("inspect context close failed (continuing)", exc_info=True)
+
+
+def _inspect_one(browser: Browser, request: InspectRequest) -> Any:
+    """Retry shell around ``_inspect_attempt`` (mirrors ``_screenshot_one``)."""
+    last_err: PlaywrightTimeoutError | None = None
+    for attempt in range(1, request.render.max_attempts + 1):
+        try:
+            return _inspect_attempt(browser, request, attempt)
+        except PlaywrightTimeoutError as err:
+            last_err = err
+            if attempt >= request.render.max_attempts:
+                raise
+            logger.warning("inspect attempt %d hit a timeout (will retry): %s", attempt, err)
+    assert last_err is not None
+    raise last_err
+
+
+def inspect_composed(request: InspectRequest, *, pool: BrowserPool | None = None) -> Any:
+    """Open the composed URL and return the JSON result of evaluating its script.
+    Warm path via ``pool`` when supplied, else a one-shot Chromium launch."""
+    if pool is not None:
+        return pool.inspect(request)
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(**_chromium_launch_kwargs())
+        try:
+            return _inspect_one(browser, request)
+        finally:
+            browser.close()
+
+
 def render_to_png(request: RenderRequest, *, pool: BrowserPool | None = None) -> bytes:
     """Open the URL in headless Chromium and return a PNG screenshot.
 
@@ -491,6 +604,7 @@ class BrowserPool:
         self._q: queue.Queue[
             tuple[RenderRequest, concurrent.futures.Future[bytes]]
             | tuple[FetchRequest, concurrent.futures.Future[str]]
+            | tuple[InspectRequest, concurrent.futures.Future[Any]]
             | tuple[()]
         ] = queue.Queue()
         self._thread: threading.Thread | None = None
@@ -533,6 +647,19 @@ class BrowserPool:
         # meant to be a hard timeout layer.
         return fut.result(timeout=(request.timeout_ms * request.max_attempts) / 1000 + 60)
 
+    def inspect(self, request: InspectRequest) -> Any:
+        """Run an inspect (evaluate) task on the pooled browser and return its
+        JSON result. Same lazy-start + timeout envelope as ``render``."""
+        if self._thread is None:
+            self.start()
+        if self._stopped:
+            raise RuntimeError("browser pool has been stopped")
+        fut: concurrent.futures.Future[Any] = concurrent.futures.Future()
+        self._q.put((request, fut))
+        return fut.result(
+            timeout=(request.render.timeout_ms * request.render.max_attempts) / 1000 + 60
+        )
+
     def fetch_text(self, request: FetchRequest) -> str:
         """Fetch a URL through the pooled Chromium's network stack.
          Returns the response body as text. Each call spawns a fresh
@@ -574,6 +701,10 @@ class BrowserPool:
                     if isinstance(request, FetchRequest):
                         cast(concurrent.futures.Future[str], fut).set_result(
                             _fetch_one(browser, request)
+                        )
+                    elif isinstance(request, InspectRequest):
+                        cast(concurrent.futures.Future[Any], fut).set_result(
+                            _inspect_one(browser, request)
                         )
                     else:
                         cast(concurrent.futures.Future[bytes], fut).set_result(

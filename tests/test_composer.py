@@ -377,6 +377,45 @@ def test_build_canvas_els_shares_fetch_across_same_widget(
     assert calls.count("weather_now") == 1
 
 
+def test_compose_measure_route_serves_measure_page(client: FlaskClient) -> None:
+    """The loopback measure page exposes window.__measure for the MCP text-measuring
+    helper and is reachable under /compose/ (static rule wins over /compose/<id>)."""
+    resp = client.get("/compose/_measure")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "__measure" in body and "__tesseraeComposed" in body
+
+
+def test_build_canvas_els_tags_data_source(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each element carries a data_source (live | sample | error | static | none) so
+    the render report can tell the agent whether it saw real data."""
+    from app.state.panel_store import Element
+
+    monkeypatch.setattr(composer, "_fetch_plugin_data", lambda *a, **k: {"error": "boom"})
+    with app.app_context():
+        out = composer._build_canvas_els(
+            [
+                Element(id="w", widget="weather_now", x=0, y=0, w=100, h=100),
+                Element(
+                    id="wl",
+                    widget="weather_now",
+                    options={"location": {"name": "X", "latitude": 1.0, "longitude": 2.0}},
+                    x=0,
+                    y=0,
+                    w=100,
+                    h=100,
+                ),
+                Element(id="r", kind="rect", x=0, y=0, w=10, h=10),
+            ],
+            400,
+            300,
+        )
+    by_id = {e["id"]: e for e in out}
+    assert by_id["w"]["data_source"] == "sample"  # no location → demo sample
+    assert by_id["wl"]["data_source"] == "error"  # configured but failing → real error
+    assert by_id["r"]["data_source"] == "static"  # decoration
+
+
 def test_resolved_options_migrates_legacy_flat_lat_lon(app: Flask) -> None:
     """Pre-v0.69.6 installs stored the app-level default as separate
     ``latitude`` + ``longitude`` numbers. When ``settings.app.location``

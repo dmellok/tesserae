@@ -64,6 +64,8 @@
     <div class="cell"
          style="left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"
          data-cell-id="{{ e.id }}"
+         data-el-id="{{ e.id }}"
+         data-data-source="{{ e.data_source }}"
          data-plugin="{{ e.widget }}"
          data-fragment="{{ e.fragment }}"
          data-parts='{{ e.parts|tojson }}'
@@ -79,6 +81,8 @@
     </div>
     {% else %}
     <div class="deco" data-el='{{ e|tojson }}'
+         data-el-id="{{ e.id }}"
+         data-data-source="{{ e.data_source }}"
          style="position:absolute;left: {{ e.x }}px; top: {{ e.y }}px; width: {{ e.w }}px; height: {{ e.h }}px;{% if e.rotate %} transform: rotate({{ e.rotate }}deg);{% endif %}{% if e.opacity is not none and e.opacity != 100 %} opacity: {{ e.opacity / 100 }};{% endif %}"></div>
     {% endif %}
     {% endfor %}

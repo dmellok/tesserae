@@ -8,6 +8,36 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **MCP: faithful, editable, hardware-aware dashboard building.** A batch of
+  agent-facing improvements from real building sessions:
+  - **Partial edits.** `update_element`, `delete_element`, and `patch_canvas`
+    change one element or one document field without re-sending the whole canvas
+    (a big dashboard was expensive and error-prone to edit before).
+  - **Structured render report.** `render_report` returns a machine-readable
+    companion to the preview PNG: per element, the resolved box, the text that
+    rendered, overflow/clip flags, whether the data was live / sample / error, and
+    the computed colours, plus the board's resolved background and theme. The agent
+    can verify a render (catch clipping, confirm live data) without parsing pixels.
+  - **Probe tells live from placeholder.** `probe_widget_data` now reports a
+    `data_source` (live | sample | error) and a `reason`, and lists the bindable
+    field paths with sample values, so an agent stops mistaking a demo sample for
+    a real result and stops reverse-engineering field shapes.
+  - **Text measurement + layout helper.** `measure_text` reports how wide text
+    renders in a given font (so a box can fit its content and not clip);
+    `arrange` computes aligned grid / row / column boxes so an agent lays out by
+    intent instead of hand-computing every pixel.
+  - **Leaner option schemas.** `get_widget_options` omits huge choice lists (HA
+    entity pickers) by default, showing a count and a `choices` endpoint; each
+    option carries a format hint for its type. `get_widget_choices` pages the rows.
+  - **Device colour capability.** `list_devices` now reports each panel's
+    `color_mode`, renderable palette (hex), and a `mono` flag, so an agent designs
+    within what the hardware can show.
+  - **Concurrent-edit guard.** Writes accept a `base_rev` (from `get_canvas`); if
+    the page changed since, the write returns a conflict instead of clobbering a UI
+    edit, and acks now carry `updated_at` / `updated_by`.
+
+  Requires the `tesserae-mcp` bridge 0.3.0.
+
 - **Canvas editor: SVG primitive.** Paste raw SVG as an element; it scales to fill
   the box and renders in a sandboxed iframe.
 

@@ -789,6 +789,23 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
         fetch_memo[memo_key] = fetched
         return fetched
 
+    def _resolve_source(
+        plugin_id: str, raw_options: dict[str, Any], cell_w: int, cell_h: int
+    ) -> tuple[dict[str, Any], Any, str]:
+        """Resolve options + fetch, classifying the result as ``live`` (real
+        fetch), ``sample`` (demo fallback because nothing was configured), or
+        ``error``. The classification is carried into the DOM so the render
+        report can tell the agent which it got."""
+        opts = _resolved_options(plugin_id, raw_options)
+        data = _shared_fetch(plugin_id, opts, cell_w, cell_h)
+        if isinstance(data, dict) and not data.get("error"):
+            return opts, data, "live"
+        if not _location_configured(raw_options):
+            sample = get_sample(plugin_id)
+            if isinstance(sample, dict):
+                return opts, sample, "sample"
+        return opts, data, "error"
+
     els_out: list[dict[str, Any]] = []
     for e in els:
         if e.visible is False:
@@ -796,15 +813,10 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
         if e.kind == "data":
             # Data primitive: fetch its source widget's data (sample fallback),
             # same path a widget uses, so the field resolves at render time.
-            opts = _resolved_options(e.source, e.options) if e.source else {}
             ddata: Any = None
+            dsrc = "none"
             if e.source:
-                ddata = _shared_fetch(e.source, opts, e.w, e.h)
-                if (not isinstance(ddata, dict) or ddata.get("error")) and not _location_configured(
-                    e.options
-                ):
-                    sample = get_sample(e.source)
-                    ddata = sample if isinstance(sample, dict) else ddata
+                _, ddata, dsrc = _resolve_source(e.source, e.options, e.w, e.h)
             els_out.append(
                 {
                     "id": e.id,
@@ -826,6 +838,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "w": e.w,
                     "h": e.h,
                     "data": ddata,
+                    "data_source": dsrc,
                 }
             )
             continue
@@ -851,6 +864,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "y": e.y,
                     "w": e.w,
                     "h": e.h,
+                    "data_source": "static",
                 }
             )
             continue
@@ -868,17 +882,13 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             "h": e.h,
             "options": {},
             "data": None,
+            "data_source": "none",
         }
         if e.widget:
-            opts = _resolved_options(e.widget, e.options)
+            opts, data, wsrc = _resolve_source(e.widget, e.options, e.w, e.h)
             item["options"] = opts
-            data = _shared_fetch(e.widget, opts, e.w, e.h)
-            if (not isinstance(data, dict) or data.get("error")) and not _location_configured(
-                e.options
-            ):
-                sample = get_sample(e.widget)
-                data = sample if isinstance(sample, dict) else data
             item["data"] = data
+            item["data_source"] = wsrc
         els_out.append(item)
     return els_out
 
@@ -914,6 +924,18 @@ def _render_canvas(layout: Any, *, target_w: int, target_h: int) -> str:
         bg_fit=layout.bg_fit or "cover",
         font_face_css=_font_face_css(registry.fonts),
     )
+
+
+@bp.get("/compose/_measure")
+def compose_measure() -> str:
+    """A minimal loopback page that loads every widget font and exposes
+    ``window.__measure(items)`` for the MCP ``measure_text`` helper. Screenshotted
+    by nobody; the headless inspector navigates here and evaluates the measure
+    function so an agent can size a box to its content (preventing text clipping).
+    Path is static under ``/compose/`` so it wins over ``/compose/<page_id>`` and
+    skips the login gate like the other composer render targets."""
+    registry = current_app.config["PLUGIN_REGISTRY"]
+    return render_template("panels_measure.html", font_face_css=_font_face_css(registry.fonts))
 
 
 @bp.get("/compose/<page_id>")

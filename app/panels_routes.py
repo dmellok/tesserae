@@ -171,6 +171,17 @@ def editor(canvas_id: str) -> str:
     )
 
 
+def _stamp(page: Page, actor: str) -> Page:
+    """Record who last wrote this page and when, for the MCP drift guard. Called
+    on every canvas write path (UI autosave → "ui", MCP → "mcp") so an agent can
+    tell its own last write apart from a UI edit that landed between its calls."""
+    from datetime import UTC, datetime
+
+    page.updated_at = datetime.now(UTC).isoformat(timespec="seconds")
+    page.updated_by = actor
+    return page
+
+
 def _canvas_rev(page: Page) -> str:
     """A short content hash of a canvas page's layout. The live-sync stream and
     the editor use it to tell an external change (the MCP agent) apart from the
@@ -269,7 +280,7 @@ def save(canvas_id: str) -> Response:
         doc = CanvasPage.model_validate(body)
     except ValidationError as err:
         return _error(400, f"invalid canvas document: {err.error_count()} problem(s)")
-    page = _doc_to_page(doc)
+    page = _stamp(_doc_to_page(doc), "ui")
     _pages().save(page)
     return jsonify(
         {"status": "ok", "id": canvas_id, "elements": len(doc.els), "rev": _canvas_rev(page)}

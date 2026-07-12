@@ -195,16 +195,30 @@ externally" reload prompt instead.
 | Tool | What it does |
 | --- | --- |
 | `list_widgets` | Every placeable widget (with fragments) + theme/style/font options |
-| `get_widget_options` | A widget's configurable options (e.g. a weather location) |
-| `probe_widget_data` | A widget's live data payload, to discover real field names/shapes |
-| `list_devices` | Registered panels with their pixel dimensions |
+| `get_widget_options` | A widget's options + format hints (big choice lists omitted by default) |
+| `get_widget_choices` | Page through one option's choice rows (HA entity pickers etc.) |
+| `probe_widget_data` | A widget's data + `data_source` (live/sample/error) + bindable field paths |
+| `list_devices` | Registered panels: dimensions + colour capability (palette, `mono` flag) |
 | `list_pages` | Existing canvas dashboards |
 | `create_canvas_page` | Create an empty canvas (size it to your panel) |
-| `get_canvas` | Read a canvas document |
+| `get_canvas` | Read a canvas document (returns a `rev` for concurrency-safe writes) |
 | `set_canvas` | Replace a canvas document (compact ack; `?return=doc` for the full doc) |
 | `add_element` | Append one element (each call saves, so an open editor updates live) |
+| `update_element` | Change one element in place, without re-sending the whole document |
+| `delete_element` | Remove one element by id |
+| `patch_canvas` | Change document-level fields (size, theme, bg) without touching elements |
+| `arrange` | Compute aligned grid/row/column boxes so you lay out by intent, not pixels |
+| `measure_text` | Measure rendered text width/height so a box fits its content |
+| `render_report` | Read back what rendered (values, overflow, live-vs-sample, colours) as JSON |
 | `render_preview` | Render the canvas to a PNG the agent can see |
 | `push_to_device` | Push the canvas to explicit device(s) |
+
+The write tools (`set_canvas`, `add_element`, `update_element`, `delete_element`,
+`patch_canvas`) accept an optional `base_rev` (the `rev` from `get_canvas`); if the
+page changed since, the write is refused with a conflict so a concurrent UI edit
+isn't clobbered. Prefer `update_element` / `patch_canvas` over resending the whole
+document for a one-field change. Verify a render with `render_report` (structured)
+alongside `render_preview` (image).
 
 ---
 

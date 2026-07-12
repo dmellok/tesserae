@@ -186,6 +186,12 @@ class Page(BaseModel):
     # an agent created over the MCP API, so the dashboards list can flag them.
     # ``exclude_none`` on dump keeps it absent for every existing page.
     created_by: str | None = None
+    # Last-write metadata for the MCP concurrency guard (issue: agents and the
+    # UI editing the same page between calls). ``updated_at`` is an ISO-8601 UTC
+    # stamp; ``updated_by`` is the actor ("mcp" | "ui"). Both None on pages
+    # written before this shipped; exclude_none keeps them absent.
+    updated_at: str | None = None
+    updated_by: str | None = None
 
     @model_validator(mode="before")
     @classmethod
