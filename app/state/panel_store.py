@@ -40,6 +40,28 @@ class PartScale(BaseModel):
     scale: int = Field(default=100, ge=10, le=400)
 
 
+class Binding(BaseModel):
+    """A live data binding on an element: read ``field`` from ``source``'s data
+    each render and map it through ``transform`` to patch element props (x / y /
+    w / h / color / icon / text). This is what makes a *shape* reflect data,
+    decorations are otherwise static geometry the renderer redraws but never
+    recomputes. Evaluated server-side in the composer, in the same pass that
+    resolves ``data`` elements, so a bound shape updates in lockstep with data
+    primitives on every frame (no agent tick, survives push / rotation).
+
+    ``transform`` is one of: ``position`` (scalar to a coordinate along a
+    segment), ``length`` (scalar to a size), ``pick`` (integer index selects from
+    arrays), ``color`` (scalar to a colour by thresholds), ``gradient`` (scalar
+    interpolated smoothly along colour stops), ``icon`` (code/string to a Phosphor
+    glyph). ``params`` is transform-specific; see :mod:`app.bindings`."""
+
+    source: str = ""
+    options: dict[str, Any] = Field(default_factory=dict)
+    field: str = ""
+    transform: str = "position"
+    params: dict[str, Any] = Field(default_factory=dict)
+
+
 class Element(BaseModel):
     """One placed element on the canvas: a widget instance rendered as one of
     its declared fragments, at an absolute box. ``z`` is implicit in list order
@@ -119,6 +141,11 @@ class Element(BaseModel):
     visible: bool = True
     locked: bool = False
     group: str | None = None
+    # Live data bindings (issue: shapes don't auto-update). Each entry reads a
+    # widget field and patches this element's props every render; several may
+    # combine (e.g. bind x by position AND colour by threshold). Empty for a
+    # static element. See :class:`Binding` and :mod:`app.bindings`.
+    bind: list[Binding] = Field(default_factory=list)
 
 
 class CanvasLayout(BaseModel):

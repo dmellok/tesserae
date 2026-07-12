@@ -159,6 +159,32 @@ def test_set_canvas_compact_and_return_doc(app: Flask) -> None:
     assert "els" in doc and len(doc["els"]) == 1
 
 
+def test_set_canvas_accepts_and_persists_shape_bindings(app: Flask) -> None:
+    """The MCP surface accepts live shape bindings with no endpoint change: the
+    write paths validate the Element model, which carries `bind`, so a bound shape
+    round-trips through set_canvas -> get_canvas."""
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    bind = {
+        "source": "weather_now",
+        "options": {"location": "Melbourne"},
+        "field": "temp",
+        "transform": "color",
+        "params": {"stops": [[5, "#4a5aa8"], [25, "#c08a2c"]], "else": "#900000"},
+    }
+    body = {
+        "w": 800,
+        "h": 480,
+        "els": [{"id": "badge", "kind": "rect", "x": 0, "y": 0, "w": 60, "h": 30, "bind": [bind]}],
+    }
+    assert client.put(f"/api/mcp/pages/{pid}/canvas", json=body).status_code == 200
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    el = doc["els"][0]
+    assert el["bind"][0]["transform"] == "color"
+    assert el["bind"][0]["field"] == "temp"
+
+
 def test_append_element_saves_incrementally(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

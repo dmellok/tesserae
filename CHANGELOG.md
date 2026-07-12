@@ -8,6 +8,21 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Canvas: live data bindings for shapes.** Data elements re-evaluate every render,
+  which is why numbers stay live; shapes (rect / ellipse / icon / line / text) were
+  static geometry. Any element can now carry `bind` entries that read a widget field
+  each render and map it through a transform to patch the element's props, so a shape
+  reflects data in lockstep with the data primitives on the same canvas, with no
+  polling or agent tick, and it survives push / rotation. Six transforms: `position`
+  (a marker that moves along a segment), `length` (a gauge that grows), `pick` (hop
+  between discrete states by index), `color` (threshold colouring), `gradient` (a
+  value interpolated smoothly along colour stops, quantised to the panel palette on
+  e-ink), and `icon` (a condition code to a Phosphor glyph). Bindings resolve through
+  the same shared fetch as data elements, so a shape bound to a widget already on the
+  canvas costs no extra request. Authored via the document (MCP `set_canvas` /
+  `tesserae-mcp` 0.4.0); a binding that can't resolve is skipped, leaving the element's
+  authored props intact.
+
 - **MCP: push a widget you are authoring to a running instance.** New endpoints let
   an authoring client (Tesserae Studio) install a widget over the network with no
   shared filesystem, so authoring works against a Tesserae on another machine or in

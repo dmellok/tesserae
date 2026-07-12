@@ -21,6 +21,7 @@ from urllib.parse import quote
 
 from flask import Blueprint, abort, current_app, render_template, request
 
+from app.bindings import apply_binding
 from app.panel import PANEL_PRESETS, resolve_panel_for_page
 from app.plugin_http import fetch_json
 from app.plugin_loader import Font, PluginRegistry
@@ -806,6 +807,19 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                 return opts, sample, "sample"
         return opts, data, "error"
 
+    def _apply_binds(el: Any, out: dict[str, Any]) -> None:
+        """Evaluate an element's live data bindings and patch its props in place,
+        so a bound shape reflects data on this render (see :mod:`app.bindings`).
+        Each binding fetches through the shared memo, so a shape bound to the same
+        widget as a data element on the canvas costs no extra fetch."""
+        for b in getattr(el, "bind", None) or []:
+            if not b.source:
+                continue
+            _, bdata, _ = _resolve_source(b.source, b.options, el.w, el.h)
+            patch = apply_binding(b, bdata)
+            if patch:
+                out.update(patch)
+
     els_out: list[dict[str, Any]] = []
     for e in els:
         if e.visible is False:
@@ -841,6 +855,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "data_source": dsrc,
                 }
             )
+            _apply_binds(e, els_out[-1])
             continue
         if e.kind and e.kind != "widget":
             els_out.append(
@@ -867,6 +882,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
                     "data_source": "static",
                 }
             )
+            _apply_binds(e, els_out[-1])
             continue
         item: dict[str, Any] = {
             "id": e.id,
@@ -889,6 +905,7 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             item["options"] = opts
             item["data"] = data
             item["data_source"] = wsrc
+        _apply_binds(e, item)
         els_out.append(item)
     return els_out
 

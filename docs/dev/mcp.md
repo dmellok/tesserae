@@ -257,6 +257,15 @@ shown as a scalable number / text / line / bar / sparkline), or a **custom HTML*
 block (static HTML + CSS in a sandboxed iframe). Elements may sit partly off the
 panel edge. The exact JSON shape for each is in the `set_canvas` tool description.
 
+Any element can also carry **live bindings** (`bind`): decorations are otherwise
+static geometry, but a binding reads a widget field each render and maps it through
+a transform to patch the element's props, so a shape reflects data in lockstep with
+the data primitives on the same canvas (no polling). Transforms: `position` (a
+moving marker), `length` (a gauge that grows), `pick` (hop between discrete states),
+`color` (threshold colouring), `gradient` (a value interpolated smoothly along
+colour stops, quantised to the panel palette on e-ink), and `icon` (condition to a
+glyph). Full shape in the `set_canvas` tool description.
+
 ## Guardrails
 
 - The API **404s** entirely while the `mcp` experiment is off.
