@@ -67,6 +67,16 @@ class DiscoveredDevice:
         return str(value) if isinstance(value, str) and value else None
 
     @property
+    def wire_format(self) -> str | None:
+        """Declared wire format from the /discover payload (``"png"`` or
+        ``"bmp"``). Lets a memory-constrained CircuitPython client ask
+        for the uncompressed-BMP renderer, which needs no on-device
+        ``zlib.decompress``. Resolved to a concrete renderer at register
+        time; here we just surface whatever the client sent."""
+        value = self.parsed.get("format")
+        return str(value).strip().lower() if isinstance(value, str) and value.strip() else None
+
+    @property
     def fw_version(self) -> str | None:
         value = self.parsed.get("fw_version")
         return str(value) if isinstance(value, (str, int, float)) else None

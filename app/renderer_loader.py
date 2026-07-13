@@ -160,7 +160,17 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
     The link between an instance and its renderers is the **kind's**
     ``renderer_ids`` list (e.g. ``esp32_client`` → ``["esp32_bin"]``).
     We can't match on ``renderer.device`` because that's a topic prefix
-    (``"esp32"``), not a device id (``"esp32_client"``)."""
+    (``"esp32"``), not a device id (``"esp32_client"``).
+
+    When a kind offers more than one renderer (e.g.
+    ``circuitpython_generic`` → ``["circuitpython_png",
+    "circuitpython_bmp"]``) the instance picks exactly one via its
+    ``renderer_id`` manifest field. A device has a single latest-render
+    slot (``PushManager._latest_renders`` is keyed by device id), so
+    cloning every variant would have them fight over it. With no
+    ``renderer_id`` recorded, the kind's first renderer wins, which keeps
+    single-renderer kinds (every built-in today) behaving exactly as
+    before."""
     get_all = getattr(devices, "all", None)
     get_one = getattr(devices, "get", None)
     if not callable(get_all) or not callable(get_one):
@@ -172,7 +182,16 @@ def clone_for_instances(renderers: RendererRegistry, devices: Any) -> None:
         kind = get_one(kind_id)
         if kind is None:
             continue
-        for renderer_id in getattr(kind, "renderer_ids", []):
+        kind_renderer_ids = list(getattr(kind, "renderer_ids", []))
+        selected = getattr(dev, "manifest", {}).get("renderer_id")
+        if selected and selected in kind_renderer_ids:
+            renderer_ids = [selected]
+        else:
+            # No valid pick recorded: clone only the primary (first)
+            # renderer, so a multi-renderer kind doesn't clobber its own
+            # latest-render slot.
+            renderer_ids = kind_renderer_ids[:1]
+        for renderer_id in renderer_ids:
             base = renderers.get(renderer_id)
             if base is None:
                 continue

@@ -1,0 +1,36 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "CircuitPython client (indexed BMP)",
+  "version": "0.1.0",
+  "description": "Composition quantized to the panel's palette and emitted as an uncompressed indexed BMP for adafruit_imageload on memory-constrained CircuitPython microcontrollers. Unlike the indexed-PNG output, a BMP needs no zlib.decompress on the client: adafruit_imageload reads it row by row with file.read / seek, so peak RAM is the framebuffer plus a small row buffer with no whole-image inflate. This is the path for Pico W class boards where CircuitPython's one-shot zlib decode exhausts (or fragments) SRAM decoding even a small PNG. Same palette selection as circuitpython_png (1-bit mono through 7-colour ACeP), the device paints what arrives without an on-device quantize or dither pass.",
+  "orientation": "composition",
+  "mime": "image/bmp",
+  "extension": "bmp",
+  "topic_pattern": "tesserae/{device}/frame/bmp",
+  "device": "circuitpython",
+  "retain": false,
+  "settings": [
+    {
+      "name": "dither",
+      "type": "select",
+      "label": "Dither mode",
+      "default": "floyd-steinberg",
+      "device_setting": true,
+      "choices": [
+        { "value": "floyd-steinberg", "label": "Floyd-Steinberg (smooth gradients)" },
+        { "value": "none", "label": "None (nearest palette, no dither)" }
+      ]
+    },
+    {
+      "name": "contrast",
+      "type": "slider",
+      "label": "Pre-dither contrast",
+      "default": 1.0,
+      "min": 0.5,
+      "max": 2.5,
+      "step": 0.05,
+      "device_setting": true,
+      "help": "Push midtones toward black or white before the dither pass. 1.0 leaves the image alone; > 1.0 deepens contrast (good for photos with grey skies); < 1.0 softens (good for text-heavy dashboards)."
+    }
+  ]
+}

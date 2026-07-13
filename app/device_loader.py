@@ -579,10 +579,22 @@ def load_instance_file(
     # /api/setup; KOReader (no MAC) keeps using token-based auth.
     if isinstance(raw_inst.get("mac"), str) and raw_inst["mac"].strip():
         inst_manifest["mac"] = raw_inst["mac"].strip()
+    # Per-instance renderer pick for kinds that offer more than one
+    # (e.g. circuitpython_generic → png / bmp). Kept on the manifest so
+    # clone_for_instances() clones only the chosen renderer and the two
+    # never fight over the device's single latest-render slot. Ignored
+    # unless it names one of the kind's renderers; absent means the
+    # kind's first renderer, which is every single-renderer built-in.
+    selected_renderer = raw_inst.get("renderer_id")
+    if isinstance(selected_renderer, str) and selected_renderer in kind.renderer_ids:
+        inst_manifest["renderer_id"] = selected_renderer
+        chosen_renderers = [selected_renderer]
+    else:
+        chosen_renderers = kind.renderer_ids[:1]
     # Point the instance at its cloned renderers so the settings UI
     # and any code that reads device.renderer_ids sees the per-
     # instance ids that clone_for_instances() will create.
-    inst_manifest["renderers"] = [f"{r}__{instance_id}" for r in kind.renderer_ids]
+    inst_manifest["renderers"] = [f"{r}__{instance_id}" for r in chosen_renderers]
     inst_data_dir = data_root / instance_id
     inst_data_dir.mkdir(parents=True, exist_ok=True)
     device = Device(

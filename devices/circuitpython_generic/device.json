@@ -3,8 +3,8 @@
   "name": "CircuitPython client (generic)",
   "icon": "device-tablet-speaker",
   "version": "0.1.0",
-  "description": "Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. Pairs with the circuitpython_png renderer, which emits an indexed PNG that adafruit_imageload can decode directly. Pairing follows the v1 REST discover-and-approve flow (POST /api/v1/device/discover with the board's MAC); steady state polls GET /api/v1/device/<id>/frame and POSTs heartbeats to /status. The kind is deliberately broad: a maintainer's own circuitpython_<board> kind (e.g. circuitpython_pico_w_inky) is welcome and stays compatible, this entry is the catch-all so boards without a tighter manifest still register cleanly.",
-  "renderers": ["circuitpython_png"],
+  "description": "Generic CircuitPython client kind for boards driving an e-paper panel from a Pico W / Pico 2 W / Feather / similar microcontroller. Serves the composition already quantised to the panel's palette, as an indexed PNG (default) or an uncompressed indexed BMP, either of which adafruit_imageload decodes directly. Declare format:'bmp' on discover for memory-constrained boards (Pico W class), where CircuitPython's one-shot zlib.decompress can't fit a PNG's decode buffer; the BMP needs no zlib. Pairing follows the v1 REST discover-and-approve flow (POST /api/v1/device/discover with the board's MAC); steady state polls GET /api/v1/device/<id>/frame and POSTs heartbeats to /status. The kind is deliberately broad: a maintainer's own circuitpython_<board> kind (e.g. circuitpython_pico_w_inky) is welcome and stays compatible, this entry is the catch-all so boards without a tighter manifest still register cleanly.",
+  "renderers": ["circuitpython_png", "circuitpython_bmp"],
   "panel": { "w": 800, "h": 480, "orientation": "landscape", "name": "Generic 800×480" },
   "config_schema": {
     "sleep_interval_s": {

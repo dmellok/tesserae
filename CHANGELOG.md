@@ -8,6 +8,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **CircuitPython clients can request an uncompressed BMP frame.** New
+  `circuitpython_bmp` renderer emits the composition quantised to the panel's palette
+  as an uncompressed indexed BMP, alongside the existing `circuitpython_png`. A client
+  declares `"format": "bmp"` on `/discover` (or `/register`) to bind it. The BMP needs
+  no `zlib.decompress` on the client: `adafruit_imageload` reads it row by row, so peak
+  RAM is the framebuffer plus a small row buffer, where an indexed PNG's one-shot inflate
+  can't fit a contiguous decode buffer on Pico W class boards. PNG stays the default for
+  boards with headroom (it's a few times smaller on the wire). The `circuitpython_generic`
+  kind now lists both renderers and pins one per instance via a `renderer_id` recorded at
+  registration; the shared pixel pipeline lives in `app.quantizer` so both formats produce
+  identical pixels. Spec: [client protocol](https://dmellok.github.io/tesserae/dev/client-protocol/).
+
 - **MCP: less friction authoring widgets via Studio.** Three additions to the
   `/api/mcp` surface: `GET /widgets/<id>/render.png` takes a `fragment` param so an
   agent can faithfully render a single declared fragment (not just the whole card),

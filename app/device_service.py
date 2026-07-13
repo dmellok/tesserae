@@ -181,6 +181,29 @@ def derive_topic(kind_topic: str, new_id: str, *, suffix: str) -> str:
     return f"tesserae/{new_id}/{suffix}"
 
 
+def renderer_id_for_format(
+    renderers: RendererRegistry, kind: Any, wire_format: str | None
+) -> str | None:
+    """Resolve a client-declared wire format (``"png"`` / ``"bmp"``) to
+    one of the kind's renderer ids by matching the renderer's file
+    extension.
+
+    Used by the discover-and-register flow so a memory-constrained
+    CircuitPython client can ask for the uncompressed-BMP renderer.
+    Returns ``None`` (leave the kind default) when the format is empty,
+    unknown, or the kind has no renderer with that extension."""
+    if not wire_format:
+        return None
+    fmt = wire_format.strip().lower().lstrip(".")
+    if not fmt:
+        return None
+    for rid in getattr(kind, "renderer_ids", []):
+        renderer = renderers.get(rid)
+        if renderer is not None and renderer.extension == fmt:
+            return str(rid)
+    return None
+
+
 def _drop_clones(renderers: RendererRegistry, instance_id: str) -> None:
     """Remove any renderer clones whose resolved device is this instance.
 
@@ -212,6 +235,7 @@ def create_instance(
     mac: str | None = None,
     api_key_strength: str = "typeable",
     transport: str | None = None,
+    renderer_id: str | None = None,
 ) -> InstanceResult:
     """Validate, persist, load, and clone-renderers for a new instance.
 
@@ -220,8 +244,14 @@ def create_instance(
     (``landscape`` / ``landscape_flipped`` / ``portrait`` /
     ``portrait_flipped``). Portrait variants swap w/h once so the stored
     canvas matches the chosen aspect; the ``_flipped`` part is a
-    renderer-side 180° turn, not a dims change. Caller rebuilds the
-    transport on success."""
+    renderer-side 180° turn, not a dims change.
+
+    ``renderer_id`` pins the instance to one of its kind's renderers when
+    the kind lists more than one (e.g. ``circuitpython_generic`` offering
+    both ``circuitpython_png`` and ``circuitpython_bmp``). Ignored when it
+    isn't one of the kind's renderers. When unset, the kind's first
+    renderer is used, so single-renderer kinds are unaffected. Caller
+    rebuilds the transport on success."""
     instance_id = instance_id.strip().lower()
     if not DEVICE_ID_RE.match(instance_id):
         return InstanceResult(
@@ -251,6 +281,12 @@ def create_instance(
     }
     if normalised_transport == "rest":
         manifest["transport"] = "rest"
+    # Pin a renderer when the kind offers a choice (multi-renderer kinds
+    # like circuitpython_generic). Only recorded when it names one of the
+    # kind's renderers, so a bad value falls back to the kind's default
+    # rather than orphaning the instance with no renderer at all.
+    if renderer_id and renderer_id in getattr(kind, "renderer_ids", []):
+        manifest["renderer_id"] = renderer_id
     # Kinds that don't speak MQTT (e.g. HTTP-polled TRMNL) declare no
     # status/config topic at all. REST instances ALSO skip these: the
     # status/config flows happen over /api/v1/device/<id>/*, not topics.

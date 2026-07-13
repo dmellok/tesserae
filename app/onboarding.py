@@ -441,13 +441,17 @@ def register_discovered(discovered_id: str) -> Response:
             from app.quantizer import canonicalise_gamut
 
             overrides["gamut"] = canonicalise_gamut(entry.gamut)
+    renderers = _renderers()
+    kind = _devices().get(kind_id)
+    renderer_id = device_service.renderer_id_for_format(renderers, kind, entry.wire_format)
     result = device_service.create_instance(
         devices=_devices(),
-        renderers=_renderers(),
+        renderers=renderers,
         data_root=_data_root(),
         instance_id=discovered_id,
         kind_id=kind_id,
         panel_overrides=overrides,
+        renderer_id=renderer_id,
     )
     if not result.ok or result.device is None:
         flash(result.error or "Could not register device.", "error")

@@ -908,6 +908,13 @@ def post_register() -> Response:
         )
     markers.clear(device_id)
 
+    # Wire format the client asked for (png / bmp), resolved to a
+    # renderer of the chosen kind. Lets a memory-constrained
+    # CircuitPython client pin the uncompressed-BMP renderer at pairing
+    # time, matching the discover-and-claim path.
+    from app.device_service import renderer_id_for_format
+
+    renderer_id_arg = renderer_id_for_format(_renderers(), kind, body.get("format"))
     result = create_instance(
         devices=devices_registry,
         renderers=_renderers(),
@@ -918,6 +925,7 @@ def post_register() -> Response:
         panel_overrides=panel_overrides,
         access_token=None,  # let create_instance mint one
         mac=incoming_mac,
+        renderer_id=renderer_id_arg,
         api_key_strength="typeable",  # ignored for REST devices, see below
         # Mark the instance REST-mode so the push pipeline skips
         # broker publishes and the admin UI shows the right transport

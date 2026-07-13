@@ -632,9 +632,17 @@ def devices_register_discovered(discovered_id: str) -> Response:
             data_root=Path(current_app.config["DATA_ROOT"]),
         )
     markers.clear(target_id)
+    # Wire format the client asked for (png / bmp). A memory-constrained
+    # CircuitPython client declares "bmp" so it gets the uncompressed-BMP
+    # renderer and never runs zlib.decompress on-device. Resolved to a
+    # concrete renderer of the chosen kind; None leaves the kind default.
+    renderers_registry = renderers()
+    renderer_id_arg = device_service.renderer_id_for_format(
+        renderers_registry, devices().get(kind_id), entry.wire_format
+    )
     result = device_service.create_instance(
         devices=devices(),
-        renderers=renderers(),
+        renderers=renderers_registry,
         data_root=device_data_root(),
         instance_id=form.get("id") or default_id,
         kind_id=kind_id,
@@ -643,6 +651,7 @@ def devices_register_discovered(discovered_id: str) -> Response:
         access_token=discovered_token if isinstance(discovered_token, str) else None,
         mac=mac_arg,
         transport=transport_arg,
+        renderer_id=renderer_id_arg,
     )
     if not result.ok or result.device is None:
         flash(result.error or "Failed to register device.", "error")
