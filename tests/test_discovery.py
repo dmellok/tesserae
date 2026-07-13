@@ -247,6 +247,47 @@ def test_register_discovered_materialises_instance(app: Flask, tmp_path: Path) -
     assert (tmp_path / "devices" / "esp32_attic.json").exists()
 
 
+def test_register_discovered_honours_bmp_format(app: Flask, tmp_path: Path) -> None:
+    # A memory-constrained CircuitPython client declares format:"bmp" in
+    # its discover payload so registering it binds the uncompressed-BMP
+    # renderer, not the default PNG one.
+    cache = app.config["DISCOVERY_CACHE"]
+    cache.record(
+        "cp_kitchen",
+        b'{"kind":"circuitpython_generic","panel_w":400,"panel_h":300,'
+        b'"gamut":"bwr_3","format":"bmp"}',
+    )
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/settings/devices/discovery/cp_kitchen/register", follow_redirects=False)
+    assert resp.status_code == 302
+
+    dev = app.config["DEVICE_REGISTRY"].get("cp_kitchen")
+    assert dev is not None
+    assert dev.renderer_ids == ["circuitpython_bmp__cp_kitchen"]
+    registry = app.config["RENDERER_REGISTRY"]
+    assert registry.get("circuitpython_bmp__cp_kitchen") is not None
+    assert registry.get("circuitpython_png__cp_kitchen") is None
+
+
+def test_register_discovered_defaults_to_png_without_format(app: Flask, tmp_path: Path) -> None:
+    cache = app.config["DISCOVERY_CACHE"]
+    cache.record(
+        "cp_hall",
+        b'{"kind":"circuitpython_generic","panel_w":400,"panel_h":300,"gamut":"bwr_3"}',
+    )
+    client = app.test_client()
+    _sign_in(client)
+    resp = client.post("/settings/devices/discovery/cp_hall/register", follow_redirects=False)
+    assert resp.status_code == 302
+
+    dev = app.config["DEVICE_REGISTRY"].get("cp_hall")
+    assert dev is not None
+    assert dev.renderer_ids == ["circuitpython_png__cp_hall"]
+    registry = app.config["RENDERER_REGISTRY"]
+    assert registry.get("circuitpython_bmp__cp_hall") is None
+
+
 def test_register_refuses_without_kind(app: Flask) -> None:
     """A heartbeat with no 'kind' field can't be one-click registered
     , the form falls back to the manual Add-device path."""

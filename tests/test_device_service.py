@@ -77,6 +77,76 @@ def test_create_instance_derives_topics_and_clones(registries) -> None:
     assert (data_root / "esp32_lab.json").exists()
 
 
+def test_renderer_id_for_format_matches_extension(registries) -> None:
+    devices, renderers, _ = registries
+    kind = devices.get("circuitpython_generic")
+    assert kind is not None
+    assert kind.renderer_ids == ["circuitpython_png", "circuitpython_bmp"]
+    assert device_service.renderer_id_for_format(renderers, kind, "bmp") == "circuitpython_bmp"
+    assert device_service.renderer_id_for_format(renderers, kind, "png") == "circuitpython_png"
+    # Leading dot / casing tolerated.
+    assert device_service.renderer_id_for_format(renderers, kind, ".BMP") == "circuitpython_bmp"
+    # Unknown / empty leaves the kind default (None).
+    assert device_service.renderer_id_for_format(renderers, kind, "webp") is None
+    assert device_service.renderer_id_for_format(renderers, kind, None) is None
+
+
+def test_circuitpython_generic_defaults_to_png_clone_only(registries) -> None:
+    # No format declared: the multi-renderer kind must clone only its
+    # first renderer so the two never fight over the device's single
+    # latest-render slot.
+    devices, renderers, data_root = registries
+    result = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_default",
+        kind_id="circuitpython_generic",
+    )
+    assert result.ok and result.device is not None
+    assert renderers.get("circuitpython_png__cp_default") is not None
+    assert renderers.get("circuitpython_bmp__cp_default") is None
+    assert result.device.renderer_ids == ["circuitpython_png__cp_default"]
+
+
+def test_circuitpython_generic_bmp_pick_clones_bmp_only(registries) -> None:
+    devices, renderers, data_root = registries
+    result = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_bmp",
+        kind_id="circuitpython_generic",
+        renderer_id="circuitpython_bmp",
+    )
+    assert result.ok and result.device is not None
+    assert renderers.get("circuitpython_bmp__cp_bmp") is not None
+    assert renderers.get("circuitpython_png__cp_bmp") is None
+    assert result.device.renderer_ids == ["circuitpython_bmp__cp_bmp"]
+    # Persisted on the manifest so it survives a reload.
+    saved = json.loads((data_root / "cp_bmp.json").read_text())
+    assert saved["renderer_id"] == "circuitpython_bmp"
+
+
+def test_create_instance_ignores_unknown_renderer_id(registries) -> None:
+    # A renderer_id that isn't one of the kind's renderers is dropped, so
+    # the instance falls back to the kind default rather than orphaning
+    # itself with no renderer clone at all.
+    devices, renderers, data_root = registries
+    result = device_service.create_instance(
+        devices=devices,
+        renderers=renderers,
+        data_root=data_root,
+        instance_id="cp_bad",
+        kind_id="circuitpython_generic",
+        renderer_id="does_not_exist",
+    )
+    assert result.ok and result.device is not None
+    assert result.device.renderer_ids == ["circuitpython_png__cp_bad"]
+    saved = json.loads((data_root / "cp_bad.json").read_text())
+    assert "renderer_id" not in saved
+
+
 def test_create_instance_portrait_swaps_dims(registries) -> None:
     devices, renderers, data_root = registries
     result = device_service.create_instance(

@@ -695,6 +695,126 @@ def quantize_to_png(
     return out.getvalue()
 
 
+# --- CircuitPython client image pipeline ------------------------------
+#
+# Shared by the ``circuitpython_png`` and ``circuitpython_bmp``
+# renderers. Both fit the composition to the panel, contrast-adjust, and
+# quantise to the panel's exact indexed palette so ``adafruit_imageload``
+# mounts the result with no on-device quantise or dither. The only
+# difference between the two renderers is the container the result is
+# saved into (indexed PNG vs uncompressed indexed BMP), so the pixel
+# pipeline lives here and each renderer just picks the ``save`` format.
+
+_CIRCUITPYTHON_MONO_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0, 0, 0),
+    (255, 255, 255),
+)
+
+_CIRCUITPYTHON_DEFAULTS: dict[str, object] = {
+    "dither": "floyd-steinberg",
+    "contrast": 1.0,
+}
+
+
+def palette_for_circuitpython_gamut(
+    gamut: str | None,
+) -> tuple[tuple[int, int, int], ...] | None:
+    """Map a panel's declared gamut to the indexed palette a CircuitPython
+    client wants, or ``None`` when the gamut asks for a full-colour
+    (unquantised) output.
+
+    Unknown or empty gamuts fall through to Spectra 6 nominal so a panel
+    that just hasn't declared its gamut yet still produces a sensible
+    indexed image rather than 8-bit RGB. Aliases handled:
+
+      * ``mono`` -> black + white
+      * ``bwr_3`` -> 3-colour black/white/red tri-colour e-ink
+      * ``gray_4`` -> 4-level greyscale ramp (2-bit, no highlight)
+      * ``bwry_4`` -> 4-colour black/white/red/yellow
+      * ``acep_7colour`` / ``acep_7color`` / ``inky_7colour`` -> 7-colour
+      * ``rgb24`` / ``rgb16`` -> ``None`` (full-colour passthrough)
+    """
+    g = (gamut or "").lower()
+    if g == "mono":
+        return _CIRCUITPYTHON_MONO_PALETTE
+    if g == "bwry_4":
+        return BWRY_4_PALETTE
+    if g == "bwr_3":
+        return BWR_3_PALETTE
+    if g == "gray_4":
+        return GRAY_4_PALETTE
+    if g in ("acep_7colour", "acep_7color", "inky_7colour"):
+        return INKY_7COLOUR_PALETTE
+    if g in ("rgb24", "rgb16"):
+        return None
+    return SPECTRA_6_PALETTE
+
+
+def circuitpython_indexed_image(
+    png_bytes: bytes,
+    *,
+    width: int,
+    height: int,
+    gamut: str | None,
+    flip: bool = False,
+    underscan: int = 0,
+    settings: dict[str, object] | None = None,
+) -> Image.Image:
+    """Fit, contrast-adjust, and quantise a composition PNG for a
+    CircuitPython client, returning the ready-to-save Pillow image.
+
+    The result is palette-mode (``"P"``) for every quantised gamut, so a
+    caller that saves it as PNG or uncompressed BMP produces an indexed
+    file ``adafruit_imageload`` mounts natively. ``rgb24`` / ``rgb16``
+    gamuts return an ``"RGB"`` image instead (full-colour passthrough).
+
+    The device paints what arrives: no on-device quantise, no dither, no
+    nibble unpack. This is the shared pixel pipeline behind both the
+    ``circuitpython_png`` and ``circuitpython_bmp`` renderers.
+    """
+    settings = settings or {}
+    img: Image.Image = Image.open(io.BytesIO(png_bytes))
+
+    if flip:
+        # Upside-down physical mount: turn the whole image 180° so it
+        # reads upright on the wall.
+        img = img.rotate(180, expand=True)
+
+    if img.size != (width, height):
+        # Composer pre-sizes pages to ``panel.w x panel.h`` so this is
+        # usually a no-op. It only does real work on Send-page image
+        # pushes where the input PNG isn't panel-sized.
+        fit = str(settings.get("image_fit") or "fit")
+        img = fit_to_panel(img, target_w=width, target_h=height, scale=fit, bg="white")
+
+    if underscan:
+        # Per-device underscan: inset rendered content so it clears a
+        # physical bezel or mat covering the panel edge.
+        img = underscan_image(img, underscan=underscan)
+
+    contrast = float(settings.get("contrast", _CIRCUITPYTHON_DEFAULTS["contrast"]))  # type: ignore[arg-type]
+    if abs(contrast - 1.0) > 1e-6:
+        # Pre-dither contrast push: bumping contrast forces more pixels to
+        # definite black or definite white before the dither pass, which
+        # tends to read better on text-heavy dashboards.
+        img = ImageEnhance.Contrast(img.convert("L")).enhance(contrast).convert("RGB")
+
+    palette = palette_for_circuitpython_gamut(gamut)
+    if palette is None:
+        # rgb24 / rgb16: full-colour passthrough, no quantise or dither.
+        return img.convert("RGB")
+
+    pal_img = _palette_image(palette)
+    dither_mode = _PIL_DITHER_MAP.get(
+        str(settings.get("dither", _CIRCUITPYTHON_DEFAULTS["dither"])),
+        Image.Dither.FLOYDSTEINBERG,
+    )
+    # ``Image.quantize`` keeps palette mode ("P"), which is what we want:
+    # the saved file carries an indexed pixel format adafruit_imageload
+    # reads natively. Deliberately no ``.convert("RGB")`` afterwards.
+    return img.convert("RGB").quantize(palette=pal_img, dither=dither_mode)
+
+
 # --- numpy-backed dither for the panel-bin packer ---------------------
 
 

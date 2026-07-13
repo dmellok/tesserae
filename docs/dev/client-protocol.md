@@ -162,6 +162,30 @@ server URL.
        (e.g. `spectra_6_pack_waveshare`) would need a migration for
        every existing config, so the awkward names stay for backwards
        compat and the aliases carry the semantic intent.
+
+   `format` is optional and selects the wire container the server
+   renders into. It only applies to kinds that offer more than one
+   renderer; `circuitpython_generic` offers two:
+
+   | Value | Renderer | Notes |
+   | --- | --- | --- |
+   | `png` (default) | `circuitpython_png` | Indexed PNG. Smallest download. Needs `zlib.decompress` on the client. |
+   | `bmp` | `circuitpython_bmp` | Uncompressed indexed BMP. No `zlib` on the client at all. |
+
+   Declare `"format": "bmp"` when the board can't spare a contiguous
+   decode buffer. CircuitPython's `zlib.decompress` is one-shot (no
+   streaming inflate), so decoding even a small indexed PNG needs the
+   whole inflated image in RAM alongside the `displayio.Bitmap`; on a
+   Pico W class board (~110K free SRAM) that exhausts or fragments
+   memory. An uncompressed BMP sidesteps it: `adafruit_imageload` reads
+   it row by row with `file.read` / `seek`, so peak RAM is the
+   framebuffer plus a small row buffer. Boards with headroom (ESP32-S3
+   etc.) should keep the default PNG, which is a few times smaller on the
+   wire (the server writes palette-mode BMP at 8 bits per pixel). The
+   value is resolved to a renderer by matching its file extension, so the
+   `format` you declare is exactly the `format` field you'll get back
+   from `/frame`. An unknown or absent value leaves the kind's default
+   (PNG) renderer in place.
 2. Server caches the announcement. Returns:
    ```json
    {
@@ -221,7 +245,8 @@ click.
 
    `gamut` follows the same rules as on `/discover` (v0.69.1). Both
    paths write the canonicalised value onto the auto-provisioned
-   instance's panel block.
+   instance's panel block. `format` (`png` / `bmp`) is honoured here
+   too, same rules as on `/discover`.
    ```
 3. Server validates, creates the instance, returns a token:
    ```json
@@ -644,6 +669,33 @@ bin/png variants.
 
 Reference: [`renderers/pi_png/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/pi_png/renderer.py),
 [`renderers/trmnl/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/trmnl/renderer.py).
+
+### CircuitPython indexed `.png` / `.bmp`
+
+The `circuitpython_generic` kind serves the composition already
+quantised to the panel's exact palette, as either an indexed PNG
+(`circuitpython_png`) or an uncompressed indexed BMP
+(`circuitpython_bmp`), selected by the `format` field on `discover` /
+`register`. Both mount straight into a `displayio.Bitmap` via
+`adafruit_imageload` with no on-device quantise, dither, or nibble
+unpack, the device paints what arrives.
+
+Pick BMP on memory-constrained boards. CircuitPython's
+`zlib.decompress` is one-shot, so decoding an indexed PNG needs the
+whole inflated image in a contiguous buffer alongside the bitmap; on a
+Pico W class board that exhausts or fragments SRAM. The BMP has no
+`zlib` in the path, `adafruit_imageload` reads it row by row with
+`file.read` / `seek`, so peak RAM is the framebuffer plus a small row
+buffer. Trade-off: the server writes palette-mode BMP at 8 bits per
+pixel, so it's a few times larger on the wire than the PNG. The
+constraint on these boards is the decode buffer, not download size.
+
+The BMP is always uncompressed `BI_RGB`, bottom-up (Pillow's default),
+which is the form `adafruit_imageload` decodes; it rejects RLE-packed
+BMP.
+
+Reference: [`renderers/circuitpython_png/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/circuitpython_png/renderer.py),
+[`renderers/circuitpython_bmp/renderer.py`](https://github.com/dmellok/tesserae/blob/main/renderers/circuitpython_bmp/renderer.py).
 
 ## Configuration push
 
