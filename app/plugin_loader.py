@@ -33,7 +33,7 @@ from types import ModuleType
 from typing import Any
 
 import jsonschema
-from flask import Blueprint, Flask, abort, render_template, send_from_directory
+from flask import Blueprint, Flask, abort, current_app, render_template, send_from_directory
 from werkzeug.wrappers import Response
 
 from app.capabilities import Capabilities
@@ -325,18 +325,29 @@ def register_routes(app: Flask, registry: PluginRegistry) -> None:
     """Register per-plugin static asset routes and any plugin-provided blueprints."""
     bp = Blueprint("plugins", __name__)
 
+    # The route closures capture ``registry`` at startup, but an in-process
+    # reload (the MCP widget-push path) swaps a fresh registry into
+    # ``app.config["PLUGIN_REGISTRY"]``. Read that per request (falling back to
+    # the closed-over one if the key is ever absent) so a newly-pushed widget's
+    # assets are found without a restart, matching how composer.py /
+    # condition_routes.py already resolve the registry.
+    def _live_registry() -> PluginRegistry:
+        live: PluginRegistry = current_app.config.get("PLUGIN_REGISTRY", registry)
+        return live
+
     @bp.get("/")
     def plugins_index() -> str:
         """Top-level page listing every loaded plugin + loader errors."""
+        reg = _live_registry()
         return render_template(
             "plugins_index.html",
-            plugins=sorted(registry.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
-            errors=registry.errors,
+            plugins=sorted(reg.plugins.values(), key=lambda p: (p.kind, p.name.lower())),
+            errors=reg.errors,
         )
 
     @bp.get("/<plugin_id>/<path:asset>")
     def plugin_asset(plugin_id: str, asset: str) -> Response:
-        plugin = registry.plugins.get(plugin_id)
+        plugin = _live_registry().plugins.get(plugin_id)
         if plugin is None:
             abort(404)
         if asset not in _ALLOWED_ASSETS and not asset.startswith(_ALLOWED_ASSET_PREFIXES):

@@ -90,6 +90,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Fixed
 
+- **Pushed widgets served their assets only after a restart.** A widget installed
+  over the MCP push path went live for data on the in-process reload but its
+  `client.js` / static assets kept 404ing until a full restart, so a freshly pushed
+  widget rendered blank. The per-plugin asset routes closed over the registry captured
+  at startup; they now read `app.config["PLUGIN_REGISTRY"]` fresh per request (matching
+  the composer / condition routes), so a newly-pushed non-blueprint widget serves its
+  assets immediately on reload. Widgets that declare an admin `blueprint()` still take
+  one restart (Flask registers blueprints once at startup).
+
 - **MCP `render.png` returned a login screenshot on password-protected instances.**
   The single-widget render endpoint screenshots `/_test/render` over loopback with no
   session; that path was not in the auth gate's loopback-exempt list, so a

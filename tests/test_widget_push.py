@@ -111,6 +111,22 @@ def test_install_reloads_in_process_and_goes_live(app: Flask) -> None:
     assert data["data_source"] == "live" and data["data"]["value"] == 42
 
 
+def test_pushed_widget_serves_client_js_after_in_process_reload(app: Flask) -> None:
+    """A brand-new widget's client.js is served over /plugins/<id>/ right after the
+    in-process reload, no restart. The asset routes read the registry fresh per
+    request, so the swapped-in registry's new plugin id resolves (regression: the
+    closed-over startup registry 404'd it)."""
+    _enable(app)
+    client = app.test_client()
+    _install(client, _make_tar(_widget_files(), top="air_quality"))
+    resp = client.get("/plugins/air_quality/client.js")
+    try:
+        assert resp.status_code == 200
+        assert b"export default" in resp.get_data()
+    finally:
+        resp.close()  # release the send_from_directory file handle
+
+
 def test_install_upserts_new_version(app: Flask) -> None:
     _enable(app)
     client = app.test_client()
