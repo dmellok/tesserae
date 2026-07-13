@@ -43,6 +43,18 @@ def test_test_render_honours_fragment(client: FlaskClient) -> None:
     assert client.get("/_test/render?plugin=weather_now&size=md&fragment=nope").status_code == 400
 
 
+def test_test_render_honours_explicit_wh(client: FlaskClient) -> None:
+    """Explicit ?w&h override the size preset for the cell + panel dims
+    (Screenshot Contract); out-of-range values clamp rather than 400 or
+    overflow the viewport."""
+    html = client.get("/_test/render?plugin=clock&w=300&h=200").get_data(as_text=True)
+    assert 'data-cell-w="300"' in html
+    assert 'data-panel-w="300"' in html
+    # Above/below the bounds clamp to 4096 / 16.
+    clamped = client.get("/_test/render?plugin=clock&w=999999&h=1").get_data(as_text=True)
+    assert 'data-cell-w="4096"' in clamped
+
+
 def test_compose_route_404s_on_unknown_page(client: FlaskClient) -> None:
     resp = client.get("/compose/nonexistent")
     assert resp.status_code == 404

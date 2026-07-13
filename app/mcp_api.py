@@ -458,28 +458,62 @@ def list_authored_widgets() -> Response:
 def widget_render(key: str) -> Response:
     """Faithful e-ink render of a single widget as a PNG, over the authed MCP
     surface (so a client can preview against a remote / HA instance where
-    ``/_test/render`` is not reachable). Query: ``size`` (xs|sm|md|lg, default lg),
-    ``opts`` (JSON cell options), optional ``theme`` / ``style`` / ``sample`` / ``zoom``,
-    ``fragment`` (render one declared fragment, default the whole widget), and
-    ``fresh=true`` (bypass caches so a just-edited server.py is reflected now)."""
+    ``/_test/render`` is not reachable). Query: ``size`` (xs|sm|md|lg, default
+    lg; ``lg`` is 1200x800) OR explicit ``w`` & ``h`` (clamped); ``options`` (or
+    ``opts``, JSON cell options); optional ``theme`` / ``style`` / ``sample`` /
+    ``zoom``; ``fragment`` (render one declared fragment, default the whole
+    widget); ``fresh=true`` (bypass caches so a just-edited server.py is
+    reflected now).
+
+    Screenshot Contract error semantics: unknown widget -> 404, unknown fragment
+    or bad ``options`` JSON -> 400, render unavailable -> 503. Never 200 + a
+    blank / HTML body."""
     from urllib.parse import urlencode
 
-    from app.composer import SIZE_DIMENSIONS
+    from app.composer import SIZE_DIMENSIONS, clamp_screenshot_dim
     from app.panels_schema import fragments_of
     from app.renderer import RenderRequest, render_to_png, to_loopback_url
 
     plugin = _pr._registry().get(key)
     if plugin is None:
         return _err(404, f"unknown widget {key!r}")
+    # Explicit ``w,h`` override the size preset (Screenshot Contract); clamped
+    # so a typo can't ask the browser for a runaway viewport. Absent, the
+    # xs|sm|md|lg mapping stands (``lg`` == 1200x800).
+    w_arg = request.args.get("w")
+    h_arg = request.args.get("h")
     size = request.args.get("size", "lg")
-    if size not in SIZE_DIMENSIONS:
-        return _err(400, f"size must be one of {'|'.join(sorted(SIZE_DIMENSIONS))}")
-    w, h = SIZE_DIMENSIONS[size]
+    if w_arg is not None or h_arg is not None:
+        try:
+            w = clamp_screenshot_dim(int(w_arg))  # type: ignore[arg-type]
+            h = clamp_screenshot_dim(int(h_arg))  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return _err(400, "w and h must both be integers")
+    else:
+        if size not in SIZE_DIMENSIONS:
+            return _err(400, f"size must be one of {'|'.join(sorted(SIZE_DIMENSIONS))}")
+        w, h = SIZE_DIMENSIONS[size]
     fragment = request.args.get("fragment")
     if fragment and fragment != "full" and fragment not in {f["id"] for f in fragments_of(plugin)}:
         return _err(400, f"widget {key!r} has no fragment {fragment!r}")
+    # ``options`` is the Screenshot Contract spelling; ``opts`` is the existing
+    # one. Validate up front: bad JSON is a 400 here (the dev preview silently
+    # falls through to defaults, which would read as a passing screenshot).
+    opts_raw = request.args.get("opts") or request.args.get("options")
+    if opts_raw:
+        try:
+            parsed = json.loads(opts_raw)
+        except (json.JSONDecodeError, ValueError):
+            return _err(400, "options must be valid JSON")
+        if not isinstance(parsed, dict):
+            return _err(400, "options must be a JSON object")
     params: dict[str, str] = {"plugin": key, "size": size}
-    for arg in ("opts", "theme", "style", "sample", "zoom", "fragment", "fresh"):
+    if w_arg is not None or h_arg is not None:
+        params["w"] = str(w)
+        params["h"] = str(h)
+    if opts_raw:
+        params["opts"] = opts_raw
+    for arg in ("theme", "style", "sample", "zoom", "fragment", "fresh"):
         val = request.args.get(arg)
         if val:
             params[arg] = val
@@ -491,7 +525,7 @@ def widget_render(key: str) -> Response:
             pool=current_app.config.get("BROWSER_POOL"),
         )
     except Exception as err:
-        return _err(502, f"render failed: {type(err).__name__}: {err}")
+        return _err(503, f"render unavailable: {type(err).__name__}: {err}")
     return current_app.response_class(png, mimetype="image/png")
 
 
