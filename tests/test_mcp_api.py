@@ -377,6 +377,79 @@ def test_render_png_unknown_fragment_400(app: Flask, monkeypatch: pytest.MonkeyP
     assert resp.status_code == 400 and "error" in resp.get_json()
 
 
+# -- AI background generation (fal.ai, Approach A) -----------------------
+
+
+def test_generate_background_sets_bg_image(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: "test-key")
+    # Stand in for the fal round-trip: return a PNG sized to the canvas.
+    monkeypatch.setattr(
+        fb, "generate", lambda prompt, **kw: _png_of_size(kw["width"], kw["height"])
+    )
+    client = app.test_client()
+    pid = _create_page(client)
+    resp = client.post(
+        f"/api/mcp/pages/{pid}/background",
+        json={"prompt": "a calm foggy sea", "style": "watercolor", "fit": "cover"},
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    body = resp.get_json()
+    assert body["ok"] is True
+    assert body["bg_image"].startswith("/renders/") and body["bg_image"].endswith(".png")
+    # Persisted on the canvas doc so the render + editor pick it up.
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    assert doc["bg_image"] == body["bg_image"] and doc["bg_fit"] == "cover"
+    # The asset was actually written under the renders dir.
+    fname = body["bg_image"].split("/renders/")[1]
+    assert (app.config["RENDERS_DIR"] / fname).exists()
+
+
+def test_generate_background_requires_prompt(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: "k")
+    client = app.test_client()
+    pid = _create_page(client)
+    assert client.post(f"/api/mcp/pages/{pid}/background", json={}).status_code == 400
+
+
+def test_generate_background_no_key_400(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: None)
+    client = app.test_client()
+    pid = _create_page(client)
+    r = client.post(f"/api/mcp/pages/{pid}/background", json={"prompt": "x"})
+    assert r.status_code == 400 and "fal" in r.get_json()["error"].lower()
+
+
+def test_generate_background_fal_failure_502(app: Flask, monkeypatch: pytest.MonkeyPatch) -> None:
+    _enable(app)
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: "k")
+
+    def _boom(prompt: str, **kw: Any) -> bytes:
+        raise fb.FalError("fal.ai returned 401: bad key")
+
+    monkeypatch.setattr(fb, "generate", _boom)
+    client = app.test_client()
+    pid = _create_page(client)
+    r = client.post(f"/api/mcp/pages/{pid}/background", json={"prompt": "x"})
+    assert r.status_code == 502 and "generation failed" in r.get_json()["error"]
+
+
+def test_generate_background_unknown_page_404(app: Flask) -> None:
+    _enable(app)
+    r = app.test_client().post("/api/mcp/pages/nope/background", json={"prompt": "x"})
+    assert r.status_code == 404
+
+
 def test_push_requires_device_ids(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

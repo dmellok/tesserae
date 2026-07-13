@@ -1019,6 +1019,74 @@
       fs.addEventListener("change", function () { pushHistory(); S.doc.bg_fit = fs.value; scheduleSave(); paint(); });
       fr.appendChild(fs); mount.appendChild(fr);
     }
+
+    // Generative background (fal.ai, Approach A). Generates an image from a
+    // prompt and sets it as bg_image; the data elements composite on top, so
+    // data never passes through the image model. Prompt/model/style live in
+    // S.bg (editor-only, not part of the saved doc).
+    if (S.cfg.bgUrl) {
+      S.bg = S.bg || { prompt: "", model: "fal-ai/flux/schnell", style: "none" };
+      var gr = el("div", "prow"); gr.style.display = "block";
+      var gtog = el("button", "minibtn", "Generate background (AI)");
+      gtog.style.cssText = "width:100%;margin-top:2px";
+      gr.appendChild(gtog); mount.appendChild(gr);
+
+      var gpanel = el("div");
+      gpanel.style.cssText = "display:" + (S.bg.open ? "flex" : "none") + ";flex-direction:column;gap:6px;margin-top:6px";
+      var gprompt = el("textarea", "dinput");
+      gprompt.placeholder = "Describe the background…"; gprompt.rows = 3;
+      gprompt.style.cssText = "width:100%;resize:vertical"; gprompt.value = S.bg.prompt || "";
+      gprompt.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      gprompt.addEventListener("input", function () { S.bg.prompt = gprompt.value; });
+
+      var models = [
+        ["fal-ai/flux/schnell", "Flux Schnell (fast, ~$0.003)"],
+        ["fal-ai/recraft-v3", "Recraft V3 (crisp, ~$0.04)"],
+        ["fal-ai/flux-pro/v1.1", "Flux Pro 1.1 (~$0.04)"],
+        ["fal-ai/nano-banana", "Nano Banana / Gemini (~$0.039)"]
+      ];
+      var styles = ["none", "oil_painting", "watercolor", "pencil_sketch", "bauhaus",
+        "risograph", "line_art", "ukiyo_e", "art_deco", "botanical", "cyberpunk", "pixel_art"];
+      var gm = el("select", "psel");
+      gm.innerHTML = models.map(function (m) { return '<option value="' + m[0] + '">' + m[1] + "</option>"; }).join("");
+      gm.value = S.bg.model; gm.addEventListener("change", function () { S.bg.model = gm.value; });
+      var gs = el("select", "psel");
+      gs.innerHTML = styles.map(function (x) { return '<option value="' + x + '">' + x.replace(/_/g, " ") + "</option>"; }).join("");
+      gs.value = S.bg.style; gs.addEventListener("change", function () { S.bg.style = gs.value; });
+
+      var ggo = el("button", "minibtn", "Generate");
+      var gstat = el("span"); gstat.style.cssText = "font-size:11px;color:var(--t-muted)";
+      ggo.addEventListener("click", function () {
+        var p = (gprompt.value || "").trim();
+        if (!p) { gstat.textContent = "Enter a prompt first."; return; }
+        ggo.disabled = true; gstat.textContent = "Generating… (this can take a few seconds)";
+        fetch(S.cfg.bgUrl, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: p, model: gm.value, style: gs.value, fit: S.doc.bg_fit || "cover" })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (res) {
+            ggo.disabled = false;
+            if (!res.ok) { gstat.textContent = (res.j && res.j.error) || "Generation failed."; return; }
+            pushHistory();
+            S.doc.bg_image = res.j.bg_image;
+            if (res.j.bg_fit) S.doc.bg_fit = res.j.bg_fit;
+            S.bg.open = true;
+            scheduleSave(); paint(); renderAppearance();
+          })
+          .catch(function () { ggo.disabled = false; gstat.textContent = "Generation failed."; });
+      });
+      gtog.addEventListener("click", function () {
+        S.bg.open = gpanel.style.display === "none";
+        gpanel.style.display = S.bg.open ? "flex" : "none";
+      });
+      gpanel.appendChild(gprompt);
+      gpanel.appendChild(apRow("Model", gm));
+      gpanel.appendChild(apRow("Style", gs));
+      var gbar = el("div"); gbar.style.cssText = "display:flex;gap:8px;align-items:center";
+      gbar.appendChild(ggo); gbar.appendChild(gstat);
+      gpanel.appendChild(gbar);
+      mount.appendChild(gpanel);
+    }
   }
 
   // ---- layers -----------------------------------------------------------
@@ -2184,6 +2252,7 @@
       devicesUrl: root.dataset.devicesUrl,
       sendUrl: root.dataset.sendUrl,
       previewUrl: root.dataset.previewUrl,
+      bgUrl: root.dataset.bgUrl,
       sourceFormUrl: root.dataset.sourceFormUrl,
       sourceOptionsUrl: root.dataset.sourceOptionsUrl,
       streamUrl: root.dataset.streamUrl,

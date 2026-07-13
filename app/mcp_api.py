@@ -725,6 +725,70 @@ def set_canvas(page_id: str) -> Response:
     return _saved(new_page)
 
 
+@bp.post("/pages/<page_id>/background")
+def generate_background(page_id: str) -> Response:
+    """Generate an AI background for a canvas (fal.ai) and set it as ``bg_image``.
+
+    Body: ``{prompt (required), model?, style?, fit?, eink_friendly?, seed?}``.
+    The image is generated from the prompt, stored as a local render asset, and
+    the canvas' ``bg_image`` / ``bg_fit`` are updated. This is Approach A: the
+    background is decorative and the data widgets composite on top, so the data
+    never passes through the image model. Uses the canvas' own w/h for the
+    aspect. 400 if no prompt or no fal key is configured; 502 if fal fails. Same
+    drift guard + compact ack as the other canvas writes, plus ``bg_image``."""
+    from app import fal_backgrounds as fb
+    from app.state.panel_store import CanvasLayout
+
+    page = _pr._get_canvas(page_id)
+    if page is None:
+        return _err(404, f"no canvas dashboard {page_id!r}")
+    conflict = _drift_conflict(page)
+    if conflict is not None:
+        return conflict
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _err(400, "body must be a JSON object")
+    prompt = str(body.get("prompt") or "").strip()
+    if not prompt:
+        return _err(400, "prompt is required")
+    api_key = fb.resolve_fal_key(_pr._registry(), _settings())
+    if not api_key:
+        return _err(
+            400,
+            "no fal.ai API key configured: set one on an installed fal-image widget, "
+            "under app.fal.api_key, or in the FAL_KEY environment variable",
+        )
+    layout = page.canvas or CanvasLayout()
+    model = str(body.get("model") or fb.DEFAULT_MODEL).strip()
+    style = str(body.get("style") or "none").strip()
+    fit = str(body.get("fit") or layout.bg_fit or "cover").strip().lower()
+    if fit not in ("cover", "contain", "stretch"):
+        fit = "cover"
+    seed_in = body.get("seed")
+    seed = int(seed_in) if isinstance(seed_in, int) else None
+    try:
+        png = fb.generate(
+            prompt,
+            api_key=api_key,
+            model=model,
+            style=style,
+            width=int(layout.w),
+            height=int(layout.h),
+            eink_friendly=bool(body.get("eink_friendly", True)),
+            seed=seed,
+        )
+    except fb.FalError as err:
+        return _err(502, f"background generation failed: {err}")
+    url = fb.store_background(current_app.config["RENDERS_DIR"], png)
+    layout.bg_image = url
+    layout.bg_fit = fit
+    page.canvas = layout
+    _save_mcp(page)
+    data = _saved(page).get_json()
+    data.update({"bg_image": url, "model": model, "prompt": prompt})
+    return jsonify(data)
+
+
 @bp.post("/pages/<page_id>/elements")
 def append_element(page_id: str) -> Response:
     """Append one element to a canvas and save (each call is one save, so an open

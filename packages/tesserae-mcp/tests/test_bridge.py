@@ -29,6 +29,7 @@ def test_tools_register() -> None:
         "delete_canvas_page",
         "get_canvas",
         "set_canvas",
+        "set_canvas_background",
         "add_element",
         "update_element",
         "delete_element",

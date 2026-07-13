@@ -662,3 +662,56 @@ def test_source_options_parses_form(app: Flask, monkeypatch: pytest.MonkeyPatch)
     assert resp.status_code == 200
     options = resp.get_json()["options"]
     assert options["units"] == "imperial" and options["label"] == "Home"
+
+
+# -- generative background (fal.ai, Approach A) --------------------------
+
+
+def _mini_png() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (32, 24), "white").save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_generate_bg_sets_bg_image(app: Flask, monkeypatch: Any) -> None:
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: "k")
+    monkeypatch.setattr(fb, "generate", lambda prompt, **kw: _mini_png())
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    r = client.post(
+        f"/pages/canvas/c/{cid}/generate-bg",
+        json={"prompt": "a foggy shore", "style": "watercolor", "fit": "cover"},
+    )
+    assert r.status_code == 200, r.get_data(as_text=True)
+    body = r.get_json()
+    assert body["status"] == "ok" and body["bg_image"].startswith("/renders/")
+    doc = client.get(f"/pages/canvas/c/{cid}/doc.json").get_json()
+    assert doc["bg_image"] == body["bg_image"] and doc["bg_fit"] == "cover"
+
+
+def test_generate_bg_requires_prompt(app: Flask, monkeypatch: Any) -> None:
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: "k")
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    assert client.post(f"/pages/canvas/c/{cid}/generate-bg", json={}).status_code == 400
+
+
+def test_generate_bg_no_key_400(app: Flask, monkeypatch: Any) -> None:
+    from app import fal_backgrounds as fb
+
+    monkeypatch.setattr(fb, "resolve_fal_key", lambda reg, ss: None)
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    r = client.post(f"/pages/canvas/c/{cid}/generate-bg", json={"prompt": "x"})
+    assert r.status_code == 400 and "fal" in r.get_json()["error"].lower()
