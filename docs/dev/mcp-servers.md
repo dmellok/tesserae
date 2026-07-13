@@ -86,8 +86,16 @@ Tesserae, faithfully render, mine a data schema, and prepare a catalog PR. Full 
 serves on `http://localhost:8770` and should point at your Tesserae via
 `STUDIO_TESSERAE_URL` for live data + faithful render.
 
-**2. Install the bridge.** It ships with the Studio server package (`pip install -e server`
-gives you the `tesserae-studio-mcp` command), or run it as a module.
+**2. Install the bridge** on the machine where your *agent* runs:
+
+```bash
+pip install tesserae-studio-mcp
+```
+
+That gives you the `tesserae-studio-mcp` command. (The bridge lives in the Tesserae Studio repo
+under `packages/tesserae-studio-mcp`; to install straight from source use
+`pip install "git+https://github.com/dmellok/tesserae-studio#subdirectory=packages/tesserae-studio-mcp"`.
+It also still ships with the Studio server package for source installs.)
 
 **3. Configure your agent.** Claude Desktop / Claude Code `mcpServers` config:
 
@@ -95,8 +103,7 @@ gives you the `tesserae-studio-mcp` command), or run it as a module.
 {
   "mcpServers": {
     "tesserae-studio": {
-      "command": "python",
-      "args": ["-m", "studio_server.mcp_server"],
+      "command": "tesserae-studio-mcp",
       "env": { "STUDIO_URL": "http://localhost:8770" }
     }
   }
@@ -134,7 +141,7 @@ What every client needs:
 | env | `TESSERAE_URL` (+ `TESSERAE_MCP_TOKEN` for a remote target) | `STUDIO_URL` |
 
 If the console scripts aren't on your `PATH`, use `command: "python"` with
-`args: ["-m", "tesserae_mcp"]` (or `["-m", "studio_server.mcp_server"]`).
+`args: ["-m", "tesserae_mcp"]` (or `["-m", "tesserae_studio_mcp"]`).
 
 **Claude Desktop / Code, Cursor, Windsurf, Cline** share the `mcpServers` JSON shape.
 The same block works in each; only the file it goes in differs:

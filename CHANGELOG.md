@@ -16,6 +16,9 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Docs
 
+- The `tesserae-studio-mcp` bridge install now reads `pip install tesserae-studio-mcp`
+  (it's on PyPI), matching the `tesserae-mcp` section, with a from-source fallback.
+
 - MCP client-config snippets for Codex CLI, Cursor, Windsurf, Cline, VS Code, and the
   OpenAI Agents SDK, alongside the existing Claude config.
 
