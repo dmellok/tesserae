@@ -1,0 +1,37 @@
+# Publish the tesserae-mcp bridge (packages/tesserae-mcp) to PyPI.
+#
+# Fires on a tag like ``mcp-v0.5.0`` (kept distinct from the app's own version
+# tags) or a manual dispatch. Uses PyPI Trusted Publishing (OIDC), so no API
+# token secret is needed, but it requires one-time setup on PyPI: add a pending
+# publisher for the ``tesserae-mcp`` project pointing at this repo, this workflow
+# file, and the ``pypi`` environment. Until that's configured the job is inert.
+
+name: publish tesserae-mcp
+
+on:
+  push:
+    tags:
+      - "mcp-v*"
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: build + publish
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # OIDC token for PyPI trusted publishing
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Build sdist + wheel
+        working-directory: packages/tesserae-mcp
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/tesserae-mcp/dist

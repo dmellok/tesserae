@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tesserae-mcp"
+version = "0.5.0"
+description = "MCP bridge for Tesserae: build e-ink canvas dashboards with an AI agent."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "AGPL-3.0-or-later" }
+authors = [{ name = "Kayden D'Mello" }]
+keywords = ["mcp", "tesserae", "e-ink", "dashboard", "ai"]
+dependencies = [
+    # The Model Context Protocol SDK (FastMCP). Everything else is stdlib.
+    "mcp>=1.2,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/dmellok/tesserae/tree/main/packages/tesserae-mcp"
+Tesserae = "https://github.com/dmellok/tesserae"
+Docs = "https://docs.tesserae.ink/dev/mcp-servers/"
+
+[project.scripts]
+tesserae-mcp = "tesserae_mcp:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.15,<0.16",
+]
+
+[tool.setuptools.packages.find]
+include = ["tesserae_mcp*"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.format]
+quote-style = "double"
+
+# Anchor pytest's rootdir here so it does NOT climb to the repo-root config /
+# conftest.py (which imports the Flask app). Without this, running the bridge's
+# tests inside the monorepo pulls in the app's conftest and fails on a missing
+# ``flask`` in the bridge's stdlib-only environment.
+[tool.pytest.ini_options]
+testpaths = ["tests"]

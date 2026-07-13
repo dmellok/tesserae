@@ -66,7 +66,7 @@ it to your `PATH`, which is exactly what an MCP client needs.
     Then install the bridge:
 
     ```bash
-    pipx install git+https://github.com/dmellok/tesserae-mcp
+    pipx install tesserae-mcp
     ```
 
     Confirm it's on your `PATH`:
@@ -81,19 +81,18 @@ it to your `PATH`, which is exactly what an MCP client needs.
 
     ```bash
     python3 -m venv ~/.tesserae-mcp
-    ~/.tesserae-mcp/bin/python -m pip install git+https://github.com/dmellok/tesserae-mcp
+    ~/.tesserae-mcp/bin/python -m pip install tesserae-mcp
     ```
 
     The command is then `~/.tesserae-mcp/bin/tesserae-mcp` (use that full path in
     the config below).
 
-=== "from a clone"
+=== "from source"
 
     ```bash
-    git clone https://github.com/dmellok/tesserae-mcp
-    cd tesserae-mcp
-    python3 -m pip install mcp
-    # run with:  python -m tesserae_mcp
+    # the bridge lives in the Tesserae repo under packages/tesserae-mcp
+    pip install "git+https://github.com/dmellok/tesserae#subdirectory=packages/tesserae-mcp"
+    # or from a clone:  pip install -e tesserae/packages/tesserae-mcp
     ```
 
 !!! warning "`error: externally-managed-environment`"

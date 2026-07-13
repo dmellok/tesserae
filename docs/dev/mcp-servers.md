@@ -29,10 +29,12 @@ agent runs on a *different* machine from Tesserae, also **Regenerate token** and
 **2. Install the bridge** on the machine where your *agent* runs:
 
 ```bash
-pip install git+https://github.com/dmellok/tesserae-mcp
+pip install tesserae-mcp
 ```
 
-That gives you the `tesserae-mcp` command.
+That gives you the `tesserae-mcp` command. (The bridge lives in the Tesserae repo under
+`packages/tesserae-mcp`; to install straight from source use
+`pip install "git+https://github.com/dmellok/tesserae#subdirectory=packages/tesserae-mcp"`.)
 
 **3. Configure your agent.** Claude Desktop / Claude Code `mcpServers` config:
 
@@ -114,6 +116,95 @@ lint it, register it, and show me the faithful render at every size."* Key tools
 `scaffold_widget`, `scaffold_bundle`, `list_files` / `read_file` / `write_file`,
 `lint_widget`, `register_widget`, `faithful_render`, `mine_data_schema`, `widget_data`,
 `package_widget`, `generate_catalog_entry`, `open_catalog_pr`.
+
+---
+
+## Client configuration
+
+Both servers are standard stdio MCP servers with nothing Claude-specific in them, so any
+MCP-capable client works, Claude Desktop / Code, Cursor, Windsurf, Cline, VS Code (Copilot
+agent mode), Codex CLI, Zed, or a custom client on the MCP SDK. Only the config **file
+format** differs; the command and environment variables are the same everywhere.
+
+What every client needs:
+
+| | tesserae-mcp | tesserae-studio-mcp |
+| --- | --- | --- |
+| command | `tesserae-mcp` | `tesserae-studio-mcp` |
+| env | `TESSERAE_URL` (+ `TESSERAE_MCP_TOKEN` for a remote target) | `STUDIO_URL` |
+
+If the console scripts aren't on your `PATH`, use `command: "python"` with
+`args: ["-m", "tesserae_mcp"]` (or `["-m", "studio_server.mcp_server"]`).
+
+**Claude Desktop / Code, Cursor, Windsurf, Cline** share the `mcpServers` JSON shape.
+The same block works in each; only the file it goes in differs:
+
+```json
+{
+  "mcpServers": {
+    "tesserae": {
+      "command": "tesserae-mcp",
+      "env": { "TESSERAE_URL": "http://127.0.0.1:8765", "TESSERAE_MCP_TOKEN": "<token>" }
+    },
+    "tesserae-studio": {
+      "command": "tesserae-studio-mcp",
+      "env": { "STUDIO_URL": "http://localhost:8770" }
+    }
+  }
+}
+```
+
+- **Claude Desktop** → `claude_desktop_config.json`; **Claude Code** → `claude mcp add …`
+  (see above) or a project `.mcp.json`.
+- **Cursor** → `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project).
+- **Windsurf** → `~/.codeium/windsurf/mcp_config.json`.
+- **Cline** → the extension's `cline_mcp_settings.json`.
+
+**Codex CLI** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.tesserae]
+command = "tesserae-mcp"
+env = { TESSERAE_URL = "http://127.0.0.1:8765", TESSERAE_MCP_TOKEN = "<token>" }
+
+[mcp_servers.tesserae-studio]
+command = "tesserae-studio-mcp"
+env = { STUDIO_URL = "http://localhost:8770" }
+```
+
+**VS Code (Copilot agent mode)** (`.vscode/mcp.json`):
+
+```json
+{
+  "servers": {
+    "tesserae": {
+      "type": "stdio",
+      "command": "tesserae-mcp",
+      "env": { "TESSERAE_URL": "http://127.0.0.1:8765", "TESSERAE_MCP_TOKEN": "<token>" }
+    }
+  }
+}
+```
+
+**OpenAI Agents SDK / custom clients** point an stdio MCP transport at the command:
+
+```python
+from agents.mcp import MCPServerStdio
+
+tesserae = MCPServerStdio(params={
+    "command": "tesserae-mcp",
+    "env": {"TESSERAE_URL": "http://127.0.0.1:8765"},
+})
+```
+
+Other clients (Zed, Continue, …) take the same command + env in their own MCP /
+context-server config; see the client's MCP docs for the file location and key names.
+
+Two behaviours depend on how rich the client's MCP support is, not on the servers: whether
+it surfaces the server's handshake **instructions** (Claude clients do; if not, paste the
+loop from the pages above), and whether it renders **image** tool results (`render_preview`
+/ `faithful_render`), a text-only client still gets every other tool, use `render_report`
+for structured verification instead.
 
 ---
 

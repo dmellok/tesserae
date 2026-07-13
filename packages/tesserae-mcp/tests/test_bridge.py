@@ -1,0 +1,62 @@
+"""Smoke tests for the tesserae-mcp bridge.
+
+These don't need a running Tesserae; they exercise the local plumbing (JSON
+handling) and, when the mcp SDK is present, that all tools register.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+import tesserae_mcp as bridge
+
+
+def test_tools_register() -> None:
+    """build_server() wires up every tool with the set_canvas doc spec."""
+    import asyncio
+
+    server = bridge.build_server()
+    tools = asyncio.run(server.list_tools())
+    names = {t.name for t in tools}
+    assert names == {
+        "list_widgets",
+        "get_widget_options",
+        "get_widget_choices",
+        "probe_widget_data",
+        "list_devices",
+        "list_pages",
+        "create_canvas_page",
+        "get_canvas",
+        "set_canvas",
+        "add_element",
+        "update_element",
+        "delete_element",
+        "patch_canvas",
+        "arrange",
+        "measure_text",
+        "render_report",
+        "render_preview",
+        "push_to_device",
+    }
+    set_canvas = next(t for t in tools if t.name == "set_canvas")
+    assert "canvas document is JSON" in (set_canvas.description or "")
+
+
+def test_server_ships_compose_instructions() -> None:
+    """The compose-agent operator loop is sent at handshake via FastMCP
+    instructions, so it lives with the tools instead of being pasted in."""
+    server = bridge.build_server()
+    text = server.instructions or ""
+    assert "LOOP:" in text and "render_report" in text and "bind" in text
+
+
+def test_json_wraps_http_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A non-2xx response is returned as data (with _status), not raised, so the
+    agent can read 422 validation details."""
+    monkeypatch.setattr(
+        bridge,
+        "_request",
+        lambda *a, **k: (422, b'{"error":"bad","details":[]}', "application/json"),
+    )
+    out = bridge._json("PUT", "/pages/x/canvas", {"w": 0})
+    assert out["error"] == "bad" and out["_status"] == 422
