@@ -111,6 +111,9 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None) -> tupl
     url = f"{_BASE}/api/mcp{path}"
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url, data=data, method=method)
+    # Cloudflare (and similar WAFs) block urllib's default "Python-urllib/x.y"
+    # user agent, so identify ourselves explicitly.
+    req.add_header("User-Agent", f"tesserae-mcp/{__version__}")
     if body is not None:
         req.add_header("Content-Type", "application/json")
     if _TOKEN:
