@@ -288,9 +288,7 @@ def _build(
         "total_24h": sum(a["c24"] for a in autos),
         "total_7d": sum(a["c7"] for a in autos),
         "most_fired": _rank(most),
-        "least_fired": (
-            _rank(least) if least and most and least["eid"] != most["eid"] else None
-        ),
+        "least_fired": (_rank(least) if least and most and least["eid"] != most["eid"] else None),
         "stale_count": sum(1 for a in autos if a["stale"]),
         "stale_hours": stale_h,
         "fetched_at": now,
