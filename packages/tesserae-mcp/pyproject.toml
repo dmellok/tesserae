@@ -38,3 +38,10 @@ line-length = 100
 
 [tool.ruff.format]
 quote-style = "double"
+
+# Anchor pytest's rootdir here so it does NOT climb to the repo-root config /
+# conftest.py (which imports the Flask app). Without this, running the bridge's
+# tests inside the monorepo pulls in the app's conftest and fails on a missing
+# ``flask`` in the bridge's stdlib-only environment.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
