@@ -480,11 +480,35 @@ def test_code_element_roundtrips_via_mcp(app: Flask) -> None:
     assert e["js"].startswith("document.getElementById") and e["css"] == "#o{color:red}"
 
 
-def test_code_element_build_resolves_source_data(app: Flask) -> None:
-    # The composer resolves a code element's source widget data (sample fallback
-    # when offline) and hands it through, so the client injects it as ctx.data.
+def test_code_element_multi_source_roundtrips_via_mcp(app: Flask) -> None:
+    # The multi-source `sources` array round-trips through the element endpoint.
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    code_el = {
+        "kind": "code",
+        "sources": [
+            {"key": "weather_now", "options": {"location": "Melbourne"}, "name": "weather"},
+            {"key": "clock_word", "options": {}, "name": "time"},
+        ],
+        "js": "document.body.textContent = Object.keys(ctx.data).join(',');",
+        "x": 0,
+        "y": 0,
+        "w": 300,
+        "h": 200,
+    }
+    r = client.post(f"/api/mcp/pages/{pid}/elements", json=code_el)
+    assert r.status_code == 200, r.get_data(as_text=True)
+    e = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()["els"][0]
+    assert [s["name"] for s in e["sources"]] == ["weather", "time"]
+    assert e["sources"][0]["key"] == "weather_now"
+
+
+def test_code_element_build_resolves_named_sources(app: Flask) -> None:
+    # The composer resolves each named source and hands a {name: data} map, so
+    # the client injects it as ctx.data.<name>.
     from app.composer import _build_canvas_els
-    from app.state.panel_store import Element
+    from app.state.panel_store import CodeSource, Element
 
     _enable(app)
     with app.app_context():
@@ -493,24 +517,38 @@ def test_code_element_build_resolves_source_data(app: Flask) -> None:
                 Element(
                     id="c1",
                     kind="code",
-                    source="weather_now",
+                    sources=[
+                        CodeSource(key="weather_now", name="weather"),
+                        CodeSource(key="clock_word", name="time"),
+                    ],
                     html="<div></div>",
                     js="x",
-                    x=0,
-                    y=0,
-                    w=200,
-                    h=100,
+                    w=300,
+                    h=200,
                 )
             ],
             800,
             480,
         )
-    assert len(els) == 1
     out = els[0]
-    assert out["kind"] == "code" and out["js"] == "x" and out["source"] == "weather_now"
-    # Source resolved to real or sample data (offline in tests → sample).
+    assert out["kind"] == "code" and out["js"] == "x"
+    assert isinstance(out["data"], dict) and set(out["data"].keys()) == {"weather", "time"}
     assert out["data_source"] in ("live", "sample", "error")
-    assert "data" in out
+
+
+def test_code_element_legacy_single_source_maps(app: Flask) -> None:
+    # A bare `source` (pre-multi-source form) still resolves, keyed by widget id.
+    from app.composer import _build_canvas_els
+    from app.state.panel_store import Element
+
+    _enable(app)
+    with app.app_context():
+        els = _build_canvas_els(
+            [Element(id="c1", kind="code", source="weather_now", js="x", w=200, h=100)],
+            800,
+            480,
+        )
+    assert "weather_now" in els[0]["data"]
 
 
 def test_push_requires_device_ids(app: Flask) -> None:

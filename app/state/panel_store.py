@@ -62,6 +62,18 @@ class Binding(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
 
+class CodeSource(BaseModel):
+    """One named data source for a ``code`` element: a widget id (``key``) plus
+    its ``options``, exposed to the element's JS as ``ctx.data[name]``. A code
+    element can list several, so its script can combine data from any number of
+    widgets (weather + calendar + transit, …). ``name`` defaults to ``key`` when
+    empty."""
+
+    key: str = ""
+    options: dict[str, Any] = Field(default_factory=dict)
+    name: str = ""
+
+
 class Element(BaseModel):
     """One placed element on the canvas: a widget instance rendered as one of
     its declared fragments, at an absolute box. ``z`` is implicit in list order
@@ -123,18 +135,24 @@ class Element(BaseModel):
     # is injected into the iframe's <style>.
     #
     # kind == "code" reuses ``html`` + ``css`` and adds ``js`` for author
-    # JavaScript, fed by ``source`` / ``options`` (a widget's live data): the
-    # resolved data is injected as ``ctx.data`` into a scripts-enabled but
-    # origin-less, network-blocked sandbox (see ``renderCode`` in decorate.js),
-    # so the JS builds the DOM from real widget data without the data ever
-    # passing through the network from inside the frame. Runs once at render
-    # (e-ink is static), same lifecycle as a widget.
+    # JavaScript, fed by any number of widgets' live data via ``sources`` below:
+    # each named source's resolved data is injected as ``ctx.data[name]`` into a
+    # scripts-enabled but origin-less, network-blocked sandbox (see ``renderCode``
+    # in decorate.js), so the JS builds the DOM from real widget data without the
+    # data ever passing through the network from inside the frame. Runs once at
+    # render (e-ink is static), same lifecycle as a widget.
     html: str = ""
     css: str = ""
     # Author JavaScript for kind == "code". Runs inside the sandboxed iframe with
-    # the widget data available as ``ctx.data`` (and ``ctx.options`` / ``ctx.w`` /
-    # ``ctx.h``). Empty for every other kind.
+    # the widget data available as ``ctx.data[name]`` per source (and
+    # ``ctx.options`` / ``ctx.w`` / ``ctx.h``). Empty for every other kind.
     js: str = ""
+    # Named data sources for kind == "code": each ``{key, options, name}`` is a
+    # widget whose fetched data lands at ``ctx.data[name]`` (name falls back to
+    # key). Lets one code element combine data from several widgets. A legacy
+    # bare ``source`` / ``options`` (single-source form) is honoured as one more
+    # source keyed by the widget id.
+    sources: list[CodeSource] = Field(default_factory=list)
     # Element opacity 0-100 (applies to widgets and decorations alike).
     opacity: int = Field(default=100, ge=0, le=100)
     # Rotation in degrees, applied to the whole element around its centre.

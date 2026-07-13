@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Code elements take data from any number of widgets; canvas editor gains collapsible
+  sidebars and a CodeMirror popout.** A `code` element now declares a list of named `sources`
+  (`{key, options, name}`), each injected as `ctx.data.<name>`, so one element's JS can combine
+  weather + transit + calendar, etc. (a legacy single `source` still works, keyed by widget id).
+  Drivable from MCP with no new endpoint (the `sources` array rides `add_element`/`set_canvas`;
+  bridge doc-shape updated, 0.5.4). In the canvas editor, the left and right sidebars now collapse
+  to reclaim canvas space (persisted per browser), and code is authored in a rich CodeMirror popout
+  (vendored, self-hosted; HTML/CSS/JS panes with syntax highlighting, line numbers, bracket matching)
+  opened from the element inspector, which also lists each source's `ctx.data.<name>.<path>` fields.
+
 - **Canvas `code` element: HTML/CSS/JS fed by widget data.** A new canvas element kind runs
   author HTML + CSS + JavaScript, fed by a widget's live data primitive: the source widget's
   fetched data is injected as the JS global `ctx.data` (plus `ctx.options`/`ctx.w`/`ctx.h`) and the

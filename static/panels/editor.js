@@ -212,9 +212,12 @@
       css: kind === "html" ? ".mini{font:700 18px sans-serif;color:#1B1A16}"
         : kind === "code" ? "#out{font:700 42px system-ui;color:#1B1A16}" : "",
       js: kind === "code"
-        ? "// ctx.data is your source widget's data. Bind a source, then use it:\n"
-          + "document.getElementById('out').textContent = ctx.data ? JSON.stringify(ctx.data).slice(0,40) : 'bind a source';"
+        ? "// ctx.data is a map of your sources by name, e.g. ctx.data.weather.\n"
+          + "// Add sources in the inspector, then read their fields here.\n"
+          + "document.getElementById('out').textContent =\n"
+          + "  Object.keys(ctx.data).length ? JSON.stringify(ctx.data).slice(0, 60) : 'add a source';"
         : "",
+      sources: kind === "code" ? [] : undefined,
       format: "",
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
@@ -225,16 +228,42 @@
     return e.widget + "|" + (e.fragment || "full") + "|" + e.w + "x" + e.h + "|" +
       JSON.stringify(e.options || {});
   }
-  // The widget a data value comes from: its own source for a data primitive or
-  // code element, else the element's widget.
+  // Every data source an element pulls from, as {key, options, name}. A widget
+  // or data primitive has one; a code element has any number (its "sources",
+  // plus a legacy bare "source"). Empty for pure decorations.
+  function elSources(e) {
+    if (e.kind === "code") {
+      var out = (e.sources || []).filter(function (s) { return s && s.key; })
+        .map(function (s) { return { key: s.key, options: s.options || {}, name: s.name || s.key }; });
+      if (e.source && !out.some(function (s) { return s.key === e.source; })) {
+        out.unshift({ key: e.source, options: e.options || {}, name: e.source });
+      }
+      return out;
+    }
+    var src = e.kind === "data" ? e.source : e.widget;
+    return src ? [{ key: src, options: e.options || {}, name: src }] : [];
+  }
+  // The primary source widget id (widget id, or a data primitive's source).
   function sourceOf(e) { return (e.kind === "data" || e.kind === "code") ? e.source : e.widget; }
   // Live data is fetched per (source, options); fragment/size don't change it.
+  function srcKey(s) { return s.key + "|" + JSON.stringify(s.options || {}); }
   function dataKey(e) { return sourceOf(e) + "|" + JSON.stringify(e.options || {}); }
-  function dataFor(e) {
-    var k = dataKey(e);
+  function dataForSrc(s) {
+    var k = srcKey(s);
     if (k in S.data) return S.data[k]; // fetched live value (may be null)
-    var w = widgetFor(sourceOf(e));
+    var w = widgetFor(s.key);
     return (w && w.sample) || null; // instant placeholder until live arrives
+  }
+  // A code element gets a MAP { name: data } across all its sources; a widget /
+  // data primitive gets its single source's data object.
+  function dataFor(e) {
+    if (e.kind === "code") {
+      var m = {};
+      elSources(e).forEach(function (s) { m[s.name] = dataForSrc(s); });
+      return m;
+    }
+    var one = elSources(e)[0];
+    return one ? dataForSrc(one) : null;
   }
   function ctxFor(e) {
     return {
@@ -258,11 +287,11 @@
     if (!S.cfg.dataUrl) return;
     var want = {};
     S.doc.els.forEach(function (e) {
-      var src = sourceOf(e); // widget id, or a data primitive's source
-      if (!src) return;
-      var k = dataKey(e);
-      if (k in S.data || S.dataPending[k]) return;
-      want[k] = { widget: src, options: e.options || {}, w: e.w, h: e.h };
+      elSources(e).forEach(function (s) {
+        var k = srcKey(s);
+        if (k in S.data || S.dataPending[k]) return;
+        want[k] = { widget: s.key, options: s.options, w: e.w, h: e.h };
+      });
     });
     Object.keys(want).forEach(function (k) {
       var req = want[k];
@@ -277,11 +306,11 @@
         .catch(function () { S.data[k] = null; })
         .then(function () {
           delete S.dataPending[k];
-          // Invalidate cached mounts for elements on this key so they re-render
-          // with the live data.
+          // Invalidate cached mounts for any element pulling from this source so
+          // it re-renders with the live data.
           var hit = false;
           S.doc.els.forEach(function (e) {
-            if (!sourceOf(e) || dataKey(e) !== k) return;
+            if (!elSources(e).some(function (s) { return srcKey(s) === k; })) return;
             // data primitives + code elements repaint from S.data.
             if (e.kind === "data" || e.kind === "code") { hit = true; return; }
             if (S.mount[e.id]) { delete S.mount[e.id]; hit = true; }
@@ -1649,50 +1678,71 @@
   }
 
   function renderCodeProps(mount, e) {
-    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-database"></i>Data source'));
-    var srow = el("div", "prow"); srow.innerHTML = '<span class="plab">Widget</span>';
-    var ssel = el("select", "psel");
-    ssel.innerHTML = '<option value="">None…</option>' + (S.catalog || []).map(function (w) {
+    if (!e.sources) e.sources = [];
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-database"></i>Data sources'));
+    mount.appendChild(el("div", "note",
+      "Add any number of widgets. Each lands at ctx.data.<name> for your JS."));
+
+    var wOpts = '<option value="">Choose widget…</option>' + (S.catalog || []).map(function (w) {
       return '<option value="' + esc(w.key) + '">' + esc(w.name || w.key) + "</option>";
     }).join("");
-    ssel.value = e.source || "";
-    ssel.addEventListener("change", function () {
-      pushHistory(); e.source = ssel.value; e.options = {};
-      scheduleSave(); paint(); renderProps();
-    });
-    srow.appendChild(ssel); mount.appendChild(srow);
 
-    if (e.source) {
-      var crow = el("div", "prow"); crow.innerHTML = '<span class="plab">Options</span>';
-      var cbtn = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Configure');
-      cbtn.addEventListener("click", function () { openConfig(e.id); });
-      crow.appendChild(cbtn); mount.appendChild(crow);
-
-      var paths = leafPaths(dataFor(e), "", [], 0);
-      if (paths.length) {
-        mount.appendChild(el("div", "note", "Available in ctx.data:"));
-        var pre = el("pre");
-        pre.textContent = paths.slice(0, 24).map(function (p) { return "ctx.data." + p.path; }).join("\n");
-        pre.style.cssText = "max-height:120px;overflow:auto;font:11px/1.4 var(--t-font-mono);" +
-          "background:var(--t-surface-soft);padding:6px;border-radius:6px;margin:0 0 6px;white-space:pre";
-        mount.appendChild(pre);
+    e.sources.forEach(function (s, idx) {
+      var box = el("div", "prow"); box.style.cssText = "display:block;border:1px solid var(--t-border);border-radius:8px;padding:8px;margin-bottom:6px";
+      // name + remove
+      var top = el("div"); top.style.cssText = "display:flex;gap:6px;align-items:center;margin-bottom:6px";
+      var nm = el("input", "dinput"); nm.value = s.name || ""; nm.placeholder = s.key || "name";
+      nm.style.cssText = "flex:1;text-align:left;font:12px var(--t-font-mono)";
+      nm.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      nm.addEventListener("change", function () { pushHistory(); s.name = nm.value.trim(); scheduleSave(); paint(); renderProps(); });
+      var rm = el("button", "minibtn", '<i class="ph-bold ph-trash"></i>');
+      rm.title = "Remove source";
+      rm.addEventListener("click", function () { pushHistory(); e.sources.splice(idx, 1); scheduleSave(); paint(); renderProps(); });
+      top.appendChild(nm); top.appendChild(rm); box.appendChild(top);
+      // widget select
+      var wsel = el("select", "psel"); wsel.innerHTML = wOpts; wsel.value = s.key || "";
+      wsel.addEventListener("change", function () {
+        pushHistory(); s.key = wsel.value; s.options = {}; if (!s.name) s.name = s.key;
+        scheduleSave(); paint(); renderProps();
+      });
+      box.appendChild(wsel);
+      if (s.key) {
+        var cfg = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Options');
+        cfg.style.marginTop = "6px";
+        cfg.addEventListener("click", function () { openConfig(e.id, idx); });
+        box.appendChild(cfg);
+        var paths = leafPaths(dataForSrc({ key: s.key, options: s.options }), "", [], 0);
+        if (paths.length) {
+          var pre = el("pre");
+          var nmv = s.name || s.key;
+          pre.textContent = paths.slice(0, 16).map(function (p) { return "ctx.data." + nmv + "." + p.path; }).join("\n");
+          pre.style.cssText = "max-height:110px;overflow:auto;font:11px/1.4 var(--t-font-mono);" +
+            "background:var(--t-surface-soft);padding:6px;border-radius:6px;margin:6px 0 0;white-space:pre";
+          box.appendChild(pre);
+        }
       }
-    }
+      mount.appendChild(box);
+    });
+
+    var addb = el("button", "minibtn", '<i class="ph-bold ph-plus"></i> Add source');
+    addb.style.cssText = "width:100%;margin-bottom:8px";
+    addb.addEventListener("click", function () {
+      pushHistory(); e.sources.push({ key: "", options: {}, name: "" });
+      scheduleSave(); renderProps();
+    });
+    mount.appendChild(addb);
 
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-brackets-curly"></i>Code'));
     mount.appendChild(el("div", "note",
-      "Sandboxed iframe: scripts on, no network. Widget data is injected as ctx.data " +
+      "Sandboxed iframe: scripts on, no network. Sources arrive as ctx.data.<name> " +
       "(plus ctx.options, ctx.w, ctx.h). Runs once at render."));
-    [["HTML", "html", 5], ["CSS", "css", 4], ["JavaScript", "js", 8]].forEach(function (f) {
-      var row = el("div", "prow"); row.style.display = "block";
-      row.innerHTML = '<span class="plab" style="display:block;margin-bottom:4px">' + f[0] + "</span>";
-      var ta = el("textarea", "dinput");
-      ta.rows = f[2]; ta.value = e[f[1]] || "";
-      ta.style.cssText = "width:100%;font-family:var(--t-font-mono);font-size:12px;resize:vertical";
-      ta.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
-      ta.addEventListener("change", function () { pushHistory(); e[f[1]] = ta.value; scheduleSave(); paint(); });
-      row.appendChild(ta); mount.appendChild(row);
-    });
+    var edit = el("button", "minibtn", '<i class="ph-bold ph-code"></i> Edit code (HTML / CSS / JS)');
+    edit.style.cssText = "width:100%";
+    edit.addEventListener("click", function () { openCodeEditor(e.id); });
+    mount.appendChild(edit);
+    var sizes = "HTML " + (e.html || "").length + " · CSS " + (e.css || "").length + " · JS " + (e.js || "").length + " chars";
+    mount.appendChild(el("div", "note", sizes));
+
     arrangeGeom(mount, e);
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
     mount.appendChild(alignButtons("canvas"));
@@ -2027,9 +2077,12 @@
   }
 
   // ---- per-element config drawer ---------------------------------------
-  function openConfig(eid) {
+  function openConfig(eid, srcIdx) {
     var e = byId(eid);
-    var key = e && sourceOf(e);
+    if (!e) return;
+    var hasSidx = typeof srcIdx === "number" && srcIdx >= 0 && e.sources && e.sources[srcIdx];
+    var key = hasSidx ? e.sources[srcIdx].key : sourceOf(e);
+    var opts = hasSidx ? (e.sources[srcIdx].options || {}) : (e.options || {});
     if (!key) return;
     var w = widgetFor(key);
     var overlay = $("panels-drawer"), body = $("panels-drawer-body"), title = $("panels-drawer-title");
@@ -2037,11 +2090,12 @@
     title.textContent = (w ? w.name : key) + " · configure";
     body.innerHTML = '<div class="note" style="padding:12px">Loading…</div>';
     body.dataset.eid = eid;
+    body.dataset.sidx = hasSidx ? String(srcIdx) : "";
     overlay.classList.add("open");
     fetch(S.cfg.sourceFormUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: key, sid: e.id, options: e.options || {} }),
+      body: JSON.stringify({ key: key, sid: e.id, options: opts }),
     })
       .then(function (r) { return r.ok ? r.text() : Promise.reject(r.status); })
       .then(function (html) {
@@ -2076,15 +2130,88 @@
         form.append(node.name, node.value);
       }
     });
-    form.append("key", sourceOf(e));
+    var sidx = body.dataset.sidx;
+    var srcSel = (sidx !== "" && e.sources && e.sources[+sidx]) ? e.sources[+sidx] : null;
+    form.append("key", srcSel ? srcSel.key : sourceOf(e));
     fetch(S.cfg.sourceOptionsUrl, { method: "POST", body: form })
       .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function (j) {
         pushHistory();
-        e.options = j.options || {};
-        scheduleSave(); closeConfig(); paint();
+        if (srcSel) srcSel.options = j.options || {}; else e.options = j.options || {};
+        scheduleSave(); closeConfig(); paint(); renderProps();
       })
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "config save failed"; });
+  }
+
+  // ---- collapsible sidebars --------------------------------------------
+  var GRID_L = "252px", GRID_R = "300px";
+  function applyGridCols() {
+    var root = document.querySelector(".ed");
+    if (!root) return;
+    var ui = S.ui || {};
+    root.style.gridTemplateColumns = (ui.lcol ? "0px" : GRID_L) + " 1fr " + (ui.rcol ? "0px" : GRID_R);
+    var lp = $("panels-left"), rp = $("panels-right");
+    if (lp) lp.style.display = ui.lcol ? "none" : "";
+    if (rp) rp.style.display = ui.rcol ? "none" : "";
+    var lb = $("panels-toggle-left"), rb = $("panels-toggle-right");
+    if (lb) lb.classList.toggle("on", !ui.lcol);
+    if (rb) rb.classList.toggle("on", !ui.rcol);
+  }
+  function wireSidebarToggle(btnId, flag) {
+    var b = $(btnId);
+    if (!b) return;
+    b.addEventListener("click", function () {
+      S.ui = S.ui || {};
+      S.ui[flag] = !S.ui[flag];
+      try { localStorage.setItem("tesserae.panels.ui", JSON.stringify(S.ui)); } catch (e) { /* ignore */ }
+      applyGridCols();
+    });
+  }
+
+  // ---- rich code editor (CodeMirror) for `code` elements ---------------
+  var _cm = { html: null, css: null, js: null };
+  var _codeEid = "";
+  var _codePaintT = null;
+  function scheduleCodePaint() { clearTimeout(_codePaintT); _codePaintT = setTimeout(paint, 250); }
+  function openCodeEditor(eid) {
+    var e = byId(eid);
+    var overlay = $("panels-code");
+    if (!e || e.kind !== "code" || !overlay || typeof CodeMirror === "undefined") return;
+    pushHistory(); // one undo reverts the whole edit session
+    _codeEid = eid;
+    overlay.classList.add("open");
+    var modes = { html: "htmlmixed", css: "css", js: "javascript" };
+    ["html", "css", "js"].forEach(function (f) {
+      var host = $("panels-cm-" + f);
+      if (!host) return;
+      host.innerHTML = "";
+      var cm = CodeMirror(host, {
+        value: e[f] || "",
+        mode: modes[f],
+        lineNumbers: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        tabSize: 2,
+        indentUnit: 2,
+        viewportMargin: Infinity,
+      });
+      cm.on("change", function () {
+        var el = byId(_codeEid);
+        if (!el) return;
+        var v = cm.getValue();
+        if (el[f] === v) return;
+        el[f] = v;
+        scheduleSave(); scheduleCodePaint();
+        var st = $("panels-code-status"); if (st) st.textContent = "Saving…";
+      });
+      _cm[f] = cm;
+      setTimeout(function () { cm.refresh(); }, 0);
+    });
+  }
+  function closeCodeEditor() {
+    var overlay = $("panels-code");
+    if (overlay) overlay.classList.remove("open");
+    renderProps(); // refresh the char-count summary in the inspector
   }
 
   // ---- accurate preview (server render) --------------------------------
@@ -2369,6 +2496,16 @@
     ["panels-drawer-cancel", "panels-drawer-close", "panels-drawer-scrim"].forEach(function (id) {
       var node = $(id);
       if (node) node.addEventListener("click", closeConfig);
+    });
+
+    // Collapsible sidebars (persisted) + rich code-editor drawer.
+    try { S.ui = JSON.parse(localStorage.getItem("tesserae.panels.ui")) || {}; } catch (e) { S.ui = {}; }
+    wireSidebarToggle("panels-toggle-left", "lcol");
+    wireSidebarToggle("panels-toggle-right", "rcol");
+    applyGridCols();
+    ["panels-code-close", "panels-code-scrim", "panels-code-done"].forEach(function (id) {
+      var node = $(id);
+      if (node) node.addEventListener("click", closeCodeEditor);
     });
 
     artboard.addEventListener("pointerdown", onArtboardDown);

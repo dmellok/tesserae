@@ -881,21 +881,33 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             _apply_binds(e, els_out[-1])
             continue
         if e.kind == "code":
-            # Author HTML/CSS/JS fed by a widget's data primitive. Resolve the
-            # source's data server-side (same shared fetch as data elements), so
-            # the client renderer injects it as ctx.data into a scripts-enabled
-            # but origin-less, network-blocked sandbox. The data is delivered,
-            # never fetched from inside the frame.
-            cdata: Any = None
+            # Author HTML/CSS/JS fed by ANY number of widgets' data primitives.
+            # Resolve each named source server-side (same shared fetch as data
+            # elements, deduped), so the client renderer injects them as
+            # ctx.data[name] into a scripts-enabled but origin-less,
+            # network-blocked sandbox. The data is delivered, never fetched from
+            # inside the frame.
+            from app.state.panel_store import CodeSource
+
+            srcs = list(getattr(e, "sources", None) or [])
+            # Legacy single-source form: a bare ``source`` becomes one source.
+            if e.source and not any(s.key == e.source for s in srcs):
+                srcs.insert(0, CodeSource(key=e.source, options=e.options, name=e.source))
+            cdata: dict[str, Any] = {}
             csrc = "none"
-            if e.source:
-                _, cdata, csrc = _resolve_source(e.source, e.options, e.w, e.h)
+            for s in srcs:
+                if not s.key:
+                    continue
+                _, sdata, sstate = _resolve_source(s.key, s.options, e.w, e.h)
+                cdata[s.name or s.key] = sdata
+                # Roll up a single status: live if any is live, else the first.
+                if csrc == "none" or sstate == "live":
+                    csrc = sstate
             els_out.append(
                 {
                     "id": e.id,
                     "kind": "code",
-                    "source": e.source,
-                    "options": e.options,
+                    "sources": [s.model_dump() for s in srcs],
                     "field": e.field,
                     "html": e.html,
                     "css": e.css,

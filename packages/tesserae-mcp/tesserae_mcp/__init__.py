@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -58,14 +58,17 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
 - html:    {"kind":"html","html":"<div>…</div>","css":"div{…}"}
            A mini widget from static HTML + CSS in a sandboxed iframe (no scripts, no network).
 - svg:     {"kind":"svg","html":"<svg …>…</svg>","css":""}   -- raw SVG, scaled to fill the box.
-- code:    {"kind":"code","source":"<widget key>","options":{...},"html":"…","css":"…","js":"…"}
-           HTML + CSS + JS fed by a widget's live data: the widget's fetched data is injected into a
-           sandboxed iframe as the JS global ctx.data (plus ctx.options, ctx.w, ctx.h). Your "js"
-           builds the DOM from ctx.data. The frame runs scripts but has NO network and NO same-origin
-           access (data is delivered, never fetched), and renders ONCE (e-ink is static -- no interactivity
-           or animation). Use this for custom layouts/formatting a "data" primitive can't express. Call
-           probe_widget_data(source, options) first to see the field shape, then read those paths off
-           ctx.data. Example js: "document.body.textContent = Math.round(ctx.data.current.temp)+'°'".
+- code:    {"kind":"code","sources":[{"key":"<widget key>","options":{...},"name":"weather"}, ...],
+            "html":"…","css":"…","js":"…"}
+           HTML + CSS + JS fed by ANY number of widgets' live data. Each source in "sources" is a widget
+           ({key, options, optional name}); its fetched data is injected into a sandboxed iframe as
+           ctx.data[name] (name falls back to key). So two sources named "weather" and "transit" give you
+           ctx.data.weather and ctx.data.transit. Your "js" builds the DOM from them (also ctx.options,
+           ctx.w, ctx.h). The frame runs scripts but has NO network and NO same-origin access (data is
+           delivered, never fetched), and renders ONCE (e-ink is static -- no interactivity or animation).
+           Use this for custom layouts/formatting a "data" primitive can't express, or to combine widgets.
+           Call probe_widget_data(key, options) per source to see field shapes, then read those paths off
+           ctx.data.<name>. Example js: "document.body.textContent = Math.round(ctx.data.weather.current.temp)+'°'".
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.

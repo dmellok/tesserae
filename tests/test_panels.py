@@ -715,3 +715,18 @@ def test_generate_bg_no_key_400(app: Flask, monkeypatch: Any) -> None:
     cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
     r = client.post(f"/pages/canvas/c/{cid}/generate-bg", json={"prompt": "x"})
     assert r.status_code == 400 and "fal" in r.get_json()["error"].lower()
+
+
+def test_editor_includes_code_editor_assets(app: Flask) -> None:
+    # The canvas editor ships the CodeMirror popout + sidebar toggles, and the
+    # vendored assets actually serve.
+    client = app.test_client()
+    _sign_in(client)
+    cid = client.get("/pages/canvas/").location.rsplit("/", 1)[1]
+    html = client.get(f"/pages/canvas/c/{cid}").get_data(as_text=True)
+    assert "vendor/codemirror/codemirror.js" in html
+    assert 'id="panels-code"' in html
+    assert 'id="panels-toggle-left"' in html and 'id="panels-toggle-right"' in html
+    # Vendored assets are present on disk.
+    for f in ("codemirror.js", "codemirror.css", "htmlmixed.js", "javascript.js"):
+        assert (REPO_ROOT / "static" / "vendor" / "codemirror" / f).exists()

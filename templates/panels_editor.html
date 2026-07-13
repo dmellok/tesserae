@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/chrome.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/editor.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style/panels/picker.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/codemirror/codemirror.css') }}">
   {# Spectra tokens + styles so the widgets mounted live on the canvas paint
      with the same semantic palette (--bg, --accent-*, …) a real panel uses. #}
   <link rel="stylesheet" href="{{ url_for('static', filename='style/spectra-tokens.css') }}">
@@ -140,6 +141,9 @@
       <div class="tbtn" id="panels-sim" title="Simulate e-ink"><i class="ph-bold ph-eye"></i></div>
       <div class="tbtn" id="panels-preview" title="Preview at panel resolution"><i class="ph-bold ph-image"></i></div>
       <div class="tbtn" id="panels-theme" title="Toggle dark mode"><i class="ph-bold ph-moon"></i></div>
+      <div class="tdiv"></div>
+      <div class="tbtn" id="panels-toggle-left" title="Collapse left sidebar"><i class="ph-bold ph-sidebar-simple"></i></div>
+      <div class="tbtn" id="panels-toggle-right" title="Collapse right sidebar"><i class="ph-bold ph-sidebar-simple" style="transform:scaleX(-1)"></i></div>
       <div style="margin-left:auto;display:flex;align-items:center;gap:11px">
         <div class="pbtn" id="panels-save-btn" title="Save now (Cmd/Ctrl+S)"><i class="ph-bold ph-floppy-disk"></i>Save</div>
         <div class="tdiv"></div>
@@ -148,7 +152,7 @@
       </div>
     </div>
 
-    <div style="grid-row:2;grid-column:1;border-right:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;gap:12px;padding:12px;min-height:0">
+    <div id="panels-left" style="grid-row:2;grid-column:1;border-right:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;gap:12px;padding:12px;min-height:0">
       <div class="card2" style="flex:none">
         <div class="pnh"><span class="t"><i class="ph-bold ph-paint-brush-broad"></i>Appearance</span></div>
         <div class="pnb" id="panels-appearance"></div>
@@ -172,7 +176,7 @@
       </div>
     </div>
 
-    <div style="grid-row:2;grid-column:3;border-left:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;min-height:0">
+    <div id="panels-right" style="grid-row:2;grid-column:3;border-left:1px solid var(--t-border);background:var(--t-surface-soft);display:flex;flex-direction:column;min-height:0">
       <div class="card2" style="margin:12px;flex:none">
         <div class="pnh"><span class="t"><i class="ph-bold ph-sliders-horizontal"></i>Element</span></div>
         <div class="pnb scroll" id="panels-data" style="max-height:none"></div>
@@ -251,7 +255,36 @@
     })();
   </script>
 
+  {# Rich code editor for `code` elements: a wide side drawer with CodeMirror
+     panes for HTML / CSS / JS, opened from the element inspector. #}
+  <div class="drawer codedrawer" id="panels-code">
+    <div class="drawer-scrim" id="panels-code-scrim"></div>
+    <div class="drawer-panel">
+      <div class="drawer-head">
+        <span class="drawer-title">Edit code</span>
+        <span class="note" style="margin:0 auto 0 4px">Sandboxed · data at <code>ctx.data.&lt;name&gt;</code> · runs once</span>
+        <button class="tbtn" id="panels-code-close" title="Close"><i class="ph-bold ph-x"></i></button>
+      </div>
+      <div class="codepanes">
+        <div class="codepane"><label>HTML</label><div class="cm-host" id="panels-cm-html"></div></div>
+        <div class="codepane"><label>CSS</label><div class="cm-host" id="panels-cm-css"></div></div>
+        <div class="codepane"><label>JavaScript</label><div class="cm-host" id="panels-cm-js"></div></div>
+      </div>
+      <div class="drawer-foot">
+        <span class="note" id="panels-code-status" style="margin-right:auto">Changes autosave</span>
+        <button class="pbtn accent" id="panels-code-done" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script src="{{ url_for('static', filename='components.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/codemirror.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/xml.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/css.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/javascript.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/htmlmixed.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/matchbrackets.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/codemirror/closebrackets.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script src="{{ url_for('static', filename='panels/editor.js') }}"></script>
 </body>
