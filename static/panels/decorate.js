@@ -140,24 +140,49 @@
   //     Tesserae's trust boundary, so blocking network is load-bearing.
   // The widget data arrives DELIVERED (injected as window.ctx), never fetched
   // from inside the frame. Runs once at render time (e-ink is static).
-  // Chart.js is made available INSIDE the sandbox by inlining its source (the
-  // frame has no network, so it can't load a URL). Fetched once, synchronously,
-  // from the same-origin vendored path and cached; on a headless compose render
-  // this runs before the page's load event, so charts are drawn by screenshot
-  // time. Returns "" when the lib isn't wired up (feature just degrades).
-  var _chartSrc = null, _chartTried = false;
-  function chartLibSource() {
-    if (_chartTried) return _chartSrc;
-    _chartTried = true;
-    var url = window.__TESSERAE_CHART_URL;
+  // Vendored libraries made available INSIDE the sandbox by inlining their
+  // source (the frame has no network, so it can't load a URL). Each lib is
+  // fetched once, synchronously, from its same-origin vendored path and cached;
+  // on a headless compose render this runs before the page's load event, so the
+  // library is ready by screenshot time. A lib is only inlined when the code
+  // actually references it (``test`` against the element's html+css+js), so a
+  // lean element stays lean. URLs come from ``window.__TESSERAE_LIBS`` (set by
+  // the compose + editor templates). None of the minified sources contain a
+  // ``</script>`` sequence, so direct inlining is safe.
+  //
+  //   name       -> label (debug only)
+  //   files      -> keys into __TESSERAE_LIBS, inlined in order (deps first)
+  //   test       -> RegExp; inline this lib when it matches the code
+  //   kind       -> "js" (inline <script>) or "css" (inline <style>)
+  //   init       -> optional JS run right after the lib loads (register/config)
+  var SANDBOX_LIBS = [
+    { name: "Chart.js", files: ["chart"], test: /\bChart\b/, kind: "js",
+      init: "try{Chart.defaults.animation=false;Chart.defaults.plugins.legend.display=false;}catch(e){}" },
+    { name: "chartjs-datalabels", files: ["datalabels"], test: /ChartDataLabels/, kind: "js",
+      init: "try{Chart.register(ChartDataLabels);}catch(e){}" },
+    { name: "canvas-gauges", files: ["gauge"], test: /RadialGauge|LinearGauge/, kind: "js" },
+    { name: "day.js", files: ["dayjs", "dayjs_utc", "dayjs_tz"], test: /\bdayjs\b/, kind: "js",
+      init: "try{dayjs.extend(window.dayjs_plugin_utc);dayjs.extend(window.dayjs_plugin_timezone);}catch(e){}" },
+    { name: "qrcode", files: ["qrcode"], test: /\bqrcode\b/, kind: "js" },
+    { name: "marked", files: ["marked"], test: /\bmarked\b/, kind: "js" },
+    { name: "chroma", files: ["chroma"], test: /\bchroma\b/, kind: "js" },
+    { name: "svg.js", files: ["svgjs"], test: /\bSVG\b/, kind: "js" },
+    { name: "phosphor", files: ["phosphor"], test: /\bph-/, kind: "css" },
+  ];
+
+  var _libCache = {};
+  function libSource(url) {
     if (!url) return null;
+    if (url in _libCache) return _libCache[url];
+    var src = null;
     try {
       var xhr = new XMLHttpRequest();
       xhr.open("GET", url, false); // sync: one-time, same-origin, cached
       xhr.send();
-      if (xhr.status >= 200 && xhr.status < 300) _chartSrc = xhr.responseText;
-    } catch (e) { _chartSrc = null; }
-    return _chartSrc;
+      if (xhr.status >= 200 && xhr.status < 300) src = xhr.responseText;
+    } catch (e) { src = null; }
+    _libCache[url] = src;
+    return src;
   }
 
   function renderCode(el, data) {
@@ -166,8 +191,6 @@
     f.setAttribute("scrolling", "no");
     f.style.cssText =
       "width:100%;height:100%;border:0;background:transparent;display:block;pointer-events:none";
-    var csp =
-      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:";
     var reset =
       "*{box-sizing:border-box}html,body{margin:0;padding:0;width:100%;height:100%;" +
       "overflow:hidden;font-family:var(--font-family,-apple-system,'Segoe UI',Roboto,sans-serif);" +
@@ -181,19 +204,40 @@
     };
     // Escape "<" so a "</script>" inside the injected JSON can't close the tag.
     var ctxJson = JSON.stringify(ctx).replace(/</g, "\\u003c");
-    // Chart.js, inlined (no `</script>` in its minified source, safe to embed).
-    // Animations off so the one-shot render captures the finished chart.
-    var chartSrc = chartLibSource();
-    var chartTag = chartSrc
-      ? "<script>" + chartSrc + ";try{Chart.defaults.animation=false;" +
-        "Chart.defaults.plugins.legend.display=false;}catch(e){}</" + "script>"
-      : "";
+
+    // Inline only the vendored libs this element references.
+    var probe = (el.html || "") + "\n" + (el.css || "") + "\n" + (el.js || "");
+    var urls = window.__TESSERAE_LIBS || {};
+    var headCss = "";
+    var libScripts = "";
+    var needFont = false;
+    for (var i = 0; i < SANDBOX_LIBS.length; i++) {
+      var lib = SANDBOX_LIBS[i];
+      if (!lib.test.test(probe)) continue;
+      var joined = "";
+      for (var j = 0; j < lib.files.length; j++) {
+        var s = libSource(urls[lib.files[j]]);
+        if (s) joined += s + "\n;\n";
+      }
+      if (!joined) continue;
+      if (lib.kind === "css") {
+        headCss += joined;
+        needFont = true; // fonts (phosphor) arrive as data: URLs
+      } else {
+        libScripts += "<script>" + joined + "</" + "script>";
+        if (lib.init) libScripts += "<script>" + lib.init + "</" + "script>";
+      }
+    }
+    var csp =
+      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:" +
+      (needFont ? "; font-src data:" : "");
+
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'>" +
       "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
-      "<style>" + reset + (el.css || "") + "</style></head><body>" +
+      "<style>" + reset + headCss + (el.css || "") + "</style></head><body>" +
       (el.html || "") +
-      chartTag +
+      libScripts +
       "<script>window.ctx=" + ctxJson + ";</" + "script>" +
       "<script>try{" + (el.js || "") + "}catch(e){" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +

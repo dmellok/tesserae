@@ -1735,7 +1735,9 @@
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-brackets-curly"></i>Code'));
     mount.appendChild(el("div", "note",
       "Sandboxed iframe: scripts on, no network. Sources arrive as ctx.data.<name> " +
-      "(plus ctx.options, ctx.w, ctx.h). Chart.js is available as window.Chart. Runs once at render."));
+      "(plus ctx.options, ctx.w, ctx.h). Runs once at render. Available when referenced: " +
+      "Chart.js + datalabels, canvas-gauges, dayjs, qrcode, marked, chroma, SVG.js, and " +
+      "Phosphor icons (<i class=\"ph-bold ph-heart\">)."));
     var edit = el("button", "minibtn", '<i class="ph-bold ph-code"></i> Edit code (HTML / CSS / JS)');
     edit.style.cssText = "width:100%";
     edit.addEventListener("click", function () { openCodeEditor(e.id); });
@@ -2143,19 +2145,26 @@
       .catch(function () { var s = $("panels-status"); if (s) s.textContent = "config save failed"; });
   }
 
-  // ---- collapsible sidebars --------------------------------------------
-  var GRID_L = "252px", GRID_R = "300px";
+  // ---- collapsible + resizable sidebars --------------------------------
+  var LW_MIN = 190, LW_MAX = 560, RW_MIN = 220, RW_MAX = 620;
+  function saveUi() {
+    try { localStorage.setItem("tesserae.panels.ui", JSON.stringify(S.ui || {})); } catch (e) { /* ignore */ }
+  }
   function applyGridCols() {
     var root = document.querySelector(".ed");
     if (!root) return;
     var ui = S.ui || {};
-    root.style.gridTemplateColumns = (ui.lcol ? "0px" : GRID_L) + " 1fr " + (ui.rcol ? "0px" : GRID_R);
+    var lw = (ui.leftW || 252) + "px", rw = (ui.rightW || 300) + "px";
+    root.style.gridTemplateColumns = (ui.lcol ? "0px" : lw) + " 1fr " + (ui.rcol ? "0px" : rw);
     var lp = $("panels-left"), rp = $("panels-right");
     if (lp) lp.style.display = ui.lcol ? "none" : "";
     if (rp) rp.style.display = ui.rcol ? "none" : "";
     var lb = $("panels-toggle-left"), rb = $("panels-toggle-right");
     if (lb) lb.classList.toggle("on", !ui.lcol);
     if (rb) rb.classList.toggle("on", !ui.rcol);
+    var lh = $("panels-resize-left"), rh = $("panels-resize-right");
+    if (lh) lh.style.display = ui.lcol ? "none" : "";
+    if (rh) rh.style.display = ui.rcol ? "none" : "";
   }
   function wireSidebarToggle(btnId, flag) {
     var b = $(btnId);
@@ -2163,8 +2172,37 @@
     b.addEventListener("click", function () {
       S.ui = S.ui || {};
       S.ui[flag] = !S.ui[flag];
-      try { localStorage.setItem("tesserae.panels.ui", JSON.stringify(S.ui)); } catch (e) { /* ignore */ }
+      saveUi();
       applyGridCols();
+    });
+  }
+  // Drag a thin handle to resize a sidebar. ``side`` is "left" | "right".
+  function wireSidebarResize(handleId, side) {
+    var h = $(handleId);
+    if (!h) return;
+    h.addEventListener("pointerdown", function (ev) {
+      ev.preventDefault();
+      S.ui = S.ui || {};
+      var startX = ev.clientX;
+      var startW = side === "left" ? (S.ui.leftW || 252) : (S.ui.rightW || 300);
+      h.setPointerCapture(ev.pointerId);
+      document.body.style.cursor = "col-resize";
+      function move(m) {
+        var dx = m.clientX - startX;
+        var w = side === "left" ? startW + dx : startW - dx;
+        if (side === "left") S.ui.leftW = Math.max(LW_MIN, Math.min(LW_MAX, w));
+        else S.ui.rightW = Math.max(RW_MIN, Math.min(RW_MAX, w));
+        applyGridCols();
+      }
+      function up(u) {
+        h.releasePointerCapture(ev.pointerId);
+        document.body.style.cursor = "";
+        h.removeEventListener("pointermove", move);
+        h.removeEventListener("pointerup", up);
+        saveUi();
+      }
+      h.addEventListener("pointermove", move);
+      h.addEventListener("pointerup", up);
     });
   }
 
@@ -2173,6 +2211,30 @@
   var _codeEid = "";
   var _codePaintT = null;
   function scheduleCodePaint() { clearTimeout(_codePaintT); _codePaintT = setTimeout(paint, 250); }
+  // Beautify one pane's source (js-beautify). Handles minified / one-line code
+  // (e.g. what an MCP agent writes) into readable, indented text. No-op if the
+  // beautifier isn't loaded or the source is empty.
+  function beautify(field, src) {
+    src = src || "";
+    var b = window.beautifier; // js-beautify UMD exposes {js, css, html}
+    if (!src.trim() || !b) return src;
+    try {
+      var opts = { indent_size: 2, wrap_line_length: 100, end_with_newline: false };
+      if (field === "js" && b.js) return b.js(src, opts);
+      if (field === "css" && b.css) return b.css(src, opts);
+      if (field === "html" && b.html) return b.html(src, opts);
+    } catch (e) { /* leave as-is on any parse hiccup */ }
+    return src;
+  }
+  function formatCode() {
+    ["html", "css", "js"].forEach(function (f) {
+      var cm = _cm[f];
+      if (!cm) return;
+      var formatted = beautify(f, cm.getValue());
+      if (formatted !== cm.getValue()) cm.setValue(formatted); // fires change -> saves
+    });
+    var st = $("panels-code-status"); if (st) st.textContent = "Formatted";
+  }
   function openCodeEditor(eid) {
     var e = byId(eid);
     var overlay = $("panels-code");
@@ -2186,9 +2248,11 @@
       if (!host) return;
       host.innerHTML = "";
       var cm = CodeMirror(host, {
-        value: e[f] || "",
+        // Auto-format on open so one-line / minified code is readable.
+        value: beautify(f, e[f] || ""),
         mode: modes[f],
         lineNumbers: true,
+        lineWrapping: true,
         matchBrackets: true,
         autoCloseBrackets: true,
         tabSize: 2,
@@ -2502,11 +2566,15 @@
     try { S.ui = JSON.parse(localStorage.getItem("tesserae.panels.ui")) || {}; } catch (e) { S.ui = {}; }
     wireSidebarToggle("panels-toggle-left", "lcol");
     wireSidebarToggle("panels-toggle-right", "rcol");
+    wireSidebarResize("panels-resize-left", "left");
+    wireSidebarResize("panels-resize-right", "right");
     applyGridCols();
     ["panels-code-close", "panels-code-scrim", "panels-code-done"].forEach(function (id) {
       var node = $(id);
       if (node) node.addEventListener("click", closeCodeEditor);
     });
+    var fmtBtn = $("panels-code-format");
+    if (fmtBtn) fmtBtn.addEventListener("click", formatCode);
 
     artboard.addEventListener("pointerdown", onArtboardDown);
     var undoBtn = $("panels-undo"), redoBtn = $("panels-redo");

@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.5"
+__version__ = "0.5.6"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -69,9 +69,24 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
            Use this for custom layouts/formatting a "data" primitive can't express, or to combine widgets.
            Call probe_widget_data(key, options) per source to see field shapes, then read those paths off
            ctx.data.<name>. Example js: "document.body.textContent = Math.round(ctx.data.weather.current.temp)+'°'".
-           Chart.js is preloaded in the sandbox as window.Chart (animations off), so you can draw charts:
-           put a <canvas id="c"> in "html", then "new Chart(document.getElementById('c'),{type:'line',
-           data:{labels:[...],datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
+           These libraries are preloaded in the sandbox (each auto-loads only when your code references
+           it by the global shown, so unused ones cost nothing). No network, so they're your toolkit:
+             - Chart.js -> window.Chart. Charts to a <canvas>. Animations are already off. On e-ink there's
+               no hover, so bake values in: also reference ChartDataLabels (chartjs-plugin-datalabels,
+               auto-registered) and add datalabels to a dataset/options to print values on bars/points.
+             - canvas-gauges -> RadialGauge / LinearGauge. Dials + meters (temperature, fuel-style).
+             - dayjs -> dayjs(...). Date/time parse + format; utc + timezone plugins are pre-extended, so
+               dayjs.utc(...) and dayjs(...).tz("Europe/Berlin") work. Use for formatting ctx.data times.
+             - qrcode -> qrcode(typeNumber, ecc). QR codes; render .createSvgTag() or .createImgTag().
+             - marked -> marked.parse(md). Markdown -> HTML string; assign to an element's innerHTML.
+             - chroma -> chroma(...). Colour parsing/scales; snap values to the panel palette so colours
+               don't quantise away (list_devices() gives the palette hex).
+             - SVG -> SVG(). @svgdotjs/svg.js for programmatic vector graphics (rings, arcs, badges).
+             - Phosphor icons: use <i class="ph-bold ph-heart"></i> in your html; the bold icon font is
+               inlined when your code contains a ph- class.
+           Chart.js example: put a <canvas id="c"> in "html", then in "js":
+           "new Chart(document.getElementById('c'),{type:'line',data:{labels:[...],
+           datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.
@@ -311,9 +326,13 @@ def build_server() -> Any:
         canvas' full-bleed background; the data elements composite crisply ON TOP,
         so the data never passes through the image model. Sized to the canvas'
         aspect. Optional "model" (default flux/schnell), "style" (e.g. watercolor,
-        bauhaus, risograph), and "fit" (cover|contain|stretch). Needs a fal.ai key
-        (an installed fal-image widget's key, app.fal.api_key, or FAL_KEY). Returns
-        the ack plus the stored "bg_image" URL; 502 if generation fails."""
+        bauhaus, risograph), and "fit" (cover|contain|stretch).
+        The fal.ai API key lives on the "AI image" widget (the fal-image widget) --
+        that's the primary place it's configured, so if this returns a 400 about a
+        missing key, tell the user to paste their fal.ai key into that widget's
+        settings (Settings -> Plugins -> Fal Image). It also falls back to
+        app.fal.api_key or the FAL_KEY env var. Returns the ack plus the stored
+        "bg_image" URL; 502 if generation fails."""
         body: dict[str, Any] = {"prompt": prompt}
         if model:
             body["model"] = model

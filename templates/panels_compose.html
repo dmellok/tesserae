@@ -88,7 +88,19 @@
     {% endfor %}
     </div>
   </div>
-  <script>window.__TESSERAE_CHART_URL = "{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}";</script>
+  <script>window.__TESSERAE_LIBS = {
+    chart: "{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}",
+    datalabels: "{{ url_for('static', filename='vendor/chartjs/chartjs-plugin-datalabels.min.js') }}",
+    gauge: "{{ url_for('static', filename='vendor/canvasgauges/gauge.min.js') }}",
+    dayjs: "{{ url_for('static', filename='vendor/dayjs/dayjs.min.js') }}",
+    dayjs_utc: "{{ url_for('static', filename='vendor/dayjs/utc.js') }}",
+    dayjs_tz: "{{ url_for('static', filename='vendor/dayjs/timezone.js') }}",
+    qrcode: "{{ url_for('static', filename='vendor/qrcode/qrcode.js') }}",
+    marked: "{{ url_for('static', filename='vendor/marked/marked.min.js') }}",
+    chroma: "{{ url_for('static', filename='vendor/chroma/chroma.min.js') }}",
+    svgjs: "{{ url_for('static', filename='vendor/svgjs/svg.min.js') }}",
+    phosphor: "{{ url_for('static', filename='vendor/phosphor/phosphor-bold.css') }}"
+  };</script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script>
     // Draw decorations, data primitives (with their fetched data) and custom

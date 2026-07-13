@@ -727,17 +727,31 @@ def test_editor_includes_code_editor_assets(app: Flask) -> None:
     assert "vendor/codemirror/codemirror.js" in html
     assert 'id="panels-code"' in html
     assert 'id="panels-toggle-left"' in html and 'id="panels-toggle-right"' in html
-    # Chart.js is wired for the code sandbox (URL global set, asset referenced).
-    assert "__TESSERAE_CHART_URL" in html and "vendor/chartjs/chart.umd.min.js" in html
-    # Vendored assets are present on disk.
-    for f in ("codemirror.js", "codemirror.css", "htmlmixed.js", "javascript.js"):
-        assert (REPO_ROOT / "static" / "vendor" / "codemirror" / f).exists()
-    assert (REPO_ROOT / "static" / "vendor" / "chartjs" / "chart.umd.min.js").exists()
+    assert 'id="panels-resize-left"' in html  # resizable sidebars
+    assert 'id="panels-code-format"' in html and "beautifier.min.js" in html  # auto-format
+    # The sandbox library map is exposed and points at vendored assets.
+    assert "__TESSERAE_LIBS" in html and "vendor/phosphor/phosphor-bold.css" in html
+    # The vendored sandbox libraries are present on disk.
+    vendored = {
+        "codemirror": ("codemirror.js", "codemirror.css", "htmlmixed.js", "javascript.js"),
+        "chartjs": ("chart.umd.min.js", "chartjs-plugin-datalabels.min.js"),
+        "canvasgauges": ("gauge.min.js",),
+        "dayjs": ("dayjs.min.js", "utc.js", "timezone.js"),
+        "qrcode": ("qrcode.js",),
+        "marked": ("marked.min.js",),
+        "chroma": ("chroma.min.js",),
+        "svgjs": ("svg.min.js",),
+        "jsbeautify": ("beautifier.min.js",),
+        "phosphor": ("phosphor-bold.css",),
+    }
+    for pkg, files in vendored.items():
+        for f in files:
+            assert (REPO_ROOT / "static" / "vendor" / pkg / f).exists(), f"{pkg}/{f}"
 
 
-def test_compose_page_wires_chartjs(app: Flask) -> None:
+def test_compose_page_wires_sandbox_libs(app: Flask) -> None:
     # The compose render page (what Playwright screenshots) also exposes the
-    # Chart.js URL so code elements can inline it into their sandbox.
+    # library map so code elements can inline what they use into their sandbox.
     from app.state.page_store import Page
     from app.state.panel_store import CanvasLayout, Element
 
@@ -749,4 +763,5 @@ def test_compose_page_wires_chartjs(app: Flask) -> None:
     )
     app.config["PAGE_STORE"].save(page)
     html = client.get("/compose/cc1").get_data(as_text=True)
-    assert "__TESSERAE_CHART_URL" in html and "vendor/chartjs/chart.umd.min.js" in html
+    assert "__TESSERAE_LIBS" in html
+    assert "vendor/chartjs/chart.umd.min.js" in html and "vendor/phosphor/phosphor-bold.css" in html

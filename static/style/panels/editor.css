@@ -127,6 +127,12 @@ body.dragging-palette .pi{cursor:grabbing}
 .drawer-body{flex:1;min-height:0;overflow:auto;padding:16px}
 .drawer-foot{display:flex;justify-content:flex-end;gap:9px;padding:12px 16px;border-top:1px solid var(--t-border)}
 
+/* Draggable sidebar resize handles (straddle the canvas edges). */
+.cv-viewport{position:relative}
+.sidebar-resize{position:absolute;top:0;bottom:0;width:9px;margin:0 -4px;z-index:40;cursor:col-resize;touch-action:none}
+.sidebar-resize::after{content:"";position:absolute;top:0;bottom:0;left:4px;width:1px;background:transparent;transition:background .12s}
+.sidebar-resize:hover::after{background:var(--t-accent)}
+
 /* Rich code editor (CodeMirror) drawer for `code` elements. */
 .codedrawer .drawer-title{flex:none}
 .codedrawer .drawer-panel{width:min(760px,96vw)}

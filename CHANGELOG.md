@@ -6,6 +6,20 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **Code elements get a rich sandbox toolkit + editor polish.** The `code` element's sandbox now
+  has a vendored, self-hosted library toolkit, each **conditionally inlined** (loaded only when the
+  code references it, so unused libs cost nothing): Chart.js + chartjs-plugin-datalabels,
+  canvas-gauges, Day.js (+utc/timezone), qrcode, marked, chroma.js, SVG.js, and Phosphor icons
+  (`<i class="ph-bold ph-heart">`, font inlined as a `data:` URL). Isolation is unchanged (opaque
+  origin, no network); verified end to end that each renders through the real compose path. The
+  canvas editor's code popout now **auto-formats** on open (js-beautify) so one-line / MCP-authored
+  code is readable, with a Format button and line-wrapping; and the sidebars are now **resizable**
+  (drag handles, persisted) and scroll when content overflows. The MCP bridge doc-shape (0.5.6)
+  documents every sandbox library with usage, and `set_canvas_background` now tells agents the
+  fal.ai key lives on the AI-image (fal-image) widget.
+
 ### Changed
 
 - **CircuitPython BMP frames are 2-8x smaller (sub-byte packing).** The `circuitpython_bmp`
