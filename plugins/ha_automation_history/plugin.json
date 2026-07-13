@@ -1,0 +1,170 @@
+{
+  "tesserae_compat": "1.x",
+  "name": "Home Assistant, Automation History",
+  "version": "0.1.0",
+  "kind": "widget",
+  "description": "Which Home Assistant automations fired, when, and how often. Ranks the most- vs least-fired automation this week, streams a most-recent-first trigger feed, tallies 1h / 24h / 7d trigger counts, and flags any tracked automation that hasn't fired within an expected cadence. Reads automation.* logbook history via the Home Assistant Core plugin.",
+  "icon": "ph-lightning",
+  "supports": {
+    "sizes": [
+      "xs",
+      "sm",
+      "md",
+      "lg"
+    ]
+  },
+  "cell_options": [
+    {
+      "name": "title",
+      "type": "string",
+      "label": "Title (blank = \"Automations\")",
+      "default": ""
+    },
+    {
+      "name": "automations",
+      "type": "multiselect",
+      "label": "Automations (blank = all)",
+      "default": [],
+      "choices_from": "entity",
+      "help": "Leave blank to track every automation; the busiest ~12 are read in detail each refresh."
+    },
+    {
+      "name": "stale_hours",
+      "type": "number",
+      "label": "Stale alert after (hours, blank = off)",
+      "default": "",
+      "help": "Flag a tracked automation that hasn't fired within this many hours. Leave blank to disable."
+    },
+    {
+      "name": "refresh",
+      "type": "select",
+      "label": "Refresh",
+      "default": "60",
+      "choices": [
+        { "value": "60", "label": "Every minute" },
+        { "value": "300", "label": "Every 5 min" },
+        { "value": "900", "label": "Every 15 min" }
+      ]
+    }
+  ],
+  "fragments": [
+    { "id": "full", "label": "Ranking + recent", "w": 320, "h": 220, "icon": "ph-lightning" },
+    { "id": "bar", "label": "Fired count", "w": 240, "h": 64, "icon": "ph-lightning-a" }
+  ],
+  "render": {
+    "dither": "none",
+    "needs_network": true
+  },
+  "data_schema": {
+    "fields": [
+      { "name": "automations[].c1", "label": "Triggers (1h)", "type": "arr" },
+      { "name": "automations[].c24", "label": "Triggers (24h)", "type": "arr" },
+      { "name": "automations[].c7", "label": "Triggers (7d)", "type": "arr" },
+      { "name": "automations[].eid", "label": "Entity id", "type": "arr" },
+      { "name": "automations[].last_ago_s", "label": "Last fired (s ago)", "type": "arr" },
+      { "name": "automations[].last_triggered", "label": "Last triggered", "type": "arr" },
+      { "name": "automations[].name", "label": "Name", "type": "arr" },
+      { "name": "automations[].on", "label": "Enabled", "type": "arr" },
+      { "name": "automations[].stale", "label": "Stale", "type": "arr" },
+      { "name": "capped", "label": "Capped", "type": "str" },
+      { "name": "count", "label": "Automation count", "type": "num" },
+      { "name": "fetched_at", "label": "Fetched at", "type": "num" },
+      { "name": "least_fired.c7", "label": "Least fired triggers (7d)", "type": "num" },
+      { "name": "least_fired.eid", "label": "Least fired entity id", "type": "str" },
+      { "name": "least_fired.name", "label": "Least fired name", "type": "str" },
+      { "name": "most_fired.c7", "label": "Most fired triggers (7d)", "type": "num" },
+      { "name": "most_fired.eid", "label": "Most fired entity id", "type": "str" },
+      { "name": "most_fired.name", "label": "Most fired name", "type": "str" },
+      { "name": "recent[].ago_s", "label": "Fired (s ago)", "type": "arr" },
+      { "name": "recent[].eid", "label": "Entity id", "type": "arr" },
+      { "name": "recent[].name", "label": "Name", "type": "arr" },
+      { "name": "recent[].when", "label": "When", "type": "arr" },
+      { "name": "stale_count", "label": "Stale count", "type": "num" },
+      { "name": "stale_hours", "label": "Stale threshold (h)", "type": "num" },
+      { "name": "title", "label": "Title", "type": "str" },
+      { "name": "total_1h", "label": "Total fired (1h)", "type": "num" },
+      { "name": "total_24h", "label": "Total fired (24h)", "type": "num" },
+      { "name": "total_7d", "label": "Total fired (7d)", "type": "num" },
+      { "name": "tracked_all", "label": "Tracking all", "type": "str" },
+      { "name": "window_days", "label": "Window (days)", "type": "num" }
+    ],
+    "sample": {
+      "automations": [
+        {
+          "c1": 66,
+          "c24": 747,
+          "c7": 4228,
+          "eid": "automation.vfd_auto_brightness_from_lux",
+          "last_ago_s": 103,
+          "last_triggered": "2026-07-13T05:50:28.826142+00:00",
+          "name": "VFD - Auto brightness from lux",
+          "on": true,
+          "stale": false
+        },
+        {
+          "c1": 0,
+          "c24": 39,
+          "c7": 341,
+          "eid": "automation.vfd_presence_on_off",
+          "last_ago_s": 5713,
+          "last_triggered": "2026-07-13T04:16:58.443311+00:00",
+          "name": "VFD - Presence on/off",
+          "on": true,
+          "stale": false
+        },
+        {
+          "c1": 0,
+          "c24": 7,
+          "c7": 138,
+          "eid": "automation.desk_light_dim_at_desk_boost_when_away",
+          "last_ago_s": 61625,
+          "last_triggered": "2026-07-12T12:45:06.692932+00:00",
+          "name": "Desk Light - Dim at desk / Boost when away",
+          "on": true,
+          "stale": false
+        }
+      ],
+      "capped": false,
+      "count": 15,
+      "fetched_at": 1783921932,
+      "least_fired": {
+        "c7": 4,
+        "eid": "automation.closet_light_door_auto",
+        "name": "Closet Light - Door Auto"
+      },
+      "most_fired": {
+        "c7": 4228,
+        "eid": "automation.vfd_auto_brightness_from_lux",
+        "name": "VFD - Auto brightness from lux"
+      },
+      "recent": [
+        {
+          "ago_s": 103,
+          "eid": "automation.vfd_auto_brightness_from_lux",
+          "name": "VFD - Auto brightness from lux",
+          "when": "2026-07-13T05:50:28.826139+00:00"
+        },
+        {
+          "ago_s": 5713,
+          "eid": "automation.vfd_presence_on_off",
+          "name": "VFD - Presence on/off",
+          "when": "2026-07-13T04:16:58.443309+00:00"
+        },
+        {
+          "ago_s": 31931,
+          "eid": "automation.blinds_up",
+          "name": "Blinds Up",
+          "when": "2026-07-12T21:00:00.494053+00:00"
+        }
+      ],
+      "stale_count": 0,
+      "stale_hours": 0.0,
+      "title": "",
+      "total_1h": 66,
+      "total_24h": 797,
+      "total_7d": 4744,
+      "tracked_all": true,
+      "window_days": 7
+    }
+  }
+}
