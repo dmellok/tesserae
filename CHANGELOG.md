@@ -6,6 +6,13 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Docs
+
+- Two new docs-site pages: **Build widgets with Studio** (the Tesserae Studio authoring
+  loop, linter rules, and the new-widget restart gate) and **MCP servers: install & use**
+  (installing and configuring both `tesserae-mcp` for dashboards and `tesserae-studio-mcp`
+  for widgets).
+
 ### Added
 
 - **Canvas: live data bindings for shapes.** Data elements re-evaluate every render,

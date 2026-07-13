@@ -115,6 +115,7 @@ nav:
   - Widget development:
       - Architecture: dev/architecture.md
       - Build a widget with AI: dev/writing-a-widget.md
+      - Build widgets with Studio: dev/studio.md
       - Publish via the catalog: dev/publishing-a-widget.md
       - Publish a theme: dev/publishing-a-theme.md
       - Widget contract: widgets.md
@@ -125,5 +126,6 @@ nav:
       - Client protocol spec: dev/client-protocol.md
       - OpenAPI spec & SDK generation: dev/openapi.md
   - Build dashboards with AI (MCP): dev/mcp.md
+  - MCP servers (install & use): dev/mcp-servers.md
   - Privacy: privacy.md
   - Credits: credits.md
