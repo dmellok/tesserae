@@ -308,6 +308,58 @@ def preview(canvas_id: str) -> Response:
     return current_app.response_class(png, mimetype="image/png")
 
 
+@bp.post("/c/<canvas_id>/generate-bg")
+def generate_bg(canvas_id: str) -> Response:
+    """Generate an AI background image (fal.ai) for a canvas and set it as
+    ``bg_image``. Body: ``{prompt (required), model?, style?, fit?}``. The image
+    is stored as a local render asset; the canvas elements composite on top
+    (Approach A), so the data never passes through the image model. Returns
+    ``{status, bg_image, bg_fit, rev}``. 400 without a prompt or fal key; 502 on
+    a fal failure."""
+    from app import fal_backgrounds as fb
+    from app.state.panel_store import CanvasLayout
+
+    _guard()
+    page = _get_canvas(canvas_id)
+    if page is None:
+        abort(404)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return _error(400, "body must be a JSON object")
+    prompt = str(body.get("prompt") or "").strip()
+    if not prompt:
+        return _error(400, "prompt is required")
+    api_key = fb.resolve_fal_key(_registry(), current_app.config.get("SETTINGS_STORE"))
+    if not api_key:
+        return _error(
+            400,
+            "no fal.ai API key configured: set one on an installed fal-image widget, "
+            "under app.fal.api_key, or in the FAL_KEY environment variable",
+        )
+    layout = page.canvas or CanvasLayout()
+    fit = str(body.get("fit") or layout.bg_fit or "cover").strip().lower()
+    if fit not in ("cover", "contain", "stretch"):
+        fit = "cover"
+    try:
+        png = fb.generate(
+            prompt,
+            api_key=api_key,
+            model=str(body.get("model") or fb.DEFAULT_MODEL).strip(),
+            style=str(body.get("style") or "none").strip(),
+            width=int(layout.w),
+            height=int(layout.h),
+        )
+    except fb.FalError as err:
+        return _error(502, f"background generation failed: {err}")
+    url = fb.store_background(current_app.config["RENDERS_DIR"], png)
+    layout.bg_image = url
+    layout.bg_fit = fit
+    page.canvas = layout
+    page = _stamp(page, "ui")
+    _pages().save(page)
+    return jsonify({"status": "ok", "bg_image": url, "bg_fit": fit, "rev": _canvas_rev(page)})
+
+
 @bp.get("/canvases.json")
 def canvases() -> Response:
     """All canvas dashboards (for the editor's canvas switcher)."""

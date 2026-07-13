@@ -8,6 +8,16 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **AI-generated canvas backgrounds (fal.ai).** A canvas dashboard can generate a full-bleed
+  background image from a text prompt; the data widgets composite crisply on top, so the data
+  never passes through the image model (the background is decorative, the numbers stay exact).
+  New `app.fal_backgrounds` service calls fal.ai, stores the result as a local render asset, and
+  sets the canvas' existing `bg_image`. Exposed as `POST /api/mcp/pages/<id>/background` (and
+  `set_canvas_background` in the `tesserae-mcp` bridge) and as a "Generate background" control in
+  the canvas editor's appearance panel. Model + style presets mirror the fal-image widget; the
+  fal key is reused from an installed fal-image widget, else `app.fal.api_key`, else `FAL_KEY`.
+  Generation is on-demand (set-and-forget). Needs a fal.ai key; no key = the feature 400s cleanly.
+
 - **MCP faithful-render screenshots for the catalog (Screenshot Contract).** The
   `GET /api/mcp/widgets/<id>/render.png` faithful render now accepts explicit `w`&`h`
   (clamped) as an alternative to `size` (`lg` stays 1200x800), reuses the same

@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -266,6 +266,29 @@ def build_server() -> Any:
     def set_canvas(page_id: str, canvas: dict[str, Any], base_rev: str = "") -> Any:
         return _json("PUT", f"/pages/{page_id}/canvas{_rev_suffix(base_rev)}", canvas)
 
+    def set_canvas_background(
+        page_id: str,
+        prompt: str,
+        model: str = "",
+        style: str = "",
+        fit: str = "",
+    ) -> Any:
+        """Generate an AI background image (fal.ai) from "prompt" and set it as the
+        canvas' full-bleed background; the data elements composite crisply ON TOP,
+        so the data never passes through the image model. Sized to the canvas'
+        aspect. Optional "model" (default flux/schnell), "style" (e.g. watercolor,
+        bauhaus, risograph), and "fit" (cover|contain|stretch). Needs a fal.ai key
+        (an installed fal-image widget's key, app.fal.api_key, or FAL_KEY). Returns
+        the ack plus the stored "bg_image" URL; 502 if generation fails."""
+        body: dict[str, Any] = {"prompt": prompt}
+        if model:
+            body["model"] = model
+        if style:
+            body["style"] = style
+        if fit:
+            body["fit"] = fit
+        return _json("POST", f"/pages/{page_id}/background", body)
+
     def add_element(page_id: str, element: dict[str, Any], base_rev: str = "") -> Any:
         """Append ONE element to a canvas and save. Each call is a separate save, so
         an editor open on the page updates live as you build. "element" is a single
@@ -361,6 +384,7 @@ def build_server() -> Any:
         create_canvas_page,
         delete_canvas_page,
         get_canvas,
+        set_canvas_background,
         update_element,
         delete_element,
         patch_canvas,
