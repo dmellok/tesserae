@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.4"
+__version__ = "0.5.5"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -69,6 +69,9 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
            Use this for custom layouts/formatting a "data" primitive can't express, or to combine widgets.
            Call probe_widget_data(key, options) per source to see field shapes, then read those paths off
            ctx.data.<name>. Example js: "document.body.textContent = Math.round(ctx.data.weather.current.temp)+'°'".
+           Chart.js is preloaded in the sandbox as window.Chart (animations off), so you can draw charts:
+           put a <canvas id="c"> in "html", then "new Chart(document.getElementById('c'),{type:'line',
+           data:{labels:[...],datasets:[{data: ctx.data.weather.hourly.map(h=>h.temp)}]}})".
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.
@@ -86,6 +89,26 @@ LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
     icon     -- code/string to a Phosphor glyph: {"table":{"<code>":"ph-name"},"default":"ph-name"}
   Several bindings combine (e.g. bind x by position AND colour by threshold). A binding that
   can't resolve its value is skipped, so the element keeps its authored props.
+
+DATA SOURCES (how every data-bearing element pulls from widgets):
+  A "source" is always a WIDGET, referenced by its list_widgets() key plus an "options" object
+  (the same shape get_widget_options(key) returns, e.g. a weather location or an HA entity_id).
+  Tesserae fetches that widget's data server-side at render time; you read fields out of it.
+  Three element kinds consume sources, all the same way:
+    - data     -> ONE source ("source" + "options"), shown as a scalar/chart via "field".
+    - bind     -> ONE source per binding, drives a shape's geometry/colour/icon.
+    - code     -> MANY sources (the "sources" array), each named, injected as ctx.data.<name>.
+  Workflow for any of them:
+    1. Pick the widget key from list_widgets().
+    2. Configure it with get_widget_options(key) -> set "options".
+    3. probe_widget_data(key, options) -> returns "data_source" (live|sample|error), the real
+       "data", and a "fields" list of bindable dot-paths with sample values. Do this BEFORE
+       choosing a "field" / writing code, so you use paths that exist.
+  Combining widgets is ONLY possible with a code element: give it several sources with distinct
+  names and read ctx.data.<nameA>, ctx.data.<nameB>, ... (e.g. weather + transit + calendar in one
+  card). The SAME (key, options) is fetched once and shared across every element that uses it, so
+  reusing a source across elements is free. A source that errors still appears (as ctx.data.<name> =
+  null for code, or the sample/error state for data), so guard for missing data in your code.
 
 FIELD PATHS ("field" on data elements):
   dotted -- "current.temp"

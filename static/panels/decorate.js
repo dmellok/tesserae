@@ -140,6 +140,26 @@
   //     Tesserae's trust boundary, so blocking network is load-bearing.
   // The widget data arrives DELIVERED (injected as window.ctx), never fetched
   // from inside the frame. Runs once at render time (e-ink is static).
+  // Chart.js is made available INSIDE the sandbox by inlining its source (the
+  // frame has no network, so it can't load a URL). Fetched once, synchronously,
+  // from the same-origin vendored path and cached; on a headless compose render
+  // this runs before the page's load event, so charts are drawn by screenshot
+  // time. Returns "" when the lib isn't wired up (feature just degrades).
+  var _chartSrc = null, _chartTried = false;
+  function chartLibSource() {
+    if (_chartTried) return _chartSrc;
+    _chartTried = true;
+    var url = window.__TESSERAE_CHART_URL;
+    if (!url) return null;
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open("GET", url, false); // sync: one-time, same-origin, cached
+      xhr.send();
+      if (xhr.status >= 200 && xhr.status < 300) _chartSrc = xhr.responseText;
+    } catch (e) { _chartSrc = null; }
+    return _chartSrc;
+  }
+
   function renderCode(el, data) {
     var f = document.createElement("iframe");
     f.setAttribute("sandbox", "allow-scripts");
@@ -161,11 +181,19 @@
     };
     // Escape "<" so a "</script>" inside the injected JSON can't close the tag.
     var ctxJson = JSON.stringify(ctx).replace(/</g, "\\u003c");
+    // Chart.js, inlined (no `</script>` in its minified source, safe to embed).
+    // Animations off so the one-shot render captures the finished chart.
+    var chartSrc = chartLibSource();
+    var chartTag = chartSrc
+      ? "<script>" + chartSrc + ";try{Chart.defaults.animation=false;" +
+        "Chart.defaults.plugins.legend.display=false;}catch(e){}</" + "script>"
+      : "";
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'>" +
       "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
       "<style>" + reset + (el.css || "") + "</style></head><body>" +
       (el.html || "") +
+      chartTag +
       "<script>window.ctx=" + ctxJson + ";</" + "script>" +
       "<script>try{" + (el.js || "") + "}catch(e){" +
       "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +

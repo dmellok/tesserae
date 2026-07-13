@@ -727,6 +727,26 @@ def test_editor_includes_code_editor_assets(app: Flask) -> None:
     assert "vendor/codemirror/codemirror.js" in html
     assert 'id="panels-code"' in html
     assert 'id="panels-toggle-left"' in html and 'id="panels-toggle-right"' in html
+    # Chart.js is wired for the code sandbox (URL global set, asset referenced).
+    assert "__TESSERAE_CHART_URL" in html and "vendor/chartjs/chart.umd.min.js" in html
     # Vendored assets are present on disk.
     for f in ("codemirror.js", "codemirror.css", "htmlmixed.js", "javascript.js"):
         assert (REPO_ROOT / "static" / "vendor" / "codemirror" / f).exists()
+    assert (REPO_ROOT / "static" / "vendor" / "chartjs" / "chart.umd.min.js").exists()
+
+
+def test_compose_page_wires_chartjs(app: Flask) -> None:
+    # The compose render page (what Playwright screenshots) also exposes the
+    # Chart.js URL so code elements can inline it into their sandbox.
+    from app.state.page_store import Page
+    from app.state.panel_store import CanvasLayout, Element
+
+    client = app.test_client()
+    _sign_in(client)
+    page = Page(id="cc1", name="c", layout_kind="canvas")
+    page.canvas = CanvasLayout(
+        w=400, h=300, els=[Element(id="e", kind="code", js="x", w=100, h=100)]
+    )
+    app.config["PAGE_STORE"].save(page)
+    html = client.get("/compose/cc1").get_data(as_text=True)
+    assert "__TESSERAE_CHART_URL" in html and "vendor/chartjs/chart.umd.min.js" in html

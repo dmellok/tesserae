@@ -88,6 +88,7 @@
     {% endfor %}
     </div>
   </div>
+  <script>window.__TESSERAE_CHART_URL = "{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}";</script>
   <script src="{{ url_for('static', filename='panels/decorate.js') }}"></script>
   <script>
     // Draw decorations, data primitives (with their fetched data) and custom

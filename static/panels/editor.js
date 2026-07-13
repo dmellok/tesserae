@@ -1735,7 +1735,7 @@
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-brackets-curly"></i>Code'));
     mount.appendChild(el("div", "note",
       "Sandboxed iframe: scripts on, no network. Sources arrive as ctx.data.<name> " +
-      "(plus ctx.options, ctx.w, ctx.h). Runs once at render."));
+      "(plus ctx.options, ctx.w, ctx.h). Chart.js is available as window.Chart. Runs once at render."));
     var edit = el("button", "minibtn", '<i class="ph-bold ph-code"></i> Edit code (HTML / CSS / JS)');
     edit.style.cssText = "width:100%";
     edit.addEventListener("click", function () { openCodeEditor(e.id); });

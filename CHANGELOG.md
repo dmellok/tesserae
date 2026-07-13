@@ -8,6 +8,15 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Chart.js in code elements; MCP data-source guidance.** Chart.js (vendored, self-hosted) is
+  preloaded inside the `code` element's sandbox as `window.Chart` (animations off), so author JS can
+  draw charts from widget data with a `<canvas>` and `new Chart(...)`. It's inlined into the
+  network-blocked opaque-origin sandbox, so the isolation is unchanged; it renders once at compose
+  time (verified end to end through the real render path). The MCP bridge doc-shape (0.5.5) gains a
+  "DATA SOURCES" section spelling out the model (a source is always a widget key + options; `data`
+  and `bind` take one, `code` takes many named ones as `ctx.data.<name>`; probe first; shared fetch
+  is free) and documents the Chart.js availability.
+
 - **Code elements take data from any number of widgets; canvas editor gains collapsible
   sidebars and a CodeMirror popout.** A `code` element now declares a list of named `sources`
   (`{key, options, name}`), each injected as `ctx.data.<name>`, so one element's JS can combine
