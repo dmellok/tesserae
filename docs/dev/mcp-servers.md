@@ -29,10 +29,12 @@ agent runs on a *different* machine from Tesserae, also **Regenerate token** and
 **2. Install the bridge** on the machine where your *agent* runs:
 
 ```bash
-pip install git+https://github.com/dmellok/tesserae-mcp
+pip install tesserae-mcp
 ```
 
-That gives you the `tesserae-mcp` command.
+That gives you the `tesserae-mcp` command. (The bridge lives in the Tesserae repo under
+`packages/tesserae-mcp`; to install straight from source use
+`pip install "git+https://github.com/dmellok/tesserae#subdirectory=packages/tesserae-mcp"`.)
 
 **3. Configure your agent.** Claude Desktop / Claude Code `mcpServers` config:
 

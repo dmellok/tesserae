@@ -74,3 +74,28 @@ jobs:
         # Only the contract modules are checked under --strict per the
         # pyproject overrides; plugin code passes default mypy.
         run: mypy app
+
+  mcp-bridge:
+    name: mcp bridge
+    runs-on: ubuntu-latest
+    # The stdio bridge (packages/tesserae-mcp) is a self-contained sub-project
+    # with its own pyproject + deps. Linting + testing it here keeps its tool
+    # list / doc-shape in lockstep with the /api/mcp surface it wraps.
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install the bridge
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "packages/tesserae-mcp[dev]"
+      - name: ruff
+        working-directory: packages/tesserae-mcp
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: pytest
+        working-directory: packages/tesserae-mcp
+        run: pytest -q

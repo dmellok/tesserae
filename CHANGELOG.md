@@ -6,7 +6,18 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The `tesserae-mcp` bridge now lives in this repo** (`packages/tesserae-mcp`) as a
+  self-contained sub-project with its own `pyproject`, so its tool list / doc-shape stay
+  in lockstep with the `/api/mcp` surface it wraps and are tested in the same CI run. It
+  still ships a thin, stdlib-plus-`mcp` wheel published to PyPI as `tesserae-mcp`, so an
+  agent-machine install stays light. Install becomes `pip install tesserae-mcp`.
+
 ### Docs
+
+- MCP client-config snippets for Codex CLI, Cursor, Windsurf, Cline, VS Code, and the
+  OpenAI Agents SDK, alongside the existing Claude config.
 
 - Two new docs-site pages: **Build widgets with Studio** (the Tesserae Studio authoring
   loop, linter rules, and the new-widget restart gate) and **MCP servers: install & use**
