@@ -880,6 +880,37 @@ def _build_canvas_els(els: list[Any], cw: int, ch: int) -> list[dict[str, Any]]:
             )
             _apply_binds(e, els_out[-1])
             continue
+        if e.kind == "code":
+            # Author HTML/CSS/JS fed by a widget's data primitive. Resolve the
+            # source's data server-side (same shared fetch as data elements), so
+            # the client renderer injects it as ctx.data into a scripts-enabled
+            # but origin-less, network-blocked sandbox. The data is delivered,
+            # never fetched from inside the frame.
+            cdata: Any = None
+            csrc = "none"
+            if e.source:
+                _, cdata, csrc = _resolve_source(e.source, e.options, e.w, e.h)
+            els_out.append(
+                {
+                    "id": e.id,
+                    "kind": "code",
+                    "source": e.source,
+                    "options": e.options,
+                    "field": e.field,
+                    "html": e.html,
+                    "css": e.css,
+                    "js": e.js,
+                    "opacity": e.opacity,
+                    "rotate": e.rotate,
+                    "x": e.x,
+                    "y": e.y,
+                    "w": e.w,
+                    "h": e.h,
+                    "data": cdata,
+                    "data_source": csrc,
+                }
+            )
+            continue
         if e.kind and e.kind != "widget":
             els_out.append(
                 {

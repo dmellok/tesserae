@@ -36,6 +36,7 @@
     { kind: "icon", label: "Icon", icon: "ph-star", w: 72, h: 72 },
     { kind: "data", label: "Data value", icon: "ph-chart-line", w: 160, h: 80 },
     { kind: "html", label: "Custom HTML", icon: "ph-code", w: 200, h: 120 },
+    { kind: "code", label: "Code (data)", icon: "ph-brackets-curly", w: 220, h: 140 },
     { kind: "svg", label: "SVG", icon: "ph-bezier-curve", w: 120, h: 120 },
   ];
   // Base colour palette: Spectra semantic tokens (follow the theme) offered
@@ -117,6 +118,8 @@
       case "icon": return "Icon: " + (e.icon || "star");
       case "html": return "Custom HTML";
       case "svg": return "SVG";
+      case "code":
+        return "Code" + (e.source ? " · " + e.source : "");
       case "data":
         return e.source ? (e.source + (e.field ? " · " + e.field : "")) : "Data value";
     }
@@ -201,11 +204,17 @@
       text: kind === "text" ? "Text" : "", align: "left", size: 0, opacity: 100,
       // data primitive
       source: "", field: "", display: "text", unit: "", precision: 0, label: "",
-      // custom html / svg
+      // custom html / svg / code
       html: kind === "html" ? '<div class="mini">Edit me</div>'
         : kind === "svg" ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1B1A16"/></svg>'
+        : kind === "code" ? '<div id="out">…</div>'
         : "",
-      css: kind === "html" ? ".mini{font:700 18px sans-serif;color:#1B1A16}" : "",
+      css: kind === "html" ? ".mini{font:700 18px sans-serif;color:#1B1A16}"
+        : kind === "code" ? "#out{font:700 42px system-ui;color:#1B1A16}" : "",
+      js: kind === "code"
+        ? "// ctx.data is your source widget's data. Bind a source, then use it:\n"
+          + "document.getElementById('out').textContent = ctx.data ? JSON.stringify(ctx.data).slice(0,40) : 'bind a source';"
+        : "",
       format: "",
       x: x, y: y, w: w, h: h, dither: true, visible: true, locked: false, group: null,
     };
@@ -216,9 +225,9 @@
     return e.widget + "|" + (e.fragment || "full") + "|" + e.w + "x" + e.h + "|" +
       JSON.stringify(e.options || {});
   }
-  // The widget a data value comes from: its own source for a data primitive,
-  // else the element's widget.
-  function sourceOf(e) { return e.kind === "data" ? e.source : e.widget; }
+  // The widget a data value comes from: its own source for a data primitive or
+  // code element, else the element's widget.
+  function sourceOf(e) { return (e.kind === "data" || e.kind === "code") ? e.source : e.widget; }
   // Live data is fetched per (source, options); fragment/size don't change it.
   function dataKey(e) { return sourceOf(e) + "|" + JSON.stringify(e.options || {}); }
   function dataFor(e) {
@@ -273,7 +282,8 @@
           var hit = false;
           S.doc.els.forEach(function (e) {
             if (!sourceOf(e) || dataKey(e) !== k) return;
-            if (e.kind === "data") { hit = true; return; } // data primitives repaint from S.data
+            // data primitives + code elements repaint from S.data.
+            if (e.kind === "data" || e.kind === "code") { hit = true; return; }
             if (S.mount[e.id]) { delete S.mount[e.id]; hit = true; }
           });
           if (hit) paint();
@@ -430,7 +440,7 @@
       // pointer-transparent so clicks hit the element wrapper. Data primitives
       // get the live source data so the field resolves.
       var deco = window.PanelsDecorate
-        ? PanelsDecorate.render(e, e.kind === "data" ? dataFor(e) : null)
+        ? PanelsDecorate.render(e, (e.kind === "data" || e.kind === "code") ? dataFor(e) : null)
         : el("div");
       deco.style.pointerEvents = "none";
       node.appendChild(deco);
@@ -1638,9 +1648,61 @@
     propRowBtns(mount, e);
   }
 
+  function renderCodeProps(mount, e) {
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-database"></i>Data source'));
+    var srow = el("div", "prow"); srow.innerHTML = '<span class="plab">Widget</span>';
+    var ssel = el("select", "psel");
+    ssel.innerHTML = '<option value="">None…</option>' + (S.catalog || []).map(function (w) {
+      return '<option value="' + esc(w.key) + '">' + esc(w.name || w.key) + "</option>";
+    }).join("");
+    ssel.value = e.source || "";
+    ssel.addEventListener("change", function () {
+      pushHistory(); e.source = ssel.value; e.options = {};
+      scheduleSave(); paint(); renderProps();
+    });
+    srow.appendChild(ssel); mount.appendChild(srow);
+
+    if (e.source) {
+      var crow = el("div", "prow"); crow.innerHTML = '<span class="plab">Options</span>';
+      var cbtn = el("button", "minibtn", '<i class="ph-bold ph-sliders-horizontal"></i> Configure');
+      cbtn.addEventListener("click", function () { openConfig(e.id); });
+      crow.appendChild(cbtn); mount.appendChild(crow);
+
+      var paths = leafPaths(dataFor(e), "", [], 0);
+      if (paths.length) {
+        mount.appendChild(el("div", "note", "Available in ctx.data:"));
+        var pre = el("pre");
+        pre.textContent = paths.slice(0, 24).map(function (p) { return "ctx.data." + p.path; }).join("\n");
+        pre.style.cssText = "max-height:120px;overflow:auto;font:11px/1.4 var(--t-font-mono);" +
+          "background:var(--t-surface-soft);padding:6px;border-radius:6px;margin:0 0 6px;white-space:pre";
+        mount.appendChild(pre);
+      }
+    }
+
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-brackets-curly"></i>Code'));
+    mount.appendChild(el("div", "note",
+      "Sandboxed iframe: scripts on, no network. Widget data is injected as ctx.data " +
+      "(plus ctx.options, ctx.w, ctx.h). Runs once at render."));
+    [["HTML", "html", 5], ["CSS", "css", 4], ["JavaScript", "js", 8]].forEach(function (f) {
+      var row = el("div", "prow"); row.style.display = "block";
+      row.innerHTML = '<span class="plab" style="display:block;margin-bottom:4px">' + f[0] + "</span>";
+      var ta = el("textarea", "dinput");
+      ta.rows = f[2]; ta.value = e[f[1]] || "";
+      ta.style.cssText = "width:100%;font-family:var(--t-font-mono);font-size:12px;resize:vertical";
+      ta.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+      ta.addEventListener("change", function () { pushHistory(); e[f[1]] = ta.value; scheduleSave(); paint(); });
+      row.appendChild(ta); mount.appendChild(row);
+    });
+    arrangeGeom(mount, e);
+    mount.appendChild(el("div", "psec", '<i class="ph-bold ph-frame-corners"></i>Align to canvas'));
+    mount.appendChild(alignButtons("canvas"));
+    propRowBtns(mount, e);
+  }
+
   function renderDecoProps(mount, e) {
     mount.textContent = "";
     if (e.kind === "html" || e.kind === "svg") { renderHtmlProps(mount, e); return; }
+    if (e.kind === "code") { renderCodeProps(mount, e); return; }
     if (e.kind === "data") { renderDataProps(mount, e); return; }
     var name = { text: "Text", rect: "Rectangle", ellipse: "Circle", line: "Line", icon: "Icon" }[e.kind] || "Shape";
     mount.appendChild(el("div", "psec", '<i class="ph-bold ph-shapes"></i>' + name));

@@ -48,6 +48,7 @@
 
     if (kind === "html") return renderHtml(el, false);
     if (kind === "svg") return renderHtml(el, true);
+    if (kind === "code") return renderCode(el, data);
     if (kind === "data") return renderData(el, data, color);
 
     if (kind === "icon") {
@@ -125,6 +126,51 @@
     f.srcdoc =
       "<!doctype html><html><head><meta charset='utf-8'><style>" +
       reset + (el.css || "") + "</style></head><body>" + (el.html || "") + "</body></html>";
+    return f;
+  }
+
+  // kind "code": author HTML/CSS/JS fed by a widget's live data. Unlike the
+  // static "html" kind, this ENABLES scripts, so the isolation must be exact:
+  //   sandbox="allow-scripts" WITHOUT allow-same-origin -> the frame is a unique
+  //     opaque origin, so it can't read the parent, cookies, storage, or reach
+  //     any same-origin (loopback) Tesserae endpoint with credentials.
+  //   CSP default-src 'none' -> no network at all (fetch/XHR/img/font blocked),
+  //     only inline <script>/<style> and data: images. The render runs in
+  //     headless Chromium navigating a loopback compose URL, i.e. inside
+  //     Tesserae's trust boundary, so blocking network is load-bearing.
+  // The widget data arrives DELIVERED (injected as window.ctx), never fetched
+  // from inside the frame. Runs once at render time (e-ink is static).
+  function renderCode(el, data) {
+    var f = document.createElement("iframe");
+    f.setAttribute("sandbox", "allow-scripts");
+    f.setAttribute("scrolling", "no");
+    f.style.cssText =
+      "width:100%;height:100%;border:0;background:transparent;display:block;pointer-events:none";
+    var csp =
+      "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:";
+    var reset =
+      "*{box-sizing:border-box}html,body{margin:0;padding:0;width:100%;height:100%;" +
+      "overflow:hidden;font-family:var(--font-family,-apple-system,'Segoe UI',Roboto,sans-serif);" +
+      "color:#1B1A16}";
+    var ctx = {
+      data: data != null ? data : (el.data != null ? el.data : null),
+      options: el.options || {},
+      field: el.field || "",
+      w: px(el.w, 0),
+      h: px(el.h, 0),
+    };
+    // Escape "<" so a "</script>" inside the injected JSON can't close the tag.
+    var ctxJson = JSON.stringify(ctx).replace(/</g, "\\u003c");
+    f.srcdoc =
+      "<!doctype html><html><head><meta charset='utf-8'>" +
+      "<meta http-equiv='Content-Security-Policy' content=\"" + csp + "\">" +
+      "<style>" + reset + (el.css || "") + "</style></head><body>" +
+      (el.html || "") +
+      "<script>window.ctx=" + ctxJson + ";</" + "script>" +
+      "<script>try{" + (el.js || "") + "}catch(e){" +
+      "document.body.innerHTML='<pre style=\"color:#900;font:12px monospace;white-space:pre-wrap\">'" +
+      "+String(e&&e.message||e)+'</pre>';}</" + "script>" +
+      "</body></html>";
     return f;
   }
 

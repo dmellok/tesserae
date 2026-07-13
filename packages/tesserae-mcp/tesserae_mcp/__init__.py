@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 _BASE = os.environ.get("TESSERAE_URL", "http://127.0.0.1:8765").rstrip("/")
 _TOKEN = os.environ.get("TESSERAE_MCP_TOKEN", "").strip()
@@ -58,6 +58,14 @@ plus optional "opacity" (0-100) and "rotate" (degrees). By "kind":
 - html:    {"kind":"html","html":"<div>…</div>","css":"div{…}"}
            A mini widget from static HTML + CSS in a sandboxed iframe (no scripts, no network).
 - svg:     {"kind":"svg","html":"<svg …>…</svg>","css":""}   -- raw SVG, scaled to fill the box.
+- code:    {"kind":"code","source":"<widget key>","options":{...},"html":"…","css":"…","js":"…"}
+           HTML + CSS + JS fed by a widget's live data: the widget's fetched data is injected into a
+           sandboxed iframe as the JS global ctx.data (plus ctx.options, ctx.w, ctx.h). Your "js"
+           builds the DOM from ctx.data. The frame runs scripts but has NO network and NO same-origin
+           access (data is delivered, never fetched), and renders ONCE (e-ink is static -- no interactivity
+           or animation). Use this for custom layouts/formatting a "data" primitive can't express. Call
+           probe_widget_data(source, options) first to see the field shape, then read those paths off
+           ctx.data. Example js: "document.body.textContent = Math.round(ctx.data.current.temp)+'°'".
 
 LIVE BINDINGS ("bind" on ANY element -- makes a SHAPE reflect data):
   Data elements auto-update, but shapes (rect/ellipse/icon/line/text) are static geometry.

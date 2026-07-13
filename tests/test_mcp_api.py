@@ -450,6 +450,69 @@ def test_generate_background_unknown_page_404(app: Flask) -> None:
     assert r.status_code == 404
 
 
+# -- code elements (HTML/CSS/JS fed by a widget's data) ------------------
+
+
+def test_code_element_roundtrips_via_mcp(app: Flask) -> None:
+    # An agent authors a code element through the existing element endpoint
+    # (kind is a free string; source/html/css/js already on the model), and it
+    # validates + persists.
+    _enable(app)
+    client = app.test_client()
+    pid = _create_page(client)
+    code_el = {
+        "kind": "code",
+        "source": "weather_now",
+        "options": {"location": "Melbourne"},
+        "html": "<div id='o'></div>",
+        "css": "#o{color:red}",
+        "js": "document.getElementById('o').textContent = ctx.data ? 'ok' : 'none';",
+        "x": 0,
+        "y": 0,
+        "w": 200,
+        "h": 100,
+    }
+    r = client.post(f"/api/mcp/pages/{pid}/elements", json=code_el)
+    assert r.status_code == 200, r.get_data(as_text=True)
+    doc = client.get(f"/api/mcp/pages/{pid}/canvas").get_json()
+    e = doc["els"][0]
+    assert e["kind"] == "code" and e["source"] == "weather_now"
+    assert e["js"].startswith("document.getElementById") and e["css"] == "#o{color:red}"
+
+
+def test_code_element_build_resolves_source_data(app: Flask) -> None:
+    # The composer resolves a code element's source widget data (sample fallback
+    # when offline) and hands it through, so the client injects it as ctx.data.
+    from app.composer import _build_canvas_els
+    from app.state.panel_store import Element
+
+    _enable(app)
+    with app.app_context():
+        els = _build_canvas_els(
+            [
+                Element(
+                    id="c1",
+                    kind="code",
+                    source="weather_now",
+                    html="<div></div>",
+                    js="x",
+                    x=0,
+                    y=0,
+                    w=200,
+                    h=100,
+                )
+            ],
+            800,
+            480,
+        )
+    assert len(els) == 1
+    out = els[0]
+    assert out["kind"] == "code" and out["js"] == "x" and out["source"] == "weather_now"
+    # Source resolved to real or sample data (offline in tests → sample).
+    assert out["data_source"] in ("live", "sample", "error")
+    assert "data" in out
+
+
 def test_push_requires_device_ids(app: Flask) -> None:
     _enable(app)
     client = app.test_client()

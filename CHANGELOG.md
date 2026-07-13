@@ -8,6 +8,17 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ### Added
 
+- **Canvas `code` element: HTML/CSS/JS fed by widget data.** A new canvas element kind runs
+  author HTML + CSS + JavaScript, fed by a widget's live data primitive: the source widget's
+  fetched data is injected as the JS global `ctx.data` (plus `ctx.options`/`ctx.w`/`ctx.h`) and the
+  JS builds the DOM from it. It renders in a sandboxed iframe with scripts enabled but an opaque
+  origin and CSP `default-src 'none'` — no network, no same-origin access — so the data is delivered
+  (never fetched from inside the frame) and the loopback render context stays sealed. Runs once at
+  render (e-ink is static). Authored in the canvas editor (source picker + HTML/CSS/JS panes with a
+  `ctx.data` field hint) and drivable from MCP with no new endpoint: `kind` is a free field, so
+  `add_element` / `set_canvas` carry it, and `probe_widget_data` surfaces the field shape first.
+  Bridge doc-shape documents the kind (bumped to 0.5.3).
+
 - **AI-generated canvas backgrounds (fal.ai).** A canvas dashboard can generate a full-bleed
   background image from a text prompt; the data widgets composite crisply on top, so the data
   never passes through the image model (the background is decorative, the numbers stay exact).

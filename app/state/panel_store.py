@@ -75,7 +75,7 @@ class Element(BaseModel):
     id: str
     # What this element is: a placed widget, a decoration shape, a data-bound
     # primitive, or a custom-HTML block.
-    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg
+    kind: str = "widget"  # widget | rect | ellipse | line | icon | text | data | html | svg | code
     # Plugin id whose render() paints this element. Empty = an unassigned box
     # (placed but not yet pointed at a widget).
     widget: str = ""
@@ -121,8 +121,20 @@ class Element(BaseModel):
     # or user-authored markup that renders in a sandboxed iframe (no scripts, no
     # network). ``html`` holds the markup (the raw <svg> for kind "svg"); ``css``
     # is injected into the iframe's <style>.
+    #
+    # kind == "code" reuses ``html`` + ``css`` and adds ``js`` for author
+    # JavaScript, fed by ``source`` / ``options`` (a widget's live data): the
+    # resolved data is injected as ``ctx.data`` into a scripts-enabled but
+    # origin-less, network-blocked sandbox (see ``renderCode`` in decorate.js),
+    # so the JS builds the DOM from real widget data without the data ever
+    # passing through the network from inside the frame. Runs once at render
+    # (e-ink is static), same lifecycle as a widget.
     html: str = ""
     css: str = ""
+    # Author JavaScript for kind == "code". Runs inside the sandboxed iframe with
+    # the widget data available as ``ctx.data`` (and ``ctx.options`` / ``ctx.w`` /
+    # ``ctx.h``). Empty for every other kind.
+    js: str = ""
     # Element opacity 0-100 (applies to widgets and decorations alike).
     opacity: int = Field(default=100, ge=0, le=100)
     # Rotation in degrees, applied to the whole element around its centre.
