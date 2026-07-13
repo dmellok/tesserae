@@ -331,6 +331,7 @@ def _parallel_fetch_plugin_data(
     preview: bool,
     *,
     sample: bool = False,
+    fresh: bool = False,
     target_device_id: str = "",
     page_name: str = "",
     page_icon: str = "",
@@ -391,6 +392,7 @@ def _parallel_fetch_plugin_data(
                 preview,
                 cell_w=cell_w,
                 cell_h=cell_h,
+                fresh=fresh,
                 target_device_id=target_device_id,
                 page_name=page_name,
                 page_icon=page_icon,
@@ -470,7 +472,9 @@ def _parallel_fetch_plugin_data(
         if idx not in synthesised_errors:
             _LAST_GOOD_DATA[key] = result
             continue
-        fallback = _LAST_GOOD_DATA.get(key)
+        # ``fresh`` surfaces the real (fresh) result instead of masking a broken
+        # reload with a stale last-good render.
+        fallback = None if fresh else _LAST_GOOD_DATA.get(key)
         if fallback is not None:
             logger.info("widget hydration fallback to last-good for cell #%d (%s)", idx, plugin_id)
             results[idx] = fallback
@@ -487,6 +491,7 @@ def _fetch_plugin_data(
     *,
     cell_w: int = 0,
     cell_h: int = 0,
+    fresh: bool = False,
     target_device_id: str = "",
     page_name: str = "",
     page_icon: str = "",
@@ -555,6 +560,12 @@ def _fetch_plugin_data(
         "home_lat": home_lat,
         "home_lon": home_lon,
     }
+    # ``fresh`` (from ?fresh=1 on the probe / render) tells a widget to bypass
+    # its own data_dir cache, so an edit to server.py is instantly verifiable.
+    # Widgets opt in by checking ctx.get("fresh"); the field is absent otherwise
+    # so non-fresh renders are byte-identical to before.
+    if fresh:
+        ctx["fresh"] = True
     # v0.71.x: per-device rendering. When the push pipeline is fanning
     # this render out to a specific device (multiple bound to the same
     # panel), the compose URL carries ``?device_id=<id>``. Widgets that
@@ -599,7 +610,7 @@ def _fetch_plugin_data(
 
 
 def _hydrate_page(
-    page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False
+    page_dict: dict[str, Any], *, preview: bool = False, sample: bool = False, fresh: bool = False
 ) -> dict[str, Any]:
     """Resolve options, fonts, server-side data, and visual layout."""
     registry = _registry()
@@ -719,6 +730,7 @@ def _hydrate_page(
         panel_h,
         preview,
         sample=sample,
+        fresh=fresh,
         target_device_id=str(page_dict.get("target_device_id") or ""),
         page_name=str(page_dict.get("name") or ""),
         page_icon=str(page_dict.get("icon") or ""),
@@ -1065,6 +1077,22 @@ def test_render() -> str:
     # the three movement styles bauhaus / destijl / brutalist).
     style_id = request.args.get("style") or "standard"
 
+    # ?fragment=<id> renders a single declared fragment of the widget
+    # (``ctx.cell.fragment``); defaults to "full". Validated against the
+    # widget's declared fragments so an unknown id 400s rather than silently
+    # rendering the whole card.
+    fragment = request.args.get("fragment") or "full"
+    plugin = _registry().get(plugin_id)
+    if fragment != "full" and plugin is not None:
+        from app.panels_schema import fragments_of
+
+        if fragment not in {f["id"] for f in fragments_of(plugin)}:
+            abort(400)
+    # ?fresh=1 bypasses caches so a just-edited server.py is reflected
+    # immediately: it sets ``ctx["fresh"]`` (widgets opt in to skip their own
+    # data_dir cache) and skips the render path's last-good fallback. Default off.
+    fresh = request.args.get("fresh") in ("1", "true", "True")
+
     # Per-widget content zoom from the gallery's zoom picker. Same
     # 0.5–3.0 clamp the Cell model enforces; out-of-range or unparseable
     # values silently fall back to 1.0.
@@ -1104,6 +1132,7 @@ def test_render() -> str:
                 "w": cell_w,
                 "h": cell_h,
                 "plugin": plugin_id,
+                "fragment": fragment,
                 "options": cell_options,
                 "zoom": zoom_val,
             }
@@ -1111,7 +1140,7 @@ def test_render() -> str:
     }
     return render_template(
         "compose.html",
-        page=_hydrate_page(page, preview=True, sample=sample_mode),
+        page=_hydrate_page(page, preview=True, sample=sample_mode, fresh=fresh),
         for_push=False,
         preview_mode=False,
     )

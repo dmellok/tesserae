@@ -26,6 +26,7 @@ def test_tools_register() -> None:
         "list_devices",
         "list_pages",
         "create_canvas_page",
+        "delete_canvas_page",
         "get_canvas",
         "set_canvas",
         "add_element",

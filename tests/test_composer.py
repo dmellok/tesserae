@@ -30,6 +30,19 @@ def test_test_render_rejects_bad_size(client: FlaskClient) -> None:
     assert resp.status_code == 400
 
 
+def test_test_render_honours_fragment(client: FlaskClient) -> None:
+    """?fragment=<id> renders a single declared fragment (data-fragment flows to
+    the widget's ctx.cell.fragment); an unknown fragment 400s."""
+    resp = client.get("/_test/render?plugin=weather_now&size=md&fragment=temp")
+    assert resp.status_code == 200
+    assert 'data-fragment="temp"' in resp.get_data(as_text=True)
+    # Default (no fragment) renders the whole widget.
+    full = client.get("/_test/render?plugin=weather_now&size=md")
+    assert 'data-fragment="full"' in full.get_data(as_text=True)
+    # Unknown fragment id is rejected.
+    assert client.get("/_test/render?plugin=weather_now&size=md&fragment=nope").status_code == 400
+
+
 def test_compose_route_404s_on_unknown_page(client: FlaskClient) -> None:
     resp = client.get("/compose/nonexistent")
     assert resp.status_code == 404

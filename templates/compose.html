@@ -129,6 +129,7 @@
          data-cell-id="{{ cell.id }}"
          data-cell-index="{{ loop.index }}"
          data-plugin="{{ cell.plugin }}"
+         data-fragment="{{ cell.fragment | default('full', true) }}"
          data-options='{{ cell.options|tojson }}'
          data-data='{{ cell.data|tojson }}'
          data-cell-w="{{ cell.w }}"

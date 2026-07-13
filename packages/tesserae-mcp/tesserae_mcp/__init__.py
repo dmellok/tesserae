@@ -246,6 +246,11 @@ def build_server() -> Any:
         to lay it out. Size it to your target panel (see list_devices)."""
         return _json("POST", "/pages", {"name": name, "w": w, "h": h})
 
+    def delete_canvas_page(page_id: str) -> Any:
+        """Delete a canvas dashboard by id (e.g. a throwaway QA page). Returns
+        {ok: true} on success, or 404 if it isn't a canvas page."""
+        return _json("DELETE", f"/pages/{page_id}")
+
     def get_canvas(page_id: str) -> Any:
         """Get the full canvas document (size, appearance, and every element) for a
         page, plus "rev" / "updated_at" / "updated_by". Keep the "rev" and pass it as
@@ -351,6 +356,7 @@ def build_server() -> Any:
         list_devices,
         list_pages,
         create_canvas_page,
+        delete_canvas_page,
         get_canvas,
         update_element,
         delete_element,

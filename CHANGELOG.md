@@ -6,6 +6,19 @@ All notable changes to Tesserae are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added
+
+- **MCP: less friction authoring widgets via Studio.** Three additions to the
+  `/api/mcp` surface: `GET /widgets/<id>/render.png` takes a `fragment` param so an
+  agent can faithfully render a single declared fragment (not just the whole card),
+  400ing an unknown fragment id; `render.png` and `POST /widgets/<id>/data` take
+  `fresh=true` to bypass caches (surfaced to widgets as `ctx["fresh"]`, and it skips
+  the render path's last-good fallback) so a just-edited `server.py` is instantly
+  verifiable; and `DELETE /api/mcp/pages/<id>` removes a canvas dashboard (throwaway QA
+  pages), exposed in the `tesserae-mcp` bridge as `delete_canvas_page`. The reload acks
+  now carry `reloaded` (and a re-imported module count) so an agent can tell a real
+  in-process reload from a no-op. All additive; no `fragment`/`fresh` = today's behaviour.
+
 ### Changed
 
 - **The `tesserae-mcp` bridge now lives in this repo** (`packages/tesserae-mcp`) as a
